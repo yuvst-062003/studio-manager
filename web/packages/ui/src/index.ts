@@ -8,3 +8,12 @@ export type { ResolvedTheme, ThemePreference } from './theme'
 export type { AppManifest, ManifestIcon } from './manifest'
 export { registerSlot, useSlot, clearSlot } from './slots'
 export type { SlotEntry, SlotId } from './slots'
+
+export {
+  AA_TEXT,
+  NON_TEXT,
+  contrastRatio,
+  meetsAA,
+  meetsNonText,
+  relativeLuminance,
+} from './contrast'
