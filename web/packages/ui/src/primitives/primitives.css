@@ -504,3 +504,72 @@
   line-height: var(--leading-normal);
   margin: 0;
 }
+
+.studio-progress {
+  align-items: center;
+  display: flex;
+  gap: var(--space-3);
+}
+
+.studio-progress__track {
+  background: color-mix(in srgb, var(--fg) 8%, transparent);
+  block-size: 8px;
+  border-radius: 5px;
+  flex: 1;
+  overflow: hidden;
+}
+
+.studio-progress__fill {
+  background: var(--fg);
+  block-size: 100%;
+  display: block;
+  transition: inline-size var(--motion-base) var(--ease-standard);
+}
+
+.studio-progress__readout {
+  color: var(--fg);
+  font-size: var(--text-label);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--weight-medium);
+}
+
+.studio-toast {
+  align-items: center;
+  background: var(--fg);
+  border-radius: var(--radius-lg);
+  color: var(--on-fg);
+  display: flex;
+  gap: var(--space-2);
+  padding-block: var(--space-3);
+  padding-inline: 14px;
+}
+
+.studio-toast__icon {
+  block-size: 20px;
+  flex: none;
+  inline-size: 20px;
+}
+
+.studio-toast__message {
+  font-size: var(--text-body);
+}
+
+/* margin-inline-start: auto is the logical form of what 4h would write as
+ * margin-left: auto — it pushes the action to the trailing edge in both directions. */
+.studio-toast__action {
+  background: none;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--text-label);
+  font-weight: var(--weight-medium);
+  margin-inline-start: auto;
+  padding: 0;
+  text-decoration: underline;
+}
+
+.studio-toast__action:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
