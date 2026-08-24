@@ -9,5 +9,8 @@
     ".": "./src/index.ts",
     "./theme": "./src/theme.ts",
     "./manifest": "./src/manifest.ts"
+  },
+  "dependencies": {
+    "@fontsource-variable/rubik": "^5.2.8"
   }
 }

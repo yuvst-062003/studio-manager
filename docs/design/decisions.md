@@ -230,6 +230,45 @@ cheap before `web/src/` exists and annoying to retrofit afterwards.
 **Corollary:** treat the exported canvas CSS as a **visual reference only**. Never
 copy-paste it into components.
 
+## D12 — Four token values the canvas audit never measured
+
+**Decided:** 2026-08-24 · from M0.3's computed token audit
+
+[canvas-review.md](canvas-review.md) measured light-mode text against the **ground**
+`#f7f5f1` and dark-mode text against the dark **ground** `#141311`. It never measured
+anything against the card **surface** (`#fffefb` / `#1e1d1a`), never measured a chip's
+text against its own tinted fill, and never measured belt fills against the dark ground
+at all. Four values seeded in M0.1 fail once those pairings are computed:
+
+| Token | Was | Measured | Needs | Now |
+|---|---|--:|--:|---|
+| `--border-strong` light | `#e5e0d5` | 1.21 on ground | 3.0 | `#8d8674` |
+| `--border-strong` dark | `#4a4842` | 1.84 on surface | 3.0 | `#726e65` |
+| `--accent` / `--paid` dark | `#3f8f52` | 4.22 on surface | 4.5 | `#4a9b5e` |
+| `--cancelled` dark | `#8f8b82` | 4.34 on its tint | 4.5 | `#a8a49a` |
+
+`--border-strong` had also been seeded one hex unit from `--border`, i.e. no distinction
+at all. It now has a job: **`--border` is the decorative hairline and carries no contrast
+obligation; `--border-strong` is the boundary of an interactive control and must reach
+3:1** (SC 1.4.11) — a ghost button's outline is the only thing identifying it as a
+control. The dark accent change also removes a collision: `#3f8f52` is artboard `4h`'s
+**green belt**, and D3 requires belt colours stay distinct from semantics.
+
+**D7 is stronger than it reads.** The audit found three failing belt fills, all on the
+light ground. Against the dark ground, brown (2.38) and green (2.86) fail as well — five
+belts across the two modes are invisible or sub-threshold as fills, not three. Nobody
+should read D7 as a three-case patch and add a fill-only variant "just for dark".
+
+**One correction to the canvas, not a re-litigation.** Artboard `4h` draws the `בוטל`
+status chip in `#7a766d`, the only retired grey anywhere on that artboard. D8 postdates
+the artboard and G11 is a global constraint, so `--cancelled` supersedes it.
+
+**Consequence:** ratios are no longer written in comments anywhere in the token layer.
+`web/packages/ui/src/tokens.roles.ts` records each token's tier and contrast obligation,
+and `tokens.audit.test.ts` recomputes every ratio from the live values on every run — so
+a new too-light value is caught as well as the ones D8 happened to name. A token with no
+role fails the build, and a role with no token fails the build.
+
 ---
 
 ## Canvas
@@ -266,7 +305,9 @@ component layer.
 
 | Decision | Recorded | Applied |
 |---|:--:|:--:|
-| D1–D8, D10 | yes | n/a — they govern code not yet written |
+| D1–D8, D10 | yes | **yes — the token layer, primitives and lint rules landed in M0.3 (2026-08-24)** |
+| D11 health template | yes | n/a — M4 |
+| D12 four corrected token values | yes | **yes — `web/packages/ui/src/tokens.css`, asserted by `tokens.audit.test.ts`** |
 | D9.1 cut in-app chat from `2b` | yes | **yes — edited + owner-approved 2026-08-24** |
 | D9.2 cut weight column from `7c` | yes | **yes — edited + owner-approved 2026-08-24** |
 | D9.3 retitle `12f` to תשלומים | yes | **yes — edited + owner-approved 2026-08-24** |

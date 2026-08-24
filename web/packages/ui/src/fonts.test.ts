@@ -61,6 +61,25 @@ describe('D6/G14 — one family, one loading strategy', () => {
     }
   })
 
+
+  it('declares the font package as a real dependency, not an accident of node_modules', () => {
+    // Found the hard way in M0.3: @fontsource-variable/rubik was in the lockfile but in
+    // NO package.json, so `npm install` for any unrelated reason pruned it as
+    // extraneous. The build then emitted `url(@fontsource-variable/rubik/...)`
+    // UNRESOLVED — a 404 in production, tofu on every screen, and nothing in the
+    // precache manifest. G14 and §6.1 both depend on this package being present.
+    const pkg = JSON.parse(
+      readFileSync(resolve(process.cwd(), 'packages/ui/package.json'), 'utf-8'),
+    ) as { dependencies?: Record<string, string> }
+    expect(pkg.dependencies).toHaveProperty('@fontsource-variable/rubik')
+  })
+
+  it('resolves every @font-face src through that package', () => {
+    for (const face of faces) {
+      expect(declared(face, 'src')).toContain('@fontsource-variable/rubik')
+    }
+  })
+
   it('uses font-display: swap on every face, so text is never invisible while loading', () => {
     expect(faces.length).toBeGreaterThan(0)
     for (const face of faces) expect(declared(face, 'font-display')).toBe('swap')

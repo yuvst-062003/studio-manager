@@ -10,6 +10,8 @@ export type { AppManifest, ManifestIcon } from './manifest'
 export { registerSlot, useSlot, clearSlot } from './slots'
 export type { SlotEntry, SlotId } from './slots'
 
+// The token layer. `contrast` is exported because M10's a11y sweep and v2's brand picker
+// both need it, and a second implementation would be a second set of numbers.
 export {
   AA_TEXT,
   NON_TEXT,
@@ -18,11 +20,13 @@ export {
   meetsNonText,
   relativeLuminance,
 } from './contrast'
-
 export { GROUND_TOKENS, TIERS, TOKEN_ROLES } from './tokens.roles'
 export type { GroundToken, Obligation, Tier, TokenRole } from './tokens.roles'
 export { BRAND_TOKENS, applyBrand, brandOverridesFor } from './brand'
 
+// Primitives, ported from dashboard artboard 4h (ספריית רכיבים).
+// `./testing` is deliberately NOT exported: it pulls in @testing-library/react, which
+// must never reach an app bundle.
 export { Alert } from './primitives/Alert'
 export type { AlertTone } from './primitives/Alert'
 export { AttendanceMark } from './primitives/AttendanceMark'
@@ -38,6 +42,7 @@ export { Radio } from './primitives/Radio'
 export { SegmentedControl } from './primitives/SegmentedControl'
 export { StatusChip } from './primitives/StatusChip'
 export type { ChipStatus } from './primitives/StatusChip'
+export { StudentRow } from './primitives/StudentRow'
 export { Switch } from './primitives/Switch'
 export { TextField } from './primitives/TextField'
 export { ThemeControl } from './primitives/ThemeControl'
