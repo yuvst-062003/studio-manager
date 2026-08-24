@@ -79,15 +79,27 @@ def test_every_cross_studio_call_site_is_accounted_for():
     CROSS_STUDIO_CALLERS with a reason. Source-level by necessity -- 'this query
     excluded the demo studio' is not observable without executing every report against
     a seeded database, and a gate that needs M9's data to run is a gate M9 turns off.
+
+    The mitigation check requires a *call* (`exclude_demo_studios(`), not a substring
+    match on the name -- a file that only mentions the helper in a comment or a TODO
+    would satisfy a plain `"exclude_demo_studios" not in text` check without ever
+    calling it, which detects the mitigation's name rather than its use.
     """
+    # Matches both with_all_tenants(reason=...) (app/core/tenancy.py:77, the broad
+    # context manager) and .execution_options(with_all_tenants=True) (tenancy.py:37,
+    # the narrow per-statement flag used by app/services/demo/service.py and
+    # fixtures.py) -- they share the literal string "with_all_tenants" and both are
+    # cross-studio escape hatches this gate must catch. Do not narrow this to match
+    # only one of them.
     pattern = re.compile(r"with_all_tenants")
+    call_pattern = re.compile(r"exclude_demo_studios\s*\(")
     unaccounted = []
     for path in sorted((ROOT / "app").rglob("*.py")):
         rel = str(path.relative_to(ROOT))
         if rel in CROSS_STUDIO_CALLERS:
             continue
         text = path.read_text(encoding="utf-8")
-        if pattern.search(text) and "exclude_demo_studios" not in text:
+        if pattern.search(text) and not call_pattern.search(text):
             unaccounted.append(rel)
     assert unaccounted == [], (
         "these reach across studios without excluding the demo studio (§19.7). Apply "
