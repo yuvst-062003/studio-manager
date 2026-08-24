@@ -21,11 +21,19 @@ describe('staff service worker build output (run after `npm run build`)', () => 
     expect(existsSync(resolve(dist, 'sw.js'))).toBe(true)
   })
 
-  it('precaches the Rubik subsets — §6.1 offline priming assumes the font is there', () => {
+  it('precaches all four Rubik subsets — §6.1 offline priming assumes the font is there', () => {
+    // Rubik is a VARIABLE font: one file per subset carrying the whole 300-900 axis, so
+    // this is what "weights 300/400/500/600/700 are available offline" reduces to. The
+    // axis itself is asserted in packages/ui/src/fonts.test.ts.
+    //
+    // `rubik-latin-wght`, not `rubik-latin`: the bare prefix also matches
+    // rubik-latin-ext, so the original assertion passed even if the latin subset itself
+    // had been dropped.
     const text = precacheText()
-    expect(text).toMatch(/rubik-hebrew[^"']*\.woff2/)
-    expect(text).toMatch(/rubik-latin[^"']*\.woff2/)
-    expect(text).toMatch(/rubik-cyrillic[^"']*\.woff2/)
+    expect(text).toMatch(/rubik-hebrew-wght[^"']*\.woff2/)
+    expect(text).toMatch(/rubik-latin-wght[^"']*\.woff2/)
+    expect(text).toMatch(/rubik-latin-ext-wght[^"']*\.woff2/)
+    expect(text).toMatch(/rubik-cyrillic-wght[^"']*\.woff2/)
   })
 
   it('precaches the app shell', () => {
