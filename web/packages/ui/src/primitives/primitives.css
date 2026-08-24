@@ -247,3 +247,40 @@
   color: var(--text-secondary);
   font-weight: var(--weight-regular);
 }
+
+.studio-attendance {
+  align-items: center;
+  block-size: 42px;
+  border: 2px solid transparent;
+  border-radius: var(--radius-lg);
+  display: inline-flex;
+  flex: none;
+  inline-size: 42px;
+  justify-content: center;
+}
+
+.studio-attendance svg {
+  block-size: 20px;
+  inline-size: 20px;
+}
+
+.studio-attendance[data-state="present"] {
+  background: var(--paid);
+  color: var(--on-accent);
+}
+
+.studio-attendance[data-state="absent"] {
+  background: var(--danger);
+  color: var(--surface);
+}
+
+.studio-attendance[data-state="notified"] {
+  border-color: var(--pending);
+  color: var(--pending);
+}
+
+.studio-attendance[data-state="unmarked"] {
+  border-color: var(--pending);
+  border-style: dashed;
+  color: var(--pending);
+}
