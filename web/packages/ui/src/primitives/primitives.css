@@ -382,3 +382,57 @@
 .studio-switch__state[data-on="true"] {
   color: var(--accent);
 }
+
+.studio-segmented {
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+
+/* The legend names the group for assistive tech; 4h shows the control bare. */
+.studio-segmented__legend {
+  block-size: 1px;
+  clip-path: inset(50%);
+  inline-size: 1px;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+}
+
+.studio-segmented__track {
+  background: var(--ground);
+  border-radius: var(--radius-md);
+  display: inline-flex;
+  gap: var(--space-1);
+  padding: 3px;
+}
+
+.studio-segmented__option {
+  border-radius: 7px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: var(--text-label);
+  font-weight: var(--weight-regular);
+  padding-block: 7px;
+  padding-inline: 13px;
+}
+
+.studio-segmented__option[data-selected="true"] {
+  background: var(--fg);
+  color: var(--on-fg);
+  font-weight: var(--weight-medium);
+}
+
+.studio-segmented__input {
+  block-size: 1px;
+  clip-path: inset(50%);
+  inline-size: 1px;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+}
+
+.studio-segmented__option:has(.studio-segmented__input:focus-visible) {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
