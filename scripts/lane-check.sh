@@ -152,6 +152,31 @@ else
   fi
 fi
 
+# CSS is invisible to eslint. D10's rule is a `no-restricted-syntax` rule over JS object
+# properties, so a physical property written in a .css file never reaches it. Verified in
+# M0.3 by planting `margin-left: 4px; inset: 0;` in tokens.css: `lane-check.sh core` went
+# green at exit 0 with both in the file. A lane that writes CSS needs the CSS gate in its
+# own check, not only in ci-local.
+if [ "$V" = "core" ]; then
+  SCOPED_GATES=$((SCOPED_GATES + 1))
+  if [ "$DRY_RUN" = 1 ]; then
+    printf '   would run: (cd web && stylelint "packages/**/*.css")\n'
+  else
+    # No --allow-empty-input: packages/ always holds tokens.css and fonts.css, so zero
+    # matches would itself be the bug.
+    ( cd web && npx stylelint "packages/**/*.css" )
+  fi
+elif [ -n "$eslint_targets" ]; then
+  SCOPED_GATES=$((SCOPED_GATES + 1))
+  if [ "$DRY_RUN" = 1 ]; then
+    printf '   would run: (cd web && stylelint "apps/*/src/features/%s/**/*.css")\n' "$V"
+  else
+    ( cd web && npx stylelint "apps/*/src/features/$V/**/*.css" --allow-empty-input )
+  fi
+else
+  skip "no CSS for $V"
+fi
+
 say "i18n parity · $V"
 # `belts`, `privacy` and `core` have no namespace of their own. Checking all nine is
 # strictly stronger than checking one, and never silently weaker than checking none.
