@@ -104,10 +104,36 @@ def test_the_studio_row_itself_is_never_wiped():
 
 def test_the_wipe_plan_deletes_children_before_parents():
     """A wipe in metadata order hits a foreign key and fails halfway, leaving the demo
-    studio in a state no fixture describes."""
-    plan = DemoStudioService.wipe_plan()
-    ordered = [t.name for t in Base.metadata.sorted_tables if t.name in plan]
-    assert plan == list(reversed(ordered))
+    studio in a state no fixture describes.
+
+    Every real tenant-scoped table in M0.4 is excluded by NEVER_WIPED, so asserting
+    this against the real schema alone compares `[] == []` -- true regardless of
+    whether `wipe_plan` reverses anything. A synthetic parent/child pair, the same
+    pattern `test_the_wipe_is_derived_from_the_schema_not_from_a_list` uses, gives
+    `sorted_tables` a real foreign key to order and makes the assertion capable of
+    failing.
+    """
+    parent = Table(
+        "probe_parent",
+        Base.metadata,
+        Column("id", PGUUID(as_uuid=True), primary_key=True),
+        Column("studio_id", PGUUID(as_uuid=True), nullable=False),
+    )
+    child = Table(
+        "probe_child",
+        Base.metadata,
+        Column("id", PGUUID(as_uuid=True), primary_key=True),
+        Column("studio_id", PGUUID(as_uuid=True), nullable=False),
+        Column("parent_id", PGUUID(as_uuid=True), sa.ForeignKey("probe_parent.id"), nullable=False),
+    )
+    try:
+        plan = DemoStudioService.wipe_plan()
+        assert plan.index("probe_child") < plan.index("probe_parent")
+    finally:
+        # Child first: metadata.remove() on a parent while a live FK still references
+        # it leaves a dangling reference behind.
+        Base.metadata.remove(child)
+        Base.metadata.remove(parent)
 
 
 def test_reset_refuses_a_studio_that_is_not_a_demo_studio(session):
