@@ -4,11 +4,13 @@ explicit response_model."""
 
 from __future__ import annotations
 
+import uuid
 from datetime import datetime
 
 from pydantic import BaseModel
 
 from app.core.config import Env
+from app.integrations.upay.ipn import IpnShape
 
 
 class DevPing(BaseModel):
@@ -30,3 +32,20 @@ class DemoResetResponse(BaseModel):
     version: str
     tables_wiped: list[str]
     layers_seeded: list[str]
+
+
+class SimulateIpnRequest(BaseModel):
+    shape: IpnShape
+    order_public_ref: uuid.UUID
+    expected_amount_agorot: int
+    #: Omitted means a fresh one. Naming it is how a duplicate is simulated across two
+    #: calls rather than only within one.
+    transaction_id: str | None = None
+
+
+class SimulateIpnResponse(BaseModel):
+    shape: IpnShape
+    delivered: bool
+    target_url: str
+    query: dict[str, str]
+    note: str

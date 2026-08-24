@@ -16,13 +16,21 @@ Routes resolve under /api/v1/dev/... : main.py mounts every discovered router be
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Request, status
 
 from app.core.clock import is_shifted, now
 from app.core.config import settings
 from app.core.db import SessionDep
 from app.core.dev_account import RequireDeveloper
-from app.schemas.dev import DemoResetRequest, DemoResetResponse, DevClock, DevPing
+from app.integrations.upay.ipn import build_ipn_query
+from app.schemas.dev import (
+    DemoResetRequest,
+    DemoResetResponse,
+    DevClock,
+    DevPing,
+    SimulateIpnRequest,
+    SimulateIpnResponse,
+)
 from app.services.demo.fixtures import LATEST_VERSION, SEEDS
 from app.services.demo.service import DemoStudioService
 
@@ -83,4 +91,45 @@ def reset_demo_studio(
         version=result.version,
         tables_wiped=list(result.tables_wiped),
         layers_seeded=list(result.layers_seeded),
+    )
+
+
+@router.post("/upay/simulate-ipn", response_model=SimulateIpnResponse)
+def simulate_ipn(
+    _: RequireDeveloper, body: SimulateIpnRequest, request: Request
+) -> SimulateIpnResponse:
+    """§19.5's fourth tool.
+
+    Delivery is best-effort and reported honestly. M6 owns
+    GET /webhooks/upay/{public_ref}; until it is mounted there is nothing to deliver
+    to, and `delivered: false` with a note naming the milestone is a more useful answer
+    than a 200 that implies something happened. When M6 lands, this starts delivering
+    with no change here.
+
+    The mounted check reads `request.app.openapi()["paths"]`, not `request.app.routes`:
+    `include_router` mounts each discovered router through an opaque `_IncludedRouter`
+    that exposes no `.routes` in this FastAPI version (tests/invariants/test_03
+    documents the trap), so a `.routes` walk would report `False` forever even after M6
+    lands. The OpenAPI path set is the same source of truth restriction 2 uses.
+    """
+    query = build_ipn_query(
+        shape=body.shape,
+        order_public_ref=body.order_public_ref,
+        expected_amount_agorot=body.expected_amount_agorot,
+        transaction_id=body.transaction_id or f"DEV-{body.order_public_ref.hex[:12]}",
+    )
+    path = f"/api/v1/webhooks/upay/{body.order_public_ref}"
+    mounted = path in request.app.openapi()["paths"]
+    note = (
+        "delivered to the webhook"
+        if mounted
+        else "M6 owns GET /webhooks/upay/{public_ref}; it is not mounted yet, so this "
+        "is the payload that would have been sent"
+    )
+    return SimulateIpnResponse(
+        shape=body.shape,
+        delivered=mounted,
+        target_url=path,
+        query=query,
+        note=note,
     )
