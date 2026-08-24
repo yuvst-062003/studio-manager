@@ -1,0 +1,1760 @@
+<title>Studio Manager Atlas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+Hebrew:wght@400;500;600;700&display=swap">
+
+<style>
+:root{
+  --ground:#FAFAFB; --surface:#FFFFFF; --surface-2:#F1F3F7; --surface-3:#E8ECF3;
+  --ink:#0F1621; --ink-2:#3D4757; --muted:#6B7688;
+  --rule:#DDE2EA; --rule-strong:#BFC8D6;
+  --accent:#1E4B8F; --accent-soft:#E5ECF8; --accent-ink:#143563;
+  --belt-white:#9AA3B2; --belt-yellow:#B98A12; --belt-orange-s:#B4611F;
+  --belt-green:#2E7A4E; --belt-blue:#2A5FA8; --belt-brown:#7A5240; --belt-black:#1B1F27;
+  --ok:#2E7A4E; --warn:#9A6412; --crit:#A93A2C;
+  --ok-bg:#E4F1E9; --warn-bg:#FAF0DC; --crit-bg:#F8E6E3;
+  --shadow:0 1px 2px rgba(15,22,33,.05), 0 8px 24px -12px rgba(15,22,33,.12);
+  --rail:240px;
+  --f-display:"Archivo","Helvetica Neue",Arial,sans-serif;
+  --f-body:"IBM Plex Sans","IBM Plex Sans Hebrew",system-ui,-apple-system,Segoe UI,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --f-he:"IBM Plex Sans Hebrew","IBM Plex Sans",system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --ground:#0D1117; --surface:#141A23; --surface-2:#1A212C; --surface-3:#222B38;
+    --ink:#E6EAF2; --ink-2:#B4BDCC; --muted:#7F8A9C;
+    --rule:#242C38; --rule-strong:#3A4553;
+    --accent:#79A6EE; --accent-soft:#16233A; --accent-ink:#B6CFF7;
+    --belt-white:#8891A1; --belt-yellow:#D9A521; --belt-orange-s:#D2803C;
+    --belt-green:#4FA271; --belt-blue:#6E9DEA; --belt-brown:#A6785F; --belt-black:#C9CDD6;
+    --ok:#4FA271; --warn:#D2A03C; --crit:#E0705F;
+    --ok-bg:#12251B; --warn-bg:#2A2214; --crit-bg:#2C1917;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.6);
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#0D1117; --surface:#141A23; --surface-2:#1A212C; --surface-3:#222B38;
+  --ink:#E6EAF2; --ink-2:#B4BDCC; --muted:#7F8A9C;
+  --rule:#242C38; --rule-strong:#3A4553;
+  --accent:#79A6EE; --accent-soft:#16233A; --accent-ink:#B6CFF7;
+  --belt-white:#8891A1; --belt-yellow:#D9A521; --belt-orange-s:#D2803C;
+  --belt-green:#4FA271; --belt-blue:#6E9DEA; --belt-brown:#A6785F; --belt-black:#C9CDD6;
+  --ok:#4FA271; --warn:#D2A03C; --crit:#E0705F;
+  --ok-bg:#12251B; --warn-bg:#2A2214; --crit-bg:#2C1917;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.6);
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--ground); color:var(--ink);
+  font-family:var(--f-body); font-size:15.5px; line-height:1.62;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{display:grid; grid-template-columns:var(--rail) minmax(0,1fr); gap:0; max-width:1480px; margin:0 auto}
+
+/* ---------- rail ---------- */
+.rail{
+  position:sticky; top:0; align-self:start; height:100vh; overflow-y:auto;
+  border-inline-end:1px solid var(--rule); padding:26px 18px 40px; background:var(--surface);
+}
+.brand{font-family:var(--f-display); font-weight:800; font-size:17px; letter-spacing:-.02em; line-height:1.15; margin:0 0 2px}
+.brand-sub{font-family:var(--f-mono); font-size:10.5px; letter-spacing:.09em; text-transform:uppercase; color:var(--muted); margin:0 0 22px}
+.rail nav{display:flex; flex-direction:column; gap:1px}
+.rail a{
+  display:flex; gap:9px; align-items:baseline; text-decoration:none; color:var(--ink-2);
+  font-size:13.2px; padding:5px 9px; border-radius:5px; line-height:1.35;
+}
+.rail a:hover{background:var(--surface-2); color:var(--ink)}
+.rail a:focus-visible{outline:2px solid var(--accent); outline-offset:1px}
+.rail a .n{font-family:var(--f-mono); font-size:10.5px; color:var(--muted); min-width:22px; flex:none}
+.rail .grp{font-family:var(--f-mono); font-size:10px; letter-spacing:.1em; text-transform:uppercase;
+  color:var(--muted); margin:20px 0 6px; padding-inline-start:9px}
+
+/* ---------- main ---------- */
+main{padding:0 clamp(20px,4vw,64px) 120px; min-width:0}
+.hero{padding:64px 0 40px; border-bottom:1px solid var(--rule); margin-bottom:8px}
+.eyebrow{font-family:var(--f-mono); font-size:11px; letter-spacing:.14em; text-transform:uppercase;
+  color:var(--accent); margin:0 0 14px}
+h1{font-family:var(--f-display); font-weight:800; font-size:clamp(34px,4.6vw,54px); line-height:1.03;
+  letter-spacing:-.032em; margin:0 0 16px; text-wrap:balance; max-width:16ch}
+.lede{font-size:18px; line-height:1.55; color:var(--ink-2); max-width:62ch; margin:0}
+
+section{padding:52px 0 8px; scroll-margin-top:20px}
+h2{font-family:var(--f-display); font-weight:700; font-size:26px; letter-spacing:-.022em;
+  margin:0 0 6px; text-wrap:balance; display:flex; align-items:baseline; gap:11px}
+h2 .sec{font-family:var(--f-mono); font-weight:500; font-size:12px; color:var(--accent);
+  letter-spacing:.04em; flex:none}
+h3{font-family:var(--f-display); font-weight:600; font-size:17px; letter-spacing:-.012em; margin:32px 0 8px}
+h4{font-family:var(--f-mono); font-weight:600; font-size:11px; letter-spacing:.11em; text-transform:uppercase;
+  color:var(--muted); margin:26px 0 8px}
+p{max-width:68ch; margin:0 0 14px}
+.dek{color:var(--ink-2); max-width:68ch; margin:0 0 22px}
+code{font-family:var(--f-mono); font-size:.87em; background:var(--surface-2); padding:.1em .34em;
+  border-radius:3px; border:1px solid var(--rule)}
+strong{font-weight:600}
+a{color:var(--accent)}
+hr{border:0; border-top:1px solid var(--rule); margin:44px 0}
+
+/* ---------- figures ---------- */
+figure{margin:22px 0 26px; background:var(--surface); border:1px solid var(--rule);
+  border-radius:10px; padding:22px 22px 16px; box-shadow:var(--shadow); overflow-x:auto}
+figure svg{display:block; width:100%; height:auto; color:var(--ink); min-width:560px}
+figcaption{font-size:13px; color:var(--muted); margin-top:14px; padding-top:12px;
+  border-top:1px solid var(--rule); max-width:74ch}
+figcaption b{color:var(--ink-2); font-weight:600}
+
+/* ---------- tables ---------- */
+.tw{overflow-x:auto; border:1px solid var(--rule); border-radius:10px; background:var(--surface);
+  margin:18px 0 24px; box-shadow:var(--shadow)}
+table{border-collapse:collapse; width:100%; font-size:13.4px; min-width:520px}
+th{font-family:var(--f-mono); font-size:10.5px; letter-spacing:.09em; text-transform:uppercase;
+  color:var(--muted); text-align:start; font-weight:600; padding:11px 14px;
+  border-bottom:1px solid var(--rule-strong); white-space:nowrap; background:var(--surface-2)}
+td{padding:10px 14px; border-bottom:1px solid var(--rule); vertical-align:top; color:var(--ink-2)}
+tr:last-child td{border-bottom:0}
+td.f{font-family:var(--f-mono); font-size:12.4px; color:var(--ink); white-space:nowrap}
+td.t{font-family:var(--f-mono); font-size:12px; color:var(--accent); white-space:nowrap}
+td b{color:var(--ink)}
+.num{font-variant-numeric:tabular-nums; text-align:end}
+.ctr{text-align:center}
+
+/* ---------- chips / pills ---------- */
+.chip{display:inline-flex; align-items:center; gap:5px; font-family:var(--f-mono); font-size:10.5px;
+  letter-spacing:.05em; padding:2px 7px; border-radius:20px; border:1px solid var(--rule-strong);
+  color:var(--ink-2); white-space:nowrap; background:var(--surface-2)}
+.chip.ok{color:var(--ok); border-color:color-mix(in srgb,var(--ok) 35%,transparent); background:var(--ok-bg)}
+.chip.warn{color:var(--warn); border-color:color-mix(in srgb,var(--warn) 35%,transparent); background:var(--warn-bg)}
+.chip.crit{color:var(--crit); border-color:color-mix(in srgb,var(--crit) 35%,transparent); background:var(--crit-bg)}
+.chip.acc{color:var(--accent-ink); border-color:color-mix(in srgb,var(--accent) 35%,transparent); background:var(--accent-soft)}
+.dot{width:7px; height:7px; border-radius:50%; flex:none}
+
+/* ---------- callouts ---------- */
+.note{border-inline-start:3px solid var(--accent); background:var(--accent-soft);
+  padding:14px 18px; border-radius:0 8px 8px 0; margin:20px 0; max-width:74ch}
+.note.crit{border-color:var(--crit); background:var(--crit-bg)}
+.note.warn{border-color:var(--warn); background:var(--warn-bg)}
+.note p{margin:0; max-width:none; font-size:14.4px}
+.note p+p{margin-top:9px}
+.note .lbl{font-family:var(--f-mono); font-size:10px; letter-spacing:.12em; text-transform:uppercase;
+  display:block; margin-bottom:5px; color:var(--accent-ink)}
+.note.crit .lbl{color:var(--crit)} .note.warn .lbl{color:var(--warn)}
+
+/* ---------- cards grid ---------- */
+.grid{display:grid; gap:14px; margin:20px 0 26px}
+.g2{grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+.card{background:var(--surface); border:1px solid var(--rule); border-radius:10px; padding:16px 18px;
+  box-shadow:var(--shadow)}
+.card h5{font-family:var(--f-display); font-weight:600; font-size:14.5px; margin:0 0 6px; letter-spacing:-.01em}
+.card p{font-size:13.4px; color:var(--ink-2); margin:0; max-width:none}
+.card .k{font-family:var(--f-mono); font-size:10.5px; letter-spacing:.09em; text-transform:uppercase;
+  color:var(--muted); display:block; margin-bottom:8px}
+
+/* belt-coded left edge for subsystem cards */
+.card.b{border-inline-start-width:3px}
+.b-people{border-inline-start-color:var(--belt-white)}
+.b-struct{border-inline-start-color:var(--belt-yellow)}
+.b-attend{border-inline-start-color:var(--belt-orange-s)}
+.b-money{border-inline-start-color:var(--belt-green)}
+.b-comms{border-inline-start-color:var(--belt-blue)}
+.b-rank{border-inline-start-color:var(--belt-brown)}
+.b-plat{border-inline-start-color:var(--belt-black)}
+
+/* ---------- step flow ---------- */
+.steps{list-style:none; padding:0; margin:20px 0 26px; display:flex; flex-direction:column; gap:0}
+.steps li{display:grid; grid-template-columns:34px 1fr; gap:14px; padding:0 0 20px; position:relative}
+.steps li::before{content:""; position:absolute; inset-inline-start:16px; top:30px; bottom:0;
+  width:1px; background:var(--rule-strong)}
+.steps li:last-child::before{display:none}
+.steps .mk{width:33px; height:33px; border-radius:50%; border:1px solid var(--rule-strong);
+  background:var(--surface); display:grid; place-items:center; font-family:var(--f-mono);
+  font-size:12px; font-weight:600; color:var(--ink-2); position:relative; z-index:1}
+.steps .mk.gate{background:var(--crit-bg); border-color:var(--crit); color:var(--crit)}
+.steps .mk.done{background:var(--accent-soft); border-color:var(--accent); color:var(--accent-ink)}
+.steps .bd{padding-top:4px}
+.steps .bd b{display:block; font-size:14.6px; margin-bottom:2px; color:var(--ink)}
+.steps .bd span{font-size:13.4px; color:var(--ink-2)}
+
+/* ---------- hebrew mock ---------- */
+.mock{font-family:var(--f-he); direction:rtl; text-align:right; background:var(--surface-2);
+  border:1px solid var(--rule); border-radius:10px; padding:16px 18px; font-size:13.6px;
+  line-height:1.85; color:var(--ink); white-space:pre-wrap; overflow-x:auto; margin:16px 0 22px}
+
+pre{background:var(--surface-2); border:1px solid var(--rule); border-radius:10px; padding:16px 18px;
+  overflow-x:auto; font-family:var(--f-mono); font-size:12.6px; line-height:1.7; margin:16px 0 22px; color:var(--ink-2)}
+pre b{color:var(--accent); font-weight:600}
+
+ul.tight{margin:10px 0 18px; padding-inline-start:20px; max-width:68ch}
+ul.tight li{margin-bottom:5px; color:var(--ink-2)}
+ul.tight li::marker{color:var(--muted)}
+
+.legend{display:flex; flex-wrap:wrap; gap:8px 16px; margin:0 0 18px; font-size:12.4px; color:var(--muted)}
+.legend span{display:inline-flex; align-items:center; gap:6px}
+
+@media (max-width:900px){
+  .wrap{grid-template-columns:1fr}
+  .rail{position:static; height:auto; border-inline-end:0; border-bottom:1px solid var(--rule); padding:18px}
+  .rail nav{display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:0}
+  main{padding:0 18px 80px}
+  .hero{padding:36px 0 28px}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important; transition:none!important}}
+</style>
+
+<div class="wrap">
+<aside class="rail">
+  <p class="brand">Studio Manager</p>
+  <p class="brand-sub">Architecture Atlas</p>
+  <nav>
+    <span class="grp">System</span>
+    <a href="#stack"><span class="n">01</span> Stack &amp; deployment</a>
+    <a href="#storage"><span class="n">02</span> Data storage</a>
+    <a href="#clients"><span class="n">03</span> Three clients</a>
+    <a href="#spine"><span class="n">04</span> The spine</a>
+    <span class="grp">Data</span>
+    <a href="#entities"><span class="n">05</span> Entity catalog</a>
+    <a href="#roles"><span class="n">06</span> Roles &amp; permissions</a>
+    <a href="#states"><span class="n">07</span> State machines</a>
+    <span class="grp">Flows</span>
+    <a href="#firstrun"><span class="n">08</span> First run</a>
+    <a href="#funnel"><span class="n">09</span> Trial &amp; conversion</a>
+    <a href="#enroll"><span class="n">10</span> Enrollment</a>
+    <a href="#health"><span class="n">11</span> Health gate</a>
+    <a href="#schedule"><span class="n">12</span> Schedule</a>
+    <a href="#attend"><span class="n">13</span> Attendance &amp; offline</a>
+    <a href="#billing"><span class="n">14</span> Billing run</a>
+    <a href="#upay"><span class="n">15</span> uPay payment</a>
+    <a href="#recon"><span class="n">16</span> הוראת קבע recon</a>
+    <a href="#notify"><span class="n">17</span> Notifications</a>
+    <a href="#events"><span class="n">18</span> Events &amp; belts</a>
+    <span class="grp">Delivery</span>
+    <a href="#privacy"><span class="n">19</span> Privacy &amp; security</a>
+    <a href="#ops"><span class="n">20</span> Your monitoring</a>
+    <a href="#dev"><span class="n">21</span> Developer account</a>
+    <a href="#limits"><span class="n">22</span> Hard constraints</a>
+    <a href="#plan"><span class="n">23</span> Milestones</a>
+  </nav>
+</aside>
+
+<main>
+<header class="hero">
+  <p class="eyebrow">Judo club management · multi-tenant SaaS · Israel</p>
+  <h1>Everything, and how it connects</h1>
+  <p class="lede">A visual companion to <code>SPEC.md</code>. Every table, every type, every flow —
+  from a parent tapping a QR code on a flyer to a הוראת קבע payment being matched to the right
+  family three months later. Section numbers map to the spec.</p>
+</header>
+
+<section id="stack">
+<h2><span class="sec">§8</span> Stack &amp; deployment</h2>
+<p class="dek">One FastAPI backend, one npm-workspaces monorepo, three React clients, two thin native
+shells. Everything runs on the existing Railway instance.</p>
+
+<figure>
+<svg viewBox="0 0 900 420" role="img" aria-label="System architecture: three React clients talk to a FastAPI API, which drives services and ARQ workers over Postgres, Redis and object storage, with uPay, Google/Apple OAuth and APNs/FCM as external systems.">
+<defs>
+  <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker>
+  <marker id="arA" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M0,0 L10,5 L0,10 z" fill="#1E4B8F"/></marker>
+</defs>
+<g font-family="IBM Plex Sans, sans-serif" font-size="12.5">
+
+<!-- clients -->
+<g>
+  <rect x="40" y="30" width="180" height="60" rx="7" fill="none" stroke="currentColor" stroke-width="1.3"/>
+  <text x="130" y="54" text-anchor="middle" font-weight="600">Staff app</text>
+  <text x="130" y="72" text-anchor="middle" font-size="10.5" opacity=".6">PWA + TWA + Capacitor</text>
+
+  <rect x="240" y="30" width="180" height="60" rx="7" fill="none" stroke="currentColor" stroke-width="1.3"/>
+  <text x="330" y="54" text-anchor="middle" font-weight="600">Parent app</text>
+  <text x="330" y="72" text-anchor="middle" font-size="10.5" opacity=".6">PWA + TWA + Capacitor</text>
+
+  <rect x="440" y="30" width="180" height="60" rx="7" fill="none" stroke="currentColor" stroke-width="1.3"/>
+  <text x="530" y="54" text-anchor="middle" font-weight="600">Dashboard</text>
+  <text x="530" y="72" text-anchor="middle" font-size="10.5" opacity=".6">responsive web</text>
+</g>
+
+<!-- externals -->
+<rect x="690" y="30" width="170" height="60" rx="7" fill="none" stroke="currentColor" stroke-width="1" stroke-dasharray="4 3" opacity=".75"/>
+<text x="775" y="55" text-anchor="middle" font-size="11.5" opacity=".85">Google · Apple</text>
+<text x="775" y="72" text-anchor="middle" font-size="10" opacity=".55">OAuth</text>
+
+<rect x="690" y="150" width="170" height="58" rx="7" fill="none" stroke="#1E4B8F" stroke-width="1.3"/>
+<text x="775" y="174" text-anchor="middle" font-size="12.5" font-weight="600" fill="#1E4B8F">uPay</text>
+<text x="775" y="191" text-anchor="middle" font-size="10" fill="#1E4B8F" opacity=".8">hosted page · IPN</text>
+
+<rect x="690" y="242" width="170" height="54" rx="7" fill="none" stroke="currentColor" stroke-width="1" stroke-dasharray="4 3" opacity=".75"/>
+<text x="775" y="266" text-anchor="middle" font-size="11.5" opacity=".85">APNs · FCM</text>
+<text x="775" y="282" text-anchor="middle" font-size="10" opacity=".55">push</text>
+
+<!-- api -->
+<rect x="40" y="150" width="580" height="58" rx="7" fill="none" stroke="currentColor" stroke-width="1.8"/>
+<text x="330" y="174" text-anchor="middle" font-weight="600" font-size="13.5">FastAPI · /api/v1</text>
+<text x="330" y="192" text-anchor="middle" font-size="10.5" opacity=".6">thin routers · tenant scoping · audit middleware</text>
+
+<!-- services / workers -->
+<rect x="40" y="248" width="270" height="52" rx="7" fill="none" stroke="currentColor" stroke-width="1.3"/>
+<text x="175" y="270" text-anchor="middle" font-size="12.5" font-weight="600">app/services</text>
+<text x="175" y="287" text-anchor="middle" font-size="10.5" opacity=".6">all business logic</text>
+
+<rect x="350" y="248" width="270" height="52" rx="7" fill="none" stroke="currentColor" stroke-width="1.3"/>
+<text x="485" y="270" text-anchor="middle" font-size="12.5" font-weight="600">ARQ workers</text>
+<text x="485" y="287" text-anchor="middle" font-size="10.5" opacity=".6">billing · IPN · PDF · notify · retention</text>
+
+<!-- stores -->
+<rect x="40" y="340" width="175" height="52" rx="7" fill="none" stroke="currentColor" stroke-width="1.3" opacity=".85"/>
+<text x="127" y="366" text-anchor="middle" font-size="12" font-weight="600">PostgreSQL</text>
+<text x="127" y="381" text-anchor="middle" font-size="9.5" opacity=".6">PITR backups</text>
+
+<rect x="235" y="340" width="150" height="52" rx="7" fill="none" stroke="currentColor" stroke-width="1.3" opacity=".85"/>
+<text x="310" y="366" text-anchor="middle" font-size="12" font-weight="600">Redis</text>
+<text x="310" y="381" text-anchor="middle" font-size="9.5" opacity=".6">job queue</text>
+
+<rect x="405" y="340" width="215" height="52" rx="7" fill="none" stroke="currentColor" stroke-width="1.3" opacity=".85"/>
+<text x="512" y="366" text-anchor="middle" font-size="12" font-weight="600">Object storage</text>
+<text x="512" y="381" text-anchor="middle" font-size="9.5" opacity=".6">signed PDFs · photos</text>
+
+<!-- arrows: clients to api -->
+<g stroke="currentColor" stroke-width="1.2" fill="none" marker-end="url(#ar)">
+  <line x1="130" y1="90" x2="130" y2="146"/>
+  <line x1="330" y1="90" x2="330" y2="146"/>
+  <line x1="530" y1="90" x2="530" y2="146"/>
+  <line x1="175" y1="208" x2="175" y2="244"/>
+  <line x1="485" y1="208" x2="485" y2="244"/>
+  <line x1="127" y1="300" x2="127" y2="336"/>
+  <line x1="270" y1="300" x2="300" y2="336"/>
+  <line x1="470" y1="300" x2="500" y2="336"/>
+  <line x1="400" y1="300" x2="340" y2="336"/>
+  <line x1="620" y1="269" x2="686" y2="269"/>
+  <line x1="622" y1="55" x2="686" y2="55"/>
+</g>
+<text x="653" y="47" text-anchor="middle" font-size="9.5" opacity=".65">system browser</text>
+<text x="653" y="262" text-anchor="middle" font-size="9.5" opacity=".65">push</text>
+
+<!-- upay arrows -->
+<g stroke="#1E4B8F" stroke-width="1.5" fill="none" marker-end="url(#arA)">
+  <line x1="622" y1="166" x2="686" y2="166"/>
+  <line x1="686" y1="192" x2="624" y2="192"/>
+</g>
+<text x="654" y="159" text-anchor="middle" font-size="9.5" fill="#1E4B8F">form POST</text>
+<text x="654" y="207" text-anchor="middle" font-size="9.5" fill="#1E4B8F">IPN ~5 min</text>
+</g>
+</svg>
+<figcaption><b>The uPay path is drawn in blue because it is the only unauthenticated inbound
+edge in the system.</b> The IPN arrives as an unsigned <code>GET</code> roughly five minutes after
+payment, so the order reference must be a UUID and the amount must be re-verified server-side
+(§14).</figcaption>
+</figure>
+
+<div class="grid g3">
+  <div class="card b b-plat"><span class="k">Backend</span><h5>Python 3.14</h5>
+    <p>FastAPI · SQLAlchemy 2 · Alembic · Pydantic v2 · ARQ workers</p></div>
+  <div class="card b b-plat"><span class="k">Frontend</span><h5>React 19 + TS 5.9</h5>
+    <p>Vite 7 · TanStack Query · Zustand · Tailwind with logical properties</p></div>
+  <div class="card b b-plat"><span class="k">Offline</span><h5>Workbox + Dexie</h5>
+    <p>Service worker cache, IndexedDB pending-ops queue, custom sync</p></div>
+  <div class="card b b-plat"><span class="k">Native</span><h5>Capacitor + TWA</h5>
+    <p>iOS shell adds APNs, camera, biometrics. Android is a Chrome TWA</p></div>
+  <div class="card b b-plat"><span class="k">Hosting</span><h5>Railway</h5>
+    <p>API + worker services, managed Postgres with PITR, Redis, storage</p></div>
+  <div class="card b b-plat"><span class="k">Types</span><h5>Generated, not written</h5>
+    <p>Python → OpenAPI → <code>openapi-typescript</code>. A drift fails CI</p></div>
+</div>
+</section>
+
+<hr>
+
+<section id="storage">
+<h2><span class="sec">§8.1a</span> Data storage</h2>
+<p class="dek">Four stores, each with a job the others cannot do — and a recorded reason for each,
+so none of these gets re-litigated later.</p>
+
+<div class="grid g2">
+<div class="card b b-plat"><span class="k">System of record</span><h5>PostgreSQL 16</h5>
+<p>Everything durable. Chosen for reasons specific to this product, not generic preference.</p></div>
+<div class="card b b-plat"><span class="k">Ephemeral only</span><h5>Redis</h5>
+<p>ARQ job queue, rate-limit counters, refresh-token denylist, short caches. <strong>Nothing here
+survives a wipe, and nothing needs to</strong> — every job is re-derivable from Postgres.</p></div>
+<div class="card b b-plat"><span class="k">Client side</span><h5>IndexedDB via Dexie</h5>
+<p>Cached rosters and the <code>pending_ops</code> queue in the staff app.</p></div>
+<div class="card b b-plat"><span class="k">Files</span><h5>Object storage</h5>
+<p>Signed health PDFs, photos, logos, export bundles — reached only through short-lived signed
+URLs. No bucket is ever public.</p></div>
+</div>
+
+<h4>Why Postgres, specifically</h4>
+<ul class="tight">
+<li><b>The money ledger requires ACID.</b> A payment allocated across four charges either lands
+entirely or not at all. Eventual consistency here produces “we charged them twice” bugs — expensive
+to unwind in a community where everyone knows each other.</li>
+<li><b>Multi-row atomic transactions are the core operation, not an edge case.</b> Approving a
+registration writes Person + Student + Guardian + Enrollment + HealthDeclaration + consents in one
+commit. A belt-exam pass writes the result, creates the belt row and updates
+<code>current_belt_id</code> together. Half of either is corruption.</li>
+<li><b>Referential integrity is the cheapest correctness available.</b> The database refuses a
+charge pointing at a non-existent student, so the code doesn't have to remember to.</li>
+<li><b>JSONB exactly where the shape is genuinely unknown</b> — form templates, audit diffs, studio
+settings, notification payloads — without surrendering relational guarantees everywhere else.</li>
+</ul>
+
+<div class="tw"><table>
+<thead><tr><th>Rejected</th><th>Why</th></tr></thead><tbody>
+<tr><td>MongoDB / Firestore</td><td>The ledger is inherently relational and needs cross-document transactions. Firestore's query limits would push us to denormalize names into charge documents — which <b>destroys the anonymization design rule</b> and makes deletion impossible</td></tr>
+<tr><td>SQLite</td><td>Concurrent writers, multi-tenant isolation, managed PITR backups</td></tr>
+<tr><td>A separate OLAP store</td><td>Reports run fine against indexed queries and a read replica. Revisit past ~50 studios, not before</td></tr>
+<tr><td>A search engine</td><td>Postgres full-text is more than enough for “find a student by name”</td></tr>
+<tr><td><code>localStorage</code> for offline</td><td>5 MB cap, a <b>synchronous API that blocks the UI thread</b>, strings only, no transactions — the pending-ops queue needs atomic writes so a mark is never half-recorded when the app is killed mid-tap</td></tr>
+<tr><td>Postgres BLOBs for files</td><td>They bloat every backup and every PITR restore, and you cannot hand a browser an expiring link to a <code>bytea</code> column</td></tr>
+</tbody></table></div>
+
+<div class="note"><span class="lbl">The honest alternative</span>
+<p>At one studio, a Postgres-backed queue (<code>SELECT … FOR UPDATE SKIP LOCKED</code>) would remove
+Redis entirely. It stays because ARQ is the chosen worker and Railway provisions it in one click —
+but if you ever want fewer moving parts, <strong>Redis is the one to drop</strong>, and nothing
+durable would be lost.</p></div>
+
+<div class="note warn"><span class="lbl">The step everyone skips</span>
+<p>Managed Postgres PITR and object-storage versioning are configuration. <strong>A documented
+restore drill, run once before launch and once a year, is not.</strong> A backup you have never
+restored is a hypothesis, not a backup. Encryption keys live in Railway secrets, never in the
+database — which is the entire point: a leaked dump is inert without them.</p></div>
+</section>
+
+<hr>
+
+<section id="clients">
+<h2><span class="sec">§6</span> Three clients, two apps, one identity</h2>
+<p class="dek">The staff app and the parent app never merge. A coach who is also a parent installs
+both — one Google/Apple identity, two apps, two different jobs.</p>
+
+<p>Access to each app is a <strong>query, not a role check</strong> — because
+<em>guardian is not a role</em> (see below):</p>
+<pre>staff app   → EXISTS(<b>role_assignment</b> WHERE person_id = :me AND revoked_at IS NULL)
+parent app  → EXISTS(<b>guardian</b>        WHERE person_id = :me)</pre>
+
+<div class="tw"><table>
+<thead><tr><th>Role</th><th class="ctr">Staff app</th><th class="ctr">Parent app</th><th>Gets in how</th></tr></thead>
+<tbody>
+<tr><td class="f">platform_admin</td><td class="ctr">✓</td><td class="ctr">—</td><td>Seeded manually</td></tr>
+<tr><td class="f">owner</td><td class="ctr">✓</td><td class="ctr">if also a guardian</td><td>Invited by platform admin</td></tr>
+<tr><td class="f">manager</td><td class="ctr">✓</td><td class="ctr">if also a guardian</td><td>Invited by owner or manager</td></tr>
+<tr><td class="f">lead_coach</td><td class="ctr">✓</td><td class="ctr">if also a guardian</td><td>Invited by manager</td></tr>
+<tr><td class="f">assistant_coach</td><td class="ctr">✓</td><td class="ctr">if also a guardian</td><td>Invited by manager</td></tr>
+<tr><td class="f">guardian</td><td class="ctr"><span class="chip crit">refused</span></td><td class="ctr">✓</td><td>Invited via enrollment</td></tr>
+<tr><td class="f">— no role, no children</td><td class="ctr">✗</td><td class="ctr">✗</td><td>Dead end, with a pointer to the other app</td></tr>
+</tbody></table></div>
+
+<div class="note"><span class="lbl">Provisioned, never self-service</span>
+<p>There is no “צור סטודיו” button anywhere. A <code>platform_admin</code> creates the studio and
+invites its owner; the owner invites managers; managers invite coaches and, through enrollment,
+guardians. Signing in with a Google account that holds no role assignment produces a refusal —
+there is no path from “I downloaded the app” to “I have a studio”.</p></div>
+</section>
+
+<hr>
+
+<section id="spine">
+<h2><span class="sec">§3–4</span> The spine</h2>
+<p class="dek">The single most important idea in the data model: <strong>a parent is never connected
+to a class or a group.</strong> They are connected to their children; their children are connected to
+groups. Two link tables carry the entire system.</p>
+
+<figure>
+<svg viewBox="0 0 900 300" role="img" aria-label="Data model spine: a guardian person links to a student via the guardian table, the student links to a group via the enrollment table, groups belong to classes which belong to studios, groups materialize sessions, and attendance joins a session to a student.">
+<defs><marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+  <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker>
+<marker id="ar2A" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+  <path d="M0,0 L10,5 L0,10 z" fill="#1E4B8F"/></marker></defs>
+<g font-family="IBM Plex Sans, sans-serif" font-size="12.5">
+
+<rect x="30" y="42" width="150" height="48" rx="7" fill="none" stroke="currentColor" stroke-width="1.3"/>
+<text x="105" y="63" text-anchor="middle" font-weight="600">PERSON</text>
+<text x="105" y="79" text-anchor="middle" font-size="10" opacity=".6">a guardian</text>
+
+<rect x="290" y="42" width="150" height="48" rx="7" fill="none" stroke="currentColor" stroke-width="1.3"/>
+<text x="365" y="63" text-anchor="middle" font-weight="600">STUDENT</text>
+<text x="365" y="79" text-anchor="middle" font-size="10" opacity=".6">a Person who trains</text>
+
+<rect x="550" y="42" width="150" height="48" rx="7" fill="none" stroke="currentColor" stroke-width="1.3"/>
+<text x="625" y="63" text-anchor="middle" font-weight="600">GROUP</text>
+<text x="625" y="79" text-anchor="middle" font-size="10" opacity=".6">roster + schedule</text>
+
+<rect x="550" y="140" width="150" height="42" rx="7" fill="none" stroke="currentColor" stroke-width="1" opacity=".8"/>
+<text x="625" y="166" text-anchor="middle" font-size="12" opacity=".85">CLASS</text>
+
+<rect x="550" y="226" width="150" height="42" rx="7" fill="none" stroke="currentColor" stroke-width="1" opacity=".8"/>
+<text x="625" y="252" text-anchor="middle" font-size="12" opacity=".85">STUDIO</text>
+
+<rect x="770" y="42" width="110" height="48" rx="7" fill="none" stroke="currentColor" stroke-width="1.3"/>
+<text x="825" y="63" text-anchor="middle" font-size="11.5" font-weight="600">SESSION</text>
+<text x="825" y="79" text-anchor="middle" font-size="9.5" opacity=".6">materialized</text>
+
+<rect x="290" y="200" width="150" height="48" rx="7" fill="none" stroke="currentColor" stroke-width="1.3"/>
+<text x="365" y="221" text-anchor="middle" font-size="11.5" font-weight="600">ATTENDANCE</text>
+<text x="365" y="237" text-anchor="middle" font-size="9.5" opacity=".6">session × student</text>
+
+<!-- the two link arrows, in accent -->
+<g stroke="#1E4B8F" stroke-width="1.8" fill="none" marker-end="url(#ar2A)">
+  <line x1="182" y1="66" x2="286" y2="66"/>
+  <line x1="442" y1="66" x2="546" y2="66"/>
+</g>
+<text x="234" y="56" text-anchor="middle" font-size="10.5" fill="#1E4B8F" font-weight="600">guardian</text>
+<text x="234" y="88" text-anchor="middle" font-size="9" fill="#1E4B8F" opacity=".75">is_primary</text>
+<text x="494" y="56" text-anchor="middle" font-size="10.5" fill="#1E4B8F" font-weight="600">enrollment</text>
+<text x="494" y="88" text-anchor="middle" font-size="9" fill="#1E4B8F" opacity=".75">price plan</text>
+
+<g stroke="currentColor" stroke-width="1.2" fill="none" marker-end="url(#ar2)">
+  <line x1="702" y1="66" x2="766" y2="66"/>
+  <line x1="625" y1="136" x2="625" y2="96"/>
+  <line x1="625" y1="222" x2="625" y2="186"/>
+  <path d="M825,92 L825,224 L444,224"/>
+  <line x1="365" y1="94" x2="365" y2="196"/>
+</g>
+<text x="734" y="58" text-anchor="middle" font-size="9.5" opacity=".7">generates</text>
+<text x="663" y="118" text-anchor="start" font-size="9.5" opacity=".7">belongs to</text>
+<text x="663" y="208" text-anchor="start" font-size="9.5" opacity=".7">belongs to</text>
+<text x="640" y="218" text-anchor="middle" font-size="9.5" opacity=".7">records</text>
+<text x="375" y="150" text-anchor="start" font-size="9.5" opacity=".7">attends</text>
+</g>
+</svg>
+<figcaption><b>Everything a parent sees is three hops.</b> Which students am I a guardian of →
+which groups are they enrolled in → what sessions do those groups have. There is no household
+entity, no family table, and no link from a parent to a group.</figcaption>
+</figure>
+
+<div class="grid g2">
+  <div class="card"><span class="k">Deleted from an earlier draft</span><h5>family · family_guardian</h5>
+    <p>A household entity with a designated payer and a <code>can_view_finance</code> flag —
+    two entities and two permission concepts, existing mostly to model divorced parents.
+    Replaced by <code>guardian(student_id, person_id, is_primary)</code>.</p></div>
+  <div class="card"><span class="k">What is_primary means</span><h5>Exactly two things</h5>
+    <p>Whose name the bill is addressed to, and which person a הוראת קבע payment is matched to.
+    <strong>Nothing about visibility, nothing about who can pay.</strong> Every guardian on a
+    student is equal.</p></div>
+</div>
+</section>
+
+<hr>
+
+<section id="entities">
+<h2><span class="sec">§4.3</span> Entity catalog</h2>
+<p class="dek">Every table, keyed by subsystem. All carry <code>id UUID</code>, <code>created_at</code>,
+<code>updated_at</code>; every tenant-scoped table carries <code>studio_id</code>. Two rules hold
+everywhere: <strong>money is always an integer count of agorot</strong>, and
+<strong>timestamps are always UTC <code>timestamptz</code></strong>, rendered in Asia/Jerusalem.</p>
+
+<div class="legend">
+  <span><i class="dot" style="background:var(--belt-black)"></i> platform</span>
+  <span><i class="dot" style="background:var(--belt-white)"></i> people</span>
+  <span><i class="dot" style="background:var(--belt-yellow)"></i> structure</span>
+  <span><i class="dot" style="background:var(--belt-orange-s)"></i> attendance</span>
+  <span><i class="dot" style="background:var(--belt-green)"></i> money</span>
+  <span><i class="dot" style="background:var(--belt-blue)"></i> comms</span>
+  <span><i class="dot" style="background:var(--belt-brown)"></i> health · belts · events</span>
+</div>
+
+<h3 style="border-inline-start:3px solid var(--belt-black); padding-inline-start:10px">Platform &amp; tenancy</h3>
+<div class="tw"><table>
+<thead><tr><th>Table</th><th>Key columns</th><th>Type notes</th></tr></thead><tbody>
+<tr><td class="f">studio</td><td>name, slug, logo_object_key, timezone, default_locale, status, settings</td><td class="t">status: active|suspended<br>settings: JSONB</td></tr>
+<tr><td class="f">auth_identity</td><td>provider, provider_subject <b>UNIQUE</b>, email, last_login_at</td><td class="t">provider: google|apple<br><b>global — no studio_id</b></td></tr>
+<tr><td class="f">platform_admin</td><td>auth_identity_id</td><td class="t">—</td></tr>
+<tr><td class="f">audit_log</td><td>actor_person_id, actor_ip, action, entity_type, entity_id, is_sensitive, diff</td><td class="t">diff: JSONB<br><b>INSERT only, no UPDATE/DELETE grant</b></td></tr>
+<tr><td class="f">invitation</td><td>email/phone, intended_role, student_id?, token, expires_at, accepted_at?</td><td class="t">token: opaque string</td></tr>
+</tbody></table></div>
+
+<h3 style="border-inline-start:3px solid var(--belt-white); padding-inline-start:10px">People</h3>
+<div class="tw"><table>
+<thead><tr><th>Table</th><th>Key columns</th><th>Type notes</th></tr></thead><tbody>
+<tr><td class="f">person</td><td>auth_identity_id?, first_name, last_name, birthdate?, phone?, email?, photo_object_key?, locale?, anonymized_at?</td><td class="t">auth_identity_id <b>nullable</b><br>— a person needs no login</td></tr>
+<tr><td class="f">student</td><td>person_id <b>UNIQUE</b>, status, source?, joined_on?, left_on?, current_belt_id?, health_status</td><td class="t">status: lead|trial|pending_approval|<br>active|frozen|left|lost<br>health_status: missing|trial_signed|signed</td></tr>
+<tr><td class="f">guardian</td><td>student_id, person_id, is_primary, relation — <b>UNIQUE(student_id, person_id)</b></td><td class="t">is_primary: BOOL<br><b>not a role</b> — being a guardian is<br>having a row here, nothing is granted</td></tr>
+<tr><td class="f">role_assignment</td><td>person_id, role, scope_type, scope_id?, granted_by, granted_at, revoked_at?</td><td class="t">role: owner|manager|lead_coach|<br>assistant_coach<br>scope_type: studio|class|group</td></tr>
+<tr><td class="f">student_freeze</td><td>student_id, from_date, to_date?, reason</td><td class="t">no charges while frozen</td></tr>
+<tr><td class="f">student_status_history</td><td>student_id, from_status?, to_status, reason?, changed_by, changed_at</td><td class="t">→ the funnel report, for free</td></tr>
+</tbody></table></div>
+
+<h3 style="border-inline-start:3px solid var(--belt-yellow); padding-inline-start:10px">Structure &amp; schedule</h3>
+<div class="tw"><table>
+<thead><tr><th>Table</th><th>Key columns</th><th>Type notes</th></tr></thead><tbody>
+<tr><td class="f">class</td><td>name, description, discipline, color, is_active</td><td class="t">no schedule, no roster</td></tr>
+<tr><td class="f">group</td><td>class_id, name, age_min?, age_max?, is_active</td><td class="t">owns schedule, staff, price</td></tr>
+<tr><td class="f">group_schedule_rule</td><td>group_id, weekday, start_time, end_time, location_id, effective_from, effective_to?</td><td class="t">weekday: 0–6<br>times: <code>time</code>, not timestamps</td></tr>
+<tr><td class="f">group_staff</td><td>group_id, person_id, role, from, to?</td><td class="t">role: lead_coach|assistant_coach</td></tr>
+<tr><td class="f">location</td><td>name, address, notes</td><td class="t">—</td></tr>
+<tr><td class="f">training_year</td><td>name, starts_on, ends_on, status</td><td class="t">status: draft|active|closed</td></tr>
+<tr><td class="f">studio_closure</td><td>training_year_id, date_from, date_to, reason, source</td><td class="t">source: holiday_preset|manual</td></tr>
+<tr><td class="f">session</td><td>group_id, training_year_id, starts_at, ends_at, location_id, status, <b>is_manually_edited</b>, generated_from_rule_id?, is_ad_hoc</td><td class="t">status: scheduled|cancelled|completed<br>is_manually_edited protects it from<br>schedule-rule rewrites</td></tr>
+<tr><td class="f">session_staff</td><td>session_id, person_id, role, is_substitute</td><td class="t">per-session substitutions</td></tr>
+<tr><td class="f">session_note</td><td>session_id, author_person_id, body, deleted_at?</td><td class="t">staff-visible only</td></tr>
+<tr><td class="f">student_note</td><td>student_id, author_person_id, body, deleted_at?</td><td class="t">never visible to guardians</td></tr>
+</tbody></table></div>
+
+<h3 style="border-inline-start:3px solid var(--belt-orange-s); padding-inline-start:10px">Enrollment &amp; attendance</h3>
+<div class="tw"><table>
+<thead><tr><th>Table</th><th>Key columns</th><th>Type notes</th></tr></thead><tbody>
+<tr><td class="f">enrollment</td><td>student_id, group_id, status, started_on, ended_on?, price_plan_id</td><td class="t">status: pending|active|frozen|ended<br><b>no enrollment ⇒ no charges</b></td></tr>
+<tr><td class="f">trial_booking</td><td>student_id, session_id?, group_id, booked_at, attended?, outcome?, coach_note?, is_override</td><td class="t">outcome: pending|converted|lost<br>is_override = a granted 2nd free trial</td></tr>
+<tr><td class="f">registration_request</td><td>source, payload_encrypted, matched_person_id?, status, reviewed_by?, reviewed_at?</td><td class="t">source: public_link|parent_app|manager<br>payload: <b>encrypted</b> BYTEA</td></tr>
+<tr><td class="f">absence_report</td><td>student_id, session_id, reported_by_person_id, reason?</td><td class="t">parent pre-reporting</td></tr>
+<tr><td class="f">attendance</td><td>session_id, student_id, status, source, marked_by?, marked_at, device_marked_at, <b>client_mark_id UNIQUE</b>, note?</td><td class="t">status: unmarked|present|<br>absent_excused|absent_unexcused<br>source: coach|parent|bulk|system<br>client_mark_id ⇒ offline idempotency</td></tr>
+</tbody></table></div>
+
+<h3 style="border-inline-start:3px solid var(--belt-green); padding-inline-start:10px">Money</h3>
+<div class="tw"><table>
+<thead><tr><th>Table</th><th>Key columns</th><th>Type notes</th></tr></thead><tbody>
+<tr><td class="f">price_plan</td><td>group_id?, class_id?, name, monthly_amount_agorot, registration_fee_agorot?, active_from, active_to?</td><td class="t"><b>INTEGER agorot</b>, never float<br>versioned — a price change<br>never rewrites history</td></tr>
+<tr><td class="f">product</td><td>name, description?, price_agorot, is_active</td><td class="t">גי · חגורה · כפפות · דמי ביטוח<br><b>no stock counts</b></td></tr>
+<tr><td class="f">charge</td><td>payer_person_id, student_id?, enrollment_id?, kind, period_year?, period_month?, amount_agorot, original_amount_agorot?, proration_note?, due_date, status</td><td class="t">kind: tuition|registration|event|manual<br>status: open|settled|void|written_off<br>manual may be <b>negative</b> (a credit)</td></tr>
+<tr><td class="f">billing_run</td><td>period_year, period_month, charges_created, status, log</td><td class="t">idempotent per period</td></tr>
+<tr><td class="f">payment</td><td>payer_person_id, method, amount_agorot, received_at, recorded_by?, payment_order_id?, upay_ipn_id?, reversed_at?</td><td class="t">method: upay_card|standing_order|<br>bank_transfer|cash|credit_adjustment</td></tr>
+<tr><td class="f">payment_allocation</td><td>payment_id, charge_id, amount_agorot</td><td class="t"><b>one payment → many charges</b><br>this is what makes “pay 3 months<br>for 2 kids in one link” work</td></tr>
+<tr><td class="f">payment_order</td><td><b>public_ref UUID UNIQUE</b>, payer_person_id, expected_amount_agorot, max_payments, status, expires_at, paid_at?, external_payment_ref?</td><td class="t">status: pending|paid|failed|<br><b>amount_mismatch</b>|expired<br>public_ref must NEVER be sequential</td></tr>
+<tr><td class="f">upay_ipn_record</td><td>received_at, source_ip, raw_query, order_public_ref?, transactionid, amount, card_owner_name, four_digits, matched_payment_id?, match_status</td><td class="t">match_status: auto|manual|<br>unmatched|ignored<br>every IPN persisted verbatim</td></tr>
+<tr><td class="f">payer_fingerprint</td><td>payer_person_id, four_digits, card_owner_name_normalized, confidence, first_seen, last_seen, confirmed_by</td><td class="t">learned from confirmed matches</td></tr>
+<tr><td class="f">recurring_subscription</td><td>payer_person_id, amount_agorot, start_date, status</td><td class="t">the <b>manager's</b> record of who is<br>on הוראת קבע — parents never set it</td></tr>
+</tbody></table></div>
+
+<h3 style="border-inline-start:3px solid var(--belt-brown); padding-inline-start:10px">Health, belts &amp; events</h3>
+<div class="tw"><table>
+<thead><tr><th>Table</th><th>Key columns</th><th>Type notes</th></tr></thead><tbody>
+<tr><td class="f">health_form_template</td><td>kind, version, schema, source_pdf_object_key, published_at</td><td class="t">kind: full|trial<br>schema: JSONB, versioned</td></tr>
+<tr><td class="f">health_declaration</td><td>student_id, template_version, <b>answers_encrypted</b>, derived_flags, <b>signature_image_encrypted</b>, signed_by, signed_at, valid_until?, signed_ip, pdf_object_key</td><td class="t">answers: BYTEA, AES-256-GCM<br>derived_flags: JSONB, <b>booleans only</b><br>valid_until stays NULL — no expiry</td></tr>
+<tr><td class="f">consent_record</td><td>subject_type, subject_id, consent_type, version, granted, granted_at, revoked_at?, ip</td><td class="t">consent_type: terms|privacy|<br>photo_video|medical_share|event</td></tr>
+<tr><td class="f">belt_rank</td><td>class_id, name, kyu?, order_index, color_hex</td><td class="t">per class, editable, judo seeded</td></tr>
+<tr><td class="f">student_belt</td><td>student_id, belt_rank_id, awarded_on, awarded_by, event_id?, note?</td><td class="t">full history, never overwritten</td></tr>
+<tr><td class="f">event</td><td>type, title, starts_at, ends_at, location?, rsvp_deadline?, fee_agorot?, requires_consent, consent_text?, status</td><td class="t">type: competition|belt_exam|seminar|<br>joint_training|trip|other</td></tr>
+<tr><td class="f">event_target</td><td>event_id, target_type, target_id</td><td class="t">target_type: studio|class|group|student</td></tr>
+<tr><td class="f">event_registration</td><td>event_id, student_id, rsvp, responded_by?, consent_signed_at?, charge_id?, attended</td><td class="t">rsvp: pending|yes|no</td></tr>
+<tr><td class="f">event_exam_result</td><td>event_id, student_id, belt_rank_id, result, examiner_person_id, note?</td><td class="t">result: pass|fail<br>a pass writes student_belt in the<br>same transaction</td></tr>
+</tbody></table></div>
+
+<h3 style="border-inline-start:3px solid var(--belt-blue); padding-inline-start:10px">Communications &amp; calendar</h3>
+<div class="tw"><table>
+<thead><tr><th>Table</th><th>Key columns</th><th>Type notes</th></tr></thead><tbody>
+<tr><td class="f">announcement</td><td>author_person_id, title, body, scope_type, scope_id?, scheduled_for?, published_at?</td><td class="t">scope_type: studio|class|group<br>one-way — no replies, no chat</td></tr>
+<tr><td class="f">notification</td><td>person_id, kind, title, body, payload, read_at?</td><td class="t">payload: JSONB<br>the in-app inbox record</td></tr>
+<tr><td class="f">notification_delivery</td><td>notification_id, channel, status, provider_message_id?, error?, sent_at?</td><td class="t">channel: push|inapp<br>status: queued|sent|delivered|<br>failed|<b>no_token|denied</b></td></tr>
+<tr><td class="f">push_token</td><td>person_id, app, platform, token <b>UNIQUE</b>, last_seen_at</td><td class="t">app: staff|parent<br>platform: ios|android|web</td></tr>
+<tr><td class="f">calendar_feed</td><td>subject_type, person_id, <b>token UNIQUE</b>, rotated_at?</td><td class="t">subject_type: guardian|coach<br>rotating the token kills the old URL</td></tr>
+<tr><td class="f">data_export_request</td><td>subject_person_id, requested_by, status, object_key?, completed_at?</td><td class="t">JSON + PDF bundle</td></tr>
+</tbody></table></div>
+
+<div class="note warn"><span class="lbl">Invariants enforced by tests, not by discipline</span>
+<p>No money column is a float · every tenant-scoped table has <code>studio_id</code> and a leading
+composite index · no coach-scoped endpoint returns any financial field · health data never appears
+in serialized log output · the billing run is idempotent across repeated executions.</p></div>
+</section>
+
+<hr>
+
+<section id="roles">
+<h2><span class="sec">§3.2</span> Roles &amp; permissions</h2>
+<p class="dek">Two different mechanisms, which must not be conflated.</p>
+
+<div class="grid g2">
+<div class="card b b-plat"><span class="k">Granted by a human</span><h5>Staff roles</h5>
+<p>Rows in <code>role_assignment(person, role, scope_type, scope_id)</code> — scoped, revocable:
+<code>platform_admin</code> · <code>owner</code> · <code>manager</code> · <code>lead_coach</code> ·
+<code>assistant_coach</code>.</p></div>
+<div class="card b b-people"><span class="k">Derived, never granted</span><h5>Guardian is not a role</h5>
+<p>There is no guardian role, no <code>role_assignment</code> row, nothing for a manager to assign.
+A person is a guardian because a row exists in the <code>guardian</code> table linking them to a
+child. <strong>A guardian is an ordinary user with a login and some children attached.</strong>
+“Adult student” likewise isn't a role — it's one Person who is both the student and their own
+guardian.</p></div>
+</div>
+
+<p>So in the matrix below, the <code>guardian</code> column is not a role's permission set — it is
+what applies to a person <strong>for the specific children they are a guardian of</strong>, resolved
+per record. “own” always means “only for my own children”.</p>
+
+<p>One hard rule shapes the rest: <strong>coaches see people, never money.</strong>
+No charge, payment, debt or price is reachable from any coach-scoped endpoint or screen — which
+means you can hire a coach without exposing the club's finances.</p>
+
+<div class="tw"><table>
+<thead><tr><th>Capability</th><th class="ctr">owner</th><th class="ctr">manager</th><th class="ctr">lead<br>coach</th><th class="ctr">asst<br>coach</th><th class="ctr">guardian</th></tr></thead>
+<tbody>
+<tr><td>Studio settings, training year, rollover</td><td class="ctr">✓</td><td class="ctr">✓</td><td class="ctr">—</td><td class="ctr">—</td><td class="ctr">—</td></tr>
+<tr><td>Create / edit classes, groups, schedules</td><td class="ctr">✓</td><td class="ctr">✓</td><td class="ctr">—</td><td class="ctr">—</td><td class="ctr">—</td></tr>
+<tr><td>Manage staff and role assignments</td><td class="ctr">✓</td><td class="ctr">✓</td><td class="ctr">—</td><td class="ctr">—</td><td class="ctr">—</td></tr>
+<tr><td>View all students in studio</td><td class="ctr">✓</td><td class="ctr">✓</td><td class="ctr">—</td><td class="ctr">—</td><td class="ctr">—</td></tr>
+<tr><td>View students in own groups</td><td class="ctr">✓</td><td class="ctr">✓</td><td class="ctr">✓</td><td class="ctr">✓</td><td class="ctr">own</td></tr>
+<tr><td>Take / edit attendance</td><td class="ctr">✓</td><td class="ctr">✓</td><td class="ctr">✓</td><td class="ctr">✓</td><td class="ctr">—</td></tr>
+<tr><td>Pre-report an absence</td><td class="ctr">—</td><td class="ctr">—</td><td class="ctr">—</td><td class="ctr">—</td><td class="ctr">✓</td></tr>
+<tr><td>Edit a single session (time, place, coach, cancel)</td><td class="ctr">✓</td><td class="ctr">✓</td><td class="ctr">✓</td><td class="ctr">—</td><td class="ctr">—</td></tr>
+<tr><td>Create events · record belt exam results</td><td class="ctr">✓</td><td class="ctr">✓</td><td class="ctr">✓</td><td class="ctr">—</td><td class="ctr">—</td></tr>
+<tr><td>Read health <b>flags</b> (אסתמה / אלרגיה)</td><td class="ctr">✓</td><td class="ctr">✓</td><td class="ctr">✓</td><td class="ctr">✓</td><td class="ctr">own</td></tr>
+<tr><td>Read the full health <b>declaration</b></td><td class="ctr">✓</td><td class="ctr">✓</td><td class="ctr"><span class="chip crit">✗</span></td><td class="ctr"><span class="chip crit">✗</span></td><td class="ctr">own</td></tr>
+<tr><td>View charges, payments, debts</td><td class="ctr">✓</td><td class="ctr">✓</td><td class="ctr"><span class="chip crit">✗</span></td><td class="ctr"><span class="chip crit">✗</span></td><td class="ctr">own</td></tr>
+<tr><td>Record a payment · run reconciliation · billing runs</td><td class="ctr">✓</td><td class="ctr">✓</td><td class="ctr">—</td><td class="ctr">—</td><td class="ctr">—</td></tr>
+<tr><td>Read / write student and session notes</td><td class="ctr">✓</td><td class="ctr">✓</td><td class="ctr">✓</td><td class="ctr">✓</td><td class="ctr"><span class="chip crit">✗</span></td></tr>
+<tr><td>Publish announcements</td><td class="ctr">✓</td><td class="ctr">✓</td><td class="ctr">own groups</td><td class="ctr">—</td><td class="ctr">—</td></tr>
+<tr><td>Convert a lead · approve registrations</td><td class="ctr">✓</td><td class="ctr">✓</td><td class="ctr">—</td><td class="ctr">—</td><td class="ctr">—</td></tr>
+<tr><td>Export data · anonymize a student</td><td class="ctr">✓</td><td class="ctr">✓</td><td class="ctr">—</td><td class="ctr">—</td><td class="ctr">request</td></tr>
+</tbody></table></div>
+
+<div class="note"><span class="lbl">One person, many roles</span>
+<p>A role is a <code>(person, role, scope_type, scope_id)</code> tuple, so “the manager who is also
+the lead coach of the competitive group” is <strong>one person with one login and two role
+assignments</strong> — never two accounts. This is the single most common complaint about
+club software that models roles as a column on a user.</p></div>
+</section>
+
+<hr>
+
+<section id="states">
+<h2><span class="sec">§5.4a · §5.7 · §5.10</span> State machines</h2>
+<p class="dek">Four state machines carry most of the system's correctness. Each one has at least
+one state that exists specifically to prevent a lie.</p>
+
+<h3>Student lifecycle</h3>
+<figure>
+<svg viewBox="0 0 900 210" role="img" aria-label="Student status machine: lead becomes trial, trial converts to active via manager approval or becomes lost, active can be frozen or left.">
+<defs><marker id="ar3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+  <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker>
+<marker id="ar3A" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+  <path d="M0,0 L10,5 L0,10 z" fill="#1E4B8F"/></marker></defs>
+<g font-family="IBM Plex Mono, monospace" font-size="12">
+
+<rect x="24" y="52" width="104" height="42" rx="21" fill="none" stroke="currentColor" stroke-width="1.3"/>
+<text x="76" y="78" text-anchor="middle">lead</text>
+
+<rect x="184" y="52" width="104" height="42" rx="21" fill="none" stroke="currentColor" stroke-width="1.3"/>
+<text x="236" y="78" text-anchor="middle">trial</text>
+
+<rect x="344" y="52" width="166" height="42" rx="21" fill="none" stroke="currentColor" stroke-width="1.3" stroke-dasharray="4 3"/>
+<text x="427" y="78" text-anchor="middle" font-size="11">pending_approval</text>
+
+<rect x="566" y="52" width="104" height="42" rx="21" fill="none" stroke="#1E4B8F" stroke-width="2"/>
+<text x="618" y="78" text-anchor="middle" fill="#1E4B8F" font-weight="600">active</text>
+
+<rect x="726" y="14" width="104" height="38" rx="19" fill="none" stroke="currentColor" stroke-width="1.1" opacity=".85"/>
+<text x="778" y="38" text-anchor="middle" font-size="11.5" opacity=".85">frozen</text>
+
+<rect x="726" y="96" width="104" height="38" rx="19" fill="none" stroke="currentColor" stroke-width="1.1" opacity=".85"/>
+<text x="778" y="120" text-anchor="middle" font-size="11.5" opacity=".85">left</text>
+
+<rect x="184" y="150" width="104" height="38" rx="19" fill="none" stroke="currentColor" stroke-width="1.1" opacity=".7"/>
+<text x="236" y="174" text-anchor="middle" font-size="11.5" opacity=".8">lost</text>
+
+<g stroke="currentColor" stroke-width="1.2" fill="none" marker-end="url(#ar3)">
+  <line x1="130" y1="73" x2="180" y2="73"/>
+  <line x1="290" y1="73" x2="340" y2="73"/>
+  <line x1="236" y1="96" x2="236" y2="146"/>
+  <path d="M670,66 L700,66 L700,34 L722,34"/>
+  <path d="M670,80 L700,80 L700,114 L722,114"/>
+</g>
+<g stroke="#1E4B8F" stroke-width="1.7" fill="none" marker-end="url(#ar3A)">
+  <line x1="512" y1="73" x2="562" y2="73"/>
+</g>
+<g font-family="IBM Plex Sans, sans-serif" font-size="9.5" opacity=".7">
+  <text x="155" y="66" text-anchor="middle">books</text>
+  <text x="315" y="66" text-anchor="middle">attends</text>
+  <text x="246" y="126" text-anchor="start">no follow-up</text>
+  <text x="700" y="56" text-anchor="middle">injury</text>
+  <text x="700" y="98" text-anchor="middle">notice</text>
+</g>
+<text x="537" y="66" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="9.5" fill="#1E4B8F" font-weight="600">manager converts</text>
+</g>
+</svg>
+<figcaption><b>A lead is just a student in an early status — there is no separate lead entity.</b>
+Everything before <code>active</code> has <strong>no enrollment</strong>, which is precisely why the
+billing run generates no charges for them, they are excluded from active-student counts, and
+attendance works with no special-casing. Only the blue transition is a human decision.</figcaption>
+</figure>
+
+<h3>Attendance</h3>
+<div class="tw"><table>
+<thead><tr><th>State</th><th>Set by</th><th>What it means</th><th>Bulk “סמן הכל נוכח”</th></tr></thead><tbody>
+<tr><td class="f">unmarked</td><td class="t">default</td><td><b>Nobody has said anything.</b> A session left entirely unmarked shows as a gap in reports — never as 25 phantom attendees</td><td><span class="chip ok">→ present</span></td></tr>
+<tr><td class="f">present</td><td class="t">coach | bulk</td><td>Marked present individually or by the bulk action</td><td><span class="chip">untouched</span></td></tr>
+<tr><td class="f">absent_unexcused</td><td class="t">coach</td><td>Didn't show up, nobody warned us</td><td><span class="chip">untouched</span></td></tr>
+<tr><td class="f">absent_excused</td><td class="t">parent | coach</td><td>A guardian pre-reported it, or a coach explicitly excused it</td><td><span class="chip crit">never overwritten</span></td></tr>
+</tbody></table></div>
+<div class="note crit"><span class="lbl">The bulk rule</span>
+<p><code>סמן הכל נוכח</code> promotes only <code>unmarked</code> rows. A parent's pre-reported
+absence is <strong>locked against bulk actions</strong> and can only be changed by an explicit coach
+long-press. Without this, one tap silently erases every warning a parent gave you.</p></div>
+
+<h3>Charge &amp; payment order</h3>
+<div class="grid g2">
+<div class="card b b-money"><span class="k">charge.status</span><h5>open → settled</h5>
+<p>A charge is <strong>never mutated to record payment</strong>. It is settled when the sum of its
+<code>payment_allocation</code> rows equals <code>amount_agorot</code>. <code>status</code> is a
+derived cache, recomputed in exactly one place. Also: <code>void</code>, <code>written_off</code>.</p></div>
+<div class="card b b-money"><span class="k">payment_order.status</span><h5>The one that matters</h5>
+<p><code>pending → paid</code>, or <code>failed</code>, <code>expired</code> — or
+<strong><code>amount_mismatch</code></strong>. That last state exists because a parent can edit the
+form amount before submitting: real money arrives, but it doesn't match. The payment is recorded,
+allocated to nothing, and a manager is alerted.</p></div>
+</div>
+</section>
+
+<hr>
+
+<section id="firstrun">
+<h2><span class="sec">§6.1</span> First run</h2>
+<p class="dek">Two apps, two completely different arrivals. The ordering of the gates is load-bearing
+in both.</p>
+
+<div class="grid g2" style="align-items:start">
+<div>
+<h4>Parent app</h4>
+<ol class="steps">
+<li><span class="mk">1</span><span class="bd"><b>שפה</b><span>Device locale → he / en / ru. <strong>Before login</strong> — a Russian-speaking parent cannot read a Hebrew consent screen.</span></span></li>
+<li><span class="mk">2</span><span class="bd"><b>Google / Apple</b><span>System browser only, never a webview. Google returns <code>disallowed_useragent</code> inside one.</span></span></li>
+<li><span class="mk">3</span><span class="bd"><b>Resolve identity</b><span>Invitation token → attach to the pre-created Person. Or match on verified email/phone. Or “לא מצאנו אותך”.</span></span></li>
+<li><span class="mk">4</span><span class="bd"><b>Studio picker</b><span>Shown only if they belong to more than one studio.</span></span></li>
+<li><span class="mk gate">5</span><span class="bd"><b>אישורים <span class="chip crit">gate</span></b><span>Terms of service and privacy policy.</span></span></li>
+<li><span class="mk gate">6</span><span class="bd"><b>הצהרת בריאות <span class="chip crit">gate</span></b><span>One per child with <code>health_status = missing</code>, signed in sequence. Nothing else is reachable.</span></span></li>
+<li><span class="mk">7</span><span class="bd"><b>צילום ופרסום</b><span>Per child. Skipping records <strong>no</strong> consent — the safe default.</span></span></li>
+<li><span class="mk">8</span><span class="bd"><b>התראות</b><span>Value pre-prompt first, <em>then</em> the OS dialog. iOS gives you one chance and a denial is permanent.</span></span></li>
+<li><span class="mk">9</span><span class="bd"><b>יומן</b><span>Offer the ICS subscription. Fully optional.</span></span></li>
+<li><span class="mk done">→</span><span class="bd"><b>Home</b><span>No payment step — the payments screen always shows all three ways to pay, so nothing is decided up front.</span></span></li>
+</ol>
+</div>
+<div>
+<h4>Staff app</h4>
+<ol class="steps">
+<li><span class="mk">1</span><span class="bd"><b>שפה</b><span>Same locale pick.</span></span></li>
+<li><span class="mk">2</span><span class="bd"><b>Google / Apple</b><span>System browser, same rule.</span></span></li>
+<li><span class="mk">3</span><span class="bd"><b>Resolve → three ways</b><span>Owner of an empty studio → setup wizard. Staff with roles → tour. <strong>No role at all → refused</strong>, with a link to the parent app.</span></span></li>
+<li><span class="mk">4</span><span class="bd"><b>Three-screen tour</b><span>“כאן השיעורים של היום” · “לחיצה לסימון נוכחות” · “עובד גם בלי אינטרנט”.</span></span></li>
+<li><span class="mk">5</span><span class="bd"><b>התראות</b><span>Asked <em>during</em> the tour — coaches need substitution and cancellation notices.</span></span></li>
+<li><span class="mk gate">6</span><span class="bd"><b>Offline priming <span class="chip crit">blocking</span></b><span>Today's and tomorrow's rosters written to IndexedDB <strong>before</strong> they reach the Today screen. Re-runs on every foreground resume.</span></span></li>
+<li><span class="mk done">→</span><span class="bd"><b>Today</b><span>Their sessions, chronologically, with a state chip on each.</span></span></li>
+</ol>
+</div>
+</div>
+
+<div class="note"><span class="lbl">Parent app in trial state</span>
+<p>A guardian whose children are all <code>trial</code> sees a reduced home: the booked session with
+a countdown, add-to-calendar, directions, and what to bring. No payments screen — they have no
+charges. No attendance history, no belt strip. After the lesson the home asks “איך היה?”, and once a
+manager converts them the full app appears with no further action from the parent.</p></div>
+
+<div class="note crit"><span class="lbl">Why offline priming blocks</span>
+<p>A coach whose very first session is in a basement with no signal must <em>already</em> have the
+roster. If priming is lazy or best-effort, the offline feature is theatre — it works in the office
+and fails on the mat, which is the only place it matters.</p></div>
+
+<h4>The studio setup wizard <span style="text-transform:none;letter-spacing:0;font-family:var(--f-body);color:var(--muted)">— resumable, progress persisted</span></h4>
+<pre>studio details + logo  →  <b>create a class</b>  →  <b>create a group</b>  →  weekly schedule
+       →  assign a coach  →  set a price  →  training year + closures
+       →  <b>generate sessions</b>  →  invite the first student's guardian</pre>
+</section>
+
+<hr>
+
+<section id="funnel">
+<h2><span class="sec">§5.4a</span> Trial &amp; conversion</h2>
+<p class="dek">The public link's only job is to get someone through the door for one free lesson.
+Nobody enrolls themselves.</p>
+
+<ol class="steps">
+<li><span class="mk">1</span><span class="bd"><b>The landing page</b><span>A public page at <code>/t/{studio-slug}</code> — the club's shop window, not a form. Logo, photos, what the club does, where and when, and one offer: <strong>שיעור ניסיון חינם</strong>. A per-group QR pre-selects that group.</span></span></li>
+<li><span class="mk">2</span><span class="bd"><b>Sign in first, then children</b><span>Google or Apple in the system browser — <strong>before</strong> any child details. Then name, birthdate and class▸group per child, with <code>+ הוסף ילד נוסף</code> for siblings. Groups are filtered by the child's age where <code>age_min</code>/<code>age_max</code> are set.</span></span></li>
+<li><span class="mk">3</span><span class="bd"><b>Short health declaration</b><span>The trial template (<code>kind='trial'</code>) plus a drawn signature, per child. Signed before they set foot in the dojo.</span></span></li>
+<li><span class="mk">4</span><span class="bd"><b>Pick the lesson</b><span>The next N upcoming sessions of each chosen group, one pick per child. Then <code>[ הוסף ליומן ]</code> and a downloadable <code>.ics</code>.</span></span></li>
+<li><span class="mk done">5</span><span class="bd"><b>Straight into the parent app</b><span>Already signed in, profile live, status <code>trial</code>. <strong>No invitation email, no waiting</strong> — one less place for the funnel to leak. The manager sees them in the שיעורי ניסיון queue immediately.</span></span></li>
+<li><span class="mk">6</span><span class="bd"><b>Before the lesson</b><span>Parent reminded 24h ahead. The roster flags them unmistakably.</span></span></li>
+<li><span class="mk">7</span><span class="bd"><b>The lesson</b><span>Attendance taken exactly as normal — the trial row is just flagged. Coach can leave a note.</span></span></li>
+<li><span class="mk">8</span><span class="bd"><b>Follow-up</b><span>Day 1 “איך היה?” · day 3 · day 7. The 7–14 day window every buyer's guide names as decisive.</span></span></li>
+<li><span class="mk done">9</span><span class="bd"><b>Manager converts</b><span>Picks the group, sets the price, status → <code>active</code>, enrollment created. The parent then completes the <strong>full</strong> health declaration through the app gate. No conversion after N days → <code>lost</code>, with a reason.</span></span></li>
+</ol>
+
+<div class="note"><span class="lbl">Why sign-in comes before child details</span>
+<p>The account exists the moment they authenticate, so the profile is live in the parent app when
+they finish — no invitation email, no waiting, one less step to abandon at. And someone who drops
+out after signing in leaves a Person with no children, which the parent app renders as a
+resume-booking prompt rather than a dead end.</p></div>
+
+<h4>How a trial student appears when taking attendance</h4>
+<div class="mock">ג'ודו / מתחילים  ·  א' 17:00
+22 רשומים  ·  1 ניסיון
+
+ ✓  דנה כהן
+ ✓  יוסי כהן
+ 👤  נועה לוי          ניסיון · שיעור ראשון
+     ⌐ לא רשומה לקבוצה · אין חיוב
+ ✓  איתי מזרחי</div>
+<p><code>student.status = 'trial'</code> is surfaced on the roster row, on the student card, in the
+session header count and in the manager's daily summary — <strong>never inferred from the absence of
+an enrollment.</strong> Whoever is taking attendance must be able to see at a glance that this child
+is not enrolled and is not being charged.</p>
+
+<div class="grid g3">
+<div class="card"><span class="k">Abuse limit</span><h5>One free lesson</h5><p>Per student, full stop. A manager can grant a second in one tap (<code>is_override</code>) so a child torn between judo and karate isn't lost to the rule.</p></div>
+<div class="card"><span class="k">Privacy</span><h5>Leads are minors too</h5><p>An unconverted lead is still personal data about a child. The retention job anonymizes them on the same schedule as students who left.</p></div>
+<div class="card"><span class="k">Reporting</span><h5>Funnel for free</h5><p><code>student_status_history</code> yields enquiries → booked → attended → converted, by source and month, with no spreadsheet export.</p></div>
+</div>
+</section>
+
+<hr>
+
+<section id="enroll">
+<h2><span class="sec">§5.4</span> Enrollment</h2>
+<p class="dek">Two paths. Both end with a manager deciding, and with the parent — not the manager —
+filling in the health form.</p>
+
+<div class="grid g2">
+<div class="card b b-people"><span class="k">Path A</span><h5>Manager adds directly</h5>
+<p><code>+ תלמיד חדש</code> → parent details → child details and group → <code>+ הוסף ילד נוסף</code>
+for each sibling → save. Everything is created immediately with <code>health_status = missing</code>
+and an invitation goes out. <strong>The manager never types a health form</strong> — the parent
+completes it through the app gate.</p></div>
+<div class="card b b-people"><span class="k">Path B</span><h5>Public trial → manager converts</h5>
+<p>The public URL and QR book a first free lesson only. After the trial the manager converts the
+lead, picks the group and sets the price. The public link is therefore a <strong>marketing
+asset</strong> — Instagram, a flyer QR, the club's bio — not an admin form.</p></div>
+</div>
+
+<h4>Where each job lives</h4>
+<div class="tw"><table>
+<thead><tr><th>Stage</th><th>Who does it</th><th>What they provide</th></tr></thead><tbody>
+<tr><td><b>Trial booking</b></td><td>Public link</td><td>Name, age, parent name, phone — <b>four fields</b></td></tr>
+<tr><td><b>Conversion</b></td><td>Manager</td><td>Decides they're in, picks the group, sets the price</td></tr>
+<tr><td><b>Full data</b></td><td>Parent, in-app</td><td>Health declaration + consents, via the existing gate</td></tr>
+</tbody></table></div>
+
+<h4>Adding a second child, a month later</h4>
+<p>The parent does nothing to “re-register”. Three routes, all producing the same two rows plus an
+enrollment — and never a duplicate parent, because submissions are matched on verified email or phone:</p>
+<div class="mock">מסלול א' — מנהל:   פרופיל יעל → [+ הוסף ילד] → נועה, קראטה▸ילדים → שמור
+מסלול ב' — הורה:   באפליקציה → [+ הוסף ילד] → נשלח לאישור מנהל
+מסלול ג' — קישור:  ממלאת שוב → המערכת מזהה לפי אימייל/טלפון → "הורה קיים"</div>
+<p>Her home screen goes from two children to three. Nothing else about her account changes.
+נועה's first charge is prorated by remaining sessions — <code>320 × 2/8 = 80₪</code> — and from the
+following month a single payment link covers all three.</p>
+</section>
+
+<hr>
+
+<section id="health">
+<h2><span class="sec">§5.5</span> The health gate</h2>
+<p class="dek">One gate, in one place: the parent app. Nothing on the mat is ever blocked.</p>
+
+<div class="grid g2">
+<div class="card b b-rank"><span class="k">Where it bites</span><h5>Parent app — hard block</h5>
+<p>A guardian signs in and any of their children has <code>health_status = missing</code> → the app
+routes into the declaration flow and <strong>no other screen is reachable</strong>. This is the
+only gate.</p></div>
+<div class="card b b-rank"><span class="k">Where it does not</span><h5>The mat — never blocked</h5>
+<p>The roster shows <code>⚠ הצהרת בריאות חסרה</code> with a one-tap reminder; the parent is chased
+on days 1, 3 and 7; the manager dashboard lists everyone missing. The coach can still mark them
+present.</p></div>
+</div>
+
+<div class="note"><span class="lbl">Why blocking attendance would be worse</span>
+<p>Blocking a row in an app does not stop a child stepping onto a mat — the coach controls that,
+physically, and can simply decline to accept the child. A hard block would only stop the
+<em>record</em> from being accurate: <strong>worse data, no safer child.</strong> There is
+deliberately no <code>block_attendance_without_health</code> setting.</p></div>
+
+<h4>What gets stored, and who can read it</h4>
+<div class="tw"><table>
+<thead><tr><th>Field</th><th>Storage</th><th>Readable by</th></tr></thead><tbody>
+<tr><td class="f">answers_encrypted</td><td class="t">BYTEA · AES-256-GCM, key outside the DB</td><td>Manager, owner — <b>every read audit-logged</b></td></tr>
+<tr><td class="f">signature_image_encrypted</td><td class="t">BYTEA · same key ring</td><td>Manager, owner</td></tr>
+<tr><td class="f">derived_flags</td><td class="t">JSONB · <b>booleans only</b>, never free text</td><td>All coaches of that student's groups</td></tr>
+<tr><td class="f">pdf_object_key</td><td class="t">Signed URL, short-lived</td><td>The guardian, and managers</td></tr>
+<tr><td class="f">valid_until</td><td class="t">NULL — <b>declarations do not expire</b></td><td>Config flag exists, defaults off</td></tr>
+</tbody></table></div>
+<p><code>derived_flags</code> exists so a coach can be warned — <code>⚠ אסתמה</code> — without anyone
+decrypting a medical file. The full form is a structured template mapped from the studio's existing
+PDF, signed with a finger, and rendered back out as a filled PDF using an embedded Noto Sans Hebrew
+face for RTL.</p>
+</section>
+
+<hr>
+
+<section id="schedule">
+<h2><span class="sec">§5.6</span> Schedule &amp; sessions</h2>
+<p class="dek">Sessions are <strong>materialized rows</strong>, generated for the whole training year —
+not computed from a rule at read time. That is what lets a manager say “this Sunday is 90 minutes
+at the beach” without breaking the pattern.</p>
+
+<pre>Studio "Gladiator Team"
+├─ Class "ג'ודו"                    <b>← a discipline. No schedule, no roster.</b>
+│    ├─ Group "מתחילים"             <b>← schedule + roster + staff + price live HERE</b>
+│    │    ├─ rule: א' 17:00–19:00
+│    │    ├─ rule: ו' 12:00–14:00
+│    │    └─ Session 2026-08-23 17:00   <b>← attendance is taken HERE</b>
+│    ├─ Group "מתקדמים"
+│    └─ Group "נבחרת"
+└─ Class "אומנויות לחימה"</pre>
+
+<p>Changing a schedule rule rewrites <strong>only</strong> sessions in the future. Two categories are
+protected and never overwritten: sessions in the past (so attendance history keeps its true times),
+and any session with <code>is_manually_edited = true</code>. The change dialog shows exactly what
+will happen before it happens:</p>
+
+<div class="mock">שינוי לוח זמנים — ג'ודו / מתחילים
+מ:  א' 17:00–19:00  ·  ו' 12:00–14:00
+ל:  א' 17:30–19:30  ·  ו' 12:00–14:00
+
+  ✓ 32 שיעורים עתידיים יעודכנו
+  ✕ 18 שיעורים שהתקיימו — ללא שינוי
+  ✕ 2 שיעורים שעודכנו ידנית — ללא שינוי  ⚠
+      · 15.11 אימון ים 90 דק'
+      · 22.11 אימון משותף</div>
+
+<p>Closures work the same way: the training-year setup <strong>pre-fills Israeli holidays as
+proposals the manager ticks</strong>, never as automatic closures — studios differ, and a wrong
+guess deletes real lessons. Adding a closure cancels the affected sessions and notifies the
+affected guardians.</p>
+</section>
+
+<hr>
+
+<section id="attend">
+<h2><span class="sec">§5.7 · §10</span> Attendance &amp; offline sync</h2>
+<p class="dek">The single most adoption-critical feature, and the one no competitor has.</p>
+
+<figure>
+<svg viewBox="0 0 900 320" role="img" aria-label="Offline attendance: the coach's device caches rosters in IndexedDB, writes marks to a local pending-ops queue with a client mark id, updates the UI immediately, and flushes to an idempotent batch endpoint when connectivity returns.">
+<defs><marker id="ar4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+  <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker>
+<marker id="ar4A" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+  <path d="M0,0 L10,5 L0,10 z" fill="#1E4B8F"/></marker></defs>
+<g font-family="IBM Plex Sans, sans-serif" font-size="12.5">
+
+<rect x="24" y="24" width="470" height="272" rx="10" fill="none" stroke="currentColor" stroke-width="1" stroke-dasharray="5 4" opacity=".45"/>
+<text x="40" y="46" font-family="IBM Plex Mono, monospace" font-size="10.5" opacity=".6" letter-spacing="1">COACH DEVICE — NO SIGNAL</text>
+
+<rect x="50" y="66" width="180" height="52" rx="7" fill="none" stroke="currentColor" stroke-width="1.3"/>
+<text x="140" y="88" text-anchor="middle" font-weight="600" font-size="12.5">Roster UI</text>
+<text x="140" y="105" text-anchor="middle" font-size="10" opacity=".6">tap → optimistic update</text>
+
+<rect x="288" y="66" width="180" height="52" rx="7" fill="none" stroke="currentColor" stroke-width="1.3"/>
+<text x="378" y="88" text-anchor="middle" font-weight="600" font-size="12.5">IndexedDB</text>
+<text x="378" y="105" text-anchor="middle" font-size="10" opacity=".6">cached rosters (Dexie)</text>
+
+<rect x="50" y="176" width="418" height="56" rx="7" fill="none" stroke="#1E4B8F" stroke-width="1.6"/>
+<text x="259" y="199" text-anchor="middle" font-weight="600" font-size="12.5" fill="#1E4B8F">pending_ops queue</text>
+<text x="259" y="217" text-anchor="middle" font-size="10" fill="#1E4B8F" opacity=".85">client_mark_id (UUID) · device_marked_at · payload</text>
+
+<text x="259" y="266" text-anchor="middle" font-size="11" opacity=".7">🔔 badge: &#8220;3 שיעורים ממתינים לסנכרון&#8221;</text>
+
+<rect x="616" y="66" width="250" height="52" rx="7" fill="none" stroke="currentColor" stroke-width="1.3"/>
+<text x="741" y="88" text-anchor="middle" font-weight="600" font-size="12.5">GET /sync/bootstrap</text>
+<text x="741" y="105" text-anchor="middle" font-size="10" opacity=".6">one payload, a date window</text>
+
+<rect x="616" y="176" width="250" height="56" rx="7" fill="none" stroke="#1E4B8F" stroke-width="1.6"/>
+<text x="741" y="199" text-anchor="middle" font-weight="600" font-size="12.5" fill="#1E4B8F">POST /attendance/batch</text>
+<text x="741" y="217" text-anchor="middle" font-size="10" fill="#1E4B8F" opacity=".85">idempotent on client_mark_id</text>
+
+<g stroke="currentColor" stroke-width="1.2" fill="none" marker-end="url(#ar4)">
+  <line x1="232" y1="92" x2="284" y2="92"/>
+  <line x1="612" y1="92" x2="472" y2="92"/>
+  <line x1="140" y1="120" x2="140" y2="172"/>
+</g>
+<g stroke="#1E4B8F" stroke-width="1.6" fill="none" marker-end="url(#ar4A)">
+  <line x1="472" y1="204" x2="612" y2="204"/>
+</g>
+<text x="542" y="196" text-anchor="middle" font-size="9.5" fill="#1E4B8F">flush on reconnect</text>
+<text x="542" y="84" text-anchor="middle" font-size="9.5" opacity=".65">prime on open</text>
+<text x="150" y="150" text-anchor="start" font-size="9.5" opacity=".65">every mark, locally first</text>
+</g>
+</svg>
+<figcaption><b>Conflicts resolve by <code>device_marked_at</code> — last write wins — with one
+exception:</b> a parent's pre-reported absence never loses to a bulk action, regardless of timestamp.
+Rejected operations surface as dismissible conflict cards; nothing is silently dropped.</figcaption>
+</figure>
+
+<div class="mock">ג'ודו / מתחילים  ·  א' 17:00
+נוכחות: 22 · חסרים: 2 · לא סומן: 1
+
+      [  ✓  סמן הכל נוכח  ]
+
+ ✓  דנה כהן
+ ✓  יוסי כהן
+ ✕  נועה לוי        הודיעו מראש
+ ✓  איתי מזרחי
+ ✕  רוני ברק
+ ○  עמית שרון       לא סומן
+ ⚠  ליאם דוד        הצהרת בריאות חסרה</div>
+
+<h4>Four network states, not two</h4>
+<p>The interesting failures live between “online” and “offline”. The client never trusts
+<code>navigator.onLine</code> alone — it reports true on a captive-portal wifi that routes
+nowhere — so mode is derived from actual request outcomes against a lightweight ping.</p>
+<div class="tw"><table>
+<thead><tr><th>State</th><th>What it looks like</th><th>How the app behaves</th></tr></thead><tbody>
+<tr><td><b>Online</b></td><td>Requests succeed</td><td>Normal</td></tr>
+<tr><td><b>Slow</b></td><td>3–15s responses, a basement with one bar</td><td>A 6s timeout <b>demotes the request into the offline path</b> rather than spinning. Never a blocked screen waiting on a slow write</td></tr>
+<tr><td><b>Intermittent</b></td><td>Connects, drops, reconnects. Captive portals</td><td>Treated as offline until two consecutive requests succeed, so the app doesn't thrash between modes mid-session</td></tr>
+<tr><td><b>Offline</b></td><td>No route at all</td><td>Full offline path</td></tr>
+<tr><td><b>API down, client online</b></td><td>5xx, or a failing health check</td><td>Distinguished from offline: “השרת אינו זמין”. Queueable writes still queue; the rest are blocked <b>with an explanation</b>, not a silent failure</td></tr>
+</tbody></table></div>
+
+<h4>Authentication while offline — the one that bites</h4>
+<p>The access JWT lives 15 minutes. A coach on a mat for 90 minutes will have an expired token long
+before they finish.</p>
+<ul class="tight">
+<li><b>Offline writes never depend on a valid token.</b> Marks go to <code>pending_ops</code>
+regardless of auth state — the local write is not an API call.</li>
+<li>On reconnect the client refreshes (rotating refresh token, 30 days) and <em>then</em> flushes.</li>
+<li>If the refresh token has also expired — a device offline over a month — <b>the queue is
+preserved, not discarded.</b> The user signs in again and it flushes afterwards, validated against
+the same <code>person_id</code>.</li>
+<li>If the re-authenticated identity is a <em>different</em> person, the queue is not flushed — it
+becomes a conflict card for a manager. A device changing hands must not silently rewrite who marked
+what.</li>
+<li><b>There is no code path that discards unsynced work.</b></li>
+</ul>
+
+<h4>Cross-actor conflicts</h4>
+<p>The interesting case isn't two coaches — it's a coach offline while a manager works online.</p>
+<div class="tw"><table>
+<thead><tr><th>Situation</th><th>Resolution</th></tr></thead><tbody>
+<tr><td>Coach marks attendance offline; a manager cancels that session meanwhile</td><td>Marks are accepted and stored, but a card appears for the manager: <span dir="rtl">“השיעור בוטל — התקבלו 22 סימוני נוכחות”</span>. A human decides. Never silently dropped, never silently applied</td></tr>
+<tr><td>Coach marks a student who was unenrolled meanwhile</td><td>Stored, flagged, surfaced the same way</td></tr>
+<tr><td>Two coaches mark the same session</td><td>Last write by <code>device_marked_at</code> — <b>except</b> a parent pre-report, which never loses to a bulk action regardless of timestamp</td></tr>
+<tr><td>The same device flushes twice</td><td>Idempotent on <code>client_mark_id</code>; the replay is a no-op</td></tr>
+</tbody></table></div>
+
+<h4>Staleness &amp; cache budget</h4>
+<p>The bootstrap payload carries <code>synced_at</code> and a server <code>generation</code>. Past
+24 hours the roster header shows <span dir="rtl">נתונים מ־&lt;time&gt;</span> and refresh is retried
+on every open and foreground resume; past 7 days the cache is untrustworthy for display but the
+queue is still preserved and flushable. The cache is bounded to two days of sessions, evicted
+oldest-first — with <strong><code>pending_ops</code> exempt from eviction under all
+circumstances.</strong> Unsynced work is the one thing that must never be reclaimed.</p>
+
+<h4>Offline scope per client</h4>
+<div class="tw"><table>
+<thead><tr><th></th><th>Staff app</th><th>Parent app</th><th>Dashboard</th></tr></thead><tbody>
+<tr><td><b>Scope</b></td><td><span class="chip ok">full for attendance</span></td><td><span class="chip">read-only cache</span></td><td><span class="chip warn">online only</span></td></tr>
+<tr><td><b>Cached</b></td><td>Today + tomorrow's sessions, rosters, student cards, health flags, belts</td><td>Upcoming sessions, announcements, student profile, the trial booking</td><td>—</td></tr>
+<tr><td><b>Writable offline</b></td><td>Attendance, session notes, student notes</td><td>Nothing</td><td>—</td></tr>
+<tr><td><b>Never offline</b></td><td>Payments, reports, settings, staff management</td><td>Payments, absence pre-reports, RSVP</td><td>—</td></tr>
+</tbody></table></div>
+<p>A parent's <strong>absence pre-report requires a connection on purpose</strong>: it's
+time-critical and worthless if it lands after the lesson. The app says so rather than queuing it
+into the void.</p>
+
+<h4>What works offline, and what doesn't</h4>
+<div class="tw"><table>
+<thead><tr><th>Capability</th><th>Offline behaviour</th></tr></thead><tbody>
+<tr><td>Today's and tomorrow's sessions + rosters</td><td><span class="chip ok">cached, readable</span></td></tr>
+<tr><td>Marking attendance</td><td><span class="chip ok">writable, queued</span></td></tr>
+<tr><td>Session and student notes</td><td><span class="chip ok">writable, queued</span></td></tr>
+<tr><td>Student details, health flags, belts</td><td><span class="chip">cached read-only, own groups</span></td></tr>
+<tr><td>Parent absence pre-reports</td><td><span class="chip warn">read from cache, write needs signal</span></td></tr>
+<tr><td>Payments, reports, settings</td><td><span class="chip warn">requires connection, clear offline state</span></td></tr>
+</tbody></table></div>
+</section>
+
+<hr>
+
+<section id="billing">
+<h2><span class="sec">§5.10</span> Billing run</h2>
+<p class="dek">A worker job, once a month, per studio. Only the <em>first</em> charge is ever variable.</p>
+
+<ol class="steps">
+<li><span class="mk">1</span><span class="bd"><b>Walk active enrollments</b><span>Every <code>active</code> enrollment not covered by a <code>student_freeze</code> gets one <code>charge</code> with <code>kind = tuition</code> for the period. Leads, trials and frozen students produce nothing — because they have no active enrollment.</span></span></li>
+<li><span class="mk">2</span><span class="bd"><b>Prorate the first month only</b><span><code>amount = round(monthly × remaining_sessions ÷ total_sessions_in_period)</code> — using <strong>materialized sessions, not calendar days</strong>. The original amount and a readable <code>proration_note</code> are stored, so the parent sees “בגין 3 מתוך 8 שיעורים”.</span></span></li>
+<li><span class="mk">3</span><span class="bd"><b>Flat thereafter</b><span>Closures, holidays and absences never change the amount. The monthly fee buys the slot, not the sessions.</span></span></li>
+<li><span class="mk">4</span><span class="bd"><b>Idempotent</b><span>Unique on <code>(enrollment_id, period_year, period_month, kind)</code>. Re-running creates nothing.</span></span></li>
+<li><span class="mk">5</span><span class="bd"><b>Escalate what goes unpaid</b><span>Day 3 a gentle reminder, day 7 firmer, day 14 a final notice plus a manager task. Aged debt (0–30 / 31–60 / 60+) on the finance report.</span></span></li>
+</ol>
+</section>
+
+<hr>
+
+<section id="upay">
+<h2><span class="sec">§5.10 · §12</span> uPay payment</h2>
+<p class="dek">The manager sets the price. The parent chooses <em>how</em> to pay — and all three
+options are always visible. Nothing is ever hidden from the payments screen.</p>
+
+<div class="mock">תשלומים
+
+חובות פתוחים
+  ספטמבר 2026   דנה   320₪
+  ספטמבר 2026   יוסי  320₪
+  אוקטובר 2026  דנה   320₪
+  אוקטובר 2026  יוסי  320₪
+                        ─────
+  סה"כ חוב            1,280₪
+
+איך תרצה לשלם?
+┌─────────────────────────────────────┐
+│ 💳  כרטיס אשראי                      │
+│     בחר חודשים   [1] [2] [3] [6]     │
+│     תשלומים בכרטיס  [1] [2] [3]      │
+│     סה"כ 1,280₪        [ לתשלום ]    │
+├─────────────────────────────────────┤
+│ 🔁  הוראת קבע                        │
+│     קישור להקמת הוראת קבע  ▸         │
+│     ⚠ רשומה הוראת קבע פעילה —        │
+│        ודא שאינך משלם פעמיים         │
+├─────────────────────────────────────┤
+│ 💵  מזומן                            │
+│     שלמו למאמן בתחילת החודש          │
+└─────────────────────────────────────┘</div>
+
+<figure>
+<svg viewBox="0 0 900 430" role="img" aria-label="uPay one-time payment sequence: the app requests N months, the backend creates a payment order with a UUID reference, renders an auto-submitting form to uPay's hosted page, the parent pays, uPay sends an unsigned IPN about five minutes later, the backend verifies the amount against the expected value and allocates the payment across charges.">
+<defs><marker id="ar5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+  <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker>
+<marker id="ar5A" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+  <path d="M0,0 L10,5 L0,10 z" fill="#1E4B8F"/></marker>
+<marker id="ar5C" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+  <path d="M0,0 L10,5 L0,10 z" fill="#A93A2C"/></marker></defs>
+<g font-family="IBM Plex Sans, sans-serif" font-size="12">
+
+<g font-family="IBM Plex Mono, monospace" font-size="10.5" letter-spacing="1" opacity=".7" text-anchor="middle">
+  <text x="90" y="26">PARENT APP</text>
+  <text x="360" y="26">BACKEND</text>
+  <text x="700" y="26">uPAY</text>
+</g>
+<g stroke="currentColor" stroke-width="1" opacity=".28">
+  <line x1="90" y1="38" x2="90" y2="410"/>
+  <line x1="360" y1="38" x2="360" y2="410"/>
+  <line x1="700" y1="38" x2="700" y2="410"/>
+</g>
+
+<g stroke="currentColor" stroke-width="1.2" fill="none" marker-end="url(#ar5)">
+  <line x1="92" y1="62" x2="356" y2="62"/>
+  <line x1="360" y1="176" x2="696" y2="176"/>
+  <line x1="92" y1="216" x2="696" y2="216"/>
+  <line x1="360" y1="392" x2="94" y2="392"/>
+</g>
+<text x="224" y="54" text-anchor="middle">choose N months</text>
+<text x="528" y="168" text-anchor="middle">auto-submitting form POST · amount · paymentdetails=public_ref</text>
+<text x="394" y="208" text-anchor="start" opacity=".75">parent enters card on uPay's hosted page — card data never touches our servers</text>
+<text x="227" y="384" text-anchor="middle">paid · charges settled</text>
+
+<rect x="230" y="76" width="260" height="76" rx="6" fill="none" stroke="currentColor" stroke-width="1.1"/>
+<text x="360" y="97" text-anchor="middle" font-size="11.5" font-weight="600">create payment_order</text>
+<text x="360" y="114" text-anchor="middle" font-size="10" opacity=".7">public_ref = <tspan font-family="IBM Plex Mono, monospace">UUIDv4</tspan></text>
+<text x="360" y="130" text-anchor="middle" font-size="10" opacity=".7">expected_amount_agorot</text>
+<text x="360" y="145" text-anchor="middle" font-size="10" opacity=".7">links the N covered charges</text>
+
+<g stroke="#1E4B8F" stroke-width="1.7" fill="none" marker-end="url(#ar5A)">
+  <line x1="696" y1="256" x2="364" y2="256"/>
+</g>
+<text x="530" y="248" text-anchor="middle" fill="#1E4B8F" font-weight="600">IPN · GET · ~5 min · UNSIGNED</text>
+<text x="530" y="271" text-anchor="middle" fill="#1E4B8F" font-size="10" opacity=".85">transactionid · amount · fourdigits · cardownername</text>
+
+<rect x="222" y="290" width="276" height="46" rx="6" fill="none" stroke="#A93A2C" stroke-width="1.4"/>
+<text x="360" y="309" text-anchor="middle" font-size="11.5" font-weight="600" fill="#A93A2C">verify amount == expected</text>
+<text x="360" y="326" text-anchor="middle" font-size="10" fill="#A93A2C" opacity=".85">never trust the client-submitted value</text>
+
+<rect x="222" y="348" width="276" height="30" rx="6" fill="none" stroke="currentColor" stroke-width="1.1"/>
+<text x="360" y="368" text-anchor="middle" font-size="11">allocate across the N charges</text>
+
+<g stroke="#A93A2C" stroke-width="1.3" fill="none" marker-end="url(#ar5C)" stroke-dasharray="5 3">
+  <path d="M498,313 L560,313 L560,352 L620,352"/>
+</g>
+<text x="628" y="349" text-anchor="start" font-size="10.5" fill="#A93A2C" font-weight="600">amount_mismatch</text>
+<text x="628" y="365" text-anchor="start" font-size="9.5" fill="#A93A2C" opacity=".85">payment recorded, allocated</text>
+<text x="628" y="378" text-anchor="start" font-size="9.5" fill="#A93A2C" opacity=".85">to nothing, manager alerted</text>
+</g>
+</svg>
+<figcaption><b>The return redirect is never the source of truth</b> — a closed tab still produces an
+IPN. And <code>public_ref</code> must be a UUID: the IPN is an unsigned <code>GET</code> on a public
+URL, so sequential order IDs would let anyone mark any family's tuition paid.</figcaption>
+</figure>
+
+<h4>Every threat, and its mitigation</h4>
+<div class="tw"><table>
+<thead><tr><th>Threat</th><th>Mitigation</th></tr></thead><tbody>
+<tr><td>Anyone can forge an IPN for a guessed order</td><td><b><code>public_ref</code> is a UUIDv4</b>, never sequential</td></tr>
+<tr><td>No signature on the callback</td><td>Source-IP allowlist (<code>84.95.87.35</code>) — one weak layer, not proof</td></tr>
+<tr><td>Client tampers with <code>amount</code> before submitting</td><td>Compare the IPN amount against <code>expected_amount_agorot</code></td></tr>
+<tr><td>Mismatch leaves real money received</td><td><span class="chip crit">amount_mismatch</span> — payment recorded, charges <b>not</b> settled, manager alerted</td></tr>
+<tr><td>Duplicate IPN delivery</td><td>Idempotent on <code>transactionid</code>; a second delivery is logged and ignored</td></tr>
+<tr><td>IPN never arrives</td><td>Nightly job flags orders pending &gt; 24h for manual verification</td></tr>
+<tr><td>Slow processing triggers uPay retries</td><td>Persist the raw record, return 200 immediately, process in a worker</td></tr>
+<tr><td>Parent pays twice</td><td>Charges covered by an open or paid order are <b>not selectable</b>; an active <code>recurring_subscription</code> triggers a warning</td></tr>
+</tbody></table></div>
+</section>
+
+<hr>
+
+<section id="recon">
+<h2><span class="sec">§5.10 · §12</span> הוראת קבע reconciliation</h2>
+<p class="dek">uPay cannot create a per-payer recurring mandate, cannot vary the amount per payer, and
+provides <strong>no field identifying which customer paid</strong>. Confirmed provider limitation,
+not a design choice. So the system never claims to know — it makes the manager fast instead.</p>
+
+<figure>
+<svg viewBox="0 0 900 350" role="img" aria-label="Reconciliation: unmatched IPN records on the left, payers expected to pay this month on the right, a manager confirms a match, and the system stores a payer fingerprint of card owner name plus last four digits so next month the same payment is pre-matched.">
+<defs><marker id="ar6" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+  <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker>
+<marker id="ar6A" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+  <path d="M0,0 L10,5 L0,10 z" fill="#1E4B8F"/></marker></defs>
+<g font-family="IBM Plex Sans, sans-serif" font-size="12">
+
+<text x="30" y="30" font-family="IBM Plex Mono, monospace" font-size="10.5" letter-spacing="1" opacity=".65">UNMATCHED IPNs</text>
+<rect x="30" y="42" width="310" height="150" rx="8" fill="none" stroke="currentColor" stroke-width="1.2"/>
+<g font-family="IBM Plex Mono, monospace" font-size="11" opacity=".85">
+  <text x="46" y="70">400₪ · כהן יוסי · ••4471 · 03.09</text>
+  <text x="46" y="102">320₪ · LEVI D. · ••8812 · 03.09</text>
+  <text x="46" y="134">640₪ · מזרחי א. · ••2205 · 04.09</text>
+  <text x="46" y="166" opacity=".55">…</text>
+</g>
+<g stroke="currentColor" stroke-width=".8" opacity=".25">
+  <line x1="30" y1="82" x2="340" y2="82"/><line x1="30" y1="114" x2="340" y2="114"/><line x1="30" y1="146" x2="340" y2="146"/>
+</g>
+
+<text x="560" y="30" font-family="IBM Plex Mono, monospace" font-size="10.5" letter-spacing="1" opacity=".65">EXPECTED THIS MONTH</text>
+<rect x="560" y="42" width="310" height="150" rx="8" fill="none" stroke="currentColor" stroke-width="1.2"/>
+<g font-family="IBM Plex Mono, monospace" font-size="11" opacity=".85">
+  <text x="576" y="70">יעל כהן · 2 ילדים · 400₪</text>
+  <text x="576" y="102">דנה לוי · 1 ילד · 320₪</text>
+  <text x="576" y="134">אבי מזרחי · 2 ילדים · 640₪</text>
+  <text x="576" y="166" opacity=".55">…</text>
+</g>
+<g stroke="currentColor" stroke-width=".8" opacity=".25">
+  <line x1="560" y1="82" x2="870" y2="82"/><line x1="560" y1="114" x2="870" y2="114"/><line x1="560" y1="146" x2="870" y2="146"/>
+</g>
+
+<g stroke="#1E4B8F" stroke-width="1.6" fill="none" marker-end="url(#ar6A)">
+  <line x1="344" y1="62" x2="556" y2="62"/>
+</g>
+<text x="450" y="52" text-anchor="middle" font-size="10.5" fill="#1E4B8F" font-weight="600">manager confirms</text>
+
+<g stroke="currentColor" stroke-width="1.1" fill="none" marker-end="url(#ar6)" stroke-dasharray="4 3" opacity=".55">
+  <line x1="344" y1="96" x2="556" y2="96"/>
+  <line x1="344" y1="130" x2="556" y2="130"/>
+</g>
+
+<rect x="270" y="236" width="360" height="58" rx="8" fill="none" stroke="#1E4B8F" stroke-width="1.6"/>
+<text x="450" y="259" text-anchor="middle" font-size="12.5" font-weight="600" fill="#1E4B8F">payer_fingerprint</text>
+<text x="450" y="277" text-anchor="middle" font-size="10" fill="#1E4B8F" opacity=".85">(normalized card owner name + last 4) → payer_person_id</text>
+
+<g stroke="#1E4B8F" stroke-width="1.3" fill="none" marker-end="url(#ar6A)">
+  <path d="M450,72 L450,110 L470,110 L470,232" opacity="0"/>
+  <line x1="450" y1="76" x2="450" y2="232"/>
+</g>
+<text x="462" y="160" text-anchor="start" font-size="10" fill="#1E4B8F" opacity=".85">learned once</text>
+
+<g stroke="currentColor" stroke-width="1.2" fill="none" marker-end="url(#ar6)">
+  <path d="M270,265 L150,265 L150,200"/>
+</g>
+<text x="146" y="290" text-anchor="middle" font-size="10.5" opacity=".75">next month: pre-matched,</text>
+<text x="146" y="305" text-anchor="middle" font-size="10.5" opacity=".75">manager taps to confirm</text>
+</g>
+</svg>
+<figcaption><b>Suggestions are never auto-applied.</b> A wrong automatic match marks the wrong payer
+paid and sends the wrong parent a debt reminder — an expensive bug in a small community. Month 1 is
+fully manual; by month 3 most rows are one-tap confirmations.</figcaption>
+</figure>
+</section>
+
+<hr>
+
+<section id="notify">
+<h2><span class="sec">§5.11</span> Notifications</h2>
+<p class="dek">Two levels, and only two. <strong>No email, no SMS, no WhatsApp channel.</strong></p>
+
+<figure>
+<svg viewBox="0 0 780 330" role="img" aria-label="Two-level notifications: a push notification acts as the doorbell and requires OS permission, while the in-app inbox with an unread badge is the permanent record and needs no permission. Undelivered pushes produce a delivery report the manager can act on.">
+<defs><marker id="ar7" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+  <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker>
+<marker id="ar7W" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+  <path d="M0,0 L10,5 L0,10 z" fill="#A93A2C"/></marker></defs>
+<g font-family="IBM Plex Sans, sans-serif" font-size="12.5">
+
+<rect x="150" y="24" width="330" height="76" rx="8" fill="none" stroke="currentColor" stroke-width="1.6"/>
+<text x="172" y="50" font-size="13" font-weight="600">📱 Phone level — push</text>
+<text x="172" y="70" font-size="10.5" opacity=".7">Buzzes on the lock screen with the app closed</text>
+<text x="172" y="87" font-size="10.5" fill="#A93A2C">⚠ Requires OS permission — opt-in on iOS and Android 13+</text>
+
+<rect x="150" y="158" width="330" height="76" rx="8" fill="none" stroke="currentColor" stroke-width="1.6"/>
+<text x="172" y="184" font-size="13" font-weight="600">📨 App level — inbox</text>
+<text x="172" y="204" font-size="10.5" opacity=".7">🔔③ unread badge · permanent הודעות list</text>
+<text x="172" y="221" font-size="10.5" opacity=".7">No permission ever needed · never expires</text>
+
+<g stroke="currentColor" stroke-width="1.3" fill="none" marker-end="url(#ar7)">
+  <line x1="315" y1="102" x2="315" y2="154"/>
+</g>
+<text x="325" y="132" text-anchor="start" font-size="10.5" opacity=".7">tap</text>
+
+<text x="150" y="272" font-size="12.5" font-weight="600">Every message goes to both.</text>
+<text x="150" y="292" font-size="11.5" opacity=".7">Push is the doorbell. The inbox is where the message lives.</text>
+<text x="150" y="310" font-size="11.5" opacity=".7">They are not alternatives.</text>
+
+<rect x="524" y="24" width="234" height="118" rx="8" fill="none" stroke="#A93A2C" stroke-width="1.4"/>
+<text x="544" y="48" font-size="11.5" font-weight="600" fill="#A93A2C">Delivery report</text>
+<g font-family="IBM Plex Mono, monospace" font-size="10.5" fill="#A93A2C" opacity=".9">
+  <text x="544" y="70">✓ 19 קיבלו</text>
+  <text x="544" y="88">⚠ 5 לא קיבלו</text>
+  <text x="544" y="112">[ העתק מספרים ]</text>
+</g>
+<g stroke="#A93A2C" stroke-width="1.3" fill="none" marker-end="url(#ar7W)" stroke-dasharray="4 3">
+  <line x1="484" y1="62" x2="520" y2="62"/>
+</g>
+<text x="524" y="170" font-size="10.5" fill="#A93A2C" opacity=".9">→ manager pastes them into the</text>
+<text x="524" y="186" font-size="10.5" fill="#A93A2C" opacity=".9">   WhatsApp group they already have</text>
+<text x="524" y="216" font-size="10.5" opacity=".7">Plus a non-dismissible in-app</text>
+<text x="524" y="232" font-size="10.5" opacity=".7">banner for anyone with push off</text>
+</g>
+</svg>
+<figcaption><b>Push is opt-in, so some parents will have a broken doorbell.</b> Delivery reporting
+turns that from a silent failure into a visible one — the same outcome automation would give,
+for half a day of work and no integration.</figcaption>
+</figure>
+
+<h4>Triggers</h4>
+<div class="tw"><table>
+<thead><tr><th>Event</th><th>Recipients</th><th>Delivery</th></tr></thead><tbody>
+<tr><td>Session cancelled or moved</td><td>Affected guardians</td><td>push + inbox + <b>delivery report</b></td></tr>
+<tr><td>Closure added affecting sessions</td><td>Affected guardians</td><td>push + inbox + <b>delivery report</b></td></tr>
+<tr><td>New announcement</td><td>Scoped guardians</td><td>push + inbox + <b>delivery report</b></td></tr>
+<tr><td>Coach substituted · new event published</td><td>Affected / targeted guardians</td><td>push + inbox</td></tr>
+<tr><td>RSVP deadline in 48h, no response</td><td>Non-responding guardians</td><td>push + inbox</td></tr>
+<tr><td>Charge created · payment received</td><td>Payer</td><td>push + inbox</td></tr>
+<tr><td>Payment overdue</td><td>Payer</td><td>push + inbox, escalating <b>day 3 / 7 / 14</b></td></tr>
+<tr><td>Payment failed or amount mismatch</td><td>Payer + all managers</td><td>push + inbox</td></tr>
+<tr><td>Health declaration missing</td><td>Guardians</td><td>push + inbox, escalating <b>day 1 / 3 / 7</b></td></tr>
+<tr><td><b>Student at risk</b> — 3+ consecutive absences</td><td>Group's coaches + managers</td><td>push + inbox</td></tr>
+<tr><td>Trial tomorrow · trial follow-up</td><td>Lead's guardian</td><td>push + inbox, <b>day 1 / 3 / 7</b> after</td></tr>
+<tr><td>Belt awarded · registration submitted</td><td>Guardians / all managers</td><td>push + inbox</td></tr>
+<tr><td>Order pending &gt; 24h · unmatched IPN</td><td>All managers</td><td>inbox</td></tr>
+</tbody></table></div>
+
+<h4>Calendar</h4>
+<p>A secret <code>webcal://</code> feed per guardian and per coach — <code>GET /api/v1/calendar/{token}.ics</code>.
+Google Calendar, Apple Calendar and Outlook all subscribe natively, and cancellations propagate by
+themselves. Chosen because <strong>Apple has no third-party calendar write API at all</strong>, so
+the API route literally cannot serve iPhone parents. The honest limitation: Google refreshes
+subscribed calendars slowly, up to ~24h — so the feed is for “where do I need to be next Tuesday”,
+never “tonight is cancelled”. That is what push is for.</p>
+</section>
+
+<hr>
+
+<section id="events">
+<h2><span class="sec">§5.8 · §5.9</span> Events &amp; belts</h2>
+<p class="dek">An event is a first-class scheduled item outside the weekly pattern, targeting any mix
+of studio, classes, groups or individual students.</p>
+
+<div class="mock">תחרות אליפות המרכז
+ו' 12.09.2026 · 08:00 · אולם נוקיה, ראשל"צ
+
+קבוצות: ג'ודו/נבחרת · ג'ודו/מתקדמים
+עלות: 120₪ · הרשמה עד 05.09
+דרוש: אישור הורה ✓
+
+נרשמו  14   טרם ענו  6   לא מגיע  3
+שולם   11 / 14
+
+[ תזכורת למי שלא ענה ]</div>
+
+<div class="grid g2">
+<div class="card b b-rank"><span class="k">Event mechanics</span><h5>RSVP · fee · consent</h5>
+<p>Guardians answer מגיע / לא מגיע before the deadline. A <code>fee_agorot</code> creates a normal
+<code>charge</code> with <code>kind = event</code>, payable through the standard uPay flow. A
+<code>requires_consent</code> event needs a signed consent before the RSVP counts. Attendance is
+taken with the same UI and the same offline behaviour as any session.</p></div>
+<div class="card b b-rank"><span class="k">Belt exams</span><h5>An event type, not a side feature</h5>
+<p>A lead coach nominates candidates by targeting students directly. On the day the examiner records
+pass/fail. <strong>A pass writes <code>event_exam_result</code>, creates a <code>student_belt</code>
+row and updates <code>student.current_belt_id</code> in one transaction</strong> — then notifies the
+guardians. The parent app shows the full progression strip.</p></div>
+</div>
+</section>
+
+<hr>
+
+<section id="privacy">
+<h2><span class="sec">§11</span> Privacy &amp; security</h2>
+<p class="dek">The system holds medical information about other people's children. All six measures
+ship in v1 — two of them are architectural and cannot be retrofitted.</p>
+
+<div class="tw"><table>
+<thead><tr><th>Measure</th><th>What it actually is</th><th class="ctr">Retrofit?</th></tr></thead><tbody>
+<tr><td><b>Column encryption</b></td><td>AES-256-GCM on health answers, signature images, registration payloads and free-text medical notes. Keys in Railway secrets, versioned for rotation. Protects against a leaked backup, SQLi, or a developer browsing production — <b>disk encryption does not</b></td><td class="ctr"><span class="chip crit">architectural</span></td></tr>
+<tr><td><b>Audit log</b></td><td>Append-only; the app DB role has <code>INSERT</code> and no <code>UPDATE</code>/<code>DELETE</code>. Every read <em>and</em> write of health data, every role change, every payment status change, every export, every login</td><td class="ctr"><span class="chip crit">architectural</span></td></tr>
+<tr><td>Data export</td><td>“Everything you hold about my child” → JSON + rendered PDFs, time-limited download</td><td class="ctr"><span class="chip">later ok</span></td></tr>
+<tr><td>Anonymizing delete</td><td>Wipe name, birthdate, phone; destroy the health file; <b>keep</b> financial rows under an anonymous ID — tax law requires ~7 years</td><td class="ctr"><span class="chip warn">needs the design rule now</span></td></tr>
+<tr><td>Retention job</td><td>Auto-anonymize students <code>left</code> — and leads never converted — after N months</td><td class="ctr"><span class="chip">later ok</span></td></tr>
+<tr><td>Consent records</td><td>Versioned, per subject: terms · privacy · <b>photo/video</b> · medical-share · per-event</td><td class="ctr"><span class="chip">later ok</span></td></tr>
+</tbody></table></div>
+
+<div class="note crit"><span class="lbl">The design rule that makes deletion possible at all</span>
+<p><strong>No PII is ever denormalized into a financial row.</strong> Charges, payments and
+allocations reference <code>payer_person_id</code> and <code>student_id</code> — never a stored name.
+Invoices render names by join. Get this wrong on day one and “delete my child's data” becomes
+impossible without destroying seven years of tax records.</p></div>
+
+<p>Two more things worth naming. <strong>Tenant isolation is enforced at the query layer</strong> —
+a <code>TenantMixin</code> applies <code>WHERE studio_id = :current_studio</code> by default, and
+bypassing it requires an explicit <code>.with_all_tenants()</code> escape hatch legal only in
+platform-admin code. And <strong>no ת.ז. is collected at all</strong> — the smallest sensitive-data
+footprint that still runs a club.</p>
+</section>
+
+<hr>
+
+<section id="ops">
+<h2><span class="sec">§18</span> Your monitoring</h2>
+<p class="dek">You are the platform operator. This is what you can see, what you deliberately
+<strong>cannot</strong> see, and what wakes you up.</p>
+
+<h3>The boundary comes first</h3>
+<div class="tw"><table>
+<thead><tr><th>Visible to platform_admin</th><th>Never visible</th></tr></thead><tbody>
+<tr><td>Studio name, slug, status, created date</td><td>Any student's or guardian's name</td></tr>
+<tr><td>Counts: active students, groups, sessions, staff</td><td>Any health declaration, in any form</td></tr>
+<tr><td>Last activity timestamp</td><td>Any student note or session note</td></tr>
+<tr><td>Aggregate revenue processed, charge/payment counts</td><td>Any individual charge, payment or amount</td></tr>
+<tr><td>Unreconciled IPN count, pending-order count</td><td>Any announcement body or message</td></tr>
+<tr><td>Failed job counts, error rates, storage used</td><td>Any person's phone, email or photo</td></tr>
+<tr><td>App versions in use, push delivery rates</td><td>Any attendance record for a named student</td></tr>
+</tbody></table></div>
+
+<div class="note crit"><span class="lbl">Enforced structurally, not by trusting the UI</span>
+<p>The platform console reads a dedicated aggregate model — <code>platform_studio_stats</code>,
+refreshed by a worker — containing only counts and timestamps, <strong>with no join path to a
+person, a student or a charge</strong>. A bug in the platform UI therefore cannot leak a child's
+medical file, because the data was never in the query result.</p></div>
+
+<h3>Break-glass access</h3>
+<p>Sometimes you genuinely will need to look at a studio's real data to debug something. That path
+exists, and it is deliberately uncomfortable:</p>
+<ol class="steps">
+<li><span class="mk">1</span><span class="bd"><b>Request elevation</b><span>For <strong>one studio</strong>, with a typed reason and a fixed expiry — 60 minutes by default, 24 hours maximum.</span></span></li>
+<li><span class="mk">2</span><span class="bd"><b>Written to the studio's own audit log</b><span>Not a separate admin log. The owner sees it alongside every other access to their data.</span></span></li>
+<li><span class="mk">3</span><span class="bd"><b>The owner is notified immediately</b><span dir="rtl">“גישת תמיכה הופעלה לחשבון שלך — &lt;reason&gt; — עד &lt;time&gt;”</span></span></li>
+<li><span class="mk">4</span><span class="bd"><b>Every read is logged individually</b><span>Tagged with the elevation id.</span></span></li>
+<li><span class="mk done">5</span><span class="bd"><b>It expires by itself</b><span>No permanent superuser, no silent access. <strong>Health declarations are excluded from break-glass entirely</strong> — you debug the shape and the encryption, never the contents.</span></span></li>
+</ol>
+
+<h3>The operations board</h3>
+<p>The one screen you actually check daily:</p>
+<pre>מצב הפלטפורמה                                   23.08.2026
+
+⚠  Gladiator Team    billing run failed — 04:12          [ retry ]
+⚠  Dojo Herzliya     7 orders pending &gt; 24h              [ view ]
+⚠  Gladiator Team    31 unmatched IPNs, oldest 9 days    [ view ]
+·  Dojo Herzliya     push delivery 62% (23 devices off)
+·  Gladiator Team    sync queue: 1 device, 47 ops, 3d
+
+3 studios · 412 active students · 0 API errors (24h)</pre>
+<p>Plus a <strong>per-studio health chip</strong> — green/amber/red from last activity,
+attendance-marking rate, unpaid ratio, unreconciled backlog and push delivery rate. That's how you
+notice a studio quietly abandoning the product <em>before</em> they churn, rather than when they
+stop replying to you.</p>
+
+<h3>Alerts</h3>
+<p>You are the entire on-call rotation, so the list is short and every entry is actionable at 2am.
+Everything else is a dashboard item, not an alert.</p>
+<div class="tw"><table>
+<thead><tr><th>Alert</th><th>Fires when</th><th>Why it matters</th></tr></thead><tbody>
+<tr><td>Billing run failed</td><td class="t">any failure</td><td>Nobody gets charged this month</td></tr>
+<tr><td>IPN endpoint returning 5xx</td><td class="t">any, immediately</td><td><b>uPay stops retrying</b> — payments are lost, not delayed</td></tr>
+<tr><td>Orders pending &gt; 24h</td><td class="t">count &gt; 0 for 1h</td><td>Real money in limbo</td></tr>
+<tr><td>Unmatched IPN backlog</td><td class="t">&gt; 10, or oldest &gt; 7d</td><td>Reconciliation rotting</td></tr>
+<tr><td>Push delivery failure rate</td><td class="t">&gt; 30% for a studio</td><td>The doorbell is broken for that club</td></tr>
+<tr><td>Job queue depth</td><td class="t">&gt; 100 for 10 min</td><td>A worker is down</td></tr>
+<tr><td>Sync queue depth</td><td class="t">device &gt; 50 ops for &gt; 24h</td><td>A coach is offline and never reconnecting</td></tr>
+<tr><td>API error rate · p95 latency</td><td class="t">&gt; 1% / 5m · &gt; 800ms / 10m</td><td>—</td></tr>
+<tr><td>Failed login spike</td><td class="t">unusual rate per IP</td><td>Credential stuffing</td></tr>
+<tr><td>DB connections · key age</td><td class="t">&gt; 80% pool · &gt; 12 months</td><td>Saturation · rotation due</td></tr>
+</tbody></table></div>
+
+<div class="note"><span class="lbl">Deliberately not built</span>
+<p>No per-studio usage billing (studios don't pay) · <strong>no session-replay tooling</strong> — it
+would record children's medical forms · <strong>no third-party analytics SDK in the parent app</strong>,
+same reason · no aggregate export of tenant data for “product research”. If a metric can't be computed
+from <code>platform_studio_stats</code>, it doesn't get computed.</p></div>
+</section>
+
+<hr>
+
+<section id="dev">
+<h2><span class="sec">§19</span> The developer account</h2>
+<p class="dek">One identity that can act as every role, so the whole system is exercisable end to end
+without maintaining six real accounts. This is an impersonation feature in a system holding medical
+data about minors — so the guardrails are part of the design, not a debug flag.</p>
+
+<div class="grid g2">
+<div class="card b b-plat"><span class="k">Mechanism 1</span><h5>The demo studio</h5>
+<p>A studio flagged <code>is_demo = true</code>, seeded with fixture data and <strong>never a real
+person's information</strong>. Exists in <em>production too</em>, so you can smoke-test a live
+deploy against real infrastructure without touching anyone's data.</p></div>
+<div class="card b b-plat"><span class="k">Mechanism 2</span><h5>The role switcher</h5>
+<p>Swaps which Person you're acting as. Available across any studio in dev and staging — and in
+production, <strong>only ever inside a demo studio</strong>.</p></div>
+</div>
+
+<h3>Personas</h3>
+<p>Studio <b>“מועדון הדגמה”</b> — 2 classes, 5 groups, ~40 fixture students with Hebrew names, a full
+training year of materialized sessions, partial attendance history, price plans, settled and open
+charges, two unmatched IPNs, belt history, one competition and one belt exam.</p>
+<div class="tw"><table>
+<thead><tr><th>Persona</th><th>Role</th><th>What it exists to test</th></tr></thead><tbody>
+<tr><td class="f">dev+owner</td><td class="t">owner</td><td>Setup wizard, training-year rollover, staff management, studio settings</td></tr>
+<tr><td class="f">dev+manager</td><td class="t">manager</td><td>Enrollment approval, trial conversion, payments, reconciliation queue, reports</td></tr>
+<tr><td class="f">dev+lead</td><td class="t">lead_coach</td><td>Attendance, session edits, events, belt exams, notes</td></tr>
+<tr><td class="f">dev+assistant</td><td class="t">assistant_coach</td><td>Attendance only — <b>used to verify no financial data leaks</b></td></tr>
+<tr><td class="f">dev+parent3</td><td class="t">guardian ×3 students</td><td>Family home, the three payment options, health gate, RSVP, calendar feed</td></tr>
+<tr><td class="f">dev+parent1</td><td class="t">guardian ×1</td><td>The single-child path that skips the family layer</td></tr>
+<tr><td class="f">dev+trial</td><td class="t">guardian of a trial</td><td>Landing page → booking → parent app in trial state</td></tr>
+<tr><td class="f">dev+both</td><td class="t">lead_coach <b>and</b> guardian</td><td>The dual-role case — two apps, one identity</td></tr>
+<tr><td class="f">dev+none</td><td class="t">nothing</td><td>The refusal screens in both apps</td></tr>
+</tbody></table></div>
+
+<div class="note warn"><span class="lbl">No student persona — and why</span>
+<p><strong>Students have no login in v1</strong> (teen logins are v2). The switcher offers
+<em>“guardian of דנה”</em> instead, and the dev bar says so explicitly, so the gap is visible rather
+than confusing. If teen logins are brought forward, a <code>dev+student</code> persona joins the list
+unchanged.</p></div>
+
+<h3>The dev bar</h3>
+<p>Rendered only for an identity with <code>is_developer</code>, and <strong>tree-shaken out of
+production client bundles</strong> by an env flag — not merely hidden.</p>
+<pre>🛠 DEV · מועדון הדגמה · acting as: [ מנהל ▾ ]
+   בעלים · מנהל · מאמן ראשי · מאמן משנה
+   הורה (3 ילדים) · הורה (ילד אחד) · הורה (ניסיון) · הורה+מאמן · ללא הרשאות
+
+   [ 📴 offline ] [ 🐌 slow ] [ ⏩ +1 month ] [ ↺ reset demo data ]
+   [ simulate IPN ▾ ]  <b>success · amount mismatch · forged ref · duplicate</b></pre>
+
+<h4>The four tools, and what each makes testable</h4>
+<div class="tw"><table>
+<thead><tr><th>Tool</th><th>Otherwise</th></tr></thead><tbody>
+<tr><td><b>Simulate offline / slow</b></td><td>You'd need airplane mode and a real basement to exercise the attendance queue, the sync badge and the conflict cards</td></tr>
+<tr><td><b>Time travel</b> — <code>X-Dev-Now</code> shifts the server clock for one request, non-prod only</td><td>The only practical way to test the billing run, the debt ladder (day 3/7/14), health reminders (day 1/3/7) and trial follow-ups <b>without waiting a fortnight</b></td></tr>
+<tr><td><b>Run a job now</b></td><td>Billing run, retention, reconciliation suggestions, follow-up sweep — all otherwise on a schedule</td></tr>
+<tr><td><b>Simulate a uPay IPN</b> — success · <b>amount mismatch</b> · <b>forged ref</b> · <b>duplicate</b></td><td>These four are exactly the security requirements from §5.10. Without a simulator they are <b>only testable against live money</b></td></tr>
+</tbody></table></div>
+
+<h3>What it cannot do</h3>
+<div class="tw"><table>
+<thead><tr><th>Restriction</th><th>How it's enforced</th></tr></thead><tbody>
+<tr><td>Act inside a <b>non-demo studio in production</b></td><td>The studio resolver excludes <code>is_demo = false</code> for developer sessions in production — and a test asserts it</td></tr>
+<tr><td>Reach the <code>/dev/*</code> endpoints in production</td><td>The router is <b>conditionally mounted</b> — when <code>ENV = production</code> the routes do not exist, rather than being guarded by an <code>if</code> someone can invert</td></tr>
+<tr><td>Read any real person's health declaration</td><td>Real-data support goes through break-glass (§18.2) — time-boxed, reason-tagged, in the tenant's audit log, owner notified. <b>Break-glass excludes health contents entirely</b>, and the developer flag doesn't change that</td></tr>
+<tr><td>Grant itself the flag, or grant it to anyone</td><td><code>is_developer</code> is settable <b>only by a seed or migration</b>. A test asserts no route can write the column</td></tr>
+<tr><td>Touch live money</td><td>The demo studio's uPay config is pinned to <code>livesystem=0</code>; a test asserts a demo studio can never render a live payment form</td></tr>
+</tbody></table></div>
+
+<div class="note"><span class="lbl">Demo data hygiene</span>
+<p>The demo studio is excluded from <code>platform_studio_stats</code>, from every cross-studio
+report and from the operations-board totals — so it never contaminates the numbers you judge real
+studios by. <code>POST /dev/demo/reset</code> restores the fixture set from a versioned seed, and a
+nightly job does the same in staging so the data can't drift into a state that hides a bug.</p></div>
+
+<div class="note crit"><span class="lbl">Built in M0, not last</span>
+<p>The demo studio, the developer account and the dev bar are part of <strong>Foundations</strong> —
+before any feature milestone. Every later milestone is then testable end to end from the day it
+lands, instead of waiting for real data to exist.</p></div>
+</section>
+
+<hr>
+
+<section id="limits">
+<h2><span class="sec">§12</span> Hard constraints</h2>
+<p class="dek">Third-party facts that shaped the architecture. Recorded so they are never
+rediscovered the expensive way.</p>
+
+<div class="tw"><table>
+<thead><tr><th>Constraint</th><th>Consequence</th></tr></thead><tbody>
+<tr><td>uPay's IPN has <b>no cryptographic signature</b></td><td>UUID order refs + IP allowlist + independent amount verification are mandatory</td></tr>
+<tr><td>The uPay form is client-submitted and <code>amount</code> is editable</td><td><code>amount_mismatch</code> must be a real state that records the real money received</td></tr>
+<tr><td>uPay recurring links are <b>dashboard-created only</b></td><td>הוראת קבע mandates cannot be created in code</td></tr>
+<tr><td>One shared recurring link, one fixed amount, all parents</td><td>Per-payer recurring amounts are impossible</td></tr>
+<tr><td>Recurring IPNs carry <b>no customer identifier</b></td><td>Automatic matching is impossible; reconciliation is human-confirmed</td></tr>
+<tr><td>IPN arrives ~5 minutes after payment</td><td>The return redirect must never be the source of truth</td></tr>
+<tr><td><b>Apple has no third-party calendar write API</b></td><td>ICS subscription is the only cross-platform calendar option</td></tr>
+<tr><td>Google Calendar write is a restricted scope</td><td>Would require an annual third-party security assessment</td></tr>
+<tr><td>App Store Guideline 4.8</td><td>Offering Google login on iOS <b>requires</b> Sign in with Apple</td></tr>
+<tr><td>App Store Guideline 4.2</td><td>A pure website wrapper is rejected — the shell must add native capability</td></tr>
+<tr><td>Google Play, new personal accounts</td><td><b>12 testers × 14 consecutive days</b> of closed testing before public release</td></tr>
+<tr><td>OAuth in embedded webviews</td><td>Blocked by Google (<code>disallowed_useragent</code>); must use the system browser</td></tr>
+<tr><td><b>WhatsApp Groups API caps a group at 8 participants</b> and exposes no endpoint to add one</td><td>A 25-family group cannot be created or messaged programmatically. Only a share-sheet handoff is viable</td></tr>
+<tr><td>Unofficial WhatsApp libraries (Baileys, whatsapp-web.js)</td><td>Violate ToS; the number gets banned. Unusable when you'd be risking <b>customers'</b> numbers</td></tr>
+<tr><td>Push permission is opt-in on iOS and Android 13+</td><td>Some parents never receive alerts — hence delivery reporting</td></tr>
+</tbody></table></div>
+</section>
+
+<hr>
+
+<section id="plan">
+<h2><span class="sec">§14</span> Milestones</h2>
+<p class="dek">One release: the club receives the finished product, payments included. These are build
+order, not separate releases.</p>
+
+<ol class="steps">
+<li><span class="mk">M0</span><span class="bd"><b>Foundations</b><span>Monorepo, CI, Railway environments, migrations, tenancy layer, encryption, audit log, i18n scaffolding, <strong>the demo studio, developer account and dev bar (§19)</strong>. <strong>Start the Google Play closed test with a skeleton build on day one</strong> — 14 days of wall-clock you cannot compress.</span></span></li>
+<li><span class="mk">M1</span><span class="bd"><b>Identity &amp; structure</b><span>Google/Apple auth via system browser, both apps' first-run flows, platform console with studio provisioning, Person/Identity/Guardian/Role model, classes, groups, staff.</span></span></li>
+<li><span class="mk">M2</span><span class="bd"><b>Schedule</b><span>Training years, closure calendar with holiday presets, schedule rules, session materialization, per-session overrides, ad-hoc sessions.</span></span></li>
+<li><span class="mk">M3</span><span class="bd"><b>People &amp; funnel</b><span>Students, guardians, enrollment, public trial booking, lead/trial statuses and history, manager conversion, follow-up automation, person and child matching.</span></span></li>
+<li><span class="mk">M4</span><span class="bd"><b>Health</b><span>Template mapped from the studio's PDF, declaration flow with drawn signature, encryption, derived flags, signed PDF rendering, the app gate.</span></span></li>
+<li><span class="mk">M5</span><span class="bd"><b>Attendance</b><span>Roster UI, bulk mark with the pre-report protection rule, parent absence reporting, offline queue, sync, conflict handling.</span></span></li>
+<li><span class="mk">M6</span><span class="bd"><b>Money</b><span>Price plans, product catalog, debt escalation, billing run with proration, charge/payment/allocation ledger, uPay flow with every security requirement, reconciliation queue, payer fingerprints.</span></span></li>
+<li><span class="mk">M7</span><span class="bd"><b>Events &amp; belts</b><span>Event types, targeting, RSVP, fees, consent, event attendance, belt ranks, grading history, belt exams.</span></span></li>
+<li><span class="mk">M8</span><span class="bd"><b>Communication</b><span>Announcements, push + inbox with delivery reporting and the push-disabled banner, at-risk alerts, ICS calendar feeds.</span></span></li>
+<li><span class="mk">M9</span><span class="bd"><b>Reports &amp; privacy completion</b><span>Financial, operational and funnel reports with export, studio overview, data export, anonymization, retention job, platform console.</span></span></li>
+<li><span class="mk">M10</span><span class="bd"><b>Rollover &amp; polish</b><span>Training-year wizard, accessibility pass, both-direction visual pass, performance.</span></span></li>
+<li><span class="mk done">M11</span><span class="bd"><b>Store release</b><span>Capacitor iOS build and submission, TWA release build, store assets in three languages, privacy declarations, phased rollout.</span></span></li>
+</ol>
+
+<div class="note"><span class="lbl">Realistic calendar time</span>
+<p>Roughly <strong>4–6 weeks of building</strong> with daily review, plus <strong>2–3 weeks of store
+wall-clock</strong> that overlaps if M0's closed test starts on day one. The bottleneck is your
+review throughput and Apple/Google queue times — not code volume.</p></div>
+
+<h4>Blocked on you</h4>
+<div class="tw"><table>
+<thead><tr><th>Item</th><th>Blocks</th></tr></thead><tbody>
+<tr><td>The studio's <b>הצהרת בריאות PDF</b> at <code>docs/forms/health-declaration.pdf</code></td><td class="f">M4</td></tr>
+<tr><td><b>uPay merchant email</b> + confirmation the account is live</td><td class="f">M6</td></tr>
+<tr><td>A <b>public HTTPS URL</b> for IPN testing (Railway staging is fine)</td><td class="f">M6</td></tr>
+<tr><td><b>Apple Developer</b> enrollment — 1–7 days</td><td class="f">M11</td></tr>
+<tr><td><b>Google Play</b> account + <b>12 testers</b> — needed on day one</td><td class="f">M0</td></tr>
+<tr><td>Studio branding · current price list · real class and group structure</td><td class="f">M1 · M6 · M2</td></tr>
+<tr><td>Translation source for <b>ru</b></td><td class="f">M0</td></tr>
+</tbody></table></div>
+</section>
+
+<hr>
+
+<section>
+<h2><span class="sec">§17</span> Where this sits against the market</h2>
+<p class="dek">Validated against Arbox and Boostapp (Israel), Gymdesk, PushPress, Kicksite, Zen
+Planner, Martialytics, Spark Membership, Wodify and Mindbody.</p>
+
+<div class="grid g2">
+<div class="card b" style="border-inline-start-color:var(--belt-orange-s)"><span class="k">Nobody else has</span><h5>Offline-first attendance</h5>
+<p>Every platform assumes connectivity. For a dojo in a basement, this is the feature that decides
+whether coaches use the app at all.</p></div>
+<div class="card b" style="border-inline-start-color:var(--belt-orange-s)"><span class="k">Nobody else has</span><h5><code>unmarked</code> as a real state</h5>
+<p>Competitors default to present or absent, so a forgotten session silently reports perfect
+attendance — and then feeds the reports you make decisions from.</p></div>
+<div class="card b" style="border-inline-start-color:var(--belt-green)"><span class="k">Nobody else has</span><h5>הוראת קבע fingerprints</h5>
+<p>A workaround for a uPay constraint nobody else has had to solve. Manual in month 1, mostly
+one-tap by month 3.</p></div>
+<div class="card b" style="border-inline-start-color:var(--belt-black)"><span class="k">Nobody advertises</span><h5>The full privacy kit</h5>
+<p>Encryption, audit log, export, anonymize, retention, consent. תיקון 13 makes it a differentiator
+in Israel, not overhead.</p></div>
+</div>
+
+<h4>Complaints designed against</h4>
+<div class="tw"><table>
+<thead><tr><th>Real complaint</th><th>Structural answer here</th></tr></thead><tbody>
+<tr><td><b>Arbox:</b> “reporting is rigid — custom data means exporting to a spreadsheet”</td><td>Export on every report table, and the funnel report exists natively rather than being reconstructed by hand</td></tr>
+<tr><td><b>Arbox:</b> “the member-facing app lacks modern design and engagement”</td><td>The parent app is a first-class deliverable with its own screens — not a stripped-down admin panel</td></tr>
+<tr><td><b>Mindbody:</b> “feels like tools stitched together that don't talk to each other”</td><td>One ledger, one shared design system, TypeScript types generated from the backend's OpenAPI schema so clients cannot drift</td></tr>
+<tr><td><b>Zen Planner:</b> “glitches, incorrect charges”</td><td>Charges are never mutated — settlement is derived from <code>payment_allocation</code> — and every payment status change hits an append-only audit log</td></tr>
+</tbody></table></div>
+
+<h4>Deliberately omitted</h4>
+<p>Full sales CRM pipeline · POS with stock counts · kiosk/QR/RFID check-in · invoicing integration ·
+SMS and WhatsApp channels · capacity limits and waitlists · coach payroll · belt progress bar ·
+drip-campaign builder · website builder · door access control · competition results · French locale.
+Each has a recorded reason in <code>SPEC.md §17.3</code>, so none of them gets re-argued in six weeks.</p>
+</section>
+
+</main>
+</div>

@@ -1,0 +1,29 @@
+name: Claude PR Review
+on:
+  pull_request:
+    types: [opened, synchronize]
+  issue_comment:
+    types: [created]
+
+jobs:
+  review:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY_CI }}
+          prompt: |
+            Review this PR. Focus on:
+            - payment callback correctness (idempotency, replay, amount verification)
+            - authorization: any query returning student data without a club_id filter
+            - personal data on minors appearing in logs or responses
+            - missing tests for stated acceptance criteria
+            Report only issues affecting correctness or security. Be concise.

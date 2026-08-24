@@ -1,0 +1,25 @@
+title = "studio-manager"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "upay-merchant-credentials"
+description = "uPay merchant identifiers or keys"
+regex = '''(?i)upay[_-]?(secret|key|token|merchant|api)[^\n]{0,10}[=:]\s*['"][^'"]{8,}['"]'''
+tags = ["upay", "payments"]
+
+[[rules]]
+id = "envelope-encryption-key"
+description = "AES-256-GCM envelope keys (§11.1) live in Railway secrets, never in the repo"
+regex = '''(?i)(studio|envelope|aes)[_-]?(master|data)?[_-]?key[^\n]{0,10}[=:]\s*['"][A-Za-z0-9+/=]{32,}['"]'''
+tags = ["encryption"]
+
+[allowlist]
+description = "Generated and documentation files"
+paths = [
+  '''openapi\.json''',
+  '''web/packages/api-client/src/schema\.d\.ts''',
+  '''package-lock\.json''',
+  '''docs/.*\.md''',
+]

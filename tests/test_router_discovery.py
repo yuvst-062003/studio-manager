@@ -7,9 +7,8 @@ rather than by accident.
 
 from pathlib import Path
 
-from fastapi.testclient import TestClient
-
 from app.main import app
+from fastapi.testclient import TestClient
 
 MAIN = Path(__file__).resolve().parents[1] / "app" / "main.py"
 MODELS_INIT = Path(__file__).resolve().parents[1] / "app" / "models" / "__init__.py"

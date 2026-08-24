@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Edit(/.claude/skills/feature/**)",
+      "Edit(/.claude/skills/ship-check/**)",
+      "Edit(/.claude/skills/payments/**)",
+      "Bash(chmod +x /Users/yuvalstolin/Desktop/studio-manager/.claude/hooks/block-protected.sh)",
+      "Bash(python3 -c \"import json;json.load\\(open\\('.claude/settings.json'\\)\\);print\\('settings.json: valid'\\)\")",
+      "Bash(python3 -c \"import yaml,sys;yaml.safe_load\\(open\\('.github/workflows/claude-review.yml'\\)\\);print\\('claude-review.yml: valid'\\)\")",
+      "Bash(ruby -ryaml -e \"YAML.load_file\\('.github/workflows/claude-review.yml'\\); puts 'claude-review.yml: valid'\")",
+      "Bash(claude --version)",
+      "Bash(python3 -c \"import fastapi\")",
+      "Bash(/Library/Frameworks/Python.framework/Versions/3.14/bin/python3 --version)",
+      "Bash(echo \"=== auto-memory for this project ===\" *)",
+      "Read(//Users/yuvalstolin/.claude/plugins/**)",
+      "Bash(git init *)",
+      "Bash(/Library/Frameworks/Python.framework/Versions/3.14/bin/python3 -m pip install --quiet --disable-pip-version-check ruff mypy)",
+      "Bash(echo \"--- exit: $? ---\")",
+      "Bash(command -v ruff mypy)",
+      "Bash(/Library/Frameworks/Python.framework/Versions/3.14/bin/python3 -m venv .venv)",
+      "Bash(.venv/bin/python -m pip install --quiet --upgrade pip)",
+      "Bash(.venv/bin/python -m pip install --quiet --disable-pip-version-check ruff mypy pytest fastapi uvicorn[standard] sqlalchemy alembic)",
+      "Bash(.venv/bin/python --version)",
+      "Bash(.venv/bin/python -c \"import fastapi, sqlalchemy, alembic; print\\('fastapi', fastapi.__version__\\); print\\('sqlalchemy', sqlalchemy.__version__\\)\")",
+      "Bash(.venv/bin/pytest --version)",
+      "Bash(.venv/bin/ruff --version)",
+      "Bash(.venv/bin/mypy --version)"
+    ]
+  }
+}
