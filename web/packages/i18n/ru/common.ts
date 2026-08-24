@@ -31,4 +31,28 @@ export const common: Bundle = {
   'storage.persisted': 'Постоянное хранилище разрешено',
   'storage.notPersisted': 'Постоянное хранилище не разрешено',
   'storage.unsupported': 'Постоянное хранилище не поддерживается в этом браузере',
+  // §19.4 — the dev bar. Developer-only UI, but UI: these go through i18n like
+  // everything else, because the persona labels are the product's own role names.
+  'dev.title': 'РАЗРАБОТКА',
+  'dev.actingAs': 'действует как',
+  'dev.noPersona': 'нет активной роли',
+  'dev.personaSwitcherPending': 'переключатель ролей появится в M1, вместе с таблицей личностей',
+  // §19.3 — 'There is no student persona, because students have no login in v1, and
+  // the dev bar says so explicitly, so the gap is visible rather than confusing.'
+  'dev.noStudentPersona': 'нет роли ученика — у учеников нет входа в версии 1',
+  'dev.tool.offline': 'офлайн',
+  'dev.tool.slow': 'медленно',
+  'dev.tool.timeTravel': 'путешествие во времени',
+  'dev.tool.runJob': 'запустить задачу',
+  'dev.tool.simulateIpn': 'симуляция IPN',
+  'dev.tool.resetDemo': 'сброс демо-данных',
+  'dev.pendingIn': 'появится в ',
+  'dev.timeTravel.plusMonth': '+1 месяц',
+  'dev.timeTravel.now': 'вернуться к текущему времени',
+  'dev.ipn.success': 'успех',
+  'dev.ipn.amount_mismatch': 'несовпадение суммы',
+  'dev.ipn.forged_ref': 'поддельный идентификатор',
+  'dev.ipn.duplicate': 'дубликат',
+  'dev.ipn.orderRef': 'идентификатор заказа',
+  'dev.noticeIcon': 'внимание',
 }

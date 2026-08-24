@@ -72,4 +72,16 @@ export default tseslint.config(
       'no-restricted-syntax': ['error', ...physicalPropertySyntax, inlineStringSyntax],
     },
   },
+  {
+    // G4 reaches the dev bar too. It lives in packages/ui because all three apps mount
+    // it, but unlike every primitive beside it, it is a feature that carries its own
+    // copy rather than taking text as props — and its persona labels are the product's
+    // own role names, so inline Hebrew here would be a second set that drifts from
+    // `people`'s the day M1 lands. Extended rather than exempted: an ESLint hole in
+    // developer-only code is a precedent a later lane can cite.
+    files: ['packages/ui/src/dev-bar/**/*.tsx'],
+    rules: {
+      'no-restricted-syntax': ['error', ...physicalPropertySyntax, inlineStringSyntax],
+    },
+  },
 )

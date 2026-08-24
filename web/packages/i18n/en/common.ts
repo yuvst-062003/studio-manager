@@ -23,4 +23,28 @@ export const common: Bundle = {
   'storage.persisted': 'Persistent storage granted',
   'storage.notPersisted': 'Persistent storage not granted',
   'storage.unsupported': 'Persistent storage unsupported in this browser',
+  // §19.4 — the dev bar. Developer-only UI, but UI: these go through i18n like
+  // everything else, because the persona labels are the product's own role names.
+  'dev.title': 'DEV',
+  'dev.actingAs': 'acting as',
+  'dev.noPersona': 'no active persona',
+  'dev.personaSwitcherPending': 'the role switcher arrives in M1, with the identity table',
+  // §19.3 — 'There is no student persona, because students have no login in v1, and
+  // the dev bar says so explicitly, so the gap is visible rather than confusing.'
+  'dev.noStudentPersona': 'no student persona — students have no login in v1',
+  'dev.tool.offline': 'offline',
+  'dev.tool.slow': 'slow',
+  'dev.tool.timeTravel': 'time travel',
+  'dev.tool.runJob': 'run a job',
+  'dev.tool.simulateIpn': 'simulate IPN',
+  'dev.tool.resetDemo': 'reset demo data',
+  'dev.pendingIn': 'arrives in ',
+  'dev.timeTravel.plusMonth': '+1 month',
+  'dev.timeTravel.now': 'back to now',
+  'dev.ipn.success': 'success',
+  'dev.ipn.amount_mismatch': 'amount mismatch',
+  'dev.ipn.forged_ref': 'forged ref',
+  'dev.ipn.duplicate': 'duplicate',
+  'dev.ipn.orderRef': 'order public_ref',
+  'dev.noticeIcon': 'notice',
 }

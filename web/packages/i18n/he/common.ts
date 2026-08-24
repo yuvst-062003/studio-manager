@@ -23,4 +23,28 @@ export const common: Bundle = {
   'storage.persisted': 'אחסון קבוע אושר',
   'storage.notPersisted': 'אחסון קבוע לא אושר',
   'storage.unsupported': 'אחסון קבוע לא נתמך בדפדפן הזה',
+  // §19.4 — the dev bar. Developer-only UI, but UI: these go through i18n like
+  // everything else, because the persona labels are the product's own role names.
+  'dev.title': 'פיתוח',
+  'dev.actingAs': 'פועל בתור',
+  'dev.noPersona': 'אין פרסונה פעילה',
+  'dev.personaSwitcherPending': 'מחליף התפקידים מגיע ב-M1, יחד עם טבלת הזהויות',
+  // §19.3 — 'There is no student persona, because students have no login in v1, and
+  // the dev bar says so explicitly, so the gap is visible rather than confusing.'
+  'dev.noStudentPersona': 'אין פרסונת תלמיד — לתלמידים אין התחברות בגרסה 1',
+  'dev.tool.offline': 'לא מקוון',
+  'dev.tool.slow': 'איטי',
+  'dev.tool.timeTravel': 'מסע בזמן',
+  'dev.tool.runJob': 'הרצת משימה',
+  'dev.tool.simulateIpn': 'הדמיית IPN',
+  'dev.tool.resetDemo': 'איפוס נתוני הדגמה',
+  'dev.pendingIn': 'מגיע ב-',
+  'dev.timeTravel.plusMonth': 'חודש קדימה',
+  'dev.timeTravel.now': 'חזרה לעכשיו',
+  'dev.ipn.success': 'הצלחה',
+  'dev.ipn.amount_mismatch': 'סכום לא תואם',
+  'dev.ipn.forged_ref': 'מזהה הזמנה מזויף',
+  'dev.ipn.duplicate': 'כפילות',
+  'dev.ipn.orderRef': 'מזהה הזמנה',
+  'dev.noticeIcon': 'שים לב',
 }
