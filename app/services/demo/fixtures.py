@@ -22,6 +22,7 @@ lands.
 
 from __future__ import annotations
 
+import copy
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -102,7 +103,15 @@ def _seed_studio(session: Session, studio_id: uuid.UUID) -> None:
 _V1 = FixtureSet(
     version="2026-08-24.1",
     studio=StudioFixture(
-        name=DEMO_STUDIO_NAME, slug=DEMO_STUDIO_SLUG, settings=DEMO_STUDIO_SETTINGS
+        name=DEMO_STUDIO_NAME,
+        slug=DEMO_STUDIO_SLUG,
+        # A deep copy, not a reference: DEMO_STUDIO_SETTINGS is also what revision 0003
+        # writes into the row. A shallow dict() would still share the nested "upay"
+        # dict -- §19.6's livesystem pin -- so anything that ever mutates
+        # fixture.studio.settings in place would corrupt the migration's own source of
+        # truth. Copied once at import, from the one constant, so the fixture and the
+        # migration still cannot drift apart.
+        settings=copy.deepcopy(DEMO_STUDIO_SETTINGS),
     ),
     layers=(
         FixtureLayer(

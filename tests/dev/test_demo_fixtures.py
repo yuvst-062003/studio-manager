@@ -14,7 +14,7 @@ rather than a quiet omission.
 from __future__ import annotations
 
 import pytest
-from app.services.demo import DEMO_STUDIO_NAME, DEMO_STUDIO_SLUG
+from app.services.demo import DEMO_STUDIO_NAME, DEMO_STUDIO_SETTINGS, DEMO_STUDIO_SLUG
 from app.services.demo.fixtures import (
     LATEST_VERSION,
     PLANNED_LAYERS,
@@ -46,6 +46,26 @@ def test_the_studio_fixture_matches_the_row_the_migration_creates():
 def test_the_demo_studios_upay_config_is_pinned_in_the_fixture_too():
     """§19.6 restriction 5. The reset must not be the thing that un-pins it."""
     assert SEEDS[LATEST_VERSION].studio.settings["upay"]["livesystem"] == 0
+
+
+def test_mutating_the_fixtures_settings_does_not_corrupt_the_shared_constant():
+    """StudioFixture.settings must be an isolated copy of DEMO_STUDIO_SETTINGS, not a
+    reference to it -- that same constant is what revision 0003 writes into the demo
+    studio row, so a mutation reaching it here would corrupt the migration's own source
+    of truth. Mutates the nested "upay" dict specifically, not just the top level: a
+    shallow `dict()` copy would still share that nested object, and it holds §19.6's
+    livesystem pin."""
+    fixture_settings = SEEDS[LATEST_VERSION].studio.settings
+    original_billing_day = DEMO_STUDIO_SETTINGS["billing_day"]
+    original_livesystem = DEMO_STUDIO_SETTINGS["upay"]["livesystem"]
+    try:
+        fixture_settings["billing_day"] = original_billing_day + 1
+        fixture_settings["upay"]["livesystem"] = 1
+        assert DEMO_STUDIO_SETTINGS["billing_day"] == original_billing_day
+        assert DEMO_STUDIO_SETTINGS["upay"]["livesystem"] == 0
+    finally:
+        fixture_settings["billing_day"] = original_billing_day
+        fixture_settings["upay"]["livesystem"] = original_livesystem
 
 
 def test_layer_names_are_unique():
