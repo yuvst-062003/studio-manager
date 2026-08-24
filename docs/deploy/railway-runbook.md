@@ -198,3 +198,15 @@ plaintext to rotate a key. Only once every row reports the new version via
 
 Locally the key lives in `.env`, which is gitignored. `.env.example` carries an
 all-zero placeholder so the shape is documented without a usable key being committed.
+
+## Scheduled jobs
+
+[`infra/railway/jobs.json`](../../infra/railway/jobs.json) is the source of truth for
+what runs on a schedule and why; `tests/config/test_jobs_config.py` asserts every
+declared command points at a module that exists, so a rename fails the build rather
+than silently stopping a job.
+
+**Still manual:** Railway's cron is configured per service in the dashboard. Create a
+cron service in the `staging` environment for each entry in that file, using its
+`schedule` and `command` verbatim. This is the one half of the mechanism a test cannot
+reach — if the dashboard and the file disagree, the file is right.

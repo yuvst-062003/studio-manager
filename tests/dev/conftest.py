@@ -41,6 +41,14 @@ RELOADABLE = (
     "app.routers.health",
     "app.routers.dev",
     "app.main",
+    # Not part of app.main's import graph -- this harness never reaches it, and
+    # tests/dev/test_demo_reset_worker.py monkeypatches settings.ENV on the live
+    # singleton directly rather than through app_in_env. It is here anyway because
+    # tests/dev/test_dev_router.py's gate is a source-level scan of all of app/, not
+    # scoped to what app.main imports, and the rule it enforces ("every module that
+    # binds settings at import time and reads .ENV off it must be reloadable") is
+    # written that broadly on purpose -- see its own module docstring.
+    "app.workers.demo_reset",
 )
 
 

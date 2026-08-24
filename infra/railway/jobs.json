@@ -1,0 +1,13 @@
+{
+  "$comment": "Scheduled jobs, declared in one place so a rename cannot silently stop one. Railway's cron is configured in the dashboard per service; this file is the source of truth that tests/config/test_jobs_config.py checks the commands against, and docs/deploy/railway-runbook.md records the dashboard step.",
+  "jobs": [
+    {
+      "name": "demo-reset",
+      "environment": "staging",
+      "schedule": "0 2 * * *",
+      "command": "python -m app.workers.demo_reset",
+      "spec": "SPEC §19.7",
+      "why": "So the demo data never drifts into a state that hides a bug. 02:00 Asia/Jerusalem is after any evening session a coach might have been testing against."
+    }
+  ]
+}
