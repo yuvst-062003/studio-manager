@@ -60,6 +60,11 @@ export default tseslint.config(
     },
   },
   {
+    // Build-time node scripts: no DOM, no D10 (they emit assets, not styles).
+    files: ['scripts/**/*.mjs'],
+    languageOptions: { globals: globals.node },
+  },
+  {
     files: ['apps/*/src/**/*.tsx'],
     rules: {
       'no-restricted-syntax': ['error', ...physicalPropertySyntax, inlineStringSyntax],
