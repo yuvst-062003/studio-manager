@@ -19,12 +19,15 @@ services:
     ports:
       - "127.0.0.1:55433:5432"
     volumes:
+      # No docker-entrypoint-initdb.d mount, deliberately. The runtime role comes
+      # from revision 0001 in every environment. A local-only init script is what
+      # let local and CI drift: locally the role arrived WITH LOGIN, CI had no init
+      # hook, and only the runner noticed.
       # PostgreSQL 18's image moved the data directory: the mount goes at
       # /var/lib/postgresql and the server puts its data in a version-named
       # subdirectory. Mounting /var/lib/postgresql/data (correct for 16 and
       # earlier) makes the container refuse to start.
       - studio-manager-pgdata:/var/lib/postgresql
-      - ./infra/postgres/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U studio_migrator -d studio_manager"]
       interval: 2s

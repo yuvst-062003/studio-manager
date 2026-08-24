@@ -53,6 +53,22 @@ def migrated(migration_engine: Engine) -> Engine:
     )
     if result.returncode != 0:
         pytest.fail(f"alembic upgrade head failed:\n{result.stdout}\n{result.stderr}")
+
+    # Revision 0001 creates the runtime role NOLOGIN on purpose: a migration must never
+    # express a credential. Staging and production grant login with a password out of
+    # band. Tests need to actually connect as that role -- it is the only way to prove
+    # Postgres refuses an UPDATE on audit_log (SPEC 11.2) -- so this is the test
+    # environment's stand-in for that out-of-band step.
+    #
+    # It lives here rather than in a local init script because a local-only init script
+    # is exactly what let local and CI drift: locally the role arrived WITH LOGIN from
+    # docker-entrypoint-initdb.d, CI has no init hook at all, and the difference only
+    # surfaced on the runner.
+    with migration_engine.begin() as connection:
+        connection.execute(text(f"ALTER ROLE {settings.APP_DB_ROLE} WITH LOGIN"))
+        connection.execute(
+            text(f"GRANT CONNECT ON DATABASE studio_manager TO {settings.APP_DB_ROLE}")
+        )
     return migration_engine
 
 

@@ -66,7 +66,7 @@ def test_env_example_documents_every_setting_the_backend_reads():
 def test_no_password_is_committed_anywhere_in_the_local_database_setup():
     """Local auth is `trust` precisely so this repo never carries a credential. A
     password appearing here is the regression this guards."""
-    for path in ("docker-compose.yml", ".env.example", "infra/postgres/init/10-roles.sql"):
+    for path in ("docker-compose.yml", ".env.example"):
         text = (ROOT / path).read_text(encoding="utf-8").lower()
         assert "password" not in text, f"{path} introduces a credential; local auth is trust"
 
