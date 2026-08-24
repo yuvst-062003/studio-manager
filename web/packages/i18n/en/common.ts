@@ -1,0 +1,20 @@
+import type { Bundle } from '../types'
+
+export const common: Bundle = {
+  hello: 'Hello',
+  'appName.staff': 'Studio — Staff',
+  'appName.parent': 'Studio — Parents',
+  'appName.dashboard': 'Studio — Management',
+  'hello.title': 'The foundation works',
+  'hello.fontProof': 'אבגד הוזח · ABCD efgh · АБВГ абвг · 0123',
+  'hello.direction': 'Writing direction',
+  'hello.theme': 'Theme',
+  'theme.light': 'Light',
+  'theme.dark': 'Dark',
+  'theme.system': 'System',
+  'displayMode.standalone': 'Installed to home screen',
+  'displayMode.browser': 'Running in a browser tab',
+  'storage.persisted': 'Persistent storage granted',
+  'storage.notPersisted': 'Persistent storage not granted',
+  'storage.unsupported': 'Persistent storage unsupported in this browser',
+}
