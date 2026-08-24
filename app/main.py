@@ -15,6 +15,11 @@ from fastapi import APIRouter, FastAPI
 
 from app import routers as routers_pkg
 from app.core.config import settings
+from app.core.logging import configure_logging
+
+# SPEC 11.7 -- structured JSON logs with the scrubbing filter installed before
+# anything can log. Not a registration: seam 2's discovery loop is untouched.
+configure_logging()
 
 app = FastAPI(title="Studio Manager API", version="0.1.0")
 
