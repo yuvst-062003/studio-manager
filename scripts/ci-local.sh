@@ -9,9 +9,12 @@ echo "── backend: lint, format, types, tests ──"
 .venv/bin/mypy app scripts
 .venv/bin/pytest
 
-echo "── frontend: types, lint, tests ──"
+echo "── frontend: types, lint, build, tests ──"
 npm --prefix web run typecheck
 npm --prefix web run lint
+# Build precedes tests: the sw-precache specs assert built output, so running
+# them first passes on a stale dist/ and hides a real regression.
+npm --prefix web run build
 npm --prefix web test
 
 echo "── generated api-client is committed (SPEC §8.2) ──"
@@ -19,8 +22,7 @@ echo "── generated api-client is committed (SPEC §8.2) ──"
 (cd web && npx openapi-typescript ../openapi.json -o packages/api-client/src/schema.d.ts)
 git diff --exit-code -- openapi.json web/packages/api-client/src/schema.d.ts
 
-echo "── build + installability ──"
-npm --prefix web run build
+echo "── installability ──"
 node web/scripts/check-installability.mjs
 
 echo "✅ all gates green"

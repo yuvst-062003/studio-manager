@@ -7,6 +7,11 @@ const read = (f: string) => readFileSync(resolve(dist, f), 'utf-8')
 
 // The precache list lives in a workbox-${hash}.js chunk, not sw.js itself.
 const precacheText = () => {
+  if (!existsSync(dist)) {
+    throw new Error('apps/parent/dist is missing — run `npm run build` first. '
+      + 'These specs assert built output on purpose: a config assertion passes '
+      + 'while the font silently fails to precache (§6.1).')
+  }
   const files = readdirSync(dist).filter((f) => f.endsWith('.js'))
   return files.map((f) => read(f)).join('\n')
 }

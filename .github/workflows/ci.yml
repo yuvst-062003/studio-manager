@@ -47,6 +47,12 @@ jobs:
         run: npm run typecheck
       - name: Lint
         run: npm run lint
+      - name: Build
+        # Must precede Tests: the sw-precache specs assert the built precache
+        # manifest, which is the only way to catch a font silently failing to
+        # precache (§6.1). Without this they pass locally on a stale dist/ and
+        # fail on a clean checkout.
+        run: npm run build
       - name: Tests
         run: npm run test
 
