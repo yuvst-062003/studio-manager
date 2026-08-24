@@ -92,3 +92,54 @@
   font-size: var(--text-caption);
   margin-block: var(--space-2) 0;
 }
+
+.studio-btn {
+  background: transparent;
+  border: var(--border-width-hairline) solid transparent;
+  border-radius: var(--radius-md);
+  color: var(--fg);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--text-body);
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-tight);
+  padding-block: var(--control-pad-block);
+  padding-inline: var(--control-pad-inline);
+  transition: background var(--motion-fast) var(--ease-standard);
+}
+
+.studio-btn[data-variant="primary"] {
+  background: var(--fg);
+  color: var(--on-fg);
+}
+
+.studio-btn[data-variant="secondary"] {
+  border-color: var(--fg);
+  border-width: var(--border-width-strong);
+}
+
+/* --border-strong, not --border: a ghost button's outline is the ONLY thing identifying
+ * it as a control, which is the case SC 1.4.11 is about. That is the token M0.3 raised
+ * from 1.21:1 to 3.33:1. */
+.studio-btn[data-variant="ghost"] {
+  border-color: var(--border-strong);
+  font-weight: var(--weight-regular);
+}
+
+.studio-btn[data-variant="destructive"] {
+  border-color: var(--danger);
+  border-width: var(--border-width-strong);
+  color: var(--danger);
+}
+
+.studio-btn:disabled {
+  background: var(--disabled-surface);
+  border-color: transparent;
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+.studio-btn:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
