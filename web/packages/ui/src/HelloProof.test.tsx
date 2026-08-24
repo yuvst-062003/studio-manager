@@ -36,10 +36,14 @@ describe('the hello screen proves the three things M0.1 claims', () => {
     expect(screen.getByRole('heading')).toHaveTextContent('הבסיס עובד')
   })
 
-  it('offers all three D4 theme options, with pressed state announced', () => {
+  it('offers all three D4 theme options as one radio group, with the resolved state shown', () => {
     renderProof()
-    const buttons = screen.getAllByRole('button')
-    expect(buttons).toHaveLength(3)
-    expect(buttons.filter((b) => b.getAttribute('aria-pressed') === 'true')).toHaveLength(1)
+    expect(screen.getByRole('radiogroup', { name: 'ערכת נושא' })).toBeInTheDocument()
+    const radios = screen.getAllByRole('radio')
+    expect(radios).toHaveLength(3)
+    expect(radios.filter((r) => (r as HTMLInputElement).checked)).toHaveLength(1)
+    // 4h: "לכל מתג יש תווית מצב" — the state is always readable, not only inferable
+    // from which option looks selected.
+    expect(screen.getByText(/מצב נוכחי:/)).toBeVisible()
   })
 })

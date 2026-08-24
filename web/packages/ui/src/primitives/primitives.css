@@ -30,3 +30,65 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+.studio-theme-control {
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.studio-theme-control__legend {
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
+  padding: 0;
+}
+
+.studio-theme-control__options {
+  background: var(--ground);
+  border-radius: var(--radius-md);
+  display: flex;
+  gap: var(--space-1);
+  margin-block-start: var(--space-2);
+  padding: 3px;
+  inline-size: fit-content;
+}
+
+.studio-theme-control__option {
+  border-radius: 7px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: var(--text-label);
+  font-weight: var(--weight-regular);
+  padding-block: 7px;
+  padding-inline: 13px;
+  transition: background var(--motion-fast) var(--ease-standard);
+}
+
+.studio-theme-control__option[data-selected="true"] {
+  background: var(--fg);
+  color: var(--on-fg);
+  font-weight: var(--weight-medium);
+}
+
+/* Off-screen, never display:none — that would remove the radio from the tab order and
+ * from the accessibility tree along with it. */
+.studio-theme-control__input {
+  block-size: 1px;
+  clip-path: inset(50%);
+  inline-size: 1px;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+}
+
+.studio-theme-control__option:has(.studio-theme-control__input:focus-visible) {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.studio-theme-control__state {
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+  margin-block: var(--space-2) 0;
+}

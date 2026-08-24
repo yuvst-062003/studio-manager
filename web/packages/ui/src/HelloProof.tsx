@@ -3,9 +3,7 @@ import { DIRECTION, t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { useDisplayMode } from '@studio/core'
 import { useTheme } from './ThemeProvider'
-import type { ThemePreference } from './theme'
-
-const PREFERENCES: ThemePreference[] = ['light', 'dark', 'system']
+import { ThemeControl } from './primitives/ThemeControl'
 
 /** One run per script D6 claims Rubik covers. Rendered isolated (SPEC §9). */
 const PROOF_RUNS = ['hebrew', 'latin', 'cyrillic', 'digits'] as const
@@ -22,7 +20,7 @@ export function HelloProof({
   appNameKey: string
   locale?: Locale
 }) {
-  const { preference, resolved, setPreference } = useTheme()
+  const { resolved } = useTheme()
   const displayMode = useDisplayMode()
   const [fontReady, setFontReady] = useState(false)
 
@@ -98,27 +96,18 @@ export function HelloProof({
         </div>
       </dl>
 
-      <div role="group" style={{ display: 'flex', gap: 'var(--space-2)' }}>
-        {PREFERENCES.map((p) => (
-          <button
-            key={p}
-            type="button"
-            aria-pressed={preference === p}
-            onClick={() => setPreference(p)}
-            style={{
-              padding: 'var(--space-2) var(--space-4)',
-              borderRadius: 'var(--radius-md)',
-              border: `1px solid ${preference === p ? 'var(--fg)' : 'var(--border)'}`,
-              background: preference === p ? 'var(--fg)' : 'var(--surface)',
-              color: preference === p ? 'var(--ground)' : 'var(--fg)',
-              font: 'inherit',
-              cursor: 'pointer',
-            }}
-          >
-            {t(locale, `common.theme.${p}`)}
-          </button>
-        ))}
-      </div>
+      <ThemeControl
+        labels={{
+          light: t(locale, 'common.theme.light'),
+          dark: t(locale, 'common.theme.dark'),
+          system: t(locale, 'common.theme.system'),
+        }}
+        legend={t(locale, 'common.theme.legend')}
+        stateLabels={{
+          light: t(locale, 'common.theme.state.light'),
+          dark: t(locale, 'common.theme.state.dark'),
+        }}
+      />
     </main>
   )
 }

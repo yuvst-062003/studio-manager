@@ -24,3 +24,4 @@ export type { GroundToken, Obligation, Tier, TokenRole } from './tokens.roles'
 export { BRAND_TOKENS, applyBrand, brandOverridesFor } from './brand'
 
 export { Card } from './primitives/Card'
+export { ThemeControl } from './primitives/ThemeControl'
