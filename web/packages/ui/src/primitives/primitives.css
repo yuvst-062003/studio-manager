@@ -284,3 +284,101 @@
   border-style: dashed;
   color: var(--pending);
 }
+
+.studio-choice {
+  align-items: center;
+  display: inline-flex;
+  gap: var(--space-2);
+}
+
+.studio-choice__input {
+  accent-color: var(--fg);
+  block-size: 20px;
+  flex: none;
+  inline-size: 20px;
+  margin: 0;
+}
+
+.studio-choice__input:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.studio-choice__label {
+  color: var(--fg);
+  cursor: pointer;
+  font-size: var(--text-label);
+}
+
+.studio-switch {
+  align-items: center;
+  display: inline-flex;
+  gap: var(--space-2);
+}
+
+/* justify-content rather than an inset offset: flexbox alignment is already
+ * flow-relative, so the knob sits on the correct edge in both directions with no
+ * left/right anywhere. */
+.studio-switch__track {
+  align-items: center;
+  background: transparent;
+  block-size: 27px;
+  border: var(--border-width-strong) solid var(--border-strong);
+  border-radius: 14px;
+  cursor: pointer;
+  display: inline-flex;
+  flex: none;
+  inline-size: 46px;
+  justify-content: flex-start;
+  padding: 2px;
+  transition: background var(--motion-fast) var(--ease-standard);
+}
+
+.studio-switch__track[aria-checked="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  justify-content: flex-end;
+}
+
+.studio-switch__track:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.studio-switch__track:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* The accessible name lives here, off-screen — never display:none, which would remove it
+ * from the accessibility tree along with the button's name. */
+.studio-switch__label {
+  block-size: 1px;
+  clip-path: inset(50%);
+  inline-size: 1px;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+}
+
+.studio-switch__knob {
+  background: var(--fg);
+  block-size: 19px;
+  border-radius: var(--radius-circle);
+  display: block;
+  inline-size: 19px;
+}
+
+.studio-switch__track[aria-checked="true"] .studio-switch__knob {
+  background: var(--on-accent);
+}
+
+.studio-switch__state {
+  color: var(--text-muted);
+  font-size: var(--text-label);
+  font-weight: var(--weight-medium);
+}
+
+.studio-switch__state[data-on="true"] {
+  color: var(--accent);
+}
