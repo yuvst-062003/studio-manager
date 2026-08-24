@@ -69,3 +69,26 @@ def test_no_password_is_committed_anywhere_in_the_local_database_setup():
     for path in ("docker-compose.yml", ".env.example", "infra/postgres/init/10-roles.sql"):
         text = (ROOT / path).read_text(encoding="utf-8").lower()
         assert "password" not in text, f"{path} introduces a credential; local auth is trust"
+
+
+def test_no_test_builds_an_executable_path_out_of_venv():
+    """G1 mandates the venv prefix for commands a *developer* types. A test that builds
+    that path and executes it is a different thing, and it is wrong: CI installs into the
+    system Python and has no virtualenv at all, so the hardcoded path passed locally and
+    failed on the runner with 27 errors.
+
+    Use `sys.executable -m <module>`, which works in both and additionally guarantees the
+    subprocess runs under the same interpreter as the test.
+
+    The pattern is assembled from parts so this file does not match itself, and matched
+    narrowly on the path construction that actually executes. The allowlist strings in
+    test_repo_config.py describe a developer command and are left alone.
+    """
+    needle = 'ROOT / "' + ".venv/bin/"
+    offenders = [
+        f"{path.relative_to(ROOT)}:{number}"
+        for path in sorted((ROOT / "tests").rglob("*.py"))
+        for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1)
+        if needle in line
+    ]
+    assert offenders == [], offenders

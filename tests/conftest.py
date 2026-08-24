@@ -8,6 +8,7 @@ times. The message carries the fix.
 from __future__ import annotations
 
 import subprocess
+import sys
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -40,8 +41,12 @@ def migration_engine() -> Iterator[Engine]:
 @pytest.fixture(scope="session")
 def migrated(migration_engine: Engine) -> Engine:
     """Upgrade to head once per session. Forward-only, per SPEC 8.1a."""
+    # `sys.executable -m alembic`, never `.venv/bin/alembic`: CI installs into the
+    # system Python and has no .venv at all, so the hardcoded path passed locally and
+    # failed on the runner with 27 errors. This form also guarantees migrations run
+    # under the same interpreter as the tests.
     result = subprocess.run(
-        [str(ROOT / ".venv/bin/alembic"), "upgrade", "head"],
+        [sys.executable, "-m", "alembic", "upgrade", "head"],
         cwd=ROOT,
         capture_output=True,
         text=True,

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -135,6 +136,6 @@ def test_the_migrations_match_the_models(migrated: Engine):
     convention), so it earns its place rather than being belt-and-braces.
     """
     result = subprocess.run(
-        [str(ROOT / ".venv/bin/alembic"), "check"], cwd=ROOT, capture_output=True, text=True
+        [sys.executable, "-m", "alembic", "check"], cwd=ROOT, capture_output=True, text=True
     )
     assert result.returncode == 0, result.stdout + result.stderr
