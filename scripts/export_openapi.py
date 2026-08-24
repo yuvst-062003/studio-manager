@@ -6,10 +6,19 @@ diff -- so a breaking backend change fails the build rather than production
 """
 
 import json
+import os
 import pathlib
 import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+
+# The schema describes the surface a deployed client can reach, and §19.2 removes the
+# dev router from production entirely -- so the export is taken from the production
+# app. Set before the import, because app/main.py reads settings.ENV once, at import,
+# in seam 2's discovery loop. Without this, `openapi.json` is a function of whichever
+# environment happened to run the export, and ci-local.sh's diff gate fails for the
+# next person.
+os.environ["ENV"] = "production"
 
 from app.main import app  # noqa: E402
 
