@@ -58,16 +58,18 @@ def probe(migrated: Engine) -> Iterator[Engine]:
                 {"id": studio_id, "slug": slug},
             )
     Widget.__table__.create(migrated, checkfirst=True)
-    with TenantSession(bind=migrated, expire_on_commit=False) as seed:
-        with with_all_tenants(reason="test fixture seeding both studios"):
-            seed.add_all(
-                [
-                    Widget(studio_id=ALPHA, name="alpha-one"),
-                    Widget(studio_id=ALPHA, name="alpha-two"),
-                    Widget(studio_id=BETA, name="beta-one"),
-                ]
-            )
-            seed.commit()
+    with (
+        TenantSession(bind=migrated, expire_on_commit=False) as seed,
+        with_all_tenants(reason="test fixture seeding both studios"),
+    ):
+        seed.add_all(
+            [
+                Widget(studio_id=ALPHA, name="alpha-one"),
+                Widget(studio_id=ALPHA, name="alpha-two"),
+                Widget(studio_id=BETA, name="beta-one"),
+            ]
+        )
+        seed.commit()
     yield migrated
     Widget.__table__.drop(migrated, checkfirst=True)
 
