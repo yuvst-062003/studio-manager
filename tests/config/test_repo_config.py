@@ -80,6 +80,11 @@ def test_c7_api_rule_uses_studio_id_and_names_the_mechanism():
         "Bash(./scripts/lane-check.sh:*)",
         "Bash(npx eslint:*)",
         "Bash(git worktree:*)",
+        # M0.2 -- the database, the migration read-only subcommands and the parity check.
+        "Bash(docker compose:*)",
+        "Bash(./scripts/dev-db.sh:*)",
+        "Bash(.venv/bin/alembic check)",
+        "Bash(node web/scripts/i18n-parity.mjs:*)",
     ],
 )
 def test_c8_allowlist_matches_the_mandated_commands(pattern):
@@ -93,3 +98,11 @@ def test_c8_alembic_downgrade_deny_actually_matches():
     assert "Bash(.venv/bin/alembic downgrade:*)" in deny, (
         "G1 mandates the .venv/bin prefix, so a bare `alembic downgrade` deny protects nothing"
     )
+
+
+def test_the_allowlist_never_blanket_allows_alembic():
+    """`Bash(.venv/bin/alembic:*)` would swallow `downgrade`, which the deny list exists
+    to stop. The allowlist names read-only subcommands one at a time on purpose."""
+    settings = json.loads((ROOT / ".claude/settings.json").read_text(encoding="utf-8"))
+    assert "Bash(.venv/bin/alembic:*)" not in settings["permissions"]["allow"]
+    assert "Bash(alembic:*)" not in settings["permissions"]["allow"]

@@ -19,6 +19,9 @@ a bare `python3`/`pytest` resolves to an old 3.8 interpreter earlier on PATH.
 - Typecheck: `npm run typecheck && .venv/bin/mypy app`
 - Lint/format: `.venv/bin/ruff check --fix app && .venv/bin/ruff format app && npm run lint`
 - Migration: `.venv/bin/alembic revision --autogenerate -m "<msg>"` then `.venv/bin/alembic upgrade head`
+- Local database: `./scripts/dev-db.sh up` (start fresh with `reset`). Database tests
+  **fail** rather than skip without it — a skipped DB test is a gate that checks nothing.
+- Lane check: `./scripts/lane-check.sh <vertical>` — the one command every lane runs.
 
 ## Layout
 - `app/` FastAPI: `routers/`, `services/`, `models/`, `schemas/`, `workers/`,
@@ -48,6 +51,22 @@ a bare `python3`/`pytest` resolves to an old 3.8 interpreter earlier on PATH.
   string in a component. `web/packages/i18n/index.ts` lists every namespace and is authored
   once — a lane never edits it. A single `he.ts` would serialize every wave.
 - New API endpoints are versioned under `/api/v1/`.
+
+## Core mechanisms (M0.2 — read before adding a model or an endpoint)
+- Tenancy: inherit `TenantMixin` from `app/core/tenancy.py`. It adds a non-null
+  `studio_id` and the leading composite index, and `TenantSession` filters every query
+  by the active studio. It **fails closed** — no studio in context raises rather than
+  returning every studio's rows. The `with_all_tenants(reason=...)` hatch is legal only
+  in platform-admin code and deliberate cross-studio jobs.
+- Encryption: `EncryptedJSON("table.column")` / `EncryptedBytes(...)` from
+  `app/core/encryption.py`. Keys live in Railway secrets, never in the database.
+  Rotation is `rewrap()`, which never decrypts a payload.
+- Audit: `AuditService.record(...)`. `audit_log` is append-only **by grant** — the app
+  role holds INSERT and SELECT and nothing else. Never put health contents in `diff`.
+- Logging: structured JSON with a scrubber. Log payloads as `extra=`, never
+  interpolated into the message — an f-string has no key for the scrubber to match.
+- Two DB roles: `studio_migrator` owns the schema and runs Alembic, `studio_app` is the
+  runtime role. That split is what makes the append-only grant possible.
 
 ## Gotchas
 - Recurring payments (הוראת קבע) cannot be created programmatically by our provider.

@@ -110,6 +110,42 @@ walkthrough is what M1 turns into an onboarding screen.
 The load-bearing session. Everything in waves 2–5 depends on the four seam mechanisms
 existing and being correct.
 
+> **M0.2 SHIPPED (2026-08-24).** All four seams and items 1–7 below are on `main`. Exit
+> gate met: `./scripts/lane-check.sh core` is green and `.venv/bin/alembic upgrade head`
+> runs clean on a fresh database. What landed, and the parts that differ from what this
+> block anticipated:
+>
+> - **Seam 1** — `alembic.ini`, `alembic/env.py`, revisions `0001_baseline` (roles,
+>   default privileges, `studio`) and `0002_audit_log`. `alembic check` runs as a test, so
+>   model/migration drift fails the build. The `block-protected.sh` hook had a real gap —
+>   `*/alembic/versions/*` needs a prefix before `alembic`, so a bare relative path was
+>   never blocked; fixed and asserted.
+> - **Seam 4** — `web/packages/ui/src/slots.ts`. `SlotEntry` is generic rather than the
+>   plan's `React.FC<any>`: `no-explicit-any` and `tsc --strict` both reject that, and
+>   `Record<string, unknown>` fails too because props are contravariant.
+> - **Tenancy** (§4.2) — `TenantSession`, `TenantMixin`, `with_all_tenants(reason=...)`.
+>   Fails closed. `with_all_tenants` takes a **required reason**, which is an addition to
+>   the spec's wording.
+> - **Encryption** (§11.1) — a real envelope: a per-record DEK wrapped by a versioned KEK,
+>   so `rewrap()` rotates a row without decrypting its payload. `EncryptedJSON` /
+>   `EncryptedBytes` are ready for M3's `payload_encrypted`.
+> - **Audit log** (§11.2) — append-only **by grant**. Two DB roles (`studio_migrator`,
+>   `studio_app`) exist because one role cannot both own a table and be denied rights on
+>   it. Proven by granting `UPDATE` back and watching three tests go red.
+> - **Log scrubber** (§11.7) + `tests/invariants/` — SPEC §13's five, each with a
+>   self-test proving its detector fires.
+> - **`scripts/lane-check.sh`** and **`web/scripts/i18n-parity.mjs`** — note the path:
+>   Node scripts live in `web/scripts/`, not the milestone plan's `scripts/`.
+>
+> **Two open items carried forward**, both recorded in
+> [the Railway runbook](../deploy/railway-runbook.md): the staging api still connects as
+> the superuser rather than as `studio_app` (M1 closes this), and Railway provisioned
+> **PostgreSQL 18** where SPEC §8.1a pins 16 — local and CI test against 16.
+>
+> **Still open from before:** SPEC §15 item 9, the `ru` translation source. Until it
+> lands, `i18n-parity.mjs` treats `ru` as *report* and `en` as *strict*; one word in
+> `POLICY` changes that.
+
 > **Already landed in M0.1 — do not rebuild:**
 > - **Seam 2** (`app/main.py` + `app/models/__init__.py` pkgutil discovery), including the
 >   `ENV == "production"` exclusion for the dev router. Note the plan's own snippet has a
@@ -119,8 +155,8 @@ existing and being correct.
 > - **Seam 3** (`web/packages/i18n`, nine namespaces × three locales, `index.ts` authored
 >   once with every namespace including the 24 empty stubs).
 >
-> **Still to build here:** Seam 1 (Alembic baseline) and Seam 4 (`slots.ts`), then items 2–7
-> below. Item 1 reduces to those two seams.
+> **Still to build here:** nothing — see the M0.2 SHIPPED note above. The prompt below is
+> kept as the record of what was asked for.
 
 ```
 Read @docs/plan/milestone-plan.md — Global Constraints, Part 1 §1.3 (all four

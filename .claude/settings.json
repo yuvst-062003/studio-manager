@@ -17,7 +17,17 @@
       "Bash(.venv/bin/alembic upgrade:*)",
       "Bash(./scripts/lane-check.sh:*)",
       "Bash(npx eslint:*)",
-      "Bash(git worktree:*)"
+      "Bash(git worktree:*)",
+      "Bash(docker compose:*)",
+      "Bash(./scripts/dev-db.sh:*)",
+      "Bash(./scripts/ci-local.sh)",
+      "Bash(.venv/bin/alembic current)",
+      "Bash(.venv/bin/alembic heads)",
+      "Bash(.venv/bin/alembic check)",
+      "Bash(.venv/bin/alembic revision:*)",
+      "Bash(railway status)",
+      "Bash(railway variables:*)",
+      "Bash(node web/scripts/i18n-parity.mjs:*)"
     ],
     "deny": [
       "Read(./.env)",

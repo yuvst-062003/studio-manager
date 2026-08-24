@@ -79,6 +79,10 @@ jobs:
         run: npm run build
       - name: Tests
         run: npm run test
+      - name: i18n parity
+        # SPEC §9 — Hebrew is the reference locale. en is strict, ru reports until §15
+        # item 9 (the ru translation source) lands; the policy lives in the script.
+        run: node scripts/i18n-parity.mjs
 
   generated:
     # SPEC §8.2 — a diff in generated output that is not committed fails the build,
