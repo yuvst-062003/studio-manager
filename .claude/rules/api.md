@@ -11,3 +11,8 @@ paths:
   enforced by `TenantMixin` / `TenantSession` (SPEC §4.2) — every tenant-scoped table carries
   a non-null `studio_id` with a leading composite index. Bypassing it requires the explicit
   `.with_all_tenants()` escape hatch, which is never valid in a request-scoped path.
+- A router serving coaches is tagged `coach` (`APIRouter(tags=["coach"])`). SPEC §13's
+  third invariant — no coach-scoped endpoint returns any financial field — is enforced
+  against that tag, so an untagged coach router is an unguarded one.
+- Tenant-scoped routes take `TenantSessionDep` from `app.core.tenancy`. It fails closed:
+  a request with no resolved studio is a 401, never an unscoped session.
