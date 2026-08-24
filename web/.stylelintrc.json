@@ -1,0 +1,19 @@
+{
+  "extends": ["stylelint-config-standard"],
+  "ignoreFiles": ["**/node_modules/**", "**/dist/**"],
+  "rules": {
+    "property-disallowed-list": [
+      "margin-left", "margin-right", "padding-left", "padding-right",
+      "border-left", "border-right", "left", "right",
+      "border-top-left-radius", "border-top-right-radius",
+      "border-bottom-left-radius", "border-bottom-right-radius"
+    ],
+    "declaration-property-value-disallowed-list": {
+      "text-align": ["left", "right"],
+      "float": ["left", "right"]
+    },
+    "custom-property-pattern": null,
+    "import-notation": null,
+    "selector-class-pattern": null
+  }
+}
