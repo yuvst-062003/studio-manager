@@ -205,3 +205,45 @@
   flex: none;
   inline-size: 8px;
 }
+
+/* 4h draws each chip's outline as its own text colour at 35-45% opacity. Deriving it from
+ * currentcolor means one declaration serves all six statuses and it flips with the theme. */
+.studio-chip {
+  border: var(--border-width-hairline) solid color-mix(in srgb, currentcolor 40%, transparent);
+  border-radius: var(--radius-pill);
+  display: inline-block;
+  font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-tight);
+  padding-block: 6px;
+  padding-inline: 11px;
+  white-space: nowrap;
+}
+
+.studio-chip[data-status="debt"] {
+  background: var(--debt-tint);
+  color: var(--debt);
+}
+
+.studio-chip[data-status="paid"] {
+  color: var(--paid);
+}
+
+.studio-chip[data-status="pending"] {
+  color: var(--pending);
+}
+
+.studio-chip[data-status="cancelled"] {
+  background: var(--cancelled-tint);
+  color: var(--cancelled);
+}
+
+.studio-chip[data-status="unmarked"] {
+  border-style: dashed;
+  color: var(--pending);
+}
+
+.studio-chip[data-status="planned"] {
+  color: var(--text-secondary);
+  font-weight: var(--weight-regular);
+}
