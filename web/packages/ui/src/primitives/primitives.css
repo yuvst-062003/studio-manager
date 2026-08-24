@@ -196,3 +196,12 @@
 .studio-field__message[data-tone="muted"] {
   color: var(--text-muted);
 }
+
+/* Geometry only. The ring and the fill are inline — see BeltBar.tsx for why. */
+.studio-belt-bar {
+  block-size: 42px;
+  border-radius: var(--radius-xs);
+  display: inline-block;
+  flex: none;
+  inline-size: 8px;
+}

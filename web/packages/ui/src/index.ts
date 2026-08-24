@@ -23,6 +23,7 @@ export { GROUND_TOKENS, TIERS, TOKEN_ROLES } from './tokens.roles'
 export type { GroundToken, Obligation, Tier, TokenRole } from './tokens.roles'
 export { BRAND_TOKENS, applyBrand, brandOverridesFor } from './brand'
 
+export { BeltBar } from './primitives/BeltBar'
 export { Button } from './primitives/Button'
 export type { ButtonVariant } from './primitives/Button'
 export { Card } from './primitives/Card'
