@@ -436,3 +436,71 @@
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
+
+.studio-empty {
+  align-items: center;
+  border: var(--border-width-hairline) dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 22px;
+  text-align: center;
+}
+
+.studio-empty__icon {
+  block-size: 24px;
+  color: var(--text-muted);
+  inline-size: 24px;
+}
+
+.studio-empty__title {
+  color: var(--fg);
+  font-size: var(--text-title);
+  font-weight: var(--weight-medium);
+  margin: 0;
+}
+
+.studio-empty__description {
+  color: var(--text-secondary);
+  font-size: var(--text-caption);
+  margin: 0;
+}
+
+.studio-alert {
+  align-items: flex-start;
+  border: var(--border-width-hairline) solid color-mix(in srgb, currentcolor 30%, transparent);
+  border-radius: var(--radius-lg);
+  display: flex;
+  gap: var(--space-2);
+  padding-block: var(--control-pad-block);
+  padding-inline: var(--field-pad-inline);
+}
+
+.studio-alert[data-tone="danger"] {
+  background: var(--danger-tint);
+  color: var(--danger);
+}
+
+.studio-alert[data-tone="pending"] {
+  background: color-mix(in srgb, var(--pending) 6%, var(--surface));
+  color: var(--pending);
+}
+
+.studio-alert[data-tone="paid"] {
+  background: color-mix(in srgb, var(--paid) 6%, var(--surface));
+  color: var(--paid);
+}
+
+.studio-alert__icon svg {
+  block-size: 20px;
+  display: block;
+  flex: none;
+  inline-size: 20px;
+}
+
+.studio-alert__body {
+  font-size: var(--text-label);
+  line-height: var(--leading-normal);
+  margin: 0;
+}
