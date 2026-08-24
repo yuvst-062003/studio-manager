@@ -27,6 +27,12 @@ class Settings(BaseSettings):
     ENCRYPTION_KEYS: dict[int, SecretStr] = {}
     ENCRYPTION_ACTIVE_KEY_VERSION: int = 0
 
+    # §19 -- who may call /dev/* on a deployed non-production environment. Staging is a
+    # public HTTPS origin, so "the router exists there" must not mean "anyone may use
+    # it". Unset in development, where there is no auth layer to authenticate against
+    # yet; M1 replaces this with the is_developer flag and it becomes vestigial.
+    DEV_TOOLS_TOKEN: SecretStr | None = None
+
     LOG_LEVEL: str = "INFO"
 
 
