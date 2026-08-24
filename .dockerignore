@@ -1,10 +1,20 @@
+# The build context is the repo root for every service, including the three PWA
+# Dockerfiles under web/apps/*/. So web/ must NOT be excluded wholesale — only
+# the parts no build needs.
 .venv/
-node_modules/
-web/
-docs/
 .git/
 __pycache__/
 *.pyc
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+
+node_modules/
+web/node_modules/
+web/apps/*/node_modules/
+web/apps/*/dist/
+web/packages/*/node_modules/
+
+docs/
+tests/
+*.md

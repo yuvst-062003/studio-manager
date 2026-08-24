@@ -1,6 +1,8 @@
 {
-  "$comment": "The only place a hostname is written. SPEC §15 item 5 (a stable custom domain) is still open, so these are Railway-generated subdomains. When the domain lands, set base_domain and replace the four hosts per environment — nothing else in the repo changes, and no rebuild is needed because every manifest start_url and scope is relative.",
+  "$comment": "The only place a hostname is written. SPEC §15 item 5 (a stable custom domain) is still open, so these are Railway-generated subdomains. When the domain lands, set base_domain and replace the hosts — nothing else in the repo changes, and no rebuild is needed because every manifest start_url and scope is relative.",
   "base_domain": null,
+  "railway_project": "studio-manager",
+  "railway_project_id": "375bada8-df9f-4afe-8f24-aa37bb5da9ed",
   "environments": {
     "development": {
       "api": "http://localhost:8000",
@@ -9,16 +11,16 @@
       "dashboard": "http://localhost:5175"
     },
     "staging": {
-      "api": "https://PENDING-railway-login",
-      "staff": "https://PENDING-railway-login",
-      "parent": "https://PENDING-railway-login",
-      "dashboard": "https://PENDING-railway-login"
+      "api": "https://api-staging-1e4d.up.railway.app",
+      "staff": "https://staff-staging-e067.up.railway.app",
+      "parent": "https://parent-staging.up.railway.app",
+      "dashboard": "https://dashboard-staging-0f4b.up.railway.app"
     },
     "production": {
-      "api": "https://PENDING-railway-login",
-      "staff": "https://PENDING-railway-login",
-      "parent": "https://PENDING-railway-login",
-      "dashboard": "https://PENDING-railway-login"
+      "api": "https://PENDING-production-services",
+      "staff": "https://PENDING-production-services",
+      "parent": "https://PENDING-production-services",
+      "dashboard": "https://PENDING-production-services"
     }
   }
 }

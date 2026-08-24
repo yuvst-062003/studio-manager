@@ -23,12 +23,6 @@ def test_every_environment_names_all_three_apps_and_the_api():
         assert set(hosts) == APPS, env
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Railway provisioning pending — run docs/deploy/railway-runbook.md. "
-    "strict=True so this turns into a failure the moment real hostnames land, "
-    "forcing the marker off rather than letting it rot.",
-)
 def test_staging_has_a_public_https_url():
     """SPEC §15 item 3 -- uPay IPN testing in W4 needs a public HTTPS URL."""
     api = _config()["environments"]["staging"]["api"]
@@ -39,9 +33,9 @@ def test_staging_has_a_public_https_url():
 
 @pytest.mark.xfail(
     strict=True,
-    reason="Railway provisioning pending — run docs/deploy/railway-runbook.md. "
-    "strict=True so this turns into a failure the moment real hostnames land, "
-    "forcing the marker off rather than letting it rot.",
+    reason="production has no service instances yet — see docs/deploy/railway-runbook.md. "
+    "strict=True so this fails the moment production hostnames land, forcing the "
+    "marker off rather than letting it rot.",
 )
 def test_each_app_gets_its_own_origin():
     """Staff and parent must not share origin-scoped IndexedDB: it holds

@@ -1,5 +1,10 @@
 # Railway runbook
 
+**Status 2026-08-24:** project `studio-manager` created
+(`375bada8-df9f-4afe-8f24-aa37bb5da9ed`). `staging` and `development` are fully
+provisioned with all four services; `production` exists but has **no service
+instances** — see *Production is not yet populated* at the bottom.
+
 Run once, by a human with the Railway account. The CLI is already installed
 (`railway 5.43.1`). Every step below is outward-facing and billable.
 
@@ -82,3 +87,49 @@ Then:
 
 The `PENDING-railway-login` placeholders make that suite fail on purpose until
 this runbook has been run.
+
+
+---
+
+## Production is not yet populated
+
+Railway services are **project-scoped by name**, but service *instances* are
+per-environment. An environment created *before* the services exist comes up
+empty and cannot be filled with `railway add` — the names are already taken, and
+`railway up` fails with `404 Not Found` because there is no instance to upload to.
+
+The supported fix is to recreate the environment as a duplicate of a populated
+one:
+
+```bash
+railway environment delete production --yes
+railway environment create production --duplicate staging
+```
+
+That worked for `development`. It was **not** run for `production`: the delete was
+blocked by a safety guard, correctly — the command is destructive by name even
+though this particular `production` is empty and destroys nothing.
+
+Run those two lines by hand, then:
+
+```bash
+railway environment production
+for s in api staff parent dashboard; do railway domain --service "$s"; done
+railway variables --service api --set "ENV=production"
+```
+
+and paste the hostnames into `infra/railway/domains.json`. The remaining
+`xfail(strict=True)` in `tests/config/test_railway_config.py` will turn into a
+failure the moment they land, which is the signal to delete the marker.
+
+## Cost note
+
+`development` was created as a duplicate of `staging`, so it has four deployed
+services of its own. `infra/railway/domains.json` points development at
+`localhost` — the local dev loop does not use them. If they are not wanted:
+
+```bash
+railway environment delete development --yes
+```
+
+The environment can be recreated from `staging` in one command whenever it is.

@@ -53,6 +53,31 @@ or, better, the real device §15 item 4 already calls for.
 
 Observed failing on a deliberately broken manifest before being trusted.
 
+## Staging is live, over real HTTPS — 2026-08-24
+
+Railway project `studio-manager`, environment `staging`. Verified with headless
+Chromium against the **public URLs**, not localhost:
+
+| App | URL | Result |
+|---|---|---|
+| api | https://api-staging-1e4d.up.railway.app | `{"status":"ok","env":"staging"}` |
+| staff | https://staff-staging-e067.up.railway.app | ✅ installable |
+| parent | https://parent-staging.up.railway.app | ✅ installable |
+| dashboard | https://dashboard-staging-0f4b.up.railway.app | ✅ installable |
+
+Each PWA passed the full gate over TLS: manifest valid, all icons resolve,
+`apple-touch-icon` present, service worker reaches `activated`, Rubik loaded,
+`dir="rtl"` applied, `window.isSecureContext` true. `sw.js` is served
+`Cache-Control: no-cache` as the Caddyfile intends, so an install cannot pin a
+dead build.
+
+**SPEC §15 item 3 is satisfied** — that api URL is what W4's uPay IPN testing needs.
+
+**These are the URLs to install from on the phones.** They are Railway
+subdomains, not the final domain (§15 item 5 still open) — good enough to prove
+the mechanics, and §6.5's point about an unfamiliar host being friction applies
+to the real invitation link, not to this test.
+
 ## Still to do — needs hardware
 
 | # | Check | Device |
