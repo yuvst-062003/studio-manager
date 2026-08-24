@@ -4,6 +4,17 @@ Verified before this plan: scripts/export_openapi.py imported app.main with no
 environment pinned, so `openapi.json` -- which ci-local.sh diffs and fails on -- was a
 function of the exporting machine's ENV the moment a conditionally-mounted router
 existed.
+
+This test and ci-local.sh cover different failure modes, and neither is sufficient
+alone. This test reads the committed `openapi.json` as it sits on disk and asserts it
+is *clean* -- it catches a dev surface that was hand-edited into the file, or
+committed from an export someone ran with the ENV pin removed, but on its own it
+cannot tell a clean file from a stale one, since it never regenerates anything.
+`ci-local.sh` regenerates the schema (line 27) and only then runs
+`git diff --exit-code -- openapi.json web/packages/api-client/src/schema.d.ts`
+(line 29) -- that diff is what catches the ENV pin itself being deleted from
+export_openapi.py. Delete the pin and the diff gate fires; hand-edit the artefact and
+this test fires.
 """
 
 from __future__ import annotations
