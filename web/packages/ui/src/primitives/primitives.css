@@ -1,0 +1,32 @@
+/* Primitives ported from dashboard artboard 4h (ספריית רכיבים) as a VISUAL REFERENCE.
+ * No declaration here was copy-pasted from the export — D10. Every value is a token.
+ *
+ * Logical properties only. stylelint enforces it (web/stylelint.config.js) and, since
+ * M0.3, `lane-check.sh core` runs stylelint over packages/ so the CSS gate is inside the
+ * lane's own check rather than only in ci-local. */
+
+.studio-card {
+  background: var(--surface);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-xl);
+  padding-block: 18px;
+  padding-inline: var(--space-5);
+}
+
+.studio-card__caption {
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-tight);
+  margin-block: 0 var(--space-3);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
