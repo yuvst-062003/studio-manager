@@ -185,6 +185,35 @@ dark-mode tokens, not shared ones.
    promising that *all* receipts live there is false for the payment methods §5.10 expects to
    be common.
 
+## D11 — The health declaration ships with a default question set the manager can edit
+
+**Decided:** 2026-08-24
+
+SPEC §5.5 says the form is *"a structured template derived from the studio's existing
+PDF"*. §15 item 1 made that PDF a hard blocker on the whole M4 health lane, because
+without it there was nothing to derive from.
+
+**Resolved:** ship a standard Israeli sports health declaration as the default
+`health_form_template` question set, seeded by migration. A manager can **add, remove and
+reword questions** in the app, and may upload their own PDF, which is stored at
+`source_pdf_object_key` for reference.
+
+**Why questions and not "sign the PDF".** The obvious cheaper design — show the parent the
+declaration and take a signature — cannot work, because §5.5 also says coaches see *only*
+`derived_flags`: a ⚠ badge reading אסתמה or אלרגיה on the roster. That badge is derived
+from structured answers. A signature over a PDF image yields no flags, so a coach gets no
+warning, a manager gets no "missing declaration" list, and reading anything at all would
+mean opening the full medical record — the exact opposite of what §11.1 and §11.2 are for.
+The parent's experience is unchanged and slightly better: they tap answers and sign with a
+finger, rather than pinch-zooming a PDF on a phone.
+
+**Caveat to carry into M4.** A health declaration for minors in an Israeli sports club
+touches insurance and regulatory ground. The bundled template is a **starting point, and
+the app must say so** where the manager edits it. It is not a compliance artefact and must
+not be presented as one.
+
+**Consequence:** §15 item 1 no longer blocks M4. Editable questions are v1 scope, not v2.
+
 ## D10 — Ban physical CSS properties before the first component
 
 **Decided:** 2026-08-24
@@ -228,15 +257,16 @@ component layer.
 - **Q4 — Where the studio logo appears** across the three surfaces.
 - ~~**Q5 — Scope resolutions**~~ **SETTLED 2026-08-24 as [D9](#d9--three-scope-cuts-from-the-canvas).**
   The §2.1/§2.2 contradiction is **fixed in SPEC.md** — `trial-lesson booking` removed from
-  the deferred list. The three artboard cuts (2b, 7c, 12f) are decided but **not yet applied
-  to the canvas** — they need a Claude Design edit pass.
+  the deferred list. The three artboard cuts (2b, 7c, 12f) are decided and **applied to the canvas**
+  (2026-08-24). `2b`'s chat was the second tab of a two-tab switcher, so the switcher
+  went with it and the עדכוני מועדון inbox stands alone.
 
 ## Applied vs. pending
 
 | Decision | Recorded | Applied |
 |---|:--:|:--:|
 | D1–D8, D10 | yes | n/a — they govern code not yet written |
-| D9.1 cut in-app chat from `2b` | yes | **no — canvas edit pending** |
-| D9.2 cut weight column from `7c` | yes | **no — canvas edit pending** |
-| D9.3 retitle `12f` to תשלומים | yes | **no — canvas edit pending** |
+| D9.1 cut in-app chat from `2b` | yes | **yes — canvas edited 2026-08-24** |
+| D9.2 cut weight column from `7c` | yes | **yes — canvas edited 2026-08-24** |
+| D9.3 retitle `12f` to תשלומים | yes | **yes — canvas edited 2026-08-24** |
 | SPEC.md §2.2 contradiction | yes | **yes — SPEC.md edited 2026-08-24** |

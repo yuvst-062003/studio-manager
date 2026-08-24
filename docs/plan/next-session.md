@@ -22,7 +22,7 @@ cannot buy back the time if they slip.
 | Do now | Why it cannot wait |
 |---|---|
 | **A stable HTTPS domain** for the apps — §15 #5 | Blocks M0. People will install this to their home screen from an invitation link; a random Railway subdomain reads as a phishing attempt and hurts install conversion, which is now the product's main adoption risk. |
-| **The studio's הצהרת בריאות PDF** → `docs/forms/health-declaration.pdf` — §15 #1 | **Hard-blocks the entire M4 health lane.** The template derives from it. Get it before W3 opens, not during. |
+| ~~**The studio's הצהרת בריאות PDF**~~ — §15 #1 | **RESOLVED 2026-08-24 as [D11](../design/decisions.md).** M4 ships a standard Israeli template as the default question set, editable in the app; a manager may upload their own PDF for reference. No longer blocks the health lane. |
 | **One iPhone and one Android** to test on — §15 #4 | The iOS install walkthrough cannot be validated in a desktop browser. Needed from M1. |
 | **3–5 real parents** willing to be walked through the iPhone install — §15 #6 | Needed at M11, before the club-wide invite. Their confusion is the only honest measure of whether the walkthrough works; your own phone will not tell you. |
 | **`ru` translation source** — decide: real translation, or machine-translate with a native-speaker review — §15 #9 | Blocks M0's i18n scaffolding. Easy to forget until the namespace files need content. |
