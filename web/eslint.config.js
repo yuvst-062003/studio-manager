@@ -60,9 +60,11 @@ export default tseslint.config(
     },
   },
   {
-    // Build-time node scripts: no DOM, no D10 (they emit assets, not styles).
+    // Build-time node scripts. Browser globals too: Playwright page.evaluate()
+    // callbacks are browser code that lexically lives inside a node script.
+    // D10 does not apply — these emit assets, they do not author styles.
     files: ['scripts/**/*.mjs'],
-    languageOptions: { globals: globals.node },
+    languageOptions: { globals: { ...globals.node, ...globals.browser } },
   },
   {
     files: ['apps/*/src/**/*.tsx'],
