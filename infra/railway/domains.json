@@ -1,0 +1,24 @@
+{
+  "$comment": "The only place a hostname is written. SPEC §15 item 5 (a stable custom domain) is still open, so these are Railway-generated subdomains. When the domain lands, set base_domain and replace the four hosts per environment — nothing else in the repo changes, and no rebuild is needed because every manifest start_url and scope is relative.",
+  "base_domain": null,
+  "environments": {
+    "development": {
+      "api": "http://localhost:8000",
+      "staff": "http://localhost:5173",
+      "parent": "http://localhost:5174",
+      "dashboard": "http://localhost:5175"
+    },
+    "staging": {
+      "api": "https://PENDING-railway-login",
+      "staff": "https://PENDING-railway-login",
+      "parent": "https://PENDING-railway-login",
+      "dashboard": "https://PENDING-railway-login"
+    },
+    "production": {
+      "api": "https://PENDING-railway-login",
+      "staff": "https://PENDING-railway-login",
+      "parent": "https://PENDING-railway-login",
+      "dashboard": "https://PENDING-railway-login"
+    }
+  }
+}

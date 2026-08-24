@@ -1,0 +1,16 @@
+:{$PORT}
+
+root * /srv/dist
+encode gzip zstd
+
+# The service worker and manifest must never be served stale, or an install can
+# pin a dead build and the app becomes unreachable without clearing site data.
+@nocache path /sw.js /manifest.webmanifest /index.html
+header @nocache Cache-Control "no-cache"
+
+# Content-hashed assets are immutable by construction.
+header /assets/* Cache-Control "public, max-age=31536000, immutable"
+
+# SPA fallback: every in-scope route serves the shell.
+try_files {path} /index.html
+file_server
