@@ -175,3 +175,25 @@ exercises 16 while staging runs 18. Nothing M0.2 uses differs between the two, b
 divergence is real and is a decision rather than an accident: either pin staging to a
 16 image, or amend §8.1a to 18 and move local and CI with it. Do not leave it undecided
 past W4, when the money ledger starts depending on this database.
+
+## Encryption keys (SPEC §11.1)
+
+Staging holds key version 1, set as a Railway secret and never written to a file:
+
+```bash
+KEY=$(.venv/bin/python -c 'import base64,os;print(base64.b64encode(os.urandom(32)).decode())')
+railway variables --service api --environment staging --skip-deploys \
+  --set "ENCRYPTION_KEYS={\"1\":\"$KEY\"}" --set 'ENCRYPTION_ACTIVE_KEY_VERSION=1'
+unset KEY
+```
+
+**Rotation is `rewrap`, not re-encryption.** Add the new version to `ENCRYPTION_KEYS`
+alongside the old one and bump `ENCRYPTION_ACTIVE_KEY_VERSION`. Existing rows keep
+decrypting immediately — each blob records the version that wrapped it. A background
+pass then calls `app.core.encryption.rewrap()` per row, which re-encrypts the 48-byte
+data key and leaves the payload byte-identical, so no health declaration is ever held in
+plaintext to rotate a key. Only once every row reports the new version via
+`key_version_of()` may the old key be dropped from `ENCRYPTION_KEYS`.
+
+Locally the key lives in `.env`, which is gitignored. `.env.example` carries an
+all-zero placeholder so the shape is documented without a usable key being committed.
