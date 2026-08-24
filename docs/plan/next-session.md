@@ -108,6 +108,18 @@ walkthrough is what M1 turns into an onboarding screen.
 The load-bearing session. Everything in waves 2–5 depends on the four seam mechanisms
 existing and being correct.
 
+> **Already landed in M0.1 — do not rebuild:**
+> - **Seam 2** (`app/main.py` + `app/models/__init__.py` pkgutil discovery), including the
+>   `ENV == "production"` exclusion for the dev router. Note the plan's own snippet has a
+>   bug — `app = FastAPI(...)` shadows the `app` package, so `app.routers.__path__` resolves
+>   against the FastAPI instance and discovery silently finds nothing. The shipped version
+>   aliases it to `routers_pkg`.
+> - **Seam 3** (`web/packages/i18n`, nine namespaces × three locales, `index.ts` authored
+>   once with every namespace including the 24 empty stubs).
+>
+> **Still to build here:** Seam 1 (Alembic baseline) and Seam 4 (`slots.ts`), then items 2–7
+> below. Item 1 reduces to those two seams.
+
 ```
 Read @docs/plan/milestone-plan.md — Global Constraints, Part 1 §1.3 (all four
 seams, with their code), and W0 · M0.
@@ -118,16 +130,11 @@ This is M0.2. Sequential on main.
 
 BUILD, in this order:
 
-1. The four seam mechanisms from Part 1 §1.3. The plan gives real code for all
-   four — use it, do not redesign it:
+1. The two remaining seam mechanisms from Part 1 §1.3. Seams 2 and 3 already
+   landed in M0.1 — read app/main.py and web/packages/i18n/index.ts first and
+   leave them alone.
      - Alembic baseline; alembic/versions/** stays owned by main (the
        block-protected.sh hook already enforces this)
-     - pkgutil discovery in app/models/__init__.py and app/main.py, so no lane
-       ever edits a registration file. Mount the /dev router only when
-       ENV != production — the routes must NOT EXIST in prod, not be guarded by
-       an if someone can invert
-     - web/packages/i18n split per namespace, all three locales, with index.ts
-       authored once listing every namespace including the empty stubs
      - web/packages/ui/src/slots.ts — the slot registry
 
 2. Tenancy (§4.2): TenantSession dependency, TenantMixin with the default
