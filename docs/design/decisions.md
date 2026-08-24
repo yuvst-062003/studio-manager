@@ -258,15 +258,16 @@ component layer.
 - ~~**Q5 — Scope resolutions**~~ **SETTLED 2026-08-24 as [D9](#d9--three-scope-cuts-from-the-canvas).**
   The §2.1/§2.2 contradiction is **fixed in SPEC.md** — `trial-lesson booking` removed from
   the deferred list. The three artboard cuts (2b, 7c, 12f) are decided and **applied to the canvas**
-  (2026-08-24). `2b`'s chat was the second tab of a two-tab switcher, so the switcher
-  went with it and the עדכוני מועדון inbox stands alone.
+  (2026-08-24), and the rendered result was reviewed and approved by the owner. `2b`'s
+  chat was the second tab of a two-tab switcher, so the switcher went with it and the
+  עדכוני מועדון inbox stands alone.
 
 ## Applied vs. pending
 
 | Decision | Recorded | Applied |
 |---|:--:|:--:|
 | D1–D8, D10 | yes | n/a — they govern code not yet written |
-| D9.1 cut in-app chat from `2b` | yes | **yes — canvas edited 2026-08-24** |
-| D9.2 cut weight column from `7c` | yes | **yes — canvas edited 2026-08-24** |
-| D9.3 retitle `12f` to תשלומים | yes | **yes — canvas edited 2026-08-24** |
+| D9.1 cut in-app chat from `2b` | yes | **yes — edited + owner-approved 2026-08-24** |
+| D9.2 cut weight column from `7c` | yes | **yes — edited + owner-approved 2026-08-24** |
+| D9.3 retitle `12f` to תשלומים | yes | **yes — edited + owner-approved 2026-08-24** |
 | SPEC.md §2.2 contradiction | yes | **yes — SPEC.md edited 2026-08-24** |
