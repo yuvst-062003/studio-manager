@@ -1,5 +1,15 @@
 {
   "extends": "./tsconfig.base.json",
-  "include": ["packages/*/src/**/*", "packages/*/*.ts", "apps/*/src/**/*", "apps/*/*.ts", "tools/**/*"],
-  "exclude": ["**/dist/**", "**/node_modules/**"]
+  "include": [
+    "packages/*/src/**/*",
+    "packages/*/*.ts",
+    "apps/*/src/**/*",
+    "apps/*/*.ts",
+    "tools/**/*",
+    "vitest.setup.ts"
+  ],
+  "exclude": [
+    "**/dist/**",
+    "**/node_modules/**"
+  ]
 }

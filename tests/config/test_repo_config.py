@@ -43,7 +43,6 @@ def test_c1_claude_md_i18n_line_is_namespaced():
     assert "web/packages/i18n/he/" in text
 
 
-@pytest.mark.xfail(strict=True, reason="web/ tree lands in Task 6")
 def test_c1_rtl_rule_is_scoped_to_paths_that_exist():
     rule = ROOT / ".claude/rules/ui-rtl-a11y.md"
     paths = _frontmatter(rule)["paths"]
