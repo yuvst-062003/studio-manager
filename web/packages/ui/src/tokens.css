@@ -1,0 +1,81 @@
+/* D2 — three tiers. Semantic and structural are never overridable.
+ * D8 — #6f6b62 is the floor for any light-mode text token; #7a766d is retired outright.
+ * D3 — near-neutral warm grounds, one deep accent, minimal decoration.
+ * Values audited in docs/design/canvas-review.md. */
+
+:root {
+  --ground: #f7f5f1;
+  --surface: #fffefb;
+  --fg: #17150f;
+  --text-secondary: #55524a;
+  --text-muted: #6f6b62;   /* D8 floor — 4.88:1 on --ground */
+  --border: #e6e1d6;
+  --border-strong: #e5e0d5;
+  --accent: #1f6b3f;
+  --on-accent: #fffefb;
+
+  /* Semantic — never overridable, never a brand colour (D2 consequence 2).
+   * A club branding itself red would otherwise swallow the debt banner. */
+  --debt: #b3261e;
+  --paid: #1f6b3f;
+  --pending: #8a5a00;
+  --cancelled: #6f6b62;
+  --danger: #b3261e;
+  --focus-ring: #2f6fa8;
+
+  /* D7 — a belt bar is never fill-only. White-on-light, black-on-dark and
+   * yellow-on-light all fail contrast; one ring solves all three. */
+  --belt-ring: #17150f;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+}
+
+[data-theme="dark"] {
+  --ground: #141311;
+  --surface: #1e1d1a;
+  --fg: #fffefb;
+  --text-secondary: #a8a49a;  /* 7.46:1 on --ground — dark-mode-only (D8) */
+  --text-muted: #8f8b82;      /* 5.47:1 on --ground — dark-mode-only (D8) */
+  --border: #3a3833;
+  --border-strong: #4a4842;
+  --accent: #3f8f52;
+  --on-accent: #141311;
+  --debt: #ff8a7d;
+  --paid: #3f8f52;
+  --pending: #e5b44f;
+  --cancelled: #8f8b82;
+  --danger: #ff8a7d;
+  --focus-ring: #6aa9e0;
+  --belt-ring: #fffefb;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--ground);
+  color: var(--fg);
+  font-family: var(--font-sans);
+
+  /* G3 — timestamps render in Asia/Jerusalem regardless of locale.
+   * That is a format-time concern, not a stylesheet one. */
+}
+
+body {
+  margin: 0;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
