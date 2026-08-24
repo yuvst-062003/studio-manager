@@ -4,6 +4,8 @@ explicit response_model."""
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from pydantic import BaseModel
 
 from app.core.config import Env
@@ -11,3 +13,8 @@ from app.core.config import Env
 
 class DevPing(BaseModel):
     env: Env
+
+
+class DevClock(BaseModel):
+    now: datetime
+    shifted: bool

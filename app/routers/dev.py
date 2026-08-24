@@ -18,9 +18,10 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
+from app.core.clock import is_shifted, now
 from app.core.config import settings
 from app.core.dev_account import RequireDeveloper
-from app.schemas.dev import DevPing
+from app.schemas.dev import DevClock, DevPing
 
 router = APIRouter(prefix="/dev", tags=["dev"])
 
@@ -32,3 +33,11 @@ def ping(_: RequireDeveloper) -> DevPing:
     tenant scope, nothing that could fail for an unrelated reason and make the
     restriction look satisfied when it is not."""
     return DevPing(env=settings.ENV)
+
+
+@router.get("/clock", response_model=DevClock)
+def read_clock(_: RequireDeveloper) -> DevClock:
+    """What time does the server think it is, and did you move it? The second field is
+    the one that matters: a shift that silently failed to apply looks identical to no
+    shift at all, and you would debug the billing run instead of the header."""
+    return DevClock(now=now(), shifted=is_shifted())
