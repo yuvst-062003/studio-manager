@@ -7,7 +7,14 @@ export default defineConfig({
     projects: [
       {
         extends: true,
-        test: { name: 'tools', include: ['tools/**/*.test.ts'], environment: 'node' },
+        // `scripts/` is where node build scripts live and where their dependencies
+        // resolve. `tools/` does not exist yet; without the second glob this project
+        // matched zero files and the parity spec was never discovered.
+        test: {
+          name: 'tools',
+          include: ['tools/**/*.test.ts', 'scripts/**/*.test.ts'],
+          environment: 'node',
+        },
       },
       {
         extends: true,
