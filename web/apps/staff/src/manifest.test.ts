@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { THEME_COLOR } from '@studio/ui'
+import { THEME_COLOR } from '@studio/ui/theme'
 import { manifest } from '../manifest.config'
 
 describe('staff manifest (§6.5 — the install is the product, not boilerplate)', () => {

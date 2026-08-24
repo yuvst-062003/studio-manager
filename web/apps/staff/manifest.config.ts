@@ -1,5 +1,5 @@
-import { THEME_COLOR } from '@studio/ui'
-import type { AppManifest, ManifestIcon } from '@studio/ui'
+import { THEME_COLOR } from '@studio/ui/theme'
+import type { AppManifest, ManifestIcon } from '@studio/ui/manifest'
 
 const icons: ManifestIcon[] = [
   { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png' },
