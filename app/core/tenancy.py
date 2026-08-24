@@ -31,7 +31,9 @@ from sqlalchemy.orm import (
     with_loader_criteria,
 )
 
+from app.core.config import settings
 from app.core.db import get_engine
+from app.core.dev_account import developer_may_act
 
 #: Per-statement opt-out, for code that already holds a deliberate cross-studio scope.
 ALL_TENANTS_OPTION = "with_all_tenants"
@@ -180,15 +182,30 @@ def _stamp_and_guard_writes(session: Session, flush_context: Any, instances: Any
 
 # -- the dependency ----------------------------------------------------------
 def studio_id_from_request(request: Request) -> uuid.UUID:
-    """SPEC §4.2 layer 1.
+    """SPEC §4.2 layer 1, and §19.6 restriction 1.
 
-    M1 owns authentication and sets ``request.state.studio_id`` from the verified JWT.
-    Until it lands this is the seam, and the contract worth holding is that an
-    unresolved studio is a 401 -- never an unscoped session.
+    M1 owns authentication and sets ``request.state.studio_id``, ``is_developer`` and
+    ``studio_is_demo`` from the verified JWT and the resolved studio. Until it lands
+    this is the seam, and the contract worth holding is that an unresolved studio is a
+    401 -- never an unscoped session -- and that a developer session cannot resolve a
+    studio holding real people in production.
     """
     studio_id = getattr(request.state, "studio_id", None)
     if not isinstance(studio_id, uuid.UUID):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="no active studio")
+
+    # §19.6 -- 'the studio resolver excludes is_demo = false for developer sessions in
+    # production'. Both flags default to False, so an ordinary request is unaffected
+    # and the rule is correct-but-unused until M1 populates them.
+    if not developer_may_act(
+        is_developer=bool(getattr(request.state, "is_developer", False)),
+        studio_is_demo=bool(getattr(request.state, "studio_is_demo", False)),
+        env=settings.ENV,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="a developer session may only act inside a demo studio in production",
+        )
     return studio_id
 
 

@@ -38,6 +38,10 @@ from fastapi import FastAPI
 RELOADABLE = (
     "app.core.config",
     "app.core.dev_account",
+    # Task 12 -- studio_id_from_request now calls developer_may_act(..., env=settings.ENV)
+    # for §19.6 restriction 1, so tenancy.py joins the modules whose `settings` binding
+    # this harness must not leave frozen to whichever environment imported it first.
+    "app.core.tenancy",
     "app.routers.health",
     "app.routers.dev",
     "app.main",
