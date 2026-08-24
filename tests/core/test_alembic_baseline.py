@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 import pytest
+import sqlalchemy as sa
 from alembic.config import Config
 from alembic.script import ScriptDirectory
 from sqlalchemy import Engine, inspect, text
@@ -139,3 +140,42 @@ def test_the_migrations_match_the_models(migrated: Engine):
         [sys.executable, "-m", "alembic", "check"], cwd=ROOT, capture_output=True, text=True
     )
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+# -- §19.1: the demo studio exists everywhere, production included ------------
+def test_the_demo_studio_row_exists_after_migration(app_session):
+    """§19.1 -- 'Exists in production: Yes, so you can smoke-test a live deploy'. A row
+    created by a seed script would exist only where someone remembered to run it."""
+    from app.services.demo import DEMO_STUDIO_NAME, DEMO_STUDIO_SLUG
+
+    row = app_session.execute(
+        sa.text("SELECT name, is_demo, settings FROM studio WHERE slug = :slug"),
+        {"slug": DEMO_STUDIO_SLUG},
+    ).one()
+    assert row.name == DEMO_STUDIO_NAME
+    assert row.is_demo is True
+
+
+def test_the_demo_studios_upay_config_is_pinned_to_the_sandbox(app_session):
+    """§19.6 -- 'Cannot touch live money.' The pin lives in the row, not in code that
+    reads the row, so a code path that forgets to check is_demo still cannot produce a
+    live form for this studio (Task 10 asserts the form builder end of it)."""
+    from app.services.demo import DEMO_STUDIO_SLUG
+
+    settings_json = app_session.execute(
+        sa.text("SELECT settings FROM studio WHERE slug = :slug"),
+        {"slug": DEMO_STUDIO_SLUG},
+    ).scalar_one()
+    assert settings_json["upay"]["livesystem"] == 0
+
+
+def test_migrating_twice_does_not_create_a_second_demo_studio(app_session):
+    """Forward-only migrations still re-run on a database that already has the row --
+    a fresh `alembic upgrade head` against staging, for instance."""
+    from app.services.demo import DEMO_STUDIO_SLUG
+
+    count = app_session.execute(
+        sa.text("SELECT count(*) FROM studio WHERE slug = :slug"),
+        {"slug": DEMO_STUDIO_SLUG},
+    ).scalar_one()
+    assert count == 1
