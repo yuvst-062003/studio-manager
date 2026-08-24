@@ -105,6 +105,8 @@ walkthrough is what M1 turns into an onboarding screen.
 
 ## Session 2 — M0.2 · the seams and the core
 
+> **Ready-to-paste prompt:** [prompts/m0-2.md](prompts/m0-2.md) — written after M0.1 shipped, so it reflects what actually landed and names the two missing prerequisites (no Postgres service, no psycopg driver). Prefer it over the block below.
+
 The load-bearing session. Everything in waves 2–5 depends on the four seam mechanisms
 existing and being correct.
 
