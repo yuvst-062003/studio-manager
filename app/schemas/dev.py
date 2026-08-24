@@ -18,3 +18,15 @@ class DevPing(BaseModel):
 class DevClock(BaseModel):
     now: datetime
     shifted: bool
+
+
+class DemoResetRequest(BaseModel):
+    #: Omitted means "the latest set". Naming one pins a bisect to the data it was
+    #: authored against.
+    version: str | None = None
+
+
+class DemoResetResponse(BaseModel):
+    version: str
+    tables_wiped: list[str]
+    layers_seeded: list[str]

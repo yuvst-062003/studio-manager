@@ -6,7 +6,12 @@ import re
 from pathlib import Path
 
 from app.core.dev_account import dev_tools_allowed
+from app.services.demo import DEMO_STUDIO_NAME
+from app.services.demo.fixtures import LATEST_VERSION
+from app.services.demo.service import DemoStudioService
 from fastapi.testclient import TestClient
+from sqlalchemy import text
+from sqlalchemy.orm import Session
 from tests.dev.conftest import RELOADABLE, app_in_env
 
 
@@ -167,3 +172,56 @@ def test_the_detector_ignores_a_function_local_import():
         "def f() -> str:\n    from app.core.config import settings\n\n    return settings.ENV\n"
     )
     assert not _binds_settings_and_reads_env(source)
+
+
+# -- POST /dev/demo/reset -----------------------------------------------------
+def test_reset_returns_the_version_it_restored(migrated):
+    with app_in_env("development") as application:
+        body = TestClient(application).post("/api/v1/dev/demo/reset").json()
+    assert body["version"] == LATEST_VERSION
+    assert "studio" in body["layers_seeded"]
+
+
+def test_reset_accepts_an_explicit_version(migrated):
+    with app_in_env("development") as application:
+        response = TestClient(application).post(
+            "/api/v1/dev/demo/reset", json={"version": LATEST_VERSION}
+        )
+    assert response.status_code == 200
+
+
+def test_reset_rejects_an_unknown_version_with_a_422_not_a_500(migrated):
+    """An unknown version is a caller mistake, not a server fault. A 500 here would
+    also mean a stack trace in the response, which .claude/rules/api.md forbids."""
+    with app_in_env("development") as application:
+        response = TestClient(application).post(
+            "/api/v1/dev/demo/reset", json={"version": "1999-01-01.0"}
+        )
+    assert response.status_code == 422
+
+
+def test_reset_does_not_exist_in_production(migrated):
+    with app_in_env("production") as application:
+        assert TestClient(application).post("/api/v1/dev/demo/reset").status_code == 404
+
+
+def test_reset_persists_the_wipe_and_reseed(migrated):
+    """The route must commit -- DemoStudioService.reset() itself does not (task 6's own
+    tests commit explicitly), and the response body is built from in-process results
+    regardless of whether the transaction ever landed. Only a read through a second,
+    independent connection proves the reset actually persisted rather than merely
+    reporting success."""
+    with Session(migrated) as probe:
+        studio_id = DemoStudioService.studio_id(probe)
+        probe.execute(text("UPDATE studio SET name = 'wrecked' WHERE id = :id"), {"id": studio_id})
+        probe.commit()
+
+    with app_in_env("development") as application:
+        response = TestClient(application).post("/api/v1/dev/demo/reset")
+    assert response.status_code == 200
+
+    with Session(migrated) as probe:
+        name = probe.execute(
+            text("SELECT name FROM studio WHERE id = :id"), {"id": studio_id}
+        ).scalar_one()
+    assert name == DEMO_STUDIO_NAME

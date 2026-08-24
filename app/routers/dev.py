@@ -16,12 +16,15 @@ Routes resolve under /api/v1/dev/... : main.py mounts every discovered router be
 
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException, status
 
 from app.core.clock import is_shifted, now
 from app.core.config import settings
+from app.core.db import SessionDep
 from app.core.dev_account import RequireDeveloper
-from app.schemas.dev import DevClock, DevPing
+from app.schemas.dev import DemoResetRequest, DemoResetResponse, DevClock, DevPing
+from app.services.demo.fixtures import LATEST_VERSION, SEEDS
+from app.services.demo.service import DemoStudioService
 
 router = APIRouter(prefix="/dev", tags=["dev"])
 
@@ -41,3 +44,29 @@ def read_clock(_: RequireDeveloper) -> DevClock:
     the one that matters: a shift that silently failed to apply looks identical to no
     shift at all, and you would debug the billing run instead of the header."""
     return DevClock(now=now(), shifted=is_shifted())
+
+
+@router.post("/demo/reset", response_model=DemoResetResponse)
+def reset_demo_studio(
+    _: RequireDeveloper,
+    session: SessionDep,
+    body: DemoResetRequest | None = None,
+) -> DemoResetResponse:
+    """§19.7 -- restore the fixture set from a versioned seed."""
+    version = (body.version if body else None) or LATEST_VERSION
+    if version not in SEEDS:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "code": "unknown_fixture_version",
+                "message": f"no fixture set {version!r}",
+                "details": {"available": sorted(SEEDS)},
+            },
+        )
+    result = DemoStudioService.reset(session, version=version)
+    session.commit()
+    return DemoResetResponse(
+        version=result.version,
+        tables_wiped=list(result.tables_wiped),
+        layers_seeded=list(result.layers_seeded),
+    )
