@@ -83,3 +83,38 @@ def test_the_frontend_gate_passes_concrete_paths_not_globs():
 # runs `pytest tests/config`, which is this file: a test that shelled out to it would
 # recurse until it hit a timeout, which is exactly what the first version did. The exit
 # gate is asserted by `./scripts/ci-local.sh`, which runs the command once from outside.
+
+
+def test_core_typechecks_the_dev_surface():
+    """§19's code lives in app/routers/dev.py, app/integrations/ and app/workers/. The
+    core lane's paths listed only app/core, app/models and app/services, so none of it
+    reached mypy, ruff or ruff format in the one command this session's exit gate
+    names."""
+    text = SCRIPT.read_text(encoding="utf-8")
+    for path in ("app/routers/dev.py", "app/integrations", "app/workers"):
+        assert path in text, f"{path} is invisible to lane-check.sh core"
+
+
+def test_restrictions_run_unscoped_in_every_lane():
+    """§19.6's five, for the same reason tests/invariants' five run everywhere: no lane
+    may land the first violation unnoticed."""
+    text = SCRIPT.read_text(encoding="utf-8")
+    assert "tests/restrictions" in text
+    # Inside the unscoped block, beside the invariants -- not in a per-vertical branch.
+    unscoped = text.split('say "invariants')[1].split('say "backend')[0]
+    assert "tests/restrictions" in unscoped
+
+
+def test_core_runs_the_dev_test_directory():
+    assert "tests/dev" in SCRIPT.read_text(encoding="utf-8")
+
+
+def test_the_dry_run_still_reports_six_scoped_gates_for_core():
+    """Widening core's paths adds targets to existing gates; it does not add gates.
+    And tests/restrictions is unscoped by design -- like tests/invariants, it runs in
+    every lane, so it correctly does not increment the count. The number is asserted
+    anyway because it is the cheapest regression detector there is: M0.3 caught a
+    missing CSS gate because core reported five where it should have reported six."""
+    result = _run("core", "--dry-run")
+    assert result.returncode == 0, result.stderr
+    assert "6 scoped gates" in result.stdout

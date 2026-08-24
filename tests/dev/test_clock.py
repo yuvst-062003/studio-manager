@@ -150,14 +150,19 @@ def test_parse_dev_now_accepts_a_bare_date_as_midnight_utc():
     assert parse_dev_now("2027-03-01") == datetime(2027, 3, 1, tzinfo=UTC)
 
 
-_WALL_CLOCK_CALL = re.compile(r"\bdatetime\.(now|utcnow|today)\s*\(")
+_WALL_CLOCK_CALL = re.compile(r"\b(?:datetime\.(?:now|utcnow|today)|date\.today)\s*\(")
 
 
 def _reads_wall_clock_directly(line: str) -> bool:
     """The discipline gate's detector, extracted to a module-level function so the gate
     and its own self-test exercise the same logic rather than two copies of the same
     pattern that could drift apart -- tests/dev/test_dev_router.py's
-    `_binds_settings_and_reads_env` is the shape this follows."""
+    `_binds_settings_and_reads_env` is the shape this follows.
+
+    Matches both the `datetime` module's `.now()` / `.utcnow()` / `.today()` and a bare
+    `date.today()`, which targets the `date` class directly and so slipped past the
+    original pattern entirely -- Task 11 avoided it only because its brief hand-held
+    the line."""
     return bool(_WALL_CLOCK_CALL.search(line))
 
 
@@ -195,3 +200,18 @@ def test_the_discipline_gate_would_flag_a_direct_call(tmp_path):
         if _reads_wall_clock_directly(line)
     ]
     assert hits == ["x = datetime.now()"]
+
+
+def test_the_discipline_gate_would_flag_a_bare_date_today(tmp_path):
+    """`date.today()` targets the `date` class directly, not the `datetime` module, so
+    the original pattern -- anchored on `datetime\\.` -- let it through entirely. Same
+    shape as the test above: exercises the real `_reads_wall_clock_directly`, not a
+    second copy of its pattern, which would only prove that *a* duplicate regex fires."""
+    probe = tmp_path / "probe.py"
+    probe.write_text("from datetime import date\nx = date.today()\n", encoding="utf-8")
+    hits = [
+        line
+        for line in probe.read_text(encoding="utf-8").splitlines()
+        if _reads_wall_clock_directly(line)
+    ]
+    assert hits == ["x = date.today()"]

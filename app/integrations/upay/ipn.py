@@ -62,10 +62,10 @@ def build_ipn_query(
 ) -> dict[str, str]:
     """The query string uPay would GET to our ipnurl, in one of §19.5's four shapes.
 
-    `payment_date` defaults to `now().date()` -- Task 2's clock, not `date.today()` --
-    so a simulated IPN fired under an active X-Dev-Now shift carries the *travelled*
-    date. "Run the billing run in March, then simulate its payment" must produce a
-    payment dated in March, not today.
+    `payment_date` defaults to `now().date()` -- Task 2's clock, not the bare wall
+    clock -- so a simulated IPN fired under an active X-Dev-Now shift carries the
+    *travelled* date. "Run the billing run in March, then simulate its payment" must
+    produce a payment dated in March, not today.
     """
     amount_agorot = expected_amount_agorot
     reference = order_public_ref

@@ -44,8 +44,12 @@ py_candidates=()
 test_candidates=()
 case "$V" in
   core)
-    py_candidates=(app/core app/models app/services)
-    test_candidates=(tests/core tests/config)
+    # §19's code is spread across routers/, integrations/ and workers/, none of which
+    # follow the per-vertical convention. Listed explicitly rather than by widening to
+    # all of app/routers: a lane's own router belongs to that lane's check, not to
+    # core's.
+    py_candidates=(app/core app/models app/services app/routers/dev.py app/integrations app/workers)
+    test_candidates=(tests/core tests/config tests/dev)
     ;;
   *)
     py_candidates=("app/services/$V" "app/routers/$V.py" "app/models/$V.py")
@@ -101,6 +105,12 @@ fi
 say "invariants (SPEC §13)"
 # Not scoped: these run in every lane, every time, which is the whole point of them.
 run .venv/bin/pytest tests/invariants -q
+
+say "restrictions (SPEC §19.6)"
+# Not scoped, for the same reason the invariants are not: §19.6's five guardrails must
+# be checked in every lane, every time, so no lane can land the first violation
+# unnoticed. §19.7's demo-data hygiene rides along in the same directory.
+run .venv/bin/pytest tests/restrictions -q
 
 say "backend · $V"
 if [ ${#test_paths[@]} -eq 0 ]; then
