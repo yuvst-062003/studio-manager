@@ -3055,15 +3055,13 @@ export function AttendanceMark({ state, label }: { state: AttendanceState; label
         strokeLinecap="round"
         strokeWidth="2"
         viewBox="0 0 20 20"
-少      >
+      >
         {path}
       </svg>
     </span>
   )
 }
 ```
-
-> **Note for the implementer:** the stray character in the `<svg>` attribute list above is a transcription artefact — delete it. The element takes only the attributes listed.
 
 - [ ] **Step 4: Append the CSS**
 
@@ -4555,4 +4553,47 @@ table without any of those lanes having to remember it."
 
 **Type consistency check.** `ChipStatus` is defined in `StatusChip.tsx` (Task 12) and imported by `StudentRow.tsx` (Task 18) — same name, same module. `renderIn` / `DIRECTIONS` / `THEMES` are defined once in Task 7 and used unchanged in Tasks 8–18. `contrastRatio` is defined in Task 1 and used in Tasks 3 and 11. `TOKEN_ROLES` is defined in Task 2 and used in Tasks 3, 4 and 6. `ResolvedTheme` / `ThemePreference` come from the existing `theme.ts` and are not redefined.
 
-**One transcription artefact to fix on sight:** Task 13's `AttendanceMark.tsx` code block contains a stray character inside the `<svg>` attribute list. It is flagged in place; delete it.
+---
+
+## As built — where execution diverged from this plan, and what it found
+
+Recorded after the fact. Every item was verified, not assumed.
+
+### Nine things the plan did not predict
+
+1. **The bijection parser had the hole it was written to prevent.** Proving the gate fired (Task 2 Step 7) showed a token planted in a *second* `:root { }` block sailed through — `readTokenBlock` read only the first block matching a selector. Fixed to merge every matching block in document order, plus a backstop asserting no custom property is declared outside the two audited blocks at all. **The plant found a bug in the plant's own target.**
+
+2. **The seeded palette failed in seven places, not three.** Task 3 run against M0.1's values produced seven failures — `--border-strong` on four ground/surface pairings, plus dark `--accent`, `--paid` and `--cancelled`. Recorded as **D12**.
+
+3. **`float` was already covered; `clear` and the `border-*-left/right-*` longhands were not.** The session prompt named `inset` and `float`. Probing rather than reading found `float` closed in M0.2 and two holes nobody had named.
+
+4. **`.stylelintrc.json` became `stylelint.config.js`.** JSON cannot express a per-property `message`, and a generic one is what gets worked around. `border-left-width` now reads *"use border-inline-start-width"*. The `message` signature is `(property, value)` — verified by probe after the first attempt printed them reversed.
+
+5. **A bare `<fieldset>` is `role="group"`, not `role="radiogroup"`.** Writing the ThemeControl test first caught it; assistive tech would not have announced "1 of 3". Both `ThemeControl` and `SegmentedControl` carry an explicit role.
+
+6. **One of this plan's own tests was vacuous.** SegmentedControl's "two controls do not interfere" asserted the checked-count, which survives pinning `name` to a constant — React drives `checked` as a controlled prop and forces each input's state on every render. Rewritten to assert distinct `name` attributes, then re-mutated.
+
+7. **`@fontsource-variable/rubik` was in no package.json at all.** It lived in the lockfile as an extraneous entry, so `npm install` for an unrelated devDependency pruned it. The build then emitted `url(@fontsource-variable/rubik/…)` **unresolved** — a 404 in production, tofu on every screen, nothing in the precache manifest. Caught by the Task 6 precache assertion. Now a declared dependency of `@studio/ui`, with a test asserting it stays one. **This is the single most consequential find of the session and it was latent before it.**
+
+8. **`lane-check.sh` gained a sixth scoped gate.** It reported 5 before and 6 now; `margin-left` and `inset` planted in `tokens.css` left it green at exit 0 before Task 5.
+
+9. **`--radius-md` and `--radius-lg` changed value** (10→9, 16→11) to match `4h`'s declared 9/11/14 corners, with `14px` becoming `--radius-xl`.
+
+### Deliberate departures from the written plan
+
+- **`EmptyState`'s title is an `<h3>`,** not a `<p role="heading" aria-level={3}>`. Same semantics, less machinery.
+- **`AttendanceMark` types its icons as `ReactElement`,** not `JSX.Element` — the global `JSX` namespace is gone in React 19's types.
+- **`brandOverridesFor` uses `Object.hasOwn`,** with a test that a prototype-polluted object cannot smuggle a brand token through.
+- **`Radio.test.tsx` was derived from `Checkbox.test.tsx`** and extended with the grouping case, rather than hand-written twice.
+- **Task 15 was written test-and-implementation in one step**, breaking fail-first. Recovered by three mutations; the second is finding 6 above.
+
+### Verification, as run
+
+```
+./scripts/lane-check.sh core     ✅  6 scoped gates
+./scripts/ci-local.sh            ✅  all gates green
+npm test                         ✅  526 tests, 39 files
+```
+
+Every primitive renders in `he`/RTL and `en`/LTR under both themes. Every contrast floor
+from D7 and D8 is a computed assertion over the live token values; none is a comment.
