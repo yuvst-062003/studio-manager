@@ -14,7 +14,7 @@
     "lint": "eslint . && stylelint \"**/*.css\" --allow-empty-input",
     "test": "vitest run --reporter=dot",
     "build": "npm run build --workspaces --if-present",
-    "installability": "node ../scripts/check-installability.mjs"
+    "installability": "node scripts/check-installability.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
