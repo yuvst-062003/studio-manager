@@ -10,8 +10,24 @@ Two rules follow from that sentence and both are enforced by tests:
 * **Nothing else calls `datetime.now()`.** A module that reads the wall clock directly
   cannot be time-travelled, so a run that half-shifts is worse than one that does not
   shift at all -- it looks like a billing bug rather than a missing feature.
-* **The shift is request-scoped.** It lives in a ContextVar set and reset by the
-  middleware, so a leak into the event loop cannot move a later request's clock.
+* **The shift must not outlive the call that set it.** `use_dev_now`'s `.reset()` is
+  what enforces that -- but *not* because it is what protects one HTTP request from the
+  next. On the HTTP path that isolation already belongs to the server: uvicorn hands
+  every real request a brand new, empty `contextvars.Context`, not a copy of the
+  previous request's (`uvicorn/protocols/http/h11_impl.py`, `task =
+  self.loop.create_task(self.cycle.run_asgi(app), context=contextvars.Context())`), so
+  a missing `.reset()` would be inert there regardless of whether it ran. What
+  `.reset()` is load-bearing for is the *other* caller this module advertises: a worker
+  or job (`python -m app.workers.billing --at=...`) that calls `use_dev_now` more than
+  once **inside a single task**. There is no fresh-Context boundary between one job and
+  the next the way there is between one HTTP request and the next, so an unreset shift
+  from job N would silently apply to job N+1. tests/dev/test_clock.py proves both
+  halves: the contract directly (enter/exit, and nested enter/exit restoring the outer
+  value rather than clearing it), and the worker's shape specifically -- two sequential
+  calls sharing one task, driven through `httpx.ASGITransport` rather than
+  `fastapi.testclient.TestClient`, because `TestClient` (and uvicorn) both destroy the
+  very condition being tested. See that test's docstring for why the two are not
+  interchangeable.
 
 G3: always timezone-aware UTC. Rendering in Asia/Jerusalem happens at the edge.
 """

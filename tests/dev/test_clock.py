@@ -1,21 +1,40 @@
 """§19.5 -- 'An X-Dev-Now header shifts the server's clock for that request only, in
 non-production.'
 
-Three properties, each of which can fail independently:
+Properties, each of which can fail independently:
   1. the header shifts the clock at all,
-  2. the shift does not survive the request (a contextvar leaked into the event loop
-     would silently move every later request's clock -- the kind of bug that surfaces
-     as "the billing run ran for the wrong month" three weeks later),
-  3. production ignores it.
+  2. the shift does not outlive the call that set it -- proved two ways: the contract
+     itself with no ASGI layer at all (enter/exit, and nested enter/exit restoring the
+     outer value rather than clearing it), and a same-task two-request replay that
+     reproduces the one caller this actually protects (see
+     test_the_shift_does_not_outlive_its_request's docstring for why that test uses
+     httpx.ASGITransport and not TestClient -- the difference is load-bearing, not
+     stylistic),
+  3. production ignores it,
+  4. an unparseable header is rejected rather than silently ignored.
+
+Round-1 review history: this file originally carried
+test_the_shift_does_not_leak_into_the_next_request, built on two sequential
+TestClient(...).get() calls. It could not go red: starlette's TestClient (this pin,
+1.6.0) gives every call -- bare or inside a `with` block -- its own
+anyio.from_thread.BlockingPortal task, i.e. a freshly copied contextvars.Context, so a
+missing use_dev_now().reset() was invisible to it regardless of whether the reset ran.
+Worse, the same review found that on the real HTTP path (uvicorn) the reset is *also*
+inert, for the same reason via a different mechanism -- see app/core/clock.py's module
+docstring. The test below replaces it with two that provably fire; see
+.superpowers/sdd/2026-08-24-m0-4-demo-studio-and-dev-bar/task-2-report.md's round-1
+section for the drill evidence.
 """
 
 from __future__ import annotations
 
+import asyncio
 import re
-from datetime import UTC
+from datetime import UTC, datetime
 from pathlib import Path
 
-from app.core.clock import X_DEV_NOW_HEADER, now
+import httpx
+from app.core.clock import X_DEV_NOW_HEADER, now, parse_dev_now, use_dev_now
 from fastapi.testclient import TestClient
 from tests.dev.conftest import app_in_env
 
@@ -41,11 +60,53 @@ def test_the_header_shifts_the_clock_for_that_request():
     assert body["shifted"] is True
 
 
-def test_the_shift_does_not_leak_into_the_next_request():
+def test_use_dev_now_reverts_on_exit_and_restores_the_outer_value_when_nested():
+    """The contract itself, with no ASGI layer at all: enter, assert shifted, exit,
+    assert reverted. The nested case is the one a naive `_dev_now.set(None)` gets
+    wrong on exit -- it would clear the shift outright instead of restoring the outer
+    one. Token-based `.reset()` is what makes nesting correct, and that is worth
+    pinning directly rather than trusting it as a side effect of the ContextVar API."""
+    assert now().year != 2027, "the clock must start unshifted"
+    outer = datetime(2027, 3, 1, tzinfo=UTC)
+    inner = datetime(2099, 1, 1, tzinfo=UTC)
+    with use_dev_now(outer):
+        assert now() == outer
+        with use_dev_now(inner):
+            assert now() == inner
+        assert now() == outer, "the inner exit must restore the outer shift, not clear it"
+    assert now().year != 2027, "the outer exit must restore the unshifted clock"
+
+
+def test_the_shift_does_not_outlive_its_request():
+    """Same-task, two-request replay of the shape use_dev_now actually protects: a
+    worker calling it more than once inside one job loop, sequentially, in one task
+    (app/core/clock.py's module docstring).
+
+    Why httpx.ASGITransport and not fastapi.testclient.TestClient: TestClient spawns a
+    fresh anyio task -- a freshly copied contextvars.Context -- for every call, bare or
+    inside a `with` block, so two sequential TestClient.get()s can never observe a
+    leaked ContextVar no matter what use_dev_now does. uvicorn does the same thing to
+    every real HTTP request, for a different reason (a brand new empty Context per
+    request, not a copy). ASGITransport has neither behaviour: it awaits the ASGI app
+    directly with no task spawned, so both requests below share one task and one
+    context -- the one condition that actually exercises the reset. Do not
+    'simplify' this back to TestClient: that is exactly the change that made the
+    predecessor of this test unable to fail.
+
+    asyncio.run in a *sync* def, not an async def: this repo has no pytest-asyncio and
+    no asyncio_mode in pyproject.toml, so an async def test would be silently skipped
+    or collected as an error rather than run.
+    """
+
+    async def scenario(application: object) -> dict[str, object]:
+        transport = httpx.ASGITransport(app=application)  # type: ignore[arg-type]
+        async with httpx.AsyncClient(transport=transport, base_url="http://dev") as client:
+            await client.get("/api/v1/dev/clock", headers={X_DEV_NOW_HEADER: TRAVELLED})
+            response = await client.get("/api/v1/dev/clock")
+            return dict(response.json())
+
     with app_in_env("development") as application:
-        client = TestClient(application)
-        client.get("/api/v1/dev/clock", headers={X_DEV_NOW_HEADER: TRAVELLED})
-        body = client.get("/api/v1/dev/clock").json()
+        body = asyncio.run(scenario(application))
     assert not body["now"].startswith("2027"), "the offset outlived its request"
     assert body["shifted"] is False
 
@@ -83,6 +144,23 @@ def test_the_middleware_is_installed_conditionally_not_guarded():
     assert "pkgutil.iter_modules" in text
 
 
+def test_parse_dev_now_accepts_a_bare_date_as_midnight_utc():
+    """`?at=2027-03-01` is what you actually type when testing a billing day -- the
+    module docstring advertises this and it had no direct test."""
+    assert parse_dev_now("2027-03-01") == datetime(2027, 3, 1, tzinfo=UTC)
+
+
+_WALL_CLOCK_CALL = re.compile(r"\bdatetime\.(now|utcnow|today)\s*\(")
+
+
+def _reads_wall_clock_directly(line: str) -> bool:
+    """The discipline gate's detector, extracted to a module-level function so the gate
+    and its own self-test exercise the same logic rather than two copies of the same
+    pattern that could drift apart -- tests/dev/test_dev_router.py's
+    `_binds_settings_and_reads_env` is the shape this follows."""
+    return bool(_WALL_CLOCK_CALL.search(line))
+
+
 def test_nothing_outside_the_clock_module_reads_the_wall_clock():
     """The discipline gate. Time travel is worthless if half the app calls
     datetime.now() directly -- the billing run would shift and the debt ladder would
@@ -97,7 +175,7 @@ def test_nothing_outside_the_clock_module_reads_the_wall_clock():
         if path.name == "clock.py":
             continue
         for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
-            if re.search(r"\bdatetime\.(now|utcnow|today)\s*\(", line):
+            if _reads_wall_clock_directly(line):
                 offenders.append(f"{path.relative_to(ROOT)}:{lineno}")
     assert offenders == [], (
         "these read the wall clock directly and so cannot be time-travelled -- "
@@ -106,12 +184,14 @@ def test_nothing_outside_the_clock_module_reads_the_wall_clock():
 
 
 def test_the_discipline_gate_would_flag_a_direct_call(tmp_path):
-    """Proves the detector fires, because today it finds nothing."""
+    """Proves the detector itself fires, using the same `_reads_wall_clock_directly`
+    the real gate calls above -- not a second copy of its pattern, which would only
+    prove that *a* duplicate regex fires, not that the gate's actual logic does."""
     probe = tmp_path / "probe.py"
     probe.write_text("from datetime import datetime\nx = datetime.now()\n", encoding="utf-8")
     hits = [
         line
         for line in probe.read_text(encoding="utf-8").splitlines()
-        if re.search(r"\bdatetime\.(now|utcnow|today)\s*\(", line)
+        if _reads_wall_clock_directly(line)
     ]
     assert hits == ["x = datetime.now()"]
