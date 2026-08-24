@@ -11,23 +11,19 @@ Two rules follow from that sentence and both are enforced by tests:
   cannot be time-travelled, so a run that half-shifts is worse than one that does not
   shift at all -- it looks like a billing bug rather than a missing feature.
 * **The shift must not outlive the call that set it.** `use_dev_now`'s `.reset()` is
-  what enforces that -- but *not* because it is what protects one HTTP request from the
-  next. On the HTTP path that isolation already belongs to the server: uvicorn hands
-  every real request a brand new, empty `contextvars.Context`, not a copy of the
-  previous request's (`uvicorn/protocols/http/h11_impl.py`, `task =
-  self.loop.create_task(self.cycle.run_asgi(app), context=contextvars.Context())`), so
-  a missing `.reset()` would be inert there regardless of whether it ran. What
-  `.reset()` is load-bearing for is the *other* caller this module advertises: a worker
-  or job (`python -m app.workers.billing --at=...`) that calls `use_dev_now` more than
-  once **inside a single task**. There is no fresh-Context boundary between one job and
-  the next the way there is between one HTTP request and the next, so an unreset shift
-  from job N would silently apply to job N+1. tests/dev/test_clock.py proves both
-  halves: the contract directly (enter/exit, and nested enter/exit restoring the outer
-  value rather than clearing it), and the worker's shape specifically -- two sequential
-  calls sharing one task, driven through `httpx.ASGITransport` rather than
-  `fastapi.testclient.TestClient`, because `TestClient` (and uvicorn) both destroy the
-  very condition being tested. See that test's docstring for why the two are not
-  interchangeable.
+  unconditionally load-bearing on the worker/job path (`python -m app.workers.billing
+  --at=...`): a job that calls `use_dev_now` more than once inside one task has no task
+  boundary between calls, so an unreset shift from job N would otherwise apply to job
+  N+1 -- the case tests/dev/test_clock.py pins directly, including nesting. On the HTTP
+  path, each request already runs in its own asyncio task, and uvicorn schedules it via
+  `loop.create_task(...)` with no explicit `context=`, which gives that task a *copy* of
+  the server's context rather than a shared one -- verified here end-to-end against real
+  uvicorn 0.52.4 with `.reset()` stripped: the second request showed no leak. That is
+  not a guarantee to lean on, though: uvicorn ships an opt-in `reset_contextvars` flag
+  (`config.py`, default `False`, unused in this repo) precisely because, per its own
+  comment, asyncio can leak context vars between tasks (CPython issue 140947). The
+  worker/job path has no such copy-per-task cushion, which is why the reset is not
+  optional there regardless of what the HTTP path happens to do today.
 
 G3: always timezone-aware UTC. Rendering in Asia/Jerusalem happens at the edge.
 """
