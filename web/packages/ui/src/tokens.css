@@ -1,58 +1,125 @@
-/* D2 — three tiers. Semantic and structural are never overridable.
- * D8 — #6f6b62 is the floor for any light-mode text token; #7a766d is retired outright.
+/* D2 — three tiers. Semantic and structural are NEVER overridable; only the brand tier
+ * is studio-settable, and not until v2 (D1 — v1 is logo-only).
  * D3 — near-neutral warm grounds, one deep accent, minimal decoration.
- * Values audited in docs/design/canvas-review.md. */
+ * D7 — a belt bar is never fill-only; --belt-ring is what makes that enforceable.
+ * D8 — #6f6b62 is the floor for any light-mode text token; #7a766d is retired outright.
+ *
+ * WHAT EACH TOKEN IS FOR lives in tokens.roles.ts, and tokens.audit.test.ts asserts a
+ * bijection between the two plus every contrast obligation. Add a token here without a
+ * role there and the build fails — deliberately. Ratios are NOT written in comments: a
+ * ratio in a comment rots the first time someone tweaks a hex, which is how D8's three
+ * greys survived 33, 19 and 9 uses.
+ *
+ * Values ported from dashboard artboard 4h (ספריית רכיבים) as a VISUAL REFERENCE. No CSS
+ * was copy-pasted from the export — D10. */
 
 :root {
-  --ground: #f7f5f1;
-  --surface: #fffefb;
-  --fg: #17150f;
-  --text-secondary: #55524a;
-  --text-muted: #6f6b62;   /* D8 floor — 4.88:1 on --ground */
-  --border: #e6e1d6;
-  --border-strong: #e5e0d5;
-  --accent: #1f6b3f;
-  --on-accent: #fffefb;
+  /* ═══ TIER 1 · BRAND — studio-owned in v2, fixed in v1 (D1) ═══════════════════ */
+  --brand-primary: #17150f;
+  --brand-on-primary: #f7f5f1;
 
-  /* Semantic — never overridable, never a brand colour (D2 consequence 2).
-   * A club branding itself red would otherwise swallow the debt banner. */
+  /* ═══ TIER 2 · SEMANTIC — never overridable, never a brand colour ═════════════
+   * D2 consequence 2: a club branding itself red would otherwise swallow the debt
+   * banner, which is the parent app's most important alert. */
   --debt: #b3261e;
+  --debt-tint: #faefec;
   --paid: #1f6b3f;
   --pending: #8a5a00;
   --cancelled: #6f6b62;
+  --cancelled-tint: #f3f2ef;
   --danger: #b3261e;
+  --danger-tint: #faf1ee;
   --focus-ring: #2f6fa8;
 
-  /* D7 — a belt bar is never fill-only. White-on-light, black-on-dark and
-   * yellow-on-light all fail contrast; one ring solves all three. */
+  /* ═══ TIER 3 · STRUCTURAL · palette ═══════════════════════════════════════════ */
+  --ground: #f7f5f1;
+  --surface: #fffefb;
+  --fg: #17150f;
+  --on-fg: #f7f5f1;
+  --text-secondary: #55524a;
+  --text-muted: #6f6b62;
+  --border: #e6e1d6;
+  --border-strong: #8d8674;
+  --accent: #1f6b3f;
+  --on-accent: #fffefb;
+  --disabled-surface: #e8e7e3;
   --belt-ring: #17150f;
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 16px;
+
+  /* ═══ TIER 3 · STRUCTURAL · type ══════════════════════════════════════════════
+   * rem, not px: a user who has raised their browser font size gets a UI that scales
+   * with them. 4h is drawn in px against a 16px root, so the conversions are exact. */
+  --text-micro: 0.6875rem;
+  --text-caption: 0.75rem;
+  --text-label: 0.8125rem;
+  --text-body: 0.875rem;
+  --text-title: 0.9375rem;
+  --text-display: 1.5rem;
+  --leading-tight: 1;
+  --leading-snug: 1.2;
+  --leading-normal: 1.4;
+  --leading-relaxed: 1.5;
+  --weight-light: 300;
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+
+  /* ═══ TIER 3 · STRUCTURAL · space, radius, shape, motion ══════════════════════ */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
   --space-4: 16px;
+  --space-5: 20px;
   --space-6: 24px;
   --space-8: 32px;
+  --control-pad-block: 11px;
+  --control-pad-inline: 18px;
+  --field-pad-inline: 12px;
+  --radius-xs: 3px;
+  --radius-sm: 6px;
+  --radius-md: 9px;
+  --radius-lg: 11px;
+  --radius-xl: 14px;
+  --radius-pill: 999px;
+  --radius-circle: 50%;
+  --border-width-hairline: 1px;
+  --border-width-strong: 1.5px;
+  --belt-ring-width: 1px;
+  --motion-fast: 120ms;
+  --motion-base: 200ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
 }
 
 [data-theme="dark"] {
+  --brand-primary: #fffefb;
+  --brand-on-primary: #141311;
+
+  /* Semantic. Every dark pair passes; --paid and --cancelled were corrected in M0.3
+   * after the audit measured them against the card surface and the chip tint, which
+   * canvas-review.md never did. */
+  --debt: #ff8a7d;
+  --debt-tint: #2e2521;
+  --paid: #4a9b5e;
+  --pending: #e5b44f;
+  --cancelled: #a8a49a;
+  --cancelled-tint: #292825;
+  --danger: #ff8a7d;
+  --danger-tint: #2c2420;
+  --focus-ring: #6aa9e0;
+
+  /* Palette. #a8a49a and #8f8b82 are legal HERE and only here — D8 makes them
+   * dark-mode tokens, not shared ones. */
   --ground: #141311;
   --surface: #1e1d1a;
   --fg: #fffefb;
-  --text-secondary: #a8a49a;  /* 7.46:1 on --ground — dark-mode-only (D8) */
-  --text-muted: #8f8b82;      /* 5.47:1 on --ground — dark-mode-only (D8) */
+  --on-fg: #141311;
+  --text-secondary: #a8a49a;
+  --text-muted: #8f8b82;
   --border: #3a3833;
-  --border-strong: #4a4842;
-  --accent: #3f8f52;
+  --border-strong: #726e65;
+  --accent: #4a9b5e;
   --on-accent: #141311;
-  --debt: #ff8a7d;
-  --paid: #3f8f52;
-  --pending: #e5b44f;
-  --cancelled: #8f8b82;
-  --danger: #ff8a7d;
-  --focus-ring: #6aa9e0;
+  --disabled-surface: #343430;
   --belt-ring: #fffefb;
 }
 
