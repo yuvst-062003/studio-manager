@@ -16,6 +16,26 @@ env:
 jobs:
   backend:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        # SPEC §8.1a pins PostgreSQL 16. Trust auth mirrors docker-compose.yml, so no
+        # credential exists in CI either. The service container has no
+        # docker-entrypoint-initdb.d hook, so studio_app does not exist here — which
+        # is exactly why revision 0001 creates it rather than relying on the local
+        # init script.
+        image: postgres:16
+        env:
+          POSTGRES_DB: studio_manager
+          POSTGRES_USER: studio_migrator
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 55433:5432
+        options: >-
+          --health-cmd "pg_isready -U studio_migrator -d studio_manager"
+          --health-interval 2s --health-timeout 3s --health-retries 30
+    env:
+      DATABASE_URL: postgresql+psycopg://studio_app@127.0.0.1:55433/studio_manager
+      MIGRATION_DATABASE_URL: postgresql+psycopg://studio_migrator@127.0.0.1:55433/studio_manager
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -27,6 +47,10 @@ jobs:
         run: ruff check app scripts tests && ruff format --check app scripts tests
       - name: Typecheck
         run: mypy app scripts
+      - name: Migrate
+        # The DB tests fail rather than skip when no database is reachable, so this is
+        # part of the gate and not setup around it.
+        run: alembic upgrade head
       - name: Tests
         run: pytest
 

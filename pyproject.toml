@@ -7,6 +7,10 @@ requires-python = ">=3.14"
 pythonpath = ["."]
 testpaths = ["tests"]
 addopts = "-q"
+markers = [
+    "db: requires a live PostgreSQL (./scripts/dev-db.sh up)",
+    "slow: runs the full lane-check; excluded with -m 'not slow'",
+]
 
 [tool.ruff]
 line-length = 100
@@ -25,3 +29,8 @@ plugins = ["pydantic.mypy"]
 [[tool.mypy.overrides]]
 module = "tests.*"
 strict = false
+
+[[tool.mypy.overrides]]
+# Alembic generates these; `op` and `sa` are untyped at the call sites it writes.
+module = "alembic.versions.*"
+ignore_errors = true

@@ -133,3 +133,45 @@ railway environment delete development --yes
 ```
 
 The environment can be recreated from `staging` in one command whenever it is.
+
+## The staging database (M0.2)
+
+Added with:
+
+```bash
+railway add --database postgres          # adds to the linked environment; there is no
+                                         # --environment flag on `add`
+railway variables --service api --environment staging --skip-deploys \
+  --set 'DATABASE_URL=${{Postgres.DATABASE_URL}}' \
+  --set 'MIGRATION_DATABASE_URL=${{Postgres.DATABASE_URL}}' \
+  --set 'APP_DB_ROLE=studio_app'
+```
+
+**Why two DSNs.** SPEC §11.2 requires the application role to hold `INSERT` on
+`audit_log` and no `UPDATE` or `DELETE`. One role cannot both own the table and be
+denied rights on it, so migrations run as a schema owner (`MIGRATION_DATABASE_URL`) and
+the app connects as a runtime role (`DATABASE_URL`). Locally those are
+`studio_migrator` and `studio_app`; see `docker-compose.yml` and
+`infra/postgres/init/10-roles.sql`.
+
+### Open item — the api service still connects as the superuser in staging
+
+Railway's managed Postgres provides one role. Revision `0001` creates `studio_app` and
+`0002` revokes `UPDATE` and `DELETE` on `audit_log` from it, so the grant §11.2 requires
+is correct in every environment and `tests/core/test_audit_append_only.py` asserts it
+against `has_table_privilege`. What is **not** yet true in staging is that the API
+*uses* that role: both variables above point at the same superuser DSN.
+
+M1 closes this by giving `studio_app` a login password from a Railway secret and
+pointing `DATABASE_URL` at it. Until then, append-only is enforced by grant in tests and
+in local development, and by convention in staging.
+
+### Open item — staging runs PostgreSQL 18, SPEC §8.1a pins 16
+
+`railway add --database postgres` provisions
+`ghcr.io/railwayapp-templates/postgres-ssl:18`. `docker-compose.yml` and the CI service
+container both run `postgres:16`, which is what §8.1a specifies, so the test suite
+exercises 16 while staging runs 18. Nothing M0.2 uses differs between the two, but the
+divergence is real and is a decision rather than an accident: either pin staging to a
+16 image, or amend §8.1a to 18 and move local and CI with it. Do not leave it undecided
+past W4, when the money ledger starts depending on this database.

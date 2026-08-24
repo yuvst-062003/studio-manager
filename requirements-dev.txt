@@ -6,3 +6,7 @@ pyyaml
 mypy
 ruff
 pip-audit
+sqlalchemy
+alembic
+psycopg[binary]
+cryptography
