@@ -166,15 +166,16 @@ M1 closes this by giving `studio_app` a login password from a Railway secret and
 pointing `DATABASE_URL` at it. Until then, append-only is enforced by grant in tests and
 in local development, and by convention in staging.
 
-### Open item — staging runs PostgreSQL 18, SPEC §8.1a pins 16
+### Settled — everything runs PostgreSQL 18
 
 `railway add --database postgres` provisions
-`ghcr.io/railwayapp-templates/postgres-ssl:18`. `docker-compose.yml` and the CI service
-container both run `postgres:16`, which is what §8.1a specifies, so the test suite
-exercises 16 while staging runs 18. Nothing M0.2 uses differs between the two, but the
-divergence is real and is a decision rather than an accident: either pin staging to a
-16 image, or amend §8.1a to 18 and move local and CI with it. Do not leave it undecided
-past W4, when the money ledger starts depending on this database.
+`ghcr.io/railwayapp-templates/postgres-ssl:18`. Rather than fight the platform for a 16
+image we would then maintain ourselves, SPEC §8.1a, `docker-compose.yml` and the CI
+service container all moved to **PostgreSQL 18** (decided 2026-08-24). Local, CI and
+staging now run the same major, which is the property that actually matters: testing
+against a different major is how a difference reaches production untested.
+`tests/config/test_database_config.py` asserts the CI image, so the three cannot drift
+apart again silently.
 
 ## Encryption keys (SPEC §11.1)
 

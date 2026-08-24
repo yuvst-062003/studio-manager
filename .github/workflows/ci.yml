@@ -18,12 +18,13 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        # SPEC §8.1a pins PostgreSQL 16. Trust auth mirrors docker-compose.yml, so no
-        # credential exists in CI either. The service container has no
+        # SPEC §8.1a pins PostgreSQL 18, matching what Railway provisions — testing
+        # against a different major is how a difference reaches production untested.
+        # Trust auth mirrors docker-compose.yml, so no credential exists in CI either. The service container has no
         # docker-entrypoint-initdb.d hook, so studio_app does not exist here — which
         # is exactly why revision 0001 creates it rather than relying on the local
         # init script.
-        image: postgres:16
+        image: postgres:18
         env:
           POSTGRES_DB: studio_manager
           POSTGRES_USER: studio_migrator

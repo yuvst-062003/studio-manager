@@ -72,12 +72,30 @@ export const bundles: Record<Locale, Record<Namespace, Bundle>> = {
  * missing everywhere returns itself rather than throwing, so a missing translation
  * degrades to a visible key instead of a blank screen.
  */
-export function t(locale: Locale, key: string): string {
+/**
+ * The lookup rule, separated from the shipped bundles so it can be tested against
+ * synthetic ones.
+ *
+ * It is separate for a reason worth keeping: the fallback test used to assert
+ * `t('ru', 'common.appName.staff') === t('he', ...)`, which passed only because that key
+ * happened to be untranslated. Completing the Russian translation turned it red. A test
+ * of the fallback rule must not depend on which translations are currently missing —
+ * otherwise it stops testing anything the moment a locale is finished.
+ */
+export function translate(
+  source: Record<Locale, Record<Namespace, Bundle>>,
+  locale: Locale,
+  key: string,
+): string {
   const dot = key.indexOf('.')
   if (dot === -1) return key
   const ns = key.slice(0, dot) as Namespace
   const rest = key.slice(dot + 1)
-  return bundles[locale]?.[ns]?.[rest] ?? bundles[REFERENCE_LOCALE]?.[ns]?.[rest] ?? key
+  return source[locale]?.[ns]?.[rest] ?? source[REFERENCE_LOCALE]?.[ns]?.[rest] ?? key
+}
+
+export function t(locale: Locale, key: string): string {
+  return translate(bundles, locale, key)
 }
 
 export { DIRECTION, LOCALES, NAMESPACES, REFERENCE_LOCALE }

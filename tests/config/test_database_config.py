@@ -43,8 +43,9 @@ def test_ci_backend_job_has_a_postgres_service():
     workflow = yaml.safe_load(WORKFLOW.read_text(encoding="utf-8"))
     services = workflow["jobs"]["backend"].get("services", {})
     assert "postgres" in services, "the backend job has no database"
-    assert services["postgres"]["image"].startswith("postgres:16"), (
-        "SPEC 8.1a specifies PostgreSQL 16; CI must not test against a different major"
+    assert services["postgres"]["image"].startswith("postgres:18"), (
+        "SPEC 8.1a specifies PostgreSQL 18, which is what Railway provisions. Testing\n"
+        "against a different major is how a difference reaches production untested."
     )
 
 

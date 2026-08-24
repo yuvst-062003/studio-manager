@@ -1524,7 +1524,7 @@ POST   /dev/jobs/{name}/run               POST /dev/upay/simulate-ipn
 
 ### 8.1 Stack
 
-- **Backend:** Python 3.14, FastAPI, SQLAlchemy 2.x, Alembic, PostgreSQL 16, Pydantic v2
+- **Backend:** Python 3.14, FastAPI, SQLAlchemy 2.x, Alembic, PostgreSQL 18, Pydantic v2
 - **Workers:** ARQ (Redis-backed) for billing runs, notification fan-out, IPN processing,
   PDF rendering, retention jobs and reconciliation suggestions
 - **Frontend:** React 19, TypeScript 5.9, Vite 7, TanStack Query, Zustand, Tailwind with
@@ -1541,7 +1541,7 @@ POST   /dev/jobs/{name}/run               POST /dev/upay/simulate-ipn
 
 Four stores, each with a job the others cannot do.
 
-#### PostgreSQL 16 — the system of record
+#### PostgreSQL 18 — the system of record
 
 Everything durable. Chosen for four reasons that are specific to this product, not generic
 database preference:

@@ -137,14 +137,18 @@ existing and being correct.
 > - **`scripts/lane-check.sh`** and **`web/scripts/i18n-parity.mjs`** — note the path:
 >   Node scripts live in `web/scripts/`, not the milestone plan's `scripts/`.
 >
-> **Two open items carried forward**, both recorded in
-> [the Railway runbook](../deploy/railway-runbook.md): the staging api still connects as
-> the superuser rather than as `studio_app` (M1 closes this), and Railway provisioned
-> **PostgreSQL 18** where SPEC §8.1a pins 16 — local and CI test against 16.
+> **Settled after the session (2026-08-24):**
+> - **PostgreSQL 18 everywhere.** Railway provisions 18; rather than maintain a 16 image
+>   ourselves, SPEC §8.1a, `docker-compose.yml` and CI all moved to 18. Note the image
+>   change that came with it: PG18 mounts its volume at `/var/lib/postgresql`, not
+>   `/var/lib/postgresql/data` — the old path makes the container refuse to start.
+> - **SPEC §15 item 9 — the `ru` source.** Machine-translated UI strings with a
+>   native-speaker review before launch. `ru/common.ts` is now at full parity with `he`;
+>   `i18n-parity.mjs` keeps `ru` on *report* until that review, then flips to *strict*.
 >
-> **Still open from before:** SPEC §15 item 9, the `ru` translation source. Until it
-> lands, `i18n-parity.mjs` treats `ru` as *report* and `en` as *strict*; one word in
-> `POLICY` changes that.
+> **One open item carried forward**, recorded in
+> [the Railway runbook](../deploy/railway-runbook.md): the staging api still connects as
+> the superuser rather than as `studio_app`. M1 closes it.
 
 > **Already landed in M0.1 — do not rebuild:**
 > - **Seam 2** (`app/main.py` + `app/models/__init__.py` pkgutil discovery), including the
