@@ -10,6 +10,14 @@ sys.modules silently changes every test that imports it later in the same sessio
 including tests/invariants/test_03, which walks app.openapi(). The harness therefore
 puts the original module objects back rather than reloading again, and
 test_the_harness_restores_what_it_swapped asserts it.
+
+**The rule for RELOADABLE**: the harness swaps ENV, so every module that binds
+`settings` at import time (`from app.core.config import settings`) **and reads `.ENV`**
+off it must be reloaded along with `app.core.config` -- otherwise that module's binding
+is frozen to whichever environment happened to import it first, for the rest of the
+process, and a test built on it becomes load-order-dependent rather than
+env-dependent. `tests/dev/test_dev_router.py` carries a source-level gate that enforces
+this for every module under app/.
 """
 
 from __future__ import annotations
@@ -22,8 +30,18 @@ from contextlib import contextmanager
 
 from fastapi import FastAPI
 
-#: Order matters: config first, because app.main imports `settings` from it by value.
-RELOADABLE = ("app.core.config", "app.main")
+#: Order matters: config first, because every other entry imports `settings` from it by
+#: value. app.core.db and app.core.encryption also bind `settings` at module scope, but
+#: read DATABASE_URL / ENCRYPTION_KEYS -- fields this harness never swaps -- so they are
+#: deliberately absent: reloading them would reset an lru_cache'd engine and decrypted
+#: key material for nothing. tests/dev/test_dev_router.py names the same exclusion.
+RELOADABLE = (
+    "app.core.config",
+    "app.core.dev_account",
+    "app.routers.health",
+    "app.routers.dev",
+    "app.main",
+)
 
 
 @contextmanager
