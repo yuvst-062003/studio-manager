@@ -28,29 +28,58 @@ import { makeScheduleClient } from './features/schedule/client'
 import { useToday } from './features/schedule/useToday'
 import { StaffScreen } from './features/staff/StaffScreen'
 import { SettingsScreen } from './features/settings/SettingsScreen'
+import {
+  AddStudentScreen,
+  AlertCentre,
+  StudentDetailScreen,
+  StudentsScreen,
+  makeDashboardPeopleClient,
+  registerPeopleAlerts,
+} from './features/people'
 
 registerM1WizardSteps(apiFetch)
+// Seam 4 — `6c` composes sections from four milestones. This lane registers the three it
+// owns; M4's, M5's and M6's land the same way without reopening AlertCentre.tsx.
+registerPeopleAlerts()
 
 const NAV = [
   { key: 'schedule', labelKey: 'schedule.week.title', href: '#/schedule' },
   { key: 'groups', labelKey: 'schedule.groups.title', href: '#/groups' },
   { key: 'closures', labelKey: 'schedule.closure.title', href: '#/closures' },
+  { key: 'students', labelKey: 'people.student.plural', href: '#/students' },
+  { key: 'alerts', labelKey: 'people.alerts.title', href: '#/alerts' },
   { key: 'staff', labelKey: 'common.dash.nav.staff', href: '#/staff' },
   { key: 'settings', labelKey: 'common.dash.nav.settings', href: '#/settings' },
   { key: 'setup', labelKey: 'common.dash.nav.setup', href: '#/setup' },
 ]
 
-export type DashboardRoute = 'home' | 'staff' | 'settings' | 'setup' | 'schedule'
+export type DashboardRoute =
+  | 'home'
+  | 'staff'
+  | 'settings'
+  | 'setup'
+  | 'schedule'
+  | 'students'
+  | 'alerts'
 
 /** Unknown hashes resolve to home rather than to a blank page. */
 export function routeFromHash(hash: string): DashboardRoute {
   const name = hash.replace(/^#\/?/, '')
-  // The schedule vertical owns three top-level hashes plus `#/groups/<id>`, and decides
-  // between them itself in features/schedule/ScheduleSection.tsx. Collapsing them to one
-  // route here is what keeps this file's diff to a NAV entry and a single branch — it is
-  // the one file lane PEOPLE also edits this wave.
+  // Each vertical collapses its own family of hashes to ONE route here and decides
+  // between them in its own feature folder — lane SCHEDULE's three top-level hashes plus
+  // `#/groups/<id>` in features/schedule/ScheduleSection.tsx, lane PEOPLE's `#/students`,
+  // `#/students/<id>`, `#/students/new` and `#/alerts` in features/people. That is what
+  // keeps this shared file to one NAV group and one branch per vertical rather than one
+  // per screen, which is what let both W2 lanes edit it without colliding on every screen.
   if (name === 'schedule' || name === 'closures' || name.startsWith('groups')) return 'schedule'
+  if (name.startsWith('students')) return 'students'
+  if (name === 'alerts') return 'alerts'
   return name === 'staff' || name === 'settings' || name === 'setup' ? name : 'home'
+}
+
+/** `#/students/<id>` → the card; `#/students/new` → 3c; bare `#/students` → the table. */
+export function studentRouteFrom(hash: string): string {
+  return hash.replace(/^#\/?students\/?/, '')
 }
 
 function useHashRoute(): { route: DashboardRoute; hash: string } {
@@ -60,19 +89,22 @@ function useHashRoute(): { route: DashboardRoute; hash: string } {
     globalThis.addEventListener('hashchange', onChange)
     return () => globalThis.removeEventListener('hashchange', onChange)
   }, [])
-  // The raw hash travels with the route: the schedule section needs `#/groups/<id>`, which
-  // the route enum deliberately does not carry.
+  // The raw hash travels with the route, because both verticals need something the route
+  // enum deliberately does not carry: `#/groups/<id>` for the schedule section, and
+  // `#/students/<id>` for the student card.
   return { route: routeFromHash(hash), hash }
 }
 
 export default function App() {
   const session = useSession()
   const { route, hash } = useHashRoute()
+  const studentRoute = studentRouteFrom(hash)
   const [locale, setLocale] = useState<Locale>('he')
   // Memoised: SetupWizard reads through this in an effect keyed on the client, so a fresh
   // object every render would re-fetch progress forever.
   const setupClient = useMemo(() => makeSetupClient(apiFetch), [])
   const scheduleClient = useMemo(() => makeScheduleClient(apiFetch), [])
+  const peopleClient = useMemo(() => makeDashboardPeopleClient(apiFetch), [])
   // Stable for as long as the studio's day is. `new Date().toISOString()` in this
   // render body was a new value every render, and downstream that is an effect
   // dependency worth `1 + 3N` requests.
@@ -125,6 +157,28 @@ export default function App() {
               hash={hash}
               today={today}
             />
+          ) : null}
+          {route === 'students' && studentRoute === 'new' ? (
+            <AddStudentScreen locale={locale} client={peopleClient} />
+          ) : null}
+          {route === 'students' && studentRoute && studentRoute !== 'new' ? (
+            <StudentDetailScreen
+              studentId={studentRoute}
+              locale={locale}
+              client={peopleClient}
+            />
+          ) : null}
+          {route === 'students' && !studentRoute ? (
+            <StudentsScreen
+              locale={locale}
+              client={peopleClient}
+              onOpen={(id) => {
+                globalThis.location.hash = `#/students/${id}`
+              }}
+            />
+          ) : null}
+          {route === 'alerts' ? (
+            <AlertCentre locale={locale} client={peopleClient} />
           ) : null}
           {route === 'staff' ? <StaffScreen locale={locale} /> : null}
           {route === 'settings' ? <SettingsScreen locale={locale} /> : null}
