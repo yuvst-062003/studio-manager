@@ -15,7 +15,15 @@ import uuid
 from datetime import date
 
 import pytest
-from app.integrations.upay.ipn import IPN_SOURCE_IP, IpnShape, build_ipn_query
+from app.integrations.upay.form import shekels
+from app.integrations.upay.ipn import (
+    IPN_SOURCE_IP,
+    IpnShape,
+    UnparsableIpnAmountError,
+    agorot_from_ipn_amount,
+    build_ipn_query,
+    ipn_amount,
+)
 from fastapi.testclient import TestClient
 from tests.dev.conftest import app_in_env
 
@@ -49,9 +57,24 @@ def test_success_carries_the_expected_amount_and_the_real_reference():
     q = _query(IpnShape.SUCCESS)
     assert q["errordescription"] == "SUCCESS"
     assert q["providererrorcode"] == "0"
-    assert q["amount"] == "320.00"
+    assert q["amount"] == "320"
     assert q["productdescription"] == str(REF)
     assert q["transactionid"] == "TX-1"
+
+
+def test_a_whole_shekel_amount_comes_back_without_a_decimal_part():
+    """Round two B1, the finding that would have broken every real payment.
+
+    A ₪1 charge returned `amount=1`. The OUTBOUND form field is "1.00" -- `shekels()` --
+    and reusing that formatter for the inbound payload made the simulator agree with a
+    string-comparing parser while uPay disagreed with both. §5.10 escalates an
+    amount_mismatch to a manager as suspected tampering, so the failure mode was a fraud
+    alert on every correct whole-shekel payment.
+    """
+    assert ipn_amount(100) == "1"
+    assert ipn_amount(32000) == "320"
+    assert shekels(100) == "1.00", "the outbound format is unchanged and still differs"
+    assert ipn_amount(100) != shekels(100)
 
 
 def test_amount_mismatch_differs_by_the_smallest_possible_amount():
@@ -63,13 +86,21 @@ def test_amount_mismatch_differs_by_the_smallest_possible_amount():
     assert q["productdescription"] == str(REF)
 
 
+def test_a_tampered_amount_moves_every_field_that_carries_it():
+    """Round two B10: submitting amount=2 against a form hardcoded to 1 returned
+    `amount=2` AND `depositamount=2`. A simulator that moved only `amount` would let a
+    parser reading `depositamount` pass this shape while missing the real tamper."""
+    q = _query(IpnShape.AMOUNT_MISMATCH)
+    assert q["amount"] == q["depositamount"] == q["depositnetamount"] == "319.99"
+
+
 def test_forged_ref_names_an_order_that_does_not_exist():
     """§5.10: 'public_ref is a UUIDv4, never a sequential id.' The forged shape must
     still LOOK like a UUID, or the endpoint would reject it as malformed before
     reaching the lookup this is meant to exercise."""
     q = _query(IpnShape.FORGED_REF)
     assert uuid.UUID(q["productdescription"]) != REF
-    assert q["amount"] == "320.00"
+    assert q["amount"] == "320"
 
 
 def test_duplicate_is_byte_identical_to_the_success_it_repeats():
@@ -88,18 +119,78 @@ def test_the_card_details_have_sensible_defaults():
 
 
 def test_the_payload_carries_every_field_upay_sends():
-    """upay-integration.md §4. A simulator missing a field is a parser that was never
-    tested against it."""
+    """upay-integration.md §Round two B1 -- the field set captured from a real payment.
+
+    This list used to hold eight names taken from prose. The live payload has
+    thirty-one. 'A simulator missing a field is a parser that was never tested against
+    it' was already the rule here; it just had the wrong list to check against.
+    """
     assert set(_query(IpnShape.SUCCESS)) == {
-        "errordescription",
         "providererrorcode",
-        "amount",
-        "transactionid",
-        "productdescription",
-        "cardownername",
+        "errordescription",
+        "providererrordescription",
+        "providerconfirmationnumber",
         "fourdigits",
+        "depositamount",
+        "depositnetamount",
+        "amount",
+        "firstpayment",
+        "constantpayment",
+        "numberpayments",
         "paymentdate",
+        "commissionreduction",
+        "clearer",
+        "cardtype",
+        "companytype",
+        "foreign",
+        "cardname",
+        "cardownername",
+        "comment",
+        "depositcashierid",
+        "transactionid",
+        "merchantnumber",
+        "identitynumber",
+        "expirydate",
+        "application",
+        "productdescription",
+        "cellphonenotify",
+        "email",
+        "emailnotify",
+        "actiondate",
     }
+
+
+def test_the_merchant_account_is_never_identified_from_the_repo():
+    """The real merchant email and number live in settings and Railway secrets. A
+    default that carried them would put a live account identifier in git, which
+    .gitleaks.toml has a rule against."""
+    q = _query(IpnShape.SUCCESS)
+    assert q["email"].endswith(".invalid")
+    assert set(q["merchantnumber"]) == {"0"}
+
+
+@pytest.mark.parametrize(
+    ("rendered", "agorot"),
+    [("1", 100), ("1.0", 100), ("1.00", 100), ("320", 32000), ("320.50", 32050), ("0", 0)],
+)
+def test_every_rendering_of_the_same_money_parses_to_the_same_agorot(rendered, agorot):
+    """The fix for B1. M6 compares integers, so "1" and "1.00" must not be a mismatch --
+    that comparison is what decides whether a manager gets a fraud alert."""
+    assert agorot_from_ipn_amount(rendered) == agorot
+
+
+def test_a_parsed_amount_round_trips_through_the_renderer():
+    for agorot in (0, 1, 99, 100, 32000, 32050):
+        assert agorot_from_ipn_amount(ipn_amount(agorot)) == agorot
+
+
+@pytest.mark.parametrize("bad", ["", "  ", "abc", "1.234", "1.2.3", "₪320", "1,000"])
+def test_an_unrecognised_amount_is_loud_not_coerced(bad):
+    """Coercing an unknown format silently produces an amount_mismatch, and §5.10
+    escalates that as suspected fraud. A format we have never seen is a bug to surface,
+    not a payment to reject."""
+    with pytest.raises(UnparsableIpnAmountError):
+        agorot_from_ipn_amount(bad)
 
 
 def test_the_documented_source_ip_is_recorded_not_invented():

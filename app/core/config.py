@@ -33,6 +33,14 @@ class Settings(BaseSettings):
     # yet; M1 replaces this with the is_developer flag and it becomes vestigial.
     DEV_TOOLS_TOKEN: SecretStr | None = None
 
+    # §5.10 / §15 item 2 -- the merchant account a payment form charges to. Not a secret
+    # in the cryptographic sense (it is a hidden field any payer can view-source), but it
+    # is the identifier that decides whose account receives the money, so it lives in
+    # Railway variables rather than in git. .gitleaks.toml carries a matching rule.
+    # Unset in development and test: `upay_form_fields` needs it only for a live form,
+    # and §19.6 means the demo studio never builds one.
+    UPAY_MERCHANT_EMAIL: str | None = None
+
     LOG_LEVEL: str = "INFO"
 
 

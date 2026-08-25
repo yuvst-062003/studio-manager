@@ -1,15 +1,23 @@
 """§19.6 restriction 5: the developer account cannot touch live money.
 
-'The demo studio's uPay configuration is pinned to livesystem=0 and a test asserts a
-demo studio can never render a live payment form.'
+**Redesigned 2026-08-25, after live testing.** The restriction used to read 'the demo
+studio's uPay configuration is pinned to livesystem=0'. That pin was never load-bearing,
+because it delegates the guarantee to uPay: the tests could assert that we *send* "0",
+never that uPay *honours* it. Live testing then found the account has no sandbox mode to
+test against (upay-integration.md §Round two, A3), so the flag's effect is unverified and
+may be nothing at all. A safety property that CI cannot verify is not a safety property.
 
-NOT VACUOUS for the pin itself -- the field builder exists and the demo studio row
-exists, so both ends are assertable today.
+What replaces it holds in our own code: **`upay_form_fields` refuses to build a form for
+a demo studio at all.** There is no argument, no configuration and no third-party
+behaviour between the demo studio and the guarantee -- the function raises. `livesystem`
+is now a constant `LIVE`, because the only forms this module builds are real ones.
 
-PARTIALLY VACUOUS for coverage: M6 owns the route that renders the form. The final test
-in this file is the gate that keeps the pin load-bearing when it lands -- it asserts no
-other module in app/ writes a `livesystem` field, so M6 must call this builder rather
-than assembling its own dict.
+`DEMO_UPAY_SETTINGS = {"livesystem": 0}` on the demo studio row stays as defence in
+depth. It is no longer what the restriction rests on.
+
+Still PARTIALLY VACUOUS for coverage: M6 owns the route. The last two tests are the gates
+that keep this load-bearing when it lands -- nothing else in app/ may write `livesystem`,
+and nothing else may name uPay's endpoint.
 """
 
 from __future__ import annotations
@@ -19,7 +27,14 @@ import uuid
 from pathlib import Path
 
 import pytest
-from app.integrations.upay.form import LIVE, SANDBOX, shekels, upay_form_fields
+from app.integrations.upay.form import (
+    LIVE,
+    UPAY_ENDPOINT,
+    DemoStudioHasNoLiveFormError,
+    TooManyInstallmentsError,
+    shekels,
+    upay_form_fields,
+)
 from app.models.studio import Studio
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -38,21 +53,44 @@ def _studio(*, is_demo: bool) -> Studio:
     return Studio(name="x", slug="x", is_demo=is_demo, settings={})
 
 
-def test_a_demo_studio_gets_the_sandbox_flag():
-    assert upay_form_fields(studio=_studio(is_demo=True), **COMMON)["livesystem"] == SANDBOX
+def test_a_demo_studio_cannot_get_a_upay_form_at_all():
+    """The restriction itself. Not 'gets a sandbox flag' -- gets nothing.
+
+    The old assertion was that a demo studio's form carried livesystem="0". That is a
+    statement about what we send, and the thing that must never happen -- a real card
+    charged during a demo -- depends on what uPay does with it. This one cannot be
+    satisfied by a third party behaving unexpectedly.
+    """
+    with pytest.raises(DemoStudioHasNoLiveFormError):
+        upay_form_fields(studio=_studio(is_demo=True), **COMMON)
 
 
-def test_a_real_studio_gets_the_live_flag():
-    """The control. A builder that returned "0" unconditionally would satisfy the
-    restriction and break every real payment."""
+def test_the_refusal_names_the_studio_so_the_log_is_actionable():
+    with pytest.raises(DemoStudioHasNoLiveFormError, match="demo"):
+        upay_form_fields(studio=_studio(is_demo=True), **COMMON)
+
+
+def test_a_real_studio_still_gets_a_live_form():
+    """The control. A builder that raised unconditionally would satisfy the restriction
+    and break every real payment."""
     assert upay_form_fields(studio=_studio(is_demo=False), **COMMON)["livesystem"] == LIVE
 
 
 def test_livesystem_cannot_be_passed_in():
-    """The pin is derived from the studio, never from an argument. A keyword the caller
-    controls is a keyword a caller gets wrong."""
+    """Not a parameter, and now not a branch either. A keyword the caller controls is a
+    keyword a caller gets wrong."""
     with pytest.raises(TypeError):
-        upay_form_fields(studio=_studio(is_demo=True), livesystem=LIVE, **COMMON)  # type: ignore[call-arg]
+        upay_form_fields(studio=_studio(is_demo=False), livesystem=LIVE, **COMMON)  # type: ignore[call-arg]
+
+
+def test_installments_are_clamped_to_what_the_account_actually_offers():
+    """Round two A1: the dashboard's dropdown stops at 12, and posting a larger
+    maxpayments straight to the form was never tested. Refusing here means M6 never
+    finds out in production what uPay does with 24."""
+    assert upay_form_fields(studio=_studio(is_demo=False), **COMMON | {"max_payments": 12})
+    for bad in (0, 13, 24):
+        with pytest.raises(TooManyInstallmentsError):
+            upay_form_fields(studio=_studio(is_demo=False), **COMMON | {"max_payments": bad})
 
 
 def test_the_order_reference_is_the_public_ref_not_a_sequential_id():
@@ -106,3 +144,25 @@ def test_no_other_module_decides_livesystem():
         "livesystem is decided in app/integrations/upay/form.py and nowhere else "
         f"(§19.6) -- these also write it: {offenders}"
     )
+
+
+def test_no_other_module_names_upays_endpoint():
+    """The second half of the gate, and the one that matters now.
+
+    Refusing to build the *fields* is only a guarantee if the fields are the only way to
+    reach uPay. A route that hardcodes the endpoint and posts its own dict would walk
+    straight past `upay_form_fields` and its refusal. So the URL, like `livesystem`, gets
+    exactly one home -- and M6's form route must import it from here.
+    """
+    host = "app.upay.co.il"
+    offenders = [
+        str(path.relative_to(ROOT))
+        for path in sorted((ROOT / "app").rglob("*.py"))
+        if path != ROOT / "app/integrations/upay/form.py"
+        and host in path.read_text(encoding="utf-8")
+    ]
+    assert offenders == [], (
+        f"uPay's endpoint is named in app/integrations/upay/form.py and nowhere else "
+        f"(§19.6) -- these also name it: {offenders}"
+    )
+    assert host in UPAY_ENDPOINT, "the constant this test guards moved"

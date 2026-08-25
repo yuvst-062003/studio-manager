@@ -1,5 +1,12 @@
 # uPay Integration — Studio Manager
 
+> **Read [Round two](#round-two--live-account-testing-2026-08-25) first.** Everything
+> before it is round one, written from earlier testing. Round two was done against the
+> live account with real charges and **corrects two things that would have reached
+> production**: the inbound `amount` format is not the outbound one, and `livesystem=0`
+> is not a control this account supports. Where the two sections disagree, round two
+> wins.
+
 ## Overview
 
 uPay is the fixed payment provider (no alternative vendor option). This document covers two distinct flows:
@@ -127,3 +134,139 @@ Since there's no reliable programmatic signal, recurring payments **cannot flow 
 | Payment identification | Automatic via IPN | Manual — no reliable signal |
 | Reconciliation | Fully automated | Same manual flow as bank transfers |
 | Source of truth | `transactionid` + `productdescription` | Manual verification against raw IPN log |
+
+---
+
+# Round two — live account testing, 2026-08-25
+
+Everything above is round one. This section is a second pass done against the **live**
+merchant account in Chrome, with real (₪1) charges. Where the two disagree, this section
+wins — it was observed, not described.
+
+Each item is labelled as it was reported: **[VERIFIED]** observed directly ·
+**[STATED]** told to us by uPay, untested · **[NOT COVERED]** never established.
+
+## The account
+
+| | |
+|---|---|
+| Merchant email | Held in `UPAY_MERCHANT_EMAIL` (Railway variables). **Not in this repo** — it is the identifier that decides whose account receives money. |
+| Status | **[VERIFIED]** live, with real revenue history. Every test charge was real money. |
+| Installment cap | **[VERIFIED]** the dashboard dropdown stops at **12**. `MAX_INSTALLMENTS` in `form.py` clamps to it; behaviour above 12 was never tested and now never needs to be. |
+| Fee | **[VERIFIED]** ~1%, taken at settlement (₪1.00 gross → ₪0.99 transferred). It is **not** in the IPN — `depositnetamount` came back equal to `depositamount`. |
+| Domain registration | **[VERIFIED]** no domain/website field exists on the account. Changing our domain needs nothing on uPay's side. |
+| `refername` | **[VERIFIED]** free text — `UPAY` was accepted. `STUDIOMANAGER` has never actually been submitted; it was only ever an example in this document. |
+| API key | An API key exists in account settings. Unused — the form path works and needs no API. Noted only so nobody rediscovers it as a surprise. |
+
+## There is no sandbox — and §19.6 was redesigned because of it
+
+**[NOT COVERED], and that is the finding.** `livesystem=0` was never tested, and the
+account has no sandbox mode to test it against.
+
+This mattered more than it looks. SPEC §19.6 restriction 5 used to read *"the demo
+studio's uPay configuration is pinned to `livesystem=0`"* — a guarantee **delegated to
+uPay**. `tests/restrictions/test_05_no_live_money.py` could assert that we *send* `"0"`;
+no test could assert that uPay *honours* it. If the flag is a no-op, a demo walkthrough
+charges a real card on the live account, and every test stays green while it happens.
+
+A safety property CI cannot verify is not a safety property. So it moved into our code:
+`upay_form_fields` now **raises `DemoStudioHasNoLiveForm`** for a demo studio. Not a
+weaker form — no form. `livesystem` is the constant `LIVE`, because every form this
+module builds is real. The demo studio's payment step renders §19.5's IPN simulator,
+which never leaves our origin. `DEMO_UPAY_SETTINGS = {"livesystem": 0}` on the studio row
+stays as defence in depth and is no longer what the restriction rests on.
+
+## The IPN contract
+
+**Transport [VERIFIED]:** `GET`, no request body. Arrives asynchronously a few minutes
+after payment — "delayed" is verified, the "~5 minutes" figure is approximate. Build the
+UI for a delay, never for instant confirmation.
+
+**`paymentdetails` → `productdescription` [VERIFIED], three times out of three.** The
+field carrying our order reference *is* renamed between the outbound form and the inbound
+callback. This is correct in `form.py` and `ipn.py` and is not a transcription error.
+
+**The amount format [VERIFIED], and it is the trap.** A ₪1 payment returned `amount=1` —
+**not** `1.00`. The outbound form field is `1.00` (`form.shekels()`). Reusing that
+formatter for the inbound payload is what the simulator used to do, which made the
+simulator agree with a string-comparing parser while uPay disagreed with both. §5.10
+escalates an `amount_mismatch` to a manager as suspected tampering, so the failure mode
+was **a fraud alert on every correct whole-shekel payment** — and every charge in this
+product is whole shekels.
+
+Hence two functions in `ipn.py`, and neither is `shekels()`:
+
+- `ipn_amount(agorot)` — renders uPay's inbound format (`100 → "1"`).
+- `agorot_from_ipn_amount(text)` — parses `"1"`, `"1.0"`, `"1.00"` to the same integer.
+  **M6 compares integers.** An unrecognised format raises rather than coercing, because
+  a silent coercion becomes a fraud alert on a good payment.
+
+Fractional amounts have never been observed and the rendering above is a best guess. If
+fractional pricing ever lands, re-test rather than trust.
+
+**Tampering [VERIFIED].** An edited `amount=2` against a form hardcoded to `1` came back
+as `amount=2` **and** `depositamount=2`, unmodified. Both fields carry the tamper, so a
+parser reading either must validate independently. Confirms round one: no signature
+exists on any request, inbound or outbound.
+
+**Source IP [VERIFIED] on two of three deliveries** — `84.95.87.35` (Petah Tikva).
+Whether it can change is **[NOT COVERED]**. Treat it as a weak signal, never a gate.
+
+**`application=BIT` is a channel label, not a payment method [VERIFIED].** The dashboard
+showed "bit" for Visa-paid transactions. Never parse it as the instrument used.
+
+**Receipts [VERIFIED] with a caveat.** A real document is generated and reachable in the
+dashboard, but its header reads **קבלה** (receipt) only, not **חשבונית מס** (tax invoice),
+despite the account config saying `INVOICEANDRECEIPT`. Whether the per-transaction flags
+control this is unresolved. **Do not generate or infer these documents** — store
+`transactionid` and link to uPay's own receipt view.
+
+### The full field set — 31 fields
+
+Captured verbatim from a real payment. The list in round one had **eight**;
+`ipn.py` now builds all 31, and `tests/dev/test_ipn_simulator.py` asserts the set.
+
+```
+providererrorcode  errordescription  providererrordescription  providerconfirmationnumber
+amount  depositamount  depositnetamount  commissionreduction
+firstpayment  constantpayment  numberpayments
+productdescription  transactionid  depositcashierid
+fourdigits  cardownername  cardname  cardtype  companytype  clearer  foreign  expirydate
+application  merchantnumber  email
+paymentdate  actiondate
+comment  identitynumber  cellphonenotify  emailnotify
+```
+
+Note `email` is the **merchant's** address echoed back, not the payer's, and
+`merchantnumber` identifies the account. Either may serve as a weak extra layer, with the
+same standing as the source IP: a signal, never proof.
+
+## Still open — and deliberately not blocking
+
+Retries on a non-200 (**[NOT COVERED]**), IPNs for failed or declined payments
+(**[NOT COVERED]**), and duplicate delivery (**[NOT COVERED]**) were never established.
+None of them blocks M6, because the design does not depend on knowing the answers:
+
+1. **Log every raw callback before parsing** — full query string, headers, timestamp.
+   The single highest-value piece of infrastructure here: it turns each unknown above
+   into something observed in production with full data, rather than pre-guessed.
+2. **Idempotence keyed on `transactionid`** — neutralises retries and duplicates
+   whatever uPay actually does.
+3. **Return 200 immediately**, after logging and before the heavy work.
+4. **`payment_order.status` moves one way**, `pending → paid`, never back.
+5. **Always validate the amount server-side** against the order's own row.
+6. **Treat "no IPN ever arrived" as a failure signal in its own right** — an order still
+   `pending` after N hours goes to the reconciliation queue. Do not wait for a
+   failure-shaped payload that may not exist.
+
+## Recurring — unchanged
+
+**[VERIFIED] + [STATED]**, no correction to round one. A recurring IPN is structurally
+identical to a one-time one (`constantpayment=0`, `numberpayments=1` regardless of a
+12-month plan) and carries no customer identifier. uPay support reconfirmed there is no
+way to add one. Recurring stays manual, on the same "mark as paid" flow as bank
+transfers.
+
+One new observation: the recurring payment page shows the customer **no
+monthly-commitment disclosure** anywhere. If that flow is ever used for real, the
+disclosure has to come from our side.
