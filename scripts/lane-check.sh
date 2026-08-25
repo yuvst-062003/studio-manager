@@ -78,6 +78,19 @@ case "$V" in
                    app/models/structure.py app/models/health.py)
     test_candidates=(tests/structure)
     ;;
+  people)
+    # SPEC §7 spreads M3 over four routers named for their endpoints -- /students,
+    # /enrollments, /public, /trial-bookings -- so none of them is `app/routers/people.py`
+    # and the default branch below would type-check the service package while silently
+    # skipping every route in the lane. Listed explicitly for the same reason `identity`
+    # lists platform.py: a router in neither list is a router the stated gate does not
+    # reach. app/workers/followups.py is here because §5.4a's day 1/3/7 ladder is a job,
+    # and a job outside every lane's check is a job nothing type-checks.
+    py_candidates=(app/services/people app/routers/students.py app/routers/enrollments.py \
+                   app/routers/public.py app/routers/trial_bookings.py \
+                   app/workers/followups.py app/models/people.py)
+    test_candidates=(tests/people)
+    ;;
   *)
     py_candidates=("app/services/$V" "app/routers/$V.py" "app/models/$V.py")
     test_candidates=("tests/$V")
