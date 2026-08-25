@@ -122,6 +122,7 @@ holdbacks:
     opened: 2026-08-24
     closed: null
     source: SPEC §15 item 2
+    lead_time: true
   - id: HB-parents
     kind: external
     title: Three to five real parents for the install walkthrough
@@ -133,6 +134,7 @@ holdbacks:
     opened: 2026-08-24
     closed: null
     source: SPEC §15 item 6
+    lead_time: true
   - id: HB-logo
     kind: external
     title: Studio branding — logo and colours
@@ -178,6 +180,7 @@ holdbacks:
     opened: 2026-08-24
     closed: null
     source: SPEC §15 item 9
+    lead_time: true
   - id: HB-staging-superuser
     kind: carried
     title: The staging api still connects as the superuser

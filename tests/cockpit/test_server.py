@@ -51,8 +51,15 @@ def test_the_active_wave_is_surfaced_for_the_page_to_lead_with():
     assert payload["active"]["wave"]["id"] == "W0"
 
 
-def test_holdbacks_arrive_grouped_in_kind_order():
-    assert list(server.build_state_payload()["holdbacks"]) == ["external", "conflict", "carried"]
+def test_holdbacks_arrive_tiered_by_distance():
+    """Not grouped by kind: what you need first is what blocks the wave you are in."""
+    assert list(server.build_state_payload()["holdbacks"]) == ["now", "next", "later"]
+
+
+def test_nothing_blocking_a_far_wave_reaches_the_now_tier_unless_it_needs_lead_time():
+    tiers = server.build_state_payload()["holdbacks"]
+    for holdback in tiers["now"]:
+        assert holdback["wave"] in (0, None) or holdback["lead_time"], holdback["id"]
 
 
 def test_commands_are_offered_by_id_and_never_as_argv():

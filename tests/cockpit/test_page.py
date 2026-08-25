@@ -66,3 +66,15 @@ def test_the_token_never_travels_in_a_url():
     assert "new EventSource(" not in text
     assert "?t=" not in text
     assert "X-Cockpit-Token" in text
+
+
+def test_the_page_renders_holdbacks_by_tier_not_by_kind():
+    """An M11 item competing with an M0 one is the thing this replaced."""
+    text = PAGE.read_text(encoding="utf-8")
+    assert "s.holdbacks.now" in text or "{ now, next, later }" in text
+    assert "further out" in text, "the later tier needs a way back in"
+
+
+def test_a_lead_time_holdback_says_why_it_is_shown_early():
+    """Without the label, uPay in the current tier looks like a mistake."""
+    assert "lead time" in PAGE.read_text(encoding="utf-8")

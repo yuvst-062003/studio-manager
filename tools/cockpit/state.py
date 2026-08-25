@@ -75,6 +75,10 @@ class Holdback:
     opened: date | None = None
     closed: date | None = None
     source: str | None = None
+    # "surface me regardless of how far out I block". For the holdbacks whose whole
+    # value is lead time -- a merchant account, a native speaker, five parents -- being
+    # correctly filed under a distant wave is the same as being invisible.
+    lead_time: bool = False
 
 
 @dataclass(frozen=True)
@@ -151,6 +155,7 @@ def _parse_holdback(raw: dict[str, Any]) -> Holdback:
         opened=_date(raw.get("opened")),
         closed=_date(raw.get("closed")),
         source=None if raw.get("source") is None else str(raw["source"]),
+        lead_time=bool(raw.get("lead_time", False)),
     )
 
 
@@ -211,6 +216,8 @@ def _holdback_to_dict(holdback: Holdback) -> dict[str, Any]:
     }
     if holdback.source is not None:
         out["source"] = holdback.source
+    if holdback.lead_time:
+        out["lead_time"] = True
     return out
 
 

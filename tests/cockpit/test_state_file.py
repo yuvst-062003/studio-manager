@@ -74,3 +74,18 @@ def test_nothing_measurable_is_declared():
     text = DEFAULT_PATH.read_text(encoding="utf-8")
     for forbidden in ("tests_passing", "ci_status", "gates:", "env_health", "branch:"):
         assert forbidden not in text, f"{forbidden} is measurable and must not be declared"
+
+
+def test_only_the_holdbacks_that_wait_on_other_people_carry_lead_time():
+    """lead_time promotes a distant holdback into the current view. It is for the ones
+    that take somebody else's weeks -- a merchant account, a native speaker, five
+    parents -- not for anything merely important."""
+    flagged = {h.id for h in load().holdbacks if h.lead_time}
+    assert flagged == {"HB-upay", "HB-parents", "HB-ru-review"}
+
+
+def test_the_current_tier_is_small_enough_to_read():
+    """The whole point of tiering. If `now` grows past a handful, lead_time is being
+    used as a synonym for important and the board is a list again."""
+    now = derive.tier_holdbacks(load())["now"]
+    assert len(now) <= 6, [h.id for h in now]

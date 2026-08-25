@@ -68,16 +68,19 @@ def build_state_payload() -> dict[str, Any]:
             else None,
             "piece": {"id": piece.id, "title": piece.title} if piece else None,
         },
+        # Tiered by distance, not grouped by kind: sixteen items with an M11 entry
+        # beside an M0 one is a list, not a status board.
         "holdbacks": {
-            kind: [
+            tier: [
                 {
                     **asdict(h),
                     "opened": h.opened.isoformat() if h.opened else None,
                     "closed": h.closed.isoformat() if h.closed else None,
+                    "wave": derive.wave_index_for(current, h.blocks),
                 }
                 for h in items
             ]
-            for kind, items in derive.group_holdbacks(current).items()
+            for tier, items in derive.tier_holdbacks(current).items()
         },
         "git": asdict(git),
         "runs": {cid: asdict(record) for cid, record in signals.latest_runs().items()},

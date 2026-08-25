@@ -100,3 +100,103 @@ def test_state_is_stale_when_commits_have_landed_since_it_was_updated():
     state = State(version=1, updated=date(2026, 8, 25), waves=(), holdbacks=())
     assert derive.staleness(state, commits_since_update=0) == derive.Staleness(0, False)
     assert derive.staleness(state, commits_since_update=3) == derive.Staleness(3, True)
+
+
+def _hb(hid: str, blocks: str, *, lead_time: bool = False, status: str = "open") -> Holdback:
+    return Holdback(
+        id=hid,
+        kind="external",
+        title=hid,
+        why="because",
+        blocks=blocks,
+        status=status,
+        lead_time=lead_time,
+    )
+
+
+def _plan(*holdbacks: Holdback) -> State:
+    def w(wid: str, milestone: str, status: str) -> Wave:
+        return Wave(
+            id=wid,
+            milestone=milestone,
+            title=wid,
+            mode="sequential",
+            exit_gate="gate",
+            status=status,
+        )
+
+    return State(
+        version=1,
+        updated=date(2026, 8, 25),
+        waves=(
+            w("W0", "M0", "active"),
+            w("W1", "M1", "pending"),
+            w("W2", "M2 ∥ M3", "pending"),
+            w("W3", "M4 ∥ M5", "pending"),
+            w("W4", "M6 ∥ M7", "pending"),
+            w("W7", "M11", "pending"),
+        ),
+        holdbacks=holdbacks,
+    )
+
+
+def test_a_wave_id_in_blocks_resolves_to_that_wave():
+    assert derive.wave_index_for(_plan(), "W4") == 4
+
+
+def test_a_milestone_in_blocks_resolves_to_the_wave_that_carries_it():
+    plan = _plan()
+    assert derive.wave_index_for(plan, "M0 exit") == 0
+    assert derive.wave_index_for(plan, "M1") == 1
+    assert derive.wave_index_for(plan, "M3") == 2, "a parallel wave carries two milestones"
+    assert derive.wave_index_for(plan, "M11") == 5
+
+
+def test_m1_does_not_match_the_wave_carrying_m11():
+    """Substring matching would put an M1 obligation in the launch wave."""
+    assert derive.wave_index_for(_plan(), "M1") == 1
+
+
+def test_something_that_names_no_known_wave_is_unplaceable():
+    assert derive.wave_index_for(_plan(), "someday") is None
+
+
+def test_the_current_waves_holdbacks_are_now_and_the_far_ones_are_later():
+    """The complaint this fixes: an M11 item competing for attention while you are
+    still in M0."""
+    tiers = derive.tier_holdbacks(
+        _plan(_hb("here", "M0 exit"), _hb("soon", "M1"), _hb("far", "M11"))
+    )
+    assert [h.id for h in tiers["now"]] == ["here"]
+    assert [h.id for h in tiers["next"]] == ["soon"]
+    assert [h.id for h in tiers["later"]] == ["far"]
+
+
+def test_a_lead_time_holdback_is_promoted_however_far_out_it_blocks():
+    """uPay blocks W4, and that is exactly why it has to be visible in W0: a merchant
+    account discovered on the first day of W4 is a stalled wave."""
+    tiers = derive.tier_holdbacks(_plan(_hb("upay", "W4", lead_time=True)))
+    assert [h.id for h in tiers["now"]] == ["upay"]
+    assert not tiers["later"]
+
+
+def test_a_lead_time_flag_does_nothing_for_something_already_current():
+    tiers = derive.tier_holdbacks(_plan(_hb("here", "M0 exit", lead_time=True)))
+    assert [h.id for h in tiers["now"]] == ["here"]
+
+
+def test_closed_holdbacks_appear_in_no_tier():
+    tiers = derive.tier_holdbacks(_plan(_hb("done", "M0 exit", status="closed")))
+    assert not any(tiers.values())
+
+
+def test_an_unplaceable_holdback_lands_in_later_rather_than_vanishing():
+    tiers = derive.tier_holdbacks(_plan(_hb("vague", "someday")))
+    assert [h.id for h in tiers["later"]] == ["vague"]
+
+
+def test_a_holdback_for_a_wave_already_passed_still_counts_as_now():
+    """W0 is active with every piece shipped. Something blocking W0 has not stopped
+    mattering because the code is done -- that is what keeps the wave open."""
+    plan = _plan(_hb("old", "W0"))
+    assert [h.id for h in derive.tier_holdbacks(plan)["now"]] == ["old"]
