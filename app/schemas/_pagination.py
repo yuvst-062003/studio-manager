@@ -25,7 +25,7 @@ same idea.
 from __future__ import annotations
 
 import uuid
-from typing import Annotated, Generic, TypeVar
+from typing import Annotated
 
 from fastapi import Header
 from pydantic import BaseModel, Field
@@ -36,10 +36,8 @@ from pydantic import BaseModel, Field
 DEFAULT_PAGE_SIZE = 50
 MAX_PAGE_SIZE = 200
 
-T = TypeVar("T")
 
-
-class CursorPage(BaseModel, Generic[T]):
+class CursorPage[T](BaseModel):
     """One page of a cursor-paginated list.
 
     `next_cursor` is the id to resume *after*, not an index. `has_more` is carried
