@@ -41,6 +41,41 @@ class Settings(BaseSettings):
     # and §19.6 means the demo studio never builds one.
     UPAY_MERCHANT_EMAIL: str | None = None
 
+    # §5.2 -- "a short-lived access JWT (15 min) plus a rotating refresh token (30 days,
+    # one-time-use, reuse detection revokes the family)". §10.3 reasons about both
+    # numbers directly -- a coach on a mat for 90 minutes against a 15-minute token is
+    # the whole reason that section exists -- so they are settings with asserted
+    # defaults rather than literals inside the token service.
+    #
+    # HS256: one service mints these and the same service verifies them, so an
+    # asymmetric pair would have no second reader. If a second service ever needs to
+    # verify one, that is the moment to move to RS256, not before.
+    JWT_SIGNING_KEY: SecretStr | None = None
+    ACCESS_TOKEN_TTL_MINUTES: int = 15
+    REFRESH_TOKEN_TTL_DAYS: int = 30
+
+    # §5.2 -- Google and Apple only. No password, no phone OTP, no email magic links.
+    # None rather than a placeholder: a default client id is one that reaches staging by
+    # accident and fails there in a way that names neither half.
+    GOOGLE_OAUTH_CLIENT_ID: str | None = None
+    GOOGLE_OAUTH_CLIENT_SECRET: SecretStr | None = None
+
+    # Sign in with Apple for the WEB needs a Services ID, a .p8 key and an ES256
+    # client-secret JWT -- all behind a paid Apple Developer Program membership, which
+    # §6.5 dropped along with the store builds. The provider is implemented because §5.2
+    # says retrofitting Apple later would be an identity migration; it stays unset until
+    # HB-apple-developer closes, and `configured_providers()` omits it so no user meets
+    # a button that fails after they have committed to it.
+    APPLE_OAUTH_CLIENT_ID: str | None = None
+    APPLE_OAUTH_TEAM_ID: str | None = None
+    APPLE_OAUTH_KEY_ID: str | None = None
+    APPLE_OAUTH_PRIVATE_KEY: SecretStr | None = None
+
+    # Where the provider sends the browser back. One value per environment, and the
+    # OAuth console's own redirect-URI allowlist must match it exactly -- which is the
+    # other half of what HB-domain gates (infra/railway/README.md § The domain).
+    OAUTH_REDIRECT_BASE_URL: str = "http://localhost:8000"
+
     LOG_LEVEL: str = "INFO"
 
 

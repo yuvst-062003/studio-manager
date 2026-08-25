@@ -10,4 +10,5 @@ sqlalchemy
 alembic
 psycopg[binary]
 cryptography
+pyjwt[crypto]
 types-PyYAML
