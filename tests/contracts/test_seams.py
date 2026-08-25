@@ -20,6 +20,7 @@ import uuid
 from datetime import date
 
 import pytest
+from app.models.billing import Charge
 from app.models.schedule import Session
 from app.services.schedule import ScheduleService
 
@@ -85,3 +86,78 @@ def test_recompute_derived_flags_refuses_rather_than_returning_nothing():
 
     with pytest.raises(NotImplementedError):
         HealthService().recompute_derived_flags(uuid.uuid4())
+
+
+# -- W4: BillingService.create_charge / recompute_charge_status ----------------
+def test_create_charge_takes_the_five_facts_a_charge_cannot_exist_without():
+    """Plan W4 seam, verbatim. `studio_id` is explicit rather than read from the request
+    context because the billing run is a **worker** (§5.10) -- there is no request, so
+    `TenantSession` has nothing to infer from and the tenant has to be passed."""
+    from app.services.billing import BillingService
+
+    parameters = _signature(BillingService.create_charge).parameters
+    assert list(parameters) == [
+        "self",
+        "studio_id",
+        "payer_person_id",
+        "kind",
+        "amount_agorot",
+        "due_date",
+        "student_id",
+        "event_id",
+    ]
+
+
+def test_student_and_event_are_keyword_only():
+    """The reason this is asserted rather than left to style. Both are `UUID | None` in
+    adjacent positions, so positionally `create_charge(..., event_id)` binds an event to
+    `student_id` and type checking cannot see it -- the annotations are identical. M7's
+    event fees are a pure caller of this method (plan W4), which makes M7 exactly the lane
+    that would hit it. Keyword-only makes the mistake unspellable."""
+    from app.services.billing import BillingService
+
+    parameters = _signature(BillingService.create_charge).parameters
+    for name in ("student_id", "event_id"):
+        assert parameters[name].kind is inspect.Parameter.KEYWORD_ONLY, name
+        assert parameters[name].default is None, name
+
+
+def test_create_charge_is_typed_end_to_end():
+    """`amount_agorot: int` is G2 stated in the signature: the seam cannot accept a float
+    without the annotation being changed by someone who has to notice they are doing it."""
+    from app.schemas.billing import ChargeKind
+    from app.services.billing import BillingService
+
+    signature = _signature(BillingService.create_charge)
+    assert signature.parameters["studio_id"].annotation is uuid.UUID
+    assert signature.parameters["payer_person_id"].annotation is uuid.UUID
+    assert signature.parameters["kind"].annotation == ChargeKind
+    assert signature.parameters["amount_agorot"].annotation is int
+    assert signature.parameters["due_date"].annotation is date
+    assert signature.parameters["student_id"].annotation == uuid.UUID | None
+    assert signature.parameters["event_id"].annotation == uuid.UUID | None
+    assert signature.return_annotation is Charge
+
+
+def test_recompute_charge_status_takes_a_charge_and_returns_nothing():
+    """`-> None`, deliberately. §4.3: `charge.status` is "a derived cache maintained in
+    one place". Returning the Charge would invite a caller to read the status off the
+    return value and cache it, which is how a derived field acquires a second reader that
+    later becomes a second writer."""
+    from app.services.billing import BillingService
+
+    signature = _signature(BillingService.recompute_charge_status)
+    assert list(signature.parameters) == ["self", "charge_id"]
+    assert signature.parameters["charge_id"].annotation is uuid.UUID
+    assert signature.return_annotation is None
+
+
+def test_the_billing_seams_refuse_rather_than_returning_nothing():
+    from app.services.billing import BillingService
+
+    with pytest.raises(NotImplementedError):
+        BillingService().create_charge(
+            uuid.uuid4(), uuid.uuid4(), "tuition", 32000, date(2026, 9, 1)
+        )
+    with pytest.raises(NotImplementedError):
+        BillingService().recompute_charge_status(uuid.uuid4())

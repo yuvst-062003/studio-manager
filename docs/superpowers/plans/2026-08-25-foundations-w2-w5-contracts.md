@@ -326,12 +326,12 @@ BillingService.recompute_charge_status(charge_id: UUID) -> None
 `recompute_charge_status` is **the one place `charge.status` is maintained** (§4.3). M7's event
 fees are a pure caller of `create_charge`.
 
-- [ ] **Step 1: Write the failing test** asserting both signatures exactly, including
+- [x] **Step 1: Write the failing test** asserting both signatures exactly, including
       keyword-only-ness of `student_id`/`event_id`.
-- [ ] **Step 2: Run it** → FAIL.
-- [ ] **Step 3: Implement**, empty bodies.
-- [ ] **Step 4: Run it** → PASS. `.venv/bin/mypy app`.
-- [ ] **Step 5: Commit.** `feat(contract): W4 schemas and the BillingService seams`
+- [x] **Step 2: Run it** → FAIL.
+- [x] **Step 3: Implement**, empty bodies.
+- [x] **Step 4: Run it** → PASS. `.venv/bin/mypy app`.
+- [x] **Step 5: Commit.** `feat(contract): W4 schemas and the BillingService seams`
 
 ## Task 13 — W4 i18n: billing + events (belts inside events)
 
