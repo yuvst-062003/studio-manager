@@ -23,6 +23,26 @@ CROSS_TENANT_TABLES = {
         "reads the table globally (11.2)"
     ),
     "alembic_version": "Alembic's own bookkeeping, not application data",
+    "auth_identity": (
+        "SPEC 3.3 -- 'GLOBAL, no studio_id', so one Google account can be a parent at "
+        "one studio and a coach at another. A studio_id here would make that false"
+    ),
+    "platform_admin": (
+        "SPEC 18.1 puts the platform operator above every studio, and 5.1's chain of "
+        "authority starts here -- so it cannot itself live inside a tenant"
+    ),
+    "refresh_token": (
+        "a session belongs to the global auth_identity and survives 5.2's "
+        "switch-studio, so it outlives any one studio it happens to be scoped to"
+    ),
+    "auth_revocation": (
+        "5.2's denylist is per-identity: one row kills every device a removed coach "
+        "holds, across every studio, which a tenant-scoped row could not do"
+    ),
+    "oauth_transaction": (
+        "the PKCE verifier is written before any studio is resolved -- there is no "
+        "tenant in context between the redirect out and the callback back"
+    ),
 }
 
 
