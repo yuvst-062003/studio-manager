@@ -42,6 +42,8 @@ from app.schemas.people import (
     GuardianCreate,
     GuardianListResponse,
     GuardianOut,
+    RegistrationRequestOut,
+    SiblingRequestIn,
     StudentConvertIn,
     StudentCreate,
     StudentCreateResult,
@@ -57,9 +59,24 @@ from app.schemas.people import (
     StudentUpdate,
 )
 from app.services.people.errors import ConflictError, NotFoundError, RefusedError
+from app.services.people.group_days import ScheduleReader
+from app.services.people.registrations import RegistrationService
 from app.services.people.students import StudentRow, StudentService
+from app.services.schedule import ScheduleService
 
 router = APIRouter(tags=["people"])
+
+
+def schedule_reader() -> ScheduleReader:
+    """L5's seam, behind one indirection -- the same shape `app/routers/public.py` uses.
+
+    A module-level factory rather than a `ScheduleService()` call inside each route, so a
+    test substitutes a reader by patching one name instead of reaching into the shared
+    service class. A function-local import cannot be patched at all, which is how the first
+    version of this silently kept calling the real seam.
+    """
+    return ScheduleService()
+
 
 #: SPEC §7 lists `/me/students` beside `/students`, and both live here. The tag that
 #: matters is per-route; see the module docstring.
@@ -393,8 +410,6 @@ def convert_student(
 ) -> StudentOut:
     """§5.4a step 5. L6 -- manager-or-owner, because enrolment is always a manager decision
     and this is the moment it is made."""
-    from app.services.schedule import ScheduleService
-
     try:
         StudentService.convert(
             session,
@@ -406,7 +421,7 @@ def convert_student(
             reason=body.reason,
             at=now(),
             actor_person_id=getattr(request.state, "person_id", None),
-            schedule=ScheduleService(),
+            schedule=schedule_reader(),
         )
     except NotFoundError as exc:
         raise _not_found() from exc
@@ -461,7 +476,6 @@ def student_price_plan(
     sessions, never an amount. `price_plan` is W4's table and this lane never resolves it.
     """
     from app.services.people.enrollments import EnrollmentService
-    from app.services.schedule import ScheduleService
 
     try:
         student, _person = StudentService.get(session, student_id=student_id)
@@ -469,7 +483,7 @@ def student_price_plan(
         raise _not_found() from exc
     try:
         volume = EnrollmentService.weekly_volume_for_student(
-            session, student_id=student_id, since=now().date(), schedule=ScheduleService()
+            session, student_id=student_id, since=now().date(), schedule=schedule_reader()
         )
     except NotImplementedError:
         # L5's seam. Until lane SCHEDULE merges there is no calendar to observe, so the
@@ -620,3 +634,47 @@ def my_students(request: Request, session: TenantSessionDep) -> StudentSummaryPa
     """
     rows = StudentService.for_guardian(session, person_id=_person_id(request))
     return StudentSummaryPage(items=[_summary(row) for row in rows], has_more=False)
+
+
+@router.post(
+    "/me/students",
+    response_model=RegistrationRequestOut,
+    status_code=status.HTTP_201_CREATED,
+)
+def request_a_sibling(
+    body: SiblingRequestIn,
+    request: Request,
+    session: TenantSessionDep,
+    idempotency_key: IdempotencyKey = None,
+) -> RegistrationRequestOut:
+    """§5.4(c) -- parent `12g`, `+ הוסף ילד`.
+
+    **A request, not an enrollment** (L6). §5.4: "This creates a registration_request with
+    source = 'parent_app' and matched_person_id set -- a request, not an enrollment. The
+    manager approves it, consistent with (b): conversion is always a human decision."
+
+    No role dependency, for the same reason `/me/students` has none: §3.1 -- 'guardian is
+    not a role'. Being a guardian is what `person_id` on a `guardian` row means, and this
+    route needs nothing more than an identity with a Person in this studio.
+    """
+    row = RegistrationService.submit_from_parent(
+        session,
+        submitter_person_id=_person_id(request),
+        first_name=body.first_name,
+        last_name=body.last_name,
+        birthdate=body.birthdate,
+        preferred_group_id=body.preferred_group_id,
+        at=now(),
+    )
+    summary = RegistrationService.summarize(session, row)
+    session.commit()
+    return RegistrationRequestOut(
+        id=summary.id,
+        source=summary.source,
+        status=summary.status,
+        submitted_at=summary.submitted_at,
+        reviewed_at=summary.reviewed_at,
+        matched_person_id=summary.matched_person_id,
+        child_display_name=summary.child_display_name,
+        guardian_display_name=summary.guardian_display_name,
+    )

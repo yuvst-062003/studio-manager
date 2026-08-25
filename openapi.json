@@ -85,6 +85,39 @@
         "title": "CallbackRequest",
         "type": "object"
       },
+      "ChildMatchOut": {
+        "description": "§5.4a's duplicate-child warning. A candidate the manager judges, never a merge.",
+        "properties": {
+          "birthdate": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Birthdate"
+          },
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "student_id",
+          "display_name",
+          "birthdate"
+        ],
+        "title": "ChildMatchOut",
+        "type": "object"
+      },
       "ClassCreate": {
         "properties": {
           "color": {
@@ -1360,6 +1393,264 @@
         "title": "PublicLandingOut",
         "type": "object"
       },
+      "RegistrationDecisionIn": {
+        "description": "`POST /registration-requests/{id}/{approve|reject}`.\n\n§5.4: **enrollment is always a manager decision.** Approving is where the group is\nchosen, which is why `group_id` lives on the decision and not on the submission — the\npublic link's only job is a first lesson.",
+        "properties": {
+          "group_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Group Id"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "title": "RegistrationDecisionIn",
+        "type": "object"
+      },
+      "RegistrationDecisionOut": {
+        "description": "The result of approving or rejecting one submission.\n\nOne shape for both verbs: a rejection creates no students and returns an empty list,\nwhich is a truer answer than a second shape that cannot express the difference.",
+        "properties": {
+          "request_id": {
+            "format": "uuid",
+            "title": "Request Id",
+            "type": "string"
+          },
+          "status": {
+            "pattern": "^(pending|approved|rejected)$",
+            "title": "Status",
+            "type": "string"
+          },
+          "student_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Student Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "request_id",
+          "status"
+        ],
+        "title": "RegistrationDecisionOut",
+        "type": "object"
+      },
+      "RegistrationRequestDetailOut": {
+        "description": "One submission, opened. Reading this is audit-logged as sensitive (§11.2) — the\nsummary in the queue is free, the full read is recorded.",
+        "properties": {
+          "child_display_name": {
+            "title": "Child Display Name",
+            "type": "string"
+          },
+          "children": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Children",
+            "type": "array"
+          },
+          "guardian_display_name": {
+            "title": "Guardian Display Name",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "matched_person_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Matched Person Id"
+          },
+          "possible_duplicate_students": {
+            "items": {
+              "$ref": "#/components/schemas/ChildMatchOut"
+            },
+            "title": "Possible Duplicate Students",
+            "type": "array"
+          },
+          "preferred_group_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preferred Group Id"
+          },
+          "reviewed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed At"
+          },
+          "source": {
+            "pattern": "^(public_link|parent_app|manager)$",
+            "title": "Source",
+            "type": "string"
+          },
+          "status": {
+            "pattern": "^(pending|approved|rejected)$",
+            "title": "Status",
+            "type": "string"
+          },
+          "submitted_at": {
+            "format": "date-time",
+            "title": "Submitted At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "source",
+          "status",
+          "submitted_at",
+          "reviewed_at",
+          "matched_person_id",
+          "child_display_name",
+          "guardian_display_name"
+        ],
+        "title": "RegistrationRequestDetailOut",
+        "type": "object"
+      },
+      "RegistrationRequestOut": {
+        "description": "The approval queue's row (dashboard `6c`).\n\n**`payload` is not here.** The encrypted payload is a stranger's personal data about a\nminor (§11.1); the queue renders a summary, and reading the full submission is a\nseparate, audit-logged fetch. A list endpoint that decrypted every row would defeat\nthe encryption for the cost of one page load.",
+        "properties": {
+          "child_display_name": {
+            "title": "Child Display Name",
+            "type": "string"
+          },
+          "guardian_display_name": {
+            "title": "Guardian Display Name",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "matched_person_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Matched Person Id"
+          },
+          "reviewed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed At"
+          },
+          "source": {
+            "pattern": "^(public_link|parent_app|manager)$",
+            "title": "Source",
+            "type": "string"
+          },
+          "status": {
+            "pattern": "^(pending|approved|rejected)$",
+            "title": "Status",
+            "type": "string"
+          },
+          "submitted_at": {
+            "format": "date-time",
+            "title": "Submitted At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "source",
+          "status",
+          "submitted_at",
+          "reviewed_at",
+          "matched_person_id",
+          "child_display_name",
+          "guardian_display_name"
+        ],
+        "title": "RegistrationRequestOut",
+        "type": "object"
+      },
+      "RegistrationRequestPageOut": {
+        "properties": {
+          "has_more": {
+            "default": false,
+            "title": "Has More",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RegistrationRequestOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "RegistrationRequestPageOut",
+        "type": "object"
+      },
       "SessionResponse": {
         "description": "The access token lives in the body, never in a cookie (§10.3).\n\nThe client holds it in memory and replays it, which is what keeps it out of\nautomatic-credential territory -- a cookie-borne access token is sent by the browser\non every request, which is what makes CSRF possible at all. The refresh token is in\nthe Set-Cookie header and never here.",
         "properties": {
@@ -1493,6 +1784,53 @@
           "status"
         ],
         "title": "SetupStepOut",
+        "type": "object"
+      },
+      "SiblingRequestIn": {
+        "description": "§5.4(c) — parent `12g`. `POST /me/students`.\n\nThe group is a **preference**, not a choice: L6 makes enrolment a manager decision, and\nthe copy on `12g` promises review rather than a place.",
+        "properties": {
+          "birthdate": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Birthdate"
+          },
+          "first_name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "First Name",
+            "type": "string"
+          },
+          "last_name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Last Name",
+            "type": "string"
+          },
+          "preferred_group_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preferred Group Id"
+          }
+        },
+        "required": [
+          "first_name",
+          "last_name"
+        ],
+        "title": "SiblingRequestIn",
         "type": "object"
       },
       "StaffGroupOut": {
@@ -4397,6 +4735,67 @@
         "tags": [
           "people"
         ]
+      },
+      "post": {
+        "description": "§5.4(c) -- parent `12g`, `+ הוסף ילד`.\n\n**A request, not an enrollment** (L6). §5.4: \"This creates a registration_request with\nsource = 'parent_app' and matched_person_id set -- a request, not an enrollment. The\nmanager approves it, consistent with (b): conversion is always a human decision.\"\n\nNo role dependency, for the same reason `/me/students` has none: §3.1 -- 'guardian is\nnot a role'. Being a guardian is what `person_id` on a `guardian` row means, and this\nroute needs nothing more than an identity with a Person in this studio.",
+        "operationId": "request_a_sibling_api_v1_me_students_post",
+        "parameters": [
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SiblingRequestIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationRequestOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Request A Sibling",
+        "tags": [
+          "people"
+        ]
       }
     },
     "/api/v1/platform/studios": {
@@ -4768,6 +5167,275 @@
         "summary": "Public Logo",
         "tags": [
           "public"
+        ]
+      }
+    },
+    "/api/v1/registration-requests": {
+      "get": {
+        "description": "Dashboard `6c`. §3.2 -- 'Approve registration requests' is owner and manager only.\n\nL10 -- `RegistrationRequestOut` carries two display names and no payload. A list\nendpoint that decrypted every row would defeat the encryption for one page load.",
+        "operationId": "list_registration_requests_api_v1_registration_requests_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": "pending",
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "After"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationRequestPageOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Registration Requests",
+        "tags": [
+          "people"
+        ]
+      }
+    },
+    "/api/v1/registration-requests/{request_id}": {
+      "get": {
+        "description": "Opening one submission. **Audit-logged as sensitive** (§11.2): this is a stranger's\npersonal data about a minor, so the summary is free and the full read is recorded.",
+        "operationId": "read_registration_request_api_v1_registration_requests__request_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Request Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationRequestDetailOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Registration Request",
+        "tags": [
+          "people"
+        ]
+      }
+    },
+    "/api/v1/registration-requests/{request_id}/approve": {
+      "post": {
+        "description": "§5.4a's approval transaction.\n\n**The group comes from the body, not the payload** (§5.4): \"Approving is where the group\nis chosen, which is why group_id lives on the decision and not on the submission.\"",
+        "operationId": "approve_registration_request_api_v1_registration_requests__request_id__approve_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Request Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegistrationDecisionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationDecisionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Approve Registration Request",
+        "tags": [
+          "people"
+        ]
+      }
+    },
+    "/api/v1/registration-requests/{request_id}/reject": {
+      "post": {
+        "operationId": "reject_registration_request_api_v1_registration_requests__request_id__reject_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Request Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegistrationDecisionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationDecisionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reject Registration Request",
+        "tags": [
+          "people"
         ]
       }
     },

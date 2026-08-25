@@ -527,3 +527,59 @@ class TrialBookingRow(BaseModel):
 
 class TrialBookingRowPage(CursorPage[TrialBookingRow]):
     pass
+
+
+class ChildMatchOut(BaseModel):
+    """§5.4a's duplicate-child warning. A candidate the manager judges, never a merge."""
+
+    student_id: uuid.UUID
+    display_name: str
+    birthdate: date | None
+
+
+class RegistrationRequestDetailOut(BaseModel):
+    """One submission, opened. Reading this is audit-logged as sensitive (§11.2) — the
+    summary in the queue is free, the full read is recorded."""
+
+    id: uuid.UUID
+    source: str = Field(pattern=REGISTRATION_SOURCE_PATTERN)
+    status: str = Field(pattern=REGISTRATION_STATUS_PATTERN)
+    submitted_at: datetime
+    reviewed_at: datetime | None
+    matched_person_id: uuid.UUID | None
+    child_display_name: str
+    guardian_display_name: str
+    children: list[dict[str, Any]] = Field(default_factory=list)
+    #: A preference the queue renders. §5.4 puts the group on the DECISION.
+    preferred_group_id: uuid.UUID | None = None
+    possible_duplicate_students: list[ChildMatchOut] = Field(default_factory=list)
+
+
+class SiblingRequestIn(BaseModel):
+    """§5.4(c) — parent `12g`. `POST /me/students`.
+
+    The group is a **preference**, not a choice: L6 makes enrolment a manager decision, and
+    the copy on `12g` promises review rather than a place.
+    """
+
+    first_name: str = Field(min_length=1, max_length=100)
+    last_name: str = Field(min_length=1, max_length=100)
+    birthdate: date | None = None
+    preferred_group_id: uuid.UUID | None = None
+
+
+class RegistrationRequestPageOut(CursorPage[RegistrationRequestOut]):
+    pass
+
+
+class RegistrationDecisionOut(BaseModel):
+    """The result of approving or rejecting one submission.
+
+    One shape for both verbs: a rejection creates no students and returns an empty list,
+    which is a truer answer than a second shape that cannot express the difference.
+    """
+
+    request_id: uuid.UUID
+    status: str = Field(pattern=REGISTRATION_STATUS_PATTERN)
+    #: §5.4a's worked example approves two children at once, so this is a list.
+    student_ids: list[uuid.UUID] = Field(default_factory=list)

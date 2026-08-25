@@ -428,7 +428,19 @@ export interface paths {
          */
         get: operations["my_students_api_v1_me_students_get"];
         put?: never;
-        post?: never;
+        /**
+         * Request A Sibling
+         * @description §5.4(c) -- parent `12g`, `+ הוסף ילד`.
+         *
+         *     **A request, not an enrollment** (L6). §5.4: "This creates a registration_request with
+         *     source = 'parent_app' and matched_person_id set -- a request, not an enrollment. The
+         *     manager approves it, consistent with (b): conversion is always a human decision."
+         *
+         *     No role dependency, for the same reason `/me/students` has none: §3.1 -- 'guardian is
+         *     not a role'. Being a guardian is what `person_id` on a `guardian` row means, and this
+         *     route needs nothing more than an identity with a Person in this studio.
+         */
+        post: operations["request_a_sibling_api_v1_me_students_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -599,6 +611,90 @@ export interface paths {
         get: operations["public_logo_api_v1_public_studios__slug__logo_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/registration-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Registration Requests
+         * @description Dashboard `6c`. §3.2 -- 'Approve registration requests' is owner and manager only.
+         *
+         *     L10 -- `RegistrationRequestOut` carries two display names and no payload. A list
+         *     endpoint that decrypted every row would defeat the encryption for one page load.
+         */
+        get: operations["list_registration_requests_api_v1_registration_requests_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/registration-requests/{request_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Registration Request
+         * @description Opening one submission. **Audit-logged as sensitive** (§11.2): this is a stranger's
+         *     personal data about a minor, so the summary is free and the full read is recorded.
+         */
+        get: operations["read_registration_request_api_v1_registration_requests__request_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/registration-requests/{request_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve Registration Request
+         * @description §5.4a's approval transaction.
+         *
+         *     **The group comes from the body, not the payload** (§5.4): "Approving is where the group
+         *     is chosen, which is why group_id lives on the decision and not on the submission."
+         */
+        post: operations["approve_registration_request_api_v1_registration_requests__request_id__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/registration-requests/{request_id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reject Registration Request */
+        post: operations["reject_registration_request_api_v1_registration_requests__request_id__reject_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1124,6 +1220,21 @@ export interface components {
             /** State */
             state: string;
         };
+        /**
+         * ChildMatchOut
+         * @description §5.4a's duplicate-child warning. A candidate the manager judges, never a merge.
+         */
+        ChildMatchOut: {
+            /** Birthdate */
+            birthdate: string | null;
+            /** Display Name */
+            display_name: string;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+        };
         /** ClassCreate */
         ClassCreate: {
             /** Color */
@@ -1614,6 +1725,120 @@ export interface components {
             studio_name: string;
         };
         /**
+         * RegistrationDecisionIn
+         * @description `POST /registration-requests/{id}/{approve|reject}`.
+         *
+         *     §5.4: **enrollment is always a manager decision.** Approving is where the group is
+         *     chosen, which is why `group_id` lives on the decision and not on the submission — the
+         *     public link's only job is a first lesson.
+         */
+        RegistrationDecisionIn: {
+            /** Group Id */
+            group_id?: string | null;
+            /** Reason */
+            reason?: string | null;
+        };
+        /**
+         * RegistrationDecisionOut
+         * @description The result of approving or rejecting one submission.
+         *
+         *     One shape for both verbs: a rejection creates no students and returns an empty list,
+         *     which is a truer answer than a second shape that cannot express the difference.
+         */
+        RegistrationDecisionOut: {
+            /**
+             * Request Id
+             * Format: uuid
+             */
+            request_id: string;
+            /** Status */
+            status: string;
+            /** Student Ids */
+            student_ids?: string[];
+        };
+        /**
+         * RegistrationRequestDetailOut
+         * @description One submission, opened. Reading this is audit-logged as sensitive (§11.2) — the
+         *     summary in the queue is free, the full read is recorded.
+         */
+        RegistrationRequestDetailOut: {
+            /** Child Display Name */
+            child_display_name: string;
+            /** Children */
+            children?: {
+                [key: string]: unknown;
+            }[];
+            /** Guardian Display Name */
+            guardian_display_name: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Matched Person Id */
+            matched_person_id: string | null;
+            /** Possible Duplicate Students */
+            possible_duplicate_students?: components["schemas"]["ChildMatchOut"][];
+            /** Preferred Group Id */
+            preferred_group_id?: string | null;
+            /** Reviewed At */
+            reviewed_at: string | null;
+            /** Source */
+            source: string;
+            /** Status */
+            status: string;
+            /**
+             * Submitted At
+             * Format: date-time
+             */
+            submitted_at: string;
+        };
+        /**
+         * RegistrationRequestOut
+         * @description The approval queue's row (dashboard `6c`).
+         *
+         *     **`payload` is not here.** The encrypted payload is a stranger's personal data about a
+         *     minor (§11.1); the queue renders a summary, and reading the full submission is a
+         *     separate, audit-logged fetch. A list endpoint that decrypted every row would defeat
+         *     the encryption for the cost of one page load.
+         */
+        RegistrationRequestOut: {
+            /** Child Display Name */
+            child_display_name: string;
+            /** Guardian Display Name */
+            guardian_display_name: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Matched Person Id */
+            matched_person_id: string | null;
+            /** Reviewed At */
+            reviewed_at: string | null;
+            /** Source */
+            source: string;
+            /** Status */
+            status: string;
+            /**
+             * Submitted At
+             * Format: date-time
+             */
+            submitted_at: string;
+        };
+        /** RegistrationRequestPageOut */
+        RegistrationRequestPageOut: {
+            /**
+             * Has More
+             * @default false
+             */
+            has_more: boolean;
+            /** Items */
+            items: components["schemas"]["RegistrationRequestOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /**
          * SessionResponse
          * @description The access token lives in the body, never in a cookie (§10.3).
          *
@@ -1675,6 +1900,23 @@ export interface components {
              * @enum {string}
              */
             status: "pending" | "done" | "skipped";
+        };
+        /**
+         * SiblingRequestIn
+         * @description §5.4(c) — parent `12g`. `POST /me/students`.
+         *
+         *     The group is a **preference**, not a choice: L6 makes enrolment a manager decision, and
+         *     the copy on `12g` promises review rather than a place.
+         */
+        SiblingRequestIn: {
+            /** Birthdate */
+            birthdate?: string | null;
+            /** First Name */
+            first_name: string;
+            /** Last Name */
+            last_name: string;
+            /** Preferred Group Id */
+            preferred_group_id?: string | null;
         };
         /** StaffGroupOut */
         StaffGroupOut: {
@@ -3108,6 +3350,42 @@ export interface operations {
             };
         };
     };
+    request_a_sibling_api_v1_me_students_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SiblingRequestIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistrationRequestOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_studios_api_v1_platform_studios_get: {
         parameters: {
             query?: never;
@@ -3369,6 +3647,146 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_registration_requests_api_v1_registration_requests_get: {
+        parameters: {
+            query?: {
+                status?: string | null;
+                after?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistrationRequestPageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_registration_request_api_v1_registration_requests__request_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistrationRequestDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_registration_request_api_v1_registration_requests__request_id__approve_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegistrationDecisionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistrationDecisionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reject_registration_request_api_v1_registration_requests__request_id__reject_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegistrationDecisionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistrationDecisionOut"];
                 };
             };
             /** @description Validation Error */

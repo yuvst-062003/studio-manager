@@ -25,6 +25,12 @@ from app.models.identity import AuthIdentity
 from app.models.studio import Studio
 from app.schemas._pagination import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, IdempotencyKey
 from app.schemas.people import (
+    ChildMatchOut,
+    RegistrationDecisionIn,
+    RegistrationDecisionOut,
+    RegistrationRequestDetailOut,
+    RegistrationRequestOut,
+    RegistrationRequestPageOut,
     StudentSummaryOut,
     TrialBookingCreate,
     TrialBookingOut,
@@ -34,16 +40,31 @@ from app.schemas.people import (
     TrialBookingSelfResult,
     TrialBookingUpdate,
 )
-from app.services.people.errors import ConflictError, NotFoundError
+from app.services.people.errors import ConflictError, NotFoundError, RefusedError
+from app.services.people.group_days import ScheduleReader
 from app.services.people.landing import LandingService
 from app.services.people.rate_limit import (
     public_booking_identity_limiter,
     public_booking_ip_limiter,
 )
+from app.services.people.registrations import RegistrationService
 from app.services.people.students import StudentService
 from app.services.people.trials import BookedTrial, TrialService
+from app.services.schedule import ScheduleService
 
 router = APIRouter(tags=["people"])
+
+
+def schedule_reader() -> ScheduleReader:
+    """L5's seam, behind one indirection -- the same shape `app/routers/public.py` uses.
+
+    A module-level factory rather than a `ScheduleService()` call inside each route, so a
+    test substitutes a reader by patching one name instead of reaching into the shared
+    service class. A function-local import cannot be patched at all, which is how the first
+    version of this silently kept calling the real seam.
+    """
+    return ScheduleService()
+
 
 #: Module-level so a test can substitute a tighter budget without reaching into the service.
 ip_limiter = public_booking_ip_limiter
@@ -281,3 +302,165 @@ def grant_override(
         raise _not_found("trial booking") from exc
     session.commit()
     return TrialBookingOut.model_validate(booking, from_attributes=True)
+
+
+# -- §5.4a's approval queue ----------------------------------------------------
+# The queue lives beside the intake it watches: a `registration_request` and a
+# `trial_booking` are the two ways somebody enters the funnel, and dashboard `6c` renders
+# both. §7 lists `/registration-requests` separately; the file it lands in is this lane's
+# choice, and splitting the funnel across two routers would put the queue further from the
+# thing it queues.
+
+
+@router.get("/registration-requests", response_model=RegistrationRequestPageOut)
+def list_registration_requests(
+    _: ManagerOrOwner,
+    session: TenantSessionDep,
+    status_filter: str | None = Query(default="pending", alias="status"),
+    after: uuid.UUID | None = None,
+    limit: int = Query(default=DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
+) -> RegistrationRequestPageOut:
+    """Dashboard `6c`. §3.2 -- 'Approve registration requests' is owner and manager only.
+
+    L10 -- `RegistrationRequestOut` carries two display names and no payload. A list
+    endpoint that decrypted every row would defeat the encryption for one page load.
+    """
+    summaries, next_cursor = RegistrationService.list_requests(
+        session, status=status_filter, after=after, limit=limit
+    )
+    return RegistrationRequestPageOut(
+        items=[
+            RegistrationRequestOut(
+                id=summary.id,
+                source=summary.source,
+                status=summary.status,
+                submitted_at=summary.submitted_at,
+                reviewed_at=summary.reviewed_at,
+                matched_person_id=summary.matched_person_id,
+                child_display_name=summary.child_display_name,
+                guardian_display_name=summary.guardian_display_name,
+            )
+            for summary in summaries
+        ],
+        next_cursor=next_cursor,
+        has_more=next_cursor is not None,
+    )
+
+
+@router.get("/registration-requests/{request_id}", response_model=RegistrationRequestDetailOut)
+def read_registration_request(
+    _: ManagerOrOwner,
+    request_id: uuid.UUID,
+    request: Request,
+    session: TenantSessionDep,
+) -> RegistrationRequestDetailOut:
+    """Opening one submission. **Audit-logged as sensitive** (§11.2): this is a stranger's
+    personal data about a minor, so the summary is free and the full read is recorded."""
+    try:
+        detail = RegistrationService.read_full(
+            session,
+            request_id=request_id,
+            actor_person_id=getattr(request.state, "person_id", None),
+            at=now(),
+        )
+    except NotFoundError as exc:
+        raise _not_found("registration request") from exc
+    session.commit()
+    return RegistrationRequestDetailOut(
+        id=detail.summary.id,
+        source=detail.summary.source,
+        status=detail.summary.status,
+        submitted_at=detail.summary.submitted_at,
+        reviewed_at=detail.summary.reviewed_at,
+        matched_person_id=detail.summary.matched_person_id,
+        child_display_name=detail.summary.child_display_name,
+        guardian_display_name=detail.summary.guardian_display_name,
+        children=detail.children,
+        preferred_group_id=detail.preferred_group_id,
+        possible_duplicate_students=[
+            ChildMatchOut(
+                student_id=match.student_id,
+                display_name=match.display_name,
+                birthdate=match.birthdate,
+            )
+            for match in detail.possible_duplicate_students
+        ],
+    )
+
+
+@router.post(
+    "/registration-requests/{request_id}/approve",
+    response_model=RegistrationDecisionOut,
+)
+def approve_registration_request(
+    _: ManagerOrOwner,
+    request_id: uuid.UUID,
+    body: RegistrationDecisionIn,
+    request: Request,
+    session: TenantSessionDep,
+    idempotency_key: IdempotencyKey = None,
+) -> RegistrationDecisionOut:
+    """§5.4a's approval transaction.
+
+    **The group comes from the body, not the payload** (§5.4): "Approving is where the group
+    is chosen, which is why group_id lives on the decision and not on the submission."
+    """
+    try:
+        created = RegistrationService.approve(
+            session,
+            request_id=request_id,
+            group_id=body.group_id,
+            actor_person_id=getattr(request.state, "person_id", None),
+            at=now(),
+            schedule=schedule_reader(),
+        )
+    except NotFoundError as exc:
+        raise _not_found("registration request or group") from exc
+    except ConflictError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"code": "already_reviewed", "message": str(exc)},
+        ) from exc
+    except RefusedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={"code": "group_required", "message": str(exc)},
+        ) from exc
+    except NotImplementedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "code": "schedule_unavailable",
+                "message": "the club's schedule has not been built yet",
+            },
+        ) from exc
+    session.commit()
+    return RegistrationDecisionOut(request_id=request_id, status="approved", student_ids=created)
+
+
+@router.post("/registration-requests/{request_id}/reject", response_model=RegistrationDecisionOut)
+def reject_registration_request(
+    _: ManagerOrOwner,
+    request_id: uuid.UUID,
+    body: RegistrationDecisionIn,
+    request: Request,
+    session: TenantSessionDep,
+    idempotency_key: IdempotencyKey = None,
+) -> RegistrationDecisionOut:
+    try:
+        RegistrationService.reject(
+            session,
+            request_id=request_id,
+            reason=body.reason,
+            actor_person_id=getattr(request.state, "person_id", None),
+            at=now(),
+        )
+    except NotFoundError as exc:
+        raise _not_found("registration request") from exc
+    except ConflictError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"code": "already_reviewed", "message": str(exc)},
+        ) from exc
+    session.commit()
+    return RegistrationDecisionOut(request_id=request_id, status="rejected")
