@@ -152,15 +152,21 @@ holdbacks:
     kind: external
     title: A stable HTTPS domain for the apps
     why: >-
+      The name is decided: gladiatorclub.co.il, confirmed unregistered against ISOC-IL on
+      2026-08-25. gladiatorclub.com was the first choice and is taken — registered 2010,
+      held at GoDaddy, resolving. What remains is buying it and pointing eight CNAMEs at
+      Railway; infra/railway/README.md § The domain carries the exact table.
       Two costs, and the second is the one that sets the deadline. People install this from
       an invitation link, and a random Railway subdomain reads as a phishing attempt, which
       §6.5 makes the product's main adoption risk. But up.railway.app is on the Public Suffix
       List, so the app hosts and the api host are different *sites* — SPEC §1883's
       httpOnly/SameSite refresh cookie is third-party to them and Safari drops it, so an iOS
       parent cannot hold a session. Localhost hides this, because a port is not part of a
-      site. M1 builds auth: if the domain is not there by then, the refresh token gets moved
-      to IndexedDB to make staging work and the workaround becomes the architecture.
-      infra/railway/domains.json still has base_domain null.
+      site. M1 has now shipped auth, so the risk it named is live: if the domain is not
+      there, the refresh token gets moved to IndexedDB to make staging work and the
+      workaround becomes the architecture. base_domain in infra/railway/domains.json records
+      the chosen name; the environment hosts there are still Railway's and must stay so
+      until the CNAMEs resolve, because app/core/cors.py builds its allowlist from them.
     blocks: W1
     status: open
     opened: 2026-08-24

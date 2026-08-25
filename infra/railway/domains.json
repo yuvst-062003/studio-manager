@@ -1,6 +1,6 @@
 {
-  "$comment": "The only place a hostname is written. SPEC §15 item 5 (a stable custom domain) is still open, so these are Railway-generated subdomains. When the domain lands, set base_domain and replace the hosts — nothing else in the repo changes, and no rebuild is needed because every manifest start_url and scope is relative.",
-  "base_domain": null,
+  "$comment": "The only place a hostname is written. `base_domain` records the name the club has CHOSEN and that ISOC-IL confirmed unregistered on 2026-08-25 — it does NOT mean the domain is bought or that DNS points anywhere. The `environments` hosts below are still the Railway-generated ones and must stay that way until the CNAMEs resolve, because app/core/cors.py builds the credentialed-request allowlist from them and pointing it at a host that does not exist would break every app. HB-domain in docs/plan/state.yaml stays open until the swap is done and verified. When it is, replace the hosts here and nothing else in the repo changes — every manifest start_url and scope is relative, so no rebuild is needed either.",
+  "base_domain": "gladiatorclub.co.il",
   "railway_project": "studio-manager",
   "railway_project_id": "375bada8-df9f-4afe-8f24-aa37bb5da9ed",
   "environments": {

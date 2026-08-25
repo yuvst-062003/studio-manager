@@ -61,16 +61,30 @@ Moving to Vercel does not help — `vercel.app` is on the same list, for the sam
 
 ### The shape when it lands
 
+**The name is `gladiatorclub.co.il`** — chosen 2026-08-25 and confirmed unregistered
+against ISOC-IL the same day (`whois -h whois.isoc.org.il gladiatorclub.co.il` returned
+"No data was found"). `gladiatorclub.com` was the first choice and is taken: registered
+2010, held at GoDaddy, resolving. Recorded in `domains.json` as `base_domain`, which is a
+record of the decision and **not** a claim that the domain is bought or that DNS resolves.
+
+`.co.il` was picked over `.app` and `.net` for one reason: the install arrives as a link
+in a WhatsApp message, §6.5 makes that link the entire distribution channel, and an
+Israeli parent reads `.co.il` as a real local business. The technical requirement is
+indifferent — any registrable domain fixes the cookie, because all that matters is that
+the four hosts share one.
+
 Four subdomains of one registrable domain, no apex, no per-tenant hosts:
 
 | | production | staging |
 |---|---|---|
-| api | `api.<base>` | `api.staging.<base>` |
-| staff | `staff.<base>` | `staff.staging.<base>` |
-| parent | `app.<base>` | `app.staging.<base>` |
-| dashboard | `admin.<base>` | `admin.staging.<base>` |
+| api | `api.gladiatorclub.co.il` | `api.staging.gladiatorclub.co.il` |
+| staff | `staff.gladiatorclub.co.il` | `staff.staging.gladiatorclub.co.il` |
+| parent | `app.gladiatorclub.co.il` | `app.staging.gladiatorclub.co.il` |
+| dashboard | `admin.gladiatorclub.co.il` | `admin.staging.gladiatorclub.co.il` |
 
-Every one is a plain `CNAME` to Railway. Avoiding the apex is deliberate: it needs
+Eight records in total. Every one is a plain `CNAME` to Railway.
+
+Avoiding the apex is deliberate: it needs
 `ALIAS`/`ANAME` support that not every registrar has, and it leaves the bare domain free
 for a marketing page. Per-studio subdomains are a deliberate **no** — tenancy already
 routes by session and invite token (§5.2, §5.3), so wildcards would buy a Railway tier and
@@ -79,10 +93,15 @@ so a staging session is never valid against production.
 
 Until it lands, these are Railway-generated subdomains. Every hostname lives in
 [`domains.json`](domains.json) and nowhere else, so the swap is one file. Manifest
-`start_url` and `scope` are relative, so no rebuild is needed either. Two things that
-are *not* in that file will also need the host when it changes: the Google OAuth
-redirect URIs in the Cloud Console, and the API's CORS allowlist — neither exists yet,
-and both are M1's.
+`start_url` and `scope` are relative, so no rebuild is needed either.
+
+Two things need the host and are *not* solved by that file:
+
+* **The API's CORS allowlist** — solved. `app/core/cors.py` shipped in M1 and reads
+  `domains.json`, so it follows the swap with no second edit.
+* **The Google OAuth redirect URIs** — not solved, and not solvable from here. They live
+  in the Google Cloud Console and must match the new host exactly, or sign-in fails with
+  an error naming neither side. Add them at the same time as the CNAMEs, not after.
 
 ## The database
 
