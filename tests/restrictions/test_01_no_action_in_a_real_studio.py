@@ -18,7 +18,9 @@ app.core.tenancy.get_tenant_session). Behaviourally identical.
 
 from __future__ import annotations
 
+import re
 import uuid
+from pathlib import Path
 from typing import Annotated
 
 import pytest
@@ -97,3 +99,88 @@ def test_the_resolver_leaves_an_ordinary_session_alone_in_production(monkeypatch
     monkeypatch.setattr(tenancy.settings, "ENV", "production", raising=False)
     client = TestClient(_probe_app(is_developer=False, studio_is_demo=False))
     assert client.get("/probe").status_code == 200
+
+
+# -- the gate: restriction 1 is available, but nothing forces a router to use it -----
+ROUTERS_ROOT = Path(__file__).resolve().parents[2] / "app" / "routers"
+
+#: Routers legitimately reaching the database through the unscoped `SessionDep`
+#: (app/core/db.py) rather than `TenantSessionDep` (app/core/tenancy.py), and why.
+#: `studio_id_from_request` carries restriction 1, but a dependency nobody is required
+#: to use has no effect -- this allowlist is what turns "available" into "enforced": a
+#: new tenant-touching router that reaches for SessionDep out of habit fails this test
+#: unless it justifies the choice here.
+SESSION_DEP_ALLOWLIST: dict[str, str] = {
+    "dev.py": (
+        "POST /dev/demo/reset deliberately spans the tenant boundary: it wipes and "
+        "re-seeds the demo studio (app/services/demo/service.py), work that must run "
+        "before/around the studio's own scoped state exists, not inside a "
+        "TenantSession that fails closed the moment no studio is in context."
+    ),
+}
+
+
+def routers_using_session_dep(root: Path) -> list[str]:
+    """Every app/routers/*.py file that names the unscoped `SessionDep`, source-level.
+
+    Source-level by necessity: 'this router bypasses restriction 1' is not observable
+    by driving a request through it -- restriction 1 fires only once a router's
+    dependency chain actually resolves a TenantSession, so a router built on plain
+    `SessionDep` never reaches the code that would refuse it. The only way to see the
+    gap before it ships real data access is to read which dependency a router asked
+    for.
+
+    Matches the bare name `SessionDep`, not `TenantSessionDep`: the latter contains the
+    former as a substring, so a naive `"SessionDep" in text` check would flag every
+    correctly tenant-scoped router too and this gate would forbid the very thing it
+    exists to allow.
+    """
+    pattern = re.compile(r"(?<!Tenant)\bSessionDep\b")
+    hits = []
+    for path in sorted(root.glob("*.py")):
+        if path.name == "__init__.py":
+            continue
+        if pattern.search(path.read_text(encoding="utf-8")):
+            hits.append(path.name)
+    return hits
+
+
+def test_every_router_using_the_unscoped_session_is_allowlisted_with_a_reason():
+    """The gate. A later lane adding a tenant-touching router with SessionDep --
+    instead of TenantSessionDep -- would otherwise silently bypass restriction 1: no
+    error, no 403, just a query that was never subject to the tenant filter or the
+    developer-in-production check at all."""
+    for name in routers_using_session_dep(ROUTERS_ROOT):
+        assert name in SESSION_DEP_ALLOWLIST, (
+            f"app/routers/{name} uses SessionDep (unscoped) rather than "
+            "TenantSessionDep, so restriction 1 (studio_id_from_request) never runs "
+            "for it. Either switch to TenantSessionDep, or add app/routers/"
+            f"{name!r} to SESSION_DEP_ALLOWLIST in this file with the reason it "
+            "legitimately spans the tenant boundary."
+        )
+        assert SESSION_DEP_ALLOWLIST[name].strip(), name
+
+
+def test_every_allowlisted_router_still_exists():
+    """An allowlist entry for a deleted or renamed router is an exemption nobody
+    notices going stale -- and the next file to reuse that name inherits it."""
+    for name in SESSION_DEP_ALLOWLIST:
+        assert (ROUTERS_ROOT / name).exists(), f"{name} is allowlisted but does not exist"
+
+
+# -- proven to fire -------------------------------------------------------------------
+def test_the_detector_flags_an_unlisted_router_using_the_unscoped_session(tmp_path):
+    (tmp_path / "probe_router.py").write_text(
+        "from app.core.db import SessionDep\n\n\ndef handler(session: SessionDep): ...\n",
+        encoding="utf-8",
+    )
+    assert routers_using_session_dep(tmp_path) == ["probe_router.py"]
+
+
+def test_the_detector_leaves_a_tenant_scoped_router_alone(tmp_path):
+    (tmp_path / "probe_router.py").write_text(
+        "from app.core.tenancy import TenantSessionDep\n\n\n"
+        "def handler(session: TenantSessionDep): ...\n",
+        encoding="utf-8",
+    )
+    assert routers_using_session_dep(tmp_path) == []
