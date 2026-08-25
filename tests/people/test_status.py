@@ -15,18 +15,8 @@ from app.models.people import Student, StudentStatusHistory
 from app.models.person import Person
 from app.services.people.errors import RefusedError
 from app.services.people.status import LEGAL_TRANSITIONS, StudentStatusService
-from sqlalchemy import delete, select
+from sqlalchemy import select
 from tests.people.conftest import T0
-
-
-@pytest.fixture(autouse=True)
-def _clear_student_status_history(app_session):
-    """Clear StudentStatusHistory before each test to avoid cross-test contamination."""
-    app_session.execute(delete(StudentStatusHistory))
-    app_session.commit()
-    yield
-    app_session.execute(delete(StudentStatusHistory))
-    app_session.commit()
 
 
 @pytest.fixture
@@ -63,7 +53,15 @@ def test_an_illegal_transition_is_refused_and_writes_nothing(app_session, a_stud
     app_session.rollback()
 
     assert a_student.status == "lead"
-    assert app_session.execute(select(StudentStatusHistory)).first() is None
+    # Scope by student_id: without it, this query sees rows from other tests in the shared
+    # database. With it, we check only that this student's transition was refused and wrote
+    # nothing -- which is what the test claims to verify.
+    assert (
+        app_session.execute(
+            select(StudentStatusHistory).where(StudentStatusHistory.student_id == a_student.id)
+        ).first()
+        is None
+    )
 
 
 def test_a_transition_to_the_same_status_is_refused(app_session, a_student):
@@ -88,9 +86,10 @@ def test_the_actor_is_recorded_when_there_is_one(app_session, a_student, as_mana
 def test_an_automated_transition_records_no_actor(app_session, a_student):
     """§5.4a -- 'No conversion after N days -> status=lost'. The job has no person behind
     it, and inventing one would make the audit trail lie about who decided."""
-    StudentStatusService.transition(app_session, student=a_student, to_status="lost", at=T0)
+    row = StudentStatusService.transition(app_session, student=a_student, to_status="lost", at=T0)
     app_session.commit()
     assert a_student.status == "lost"
+    assert row.changed_by_person_id is None
 
 
 def test_every_status_in_the_graph_is_one_the_table_allows():
