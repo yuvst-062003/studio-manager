@@ -88,6 +88,12 @@ APP_ROOT = Path(__file__).resolve().parents[2] / "app"
 _MODULE_SCOPE_IMPORT = re.compile(r"^from app\.core\.config import\b.*\bsettings\b", re.MULTILINE)
 _READS_ENV = re.compile(r"\bsettings\.ENV\b")
 
+#: Modules that bind `settings` at module scope but read a field this harness never
+#: swaps, so `_binds_settings_and_reads_env` correctly never flags them and they need
+#: no entry in RELOADABLE. This is NOT the only reason a module gets special handling
+#: in this apparatus -- see `modules_that_must_be_reloadable`'s docstring, which names
+#: the other one (`app.workers.demo_reset`, which the detector DOES flag and which
+#: DOES sit in RELOADABLE, for an unrelated reason).
 DELIBERATELY_EXCLUDED = frozenset({"app.core.db", "app.core.encryption"})
 
 
@@ -114,12 +120,27 @@ def modules_that_must_be_reloadable() -> list[str]:
     Scanning app/'s source is the only way to catch the *next* module Tasks 2-12 add
     with the same shape before it repeats the bug rather than after.
 
-    Two modules are deliberately excluded even though they also bind `settings` at
-    module scope: `app.core.db` (reads DATABASE_URL) and `app.core.encryption` (reads
-    ENCRYPTION_KEYS / ENCRYPTION_ACTIVE_KEY_VERSION). Neither reads `.ENV`, which this
-    harness never swaps, so reloading them would only reset an lru_cache'd engine and
-    decrypted key material for nothing -- see RELOADABLE's own comment in
-    tests/dev/conftest.py, and DELIBERATELY_EXCLUDED above.
+    Two kinds of module get special-cased here, for two unrelated reasons -- naming
+    both, because a criterion that only describes one of them is a rule a future editor
+    can misapply to the other:
+
+    * DELIBERATELY_EXCLUDED, above -- `app.core.db` (reads DATABASE_URL) and
+      `app.core.encryption` (reads ENCRYPTION_KEYS / ENCRYPTION_ACTIVE_KEY_VERSION).
+      Both bind `settings` at module scope, like every module this detector flags, but
+      neither reads `.ENV` -- the field this harness swaps -- so this detector never
+      flags them and they carry no entry in RELOADABLE. Reloading them would only reset
+      an lru_cache'd engine and decrypted key material for nothing.
+    * `app.workers.demo_reset` -- the opposite situation. It DOES read `.ENV` and IS
+      flagged by this detector, and it DOES carry an entry in RELOADABLE (see
+      tests/dev/conftest.py). It needs a mention here anyway because it is not reached
+      through `app.main`'s import graph the way every other RELOADABLE entry is --
+      tests/dev/test_demo_reset_worker.py exercises it by monkeypatching
+      `settings.ENV` on the live singleton directly, never through `app_in_env` -- and
+      it is still in scope for this file's scan because that scan walks every module
+      under app/, not just what app.main imports. It is not a member of
+      DELIBERATELY_EXCLUDED and "reads a different field" does not describe it; its own
+      reason lives as an inline comment on its RELOADABLE entry in
+      tests/dev/conftest.py.
     """
     return sorted(
         _module_name(path)
