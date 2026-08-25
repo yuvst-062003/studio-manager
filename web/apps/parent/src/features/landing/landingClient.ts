@@ -15,9 +15,17 @@ export type BookingResult = components['schemas']['TrialBookingSelfResult']
 export type Fetcher = (path: string, init?: RequestInit) => Promise<Response>
 
 export type BookingRequest = {
-  group_id: string
-  session_id: string
-  children: { first_name: string; last_name: string; birthdate?: string | null }[]
+  /** §5.4a steps 2 and 4 are asked PER CHILD — the group list is filtered by each child's
+   *  age, so siblings of different ages are the case the picker exists for. The request
+   *  root still accepts a `group_id`/`session_id` pair as a default for a per-group QR,
+   *  but this client always sends the choice with the child it belongs to. */
+  children: {
+    first_name: string
+    last_name: string
+    birthdate?: string | null
+    group_id: string
+    session_id?: string | null
+  }[]
   trial_health_declarations: Record<string, unknown>[]
 }
 

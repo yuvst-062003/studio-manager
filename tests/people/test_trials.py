@@ -43,6 +43,23 @@ def bookable(monkeypatch, studio, a_group, a_training_year, app_session):
 
 
 @pytest.fixture
+def bookable_second(bookable, studio, a_second_group, a_training_year, app_session):
+    """A second group with a session at a DIFFERENT hour, so a test can tell the two
+    apart by more than their group id. §5.4a step 2 filters groups by the child's age,
+    which only matters when siblings of different ages pick differently."""
+    row = make_session(
+        studio_id=studio.id,
+        group_id=a_second_group,
+        training_year_id=a_training_year,
+        starts_at=SUNDAY + timedelta(days=1),
+    )
+    app_session.add(row)
+    app_session.commit()
+    bookable.sessions[a_second_group] = [row]
+    return bookable
+
+
+@pytest.fixture
 def a_stranger(client, fake_provider):
     """§5.4a step 1 -- somebody who has just signed in and belongs to no studio at all."""
     subject = f"stranger-{uuid.uuid4()}"
@@ -183,6 +200,127 @@ def test_several_children_book_in_one_request(client, a_stranger, bookable, a_gr
     assert len(guardians) == 1
 
 
+def test_two_siblings_book_into_their_own_groups_and_their_own_slots(
+    client, a_stranger, bookable_second, a_group, a_second_group, app_session
+):
+    """§5.4a step 2 is per child -- 'class > group (groups filtered by the child's age)'
+    with '[ + הוסף ילד נוסף ] — several children in one booking' -- and step 4 is 'the next
+    N upcoming sessions of each chosen group, ONE PICK PER CHILD'.
+
+    The age filter in step 2 exists precisely for siblings who do not belong in the same
+    group, so a booking that applies child 0's group to everyone breaks the exact case the
+    picker was built for: the younger child silently lands in the older one's group.
+    """
+    tag = uuid.uuid4().hex[:6]
+    younger = bookable_second.sessions[a_group][0]
+    older = bookable_second.sessions[a_second_group][0]
+    assert younger.starts_at != older.starts_at
+
+    response = client.post(
+        "/api/v1/trial-bookings/self",
+        json={
+            "children": [
+                {
+                    "first_name": f"דנה{tag}",
+                    "last_name": f"כהן{tag}",
+                    "birthdate": "2019-04-01",
+                    "group_id": str(a_group),
+                    "session_id": str(younger.id),
+                },
+                {
+                    "first_name": f"יוסי{tag}",
+                    "last_name": f"כהן{tag}",
+                    "birthdate": "2014-02-11",
+                    "group_id": str(a_second_group),
+                    "session_id": str(older.id),
+                },
+            ],
+            "trial_health_declarations": [{"asthma": False}, {"asthma": False}],
+        },
+        headers=a_stranger,
+    )
+    assert response.status_code == 201, response.text
+    body = response.json()
+
+    by_name = {row["student_display_name"]: row for row in body["bookings"]}
+    assert by_name[f"דנה{tag} כהן{tag}"]["group_name"] == "מתחילים"
+    assert by_name[f"יוסי{tag} כהן{tag}"]["group_name"] == "נבחרת"
+    assert by_name[f"דנה{tag} כהן{tag}"]["session_starts_at"] != (
+        by_name[f"יוסי{tag} כהן{tag}"]["session_starts_at"]
+    )
+
+    # And the rows themselves, not just what the response says about them.
+    student_ids = [uuid.UUID(row["id"]) for row in body["students"]]
+    rows = app_session.execute(
+        select(TrialBooking).where(TrialBooking.student_id.in_(student_ids))
+    ).scalars()
+    landed = {(row.group_id, row.session_id) for row in rows}
+    assert landed == {(a_group, younger.id), (a_second_group, older.id)}
+
+
+def test_a_child_with_no_group_of_their_own_inherits_the_one_at_the_root(
+    client, a_stranger, bookable, a_group, app_session
+):
+    """A per-group QR pre-selects a group (§5.4a ①), and a single-child booking has one
+    group by definition. The root stays a legal fallback so those two shapes keep working
+    -- it is only wrong when it silently overrides a choice the parent made per child."""
+    session_id = bookable.sessions[a_group][0].id
+    response = _book(client, a_stranger, a_group, session_id)
+    assert response.status_code == 201, response.text
+    booking = app_session.execute(
+        select(TrialBooking).where(
+            TrialBooking.student_id == uuid.UUID(response.json()["students"][0]["id"])
+        )
+    ).scalar_one()
+    assert (booking.group_id, booking.session_id) == (a_group, session_id)
+
+
+def test_a_child_with_no_group_anywhere_is_refused(client, a_stranger, bookable):
+    """422 rather than a booking with a null group. A trial booking nobody can hold a
+    lesson for is worse than a rejected form."""
+    response = client.post(
+        "/api/v1/trial-bookings/self",
+        json={
+            "children": [{"first_name": "נועה", "last_name": "לוי", "birthdate": "2019-04-01"}],
+            "trial_health_declarations": [{"asthma": False}],
+        },
+        headers=a_stranger,
+    )
+    assert response.status_code == 422, response.text
+
+
+def test_a_sibling_may_not_be_booked_into_another_studio_s_group(
+    client, a_stranger, bookable, a_group, other_studio_group_id, app_session
+):
+    """The studio is resolved from the FIRST group, and everything after runs inside a
+    TenantSession scoped to it. A second child naming a group in a different studio must
+    not slip through on the back of the first child's resolution."""
+    session_id = bookable.sessions[a_group][0].id
+    response = client.post(
+        "/api/v1/trial-bookings/self",
+        json={
+            "children": [
+                {
+                    "first_name": "דנה",
+                    "last_name": "כהן",
+                    "group_id": str(a_group),
+                    "session_id": str(session_id),
+                },
+                {"first_name": "יוסי", "last_name": "כהן", "group_id": str(other_studio_group_id)},
+            ],
+            "trial_health_declarations": [{"asthma": False}, {"asthma": False}],
+        },
+        headers=a_stranger,
+    )
+    assert response.status_code == 404, response.text
+    assert (
+        app_session.execute(
+            select(TrialBooking).where(TrialBooking.group_id == other_studio_group_id)
+        ).first()
+        is None
+    )
+
+
 def test_the_parent_lands_in_the_app_already_signed_in(client, a_stranger, bookable, a_group):
     """§5.4a -- 'the parent lands DIRECTLY in the parent app, already signed in.' The
     response carries what `13b` renders, because the parent's token still has no studio in
@@ -191,8 +329,12 @@ def test_the_parent_lands_in_the_app_already_signed_in(client, a_stranger, booka
     body = _book(client, a_stranger, a_group, session_id).json()
     assert body["studio_slug"]
     assert body["studio_name"]
-    assert body["group_name"]
-    assert body["session_starts_at"]
+    # Per child, not per booking: with siblings in two groups any single name at the root
+    # would be wrong for one of them.
+    assert len(body["bookings"]) == 1
+    assert body["bookings"][0]["group_name"]
+    assert body["bookings"][0]["session_starts_at"]
+    assert body["bookings"][0]["student_id"] == body["students"][0]["id"]
 
 
 def test_an_anonymous_caller_cannot_book(client, bookable, a_group):

@@ -34,15 +34,23 @@ const pageStyle: CSSProperties = {
  */
 export function icsFor(result: BookingResult): string {
   const stamp = (iso: string) => `${iso.replace(/[-:]/g, '').split('.')[0]}Z`
-  const start = result.session_starts_at ? stamp(result.session_starts_at) : ''
+  // One VEVENT per child, inside one VCALENDAR. Siblings can be in different groups at
+  // different hours, and a single event would put one of them in the parent's calendar
+  // and silently drop the other.
+  const events = (result.bookings ?? []).flatMap((booking) => {
+    const start = booking.session_starts_at ? stamp(booking.session_starts_at) : ''
+    return [
+      'BEGIN:VEVENT',
+      `SUMMARY:${result.studio_name} — ${booking.group_name}`,
+      start ? `DTSTART:${start}` : '',
+      'END:VEVENT',
+    ]
+  })
   return [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
     'PRODID:-//Studio Manager//Trial//EN',
-    'BEGIN:VEVENT',
-    `SUMMARY:${result.studio_name} — ${result.group_name}`,
-    start ? `DTSTART:${start}` : '',
-    'END:VEVENT',
+    ...events,
     'END:VCALENDAR',
   ]
     .filter(Boolean)
@@ -56,30 +64,30 @@ export function BookingConfirmed({
   result: BookingResult
   locale: Locale
 }) {
-  const when = result.session_starts_at
   return (
     <section style={pageStyle} aria-labelledby="booked-title" data-testid="booking-confirmed">
       <h2 id="booked-title">{t(locale, 'people.submitted.title')}</h2>
       <p>{t(locale, 'people.submitted.subtitle')}</p>
 
-      <Card>
-        <p data-testid="booked-group">
-          <bdi>{result.group_name}</bdi>
-        </p>
-        {when ? (
-          // G3 — stored UTC, rendered Asia/Jerusalem regardless of the reader's locale.
-          <p data-testid="booked-when">
-            {formatDateInStudioZone(when, locale)} {formatTimeInStudioZone(when, locale)}
+      {/* One card per child. §5.4a step 5 confirms what was actually booked, and with
+          siblings in two groups there is no single group or time to confirm. */}
+      {(result.bookings ?? []).map((booking, index) => (
+        <Card key={booking.student_id}>
+          <p>
+            <bdi>{booking.student_display_name}</bdi>
           </p>
-        ) : null}
-        <ul>
-          {(result.students ?? []).map((student) => (
-            <li key={student.id}>
-              <bdi>{`${student.first_name} ${student.last_name}`}</bdi>
-            </li>
-          ))}
-        </ul>
-      </Card>
+          <p data-testid={`booked-group-${index}`}>
+            <bdi>{booking.group_name}</bdi>
+          </p>
+          {booking.session_starts_at ? (
+            // G3 — stored UTC, rendered Asia/Jerusalem regardless of the reader's locale.
+            <p data-testid={`booked-when-${index}`}>
+              {formatDateInStudioZone(booking.session_starts_at, locale)}{' '}
+              {formatTimeInStudioZone(booking.session_starts_at, locale)}
+            </p>
+          ) : null}
+        </Card>
+      ))}
 
       <a
         href={`data:text/calendar;charset=utf-8,${encodeURIComponent(icsFor(result))}`}

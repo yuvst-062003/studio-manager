@@ -32,6 +32,7 @@ from app.schemas.people import (
     RegistrationRequestOut,
     RegistrationRequestPageOut,
     StudentSummaryOut,
+    TrialBookingConfirmationOut,
     TrialBookingCreate,
     TrialBookingOut,
     TrialBookingRow,
@@ -79,16 +80,24 @@ def _not_found(what: str = "record") -> HTTPException:
 
 
 def _self_result(session: TenantSession, booked: BookedTrial) -> TrialBookingSelfResult:
-    studio = session.get(Studio, booked.group.studio_id)
-    assert studio is not None  # the group was resolved through it a moment ago
+    studio = session.get(Studio, booked.studio_id)
+    assert studio is not None  # every group was resolved through it a moment ago
+    students = [
+        StudentSummaryOut(**StudentService.detail(session, student_id=row.student.id).__dict__)
+        for row in booked.booked
+    ]
     return TrialBookingSelfResult(
         studio_slug=studio.slug,
         studio_name=studio.name,
-        group_name=booked.group.name,
-        session_starts_at=booked.session_row.starts_at if booked.session_row else None,
-        students=[
-            StudentSummaryOut(**StudentService.detail(session, student_id=student.id).__dict__)
-            for student in booked.students
+        students=students,
+        bookings=[
+            TrialBookingConfirmationOut(
+                student_id=row.student.id,
+                student_display_name=f"{summary.first_name} {summary.last_name}",
+                group_name=row.group.name,
+                session_starts_at=row.session_row.starts_at if row.session_row else None,
+            )
+            for row, summary in zip(booked.booked, students, strict=True)
         ],
     )
 
@@ -130,8 +139,16 @@ def book_trial_for_self(
             detail={"code": "too_many_bookings", "message": "try again in a few minutes"},
         )
 
+    # The studio comes from the FIRST child's group. Every other group in the request is
+    # checked against it inside the service, so a sibling cannot name a group in a
+    # different club and ride in on this resolution.
+    first_group = body.children[0].group_id
+    # `_resolve_per_child_choices` fills every child's group from the root or rejects the
+    # request, so this is narrowing rather than a check -- the same shape as the `studio`
+    # assertion in `_self_result` below.
+    assert first_group is not None
     try:
-        studio_id = LandingService.studio_id_for_group(session, group_id=body.group_id)
+        studio_id = LandingService.studio_id_for_group(session, group_id=first_group)
     except NotFoundError as exc:
         raise _not_found("class") from exc
 
@@ -141,8 +158,7 @@ def book_trial_for_self(
             booked = TrialService.book_for_self(
                 scoped,
                 identity_id=identity_id,
-                group_id=body.group_id,
-                session_id=body.session_id,
+                studio_id=studio_id,
                 children=[child.model_dump() for child in body.children],
                 declarations=body.trial_health_declarations,
                 provider_email=identity.email if identity else None,
@@ -155,7 +171,7 @@ def book_trial_for_self(
                 detail={"code": "trial_already_used", "message": str(exc)},
             ) from exc
         except NotFoundError as exc:
-            raise _not_found("session") from exc
+            raise _not_found("group or session") from exc
         scoped.commit()
         # Read back inside the scope, so §5.4a step 5's "נתראה ביום א' 17:00" needs no
         # second round trip -- which the parent could not make anyway: their token still

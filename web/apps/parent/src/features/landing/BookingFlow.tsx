@@ -91,25 +91,35 @@ export function BookingFlow({
   const [step, setStep] = useState<Step>(signedIn ? 'children' : 'sign-in')
   const [children, setChildren] = useState<Child[]>([blankChild()])
   const [confirmed, setConfirmed] = useState<boolean[]>([false])
-  const [slots, setSlots] = useState<TrialSlot[]>([])
-  const [sessionId, setSessionId] = useState('')
+  // Keyed by group, because §5.4a step 4 offers 'the next N upcoming sessions of EACH
+  // chosen group'. Two siblings in one group share one fetch; two siblings in different
+  // groups get one each.
+  const [slotsByGroup, setSlotsByGroup] = useState<Record<string, TrialSlot[]>>({})
+  const [sessionIds, setSessionIds] = useState<string[]>([''])
   const [error, setError] = useState<BookingError | null>(null)
   const [sending, setSending] = useState(false)
   const [result, setResult] = useState<BookingResult | null>(null)
 
-  const chosenGroup = children[0]?.group_id ?? ''
+  // Sorted and joined so the effect re-runs when the SET of groups changes, not on every
+  // render that happens to rebuild the array.
+  const groupKey = [...new Set(children.map((child) => child.group_id).filter(Boolean))]
+    .sort()
+    .join(',')
 
   useEffect(() => {
-    if (step !== 'slot' || !chosenGroup) return
+    if (step !== 'slot' || !groupKey) return
     let live = true
-    client
-      .trialSlots(chosenGroup)
-      .then((body) => live && setSlots(body.items))
+    Promise.all(
+      groupKey.split(',').map((groupId) =>
+        client.trialSlots(groupId).then((body) => [groupId, body.items] as const),
+      ),
+    )
+      .then((pairs) => live && setSlotsByGroup(Object.fromEntries(pairs)))
       .catch(() => live && setError('schedule_unavailable'))
     return () => {
       live = false
     }
-  }, [client, chosenGroup, step])
+  }, [client, groupKey, step])
 
   if (result) return <BookingConfirmed result={result} locale={locale} />
 
@@ -191,6 +201,7 @@ export function BookingFlow({
                   onClick={() => {
                     setChildren((current) => current.filter((_, i) => i !== index))
                     setConfirmed((current) => current.filter((_, i) => i !== index))
+                    setSessionIds((current) => current.filter((_, i) => i !== index))
                   }}
                   data-testid={`booking-remove-child-${index}`}
                 >
@@ -205,6 +216,7 @@ export function BookingFlow({
           onClick={() => {
             setChildren((current) => [...current, blankChild()])
             setConfirmed((current) => [...current, false])
+            setSessionIds((current) => [...current, ''])
           }}
           data-testid="booking-add-child"
         >
@@ -260,18 +272,28 @@ export function BookingFlow({
   }
 
   // -- step 4: the session picker ---------------------------------------------
+  // §5.4a step 4 is 'one pick per child'. A child whose group has no bookable session at
+  // all is not a reason to block the others -- the manager can place them by hand, and
+  // the backend accepts a booking with no session id.
+  const everyChildHasASlot = children.every(
+    (child, index) =>
+      sessionIds[index] || (slotsByGroup[child.group_id] ?? []).every((slot) => !slot.is_bookable),
+  )
+
   const submit = (event: FormEvent) => {
     event.preventDefault()
     setSending(true)
     setError(null)
     client
       .book({
-        group_id: chosenGroup,
-        session_id: sessionId,
-        children: children.map((child) => ({
+        children: children.map((child, index) => ({
           first_name: child.first_name,
           last_name: child.last_name,
           birthdate: child.birthdate || null,
+          // §5.4a steps 2 and 4 are both per child. Sending one group and one session for
+          // the whole booking put every sibling in the eldest's group and slot.
+          group_id: child.group_id,
+          session_id: sessionIds[index] || null,
         })),
         // One per child, same order — the server validates the pairing.
         trial_health_declarations: children.map(() => ({ confirmed: true })),
@@ -293,33 +315,52 @@ export function BookingFlow({
   return (
     <form onSubmit={submit} aria-labelledby="booking-slot" data-testid="booking-slot">
       <h3 id="booking-slot">{t(locale, 'people.landing.chooseSlot')}</h3>
-      {slots.length === 0 ? (
-        <p data-testid="booking-no-slots">{t(locale, 'people.landing.noSlots')}</p>
-      ) : (
-        <ul style={listStyle}>
-          {slots.map((slot) => (
-            <li key={slot.session_id}>
-              <label>
-                <input
-                  type="radio"
-                  name="slot"
-                  value={slot.session_id}
-                  checked={sessionId === slot.session_id}
-                  // §5.4 — 'the picker greys out a slot rather than hiding it, so a parent
-                  // can see the class exists and pick a different week instead of
-                  // concluding there is nothing.'
-                  disabled={!slot.is_bookable}
-                  onChange={() => setSessionId(slot.session_id)}
-                  data-testid={`booking-slot-${slot.session_id}`}
-                />
-                {formatDateInStudioZone(slot.starts_at, locale)}{' '}
-                {formatTimeInStudioZone(slot.starts_at, locale)}
-                {slot.is_bookable ? '' : ` — ${t(locale, 'people.landing.slotUnavailable')}`}
-              </label>
-            </li>
-          ))}
-        </ul>
-      )}
+      {children.map((child, index) => {
+        const forChild = slotsByGroup[child.group_id] ?? []
+        return (
+          <fieldset key={index} data-testid={`booking-slot-child-${index}`}>
+            {/* Named, because with two lists on screen an unlabelled one belongs to
+                nobody — and picking the wrong child's slot is the bug this screen was
+                just rebuilt to make impossible. */}
+            <legend>
+              <bdi>{`${child.first_name} ${child.last_name}`}</bdi>
+            </legend>
+            {forChild.length === 0 ? (
+              <p data-testid={`booking-no-slots-${index}`}>{t(locale, 'people.landing.noSlots')}</p>
+            ) : (
+              <ul style={listStyle}>
+                {forChild.map((slot) => (
+                  <li key={slot.session_id}>
+                    <label>
+                      <input
+                        type="radio"
+                        // One radio GROUP per child, or the second child's pick would
+                        // clear the first's.
+                        name={`slot-${index}`}
+                        value={slot.session_id}
+                        checked={sessionIds[index] === slot.session_id}
+                        // §5.4 — 'the picker greys out a slot rather than hiding it, so a
+                        // parent can see the class exists and pick a different week
+                        // instead of concluding there is nothing.'
+                        disabled={!slot.is_bookable}
+                        onChange={() =>
+                          setSessionIds((current) =>
+                            current.map((id, i) => (i === index ? slot.session_id : id)),
+                          )
+                        }
+                        data-testid={`booking-slot-${index}-${slot.session_id}`}
+                      />
+                      {formatDateInStudioZone(slot.starts_at, locale)}{' '}
+                      {formatTimeInStudioZone(slot.starts_at, locale)}
+                      {slot.is_bookable ? '' : ` — ${t(locale, 'people.landing.slotUnavailable')}`}
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </fieldset>
+        )
+      })}
 
       {error ? (
         <span data-testid="booking-error">
@@ -341,7 +382,7 @@ export function BookingFlow({
       <Button variant="ghost" onClick={() => setStep('health')}>
         {t(locale, 'people.landing.back')}
       </Button>
-      <Button type="submit" disabled={!sessionId || sending} data-testid="booking-submit">
+      <Button type="submit" disabled={!everyChildHasASlot || sending} data-testid="booking-submit">
         {sending ? t(locale, 'people.landing.submitting') : t(locale, 'people.landing.submit')}
       </Button>
     </form>

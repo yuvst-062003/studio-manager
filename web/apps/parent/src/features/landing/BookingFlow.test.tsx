@@ -48,10 +48,26 @@ const SLOTS: TrialSlot[] = [
   },
 ]
 
+const SQUAD_SLOTS: TrialSlot[] = [
+  {
+    session_id: 's9',
+    group_id: 'g2',
+    group_name: 'נבחרת',
+    starts_at: '2026-09-07T18:00:00Z',
+    ends_at: '2026-09-07T19:30:00Z',
+    location_name: null,
+    is_bookable: true,
+  },
+]
+
 function makeClient(bookResponse = new Response(null, { status: 201 })): LandingClient {
   return {
     landing: vi.fn(),
-    trialSlots: vi.fn(() => Promise.resolve({ items: SLOTS })),
+    // Keyed by group, because §5.4a step 4 is 'the next N upcoming sessions of EACH
+    // chosen group'. A stub that ignores the group id cannot fail the sibling case.
+    trialSlots: vi.fn((groupId: string) =>
+      Promise.resolve({ items: groupId === 'g2' ? SQUAD_SLOTS : SLOTS }),
+    ),
     book: vi.fn(() => Promise.resolve(bookResponse)),
   } as unknown as LandingClient
 }
@@ -161,8 +177,8 @@ describe('BookingFlow — §5.4a steps 1-4', () => {
     await user.click(screen.getByLabelText(t('he', 'people.trialHealth.confirm')))
     await user.click(screen.getByTestId('booking-to-slot'))
 
-    expect(await screen.findByTestId('booking-slot-s1')).toBeEnabled()
-    expect(screen.getByTestId('booking-slot-s2')).toBeDisabled()
+    expect(await screen.findByTestId('booking-slot-0-s1')).toBeEnabled()
+    expect(screen.getByTestId('booking-slot-0-s2')).toBeDisabled()
   })
 
   it('submits every child and one declaration each, in order', async () => {
@@ -173,16 +189,80 @@ describe('BookingFlow — §5.4a steps 1-4', () => {
     await user.click(screen.getByTestId('booking-to-health'))
     await user.click(screen.getByLabelText(t('he', 'people.trialHealth.confirm')))
     await user.click(screen.getByTestId('booking-to-slot'))
-    await user.click(await screen.findByTestId('booking-slot-s1'))
+    await user.click(await screen.findByTestId('booking-slot-0-s1'))
     await user.click(screen.getByTestId('booking-submit'))
 
     await waitFor(() => expect(client.book).toHaveBeenCalled())
     const body = vi.mocked(client.book).mock.calls[0]![0]
-    expect(body.group_id).toBe('g1')
-    expect(body.session_id).toBe('s1')
     expect(body.children).toHaveLength(1)
+    expect(body.children[0]!.group_id).toBe('g1')
+    expect(body.children[0]!.session_id).toBe('s1')
     // One declaration per child, same order — the server validates the pairing.
     expect(body.trial_health_declarations).toHaveLength(body.children.length)
+  })
+
+  it('sends each sibling their OWN group and their OWN slot', async () => {
+    // §5.4a step 2 is per child — 'groups filtered by the child's age' — and step 4 is
+    // 'the next N upcoming sessions of each chosen group, ONE PICK PER CHILD'. The age
+    // filter exists for siblings who do not belong in the same group, so applying child
+    // 0's choice to everyone breaks the exact case the picker was built for: a 6-year-old
+    // silently ends up in the 12-16 squad with their older brother.
+    const user = userEvent.setup()
+    const client = makeClient()
+    render(<BookingFlow slug="judo" locale="he" client={client} groups={GROUPS} signedIn />)
+
+    await user.type(screen.getByLabelText(t('he', 'people.student.firstName')), 'נועה')
+    await user.type(screen.getByLabelText(t('he', 'people.student.lastName')), 'לוי')
+    await user.selectOptions(screen.getByTestId('booking-group-0'), 'g1')
+
+    await user.click(screen.getByTestId('booking-add-child'))
+    await user.type(screen.getAllByLabelText(t('he', 'people.student.firstName'))[1]!, 'יוסי')
+    await user.type(screen.getAllByLabelText(t('he', 'people.student.lastName'))[1]!, 'לוי')
+    await user.selectOptions(screen.getByTestId('booking-group-1'), 'g2')
+
+    await user.click(screen.getByTestId('booking-to-health'))
+    for (const box of screen.getAllByLabelText(t('he', 'people.trialHealth.confirm'))) {
+      await user.click(box)
+    }
+    await user.click(screen.getByTestId('booking-to-slot'))
+
+    // Each child is offered their own group's sessions and nobody else's.
+    await user.click(await screen.findByTestId('booking-slot-0-s1'))
+    await user.click(await screen.findByTestId('booking-slot-1-s9'))
+    expect(screen.queryByTestId('booking-slot-1-s1')).toBeNull()
+    expect(screen.queryByTestId('booking-slot-0-s9')).toBeNull()
+
+    await user.click(screen.getByTestId('booking-submit'))
+    await waitFor(() => expect(client.book).toHaveBeenCalled())
+
+    const body = vi.mocked(client.book).mock.calls[0]![0]
+    expect(body.children).toHaveLength(2)
+    expect(body.children[0]!.group_id).toBe('g1')
+    expect(body.children[0]!.session_id).toBe('s1')
+    expect(body.children[1]!.group_id).toBe('g2')
+    expect(body.children[1]!.session_id).toBe('s9')
+  })
+
+  it('will not submit until every child has picked a slot of their own', async () => {
+    // §5.4a step 4 — 'one pick per child'. Submitting with one sibling unbooked is the
+    // silent half of the same bug.
+    const user = userEvent.setup()
+    render(<BookingFlow slug="judo" locale="he" client={makeClient()} groups={GROUPS} signedIn />)
+    await fillOneChild(user)
+    await user.click(screen.getByTestId('booking-add-child'))
+    await user.type(screen.getAllByLabelText(t('he', 'people.student.firstName'))[1]!, 'יוסי')
+    await user.type(screen.getAllByLabelText(t('he', 'people.student.lastName'))[1]!, 'לוי')
+    await user.selectOptions(screen.getByTestId('booking-group-1'), 'g2')
+    await user.click(screen.getByTestId('booking-to-health'))
+    for (const box of screen.getAllByLabelText(t('he', 'people.trialHealth.confirm'))) {
+      await user.click(box)
+    }
+    await user.click(screen.getByTestId('booking-to-slot'))
+
+    await user.click(await screen.findByTestId('booking-slot-0-s1'))
+    expect(screen.getByTestId('booking-submit')).toBeDisabled()
+    await user.click(await screen.findByTestId('booking-slot-1-s9'))
+    expect(screen.getByTestId('booking-submit')).toBeEnabled()
   })
 
   it.each([
@@ -197,13 +277,13 @@ describe('BookingFlow — §5.4a steps 1-4', () => {
     await user.click(screen.getByTestId('booking-to-health'))
     await user.click(screen.getByLabelText(t('he', 'people.trialHealth.confirm')))
     await user.click(screen.getByTestId('booking-to-slot'))
-    await user.click(await screen.findByTestId('booking-slot-s1'))
+    await user.click(await screen.findByTestId('booking-slot-0-s1'))
     await user.click(screen.getByTestId('booking-submit'))
 
     expect(await screen.findByTestId('booking-error')).toHaveTextContent(t('he', key))
     // The chosen slot is still chosen — an error that resets the form makes somebody who
     // already hesitated start again.
-    expect(screen.getByTestId('booking-slot-s1')).toBeChecked()
+    expect(screen.getByTestId('booking-slot-0-s1')).toBeChecked()
   })
 
   it('renders the confirmation on success', async () => {
@@ -222,7 +302,7 @@ describe('BookingFlow — §5.4a steps 1-4', () => {
     await user.click(screen.getByTestId('booking-to-health'))
     await user.click(screen.getByLabelText(t('he', 'people.trialHealth.confirm')))
     await user.click(screen.getByTestId('booking-to-slot'))
-    await user.click(await screen.findByTestId('booking-slot-s1'))
+    await user.click(await screen.findByTestId('booking-slot-0-s1'))
     await user.click(screen.getByTestId('booking-submit'))
 
     expect(await screen.findByTestId('booking-confirmed')).toBeInTheDocument()

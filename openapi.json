@@ -2099,6 +2099,20 @@
       },
       "StudentCreate": {
         "properties": {
+          "attends_weekdays": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attends Weekdays"
+          },
           "birthdate": {
             "anyOf": [
               {
@@ -3048,6 +3062,44 @@
         "title": "SwitchStudioRequest",
         "type": "object"
       },
+      "TrialBookingConfirmationOut": {
+        "description": "§5.4a step 5's \"נתראה ביום א׳ 17:00\", once per child.\n\nTwo siblings in different groups have two different answers to 'which group' and\n'when', so `13b` renders one of these per child rather than one for the booking.",
+        "properties": {
+          "group_name": {
+            "title": "Group Name",
+            "type": "string"
+          },
+          "session_starts_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Starts At"
+          },
+          "student_display_name": {
+            "title": "Student Display Name",
+            "type": "string"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "student_id",
+          "student_display_name",
+          "group_name",
+          "session_starts_at"
+        ],
+        "title": "TrialBookingConfirmationOut",
+        "type": "object"
+      },
       "TrialBookingCreate": {
         "description": "§5.4a — 'A manager can also log a phone enquiry, producing the same rows.'",
         "properties": {
@@ -3247,7 +3299,7 @@
         "properties": {
           "children": {
             "items": {
-              "$ref": "#/components/schemas/StudentCreate"
+              "$ref": "#/components/schemas/TrialChildIn"
             },
             "maxItems": 10,
             "minItems": 1,
@@ -3255,14 +3307,28 @@
             "type": "array"
           },
           "group_id": {
-            "format": "uuid",
-            "title": "Group Id",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Group Id"
           },
           "session_id": {
-            "format": "uuid",
-            "title": "Session Id",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id"
           },
           "trial_health_declarations": {
             "items": {
@@ -3274,8 +3340,6 @@
           }
         },
         "required": [
-          "group_id",
-          "session_id",
           "children"
         ],
         "title": "TrialBookingSelfIn",
@@ -3284,21 +3348,12 @@
       "TrialBookingSelfResult": {
         "description": "§5.4a step 5 — 'אישור: \"נתראה ביום א׳ 17:00\" · [ הוסף ליומן ] · .ics'.\n\nEverything artboard `13b` renders, in one response, because the parent has no studio in\ntheir token yet and a second round trip would need one.",
         "properties": {
-          "group_name": {
-            "title": "Group Name",
-            "type": "string"
-          },
-          "session_starts_at": {
-            "anyOf": [
-              {
-                "format": "date-time",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Session Starts At"
+          "bookings": {
+            "items": {
+              "$ref": "#/components/schemas/TrialBookingConfirmationOut"
+            },
+            "title": "Bookings",
+            "type": "array"
           },
           "students": {
             "items": {
@@ -3318,9 +3373,7 @@
         },
         "required": [
           "studio_slug",
-          "studio_name",
-          "group_name",
-          "session_starts_at"
+          "studio_name"
         ],
         "title": "TrialBookingSelfResult",
         "type": "object"
@@ -3365,6 +3418,113 @@
           }
         },
         "title": "TrialBookingUpdate",
+        "type": "object"
+      },
+      "TrialChildIn": {
+        "description": "One child in §5.4a's booking, with the two choices the spec makes **per child**.\n\nStep 2 is \"class ▸ group (groups filtered by the child's age)\" and step 4 is \"the next\nN upcoming sessions of each chosen group, **one pick per child**\". Siblings of\ndifferent ages are the whole reason the group list is age-filtered, so a booking that\ncan only carry one group cannot express the case the picker exists for.",
+        "properties": {
+          "attends_weekdays": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attends Weekdays"
+          },
+          "birthdate": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Birthdate"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "first_name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "First Name",
+            "type": "string"
+          },
+          "group_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Group Id"
+          },
+          "guardian": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GuardianCreate"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "last_name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Last Name",
+            "type": "string"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id"
+          }
+        },
+        "required": [
+          "first_name",
+          "last_name"
+        ],
+        "title": "TrialChildIn",
         "type": "object"
       },
       "TrialSlotListResponse": {

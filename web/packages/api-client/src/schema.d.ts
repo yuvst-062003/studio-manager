@@ -2008,6 +2008,8 @@ export interface components {
         };
         /** StudentCreate */
         StudentCreate: {
+            /** Attends Weekdays */
+            attends_weekdays?: number[] | null;
             /** Birthdate */
             birthdate?: string | null;
             /** Email */
@@ -2355,6 +2357,26 @@ export interface components {
             studio_id: string;
         };
         /**
+         * TrialBookingConfirmationOut
+         * @description §5.4a step 5's "נתראה ביום א׳ 17:00", once per child.
+         *
+         *     Two siblings in different groups have two different answers to 'which group' and
+         *     'when', so `13b` renders one of these per child rather than one for the booking.
+         */
+        TrialBookingConfirmationOut: {
+            /** Group Name */
+            group_name: string;
+            /** Session Starts At */
+            session_starts_at: string | null;
+            /** Student Display Name */
+            student_display_name: string;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+        };
+        /**
          * TrialBookingCreate
          * @description §5.4a — 'A manager can also log a phone enquiry, producing the same rows.'
          */
@@ -2453,17 +2475,11 @@ export interface components {
          */
         TrialBookingSelfIn: {
             /** Children */
-            children: components["schemas"]["StudentCreate"][];
-            /**
-             * Group Id
-             * Format: uuid
-             */
-            group_id: string;
-            /**
-             * Session Id
-             * Format: uuid
-             */
-            session_id: string;
+            children: components["schemas"]["TrialChildIn"][];
+            /** Group Id */
+            group_id?: string | null;
+            /** Session Id */
+            session_id?: string | null;
             /** Trial Health Declarations */
             trial_health_declarations?: {
                 [key: string]: unknown;
@@ -2477,10 +2493,8 @@ export interface components {
          *     their token yet and a second round trip would need one.
          */
         TrialBookingSelfResult: {
-            /** Group Name */
-            group_name: string;
-            /** Session Starts At */
-            session_starts_at: string | null;
+            /** Bookings */
+            bookings?: components["schemas"]["TrialBookingConfirmationOut"][];
             /** Students */
             students?: components["schemas"]["StudentSummaryOut"][];
             /** Studio Name */
@@ -2503,6 +2517,34 @@ export interface components {
             coach_note?: string | null;
             /** Outcome */
             outcome?: string | null;
+        };
+        /**
+         * TrialChildIn
+         * @description One child in §5.4a's booking, with the two choices the spec makes **per child**.
+         *
+         *     Step 2 is "class ▸ group (groups filtered by the child's age)" and step 4 is "the next
+         *     N upcoming sessions of each chosen group, **one pick per child**". Siblings of
+         *     different ages are the whole reason the group list is age-filtered, so a booking that
+         *     can only carry one group cannot express the case the picker exists for.
+         */
+        TrialChildIn: {
+            /** Attends Weekdays */
+            attends_weekdays?: number[] | null;
+            /** Birthdate */
+            birthdate?: string | null;
+            /** Email */
+            email?: string | null;
+            /** First Name */
+            first_name: string;
+            /** Group Id */
+            group_id?: string | null;
+            guardian?: components["schemas"]["GuardianCreate"] | null;
+            /** Last Name */
+            last_name: string;
+            /** Phone */
+            phone?: string | null;
+            /** Session Id */
+            session_id?: string | null;
         };
         /**
          * TrialSlotListResponse

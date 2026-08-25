@@ -11,9 +11,40 @@ import type { BookingResult } from './landingClient'
 const RESULT: BookingResult = {
   studio_slug: 'judo-tel-aviv',
   studio_name: 'מועדון ג׳ודו',
-  group_name: 'מתחילים',
-  session_starts_at: '2026-09-06T14:00:00Z',
   students: [{ id: 'st1', first_name: 'נועה', last_name: 'לוי' }],
+  bookings: [
+    {
+      student_id: 'st1',
+      student_display_name: 'נועה לוי',
+      group_name: 'מתחילים',
+      session_starts_at: '2026-09-06T14:00:00Z',
+    },
+  ],
+} as unknown as BookingResult
+
+/** Two siblings in different groups at different hours — the case a single group_name
+ *  and a single session_starts_at at the response root could not represent. */
+const SIBLINGS: BookingResult = {
+  studio_slug: 'judo-tel-aviv',
+  studio_name: 'מועדון ג׳ודו',
+  students: [
+    { id: 'st1', first_name: 'נועה', last_name: 'לוי' },
+    { id: 'st2', first_name: 'יוסי', last_name: 'לוי' },
+  ],
+  bookings: [
+    {
+      student_id: 'st1',
+      student_display_name: 'נועה לוי',
+      group_name: 'מתחילים',
+      session_starts_at: '2026-09-06T14:00:00Z',
+    },
+    {
+      student_id: 'st2',
+      student_display_name: 'יוסי לוי',
+      group_name: 'נבחרת',
+      session_starts_at: '2026-09-07T18:00:00Z',
+    },
+  ],
 } as unknown as BookingResult
 
 describe('BookingConfirmed — 13b', () => {
@@ -26,8 +57,22 @@ describe('BookingConfirmed — 13b', () => {
 
   it('renders the group and the time', () => {
     render(<BookingConfirmed result={RESULT} locale="he" />)
-    expect(screen.getByTestId('booked-group')).toHaveTextContent('מתחילים')
-    expect(screen.getByTestId('booked-when')).not.toBeEmptyDOMElement()
+    expect(screen.getByTestId('booked-group-0')).toHaveTextContent('מתחילים')
+    expect(screen.getByTestId('booked-when-0')).not.toBeEmptyDOMElement()
+  })
+
+  it('gives each sibling their OWN group and time', () => {
+    // §5.4a step 5 confirms what was actually booked, and two siblings in different groups
+    // have two different answers. One group name for the whole booking would be wrong for
+    // one of them — silently, which is how the per-child pick got lost upstream.
+    render(<BookingConfirmed result={SIBLINGS} locale="he" />)
+    expect(screen.getByTestId('booked-group-0')).toHaveTextContent('מתחילים')
+    expect(screen.getByTestId('booked-group-1')).toHaveTextContent('נבחרת')
+    expect(screen.getByTestId('booked-when-0').textContent).not.toEqual(
+      screen.getByTestId('booked-when-1').textContent,
+    )
+    expect(screen.getByText(/נועה לוי/)).toBeInTheDocument()
+    expect(screen.getByText(/יוסי לוי/)).toBeInTheDocument()
   })
 
   it('names each child who was booked', () => {
@@ -70,10 +115,14 @@ describe('BookingConfirmed — 13b', () => {
   })
 
   it('survives a booking with no session picked', () => {
-    // A manager-logged phone enquiry has no session id. The screen still confirms.
-    const noSession = { ...RESULT, session_starts_at: null } as unknown as BookingResult
+    // A group with no bookable session yet. The screen still confirms the group.
+    const noSession = {
+      ...RESULT,
+      bookings: [{ ...RESULT.bookings![0]!, session_starts_at: null }],
+    } as unknown as BookingResult
     render(<BookingConfirmed result={noSession} locale="he" />)
-    expect(screen.queryByTestId('booked-when')).toBeNull()
+    expect(screen.queryByTestId('booked-when-0')).toBeNull()
+    expect(screen.getByTestId('booked-group-0')).toBeInTheDocument()
     expect(screen.getByTestId('booking-confirmed')).toBeInTheDocument()
   })
 
@@ -104,9 +153,23 @@ describe('icsFor', () => {
   })
 
   it('omits DTSTART when no session was picked, rather than emitting a broken one', () => {
-    const noSession = { ...RESULT, session_starts_at: null } as unknown as BookingResult
+    const noSession = {
+      ...RESULT,
+      bookings: [{ ...RESULT.bookings![0]!, session_starts_at: null }],
+    } as unknown as BookingResult
     const ics = icsFor(noSession)
     expect(ics).not.toContain('DTSTART')
     expect(ics).toContain('END:VCALENDAR')
+  })
+
+  it('writes one VEVENT per child, so both siblings land in the calendar', () => {
+    // A single event would put one child in the parent's calendar and quietly drop the
+    // other — the same loss as the booking bug, one screen later.
+    const ics = icsFor(SIBLINGS)
+    expect(ics.match(/BEGIN:VEVENT/g)).toHaveLength(2)
+    expect(ics).toContain('DTSTART:20260906T140000Z')
+    expect(ics).toContain('DTSTART:20260907T180000Z')
+    expect(ics).toContain('נבחרת')
+    expect(ics.match(/BEGIN:VCALENDAR/g)).toHaveLength(1)
   })
 })

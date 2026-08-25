@@ -49,12 +49,35 @@ from app.services.people.status import StudentStatusService
 
 
 @dataclass
-class BookedTrial:
-    students: list[Student]
-    bookings: list[TrialBooking]
-    guardian_person_id: uuid.UUID
-    session_row: SessionRow | None
+class BookedChild:
+    """What §5.4a step 5 confirms, for ONE child.
+
+    Siblings can be in different groups at different hours, so `group` and `session_row`
+    hang off each child rather than off the booking. A single pair at the request level is
+    exactly the shape that silently booked every sibling into the eldest's group.
+    """
+
+    student: Student
+    booking: TrialBooking
     group: Group
+    session_row: SessionRow | None
+
+
+@dataclass
+class BookedTrial:
+    booked: list[BookedChild]
+    guardian_person_id: uuid.UUID
+    #: The studio every group in the request resolved to. All of them, or the booking was
+    #: refused -- see `_group_in_studio`.
+    studio_id: uuid.UUID
+
+    @property
+    def students(self) -> list[Student]:
+        return [row.student for row in self.booked]
+
+    @property
+    def bookings(self) -> list[TrialBooking]:
+        return [row.booking for row in self.booked]
 
 
 class TrialService:
@@ -139,8 +162,7 @@ class TrialService:
         session: Session,
         *,
         identity_id: uuid.UUID,
-        group_id: uuid.UUID,
-        session_id: uuid.UUID | None,
+        studio_id: uuid.UUID,
         children: list[dict[str, Any]],
         declarations: list[dict[str, Any]],
         provider_email: str | None,
@@ -157,12 +179,17 @@ class TrialService:
         Person -> Student(trial) -> Guardian(is_primary) -> TrialBooking -> status history,
         then one encrypted RegistrationRequest holding every child's trial declaration.
         """
-        group = session.get(Group, group_id)
-        if group is None:
-            raise NotFoundError(str(group_id))
-        session_row = session.get(SessionRow, session_id) if session_id else None
-        if session_id is not None and session_row is None:
-            raise NotFoundError(str(session_id))
+        # Every child's group and session are resolved BEFORE anything is written, so a
+        # request naming one bad group creates no half-booked family.
+        choices = [
+            TrialService._resolve_choice(
+                session,
+                studio_id=studio_id,
+                group_id=child.get("group_id"),
+                session_id=child.get("session_id"),
+            )
+            for child in children
+        ]
 
         parent = TrialService._resolve_parent(
             session,
@@ -182,9 +209,8 @@ class TrialService:
                 "this family has already used a free trial lesson; a manager can grant another"
             )
 
-        students: list[Student] = []
-        bookings: list[TrialBooking] = []
-        for child in children:
+        booked: list[BookedChild] = []
+        for child, (group, session_row) in zip(children, choices, strict=True):
             child_person = Person(
                 first_name=str(child["first_name"]).strip(),
                 last_name=str(child["last_name"]).strip(),
@@ -224,8 +250,8 @@ class TrialService:
             )
             booking = TrialBooking(
                 student_id=student.id,
-                session_id=session_id,
-                group_id=group_id,
+                session_id=session_row.id if session_row else None,
+                group_id=group.id,
                 booked_at=at,
                 # Three states, not two. NULL is "the lesson has not happened yet", which
                 # the follow-up ladder treats completely differently from "did not turn up".
@@ -235,9 +261,12 @@ class TrialService:
             )
             session.add(booking)
             session.flush()
-            students.append(student)
-            bookings.append(booking)
+            booked.append(
+                BookedChild(student=student, booking=booking, group=group, session_row=session_row)
+            )
 
+        students = [row.student for row in booked]
+        bookings = [row.booking for row in booked]
         if declarations:
             TrialService._store_trial_declarations(
                 session,
@@ -259,20 +288,48 @@ class TrialService:
             # -- §11.2 and G7: `audit_log` is append-only, so anything written here is
             # beyond anonymization's reach (§11.4).
             diff={
-                "group_id": str(group_id),
-                "session_id": str(session_id) if session_id else None,
-                "children": len(students),
+                # One entry per child. A single group_id here was accurate only while the
+                # booking had one group, and would now hide exactly the thing that went
+                # wrong if a sibling landed in the wrong place.
+                "group_ids": [str(row.group.id) for row in booked],
+                "session_ids": [
+                    str(row.session_row.id) if row.session_row else None for row in booked
+                ],
+                "children": len(booked),
                 "is_override": allow_override,
             },
         )
         session.flush()
-        return BookedTrial(
-            students=students,
-            bookings=bookings,
-            guardian_person_id=parent.id,
-            session_row=session_row,
-            group=group,
-        )
+        return BookedTrial(booked=booked, guardian_person_id=parent.id, studio_id=studio_id)
+
+    @staticmethod
+    def _resolve_choice(
+        session: Session,
+        *,
+        studio_id: uuid.UUID,
+        group_id: uuid.UUID | None,
+        session_id: uuid.UUID | None,
+    ) -> tuple[Group, SessionRow | None]:
+        """One child's group and session, checked against each other and the studio.
+
+        The studio check is not redundant with the tenant scope. The route resolves the
+        studio from the FIRST group and scopes everything to it, so without this a second
+        child could name a group in someone else's club and ride in on that resolution.
+        Group and session are checked against each other for the same reason one level
+        down: a session id from a different group would book the child into a lesson their
+        group never holds.
+        """
+        if group_id is None:  # pragma: no cover - the schema rejects this first
+            raise NotFoundError("group")
+        group = session.get(Group, group_id)
+        if group is None or group.studio_id != studio_id:
+            raise NotFoundError(str(group_id))
+        if session_id is None:
+            return group, None
+        session_row = session.get(SessionRow, session_id)
+        if session_row is None or session_row.group_id != group.id:
+            raise NotFoundError(str(session_id))
+        return group, session_row
 
     @staticmethod
     def _store_trial_declarations(

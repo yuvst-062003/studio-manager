@@ -113,8 +113,15 @@ class StudentCreate(BaseModel):
     birthdate: date | None = None
     phone: str | None = Field(default=None, max_length=40)
     email: str | None = Field(default=None, max_length=255)
-    #: §5.4 — a manager adding a student directly. The public link cannot reach this.
+    #: The group this child joins. §5.4(a) for a manager adding a student directly —
+    #: 'child details and group ... creates everything immediately' — and §5.4a step 2 for
+    #: a trial booking, where it is asked **per child** because the group list is filtered
+    #: by each child's age. Absent on a trial booking means 'use the one at the root'.
     group_id: uuid.UUID | None = None
+    #: C12 — which of that group's weekly sessions the child is actually expected at.
+    #: NULL means all of them, which is the default and the common case. Ignored when
+    #: `group_id` is absent, and by §5.4a's trial booking, which creates no enrollment.
+    attends_weekdays: list[int] | None = None
     #: §5.4(a) — 'parent details → child details and group'. One request, because a
     #: student with no guardian is a child nobody can be contacted about, and §5.3 makes
     #: at least one guardian structural rather than optional.
@@ -212,6 +219,20 @@ class TrialBookingOut(BaseModel):
     is_override: bool
 
 
+class TrialChildIn(StudentCreate):
+    """One child in §5.4a's booking, with the two choices the spec makes **per child**.
+
+    Step 2 is "class ▸ group (groups filtered by the child's age)" and step 4 is "the next
+    N upcoming sessions of each chosen group, **one pick per child**". Siblings of
+    different ages are the whole reason the group list is age-filtered, so a booking that
+    can only carry one group cannot express the case the picker exists for.
+    """
+
+    #: §5.4a step 4. Absent means 'use the root one', which is only honoured when this
+    #: child is in the root group — see `TrialBookingSelfIn._resolve_per_child_choices`.
+    session_id: uuid.UUID | None = None
+
+
 class TrialBookingSelfIn(BaseModel):
     """§7 — `POST /trial-bookings/self`, **authenticated**: the parent has just signed in.
 
@@ -222,12 +243,39 @@ class TrialBookingSelfIn(BaseModel):
     being written straight to a table (§11.1).
     """
 
-    group_id: uuid.UUID
-    session_id: uuid.UUID
-    children: list[StudentCreate] = Field(min_length=1, max_length=10)
+    #: §5.4a ① — 'A per-group QR pre-selects that group.' A default for children who name
+    #: no group of their own; a child's own `group_id` always wins. Optional because a
+    #: booking where every child chose for themselves has no single group to put here.
+    group_id: uuid.UUID | None = None
+    session_id: uuid.UUID | None = None
+    children: list[TrialChildIn] = Field(min_length=1, max_length=10)
     #: One per child, same order. Booleans and short answers only — never free text about
     #: a condition, which is what the full declaration (W3) is for.
     trial_health_declarations: list[dict[str, Any]] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _resolve_per_child_choices(self) -> TrialBookingSelfIn:
+        """Fold the root defaults into each child, so every layer below reads one place.
+
+        The session default is deliberately narrower than the group default: a root
+        `session_id` belongs to the root group, so handing it to a child who chose a
+        DIFFERENT group would book them into a lesson their group never holds. That is the
+        same class of mistake as applying one group to every child, one level down.
+        """
+        for child in self.children:
+            if child.group_id is None:
+                child.group_id = self.group_id
+                if child.session_id is None:
+                    child.session_id = self.session_id
+        without_a_group = [
+            index for index, child in enumerate(self.children) if child.group_id is None
+        ]
+        if without_a_group:
+            raise ValueError(
+                f"children at {without_a_group} have no group: give each child a group_id, "
+                "or one at the root for all of them"
+            )
+        return self
 
     @model_validator(mode="after")
     def _one_declaration_per_child(self) -> TrialBookingSelfIn:
@@ -471,6 +519,19 @@ class EnrollmentWeekdayOptionsOut(BaseModel):
 StudentSummaryPage = CursorPage[StudentSummaryOut]
 
 
+class TrialBookingConfirmationOut(BaseModel):
+    """§5.4a step 5's "נתראה ביום א׳ 17:00", once per child.
+
+    Two siblings in different groups have two different answers to 'which group' and
+    'when', so `13b` renders one of these per child rather than one for the booking.
+    """
+
+    student_id: uuid.UUID
+    student_display_name: str
+    group_name: str
+    session_starts_at: datetime | None
+
+
 class TrialBookingSelfResult(BaseModel):
     """§5.4a step 5 — 'אישור: "נתראה ביום א׳ 17:00" · [ הוסף ליומן ] · .ics'.
 
@@ -480,9 +541,12 @@ class TrialBookingSelfResult(BaseModel):
 
     studio_slug: str
     studio_name: str
-    group_name: str
-    session_starts_at: datetime | None
     students: list[StudentSummaryOut] = Field(default_factory=list)
+    #: One per child, in the order they were submitted. There is deliberately no
+    #: `group_name` on this model: with siblings in two groups, any single name here would
+    #: be wrong for one of them, and quietly wrong is how the per-child pick got lost in
+    #: the first place.
+    bookings: list[TrialBookingConfirmationOut] = Field(default_factory=list)
 
 
 class TrialBookingCreate(BaseModel):
