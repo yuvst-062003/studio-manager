@@ -5094,3 +5094,80 @@ implementation.
 entry and a `PENDING_TOOLS` entry but no separate §19.5 line item in the table above —
 §19.5 treats "offline / slow" as one tool. Both keys exist so M5 can register them
 independently, which is how §10.1's four network states will actually need them.
+
+---
+
+## Retrospective — what actually happened
+
+Recorded after the fact. Every item was verified, not assumed.
+
+**Final state.** 35 commits, `64cbfbe..1221aac`. Backend **316 passed**, 1 skipped, 1 xfailed
+(baseline 161). Frontend **574 passed** across 48 files (baseline 526). `tests/restrictions`
+holds **62 tests** across six files and runs unscoped in every lane, like `tests/invariants`.
+`./scripts/lane-check.sh core` green at **6 scoped gates**; `./scripts/ci-local.sh` green,
+including the generated-api-client diff.
+
+### Ten gates that could not fail, found and fixed
+
+This project had found six such gates before M0.4. This milestone found **ten more**, and
+three of them were written into this plan:
+
+1. **The `X-Dev-Now` leak test could not fail.** `TestClient` spawns a fresh anyio portal per
+   call, so each request gets an isolated context whether or not the middleware resets
+   anything. Replaced with a sync unit test of the contract plus an `httpx.ASGITransport`
+   test driven by `asyncio.run`, which shares one task — measured at `reset=True → None`,
+   `reset=False → 'SHIFTED'`.
+2. **`test_the_wipe_plan_deletes_children_before_parents` compared `[] == []`.** Every
+   tenant-scoped table in M0's metadata is excluded, so deleting `reversed()` would have
+   passed. Fixed with a synthetic parent/child FK pair.
+3. **`POST /dev/demo/reset` lost its `session.commit()` and all four prescribed tests stayed
+   green** — the response body is built before the commit. The same happened again in the
+   nightly worker. Both now have a persistence test reading back through an independent
+   session.
+4. **The §19.7 detector tested `"exclude_demo_studios" not in text`** — a decoy mention in a
+   comment satisfied it. Sharpened to require a call.
+5. **The `is_developer` grant detector missed `AuthIdentity(is_developer=True)` and
+   `.values(is_developer=True)`** — exactly M1's forms. A mid-milestone fix had traded a
+   false positive for a false negative in the one case the gate exists for. Only the
+   whole-branch review saw it.
+6. **`openapi.json` was stale**, so the "no dev surface" test would have passed before the
+   fix it was meant to prove. Caught by regenerating first and watching it fail.
+7–10. The wall-clock detector's `date.today()` blind spot; `lane-check.sh core` reading none
+   of `app/routers/dev.py`, `app/integrations/` or `app/workers/`; the bundle gate's harness
+   leaking `NODE_ENV=test`; and `FixtureLayer.tables` promising "a red build" while nothing
+   read it.
+
+### Three things the plan got wrong, found by measurement
+
+- **A CSS file imported by a tree-shaken module is still emitted.** Measured before the plan
+  was written: the JS marker vanished from `dist/`, the stylesheet did not. The plan's option
+  of "keep dev-bar-only CSS beside the feature" was rejected on that evidence — the dev bar
+  is styled with inline objects and has no stylesheet.
+- **`uvicorn`'s `reset_contextvars` branch never runs here** (it defaults to `False`). A
+  docstring citing it was corrected to name ordinary asyncio per-task context copying, and to
+  say what the reset actually protects: the worker path, not the HTTP path.
+- **Two docstrings asserted enforcement that does not run.** `seed()` claimed `TenantMixin`
+  stamps `studio_id` — the listeners are on `TenantSession` and every caller passes a plain
+  `Session`. In a codebase where the comment is the specification, a confidently wrong
+  docstring is worse than a missing one: it stops the next author checking.
+
+### Two environment hazards, both self-inflicted
+
+- **Symlinking `web/node_modules` across checkouts silently redirected workspace-internal
+  package resolution.** Every `@studio/*` import resolved to the *other* checkout's packages;
+  `t()` returned raw keys and the tests passed self-consistently. Copy or reinstall — never
+  symlink a workspace's `node_modules`.
+- **`docker-compose.yml` pins `container_name`**, so running `ci-local.sh` from a second
+  worktree would have created a new project and an empty volume, then claimed the running
+  container. `COMPOSE_PROJECT_NAME=studio-manager` makes compose adopt the existing project.
+
+### What M1 inherits
+
+Four obligations, each with a test already written that goes red until met — two of which say
+in their own failure message to delete themselves once they stop being vacuous. See
+[next-session.md](../../plan/next-session.md).
+
+**One boundary worth knowing:** the `is_developer` static detector catches literal grants
+(`= True`, `=1`). A grant through a *variable* is caught at runtime by `developer_may_act`
+and restriction 1, not at commit time. That split is deliberate — a grep that pretended to
+catch every form would be the more dangerous artefact.
