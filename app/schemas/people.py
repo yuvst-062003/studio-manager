@@ -468,3 +468,62 @@ class EnrollmentWeekdayOptionsOut(BaseModel):
 
 class StudentSummaryPage(CursorPage[StudentSummaryOut]):
     pass
+
+
+class TrialBookingSelfResult(BaseModel):
+    """§5.4a step 5 — 'אישור: "נתראה ביום א׳ 17:00" · [ הוסף ליומן ] · .ics'.
+
+    Everything artboard `13b` renders, in one response, because the parent has no studio in
+    their token yet and a second round trip would need one.
+    """
+
+    studio_slug: str
+    studio_name: str
+    group_name: str
+    session_starts_at: datetime | None
+    students: list[StudentSummaryOut] = Field(default_factory=list)
+
+
+class TrialBookingCreate(BaseModel):
+    """§5.4a — 'A manager can also log a phone enquiry, producing the same rows.'"""
+
+    group_id: uuid.UUID
+    session_id: uuid.UUID | None = None
+    child: StudentCreate
+    guardian: GuardianCreate
+
+
+class TrialBookingUpdate(BaseModel):
+    """§5.4a ③ — the coach marks attendance and may leave a note.
+
+    `attended` is `bool | None` **and** the field is optional, so three states survive the
+    wire: absent means "do not change", `null` means "not yet", `false` means "did not turn
+    up". The follow-up ladder treats the last two completely differently.
+    """
+
+    attended: bool | None = None
+    coach_note: str | None = Field(default=None, max_length=2000)
+    outcome: str | None = Field(default=None, pattern=TRIAL_OUTCOME_PATTERN)
+
+
+class TrialBookingRow(BaseModel):
+    """One row of the dashboard's שיעורי ניסיון queue (§5.4a ②).
+
+    Carries the child's name because a queue of timestamps is not a queue anyone can act
+    on — but nothing else about them, and nothing at all about health.
+    """
+
+    id: uuid.UUID
+    student_id: uuid.UUID
+    student_display_name: str
+    group_id: uuid.UUID
+    group_name: str
+    session_id: uuid.UUID | None
+    booked_at: datetime
+    attended: bool | None
+    outcome: str | None = Field(default=None, pattern=TRIAL_OUTCOME_PATTERN)
+    is_override: bool
+
+
+class TrialBookingRowPage(CursorPage[TrialBookingRow]):
+    pass

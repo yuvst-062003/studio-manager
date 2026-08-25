@@ -977,6 +977,105 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/trial-bookings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Trial Bookings
+         * @description §5.4a ② -- the dashboard's שיעורי ניסיון queue.
+         */
+        get: operations["list_trial_bookings_api_v1_trial_bookings_get"];
+        put?: never;
+        /**
+         * Log Trial Booking
+         * @description §5.4a -- 'A manager can also log a phone enquiry, producing the same rows.'
+         *
+         *     `AnyStaff` and not `ManagerOrOwner`: staff `11b` is a coach adding a trial student
+         *     mid-lesson, which §5.4a ③ describes and §3.2 permits -- it records an enquiry, it does
+         *     not enrol anybody. L6 is untouched: no enrollment is created here either.
+         */
+        post: operations["log_trial_booking_api_v1_trial_bookings_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/trial-bookings/self": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Book Trial For Self
+         * @description §5.4a steps 1-5. **Authenticated, but with no studio in the token.**
+         *
+         *     `SessionDep` and not `TenantSessionDep`, deliberately -- see the module docstring. The
+         *     writes below all happen inside a `TenantSession` scoped to the studio the group belongs
+         *     to, so nothing here escapes the tenant guard; it simply arrives by a different route.
+         *
+         *     §11.7's two controls: rate-limited per IP and per identity (see
+         *     `app/services/people/rate_limit.py` for what that limiter is and is not), and
+         *     sign-in-first standing in for the captcha that has no provider configured.
+         */
+        post: operations["book_trial_for_self_api_v1_trial_bookings_self_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/trial-bookings/{booking_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Trial Booking
+         * @description §5.4a ③ -- 'Coach marks attendance exactly as normal. Coach can leave a note.'
+         */
+        patch: operations["update_trial_booking_api_v1_trial_bookings__booking_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/trial-bookings/{booking_id}/grant-override": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Grant Override
+         * @description §5.4a -- a manager granting a **second** free trial, in one tap.
+         *
+         *     Manager-only, because §5.4a makes one free trial the rule and a second one "a
+         *     deliberate, visible, countable act rather than someone quietly adding a row".
+         */
+        post: operations["grant_override_api_v1_trial_bookings__booking_id__grant_override_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2000,6 +2099,168 @@ export interface components {
              * Format: uuid
              */
             studio_id: string;
+        };
+        /**
+         * TrialBookingCreate
+         * @description §5.4a — 'A manager can also log a phone enquiry, producing the same rows.'
+         */
+        TrialBookingCreate: {
+            child: components["schemas"]["StudentCreate"];
+            /**
+             * Group Id
+             * Format: uuid
+             */
+            group_id: string;
+            guardian: components["schemas"]["GuardianCreate"];
+            /** Session Id */
+            session_id?: string | null;
+        };
+        /** TrialBookingOut */
+        TrialBookingOut: {
+            /** Attended */
+            attended: boolean | null;
+            /**
+             * Booked At
+             * Format: date-time
+             */
+            booked_at: string;
+            /**
+             * Group Id
+             * Format: uuid
+             */
+            group_id: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Override */
+            is_override: boolean;
+            /** Outcome */
+            outcome?: string | null;
+            /** Session Id */
+            session_id: string | null;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+        };
+        /**
+         * TrialBookingRow
+         * @description One row of the dashboard's שיעורי ניסיון queue (§5.4a ②).
+         *
+         *     Carries the child's name because a queue of timestamps is not a queue anyone can act
+         *     on — but nothing else about them, and nothing at all about health.
+         */
+        TrialBookingRow: {
+            /** Attended */
+            attended: boolean | null;
+            /**
+             * Booked At
+             * Format: date-time
+             */
+            booked_at: string;
+            /**
+             * Group Id
+             * Format: uuid
+             */
+            group_id: string;
+            /** Group Name */
+            group_name: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Override */
+            is_override: boolean;
+            /** Outcome */
+            outcome?: string | null;
+            /** Session Id */
+            session_id: string | null;
+            /** Student Display Name */
+            student_display_name: string;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+        };
+        /** TrialBookingRowPage */
+        TrialBookingRowPage: {
+            /**
+             * Has More
+             * @default false
+             */
+            has_more: boolean;
+            /** Items */
+            items: components["schemas"]["TrialBookingRow"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /**
+         * TrialBookingSelfIn
+         * @description §7 — `POST /trial-bookings/self`, **authenticated**: the parent has just signed in.
+         *
+         *     §5.4's sign-in-first booking. The children are described here rather than matched by
+         *     the client, because §5.4 matches people on **verified email or phone** and a client
+         *     cannot verify anything. `trial_health_declarations` carries §5.4a's trial answers,
+         *     which is why the request lands in `registration_request.payload_encrypted` rather than
+         *     being written straight to a table (§11.1).
+         */
+        TrialBookingSelfIn: {
+            /** Children */
+            children: components["schemas"]["StudentCreate"][];
+            /**
+             * Group Id
+             * Format: uuid
+             */
+            group_id: string;
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
+            /** Trial Health Declarations */
+            trial_health_declarations?: {
+                [key: string]: unknown;
+            }[];
+        };
+        /**
+         * TrialBookingSelfResult
+         * @description §5.4a step 5 — 'אישור: "נתראה ביום א׳ 17:00" · [ הוסף ליומן ] · .ics'.
+         *
+         *     Everything artboard `13b` renders, in one response, because the parent has no studio in
+         *     their token yet and a second round trip would need one.
+         */
+        TrialBookingSelfResult: {
+            /** Group Name */
+            group_name: string;
+            /** Session Starts At */
+            session_starts_at: string | null;
+            /** Students */
+            students?: components["schemas"]["StudentSummaryOut"][];
+            /** Studio Name */
+            studio_name: string;
+            /** Studio Slug */
+            studio_slug: string;
+        };
+        /**
+         * TrialBookingUpdate
+         * @description §5.4a ③ — the coach marks attendance and may leave a note.
+         *
+         *     `attended` is `bool | None` **and** the field is optional, so three states survive the
+         *     wire: absent means "do not change", `null` means "not yet", `false` means "did not turn
+         *     up". The follow-up ladder treats the last two completely differently.
+         */
+        TrialBookingUpdate: {
+            /** Attended */
+            attended?: boolean | null;
+            /** Coach Note */
+            coach_note?: string | null;
+            /** Outcome */
+            outcome?: string | null;
         };
         /**
          * TrialSlotListResponse
@@ -3828,6 +4089,180 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    list_trial_bookings_api_v1_trial_bookings_get: {
+        parameters: {
+            query?: {
+                outcome?: string | null;
+                after?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrialBookingRowPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    log_trial_booking_api_v1_trial_bookings_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TrialBookingCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrialBookingOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    book_trial_for_self_api_v1_trial_bookings_self_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TrialBookingSelfIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrialBookingSelfResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_trial_booking_api_v1_trial_bookings__booking_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                booking_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TrialBookingUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrialBookingOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    grant_override_api_v1_trial_bookings__booking_id__grant_override_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                booking_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrialBookingOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
             };
         };
     };

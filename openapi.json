@@ -2677,6 +2677,358 @@
         "title": "SwitchStudioRequest",
         "type": "object"
       },
+      "TrialBookingCreate": {
+        "description": "§5.4a — 'A manager can also log a phone enquiry, producing the same rows.'",
+        "properties": {
+          "child": {
+            "$ref": "#/components/schemas/StudentCreate"
+          },
+          "group_id": {
+            "format": "uuid",
+            "title": "Group Id",
+            "type": "string"
+          },
+          "guardian": {
+            "$ref": "#/components/schemas/GuardianCreate"
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id"
+          }
+        },
+        "required": [
+          "group_id",
+          "child",
+          "guardian"
+        ],
+        "title": "TrialBookingCreate",
+        "type": "object"
+      },
+      "TrialBookingOut": {
+        "properties": {
+          "attended": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attended"
+          },
+          "booked_at": {
+            "format": "date-time",
+            "title": "Booked At",
+            "type": "string"
+          },
+          "group_id": {
+            "format": "uuid",
+            "title": "Group Id",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_override": {
+            "title": "Is Override",
+            "type": "boolean"
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "pattern": "^(pending|converted|lost)$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outcome"
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "student_id",
+          "group_id",
+          "session_id",
+          "booked_at",
+          "attended",
+          "is_override"
+        ],
+        "title": "TrialBookingOut",
+        "type": "object"
+      },
+      "TrialBookingRow": {
+        "description": "One row of the dashboard's שיעורי ניסיון queue (§5.4a ②).\n\nCarries the child's name because a queue of timestamps is not a queue anyone can act\non — but nothing else about them, and nothing at all about health.",
+        "properties": {
+          "attended": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attended"
+          },
+          "booked_at": {
+            "format": "date-time",
+            "title": "Booked At",
+            "type": "string"
+          },
+          "group_id": {
+            "format": "uuid",
+            "title": "Group Id",
+            "type": "string"
+          },
+          "group_name": {
+            "title": "Group Name",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_override": {
+            "title": "Is Override",
+            "type": "boolean"
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "pattern": "^(pending|converted|lost)$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outcome"
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id"
+          },
+          "student_display_name": {
+            "title": "Student Display Name",
+            "type": "string"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "student_id",
+          "student_display_name",
+          "group_id",
+          "group_name",
+          "session_id",
+          "booked_at",
+          "attended",
+          "is_override"
+        ],
+        "title": "TrialBookingRow",
+        "type": "object"
+      },
+      "TrialBookingRowPage": {
+        "properties": {
+          "has_more": {
+            "default": false,
+            "title": "Has More",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TrialBookingRow"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "TrialBookingRowPage",
+        "type": "object"
+      },
+      "TrialBookingSelfIn": {
+        "description": "§7 — `POST /trial-bookings/self`, **authenticated**: the parent has just signed in.\n\n§5.4's sign-in-first booking. The children are described here rather than matched by\nthe client, because §5.4 matches people on **verified email or phone** and a client\ncannot verify anything. `trial_health_declarations` carries §5.4a's trial answers,\nwhich is why the request lands in `registration_request.payload_encrypted` rather than\nbeing written straight to a table (§11.1).",
+        "properties": {
+          "children": {
+            "items": {
+              "$ref": "#/components/schemas/StudentCreate"
+            },
+            "maxItems": 10,
+            "minItems": 1,
+            "title": "Children",
+            "type": "array"
+          },
+          "group_id": {
+            "format": "uuid",
+            "title": "Group Id",
+            "type": "string"
+          },
+          "session_id": {
+            "format": "uuid",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "trial_health_declarations": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Trial Health Declarations",
+            "type": "array"
+          }
+        },
+        "required": [
+          "group_id",
+          "session_id",
+          "children"
+        ],
+        "title": "TrialBookingSelfIn",
+        "type": "object"
+      },
+      "TrialBookingSelfResult": {
+        "description": "§5.4a step 5 — 'אישור: \"נתראה ביום א׳ 17:00\" · [ הוסף ליומן ] · .ics'.\n\nEverything artboard `13b` renders, in one response, because the parent has no studio in\ntheir token yet and a second round trip would need one.",
+        "properties": {
+          "group_name": {
+            "title": "Group Name",
+            "type": "string"
+          },
+          "session_starts_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Starts At"
+          },
+          "students": {
+            "items": {
+              "$ref": "#/components/schemas/StudentSummaryOut"
+            },
+            "title": "Students",
+            "type": "array"
+          },
+          "studio_name": {
+            "title": "Studio Name",
+            "type": "string"
+          },
+          "studio_slug": {
+            "title": "Studio Slug",
+            "type": "string"
+          }
+        },
+        "required": [
+          "studio_slug",
+          "studio_name",
+          "group_name",
+          "session_starts_at"
+        ],
+        "title": "TrialBookingSelfResult",
+        "type": "object"
+      },
+      "TrialBookingUpdate": {
+        "description": "§5.4a ③ — the coach marks attendance and may leave a note.\n\n`attended` is `bool | None` **and** the field is optional, so three states survive the\nwire: absent means \"do not change\", `null` means \"not yet\", `false` means \"did not turn\nup\". The follow-up ladder treats the last two completely differently.",
+        "properties": {
+          "attended": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attended"
+          },
+          "coach_note": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coach Note"
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "pattern": "^(pending|converted|lost)$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outcome"
+          }
+        },
+        "title": "TrialBookingUpdate",
+        "type": "object"
+      },
       "TrialSlotListResponse": {
         "description": "Not a `CursorPage`: §7 asks for \"the next N bookable sessions\", which is a bounded\npeek rather than a list somebody pages through. G16's rule is about lists that grow.",
         "properties": {
@@ -5599,6 +5951,324 @@
         "summary": "Upload Logo",
         "tags": [
           "studio"
+        ]
+      }
+    },
+    "/api/v1/trial-bookings": {
+      "get": {
+        "description": "§5.4a ② -- the dashboard's שיעורי ניסיון queue.",
+        "operationId": "list_trial_bookings_api_v1_trial_bookings_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "outcome",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Outcome"
+            }
+          },
+          {
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "After"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrialBookingRowPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Trial Bookings",
+        "tags": [
+          "people"
+        ]
+      },
+      "post": {
+        "description": "§5.4a -- 'A manager can also log a phone enquiry, producing the same rows.'\n\n`AnyStaff` and not `ManagerOrOwner`: staff `11b` is a coach adding a trial student\nmid-lesson, which §5.4a ③ describes and §3.2 permits -- it records an enquiry, it does\nnot enrol anybody. L6 is untouched: no enrollment is created here either.",
+        "operationId": "log_trial_booking_api_v1_trial_bookings_post",
+        "parameters": [
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TrialBookingCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrialBookingOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Log Trial Booking",
+        "tags": [
+          "people"
+        ]
+      }
+    },
+    "/api/v1/trial-bookings/self": {
+      "post": {
+        "description": "§5.4a steps 1-5. **Authenticated, but with no studio in the token.**\n\n`SessionDep` and not `TenantSessionDep`, deliberately -- see the module docstring. The\nwrites below all happen inside a `TenantSession` scoped to the studio the group belongs\nto, so nothing here escapes the tenant guard; it simply arrives by a different route.\n\n§11.7's two controls: rate-limited per IP and per identity (see\n`app/services/people/rate_limit.py` for what that limiter is and is not), and\nsign-in-first standing in for the captcha that has no provider configured.",
+        "operationId": "book_trial_for_self_api_v1_trial_bookings_self_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TrialBookingSelfIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrialBookingSelfResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Book Trial For Self",
+        "tags": [
+          "people"
+        ]
+      }
+    },
+    "/api/v1/trial-bookings/{booking_id}": {
+      "patch": {
+        "description": "§5.4a ③ -- 'Coach marks attendance exactly as normal. Coach can leave a note.'",
+        "operationId": "update_trial_booking_api_v1_trial_bookings__booking_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "booking_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Booking Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TrialBookingUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrialBookingOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Trial Booking",
+        "tags": [
+          "people"
+        ]
+      }
+    },
+    "/api/v1/trial-bookings/{booking_id}/grant-override": {
+      "post": {
+        "description": "§5.4a -- a manager granting a **second** free trial, in one tap.\n\nManager-only, because §5.4a makes one free trial the rule and a second one \"a\ndeliberate, visible, countable act rather than someone quietly adding a row\".",
+        "operationId": "grant_override_api_v1_trial_bookings__booking_id__grant_override_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "booking_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Booking Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrialBookingOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Grant Override",
+        "tags": [
+          "people"
         ]
       }
     }

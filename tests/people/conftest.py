@@ -276,3 +276,35 @@ def tenant_session(studio: Studio) -> Iterator[TenantSession]:
     """
     with use_studio(studio.id), TenantSession(bind=get_engine(), expire_on_commit=False) as s:
         yield s
+
+
+@pytest.fixture(autouse=True)
+def encryption_keys(monkeypatch) -> None:
+    """A keyring, for the one column in this wave that is encrypted at rest.
+
+    `registration_request.payload_encrypted` is an `EncryptedJSON` column (§11.1), and
+    `Keyring.from_settings()` refuses outright when `ENCRYPTION_KEYS` is empty. It IS empty
+    here and on CI -- neither has a local settings file, and `.github/workflows/ci.yml` sets
+    only the two database URLs -- because until this lane no test had ever written an
+    encrypted column against the database. `tests/core/test_encryption.py` builds its own
+    `Keyring` in process and never goes through settings, so the gap stayed invisible.
+
+    Set through `monkeypatch` rather than by writing a settings file, for the reason the
+    repo already applies elsewhere: a test that depends on one developer's local
+    environment passes on their machine and fails on the runner.
+
+    Thirty-two zero bytes, base64'd -- exactly what the checked-in example ships. It is a
+    test key and models nothing about production, where §11.1 puts these in Railway
+    secrets.
+    """
+    import base64
+
+    from app.core import encryption
+    from pydantic import SecretStr
+
+    monkeypatch.setattr(
+        encryption.settings,
+        "ENCRYPTION_KEYS",
+        {1: SecretStr(base64.b64encode(b"\x00" * 32).decode())},
+    )
+    monkeypatch.setattr(encryption.settings, "ENCRYPTION_ACTIVE_KEY_VERSION", 1)

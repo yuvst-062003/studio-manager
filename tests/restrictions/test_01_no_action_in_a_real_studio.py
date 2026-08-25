@@ -126,6 +126,17 @@ SESSION_DEP_ALLOWLIST: dict[str, str] = {
         "app/core/auth_context.py puts it on request.state, and every OTHER router "
         "takes TenantSessionDep and fails closed on it."
     ),
+    "trial_bookings.py": (
+        "One route in this file -- POST /trial-bookings/self -- is SPEC 6.1's single "
+        "self-service entry point: 'booking a trial creates the guardian row itself'. The "
+        "caller has just signed in and belongs to no studio, so their token carries no "
+        "`sid` and TenantSessionDep would 401 the one path a stranger is meant to take. "
+        "The unscoped session is used for exactly two reads -- the identity, and the "
+        "studio the chosen group belongs to -- and every WRITE then happens inside a "
+        "TenantSession opened with use_studio(that studio), so the rows are stamped and "
+        "guarded exactly as on any other route. Every other route in this file takes "
+        "TenantSessionDep."
+    ),
     "public.py": (
         "SPEC 6.1 -- 'Parent-app access needs no provisioning at all, because booking a "
         "trial creates the guardian row itself. That is the only self-service entry point "
