@@ -76,7 +76,8 @@ waves:
         on: 2026-08-25
       - id: M1.10
         title: The dashboard app — shell, 3d צוות and 3f הגדרות
-        status: pending
+        status: shipped
+        on: 2026-08-25
       - id: M1.11
         title: Parent home — artboard 1a
         status: pending
@@ -323,6 +324,22 @@ holdbacks:
     opened: 2026-08-24
     closed: null
     source: docs/plan/milestone-plan.md Part 5
+  - id: HB-c10-3f-health-toggle
+    kind: conflict
+    title: C10 — artboard 3f draws a setting SPEC §5.5 says must not exist
+    why: >-
+      3f's הגדרות panel includes a חסימת השתתפות ללא הצהרת בריאות toggle. §5.5 states in as
+      many words that there is no block_attendance_without_health setting — "nothing to
+      configure" — because a hard block stops the RECORD from being accurate without making
+      anyone safer, and the decision stays with the people in the room. M1.10 built the panel
+      without that row and carries a test that fails if it is added back from the canvas. The
+      conflict is in the mockup, not the code: either the artboard loses the row or §5.5
+      changes, and the mockup is what a human opens at 2am. Same family as C9.
+    blocks: W6
+    status: open
+    opened: 2026-08-25
+    closed: null
+    source: SPEC §5.5 · docs/design/canvas/03-manager-dashboard artboard 3f
   - id: HB-c9-canvas
     kind: conflict
     title: C9 — the D9 canvas edits are recorded but not applied

@@ -437,6 +437,23 @@ export interface paths {
         patch: operations["update_step_api_v1_setup_steps__step_id__patch"];
         trace?: never;
     };
+    "/api/v1/staff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Staff */
+        get: operations["list_staff_api_v1_staff_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/studio": {
         parameters: {
             query?: never;
@@ -890,6 +907,47 @@ export interface components {
              * @enum {string}
              */
             status: "pending" | "done" | "skipped";
+        };
+        /** StaffGroupOut */
+        StaffGroupOut: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+        };
+        /** StaffListResponse */
+        StaffListResponse: {
+            /**
+             * Groups Without Coach
+             * @description 3d's banner, at the resolution M1 can answer. It draws 'sessions this week with no coach', which needs materialised sessions; W2's SCHEDULE lane sharpens this to that.
+             */
+            groups_without_coach: components["schemas"]["StaffGroupOut"][];
+            /** Items */
+            items: components["schemas"]["StaffMemberOut"][];
+        };
+        /** StaffMemberOut */
+        StaffMemberOut: {
+            /** Email */
+            email?: string | null;
+            /** First Name */
+            first_name?: string | null;
+            /** Groups */
+            groups: components["schemas"]["StaffGroupOut"][];
+            /** Last Name */
+            last_name?: string | null;
+            /** Permissions */
+            permissions: string[];
+            /** Person Id */
+            person_id?: string | null;
+            /** Roles */
+            roles: string[];
+            /** Status */
+            status: string;
+            /**
+             * Weekly Hours
+             * @description Always null in M1. Weekly load is group_schedule_rule × session, both W2 contract models. Zero would report an idle coach rather than a missing measurement.
+             */
+            weekly_hours?: number | null;
         };
         /** StudioListResponse */
         StudioListResponse: {
@@ -1753,6 +1811,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_staff_api_v1_staff_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StaffListResponse"];
                 };
             };
         };

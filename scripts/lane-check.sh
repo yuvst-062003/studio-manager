@@ -74,7 +74,7 @@ case "$V" in
     # neither list is a router the stated gate does not reach. app/core/storage.py is
     # already covered by the `core` vertical's app/core.
     py_candidates=(app/services/structure app/routers/structure.py \
-                   app/routers/studio.py app/routers/setup.py \
+                   app/routers/studio.py app/routers/setup.py app/routers/staff.py \
                    app/models/structure.py app/models/health.py)
     test_candidates=(tests/structure)
     ;;

@@ -1003,6 +1003,142 @@
         "title": "SetupStepOut",
         "type": "object"
       },
+      "StaffGroupOut": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "StaffGroupOut",
+        "type": "object"
+      },
+      "StaffListResponse": {
+        "properties": {
+          "groups_without_coach": {
+            "description": "3d's banner, at the resolution M1 can answer. It draws 'sessions this week with no coach', which needs materialised sessions; W2's SCHEDULE lane sharpens this to that.",
+            "items": {
+              "$ref": "#/components/schemas/StaffGroupOut"
+            },
+            "title": "Groups Without Coach",
+            "type": "array"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/StaffMemberOut"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items",
+          "groups_without_coach"
+        ],
+        "title": "StaffListResponse",
+        "type": "object"
+      },
+      "StaffMemberOut": {
+        "properties": {
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "first_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Name"
+          },
+          "groups": {
+            "items": {
+              "$ref": "#/components/schemas/StaffGroupOut"
+            },
+            "title": "Groups",
+            "type": "array"
+          },
+          "last_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Name"
+          },
+          "permissions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Permissions",
+            "type": "array"
+          },
+          "person_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Person Id"
+          },
+          "roles": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Roles",
+            "type": "array"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "weekly_hours": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Always null in M1. Weekly load is group_schedule_rule × session, both W2 contract models. Zero would report an idle coach rather than a missing measurement.",
+            "title": "Weekly Hours"
+          }
+        },
+        "required": [
+          "roles",
+          "groups",
+          "permissions",
+          "status"
+        ],
+        "title": "StaffMemberOut",
+        "type": "object"
+      },
       "StudioListResponse": {
         "properties": {
           "items": {
@@ -2377,6 +2513,27 @@
         "summary": "Update Step",
         "tags": [
           "setup"
+        ]
+      }
+    },
+    "/api/v1/staff": {
+      "get": {
+        "operationId": "list_staff_api_v1_staff_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Staff",
+        "tags": [
+          "staff"
         ]
       }
     },
