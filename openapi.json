@@ -1,6 +1,22 @@
 {
   "components": {
     "schemas": {
+      "AcceptInvitationRequest": {
+        "description": "§6.1 step 3's `[ יש לי קוד הזמנה ]` branch.\n\nThe callback already accepts an `invitation_token`, but that only helps someone who\nhas the code BEFORE they sign in. A parent whose email differs from the invitation by\none character signs in successfully, matches nothing, and needs a way forward that is\nnot \"sign out and start again with a code you were not told to keep\".",
+        "properties": {
+          "token": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token"
+        ],
+        "title": "AcceptInvitationRequest",
+        "type": "object"
+      },
       "AppAccessOut": {
         "description": "§6.1's two queries, as the client sees them.\n\nTwo booleans and nothing else. A count of students or studios in the *other* app\nwould leak what §6.1 says neither refusal screen may: \"Neither screen leaks whether\nthe account exists in the other app.\"",
         "properties": {
@@ -1065,6 +1081,48 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/auth/accept-invitation": {
+      "post": {
+        "description": "§6.1 step 3 -- '[ יש לי קוד הזמנה ]'.\n\nThe same `accept_invitation` the callback uses, reached by someone who is already\nsigned in. Without it, a correctly-invited parent whose email differs from the\ninvitation by one character has no way forward at all -- and cannot tell their\nsituation apart from a genuine refusal.",
+        "operationId": "accept_invitation_code_api_v1_auth_accept_invitation_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptInvitationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Accept Invitation Code",
+        "tags": [
+          "identity"
+        ]
+      }
+    },
     "/api/v1/auth/logout": {
       "post": {
         "description": "Ends the session server-side, not merely locally.\n\nRevoking the family is what makes this different from clearing a cookie: a copy of\nthe cookie taken before logout would otherwise still refresh.",

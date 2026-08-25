@@ -26,6 +26,18 @@ class CallbackRequest(BaseModel):
     invitation_token: str | None = Field(default=None, max_length=128)
 
 
+class AcceptInvitationRequest(BaseModel):
+    """§6.1 step 3's `[ יש לי קוד הזמנה ]` branch.
+
+    The callback already accepts an `invitation_token`, but that only helps someone who
+    has the code BEFORE they sign in. A parent whose email differs from the invitation by
+    one character signs in successfully, matches nothing, and needs a way forward that is
+    not "sign out and start again with a code you were not told to keep".
+    """
+
+    token: str = Field(min_length=1, max_length=128)
+
+
 class SwitchStudioRequest(BaseModel):
     studio_id: uuid.UUID
 

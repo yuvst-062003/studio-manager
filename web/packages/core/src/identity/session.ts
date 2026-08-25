@@ -76,18 +76,28 @@ export function clearSession(): void {
   inFlightRefresh = null
 }
 
-function adopt(body: {
+/**
+ * Normalise a session response into the shape callers rely on.
+ *
+ * Every field is defaulted rather than trusted. The response comes from our own API, so
+ * in principle it always carries all five — but "in principle" is doing the work there,
+ * and the failure mode of being wrong is a `.find` on `undefined` inside a render, which
+ * is a WHITE SCREEN. Being signed out is a recoverable state a person understands; a
+ * blank app is neither. An endpoint that changes shape should degrade to "no access",
+ * not to nothing at all.
+ */
+function adopt(body: Partial<{
   access_token: string
   expires_in: number
   access: AppAccess
   studios: StudioMembership[]
   active_studio_id: string | null
-}): SessionState {
-  setAccessToken(body.access_token, body.expires_in)
+}>): SessionState {
+  if (body.access_token) setAccessToken(body.access_token, body.expires_in ?? 900)
   return {
-    access: body.access,
-    studios: body.studios,
-    activeStudioId: body.active_studio_id,
+    access: body.access ?? { staff: false, parent: false },
+    studios: body.studios ?? [],
+    activeStudioId: body.active_studio_id ?? null,
   }
 }
 

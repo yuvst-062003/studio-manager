@@ -258,3 +258,75 @@ def test_no_auth_request_schema_exposes_is_developer(client):
         for op in ops.values()
     ]
     assert "is_developer" not in str(bodies)
+
+
+# -- §6.1 step 3's invitation-code branch -------------------------------------
+def test_an_already_signed_in_person_can_redeem_an_invitation_code(
+    client, fake_provider, app_session
+):
+    """§6.1 step 3 -- '[ יש לי קוד הזמנה ]'. The callback's own invitation_token only helps
+    someone who has the code BEFORE signing in; a parent whose email differs from the
+    invitation by one character signs in successfully, matches nothing, and needs a way
+    forward that is not 'sign out and start again'."""
+    import hashlib
+    import secrets
+    from datetime import UTC, datetime, timedelta
+
+    from app.models.person import Invitation, Person
+    from app.models.studio import Studio
+
+    at = datetime.now(UTC)
+    token = secrets.token_urlsafe(16)
+    studio = Studio(name="מועדון", slug=f"inv-{uuid.uuid4().hex[:8]}")
+    app_session.add(studio)
+    app_session.flush()
+    app_session.add(
+        Person(
+            studio_id=studio.id,
+            first_name="שירה",
+            last_name="הורה",
+            email="late@example.invalid",
+        )
+    )
+    app_session.add(
+        Invitation(
+            studio_id=studio.id,
+            email="late@example.invalid",
+            intended_role="guardian",
+            token_hash=hashlib.sha256(token.encode()).hexdigest(),
+            expires_at=at + timedelta(days=7),
+        )
+    )
+    app_session.commit()
+
+    # Signs in with a DIFFERENT address, so nothing matches and §6.1's 'no match' branch
+    # is what she lands on.
+    fake_provider.register(
+        code="c-late", subject=f"late-{uuid.uuid4()}", email="typo@example.invalid"
+    )
+    signed = sign_in(client, code="c-late")
+    assert signed.json()["studios"] == []
+
+    token_header = {"Authorization": f"Bearer {signed.json()['access_token']}"}
+    redeemed = client.post(
+        "/api/v1/auth/accept-invitation", json={"token": token}, headers=token_header
+    )
+    assert redeemed.status_code == 200, redeemed.text
+    assert redeemed.json()["studios"][0]["studio_id"] == str(studio.id)
+    # The invitation named the studio, so accepting one is also choosing it.
+    assert redeemed.json()["active_studio_id"] == str(studio.id)
+
+
+def test_an_unknown_invitation_code_is_refused(client, fake_provider):
+    fake_provider.register(code="c-bad", subject=f"bad-{uuid.uuid4()}", email="b@example.invalid")
+    token = sign_in(client, code="c-bad").json()["access_token"]
+    response = client.post(
+        "/api/v1/auth/accept-invitation",
+        json={"token": "not-a-real-code"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 400
+
+
+def test_redeeming_an_invitation_requires_being_signed_in(client):
+    assert client.post("/api/v1/auth/accept-invitation", json={"token": "x"}).status_code == 401

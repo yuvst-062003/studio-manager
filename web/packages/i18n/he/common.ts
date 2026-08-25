@@ -43,6 +43,40 @@ export const common: Bundle = {
   'nav.myChildren': 'הילדים שלי',
   'nav.settings': 'הגדרות',
   'nav.signOut': 'התנתקות',
+  // §6.1's first run. The refusal wording is §6.1's own, verbatim.
+  'language.title': 'שפה',
+  'auth.continueWithGoogle': 'המשך עם Google',
+  'auth.continueWithApple': 'המשך עם Apple',
+  'auth.signingIn': 'מתחבר…',
+  'auth.notFound': 'לא מצאנו אותך',
+  'auth.haveInviteCode': 'יש לי קוד הזמנה',
+  'auth.registerToStudio': 'הרשמה לסטודיו',
+  'auth.inviteCodeLabel': 'קוד הזמנה',
+  'auth.inviteCodeSubmit': 'שליחה',
+  'refusal.staff.title': 'אין לך גישה לאפליקציית הצוות',
+  'refusal.staff.body': 'פנה למנהל הסטודיו שלך.',
+  'refusal.staff.otherApp': 'אפליקציית ההורים',
+  'refusal.parent.title': 'לא נמצאו תלמידים המשויכים אליך',
+  'refusal.parent.body': 'פנה למנהל הסטודיו שלך.',
+  'refusal.parent.otherApp': 'אפליקציית הצוות',
+  'tour.1': 'כאן השיעורים של היום',
+  'tour.2': 'לחיצה לסימון נוכחות',
+  'tour.3': 'עובד גם בלי אינטרנט',
+  'tour.skip': 'דילוג',
+  'tour.next': 'הבא',
+  'studioPicker.title': 'איזה סטודיו?',
+  // §6.5's iOS install walkthrough. There is no API to prompt with on iOS, so the steps
+  // are taught — and the share icon is NAMED, because a picture beside 'tap the icon' is
+  // not instructions for the parent most likely to need this screen.
+  'install.title': 'התקנת האפליקציה',
+  'install.why': 'התקנה נדרשת כדי לקבל התראות ולעבוד גם בלי אינטרנט',
+  'install.ios.step1': '1. הקישו על כפתור השיתוף בשורת הכתובת',
+  'install.ios.step2': '2. גללו ובחרו ״הוספה למסך הבית״',
+  'install.ios.step3': '3. הקישו ״הוספה״ ופתחו את האפליקציה מהמסך הבית',
+  'install.ios.shareIcon': 'כפתור השיתוף',
+  'install.ios.screenshotAlt': 'צילום מסך של תפריט השיתוף בספארי, עם ״הוספה למסך הבית״ מסומן',
+  'install.button': 'התקנה',
+  'install.done': 'האפליקציה מותקנת',
   // §19.4's persona switcher. These are §19.4's own labels, verbatim from the artboard:
   //   בעלים · מנהל · מאמן ראשי · מאמן משנה
   //   הורה (3 ילדים) · הורה (ילד אחד) · הורה (ניסיון) · הורה+מאמן · ללא הרשאות

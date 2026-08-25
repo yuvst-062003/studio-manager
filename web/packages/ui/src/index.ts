@@ -55,3 +55,13 @@ export { NavDrawer } from './shell/NavDrawer'
 export type { NavItem } from './shell/NavDrawer'
 export { StudioSwitcher } from './shell/StudioSwitcher'
 export type { SwitchableStudio } from './shell/StudioSwitcher'
+
+// §6.1's first run and §6.5's install walkthrough. Shared because both apps walk the same
+// four screens; only the branch AFTER sign-in differs, and that lives in each app's own
+// features/identity/Resolve.tsx.
+export { LanguagePicker } from './first-run/LanguagePicker'
+export { SignIn } from './first-run/SignIn'
+export type { SignInProvider } from './first-run/SignIn'
+export { RefusalScreen } from './first-run/RefusalScreen'
+export { InstallWalkthrough, isIosSafari } from './first-run/InstallWalkthrough'
+export type { InstallPromptEvent } from './first-run/InstallWalkthrough'

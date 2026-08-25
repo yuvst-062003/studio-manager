@@ -56,9 +56,9 @@ export function useSession(): Session {
       if (response.ok) {
         const me = await response.json()
         setState({
-          access: me.access,
-          studios: me.studios,
-          activeStudioId: me.active_studio_id,
+          access: me.access ?? { staff: false, parent: false },
+          studios: me.studios ?? [],
+          activeStudioId: me.active_studio_id ?? null,
         })
         setDev({
           devTools: Boolean(me.dev_tools),
@@ -94,7 +94,11 @@ export function useSession(): Session {
   // that can never fire in it.
   useEffect(() => startListeningForPersonaSwitch(), [])
 
-  const active = state?.studios.find((s) => s.studio_id === state.activeStudioId) ?? null
+  // `?? []` and not `state?.studios.find(...)`: a response missing `studios` would make
+  // that a `.find` on undefined INSIDE a render, which is a white screen rather than an
+  // error anyone can act on. `adopt` normalises too; this is the second layer because
+  // /auth/me's body reaches state without passing through it.
+  const active = (state?.studios ?? []).find((s) => s.studio_id === state?.activeStudioId) ?? null
 
   return {
     status,

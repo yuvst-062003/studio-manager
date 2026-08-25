@@ -62,6 +62,10 @@ waves:
         title: The §19.4 role switcher, backend and dev bar
         status: shipped
         on: 2026-08-25
+      - id: M1.7
+        title: §6.1 first run — language, sign-in, the two refusals and the install gate
+        status: shipped
+        on: 2026-08-25
   - id: W2
     milestone: M2 ∥ M3
     title: Schedule ∥ People and funnel

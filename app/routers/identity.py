@@ -34,9 +34,10 @@ from sqlalchemy import select
 from app.core.clock import now
 from app.core.config import settings
 from app.core.db import SessionDep
-from app.models.identity import OAuthTransaction
+from app.models.identity import AuthIdentity, OAuthTransaction
 from app.schemas.identity import (
     APPS,
+    AcceptInvitationRequest,
     AppAccessOut,
     CallbackRequest,
     MeResponse,
@@ -435,6 +436,46 @@ def logout(request: Request, response: Response, session: SessionDep) -> Respons
     response.delete_cookie(REFRESH_COOKIE_NAME, path=REFRESH_COOKIE_PATH)
     response.status_code = status.HTTP_204_NO_CONTENT
     return response
+
+
+@router.post("/accept-invitation", response_model=SessionResponse)
+def accept_invitation_code(
+    body: AcceptInvitationRequest, request: Request, response: Response, session: SessionDep
+) -> SessionResponse:
+    """§6.1 step 3 -- '[ יש לי קוד הזמנה ]'.
+
+    The same `accept_invitation` the callback uses, reached by someone who is already
+    signed in. Without it, a correctly-invited parent whose email differs from the
+    invitation by one character has no way forward at all -- and cannot tell their
+    situation apart from a genuine refusal.
+    """
+    identity_id = getattr(request.state, "identity_id", None)
+    if not isinstance(identity_id, uuid.UUID):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={"code": "unauthenticated", "message": "sign in first"},
+        )
+    try:
+        person = accept_invitation(session, token=body.token, identity_id=identity_id, at=now())
+    except InvitationRejectedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"code": "invitation_rejected", "message": "this invitation is not valid"},
+        ) from exc
+
+    identity = session.get(AuthIdentity, identity_id)
+    result = _build_session(
+        session,
+        response,
+        identity_id=identity_id,
+        is_developer=bool(identity and identity.is_developer),
+        is_platform_admin=is_platform_admin(session, identity_id),
+        # The invitation named the studio, so accepting one is also choosing it -- a
+        # parent who has just proved which club they belong to should not then be asked.
+        active_studio_id=person.studio_id,
+    )
+    session.commit()
+    return result
 
 
 @router.post("/switch-studio", response_model=SessionResponse)
