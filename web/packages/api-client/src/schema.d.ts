@@ -623,6 +623,90 @@ export interface paths {
         patch: operations["update_student_api_v1_students__student_id__patch"];
         trace?: never;
     };
+    "/api/v1/students/{student_id}/convert": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Convert Student
+         * @description §5.4a step 5. L6 -- manager-or-owner, because enrolment is always a manager decision
+         *     and this is the moment it is made.
+         */
+        post: operations["convert_student_api_v1_students__student_id__convert_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/students/{student_id}/freeze": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Freeze Student
+         * @description §5.4's freeze. Parent `12i` and dashboard `4a`. The enrollment and the spot are
+         *     retained -- see `StudentService.freeze`.
+         */
+        post: operations["freeze_student_api_v1_students__student_id__freeze_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/students/{student_id}/leave": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Leave Studio
+         * @description §5.4's leaving. `StudentLeaveIn` carries no money field and no write-off flag --
+         *     parent `12i`: the monthly charge stays the parent's responsibility.
+         */
+        post: operations["leave_studio_api_v1_students__student_id__leave_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/students/{student_id}/mark-lost": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark Student Lost
+         * @description §5.4a ⑤. The reason is required here and optional in the job: a manager pressing the
+         *     button knows why, and the job only knows that time passed.
+         */
+        post: operations["mark_student_lost_api_v1_students__student_id__mark_lost_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/students/{student_id}/price-plan": {
         parameters: {
             query?: never;
@@ -1304,6 +1388,29 @@ export interface components {
              */
             weekly_hours?: number | null;
         };
+        /**
+         * StudentConvertIn
+         * @description §5.4a step 5 — 'Manager converts → picks group, sets price, status=active,
+         *     enrollment created.' Three decisions in one request, because they are one decision.
+         */
+        StudentConvertIn: {
+            /** Attends Weekdays */
+            attends_weekdays?: number[] | null;
+            /**
+             * Group Id
+             * Format: uuid
+             */
+            group_id: string;
+            /** Price Plan Id */
+            price_plan_id?: string | null;
+            /** Reason */
+            reason?: string | null;
+            /**
+             * Started On
+             * Format: date
+             */
+            started_on: string;
+        };
         /** StudentCreate */
         StudentCreate: {
             /** Birthdate */
@@ -1385,6 +1492,50 @@ export interface components {
             phone?: string | null;
             /** Status */
             status: string;
+        };
+        /**
+         * StudentFreezeIn
+         * @description §7 — `POST /students/{id}/freeze`. §5.10 step 4: a frozen student generates no
+         *     charge for the frozen period, which is why this is a date range and not a boolean.
+         */
+        StudentFreezeIn: {
+            /**
+             * From Date
+             * Format: date
+             */
+            from_date: string;
+            /** Reason */
+            reason?: string | null;
+            /** To Date */
+            to_date?: string | null;
+        };
+        /**
+         * StudentLeaveIn
+         * @description §7 — `POST /students/{id}/leave`.
+         *
+         *     Parent artboard `12i` states it plainly: **the monthly charge stays the parent's
+         *     responsibility**. Leaving is not a refund, so this shape carries no money field and no
+         *     "cancel outstanding charges" flag. A manager who wants to write one off does it in the
+         *     billing screen, deliberately, where it is audit-logged as a write-off.
+         */
+        StudentLeaveIn: {
+            /**
+             * Left On
+             * Format: date
+             */
+            left_on: string;
+            /** Reason */
+            reason?: string | null;
+        };
+        /**
+         * StudentMarkLostIn
+         * @description §5.4a — 'No conversion after N days → status=lost, with a reason.' Required here
+         *     and optional in the job, because a manager pressing the button knows why and the job
+         *     only knows that time passed.
+         */
+        StudentMarkLostIn: {
+            /** Reason */
+            reason: string;
         };
         /**
          * StudentOut
@@ -2749,6 +2900,158 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["StudentUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    convert_student_api_v1_students__student_id__convert_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StudentConvertIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    freeze_student_api_v1_students__student_id__freeze_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StudentFreezeIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    leave_studio_api_v1_students__student_id__leave_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StudentLeaveIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mark_student_lost_api_v1_students__student_id__mark_lost_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StudentMarkLostIn"];
             };
         };
         responses: {

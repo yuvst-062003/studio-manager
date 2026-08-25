@@ -30,12 +30,20 @@ from datetime import date, datetime, timedelta
 from sqlalchemy import Select, or_, select
 from sqlalchemy.orm import Session
 
-from app.models.people import Enrollment, Student, StudentFreeze, StudentStatusHistory
+from app.models.people import (
+    Enrollment,
+    Student,
+    StudentFreeze,
+    StudentStatusHistory,
+    TrialBooking,
+)
 from app.models.person import Guardian, Invitation, Person
 from app.models.structure import Group, GroupStaff
 from app.services.audit import AuditService
 from app.services.people.errors import NotFoundError
+from app.services.people.group_days import ScheduleReader
 from app.services.people.matching import match_person
+from app.services.people.status import StudentStatusService
 
 #: §5.3's invitation. Thirty days matches the refresh-token window and is long enough that
 #: a parent who is away for a fortnight is not locked out of their own children.
@@ -395,6 +403,220 @@ class StudentService:
         )
 
     # -- writes ----------------------------------------------------------------
+    @staticmethod
+    def freeze(
+        session: Session,
+        *,
+        student_id: uuid.UUID,
+        from_date: date,
+        to_date: date | None,
+        reason: str | None,
+        at: datetime,
+        actor_person_id: uuid.UUID | None,
+    ) -> StudentFreeze:
+        """§5.4's freeze. A **date range**, not a boolean.
+
+        §5.10 step 4's billing run reads `student_freeze` rather than `student.status`,
+        because it asks about a *period*: a student frozen for March and back in April is
+        `frozen` today and still owes April. That is why the row is the artefact and the
+        status is the consequence.
+
+        The enrollments are deliberately left alone -- §5.4: "the enrollment and the spot
+        are retained". Ending them would give away the one thing the parent was promised
+        would be kept.
+        """
+        student, _person = StudentService.get(session, student_id=student_id)
+        row = StudentFreeze(
+            student_id=student.id,
+            from_date=from_date,
+            to_date=to_date,
+            reason=reason,
+            created_by_person_id=actor_person_id,
+            created_at=at,
+        )
+        session.add(row)
+        StudentStatusService.transition(
+            session,
+            student=student,
+            to_status="frozen",
+            at=at,
+            actor_person_id=actor_person_id,
+            reason=reason,
+        )
+        session.flush()
+        return row
+
+    @staticmethod
+    def expire_freezes(session: Session, *, on: date, at: datetime) -> list[Student]:
+        """Every student whose freeze has run out, reactivated.
+
+        §7 offers no unfreeze endpoint and §5.4 gives the freeze a return date, so the date
+        is what ends it. Without this a student stays `frozen` forever: the roster never
+        shows them again and the guardian is still reading "מוקפא" in April. Called daily
+        by `app/workers/followups.py`.
+
+        An open-ended freeze (`to_date IS NULL`) is never expired here. §5.4's army case has
+        no return date, and inventing one would put a child back on a roster they are not at.
+        """
+        frozen = list(session.execute(select(Student).where(Student.status == "frozen")).scalars())
+        reactivated: list[Student] = []
+        for student in frozen:
+            latest = session.execute(
+                select(StudentFreeze)
+                .where(StudentFreeze.student_id == student.id)
+                .order_by(StudentFreeze.from_date.desc())
+                .limit(1)
+            ).scalar_one_or_none()
+            if latest is None or latest.to_date is None or latest.to_date >= on:
+                continue
+            StudentStatusService.transition(
+                session, student=student, to_status="active", at=at, reason="freeze ended"
+            )
+            reactivated.append(student)
+        session.flush()
+        return reactivated
+
+    @staticmethod
+    def leave(
+        session: Session,
+        *,
+        student_id: uuid.UUID,
+        left_on: date,
+        reason: str | None,
+        at: datetime,
+        actor_person_id: uuid.UUID | None,
+    ) -> Student:
+        """§5.4's leaving, and parent `12i`'s promise kept in the negative.
+
+        **Nothing here touches money.** §5.4: "ending an enrollment mid-month does not void
+        that month's charge and produces no refund", and `12i` states it to the parent's
+        face. A manager who wants to write a charge off does it in the billing screen,
+        deliberately, where it is audit-logged as a write-off.
+
+        Every live enrollment ends, not one. C11 makes several normal, and a student who
+        left while still enrolled in the second group would keep appearing on that roster.
+        """
+        student, _person = StudentService.get(session, student_id=student_id)
+        live = list(
+            session.execute(
+                select(Enrollment).where(
+                    Enrollment.student_id == student.id, Enrollment.ended_on.is_(None)
+                )
+            ).scalars()
+        )
+        for enrollment in live:
+            enrollment.ended_on = left_on
+            enrollment.status = "ended"
+        student.left_on = left_on
+        StudentStatusService.transition(
+            session,
+            student=student,
+            to_status="left",
+            at=at,
+            actor_person_id=actor_person_id,
+            reason=reason,
+        )
+        session.flush()
+        return student
+
+    @staticmethod
+    def convert(
+        session: Session,
+        *,
+        student_id: uuid.UUID,
+        group_id: uuid.UUID,
+        started_on: date,
+        price_plan_id: uuid.UUID | None,
+        attends_weekdays: list[int] | None,
+        reason: str | None,
+        at: datetime,
+        actor_person_id: uuid.UUID | None,
+        schedule: ScheduleReader,
+    ) -> Student:
+        """§5.4a step 5 -- 'Manager converts → picks group, sets price, status=active,
+        enrollment created.'
+
+        **C11 puts the price on the student**, here, in one place, however many groups they
+        end up in. `EnrollmentService.create` writes no price because `enrollment` has no
+        column for one, and that absence is the fix for a child in two groups being billed
+        twice a month at two different prices.
+
+        **`health_status` is not promoted.** §5.4a: "The trial declaration is not sufficient
+        for enrollment... converting requires the full form." Moving it to `signed` here
+        would switch off the app's health gate for exactly the students who have signed
+        nothing.
+
+        The transition runs first: an illegal move must refuse before an enrollment is
+        written, or a refused conversion leaves the student in a group they were never
+        put in.
+        """
+        from app.services.people.enrollments import EnrollmentService
+
+        student, _person = StudentService.get(session, student_id=student_id)
+        StudentStatusService.transition(
+            session,
+            student=student,
+            to_status="active",
+            at=at,
+            actor_person_id=actor_person_id,
+            reason=reason,
+        )
+        student.joined_on = student.joined_on or started_on
+        student.price_plan_id = price_plan_id
+
+        EnrollmentService.create(
+            session,
+            student_id=student.id,
+            group_id=group_id,
+            started_on=started_on,
+            attends_weekdays=attends_weekdays,
+            at=at,
+            actor_person_id=actor_person_id,
+            schedule=schedule,
+            status="active",
+        )
+        StudentService._close_open_trials(session, student_id=student.id, outcome="converted")
+        session.flush()
+        return student
+
+    @staticmethod
+    def mark_lost(
+        session: Session,
+        *,
+        student_id: uuid.UUID,
+        reason: str | None,
+        at: datetime,
+        actor_person_id: uuid.UUID | None,
+    ) -> Student:
+        """§5.4a -- 'No conversion after N days → status=lost, with a reason.'
+
+        `lost` is a real outcome and not an absence of one, which is what makes the funnel
+        report's denominator honest.
+        """
+        student, _person = StudentService.get(session, student_id=student_id)
+        StudentStatusService.transition(
+            session,
+            student=student,
+            to_status="lost",
+            at=at,
+            actor_person_id=actor_person_id,
+            reason=reason,
+        )
+        StudentService._close_open_trials(session, student_id=student.id, outcome="lost")
+        session.flush()
+        return student
+
+    @staticmethod
+    def _close_open_trials(session: Session, *, student_id: uuid.UUID, outcome: str) -> None:
+        """§5.4a -- a trial booking left `pending` after the decision was made shows in the
+        funnel as a trial nobody ever decided about."""
+        for booking in session.execute(
+            select(TrialBooking).where(
+                TrialBooking.student_id == student_id, TrialBooking.outcome == "pending"
+            )
+        ).scalars():
+            booking.outcome = outcome
+
     @staticmethod
     def update(
         session: Session,

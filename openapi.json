@@ -1447,6 +1447,68 @@
         "title": "StaffMemberOut",
         "type": "object"
       },
+      "StudentConvertIn": {
+        "description": "§5.4a step 5 — 'Manager converts → picks group, sets price, status=active,\nenrollment created.' Three decisions in one request, because they are one decision.",
+        "properties": {
+          "attends_weekdays": {
+            "anyOf": [
+              {
+                "items": {
+                  "maximum": 6.0,
+                  "minimum": 0.0,
+                  "type": "integer"
+                },
+                "minItems": 1,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attends Weekdays"
+          },
+          "group_id": {
+            "format": "uuid",
+            "title": "Group Id",
+            "type": "string"
+          },
+          "price_plan_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Plan Id"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "started_on": {
+            "format": "date",
+            "title": "Started On",
+            "type": "string"
+          }
+        },
+        "required": [
+          "group_id",
+          "started_on"
+        ],
+        "title": "StudentConvertIn",
+        "type": "object"
+      },
       "StudentCreate": {
         "properties": {
           "birthdate": {
@@ -1706,6 +1768,88 @@
           "left_on"
         ],
         "title": "StudentDetailOut",
+        "type": "object"
+      },
+      "StudentFreezeIn": {
+        "description": "§7 — `POST /students/{id}/freeze`. §5.10 step 4: a frozen student generates no\ncharge for the frozen period, which is why this is a date range and not a boolean.",
+        "properties": {
+          "from_date": {
+            "format": "date",
+            "title": "From Date",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "to_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To Date"
+          }
+        },
+        "required": [
+          "from_date"
+        ],
+        "title": "StudentFreezeIn",
+        "type": "object"
+      },
+      "StudentLeaveIn": {
+        "description": "§7 — `POST /students/{id}/leave`.\n\nParent artboard `12i` states it plainly: **the monthly charge stays the parent's\nresponsibility**. Leaving is not a refund, so this shape carries no money field and no\n\"cancel outstanding charges\" flag. A manager who wants to write one off does it in the\nbilling screen, deliberately, where it is audit-logged as a write-off.",
+        "properties": {
+          "left_on": {
+            "format": "date",
+            "title": "Left On",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "required": [
+          "left_on"
+        ],
+        "title": "StudentLeaveIn",
+        "type": "object"
+      },
+      "StudentMarkLostIn": {
+        "description": "§5.4a — 'No conversion after N days → status=lost, with a reason.' Required here\nand optional in the job, because a manager pressing the button knows why and the job\nonly knows that time passed.",
+        "properties": {
+          "reason": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "StudentMarkLostIn",
         "type": "object"
       },
       "StudentOut": {
@@ -4226,6 +4370,298 @@
           }
         },
         "summary": "Update Student",
+        "tags": [
+          "people"
+        ]
+      }
+    },
+    "/api/v1/students/{student_id}/convert": {
+      "post": {
+        "description": "§5.4a step 5. L6 -- manager-or-owner, because enrolment is always a manager decision\nand this is the moment it is made.",
+        "operationId": "convert_student_api_v1_students__student_id__convert_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StudentConvertIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Convert Student",
+        "tags": [
+          "people"
+        ]
+      }
+    },
+    "/api/v1/students/{student_id}/freeze": {
+      "post": {
+        "description": "§5.4's freeze. Parent `12i` and dashboard `4a`. The enrollment and the spot are\nretained -- see `StudentService.freeze`.",
+        "operationId": "freeze_student_api_v1_students__student_id__freeze_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StudentFreezeIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Freeze Student",
+        "tags": [
+          "people"
+        ]
+      }
+    },
+    "/api/v1/students/{student_id}/leave": {
+      "post": {
+        "description": "§5.4's leaving. `StudentLeaveIn` carries no money field and no write-off flag --\nparent `12i`: the monthly charge stays the parent's responsibility.",
+        "operationId": "leave_studio_api_v1_students__student_id__leave_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StudentLeaveIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Leave Studio",
+        "tags": [
+          "people"
+        ]
+      }
+    },
+    "/api/v1/students/{student_id}/mark-lost": {
+      "post": {
+        "description": "§5.4a ⑤. The reason is required here and optional in the job: a manager pressing the\nbutton knows why, and the job only knows that time passed.",
+        "operationId": "mark_student_lost_api_v1_students__student_id__mark_lost_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StudentMarkLostIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Mark Student Lost",
         "tags": [
           "people"
         ]

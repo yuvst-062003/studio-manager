@@ -40,9 +40,13 @@ from app.models.person import Person
 from app.schemas._pagination import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, IdempotencyKey
 from app.schemas.people import (
     GuardianOut,
+    StudentConvertIn,
     StudentCreate,
     StudentCreateResult,
     StudentDetailOut,
+    StudentFreezeIn,
+    StudentLeaveIn,
+    StudentMarkLostIn,
     StudentOut,
     StudentPricePlanOut,
     StudentStatusHistoryListResponse,
@@ -50,7 +54,7 @@ from app.schemas.people import (
     StudentSummaryPage,
     StudentUpdate,
 )
-from app.services.people.errors import ConflictError, NotFoundError
+from app.services.people.errors import ConflictError, NotFoundError, RefusedError
 from app.services.people.students import StudentRow, StudentService
 
 router = APIRouter(tags=["people"])
@@ -77,6 +81,18 @@ def _refused(code: str, message: str) -> HTTPException:
     return HTTPException(
         status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         detail={"code": code, "message": message},
+    )
+
+
+def _schedule_unavailable() -> HTTPException:
+    """L5's seam, surfaced honestly rather than as a stack trace
+    (`.claude/rules/api.md`). This arm disappears when lane SCHEDULE merges."""
+    return HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail={
+            "code": "schedule_unavailable",
+            "message": "the club's schedule has not been built yet",
+        },
     )
 
 
@@ -302,6 +318,132 @@ def update_student(
     except NotFoundError as exc:
         raise _not_found() from exc
     session.commit()
+    return _out(session, student, person)
+
+
+@router.post("/students/{student_id}/freeze", response_model=StudentOut)
+def freeze_student(
+    _: ManagerOrOwner,
+    student_id: uuid.UUID,
+    body: StudentFreezeIn,
+    request: Request,
+    session: TenantSessionDep,
+    idempotency_key: IdempotencyKey = None,
+) -> StudentOut:
+    """§5.4's freeze. Parent `12i` and dashboard `4a`. The enrollment and the spot are
+    retained -- see `StudentService.freeze`."""
+    try:
+        StudentService.freeze(
+            session,
+            student_id=student_id,
+            from_date=body.from_date,
+            to_date=body.to_date,
+            reason=body.reason,
+            at=now(),
+            actor_person_id=getattr(request.state, "person_id", None),
+        )
+    except NotFoundError as exc:
+        raise _not_found() from exc
+    except RefusedError as exc:
+        raise _refused("refused", str(exc)) from exc
+    session.commit()
+    student, person = StudentService.get(session, student_id=student_id)
+    return _out(session, student, person)
+
+
+@router.post("/students/{student_id}/leave", response_model=StudentOut)
+def leave_studio(
+    _: ManagerOrOwner,
+    student_id: uuid.UUID,
+    body: StudentLeaveIn,
+    request: Request,
+    session: TenantSessionDep,
+    idempotency_key: IdempotencyKey = None,
+) -> StudentOut:
+    """§5.4's leaving. `StudentLeaveIn` carries no money field and no write-off flag --
+    parent `12i`: the monthly charge stays the parent's responsibility."""
+    try:
+        StudentService.leave(
+            session,
+            student_id=student_id,
+            left_on=body.left_on,
+            reason=body.reason,
+            at=now(),
+            actor_person_id=getattr(request.state, "person_id", None),
+        )
+    except NotFoundError as exc:
+        raise _not_found() from exc
+    except RefusedError as exc:
+        raise _refused("refused", str(exc)) from exc
+    session.commit()
+    student, person = StudentService.get(session, student_id=student_id)
+    return _out(session, student, person)
+
+
+@router.post("/students/{student_id}/convert", response_model=StudentOut)
+def convert_student(
+    _: ManagerOrOwner,
+    student_id: uuid.UUID,
+    body: StudentConvertIn,
+    request: Request,
+    session: TenantSessionDep,
+    idempotency_key: IdempotencyKey = None,
+) -> StudentOut:
+    """§5.4a step 5. L6 -- manager-or-owner, because enrolment is always a manager decision
+    and this is the moment it is made."""
+    from app.services.schedule import ScheduleService
+
+    try:
+        StudentService.convert(
+            session,
+            student_id=student_id,
+            group_id=body.group_id,
+            started_on=body.started_on,
+            price_plan_id=body.price_plan_id,
+            attends_weekdays=body.attends_weekdays,
+            reason=body.reason,
+            at=now(),
+            actor_person_id=getattr(request.state, "person_id", None),
+            schedule=ScheduleService(),
+        )
+    except NotFoundError as exc:
+        raise _not_found() from exc
+    except ConflictError as exc:
+        raise _conflict(str(exc)) from exc
+    except RefusedError as exc:
+        raise _refused("refused", str(exc)) from exc
+    except NotImplementedError as exc:
+        raise _schedule_unavailable() from exc
+    session.commit()
+    student, person = StudentService.get(session, student_id=student_id)
+    return _out(session, student, person)
+
+
+@router.post("/students/{student_id}/mark-lost", response_model=StudentOut)
+def mark_student_lost(
+    _: ManagerOrOwner,
+    student_id: uuid.UUID,
+    body: StudentMarkLostIn,
+    request: Request,
+    session: TenantSessionDep,
+    idempotency_key: IdempotencyKey = None,
+) -> StudentOut:
+    """§5.4a ⑤. The reason is required here and optional in the job: a manager pressing the
+    button knows why, and the job only knows that time passed."""
+    try:
+        StudentService.mark_lost(
+            session,
+            student_id=student_id,
+            reason=body.reason,
+            at=now(),
+            actor_person_id=getattr(request.state, "person_id", None),
+        )
+    except NotFoundError as exc:
+        raise _not_found() from exc
+    except RefusedError as exc:
+        raise _refused("refused", str(exc)) from exc
+    session.commit()
+    student, person = StudentService.get(session, student_id=student_id)
     return _out(session, student, person)
 
 
