@@ -9,10 +9,16 @@ Run as `python -m app.workers.schedule`, and under time travel as
 `python -m app.workers.schedule --at=2027-03-01` — §19.5's `use_dev_now` is the same
 mechanism the `X-Dev-Now` header uses, not a second one.
 
-**Cross-studio on purpose.** This is maintenance, not a report: every studio's ended
-sessions become `completed`, the demo studio included. `app.core.demo.exclude_demo_studios`
-guards cross-studio *numbers*, and a status that lagged only in the demo studio would make
-the demo the one place the product looked broken.
+**Cross-studio on purpose, and the session's type is how it says so.** A plain
+`sqlalchemy.orm.Session` carries no tenant filter at all — `app/core/tenancy.py` registers
+its handlers on `TenantSession` specifically, so that "a deliberately unscoped session -- a
+migration, a seed script -- is a different type rather than a forgotten flag".
+`with_all_tenants` is the hatch for escaping a *scoped* session and would be noise here.
+`app/workers/demo_reset.py` takes the same route.
+
+The demo studio is included deliberately. §19.7's `exclude_demo_studios` guards cross-studio
+*numbers*; this is a per-row status, and a status that lagged only in the demo studio would
+make the demo the one place the product looked broken.
 
 **Not yet scheduled.** `infra/railway/jobs.json` is the source of truth for cron and is not
 this lane's file; until an entry lands there this module runs only when invoked by hand.
@@ -33,7 +39,6 @@ from sqlalchemy.orm import Session as OrmSession
 from app.core.clock import now, parse_dev_now, use_dev_now
 from app.core.db import get_engine
 from app.core.logging import configure_logging
-from app.core.tenancy import with_all_tenants
 from app.models.schedule import Session
 
 logger = logging.getLogger(__name__)
@@ -68,13 +73,11 @@ def main(argv: list[str] | None = None) -> int:
     shifted = parse_dev_now(args.at) if args.at else None
     with use_dev_now(shifted):
         at = now()
-        # A plain Session, not a TenantSession: this walks every studio deliberately, which
-        # is exactly the case §4.2's escape hatch exists for. The reason is required so
-        # which of the two legal uses this is stays visible at the call site.
-        with (
-            with_all_tenants(reason="maintenance job: complete ended sessions in every studio"),
-            OrmSession(get_engine(), expire_on_commit=False) as session,
-        ):
+        # A plain Session, not a TenantSession: this walks every studio deliberately, and
+        # the type is the declaration. TenantSession is what carries the filter, so opening
+        # `with_all_tenants` around a session that was never filtered would announce an
+        # escape from a rule that is not in force here.
+        with OrmSession(get_engine(), expire_on_commit=False) as session:
             completed = complete_ended_sessions(session, at=at)
             session.commit()
 
