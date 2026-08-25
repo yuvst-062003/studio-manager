@@ -42,6 +42,10 @@ waves:
         title: The identity and structure schema
         status: shipped
         on: 2026-08-25
+      - id: M1.2
+        title: OAuth, the JWT, and the request context
+        status: shipped
+        on: 2026-08-25
   - id: W2
     milestone: M2 ∥ M3
     title: Schedule ∥ People and funnel
@@ -231,9 +235,9 @@ holdbacks:
       correct; only its inputs are absent. Until they exist the developer path is
       unreachable in a running app.
     blocks: M1
-    status: open
+    status: closed
     opened: 2026-08-24
-    closed: null
+    closed: 2026-08-25
     source: docs/plan/next-session.md — what M1 inherits
   - id: HB-m1-personas-layer
     kind: carried
