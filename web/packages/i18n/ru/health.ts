@@ -1,4 +1,80 @@
 import type { Bundle } from '../types'
 
-/** Owned by the HEALTH lane. Empty until that milestone. */
-export const health: Bundle = {}
+/** Mirrors `he/health.ts`. `ru` is `report` in the parity check until §15 item 9 lands. */
+export const health: Bundle = {
+  'declaration.title': 'Медицинская декларация',
+  'declaration.subtitle': 'Требуется до начала тренировок',
+  'declaration.forChild': 'Для',
+  'declaration.intro': 'Ответьте на вопросы и подпишите внизу формы',
+  'declaration.yes': 'Да',
+  'declaration.no': 'Нет',
+  'declaration.details': 'Подробности',
+  'declaration.detailsRequired': 'При положительном ответе нужны подробности',
+  'declaration.signature': 'Подпись',
+  'declaration.signatureHint': 'Распишитесь пальцем в рамке',
+  'declaration.signatureClear': 'Очистить подпись',
+  'declaration.signatureRequired': 'Для отправки нужна подпись',
+  'declaration.submit': 'Отправить декларацию',
+  'declaration.submitting': 'Отправка…',
+  'declaration.submitted': 'Декларация отправлена',
+  'declaration.signedOn': 'Подписана',
+  'declaration.signedBy': 'Подписал',
+  'declaration.update': 'Обновить декларацию',
+  'declaration.download': 'Скачать декларацию',
+  'declaration.noExpiry': 'Декларация действует бессрочно',
+
+  'gate.title': 'Требуется медицинская декларация',
+  'gate.body': 'Чтобы продолжить, заполните медицинскую декларацию ребёнка',
+  'gate.action': 'Заполнить декларацию',
+
+  'badge.missing': 'Нет медицинской декларации',
+  'badge.trialSigned': 'Декларация для пробного занятия',
+  'badge.signed': 'Декларация есть',
+  'badge.missingHint':
+    'Посещаемость всё равно можно отметить. Декларацию должен предоставить родитель',
+  'reminder.send': 'Отправить напоминание родителю',
+  'reminder.sent': 'Напоминание отправлено',
+  'reminder.sentOn': 'Последнее напоминание отправлено',
+  'reminder.sendAll': 'Напомнить всем, у кого нет декларации',
+
+  'flag.title': 'Внимание',
+  'flag.asthma': 'Астма',
+  'flag.allergy': 'Аллергия',
+  'flag.medication': 'Постоянные лекарства',
+  'flag.epilepsy': 'Эпилепсия',
+  'flag.heart': 'Заболевание сердца',
+  'flag.diabetes': 'Диабет',
+  'flag.injury': 'Активная травма',
+  'flag.other': 'Другое медицинское состояние',
+  'flag.detailsRestricted': 'Полные сведения доступны только руководителю',
+
+  'documents.title': 'Документы и декларации',
+  'documents.missing': 'Отсутствуют',
+  'documents.signed': 'Поданы',
+  'documents.empty': 'Все декларации поданы',
+  'documents.requestGroup': 'Запросить у группы',
+  'documents.viewFull': 'Открыть полную декларацию',
+  'documents.viewFullNotice': 'Просмотр декларации записывается в журнал аудита',
+  'documents.exportList': 'Экспорт списка отсутствующих',
+
+  'template.title': 'Анкета медицинской декларации',
+  'template.edit': 'Редактировать анкету',
+  'template.addQuestion': 'Добавить вопрос',
+  'template.removeQuestion': 'Удалить вопрос',
+  'template.questionText': 'Формулировка вопроса',
+  'template.version': 'Версия',
+  'template.publish': 'Опубликовать версию',
+  'template.uploadPdf': 'Загрузить форму клуба',
+  'template.disclaimer':
+    'Прилагаемая анкета — только отправная точка и не является документом соответствия требованиям. Клуб сам отвечает за её приведение в соответствие с требованиями страхования и закона',
+
+  'consent.terms': 'Условия использования',
+  'consent.privacy': 'Политика конфиденциальности',
+  'consent.photo_video': 'Фото и видео',
+  'consent.medical_share': 'Передача медицинских данных',
+  'consent.event': 'Участие в мероприятии',
+  'consent.granted': 'Согласие дано',
+  'consent.revoked': 'Согласие отозвано',
+  'consent.revoke': 'Отозвать согласие',
+  'consent.grantedOn': 'Согласие дано',
+}

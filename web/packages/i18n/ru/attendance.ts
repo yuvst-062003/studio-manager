@@ -1,4 +1,89 @@
 import type { Bundle } from '../types'
 
-/** Owned by the ATTENDANCE lane. Empty until that milestone. */
-export const attendance: Bundle = {}
+/** Mirrors `he/attendance.ts`. `ru` is `report` in the parity check until §15 item 9 lands. */
+export const attendance: Bundle = {
+  'roster.title': 'Посещаемость',
+  'roster.empty': 'В этой группе нет учеников',
+  'roster.present': 'Присутствует',
+  'roster.absent': 'Отсутствует',
+  'roster.absentExcused': 'Отсутствует по уважительной причине',
+  'roster.absentUnexcused': 'Отсутствует без причины',
+  'roster.unmarked': 'Не отмечен',
+  'roster.unmarkedCount': 'Не отмечено учеников: {{count}}',
+  'roster.markAllPresent': 'Отметить всех присутствующими',
+  'roster.tapToToggle': 'Нажатие на строку меняет состояние',
+  'roster.saved': 'Посещаемость сохранена',
+  'roster.editAnytime': 'Посещаемость можно изменить в любое время',
+  'roster.markedBy': 'Отметил',
+  'roster.markedAt': 'Отмечено в',
+  'roster.addNote': 'Добавить заметку',
+
+  'source.coach': 'Тренер',
+  'source.parent': 'Родитель',
+  'source.bulk': 'Групповая отметка',
+  'source.system': 'Система',
+  'source.preReported': 'Сообщили заранее',
+  'source.preReportedHint':
+    'Родитель сообщил заранее. Групповая отметка это не перезапишет',
+
+  'absence.title': 'Сообщить об отсутствии',
+  'absence.subtitle': 'До начала занятия',
+  'absence.chooseSession': 'Выбор занятия',
+  'absence.reason': 'Причина',
+  'absence.reasonOptional': 'Причина — необязательно',
+  'absence.submit': 'Отправить сообщение',
+  'absence.submitted': 'Сообщение отправлено',
+  'absence.tooLate': 'Занятие уже началось',
+  'absence.alreadyReported': 'Вы уже сообщили об этом занятии',
+  'absence.cancel': 'Отменить сообщение',
+  'absence.requiresConnection': 'Для сообщения об отсутствии нужен интернет',
+  'absence.requiresConnectionHint':
+    'Без сети сообщение не сохранится. Попробуйте снова при подключении',
+
+  'network.online': 'В сети',
+  'network.offline': 'Нет сети',
+  'network.intermittent': 'Нестабильное соединение',
+  'network.slow': 'Медленное соединение',
+  'network.offlineHint':
+    'Отметки сохраняются на устройстве и синхронизируются при появлении связи',
+  'network.intermittentHint':
+    'Сеть есть, но сервер не отвечает. Отметки сохраняются на устройстве',
+
+  'sync.pending': 'Ожидает синхронизации',
+  'sync.pendingCount': 'Отметок ожидает синхронизации: {{count}}',
+  'sync.syncing': 'Синхронизация…',
+  'sync.synced': 'Всё синхронизировано',
+  'sync.syncedAt': 'Последняя синхронизация в',
+  'sync.retry': 'Повторить синхронизацию',
+  'sync.failed': 'Синхронизация не удалась',
+  'sync.staleWarning': 'Некоторые отметки не синхронизировались больше суток',
+  'sync.staleBody': 'Подключитесь к интернету, чтобы сохранить отметки, пока они не потеряны',
+  'sync.staleAction': 'Синхронизировать сейчас',
+  'stale.title': 'Данные устарели',
+  'stale.body': 'Последняя загрузка в {{time}}',
+
+  'priming.title': 'Подготовка приложения',
+  'priming.body': 'Загружаем занятия на сегодня и завтра, чтобы они работали без сети',
+  'priming.failed': 'Подготовка не удалась',
+  'priming.retry': 'Повторить',
+
+  'conflict.title': 'Конфликт отметок',
+  'conflict.sessionCancelled': 'Занятие отменили, пока вы отмечали',
+  'conflict.sessionCancelledBody':
+    'Отметки сохранены, но не применены. Решение принимает руководитель',
+  'conflict.otherCoach': 'Это занятие отметил другой тренер',
+  'conflict.differentPerson': 'Вы вошли под другим пользователем',
+  'conflict.differentPersonBody': 'Есть несинхронизированные отметки предыдущего пользователя',
+  'conflict.keepMine': 'Оставить мои отметки',
+  'conflict.keepTheirs': 'Оставить существующие отметки',
+  'conflict.review': 'Разобрать конфликт',
+
+  'report.title': 'Посещаемость',
+  'report.unmarkedSessions': 'Неотмеченные занятия',
+  'report.consecutiveAbsences': 'Пропуски подряд',
+  'report.attendanceRate': 'Процент посещаемости',
+  'report.sessionsHeld': 'Проведено занятий',
+  'report.sessionsPlanned': 'Запланировано занятий',
+  'report.empty': 'Нет данных о посещаемости за этот период',
+  'report.export': 'Экспорт',
+}
