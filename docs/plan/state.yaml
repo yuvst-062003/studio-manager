@@ -1,0 +1,274 @@
+# Machine-written. The cockpit rewrites this file, and PyYAML does not preserve
+# comments across a round-trip, so every explanation belongs in a `why:` or
+# `source:` field rather than in a comment that would silently disappear.
+version: 1
+updated: 2026-08-25
+waves:
+  - id: W0
+    milestone: M0
+    title: Foundations
+    mode: sequential
+    lanes: []
+    exit_gate: lane-check.sh core green · all three apps install to a home screen and run standalone
+    status: active
+    opened: 2026-08-24
+    pieces:
+      - id: M0.1
+        title: Corrections, skeleton, install layer
+        status: shipped
+        on: 2026-08-24
+      - id: M0.2
+        title: The seams and the core
+        status: shipped
+        on: 2026-08-24
+      - id: M0.3
+        title: The design system
+        status: shipped
+        on: 2026-08-24
+      - id: M0.4
+        title: The demo studio and the dev bar
+        status: shipped
+        on: 2026-08-24
+  - id: W1
+    milestone: M1
+    title: Identity and structure
+    mode: sequential
+    lanes: []
+    exit_gate: both apps sign in, refuse correctly, and route to the wizard
+    status: pending
+    pieces: []
+  - id: W2
+    milestone: M2 ∥ M3
+    title: Schedule ∥ People and funnel
+    mode: parallel
+    lanes: [SCHEDULE, PEOPLE]
+    exit_gate: E2E-5 schedule change · E2E-1a registration → approval → active
+    status: pending
+    pieces: []
+  - id: W3
+    milestone: M4 ∥ M5
+    title: Health ∥ Attendance
+    mode: parallel
+    lanes: [HEALTH, ATTENDANCE]
+    exit_gate: E2E-2 offline attendance → sync · E2E-1 complete, with health
+    status: pending
+    pieces: []
+  - id: W4
+    milestone: M6 ∥ M7
+    title: Money ∥ Events and belts
+    mode: parallel
+    lanes: [MONEY, EVENTS]
+    exit_gate: E2E-3 uPay happy path · E2E-4 forged IPN
+    status: pending
+    pieces: []
+  - id: W5
+    milestone: M8 ∥ M9
+    title: Communication ∥ Reports and privacy completion
+    mode: parallel
+    lanes: [COMMS, REPORTS]
+    exit_gate: announcement delivered to push and inbox; every report exports
+    status: pending
+    pieces: []
+  - id: W6
+    milestone: M10
+    title: Rollover and polish
+    mode: sequential
+    lanes: []
+    exit_gate: all 61 artboards pass the a11y/RTL sweep in he and en, light and dark
+    status: pending
+    pieces: []
+  - id: W7
+    milestone: M11
+    title: Launch
+    mode: sequential
+    lanes: []
+    exit_gate: production cutover done; the iOS install walkthrough validated on real parents' phones
+    status: pending
+    pieces: []
+holdbacks:
+  - id: HB-devices
+    kind: external
+    title: One iPhone and one Android to test the install on
+    why: >-
+      M0's exit gate is that all three apps install to a home screen and launch
+      standalone. The iOS simulator proved the rendering half and none of the install
+      half, and the Android emulator was never run — the only installed system image has
+      no Play services. This is what keeps W0 open with every piece shipped.
+    blocks: M0 exit
+    status: open
+    opened: 2026-08-24
+    closed: null
+    source: SPEC §15 item 4 · docs/install/verification-log.md
+  - id: HB-domain
+    kind: external
+    title: A stable HTTPS domain for the apps
+    why: >-
+      People install this from an invitation link. A random Railway subdomain reads as a
+      phishing attempt and hurts install conversion, which §6.5 makes the product's main
+      adoption risk. infra/railway/domains.json still has base_domain null.
+    blocks: M0 exit
+    status: open
+    opened: 2026-08-24
+    closed: null
+    source: SPEC §15 item 5
+  - id: HB-upay
+    kind: external
+    title: uPay merchant account not confirmed live
+    why: >-
+      Third-party turnaround is not yours to control, and the whole money lane sits
+      behind it.
+    blocks: W4
+    status: open
+    opened: 2026-08-24
+    closed: null
+    source: SPEC §15 item 2
+  - id: HB-parents
+    kind: external
+    title: Three to five real parents for the install walkthrough
+    why: >-
+      Their confusion is the only honest measure of whether the walkthrough works. Your
+      own phone will not tell you.
+    blocks: M11
+    status: open
+    opened: 2026-08-24
+    closed: null
+    source: SPEC §15 item 6
+  - id: HB-logo
+    kind: external
+    title: Studio branding — logo and colours
+    why: >-
+      D1 ships one fixed design in v1 and per-studio colour is v2, so what is actually
+      needed here is the logo. The setup wizard has nowhere to put a placeholder.
+    blocks: M1
+    status: open
+    opened: 2026-08-24
+    closed: null
+    source: SPEC §15 item 7
+  - id: HB-price-list
+    kind: external
+    title: The current price list per group
+    why: >-
+      The billing run prices from the product catalog. Without the real numbers M6 ships
+      against invented ones, and the first real monthly run is where that surfaces.
+    blocks: M6
+    status: open
+    opened: 2026-08-24
+    closed: null
+    source: SPEC §15 item 8
+  - id: HB-class-structure
+    kind: external
+    title: The club's real class and group structure, and the weekly schedule
+    why: >-
+      M2 materialises sessions from this. Building it against invented groups means the
+      first real rollover is also the first real test.
+    blocks: M2
+    status: open
+    opened: 2026-08-24
+    closed: null
+    source: SPEC §15 item 10
+  - id: HB-ru-review
+    kind: external
+    title: A native speaker to review the machine-translated ru strings
+    why: >-
+      Machine translation was approved and ru/common.ts is at full parity with he, but
+      i18n-parity.mjs keeps ru on report rather than strict until a native speaker has
+      read it. The gate cannot be tightened before the review happens.
+    blocks: M11
+    status: open
+    opened: 2026-08-24
+    closed: null
+    source: SPEC §15 item 9
+  - id: HB-staging-superuser
+    kind: carried
+    title: The staging api still connects as the superuser
+    why: >-
+      Railway's managed Postgres provides one role. Revision 0001 creates studio_app, but
+      both DSNs point at the same superuser, so the append-only audit grant is not
+      actually in force on staging. M1 closes it with a login password from a secret.
+    blocks: M1
+    status: open
+    opened: 2026-08-24
+    closed: null
+    source: docs/deploy/railway-runbook.md
+  - id: HB-m1-is-developer-column
+    kind: carried
+    title: auth_identity.is_developer, settable only by seed or migration
+    why: >-
+      tests/restrictions/test_04_the_flag_is_not_grantable.py is vacuous until this
+      column exists, and carries a test whose failure message says to delete it at that
+      point. A restriction proven against a column that does not exist proves nothing.
+    blocks: M1
+    status: open
+    opened: 2026-08-24
+    closed: null
+    source: docs/plan/next-session.md — what M1 inherits
+  - id: HB-m1-request-state
+    kind: carried
+    title: Set request.state.is_developer and studio_is_demo from the verified JWT
+    why: >-
+      The rule is already wired into app/core/tenancy.py::studio_id_from_request and is
+      correct; only its inputs are absent. Until they exist the developer path is
+      unreachable in a running app.
+    blocks: M1
+    status: open
+    opened: 2026-08-24
+    closed: null
+    source: docs/plan/next-session.md — what M1 inherits
+  - id: HB-m1-personas-layer
+    kind: carried
+    title: Move personas out of PLANNED_LAYERS into a real FixtureLayer
+    why: >-
+      The nine §19.3 personas are the point of the role switcher.
+      test_no_layer_is_both_planned_and_present fails if the planned entry is left behind
+      once the real layer lands.
+    blocks: M1
+    status: open
+    opened: 2026-08-24
+    closed: null
+    source: docs/plan/next-session.md — what M1 inherits
+  - id: HB-m1-role-switcher
+    kind: carried
+    title: The role switcher — POST /dev/act-as, X-Acting-As, and an audit entry per switch
+    why: >-
+      Registers into the dev-bar slot with registerDevTool; the container is not
+      reopened. Without it the demo studio has personas nobody can become.
+    blocks: M1
+    status: open
+    opened: 2026-08-24
+    closed: null
+    source: docs/plan/next-session.md — what M1 inherits · SPEC §19.4
+  - id: HB-c3-trial-template
+    kind: conflict
+    title: C3 — M3's trial booking needs a health declaration §14 puts in M4
+    why: >-
+      health_form_template.kind is already (full|trial) in §4.3. Seeding the trial
+      template in M1 is what unblocks M3's trial booking without pulling M4 forward.
+    blocks: M1
+    status: open
+    opened: 2026-08-24
+    closed: null
+    source: docs/plan/milestone-plan.md Part 5
+  - id: HB-c5-rollover-artboard
+    kind: conflict
+    title: C5 — the rollover wizard has no artboard
+    why: >-
+      §5.15 calls it the single highest-leverage screen in the product and specs seven
+      steps, but the canvas has 61 screens and none of them is this one. Every other
+      major flow was designed before it was built. Either design it, or accept it ships
+      without a visual reference and say so out loud.
+    blocks: W6
+    status: open
+    opened: 2026-08-24
+    closed: null
+    source: docs/plan/milestone-plan.md Part 5
+  - id: HB-c9-canvas
+    kind: conflict
+    title: C9 — the D9 canvas edits are recorded but not applied
+    why: >-
+      2b still shows in-app chat, 7c still shows the weight column, 12f is still titled
+      קבלות ותשלומים. The mockup is what a human opens at 2am, not a table in a plan.
+    blocks: W6
+    status: open
+    opened: 2026-08-24
+    closed: null
+    source: docs/plan/milestone-plan.md Part 5 · D9
