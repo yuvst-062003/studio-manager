@@ -33,9 +33,7 @@ def get_setup(client, caller):
 
 
 def patch_step(client, caller, step_id: str, status: str):
-    return client.patch(
-        f"{SETUP}/steps/{step_id}", json={"status": status}, headers=caller.headers
-    )
+    return client.patch(f"{SETUP}/steps/{step_id}", json={"status": status}, headers=caller.headers)
 
 
 # -- the shape ----------------------------------------------------------------

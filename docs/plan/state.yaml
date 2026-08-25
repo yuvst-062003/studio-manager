@@ -83,8 +83,9 @@ waves:
         status: shipped
         on: 2026-08-25
       - id: M1.12
-        title: studio_app connects as studio_app on staging
-        status: pending
+        title: studio_app connects as studio_app — the check, and the runbook to close it
+        status: shipped
+        on: 2026-08-25
   - id: W2
     milestone: M2 ∥ M3
     title: Schedule ∥ People and funnel
@@ -248,12 +249,21 @@ holdbacks:
     why: >-
       Railway's managed Postgres provides one role. Revision 0001 creates studio_app, but
       both DSNs point at the same superuser, so the append-only audit grant is not
-      actually in force on staging. M1 closes it with a login password from a secret.
+      actually in force on staging — a grant on a role the api does not connect as
+      protects nothing, and it passes every test while doing so. M1.12 shipped the half a
+      keyboard can reach: app/core/db_roles.py asks the live connection what it actually
+      is, app/main.py's lifespan refuses to serve in production on a role that can mutate
+      audit_log and warns everywhere else, and scripts/verify-db-roles.py is the same
+      measurement by hand. What remains is three Railway steps in
+      docs/deploy/railway-runbook.md — grant studio_app a login password, point
+      DATABASE_URL at it, and run the verifier against staging. This stays open until that
+      command has printed 'connected as : studio_app' against staging, because the code
+      being written is not the same claim as the role being in force.
     blocks: M1
     status: open
     opened: 2026-08-24
     closed: null
-    source: docs/deploy/railway-runbook.md
+    source: docs/deploy/railway-runbook.md § Open item
   - id: HB-m1-is-developer-column
     kind: carried
     title: auth_identity.is_developer, settable only by seed or migration

@@ -207,9 +207,7 @@ def test_a_coach_whose_assignment_ended_leaves_the_group_uncovered(
 def test_an_inactive_group_is_not_reported_as_uncovered(
     client, as_manager, app_session, a_class
 ) -> None:
-    group = Group(
-        studio_id=as_manager.studio_id, class_id=a_class, name="ארכיון", is_active=False
-    )
+    group = Group(studio_id=as_manager.studio_id, class_id=a_class, name="ארכיון", is_active=False)
     app_session.add(group)
     app_session.commit()
     body = client.get(STAFF, headers=as_manager.headers).json()
@@ -226,7 +224,9 @@ def test_an_anonymous_caller_is_401(client) -> None:
     assert client.get(STAFF).status_code == 401
 
 
-def test_one_studio_never_sees_anothers_staff(client, as_manager, app_session, fake_provider) -> None:
+def test_one_studio_never_sees_anothers_staff(
+    client, as_manager, app_session, fake_provider
+) -> None:
     from app.models.studio import Studio
     from tests.structure.conftest import _make_caller
 

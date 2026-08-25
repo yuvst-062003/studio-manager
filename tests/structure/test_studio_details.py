@@ -22,9 +22,7 @@ def test_get_returns_the_merged_column_and_settings_view(client, as_owner) -> No
     assert body["parent_locales"] == ["he"]
 
 
-def test_name_lands_on_the_column_and_the_rest_in_settings(
-    client, as_owner, app_session
-) -> None:
+def test_name_lands_on_the_column_and_the_rest_in_settings(client, as_owner, app_session) -> None:
     response = client.patch(
         STUDIO,
         json={
@@ -39,9 +37,7 @@ def test_name_lands_on_the_column_and_the_rest_in_settings(
     assert response.status_code == 200, response.text
 
     app_session.expire_all()
-    row = app_session.execute(
-        select(Studio).where(Studio.id == as_owner.studio_id)
-    ).scalar_one()
+    row = app_session.execute(select(Studio).where(Studio.id == as_owner.studio_id)).scalar_one()
     assert row.name == "מכבי ג'ודו רעננה"
     assert row.settings["sport"] == "judo"
     assert row.settings["address"] == "אחוזה 120, רעננה"
@@ -59,7 +55,8 @@ def test_a_partial_patch_leaves_the_untouched_fields_alone(client, as_owner) -> 
 def test_parent_locales_must_be_a_non_empty_subset_of_the_three(client, as_owner) -> None:
     """§9 ships he, en and ru. A studio offering a language with no locale file would
     render keys at a parent."""
-    assert client.patch(STUDIO, json={"parent_locales": []}, headers=as_owner.headers).status_code == 422
+    empty = client.patch(STUDIO, json={"parent_locales": []}, headers=as_owner.headers)
+    assert empty.status_code == 422
     assert (
         client.patch(STUDIO, json={"parent_locales": ["fr"]}, headers=as_owner.headers).status_code
         == 422
@@ -86,7 +83,8 @@ def test_an_empty_name_is_refused(client, as_owner) -> None:
 
 def test_a_coach_may_read_but_never_write_studio_details(client, as_lead_coach) -> None:
     assert client.get(STUDIO, headers=as_lead_coach.headers).status_code == 200
-    assert client.patch(STUDIO, json={"name": "x"}, headers=as_lead_coach.headers).status_code == 403
+    refused = client.patch(STUDIO, json={"name": "x"}, headers=as_lead_coach.headers)
+    assert refused.status_code == 403
 
 
 def test_an_anonymous_caller_is_401(client) -> None:

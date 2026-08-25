@@ -162,9 +162,75 @@ is correct in every environment and `tests/core/test_audit_append_only.py` asser
 against `has_table_privilege`. What is **not** yet true in staging is that the API
 *uses* that role: both variables above point at the same superuser DSN.
 
-M1 closes this by giving `studio_app` a login password from a Railway secret and
-pointing `DATABASE_URL` at it. Until then, append-only is enforced by grant in tests and
-in local development, and by convention in staging.
+A grant on a role the api does not connect as protects nothing. It is the most dangerous
+shape a security control can take, because it passes every test: the audit log looks like
+evidence right up until the moment someone needs it to be.
+
+#### What M1.12 shipped
+
+The code half, which is measurable from a keyboard:
+
+* `app/core/db_roles.py` asks the **live connection** what it actually is —
+  `has_table_privilege(current_user, 'audit_log', …)`, never a lookup against
+  `APP_DB_ROLE`. A check that trusted the setting would report whatever the config
+  claimed, which is exactly what was wrong here.
+* `app/main.py`'s lifespan runs it on every boot. **Production refuses to serve** on a
+  role that can mutate `audit_log`; every other environment logs a warning naming the
+  fix. A production deploy that refuses is visible in thirty seconds; one that quietly
+  runs as a superuser is visible far too late. Staging warns rather than refusing because
+  the unenforced condition is true there *today*, and a gate that has to be disabled in
+  order to deploy is a gate that gets deleted.
+* An unreachable database returns `None` and never fails a boot. This answers a question
+  about grants; when it cannot ask, it stands aside rather than turning a database blip
+  into a failed deploy.
+* `scripts/verify-db-roles.py` is the same measurement by hand. Exit `0` enforced, `1` not
+  enforced, `2` could not reach the database — three outcomes, because "could not check"
+  is not the same answer as "enforced" and conflating them lets a network blip read as a
+  pass.
+
+#### The three steps that close it — **not yet done**
+
+These need the Railway project and cannot be done from the repository.
+
+**1. Give the role a login and a password.** As the superuser, once per environment. A
+migration must never express a credential, which is why this is here and not in
+`alembic/versions/`.
+
+```bash
+# generate one; do not reuse anything
+python3 -c "import secrets; print(secrets.token_urlsafe(32))"
+
+railway connect Postgres --environment staging
+```
+```sql
+ALTER ROLE studio_app WITH LOGIN PASSWORD '<the generated password>';
+GRANT CONNECT ON DATABASE railway TO studio_app;
+```
+
+**2. Point `DATABASE_URL` at it, and leave `MIGRATION_DATABASE_URL` alone.** That split is
+the mechanism, not a leftover: one role cannot both own `audit_log` and be denied rights
+on it.
+
+```bash
+railway variables --service api --environment staging --skip-deploys \
+  --set 'STUDIO_APP_DB_PASSWORD=<the generated password>' \
+  --set 'DATABASE_URL=postgresql+psycopg://studio_app:${{STUDIO_APP_DB_PASSWORD}}@${{Postgres.PGHOST}}:${{Postgres.PGPORT}}/${{Postgres.PGDATABASE}}'
+# MIGRATION_DATABASE_URL stays on ${{Postgres.DATABASE_URL}} — the schema owner.
+```
+
+**3. Prove it, then close the holdback.** Not before: the code being written is not the
+same claim as the role being in force.
+
+```bash
+railway run --service api --environment staging .venv/bin/python scripts/verify-db-roles.py
+```
+
+Expected output is `connected as : studio_app` with `UPDATE : False` and `DELETE : False`.
+`HB-staging-superuser` in `docs/plan/state.yaml` stays **open** until that command has
+printed it against staging.
+
+Repeat all three for production at the W7 cutover, where step 2 is also what makes the
+lifespan check stop refusing.
 
 ### Settled — everything runs PostgreSQL 18
 

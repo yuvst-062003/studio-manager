@@ -10,6 +10,8 @@ rather than the package and discovery would silently find nothing.
 
 import importlib
 import pkgutil
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -19,6 +21,8 @@ from app.core.auth_context import AuthContextMiddleware
 from app.core.clock import X_DEV_NOW_HEADER, DevClockMiddleware
 from app.core.config import settings
 from app.core.cors import allowed_origins
+from app.core.db import get_engine
+from app.core.db_roles import enforce_runtime_role
 from app.core.dev_account import DEV_TOKEN_HEADER
 from app.core.logging import configure_logging
 
@@ -26,7 +30,23 @@ from app.core.logging import configure_logging
 # anything can log. Not a registration: seam 2's discovery loop is untouched.
 configure_logging()
 
-app = FastAPI(title="Studio Manager API", version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    """HB-staging-superuser -- §11.2's append-only guarantee is a GRANT, and a grant on a
+    role the api does not connect as protects nothing. This asks the live connection what
+    it actually is: production refuses to serve on a role that can mutate audit_log, every
+    other environment logs it. An unreachable database returns None and never fails a boot.
+
+    In a lifespan and not at module scope, because app/core/db.py is lazy on purpose:
+    importing this module must not open a connection, or `pytest --collect-only` and
+    `scripts/export_openapi.py` would both need a database to run.
+    """
+    enforce_runtime_role(get_engine())
+    yield
+
+
+app = FastAPI(title="Studio Manager API", version="0.1.0", lifespan=lifespan)
 
 # §19.5 -- X-Dev-Now shifts the clock for one request, and only where the router that
 # documents it exists. Not a registration: seam 2's discovery loop below is untouched,

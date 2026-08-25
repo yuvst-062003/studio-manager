@@ -64,9 +64,7 @@ def test_the_bytes_come_back_from_the_scoped_get(client, as_manager) -> None:
     assert response.headers["content-type"] == "image/png"
 
 
-@pytest.mark.parametrize(
-    ("data", "extension"), [(PNG, "png"), (JPEG, "jpg"), (WEBP, "webp")]
-)
+@pytest.mark.parametrize(("data", "extension"), [(PNG, "png"), (JPEG, "jpg"), (WEBP, "webp")])
 def test_all_three_allowed_formats_round_trip(
     client, as_manager, app_session, data: bytes, extension: str
 ) -> None:
@@ -162,7 +160,8 @@ def test_a_coach_may_still_read_the_logo(client, as_manager, as_lead_coach) -> N
 
 def test_an_anonymous_caller_gets_401_from_every_verb(client) -> None:
     assert client.get("/api/v1/studio/logo").status_code == 401
-    assert client.post("/api/v1/studio/logo", files={"file": ("l.png", PNG, "image/png")}).status_code == 401
+    posted = client.post("/api/v1/studio/logo", files={"file": ("l.png", PNG, "image/png")})
+    assert posted.status_code == 401
     assert client.delete("/api/v1/studio/logo").status_code == 401
 
 
@@ -201,7 +200,11 @@ def test_the_upload_is_audited(client, as_manager, app_session) -> None:
     from app.models.audit import AuditLog
 
     upload(client, as_manager, PNG)
-    actions = app_session.execute(
-        select(AuditLog.action).where(AuditLog.studio_id == as_manager.studio_id)
-    ).scalars().all()
+    actions = (
+        app_session.execute(
+            select(AuditLog.action).where(AuditLog.studio_id == as_manager.studio_id)
+        )
+        .scalars()
+        .all()
+    )
     assert "studio.logo.uploaded" in actions

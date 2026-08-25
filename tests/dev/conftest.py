@@ -40,6 +40,11 @@ from fastapi.testclient import TestClient
 RELOADABLE = (
     "app.core.config",
     "app.core.dev_account",
+    # M1.12 -- enforce_runtime_role branches on settings.ENV (production refuses, every
+    # other environment warns), so its `settings` binding must not stay frozen to whichever
+    # environment imported it first. Unlike app.core.db beside it, this module caches
+    # nothing, so reloading it costs nothing either.
+    "app.core.db_roles",
     # Task 12 -- studio_id_from_request now calls developer_may_act(..., env=settings.ENV)
     # for §19.6 restriction 1, so tenancy.py joins the modules whose `settings` binding
     # this harness must not leave frozen to whichever environment imported it first.
