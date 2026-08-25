@@ -20,6 +20,7 @@ from typing import Annotated, Any
 from pydantic import BaseModel, Field, model_validator
 
 from app.schemas._pagination import CursorPage
+from app.schemas.schedule import TrialSlotOut
 
 #: §4.3, mirrored as patterns so the generated client gets unions rather than `string`.
 STUDENT_STATUS_PATTERN = r"^(lead|trial|pending_approval|active|frozen|left|lost)$"
@@ -444,6 +445,13 @@ class PublicLandingOut(BaseModel):
     address: str | None
     photo_urls: list[str] = Field(default_factory=list)
     groups: list[PublicGroupOut] = Field(default_factory=list)
+
+
+class TrialSlotListResponse(BaseModel):
+    """Not a `CursorPage`: §7 asks for "the next N bookable sessions", which is a bounded
+    peek rather than a list somebody pages through. G16's rule is about lists that grow."""
+
+    items: list[TrialSlotOut]
 
 
 class EnrollmentWeekdayOptionsOut(BaseModel):

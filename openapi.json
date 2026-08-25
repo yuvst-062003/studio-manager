@@ -1192,6 +1192,174 @@
         "title": "ProvisionStudioRequest",
         "type": "object"
       },
+      "PublicGroupListResponse": {
+        "description": "Not a `CursorPage`: a club has a dozen groups, not a growing list somebody pages\nthrough, and the landing page renders all of them at once.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PublicGroupOut"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "PublicGroupListResponse",
+        "type": "object"
+      },
+      "PublicGroupOut": {
+        "description": "§7 — `GET /public/studios/{slug}/groups`, unauthenticated.\n\nA deliberately narrow projection, for the same reason `TrialSlotOut` is one: this is a\nshop window on the open internet. No class id, no staff, no enrollment count.\n`training_weekdays` is here because parent `13a` shows \"מתאמנים בימים\" beside each\ngroup, and because §5.4a filters groups by the child's age where a range is set.",
+        "properties": {
+          "age_max": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age Max"
+          },
+          "age_min": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age Min"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "training_weekdays": {
+            "items": {
+              "maximum": 6.0,
+              "minimum": 0.0,
+              "type": "integer"
+            },
+            "title": "Training Weekdays",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "age_min",
+          "age_max"
+        ],
+        "title": "PublicGroupOut",
+        "type": "object"
+      },
+      "PublicLandingOut": {
+        "description": "§5.4a ① — 'a public LANDING PAGE at /t/{studio-slug} — the club's shop window, not\na form.'",
+        "properties": {
+          "about": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "About"
+          },
+          "address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "default_locale": {
+            "title": "Default Locale",
+            "type": "string"
+          },
+          "groups": {
+            "items": {
+              "$ref": "#/components/schemas/PublicGroupOut"
+            },
+            "title": "Groups",
+            "type": "array"
+          },
+          "headline": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Headline"
+          },
+          "logo_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Logo Url"
+          },
+          "photo_urls": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Photo Urls",
+            "type": "array"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          },
+          "studio_name": {
+            "title": "Studio Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "studio_name",
+          "slug",
+          "logo_url",
+          "default_locale",
+          "headline",
+          "about",
+          "address"
+        ],
+        "title": "PublicLandingOut",
+        "type": "object"
+      },
       "SessionResponse": {
         "description": "The access token lives in the body, never in a cookie (§10.3).\n\nThe client holds it in memory and replays it, which is what keeps it out of\nautomatic-credential territory -- a cookie-borne access token is sent by the browser\non every request, which is what makes CSRF possible at all. The refresh token is in\nthe Set-Cookie header and never here.",
         "properties": {
@@ -2507,6 +2675,78 @@
           "studio_id"
         ],
         "title": "SwitchStudioRequest",
+        "type": "object"
+      },
+      "TrialSlotListResponse": {
+        "description": "Not a `CursorPage`: §7 asks for \"the next N bookable sessions\", which is a bounded\npeek rather than a list somebody pages through. G16's rule is about lists that grow.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TrialSlotOut"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "TrialSlotListResponse",
+        "type": "object"
+      },
+      "TrialSlotOut": {
+        "description": "§7 — `GET /public/groups/{id}/trial-slots`, the next N bookable sessions.\n\n**Unauthenticated, so it is a deliberately narrower projection of `SessionOut`.** No\nstaff list, no ids beyond the session and group, no note of whether attendance was\ntaken. A public landing page (§5.4, parent `13a`) has no business knowing which coach\nis on the mat, and the cheapest way to guarantee that is a shape that cannot carry it.",
+        "properties": {
+          "ends_at": {
+            "format": "date-time",
+            "title": "Ends At",
+            "type": "string"
+          },
+          "group_id": {
+            "format": "uuid",
+            "title": "Group Id",
+            "type": "string"
+          },
+          "group_name": {
+            "title": "Group Name",
+            "type": "string"
+          },
+          "is_bookable": {
+            "default": true,
+            "title": "Is Bookable",
+            "type": "boolean"
+          },
+          "location_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location Name"
+          },
+          "session_id": {
+            "format": "uuid",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "starts_at": {
+            "format": "date-time",
+            "title": "Starts At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id",
+          "group_id",
+          "group_name",
+          "starts_at",
+          "ends_at",
+          "location_name"
+        ],
+        "title": "TrialSlotOut",
         "type": "object"
       },
       "ValidationError": {
@@ -3964,6 +4204,218 @@
         "summary": "Suspend",
         "tags": [
           "platform"
+        ]
+      }
+    },
+    "/api/v1/public/groups/{group_id}/trial-slots": {
+      "get": {
+        "description": "§5.4a step 4 -- 'the next N upcoming sessions of each chosen group, one pick per\nchild.'",
+        "operationId": "trial_slots_api_v1_public_groups__group_id__trial_slots_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "group_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Group Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrialSlotListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Trial Slots",
+        "tags": [
+          "public"
+        ]
+      }
+    },
+    "/api/v1/public/studios/{slug}": {
+      "get": {
+        "description": "§7 lists this separately from `/landing`. Same payload: splitting the club's name\nfrom the club's page would give a caller two shapes to keep in step for no benefit, and\nthe narrow one is already as narrow as it goes.",
+        "operationId": "public_studio_api_v1_public_studios__slug__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicLandingOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Public Studio",
+        "tags": [
+          "public"
+        ]
+      }
+    },
+    "/api/v1/public/studios/{slug}/groups": {
+      "get": {
+        "operationId": "public_groups_api_v1_public_studios__slug__groups_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicGroupListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Public Groups",
+        "tags": [
+          "public"
+        ]
+      }
+    },
+    "/api/v1/public/studios/{slug}/landing": {
+      "get": {
+        "operationId": "landing_api_v1_public_studios__slug__landing_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicLandingOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Landing",
+        "tags": [
+          "public"
+        ]
+      }
+    },
+    "/api/v1/public/studios/{slug}/logo": {
+      "get": {
+        "description": "§5.4a ① -- the logo, on the club's own marketing page.\n\nUnauthenticated by necessity: `/api/v1/studio/logo` is tenant-scoped and needs a token,\nand a stranger tapping an Instagram link has neither. A club's own logo on its own shop\nwindow is public by definition -- it is the thing they print on flyers.",
+        "operationId": "public_logo_api_v1_public_studios__slug__logo_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Public Logo",
+        "tags": [
+          "public"
         ]
       }
     },

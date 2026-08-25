@@ -504,6 +504,107 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/public/groups/{group_id}/trial-slots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Trial Slots
+         * @description §5.4a step 4 -- 'the next N upcoming sessions of each chosen group, one pick per
+         *     child.'
+         */
+        get: operations["trial_slots_api_v1_public_groups__group_id__trial_slots_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/studios/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Public Studio
+         * @description §7 lists this separately from `/landing`. Same payload: splitting the club's name
+         *     from the club's page would give a caller two shapes to keep in step for no benefit, and
+         *     the narrow one is already as narrow as it goes.
+         */
+        get: operations["public_studio_api_v1_public_studios__slug__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/studios/{slug}/groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Public Groups */
+        get: operations["public_groups_api_v1_public_studios__slug__groups_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/studios/{slug}/landing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Landing */
+        get: operations["landing_api_v1_public_studios__slug__landing_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/studios/{slug}/logo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Public Logo
+         * @description §5.4a ① -- the logo, on the club's own marketing page.
+         *
+         *     Unauthenticated by necessity: `/api/v1/studio/logo` is tenant-scoped and needs a token,
+         *     and a stranger tapping an Instagram link has neither. A club's own logo on its own shop
+         *     window is public by definition -- it is the thing they print on flyers.
+         */
+        get: operations["public_logo_api_v1_public_studios__slug__logo_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/setup": {
         parameters: {
             query?: never;
@@ -1354,6 +1455,66 @@ export interface components {
             timezone: string;
         };
         /**
+         * PublicGroupListResponse
+         * @description Not a `CursorPage`: a club has a dozen groups, not a growing list somebody pages
+         *     through, and the landing page renders all of them at once.
+         */
+        PublicGroupListResponse: {
+            /** Items */
+            items: components["schemas"]["PublicGroupOut"][];
+        };
+        /**
+         * PublicGroupOut
+         * @description §7 — `GET /public/studios/{slug}/groups`, unauthenticated.
+         *
+         *     A deliberately narrow projection, for the same reason `TrialSlotOut` is one: this is a
+         *     shop window on the open internet. No class id, no staff, no enrollment count.
+         *     `training_weekdays` is here because parent `13a` shows "מתאמנים בימים" beside each
+         *     group, and because §5.4a filters groups by the child's age where a range is set.
+         */
+        PublicGroupOut: {
+            /** Age Max */
+            age_max: number | null;
+            /** Age Min */
+            age_min: number | null;
+            /** Description */
+            description: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Training Weekdays */
+            training_weekdays?: number[];
+        };
+        /**
+         * PublicLandingOut
+         * @description §5.4a ① — 'a public LANDING PAGE at /t/{studio-slug} — the club's shop window, not
+         *     a form.'
+         */
+        PublicLandingOut: {
+            /** About */
+            about: string | null;
+            /** Address */
+            address: string | null;
+            /** Default Locale */
+            default_locale: string;
+            /** Groups */
+            groups?: components["schemas"]["PublicGroupOut"][];
+            /** Headline */
+            headline: string | null;
+            /** Logo Url */
+            logo_url: string | null;
+            /** Photo Urls */
+            photo_urls?: string[];
+            /** Slug */
+            slug: string;
+            /** Studio Name */
+            studio_name: string;
+        };
+        /**
          * SessionResponse
          * @description The access token lives in the body, never in a cookie (§10.3).
          *
@@ -1839,6 +2000,55 @@ export interface components {
              * Format: uuid
              */
             studio_id: string;
+        };
+        /**
+         * TrialSlotListResponse
+         * @description Not a `CursorPage`: §7 asks for "the next N bookable sessions", which is a bounded
+         *     peek rather than a list somebody pages through. G16's rule is about lists that grow.
+         */
+        TrialSlotListResponse: {
+            /** Items */
+            items: components["schemas"]["TrialSlotOut"][];
+        };
+        /**
+         * TrialSlotOut
+         * @description §7 — `GET /public/groups/{id}/trial-slots`, the next N bookable sessions.
+         *
+         *     **Unauthenticated, so it is a deliberately narrower projection of `SessionOut`.** No
+         *     staff list, no ids beyond the session and group, no note of whether attendance was
+         *     taken. A public landing page (§5.4, parent `13a`) has no business knowing which coach
+         *     is on the mat, and the cheapest way to guarantee that is a shape that cannot carry it.
+         */
+        TrialSlotOut: {
+            /**
+             * Ends At
+             * Format: date-time
+             */
+            ends_at: string;
+            /**
+             * Group Id
+             * Format: uuid
+             */
+            group_id: string;
+            /** Group Name */
+            group_name: string;
+            /**
+             * Is Bookable
+             * @default true
+             */
+            is_bookable: boolean;
+            /** Location Name */
+            location_name: string | null;
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
+            /**
+             * Starts At
+             * Format: date-time
+             */
+            starts_at: string;
         };
         /** ValidationError */
         ValidationError: {
@@ -2743,6 +2953,161 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["app__schemas__platform__StudioOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    trial_slots_api_v1_public_groups__group_id__trial_slots_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                group_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrialSlotListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    public_studio_api_v1_public_studios__slug__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicLandingOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    public_groups_api_v1_public_studios__slug__groups_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicGroupListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    landing_api_v1_public_studios__slug__landing_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicLandingOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    public_logo_api_v1_public_studios__slug__logo_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
