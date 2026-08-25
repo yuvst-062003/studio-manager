@@ -1901,6 +1901,12 @@ Recorded so they are never rediscovered the hard way. Details in `upay-integrati
 | Recurring IPNs carry **no customer identifier** | Automatic matching is impossible; reconciliation is human-confirmed |
 | No custom free-text field on the uPay payment page | Cannot ask the payer to type a student name |
 | IPN arrives ~5 minutes after payment | The return redirect must never be the source of truth |
+| **The IPN's `amount` is not the form's `amount`** — a ₪1 charge returns `1`, not `1.00` | Reconciliation compares **integers** (`agorot_from_ipn_amount`), never strings. A string compare fails every correct whole-shekel payment into `amount_mismatch`, i.e. a fraud alert on good money |
+| **The merchant account has no sandbox** — `livesystem=0` is untestable and may be a no-op | §19.6 cannot rest on it. A demo studio is refused a form in our own code instead |
+| The form field `paymentdetails` returns as `productdescription` | Confirmed live, 3/3. The outbound and inbound names for the order reference genuinely differ |
+| Installments cap at **12** on the merchant account | `max_payments` is clamped; above it is an untested path |
+| `application=BIT` is uPay's channel label, **not** the payment method | Never parse it as the instrument used — it reads "bit" for Visa-paid transactions |
+| uPay issues a **קבלה**, not a **חשבונית מס** | Do not generate or infer tax documents; store `transactionid` and link to uPay's own receipt view |
 | **Apple has no third-party calendar write API** | ICS subscription is the only cross-platform calendar option |
 | Google Calendar write is a restricted scope | Would require an annual third-party security assessment |
 | **iOS Web Push exists only for a home-screen web app** | An iPhone parent using a Safari tab can receive no push whatsoever. The API is absent, not denied — there is nothing to request |
@@ -1980,11 +1986,11 @@ Play's 14-day closed test. The bottleneck is review throughput, not queue time.
 | 2 | **uPay merchant email** and confirmation the account is live | M6 |
 | 3 | A **public HTTPS URL** for IPN testing (Railway staging is fine) | M6 |
 | 4 | **One iPhone and one Android device** to test the install walkthrough on | M1 |
-| 5 | **A stable HTTPS domain** for the apps — an invitation link people install from should not be a random subdomain | M0 |
+| 5 | **A stable HTTPS domain** for the apps — an invitation link people install from should not be a random subdomain, and the four hosts must share one registrable domain or §11.7's refresh cookie is third-party (see `infra/railway/README.md`) | M1 |
 | 6 | **3–5 real parents** to walk through the iPhone install, before the club-wide invite | M11 |
 | 7 | Studio branding: logo, colours | M1 |
 | 8 | Current price list per group | M6 |
-| 9 | Translation source for **ru** (or approval to machine-translate and have a native speaker review) | M0 |
+| 9 | Translation source for **ru** — machine translation approved and at parity in M0; the **native-speaker review** is what remains, and it gates only tightening `i18n-parity.mjs` to `strict` | M11 |
 | 10 | The club's real class/group structure and weekly schedule | M2 |
 
 ---
@@ -2300,8 +2306,15 @@ Four controls, each targeting something that is otherwise painful or impossible 
   tenant's own audit log and notified to the studio owner. Break-glass excludes health
   declaration contents entirely, and the developer flag does not change that.
 - **Cannot grant itself the flag**, or grant it to anyone else.
-- **Cannot touch live money.** The demo studio's uPay configuration is pinned to
-  `livesystem=0` and a test asserts a demo studio can never render a live payment form.
+- **Cannot touch live money.** `upay_form_fields` **raises** for a demo studio: it gets no
+  payment form at all, and its payment step renders §19.5's IPN simulator instead. Tests
+  assert both the refusal and that no other module in `app/` names uPay's endpoint or
+  writes `livesystem`.
+  > **Amended 2026-08-25.** This previously read *"pinned to `livesystem=0`"*. That
+  > delegated the guarantee to uPay — a test can assert what we send, never what uPay
+  > does with it — and live testing found the merchant account has no sandbox mode, so
+  > the flag's effect is unverified and may be nothing. A demo would have charged a real
+  > card with every test green. The row-level pin stays as defence in depth.
 
 ### 19.7 Demo data hygiene
 

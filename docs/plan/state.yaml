@@ -103,25 +103,38 @@ holdbacks:
     kind: external
     title: A stable HTTPS domain for the apps
     why: >-
-      People install this from an invitation link. A random Railway subdomain reads as a
-      phishing attempt and hurts install conversion, which §6.5 makes the product's main
-      adoption risk. infra/railway/domains.json still has base_domain null.
-    blocks: M0 exit
+      Two costs, and the second is the one that sets the deadline. People install this from
+      an invitation link, and a random Railway subdomain reads as a phishing attempt, which
+      §6.5 makes the product's main adoption risk. But up.railway.app is on the Public Suffix
+      List, so the app hosts and the api host are different *sites* — SPEC §1883's
+      httpOnly/SameSite refresh cookie is third-party to them and Safari drops it, so an iOS
+      parent cannot hold a session. Localhost hides this, because a port is not part of a
+      site. M1 builds auth: if the domain is not there by then, the refresh token gets moved
+      to IndexedDB to make staging work and the workaround becomes the architecture.
+      infra/railway/domains.json still has base_domain null.
+    blocks: W1
     status: open
     opened: 2026-08-24
     closed: null
-    source: SPEC §15 item 5
+    source: SPEC §15 item 5 · infra/railway/README.md
   - id: HB-upay
     kind: external
     title: uPay merchant account not confirmed live
     why: >-
-      Third-party turnaround is not yours to control, and the whole money lane sits
-      behind it.
+      Closed 2026-08-25 by live testing against the account. §15 item 2 wanted the
+      merchant email and confirmation the account is live; both are in hand — the email
+      lives in UPAY_MERCHANT_EMAIL (Railway variables, never git) and the account has
+      real revenue history. §15 item 3, a public HTTPS URL for IPN testing, was already
+      satisfied by staging in M0. The lane was never as blocked as this said: W4's exit
+      gate is E2E-3 and E2E-4, and §13 writes both against a *simulated* IPN, which
+      §19.5 has shipped since M0.4. Two corrections came out of the testing and are
+      recorded in upay-integration.md §Round two — the inbound amount format, and the
+      absence of a sandbox, which forced §19.6 restriction 5 to be redesigned.
     blocks: W4
-    status: open
+    status: closed
     opened: 2026-08-24
-    closed: null
-    source: SPEC §15 item 2
+    closed: 2026-08-25
+    source: SPEC §15 item 2 · upay-integration.md §Round two
     lead_time: true
   - id: HB-parents
     kind: external

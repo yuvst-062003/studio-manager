@@ -349,9 +349,17 @@ web app, and iOS gives you no way to trigger an install. So the install has to b
 and that work is spread across M0 (the manifest layer), M1 (the iOS walkthrough in first run)
 and M8 (install-state reporting beside push delivery).
 
-Two §15 items still block M0 and are easy to forget: **item 5**, a stable HTTPS domain — an
-invitation link people install from should not be a random subdomain — and **item 9**, the
-`ru` translation source, which the i18n scaffolding needs.
+**No §15 item blocks M0 any more.** Item 9, the `ru` translation source, was answered —
+machine translation was approved and `ru/common.ts` reached parity with `he`. What remains
+is the native-speaker read, which only gates tightening `i18n-parity.mjs` from `report` to
+`strict`, and `HB-ru-review` files that under **M11**.
+
+**Item 5**, a stable HTTPS domain, was repointed to **W1** on 2026-08-25. It was filed under
+M0 for the trust reason — an invitation link people install from should not be a random
+subdomain — but the binding constraint is auth, not install. `up.railway.app` is a public
+suffix, so the app hosts and the api host are different sites and §11.7's refresh cookie is
+third-party across them; Safari drops it and an iPhone session cannot renew past the
+15-minute JWT. M0 ships no auth, M1 does. See `infra/railway/README.md` § The domain.
 
 **Artboards** — dashboard `4h`.
 
