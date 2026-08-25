@@ -28,7 +28,9 @@ import sys
 from collections.abc import Iterator
 from contextlib import contextmanager
 
+import pytest
 from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
 #: Order matters: config first, because every other entry imports `settings` from it by
 #: value. app.core.db and app.core.encryption also bind `settings` at module scope, but
@@ -91,3 +93,16 @@ def app_in_env(env: str) -> Iterator[FastAPI]:
                     parent.__dict__.pop(child_name, None)
                 else:
                     setattr(parent, child_name, module)
+
+
+@pytest.fixture
+def production_client() -> Iterator[TestClient]:
+    """The app as production builds it -- §19.6 restriction 2's whole mechanism.
+
+    `app_in_env` reloads app.core.config and app.main with ENV pinned, which is what makes
+    seam 2's discovery loop skip the `dev` module. A fixture rather than a helper call
+    because more than one test needs to ask "does this path exist in production?", and the
+    reload has to be undone either way.
+    """
+    with app_in_env("production") as app:
+        yield TestClient(app)

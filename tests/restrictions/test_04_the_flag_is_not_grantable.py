@@ -144,6 +144,34 @@ def _is_literal_true(node: ast.expr) -> bool:
     return isinstance(node, ast.Constant) and node.value in (True, 1)
 
 
+#: The mapped class the column lives on, and the ORM verbs that write a row.
+_MODEL = "AuthIdentity"
+_WRITE_VERBS = {"values", "update", "insert"}
+
+
+def _writes_the_row(call: ast.Call) -> bool:
+    """Whether a call with an `is_developer=` keyword is writing the COLUMN.
+
+    §19.2 forbids granting the flag, and `is_developer` exists on exactly one table -- so
+    a keyword of that name is a grant only when the callee is the model's constructor or
+    an ORM write verb. M1 introduced two other callables that legitimately take a literal
+    True under the same name and touch no row: `AccessClaims(is_developer=True)` is a
+    token claim, and `developer_may_act(is_developer=True, ...)` is a pure rule
+    evaluation whose eight-row truth table tests/restrictions/test_01 asserts in full.
+
+    Flagging those would have forced them to be renamed or the files exempted -- and the
+    router that mints developer sessions is the last place anyone should be silencing
+    this gate. Attribute and bare-name assignments are unaffected and still caught
+    unconditionally, so `identity.is_developer = <anything>` remains a grant.
+    """
+    func = call.func
+    if isinstance(func, ast.Name):
+        return func.id == _MODEL
+    if isinstance(func, ast.Attribute):
+        return func.attr in _WRITE_VERBS or func.attr == _MODEL
+    return False
+
+
 def grant_lines(path: Path) -> list[int]:
     """Every line in one file that GRANTS the flag.
 
@@ -197,7 +225,7 @@ def grant_lines(path: Path) -> list[int]:
                     ):
                         continue
                     lines.add(node.lineno)
-        elif isinstance(node, ast.Call):
+        elif isinstance(node, ast.Call) and _writes_the_row(node):
             for keyword in node.keywords:
                 if keyword.arg == COLUMN and _is_literal_true(keyword.value):
                     lines.add(node.lineno)
@@ -315,6 +343,25 @@ SIX_CASES = [
         id="column declaration",
     ),
     pytest.param("is_developer: bool", False, id="dataclass field"),
+    # §19.2 is about writing the COLUMN, and `is_developer` exists on exactly one table.
+    # M1 introduced two other callables that legitimately take a literal True under that
+    # name, and neither touches a row: a token claim and a pure rule evaluation. Treating
+    # every literal kwarg as a grant would have forced both to be renamed or exempted --
+    # and a per-file exemption on the router that mints developer sessions is the last
+    # place anyone should be silencing this gate.
+    pytest.param("AccessClaims(is_developer=True)", False, id="a token claim, not a row"),
+    pytest.param(
+        "developer_may_act(is_developer=True, studio_is_demo=d, env=e)",
+        False,
+        id="a rule evaluation, not a row",
+    ),
+    # ...and the model writes are still caught, which is what keeps the narrowing honest.
+    pytest.param("AuthIdentity(is_developer=True)", True, id="model constructor"),
+    pytest.param(
+        "session.execute(update(AuthIdentity).values(is_developer=True))",
+        True,
+        id="ORM update .values",
+    ),
 ]
 
 

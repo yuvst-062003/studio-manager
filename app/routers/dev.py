@@ -16,23 +16,40 @@ Routes resolve under /api/v1/dev/... : main.py mounts every discovered router be
 
 from __future__ import annotations
 
+import uuid
+from datetime import timedelta
+
 from fastapi import APIRouter, HTTPException, Request, status
+from sqlalchemy import select
 
 from app.core.clock import is_shifted, now
 from app.core.config import settings
 from app.core.db import SessionDep
 from app.core.dev_account import RequireDeveloper
 from app.integrations.upay.ipn import build_ipn_query
+from app.models.identity import RefreshToken
 from app.schemas.dev import (
+    ActAsResponse,
     DemoResetRequest,
     DemoResetResponse,
     DevClock,
     DevPing,
+    PersonaListResponse,
+    PersonaOut,
     SimulateIpnRequest,
     SimulateIpnResponse,
 )
+from app.services.audit import AuditService
 from app.services.demo.fixtures import LATEST_VERSION, SEEDS
 from app.services.demo.service import DemoStudioService
+from app.services.identity.act_as import (
+    NO_STUDENT_PERSONA_NOTE,
+    ActAsRefusedError,
+    resolve_persona,
+    switchable_personas,
+)
+from app.services.identity.refresh import REFRESH_COOKIE_NAME, hash_refresh_secret
+from app.services.identity.tokens import AccessClaims, mint_access_token
 
 router = APIRouter(prefix="/dev", tags=["dev"])
 
@@ -132,4 +149,112 @@ def simulate_ipn(
         target_url=path,
         query=query,
         note=note,
+    )
+
+
+# -- §19.4's role switcher ----------------------------------------------------
+@router.get("/personas", response_model=PersonaListResponse)
+def list_personas(_: RequireDeveloper, session: SessionDep) -> PersonaListResponse:
+    """What the dev bar's dropdown renders.
+
+    Only personas this environment would actually let you switch INTO -- the same rule
+    the switch itself applies. Offering one that would be refused is a dropdown with a
+    trapdoor in it.
+    """
+    return PersonaListResponse(
+        items=[
+            PersonaOut(
+                key=persona.key,
+                person_id=persona.person_id,
+                studio_id=persona.studio_id,
+                label=persona.label,
+                roles=list(persona.roles),
+                is_guardian=persona.is_guardian,
+                tests=persona.tests,
+            )
+            for persona in switchable_personas(session, env=settings.ENV)
+        ],
+        no_student_persona_note=NO_STUDENT_PERSONA_NOTE,
+    )
+
+
+@router.post("/act-as/{person_id}", response_model=ActAsResponse)
+def act_as(
+    _: RequireDeveloper, person_id: uuid.UUID, request: Request, session: SessionDep
+) -> ActAsResponse:
+    """§19.4 -- the role switcher.
+
+    **Mints a NEW access token; it does not mutate the caller's.** A switch is a new
+    session shape, and rewriting a token in place would leave the previous one valid for
+    up to fifteen more minutes -- one identity with two live personas, only one of which
+    is in the audit trail.
+
+    The refresh row is updated too, so the persona survives a rotation. Without that, the
+    switch would silently revert the next time the access token expired, which on a
+    fifteen-minute clock is the middle of whatever you were testing.
+    """
+    at = now()
+    try:
+        persona = resolve_persona(session, person_id=person_id, env=settings.ENV)
+    except ActAsRefusedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"code": "act_as_refused", "message": "this persona is not available here"},
+        ) from exc
+
+    identity_id = getattr(request.state, "identity_id", None)
+    # §19.4 -- 'Every switch is audit-logged in the demo studio's own log.' An
+    # impersonation feature in a system holding medical data about minors leaves a trail
+    # or it is not a feature, it is a hole. The diff names the persona and its roles and
+    # nothing else: G7 forbids health contents here, and there are none to put.
+    AuditService.record(
+        session,
+        action="dev.act_as",
+        entity_type="person",
+        entity_id=persona.person_id,
+        studio_id=persona.studio_id,
+        actor_identity_id=identity_id if isinstance(identity_id, uuid.UUID) else None,
+        diff={"persona": persona.key, "label": persona.label, "roles": list(persona.roles)},
+    )
+
+    presented = request.cookies.get(REFRESH_COOKIE_NAME)
+    if presented:
+        row = session.execute(
+            select(RefreshToken).where(RefreshToken.token_hash == hash_refresh_secret(presented))
+        ).scalar_one_or_none()
+        if row is not None and row.revoked_at is None and row.used_at is None:
+            row.acting_as_person_id = persona.person_id
+            row.active_studio_id = persona.studio_id
+
+    key = settings.JWT_SIGNING_KEY
+    if key is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={"code": "auth_unconfigured", "message": "no signing key is configured"},
+        )
+
+    claims = AccessClaims(
+        identity_id=identity_id if isinstance(identity_id, uuid.UUID) else uuid.uuid4(),
+        person_id=persona.person_id,
+        active_studio_id=persona.studio_id,
+        acting_as_person_id=persona.person_id,
+        # §19.4 -- 'the API resolves permissions from that Person exactly as it would for
+        # a real login.' The roles are the PERSONA's, not the developer's: acting as the
+        # assistant coach has to actually lose the manager's rights, or the persona that
+        # exists to verify no financial data leaks proves nothing.
+        roles=persona.roles,
+        is_developer=True,
+        studio_is_demo=persona.studio_is_demo,
+        is_platform_admin=False,
+        issued_at=at,
+        expires_at=at + timedelta(minutes=settings.ACCESS_TOKEN_TTL_MINUTES),
+    )
+    session.commit()
+    return ActAsResponse(
+        access_token=mint_access_token(claims, key=key.get_secret_value()),
+        expires_in=settings.ACCESS_TOKEN_TTL_MINUTES * 60,
+        acting_as_person_id=persona.person_id,
+        persona_label=persona.label,
+        studio_id=persona.studio_id,
+        roles=list(persona.roles),
     )

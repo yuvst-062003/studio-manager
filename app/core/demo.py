@@ -54,6 +54,12 @@ CROSS_STUDIO_CALLERS: dict[str, str] = {
     "app/services/demo/fixtures.py": (
         "seeds the demo studio's own tenant root, for the same reason"
     ),
+    "app/services/identity/act_as.py": (
+        "SPEC 19.1 -- 'in dev and staging the role switcher works across any studio in "
+        "that environment.' Resolving a persona happens before any studio is active, and "
+        "19.7's exclusion would be backwards here: the demo studio is the ONLY one the "
+        "switcher may reach in production, so filtering it out would delete the feature"
+    ),
     "app/services/identity/platform.py": (
         "SPEC 18.1 -- the console operates above every studio because 5.1 makes it the "
         "only thing that can create one. 19.7 is about reports and totals; this is the "

@@ -48,7 +48,10 @@ from app.schemas.identity import (
 )
 from app.services.identity.providers import OAuthProvider, configured_providers, new_pkce_pair
 from app.services.identity.refresh import (
+    REFRESH_COOKIE_NAME,
+    REFRESH_COOKIE_PATH,
     RefreshRejectedError,
+    hash_refresh_secret,
     issue_refresh_token,
     revoke_family,
     rotate_refresh_token,
@@ -68,13 +71,6 @@ from app.services.identity.tokens import AccessClaims, mint_access_token
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["identity"])
-
-#: §11.7's cookie. The name is boring on purpose: it appears in DevTools next to the
-#: instructions for verifying it (docs/install/verification-log.md).
-REFRESH_COOKIE_NAME = "studio_refresh"
-#: Scoped to the one endpoint that reads it. Sending it on every API call would widen the
-#: CSRF surface for no benefit.
-REFRESH_COOKIE_PATH = "/api/v1/auth"
 
 #: A sign-in the user is actively walking through. Long enough to read a consent screen,
 #: short enough that an abandoned transaction is not a standing invitation.
@@ -356,7 +352,18 @@ def me(request: Request, session: SessionDep) -> MeResponse:
             detail={"code": "unauthenticated", "message": "sign in first"},
         )
     memberships = studios_for_identity(session, identity_id)
-    access = app_access(session, [m.person_id for m in memberships])
+
+    # §19.4 -- 'the API resolves permissions from that Person exactly as it would for a
+    # real login.' While a persona is active, §6.1's two access queries have to ask about
+    # the PERSONA, not about the developer's own identity -- otherwise the switcher looks
+    # like it works (the token carries the right roles) while every screen that reads
+    # /auth/me shows the developer's access instead. dev+both is what caught it: it is
+    # the only persona whose answer differs from the developer's in both directions.
+    acting_as = getattr(request.state, "acting_as_person_id", None)
+    subject_person_ids = (
+        [acting_as] if isinstance(acting_as, uuid.UUID) else [m.person_id for m in memberships]
+    )
+    access = app_access(session, subject_person_ids)
     return MeResponse(
         identity_id=identity_id,
         access=AppAccessOut(staff=access.staff, parent=access.parent),
@@ -418,10 +425,9 @@ def logout(request: Request, response: Response, session: SessionDep) -> Respons
     presented = request.cookies.get(REFRESH_COOKIE_NAME)
     if presented:
         from app.models.identity import RefreshToken
-        from app.services.identity.refresh import _hash  # noqa: PLC0415
 
         row = session.execute(
-            select(RefreshToken).where(RefreshToken.token_hash == _hash(presented))
+            select(RefreshToken).where(RefreshToken.token_hash == hash_refresh_secret(presented))
         ).scalar_one_or_none()
         if row is not None:
             revoke_family(session, row.family_id, at=now(), reason="logout")

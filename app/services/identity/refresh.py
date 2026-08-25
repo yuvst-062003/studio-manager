@@ -41,6 +41,15 @@ from app.models.identity import AuthRevocation, RefreshToken
 #: 32 bytes, urlsafe-base64'd. The cookie carries this and nothing else.
 _SECRET_BYTES = 32
 
+#: §11.7's cookie. Named here rather than in the router because §19.4's role switcher
+#: needs them too, and a router importing another router is a dependency neither wants.
+#: The attributes themselves are set in one place -- app/routers/identity.py's
+#: `_set_refresh_cookie` -- so no route can weaken them.
+REFRESH_COOKIE_NAME = "studio_refresh"
+#: Scoped to the one endpoint that reads it. Sending it on every API call would widen the
+#: CSRF surface for no benefit.
+REFRESH_COOKIE_PATH = "/api/v1/auth"
+
 
 class RefreshRejectedError(Exception):
     """Every rejection the refresh endpoint can produce.
@@ -62,7 +71,13 @@ class IssuedRefresh:
     row: RefreshToken
 
 
-def _hash(secret: str) -> str:
+def hash_refresh_secret(secret: str) -> str:
+    """SHA-256 of a presented secret, which is all `refresh_token.token_hash` ever holds.
+
+    Public because §19.4's role switcher has to find the caller's refresh row to write the
+    persona onto it. A second implementation of this one line elsewhere would be a second
+    place for the hash to change.
+    """
     return hashlib.sha256(secret.encode("utf-8")).hexdigest()
 
 
@@ -96,7 +111,7 @@ def issue_refresh_token(
     row = RefreshToken(
         auth_identity_id=identity_id,
         family_id=family_id or uuid.uuid4(),
-        token_hash=_hash(secret),
+        token_hash=hash_refresh_secret(secret),
         parent_id=parent_id,
         active_studio_id=active_studio_id,
         acting_as_person_id=acting_as_person_id,
@@ -153,7 +168,7 @@ def revoke_sessions_for_identity(
 
 def rotate_refresh_token(session: Session, *, presented: str, at: datetime) -> IssuedRefresh:
     row = session.execute(
-        select(RefreshToken).where(RefreshToken.token_hash == _hash(presented))
+        select(RefreshToken).where(RefreshToken.token_hash == hash_refresh_secret(presented))
     ).scalar_one_or_none()
 
     if row is None:
