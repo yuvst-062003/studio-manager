@@ -15,7 +15,7 @@ import uuid
 import pytest
 from app.models.identity import AuthIdentity, PlatformAdmin
 from sqlalchemy.orm import Session
-from tests.identity.conftest import sign_in
+from tests.conftest import sign_in
 
 
 @pytest.fixture

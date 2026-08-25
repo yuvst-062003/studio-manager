@@ -165,6 +165,64 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/classes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Classes */
+        get: operations["list_classes_api_v1_classes_get"];
+        put?: never;
+        /** Create Class */
+        post: operations["create_class_api_v1_classes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Groups */
+        get: operations["list_groups_api_v1_groups_get"];
+        put?: never;
+        /** Create Group */
+        post: operations["create_group_api_v1_groups_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/groups/{group_id}/staff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Group Staff */
+        get: operations["list_group_staff_api_v1_groups__group_id__staff_get"];
+        put?: never;
+        /**
+         * Assign Group Staff
+         * @description §5.1's wizard step 5. Creates the group_staff row AND the group-scoped role
+         *     assignment -- see StructureService.assign_staff for why that is one call.
+         */
+        post: operations["assign_group_staff_api_v1_groups__group_id__staff_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/health": {
         parameters: {
             query?: never;
@@ -183,6 +241,48 @@ export interface paths {
         get: operations["read_health_api_v1_health_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/health-templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Health Templates
+         * @description Conflict C3's read side, so M3 can find the trial template it must present.
+         *
+         *     Manager and owner only: §3.2 gives 'Read full health declaration' to those two, and
+         *     §6.4 puts the template editor on the manager dashboard. A coach has no business here
+         *     -- they see `derived_flags` and nothing else (§5.5).
+         */
+        get: operations["list_health_templates_api_v1_health_templates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/locations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Locations */
+        get: operations["list_locations_api_v1_locations_get"];
+        put?: never;
+        /** Create Location */
+        post: operations["create_location_api_v1_locations_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -285,6 +385,132 @@ export interface components {
             /** State */
             state: string;
         };
+        /** ClassCreate */
+        ClassCreate: {
+            /** Color */
+            color?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Discipline */
+            discipline?: string | null;
+            /** Name */
+            name: string;
+        };
+        /** ClassListResponse */
+        ClassListResponse: {
+            /** Items */
+            items: components["schemas"]["ClassOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** ClassOut */
+        ClassOut: {
+            /** Color */
+            color: string | null;
+            /** Description */
+            description: string | null;
+            /** Discipline */
+            discipline: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Active */
+            is_active: boolean;
+            /** Name */
+            name: string;
+        };
+        /** GroupCreate */
+        GroupCreate: {
+            /** Age Max */
+            age_max?: number | null;
+            /** Age Min */
+            age_min?: number | null;
+            /**
+             * Class Id
+             * Format: uuid
+             */
+            class_id: string;
+            /** Description */
+            description?: string | null;
+            /** Name */
+            name: string;
+        };
+        /** GroupListResponse */
+        GroupListResponse: {
+            /** Items */
+            items: components["schemas"]["GroupOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** GroupOut */
+        GroupOut: {
+            /** Age Max */
+            age_max: number | null;
+            /** Age Min */
+            age_min: number | null;
+            /**
+             * Class Id
+             * Format: uuid
+             */
+            class_id: string;
+            /** Description */
+            description: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Active */
+            is_active: boolean;
+            /** Name */
+            name: string;
+        };
+        /** GroupStaffCreate */
+        GroupStaffCreate: {
+            /** From Date */
+            from_date?: string | null;
+            /**
+             * Person Id
+             * Format: uuid
+             */
+            person_id: string;
+            /** Role */
+            role: string;
+        };
+        /** GroupStaffListResponse */
+        GroupStaffListResponse: {
+            /** Items */
+            items: components["schemas"]["GroupStaffOut"][];
+        };
+        /** GroupStaffOut */
+        GroupStaffOut: {
+            /**
+             * From Date
+             * Format: date
+             */
+            from_date: string;
+            /**
+             * Group Id
+             * Format: uuid
+             */
+            group_id: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Person Id
+             * Format: uuid
+             */
+            person_id: string;
+            /** Role */
+            role: string;
+            /** To Date */
+            to_date: string | null;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -306,6 +532,27 @@ export interface components {
             started_at: string;
             /** Status */
             status: string;
+        };
+        /** HealthTemplateListResponse */
+        HealthTemplateListResponse: {
+            /** Items */
+            items: components["schemas"]["HealthTemplateOut"][];
+        };
+        /**
+         * HealthTemplateOut
+         * @description Conflict C3. The questions, never an answer -- M4 owns anything that could hold
+         *     one.
+         */
+        HealthTemplateOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Version */
+            version: number;
         };
         /**
          * InvitationOut
@@ -338,6 +585,36 @@ export interface components {
             first_name: string;
             /** Last Name */
             last_name: string;
+        };
+        /** LocationCreate */
+        LocationCreate: {
+            /** Address */
+            address?: string | null;
+            /** Name */
+            name: string;
+            /** Notes */
+            notes?: string | null;
+        };
+        /** LocationListResponse */
+        LocationListResponse: {
+            /** Items */
+            items: components["schemas"]["LocationOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** LocationOut */
+        LocationOut: {
+            /** Address */
+            address: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Notes */
+            notes: string | null;
         };
         /** MeResponse */
         MeResponse: {
@@ -675,6 +952,203 @@ export interface operations {
             };
         };
     };
+    list_classes_api_v1_classes_get: {
+        parameters: {
+            query?: {
+                cursor?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClassListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_class_api_v1_classes_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClassCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClassOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_groups_api_v1_groups_get: {
+        parameters: {
+            query?: {
+                class_id?: string | null;
+                cursor?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroupListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_group_api_v1_groups_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GroupCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroupOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_group_staff_api_v1_groups__group_id__staff_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                group_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroupStaffListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    assign_group_staff_api_v1_groups__group_id__staff_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                group_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GroupStaffCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroupStaffOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     read_health_api_v1_health_get: {
         parameters: {
             query?: never;
@@ -691,6 +1165,102 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthResponse"];
+                };
+            };
+        };
+    };
+    list_health_templates_api_v1_health_templates_get: {
+        parameters: {
+            query?: {
+                kind?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HealthTemplateListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_locations_api_v1_locations_get: {
+        parameters: {
+            query?: {
+                cursor?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LocationListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_location_api_v1_locations_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LocationCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LocationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

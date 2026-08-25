@@ -14,7 +14,7 @@ import uuid
 from http.cookies import SimpleCookie
 
 from app.routers.identity import REFRESH_COOKIE_NAME, REFRESH_COOKIE_PATH
-from tests.identity.conftest import sign_in, start_flow
+from tests.conftest import sign_in, start_flow
 
 
 def _set_cookie(response) -> str:

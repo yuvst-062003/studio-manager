@@ -16,10 +16,14 @@ from app.core.tenancy import (
     NoActiveStudioError,
     TenantMixin,
     TenantSession,
+    TenantSessionDep,
     get_current_studio_id,
+    require_current_studio_id,
     use_studio,
     with_all_tenants,
 )
+from fastapi import FastAPI, Request
+from fastapi.testclient import TestClient
 from sqlalchemy import Column, Engine, MetaData, String, Table, select, text
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -193,3 +197,64 @@ def test_the_dependency_rejects_a_request_with_no_resolved_studio():
     with pytest.raises(HTTPException) as caught:
         studio_id_from_request(request)
     assert caught.value.status_code == 401
+
+
+# TenantSessionDep is imported at the TOP of this module, not inside the tests below.
+# This file has `from __future__ import annotations`, so every annotation is a string and
+# FastAPI resolves `session: TenantSessionDep` from the module globals -- a name bound
+# inside a test function is invisible to it, and the route comes back 422 "field
+# required" as if the parameter were a query string.
+# -- the dependency, driven over HTTP -----------------------------------------
+# M1 found this the expensive way. Every test above drives `use_studio` directly, so the
+# FastAPI dependency was never exercised through a real request -- and it did not work.
+# FastAPI wraps a SYNC generator dependency in `contextmanager_in_threadpool`: `__enter__`
+# runs in one worker thread, the endpoint in another and `__exit__` in a third, so the
+# ContextVar `use_studio` sets is invisible to the endpoint and `token.reset()` raises
+# "was created in a different Context".
+#
+# The symptom is the worst available one: every tenant-scoped query inside a request
+# raises NoActiveStudioError, which reads exactly like a caller who forgot to resolve a
+# studio. Nothing about it points at the dependency.
+def test_the_tenant_session_dependency_scopes_a_real_request():
+    studio = uuid.uuid4()
+    app = FastAPI()
+
+    @app.middleware("http")
+    async def _present_a_studio(request: Request, call_next):
+        request.state.studio_id = studio
+        return await call_next(request)
+
+    @app.get("/scoped")
+    def scoped(session: TenantSessionDep) -> dict[str, str]:
+        # The read the whole mechanism exists for: inside a request, a tenant-scoped
+        # query must find the studio the dependency resolved.
+        return {"studio_id": str(require_current_studio_id())}
+
+    response = TestClient(app).get("/scoped")
+    assert response.status_code == 200, response.text
+    assert response.json()["studio_id"] == str(studio)
+
+
+def test_the_scope_does_not_leak_into_the_next_request():
+    """The other half. A dependency that set the ContextVar and never reset it would pass
+    the test above and hand request N+1 request N's studio -- a cross-tenant read that
+    looks like the product working."""
+    first, second = uuid.uuid4(), uuid.uuid4()
+    seen: list[str] = []
+    app = FastAPI()
+
+    @app.middleware("http")
+    async def _present_a_studio(request: Request, call_next):
+        # Whatever the previous request left behind must not be visible here.
+        seen.append(str(get_current_studio_id()))
+        request.state.studio_id = first if not seen[1:] else second
+        return await call_next(request)
+
+    @app.get("/scoped")
+    def scoped(session: TenantSessionDep) -> dict[str, str]:
+        return {"studio_id": str(require_current_studio_id())}
+
+    client = TestClient(app)
+    assert client.get("/scoped").json()["studio_id"] == str(first)
+    assert client.get("/scoped").json()["studio_id"] == str(second)
+    assert seen == ["None", "None"]

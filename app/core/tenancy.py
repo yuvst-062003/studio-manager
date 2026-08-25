@@ -13,7 +13,7 @@ degrades to "no filter" is worse than none, because it looks like it is working.
 from __future__ import annotations
 
 import uuid
-from collections.abc import Iterator
+from collections.abc import AsyncIterator, Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
 from itertools import chain
@@ -216,9 +216,28 @@ def studio_id_from_request(request: Request) -> uuid.UUID:
     return studio_id
 
 
-def get_tenant_session(
+async def get_tenant_session(
     studio_id: Annotated[uuid.UUID, Depends(studio_id_from_request)],
-) -> Iterator[TenantSession]:
+) -> AsyncIterator[TenantSession]:
+    """The session every tenant-scoped route takes.
+
+    **`async def`, and that is load-bearing.** FastAPI wraps a *sync* generator dependency
+    in `contextmanager_in_threadpool`, which runs `__enter__`, the endpoint and `__exit__`
+    in three different worker threads. A ContextVar set in the first is invisible to the
+    second, and `token.reset()` in the third raises "was created in a different Context" --
+    so `use_studio` silently did nothing and every tenant-scoped query inside a request
+    raised NoActiveStudioError. The symptom is the worst available one: it reads exactly
+    like a caller who forgot to resolve a studio, and points nowhere near here.
+
+    An async dependency runs in the request's own context on the event loop, and
+    `run_in_threadpool` copies that context into the sync endpoint -- so the scope reaches
+    the route and is reset on the way out. The Session itself stays synchronous; nothing
+    below awaits.
+
+    This went unnoticed through M0.2 because every test drove `use_studio` directly.
+    tests/core/test_tenancy.py now drives the dependency through a real request, in both
+    directions: the scope arrives, and it does not leak into the next request.
+    """
     with use_studio(studio_id), TenantSession(bind=get_engine(), expire_on_commit=False) as s:
         yield s
 

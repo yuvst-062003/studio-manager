@@ -50,6 +50,10 @@ waves:
         title: The platform console and the trial health template
         status: shipped
         on: 2026-08-25
+      - id: M1.4
+        title: Classes, groups, locations and coach assignment
+        status: shipped
+        on: 2026-08-25
   - id: W2
     milestone: M2 ∥ M3
     title: Schedule ∥ People and funnel

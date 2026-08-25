@@ -24,7 +24,7 @@ from app.services.identity.tokens import AccessClaims, mint_access_token
 from fastapi import Depends, FastAPI, Request
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
-from tests.identity.conftest import TEST_JWT_KEY
+from tests.conftest import TEST_JWT_KEY
 
 T0 = datetime(2026, 8, 25, 12, 0, tzinfo=UTC)
 

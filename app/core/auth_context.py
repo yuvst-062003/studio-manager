@@ -20,8 +20,9 @@ claimed anything*.
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
+from typing import Annotated
 
-from fastapi import Request, Response
+from fastapi import Depends, HTTPException, Request, Response, status
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.core.clock import now
@@ -72,3 +73,51 @@ class AuthContextMiddleware(BaseHTTPMiddleware):
         if acting_as is not None:
             response.headers["X-Acting-As"] = str(acting_as)
         return response
+
+
+def require_roles(*allowed: str) -> Callable[[Request], None]:
+    """SPEC §3.2's permission matrix as a router dependency.
+
+    .claude/rules/api.md: "Authorization is checked in the router via a dependency, never
+    inside a service." A service that checked its own caller would be a service whose
+    guarantees depend on who imported it.
+
+    Reads `request.state.roles`, which is a fifteen-minute snapshot from the verified JWT.
+    §5.2 accepts that latency in as many words -- "Role changes take effect on the next
+    refresh, at most 15 minutes later" -- and pays for the case that cannot wait
+    (removing a coach) with the refresh denylist rather than a database read per request.
+
+    The 401/403 split is decided here rather than left to dependency ordering. FastAPI
+    resolves a route's parameters in declaration order, so whether an anonymous caller met
+    this dependency or `studio_id_from_request` first would depend on which parameter a
+    router happened to list first -- and the answer would differ per route. An anonymous
+    caller gets 401 ("authenticate"), an authenticated one without the role gets 403
+    ("you may not"), from every route, whatever order its parameters are in.
+    """
+
+    def dependency(request: Request) -> None:
+        if getattr(request.state, "identity_id", None) is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail={"code": "unauthenticated", "message": "sign in first"},
+            )
+        roles = set(getattr(request.state, "roles", ()) or ())
+        if not roles & set(allowed):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={"code": "forbidden", "message": "this action is not yours"},
+            )
+
+    return dependency
+
+
+#: §3.2 -- 'Create/edit classes, groups, schedules' and 'Manage staff and role
+#: assignments'. A coach who can create a group can assign themselves to it.
+ManagerOrOwner = Annotated[None, Depends(require_roles("owner", "manager"))]
+
+#: §3.2 -- 'View students in own groups' reaches every staff role, and a roster is
+#: unreadable without the group it belongs to. Refusing reads to coaches would break the
+#: coach app in order to enforce a rule about writes.
+AnyStaff = Annotated[
+    None, Depends(require_roles("owner", "manager", "lead_coach", "assistant_coach"))
+]
