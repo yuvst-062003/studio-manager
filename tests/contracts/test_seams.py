@@ -58,3 +58,30 @@ def test_materialize_sessions_refuses_rather_than_returning_nothing():
     permanently empty picker. `NotImplementedError` cannot be mistaken for an answer."""
     with pytest.raises(NotImplementedError):
         ScheduleService().materialize_sessions(uuid.uuid4(), date(2026, 9, 1), date(2026, 9, 30))
+
+
+# -- W3: HealthService.recompute_derived_flags --------------------------------
+def test_recompute_derived_flags_takes_a_student():
+    """Plan W3 seam, verbatim:
+    `HealthService.recompute_derived_flags(student_id) -> dict[str, bool]`."""
+    from app.services.health import HealthService
+
+    parameters = _signature(HealthService.recompute_derived_flags).parameters
+    assert list(parameters) == ["self", "student_id"]
+
+
+def test_recompute_derived_flags_returns_booleans():
+    """`dict[str, bool]`, not `dict[str, Any]`. §4.3 allows booleans only, and the
+    annotation is the first place that rule is stated to M5."""
+    from app.services.health import HealthService
+
+    signature = _signature(HealthService.recompute_derived_flags)
+    assert signature.parameters["student_id"].annotation is uuid.UUID
+    assert signature.return_annotation == dict[str, bool]
+
+
+def test_recompute_derived_flags_refuses_rather_than_returning_nothing():
+    from app.services.health import HealthService
+
+    with pytest.raises(NotImplementedError):
+        HealthService().recompute_derived_flags(uuid.uuid4())
