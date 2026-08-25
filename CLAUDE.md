@@ -67,6 +67,14 @@ a bare `python3`/`pytest` resolves to an old 3.8 interpreter earlier on PATH.
   interpolated into the message — an f-string has no key for the scrubber to match.
 - Two DB roles: `studio_migrator` owns the schema and runs Alembic, `studio_app` is the
   runtime role. That split is what makes the append-only grant possible.
+- Developer account (§19 — M0.4): `/dev/*` is **conditionally mounted** — `app/main.py`
+  skips `app/routers/dev.py` when `ENV == production`, so the routes do not exist there.
+  `app.core.clock.now()` is the **only** clock; `X-Dev-Now` shifts it for one request
+  outside production and a test fails the build on any other `datetime.now()` in `app/`.
+  The demo studio is created by migration (so production has one), reset from a
+  versioned fixture set in `app/services/demo/fixtures.py`, and excluded from every
+  cross-studio number by `app.core.demo.exclude_demo_studios`. §19.6's five restrictions
+  live in `tests/restrictions/` and run **unscoped in every lane**, like the invariants.
 
 ## Gotchas
 - Recurring payments (הוראת קבע) cannot be created programmatically by our provider.

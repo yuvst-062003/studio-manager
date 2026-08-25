@@ -263,6 +263,23 @@ Plan first with superpowers:writing-plans.
 
 ## Session 4 — M0.4 · the demo studio and the dev bar
 
+> **M0.4 landed 2026-08-24.** M1's contract commit inherits four specific obligations
+> from §19, each with a test already written that will go red until it is met:
+>
+> 1. `auth_identity.is_developer BOOLEAN NOT NULL DEFAULT false`, settable only by seed or
+>    migration. `tests/restrictions/test_04_the_flag_is_not_grantable.py` is vacuous until
+>    this lands and has a test whose failure message says to delete it at that point.
+> 2. Set `request.state.is_developer` and `request.state.studio_is_demo` from the verified
+>    JWT and the resolved studio. The rule is already wired into
+>    `app/core/tenancy.py::studio_id_from_request` and correct; only its inputs are absent.
+> 3. Move `personas` out of `PLANNED_LAYERS` in `app/services/demo/fixtures.py` into a real
+>    `FixtureLayer` — the nine §19.3 personas. `test_no_layer_is_both_planned_and_present`
+>    fails if the entry is left behind.
+> 4. The role switcher: `POST /dev/act-as/{person_id}`, `acting_as_person_id` on the
+>    session, the `X-Acting-As` response header, and an audit entry per switch (§19.4).
+>    Register it into the `dev-bar` slot with `registerDevTool` — the container is not
+>    reopened.
+
 ```
 Read @docs/plan/milestone-plan.md — W0 · M0.
 Read @SPEC.md §19 in full.
