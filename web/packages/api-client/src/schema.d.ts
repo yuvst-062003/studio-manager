@@ -154,11 +154,40 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * Callback Redirect
+         * @description The callback as a **browser navigation** -- which is how every Google sign-in ends.
+         *
+         *     §5.2: "a standard top-level redirect, then PKCE code exchange server-side, returning
+         *     to the app's start URL." `/{provider}/start` builds `redirect_uri` as this very path,
+         *     so Google finishes the flow by navigating the user's browser here with a GET. With
+         *     only the POST arm registered that last step was a **405**, and the suite never saw it:
+         *     the fake provider is driven by a test client posting JSON directly, so no test had
+         *     ever walked the flow the way a browser does.
+         *
+         *     A browser has nowhere to put a JSON body, so this arm ends in a redirect instead. The
+         *     session travels in §11.7's refresh cookie, which `_build_session` has already set on
+         *     `response`; the app that receives the user calls `POST /auth/refresh` to turn it into
+         *     an access token. That is the same exchange `useSession` already performs on boot, so
+         *     the client needs nothing new.
+         *
+         *     The destination is rebuilt from the **stored** transaction -- never from a query
+         *     parameter. `start` validated `return_path` as app-relative when it issued the flow
+         *     (an open redirect on the way out of an OAuth flow is a credential-phishing primitive:
+         *     the user has just authenticated and will trust wherever they land), and reading it
+         *     back from the row is what keeps that validation load-bearing.
+         */
+        get: operations["callback_redirect_api_v1_auth__provider__callback_get"];
         put?: never;
         /**
          * Callback
-         * @description §5.2's server-side exchange, and §6.1 step 3's identity resolution.
+         * @description The callback as a **form POST**.
+         *
+         *     Kept, and not superseded by the GET arm below. Apple posts its callback whenever
+         *     `name` or `email` is in scope -- `response_mode=form_post`, documented in
+         *     `app/services/identity/providers.py` -- so both verbs are genuinely needed. It is also
+         *     the arm the fake provider and most of the suite drive, because a JSON body is far
+         *     easier to assert against than a redirect.
          */
         post: operations["callback_api_v1_auth__provider__callback_post"];
         delete?: never;
@@ -1226,6 +1255,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SessionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    callback_redirect_api_v1_auth__provider__callback_get: {
+        parameters: {
+            query: {
+                code: string;
+                state: string;
+                invitation_token?: string | null;
+            };
+            header?: never;
+            path: {
+                provider: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

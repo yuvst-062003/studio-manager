@@ -43,6 +43,25 @@ def _environments() -> dict[str, dict[str, str]]:
     return environments
 
 
+def app_origin(app: str, env: str) -> str | None:
+    """Where one PWA is reachable, for the OAuth callback's redirect back.
+
+    §5.2's flow ends by "returning to the app's start URL", and the app that began it is
+    recorded on the `OAuthTransaction`. The browser arrives at the API with a GET; the API
+    sets the refresh cookie and sends it here.
+
+    Same source and same `PENDING` rule as `allowed_origins`, and that is the point of
+    putting it in this module: a second place hostnames are written is the place nobody
+    remembers to change on the day HB-domain closes. `None` when the host is unknown or
+    still a placeholder -- the caller decides what to do rather than redirecting a
+    freshly-authenticated user at a hostname that does not exist.
+    """
+    origin = _environments().get("development" if env == "test" else env, {}).get(app)
+    if not origin or _PLACEHOLDER in origin:
+        return None
+    return origin
+
+
 def allowed_origins(env: str) -> list[str]:
     """The origins the API answers credentialed cross-origin requests from.
 

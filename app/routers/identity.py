@@ -33,6 +33,7 @@ from sqlalchemy import select
 
 from app.core.clock import now
 from app.core.config import settings
+from app.core.cors import app_origin
 from app.core.db import SessionDep
 from app.models.identity import AuthIdentity, OAuthTransaction
 from app.schemas.identity import (
@@ -249,15 +250,23 @@ def start(
     )
 
 
-@router.post("/{provider}/callback", response_model=SessionResponse)
-def callback(
+def _complete_callback(
     provider: str,
     body: CallbackRequest,
     response: Response,
     providers: ProvidersDep,
     session: SessionDep,
-) -> SessionResponse:
-    """§5.2's server-side exchange, and §6.1 step 3's identity resolution."""
+) -> tuple[SessionResponse, OAuthTransaction]:
+    """§5.2's server-side exchange, and §6.1 step 3's identity resolution.
+
+    Shared by both callback verbs, and every rule below holds identically for each: the
+    state check, the single-use burn, the provider match, the exchange. The verb is a
+    transport detail; the CSRF defence is not, and a second copy of this would be a second
+    place for one of these four to be forgotten.
+
+    Returns the consumed transaction alongside the session because the GET arm needs its
+    `app` and `return_path` to send the browser home.
+    """
     if provider not in providers:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -335,7 +344,85 @@ def callback(
         refresh_secret=issued.secret,
     )
     session.commit()
+    return result, transaction
+
+
+@router.post("/{provider}/callback", response_model=SessionResponse)
+def callback(
+    provider: str,
+    body: CallbackRequest,
+    response: Response,
+    providers: ProvidersDep,
+    session: SessionDep,
+) -> SessionResponse:
+    """The callback as a **form POST**.
+
+    Kept, and not superseded by the GET arm below. Apple posts its callback whenever
+    `name` or `email` is in scope -- `response_mode=form_post`, documented in
+    `app/services/identity/providers.py` -- so both verbs are genuinely needed. It is also
+    the arm the fake provider and most of the suite drive, because a JSON body is far
+    easier to assert against than a redirect.
+    """
+    result, _ = _complete_callback(provider, body, response, providers, session)
     return result
+
+
+@router.get("/{provider}/callback")
+def callback_redirect(
+    provider: str,
+    response: Response,
+    providers: ProvidersDep,
+    session: SessionDep,
+    code: str,
+    state: str,
+    invitation_token: str | None = None,
+) -> RedirectResponse:
+    """The callback as a **browser navigation** -- which is how every Google sign-in ends.
+
+    §5.2: "a standard top-level redirect, then PKCE code exchange server-side, returning
+    to the app's start URL." `/{provider}/start` builds `redirect_uri` as this very path,
+    so Google finishes the flow by navigating the user's browser here with a GET. With
+    only the POST arm registered that last step was a **405**, and the suite never saw it:
+    the fake provider is driven by a test client posting JSON directly, so no test had
+    ever walked the flow the way a browser does.
+
+    A browser has nowhere to put a JSON body, so this arm ends in a redirect instead. The
+    session travels in §11.7's refresh cookie, which `_build_session` has already set on
+    `response`; the app that receives the user calls `POST /auth/refresh` to turn it into
+    an access token. That is the same exchange `useSession` already performs on boot, so
+    the client needs nothing new.
+
+    The destination is rebuilt from the **stored** transaction -- never from a query
+    parameter. `start` validated `return_path` as app-relative when it issued the flow
+    (an open redirect on the way out of an OAuth flow is a credential-phishing primitive:
+    the user has just authenticated and will trust wherever they land), and reading it
+    back from the row is what keeps that validation load-bearing.
+    """
+    result, transaction = _complete_callback(
+        provider,
+        CallbackRequest(code=code, state=state, invitation_token=invitation_token),
+        response,
+        providers,
+        session,
+    )
+    origin = app_origin(transaction.app, settings.ENV)
+    if origin is None:
+        # Production's hosts are still `PENDING` in domains.json (HB-domain). Refusing is
+        # the honest answer: the alternative is redirecting a freshly-authenticated user
+        # at a hostname that does not resolve, which looks to them like the sign-in ate
+        # their account. 503 rather than 500 -- a configuration state, not a crash.
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={"code": "app_host_unconfigured", "message": f"no host for {transaction.app}"},
+        )
+    redirect = RedirectResponse(
+        f"{origin}{transaction.return_path}", status_code=status.HTTP_307_TEMPORARY_REDIRECT
+    )
+    # The cookie was set on `response`, which FastAPI discards when a handler returns a
+    # Response of its own. Carrying the headers across is what makes the redirect carry
+    # the session -- without it this endpoint authenticates the user and then forgets.
+    redirect.raw_headers.extend(response.raw_headers)
+    return redirect
 
 
 @router.get("/me", response_model=MeResponse)

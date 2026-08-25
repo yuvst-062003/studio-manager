@@ -330,3 +330,73 @@ def test_an_unknown_invitation_code_is_refused(client, fake_provider):
 
 def test_redeeming_an_invitation_requires_being_signed_in(client):
     assert client.post("/api/v1/auth/accept-invitation", json={"token": "x"}).status_code == 401
+
+
+# -- the callback a BROWSER makes ---------------------------------------------
+# Every test above drives the callback with `client.post(..., json=...)`, which no browser
+# ever does. §5.2's flow is "a standard top-level redirect, then PKCE code exchange
+# server-side": Google finishes by navigating the user's browser to `redirect_uri` with a
+# GET, and `/{provider}/start` builds that redirect_uri as this very endpoint. With only a
+# POST handler registered the last step of every real sign-in is a 405 -- and the suite
+# stayed green throughout, because the fake provider is driven by a test client that POSTs
+# directly and no test ever walked the flow the way a browser does.
+def test_the_callback_answers_the_get_a_browser_actually_arrives_with(client, fake_provider):
+    """The defect, in one request. `start` sends the user to the provider with
+    `redirect_uri=.../auth/fake/callback`; the provider returns them here with a GET."""
+    fake_provider.register(code="c-get", subject=f"s-{uuid.uuid4()}", email="get@example.invalid")
+    state = start_flow(client)
+    response = client.get(
+        f"/api/v1/auth/fake/callback?code=c-get&state={state}", follow_redirects=False
+    )
+    assert response.status_code != 405, "Google returns the browser with a GET"
+    assert response.status_code == 307
+
+
+def test_the_browser_callback_lands_back_in_the_app_that_started_the_flow(client, fake_provider):
+    """`OAuthTransaction` stores `app` and `return_path` for exactly this moment. A JSON
+    body would leave the user staring at a serialized session -- the browser has nowhere
+    to put it, and §5.2 ends the flow "returning to the app's start URL"."""
+    fake_provider.register(code="c-get2", subject=f"s-{uuid.uuid4()}", email="g2@example.invalid")
+    state = start_flow(client, "staff")
+    response = client.get(
+        f"/api/v1/auth/fake/callback?code=c-get2&state={state}&", follow_redirects=False
+    )
+    assert response.status_code == 307
+    assert response.headers["location"].endswith("/")
+
+
+def test_the_browser_callback_sets_the_refresh_cookie(client, fake_provider):
+    """The redirect carries the session or it carries nothing. §11.7's cookie is how the
+    app that receives the user gets an access token, through POST /auth/refresh -- there
+    is no body on a 307 for it to read one from."""
+    fake_provider.register(code="c-get3", subject=f"s-{uuid.uuid4()}", email="g3@example.invalid")
+    state = start_flow(client)
+    response = client.get(
+        f"/api/v1/auth/fake/callback?code=c-get3&state={state}", follow_redirects=False
+    )
+    header = _set_cookie(response).lower()
+    assert REFRESH_COOKIE_NAME.lower() in header
+    assert "httponly" in header and "secure" in header and "samesite=lax" in header
+
+
+def test_the_browser_callback_still_refuses_an_unknown_state(client):
+    """Every rule the POST arm enforces holds on the GET arm — the verb changed, not the
+    CSRF defence. A GET that skipped the state check would be the more dangerous half."""
+    response = client.get(
+        "/api/v1/auth/fake/callback?code=c&state=never-issued", follow_redirects=False
+    )
+    assert response.status_code == 400
+
+
+def test_the_post_callback_is_kept_for_apple(client, fake_provider):
+    """Not an accident of history. `providers.py` records that Apple POSTs its callback
+    whenever `name` or `email` is in scope (`response_mode=form_post`), so both verbs are
+    genuinely needed and the POST arm must not be replaced by the GET one."""
+    fake_provider.register(code="c-post", subject=f"s-{uuid.uuid4()}", email="p@example.invalid")
+    state = start_flow(client)
+    assert (
+        client.post(
+            "/api/v1/auth/fake/callback", json={"code": "c-post", "state": state}
+        ).status_code
+        == 200
+    )
