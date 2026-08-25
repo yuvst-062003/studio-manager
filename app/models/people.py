@@ -16,7 +16,16 @@ exactly the same things, payments included. Nothing in this module branches on i
 
 **There is no `payment_mode` on a person** (§4.3). A payer is never locked into one way of
 paying; §5.10's payments screen always offers all three. What a manager sets is the
-*price*, on the group's price plan (W4), never a mode on a person.
+*price* — and after **C11** that price is set on the **student** (`student.price_plan_id`),
+never on a group and never on an enrollment.
+
+**C11 and C12, settled together in W2's contract commit.** The club prices by how often a
+child trains, not by which groups they attend, and it decides per child which of a group's
+weekly sessions they come to. Those are the same input read twice: `enrollment.
+attends_weekdays` is what the child attends, and the volume it implies is what the price is
+set against. Designing either alone produces a model that contradicts the other — see
+`app/services/people/attendance_pattern.py`, which both the billing run and the roster read
+rather than re-deriving.
 """
 
 from __future__ import annotations
@@ -32,10 +41,12 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Index,
+    SmallInteger,
     String,
     Text,
     text,
 )
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -81,16 +92,23 @@ REGISTRATION_STATUSES = ("pending", "approved", "rejected")
 
 class Student(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
     """§4.3 — `student  studio_id, person_id UNIQUE, status, source?, joined_on?,
-    left_on?, current_belt_id?, health_status`.
+    left_on?, current_belt_id?, health_status, price_plan_id?`.
 
     A student **is** a person (`person_id UNIQUE`), not a copy of one. §3.3's identity
     model allows an adult student who is also their own guardian, and a second name/
     birthdate column here would immediately let the two drift apart.
 
-    `current_belt_id` carries no foreign key: `belt_rank` is W4's table. W4's contract
-    commit adds the constraint, exactly as W2's adds `guardian.student_id`'s. A forward
-    reference in a `ForeignKey` string would fail at mapper-configuration time, which is
-    every test in the suite rather than one.
+    `current_belt_id` and `price_plan_id` carry no foreign key: `belt_rank` and
+    `price_plan` are W4's tables. W4's contract commit adds both constraints, exactly as
+    W2's adds `guardian.student_id`'s. A forward reference in a `ForeignKey` string would
+    fail at mapper-configuration time, which is every test in the suite rather than one.
+
+    **`price_plan_id` is here and not on `enrollment` — that is C11.** The club prices by
+    how often a child trains, not by which groups they attend, so one student has one
+    tuition price however many groups they are enrolled in. §5.10's billing run walks
+    students and creates **one** tuition charge each; walking enrollments, as the spec
+    said before C11, bills a child in two groups twice a month at two different prices,
+    silently and forever.
     """
 
     __tablename__ = "student"
@@ -125,6 +143,10 @@ class Student(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
     #: docstring.
     current_belt_id: Mapped[uuid.UUID | None] = mapped_column(PGUUID(as_uuid=True))
     health_status: Mapped[str] = mapped_column(String(15), nullable=False, default="missing")
+    #: §5.10, C11 — the tuition price, **per student**. W4's `price_plan`, unconstrained
+    #: until that wave's contract commit. Nullable: a `lead` or `trial` has no price yet,
+    #: and §5.4 makes setting one part of the manager's conversion decision.
+    price_plan_id: Mapped[uuid.UUID | None] = mapped_column(PGUUID(as_uuid=True))
 
 
 class StudentFreeze(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
@@ -229,14 +251,28 @@ class TrialBooking(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
 
 class Enrollment(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
     """§4.3 — `enrollment  student_id, group_id, status, started_on, ended_on?,
-    price_plan_id`.
+    attends_weekdays?`.
 
-    The billing run's unit of work: §5.10 step 1 creates one tuition charge per active
-    enrollment not covered by a freeze. A student in two groups has two enrollments and
-    two charges, which is correct — they are attending twice.
+    **A link table, and it always was** (§3.3). A child in the competition group *and* the
+    teenagers group is two rows, which the club confirmed is normal. §5.4's opening line
+    used to assert "each child is enrolled in one group"; the schema never enforced it, the
+    club contradicts it outright, and C11 is where that sentence was corrected.
 
-    `price_plan_id` carries no foreign key for the same reason as `student.current_belt_id`
-    — `price_plan` is W4's table and W4's contract commit adds the constraint.
+    **This is not the billing run's unit of work — the student is** (C11). §5.10 step 1
+    creates one tuition charge per *student*, at `student.price_plan_id`'s amount. Two
+    enrollments are still one charge. This row carries no price at all, which is the point:
+    a `price_plan_id` here is what made a child in two groups pay twice.
+
+    **`attends_weekdays` is C12.** A group that trains twice a week may have students
+    signed up for only one of those days, and §5.7's four attendance states cannot say "not
+    expected today" — so such a student was `absent_unexcused` every week forever and read
+    as 50% attendance while attending everything they agreed to. The manager sets the days
+    per student; the roster and every §5.14 denominator read them through
+    `app/services/people/attendance_pattern.py`.
+
+    The two are one decision. "Twice a week" is simultaneously what a child attends (C12)
+    and what they pay for (C11): the volume implied by these weekdays across a student's
+    active enrollments is the number the manager sets `student.price_plan_id` against.
     """
 
     __tablename__ = "enrollment"
@@ -245,6 +281,15 @@ class Enrollment(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
             "status IN ('pending', 'active', 'frozen', 'ended')", name="enrollment_status"
         ),
         CheckConstraint("ended_on IS NULL OR ended_on >= started_on", name="enrollment_date_range"),
+        # C12 — 0-6, matching `group_schedule_rule.weekday`. NULL is "every session of
+        # this group"; an EMPTY array is not, and is rejected: it would silently mean a
+        # student expected at nothing, which is a left student rather than an enrolled one.
+        CheckConstraint(
+            "attends_weekdays IS NULL OR ("
+            "array_length(attends_weekdays, 1) > 0 "
+            "AND attends_weekdays <@ ARRAY[0,1,2,3,4,5,6]::smallint[])",
+            name="enrollment_attends_weekdays",
+        ),
         # One live enrollment per (student, group). A student re-added to a group they are
         # already in is a duplicate, and a duplicate here bills them twice.
         Index(
@@ -268,8 +313,16 @@ class Enrollment(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
     status: Mapped[str] = mapped_column(String(10), nullable=False, default="pending")
     started_on: Mapped[date] = mapped_column(Date, nullable=False)
     ended_on: Mapped[date | None] = mapped_column(Date)
-    #: W4's `price_plan`. Unconstrained until that wave — see the class docstring.
-    price_plan_id: Mapped[uuid.UUID | None] = mapped_column(PGUUID(as_uuid=True))
+    #: §5.7, C12 — which of this group's weekly sessions the student is expected at, as
+    #: weekdays 0-6 matching `group_schedule_rule.weekday`. **NULL means all of them**,
+    #: which is the default and the common case: a group that trains once a week never
+    #: needs this set, and neither does a student who comes to everything.
+    #:
+    #: Weekdays rather than `group_schedule_rule_id`s on purpose. §5.6 rewrites future
+    #: sessions when a rule changes, so a rule id here would dangle the day a manager
+    #: edits the schedule and would silently drop the student off the roster. A weekday
+    #: survives a schedule change; "Tuesday" means the same thing before and after.
+    attends_weekdays: Mapped[list[int] | None] = mapped_column(ARRAY(SmallInteger))
 
 
 class RegistrationRequest(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):

@@ -92,8 +92,13 @@ waves:
     mode: parallel
     lanes: [SCHEDULE, PEOPLE]
     exit_gate: E2E-5 schedule change · E2E-1a registration → approval → active
-    status: pending
-    pieces: []
+    status: active
+    opened: 2026-08-25
+    pieces:
+      - id: W2.0
+        title: The contract commit — revision 0006, C11 and C12, the attendance-pattern seam
+        status: shipped
+        on: 2026-08-25
   - id: W3
     milestone: M4 ∥ M5
     title: Health ∥ Attendance
@@ -266,10 +271,22 @@ holdbacks:
       W2's contract commit, because that is where enrollment is built: the billing run must
       produce ONE tuition charge per student per period rather than one per enrollment, and
       the amount must hang off something the manager sets per student.
+    resolution: >-
+      Closed 2026-08-25 in W2's contract commit. The price moved off the group and off the
+      enrollment onto the STUDENT: student.price_plan_id, with price_plan rescoped from
+      group_id/class_id to sessions_per_week — 'פעמיים בשבוע 300', 'כל יום 500'. The
+      billing run's unit of work is now the student, and charge's idempotency index is
+      keyed uq_charge_student_period_kind rather than on enrollment_id, which is the
+      structural half: an enrollment-keyed index does not merely fail to prevent the double
+      charge, it permits it. charge.enrollment_id is gone so nothing invites the
+      per-enrollment run back. SPEC §5.4's 'each child is enrolled in one group' is
+      corrected to 'one or more groups', and §5.10's pricing, billing-run step 1, step 5's
+      uniqueness and step 6's registration fee are rewritten to match. Settled together
+      with C12 — see its resolution for the shared reader.
     blocks: W2
-    status: open
+    status: closed
     opened: 2026-08-25
-    closed: null
+    closed: 2026-08-25
     source: SPEC §5.4, §5.10 · the club, 2026-08-25
   - id: HB-c12-partial-attendance
     kind: conflict
@@ -286,10 +303,25 @@ holdbacks:
       same input C11 depends on — 'twice a week' is both what a student attends and what
       they pay for — so the two must be settled together or the second will contradict the
       first.
+    resolution: >-
+      Closed 2026-08-25 in W2's contract commit. enrollment.attends_weekdays SMALLINT[]
+      carries which of a group's weekly sessions a student is expected at, 0-6 matching
+      group_schedule_rule.weekday; NULL means all of them and is the default and the common
+      case. Weekdays rather than group_schedule_rule_ids on purpose — §5.6 rewrites future
+      sessions when a rule changes, so a rule id would dangle and silently drop the student
+      off the roster, while 'Tuesday' means the same thing before and after. Deliberately
+      NOT a fifth attendance state: §5.7's four record what somebody said, expectation
+      records what was asked of them, and the axes are independent. The roster lists the
+      expected; students enrolled but not expected today sit beneath it in a collapsed
+      'לא אמורים להגיע היום' section, are still markable, are never touched by סמן הכל
+      נוכח, and never enter a §5.14 denominator. Settled together with C11 as one decision:
+      app/services/people/attendance_pattern.py is the single reader both the roster and
+      the billing run go through — expected_weekdays, is_expected, and weekly_volume, the
+      last being the sessions-per-week figure a manager sets the student's price against.
     blocks: W2
-    status: open
+    status: closed
     opened: 2026-08-25
-    closed: null
+    closed: 2026-08-25
     source: SPEC §5.7, §5.14 · the club, 2026-08-25
   - id: HB-ru-review
     kind: external

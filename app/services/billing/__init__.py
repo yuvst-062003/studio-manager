@@ -22,8 +22,16 @@ from __future__ import annotations
 
 import uuid
 from datetime import date
+from typing import TYPE_CHECKING
 
-from app.models.billing import Charge
+# The model lives in `app/models/_pending/` until W4's contract commit migrates it, and
+# importing it at runtime would register `charge` in `Base.metadata` with no table behind
+# it -- which is `alembic check` red and a demo reset that fails on a missing relation.
+# `from __future__ import annotations` makes every annotation a string, so the guard costs
+# the signature nothing: mypy and the IDE resolve `Charge`, the interpreter never does.
+if TYPE_CHECKING:
+    from app.models._pending.billing import Charge
+
 from app.schemas.billing import ChargeKind
 
 
@@ -68,9 +76,10 @@ class BillingService:
         the lane most likely to make it, being the one that passes `event_id` at all.
 
         A charge for a whole studio's month is created one row at a time. §4.3's
-        idempotency key -- `UNIQUE(enrollment_id, period_year, period_month, kind)` --
-        is what makes a re-run after a partial failure safe, so this may be called again
-        for a period already partly billed.
+        idempotency key -- `UNIQUE(student_id, period_year, period_month, kind)` -- is what
+        makes a re-run after a partial failure safe, so this may be called again for a
+        period already partly billed. **Per student, not per enrollment** (C11): a child in
+        two groups is billed once, at the plan on `student.price_plan_id`.
         """
         raise NotImplementedError("M6 — lane MONEY owns app/services/billing/**")
 

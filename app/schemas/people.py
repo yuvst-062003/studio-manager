@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime
-from typing import Any
+from typing import Annotated, Any
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -28,6 +28,12 @@ ENROLLMENT_STATUS_PATTERN = r"^(pending|active|frozen|ended)$"
 TRIAL_OUTCOME_PATTERN = r"^(pending|converted|lost)$"
 REGISTRATION_SOURCE_PATTERN = r"^(public_link|parent_app|manager)$"
 REGISTRATION_STATUS_PATTERN = r"^(pending|approved|rejected)$"
+
+#: C12 — `enrollment.attends_weekdays`. 0-6 **Sunday-first**, matching
+#: `group_schedule_rule.weekday` (§4.3) and not Python's Monday-first `date.weekday()`.
+#: Bounded here as well as by the table's CHECK so the generated client and the OpenAPI
+#: document both carry the range: a client sending 7 should be told why, not 500'd.
+Weekday = Annotated[int, Field(ge=0, le=6)]
 
 
 class GuardianOut(BaseModel):
@@ -66,6 +72,9 @@ class StudentOut(BaseModel):
     joined_on: date | None
     left_on: date | None
     current_belt_id: uuid.UUID | None
+    #: C11 — the tuition price is set per **student**, never per enrollment. The id only;
+    #: the amount is W4's `PricePlanOut`, behind a manager-scoped endpoint.
+    price_plan_id: uuid.UUID | None = None
     #: Rendered as `BeltBar` — D7's ring is unconditional, so the colour travels raw and
     #: the component is what guarantees it is never fill-only.
     current_belt_name: str | None = None
@@ -129,6 +138,9 @@ class StudentStatusHistoryOut(BaseModel):
 
 
 class EnrollmentOut(BaseModel):
+    """One group membership. **Carries no price** — C11 put that on the student, so a
+    child in two groups has two of these and one tuition charge."""
+
     id: uuid.UUID
     student_id: uuid.UUID
     group_id: uuid.UUID
@@ -136,22 +148,22 @@ class EnrollmentOut(BaseModel):
     status: str = Field(pattern=ENROLLMENT_STATUS_PATTERN)
     started_on: date
     ended_on: date | None
-    #: The id only. The *price* is W4's `PricePlanOut`, reachable by a manager-scoped
-    #: endpoint — never inlined here, or invariant 3 fails on the roster.
-    price_plan_id: uuid.UUID | None
+    #: C12 — which of this group's weekly sessions the student is expected at, 0-6 matching
+    #: `group_schedule_rule.weekday`. `None` means all of them.
+    attends_weekdays: list[Weekday] | None = None
 
 
 class EnrollmentCreate(BaseModel):
     student_id: uuid.UUID
     group_id: uuid.UUID
     started_on: date
-    price_plan_id: uuid.UUID | None = None
+    attends_weekdays: list[Weekday] | None = Field(default=None, min_length=1)
 
 
 class EnrollmentUpdate(BaseModel):
     status: str | None = Field(default=None, pattern=ENROLLMENT_STATUS_PATTERN)
     ended_on: date | None = None
-    price_plan_id: uuid.UUID | None = None
+    attends_weekdays: list[Weekday] | None = Field(default=None, min_length=1)
 
 
 class TrialBookingOut(BaseModel):

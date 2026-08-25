@@ -7,6 +7,10 @@ requires-python = ">=3.14"
 pythonpath = ["."]
 testpaths = ["tests"]
 addopts = "-q"
+# tests/contracts/_pending/ asserts against tables app/models/_pending/ deliberately keeps
+# out of Base.metadata until their wave. Each wave's contract commit moves its model file
+# and its test file up together. See tests/contracts/_pending/__init__.py.
+norecursedirs = ["_pending"]
 markers = [
     "db: requires a live PostgreSQL (./scripts/dev-db.sh up)",
     "slow: runs the full lane-check; excluded with -m 'not slow'",

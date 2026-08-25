@@ -88,7 +88,19 @@ SUBSCRIPTION_STATUSES = ("active", "cancelled")
 
 
 class PricePlan(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
-    """§5.10 -- 'A `price_plan` attaches to a group (falling back to the class).'
+    """§5.10 -- 'A `price_plan` is scoped by training volume and attaches to a student,
+    never to a group.'
+
+    **C11.** The club prices by how often a child trains -- about 300 for twice a week,
+    about 500 for daily -- independent of which groups those sessions belong to. The plan
+    the spec used to describe hung off `group_id` (falling back to `class_id`), which
+    charged a child in the competition group *and* the teenagers group twice a month at two
+    different prices, silently and forever. `sessions_per_week` is what a plan is now for,
+    and `student.price_plan_id` is where a student's is chosen.
+
+    `sessions_per_week` is a **label on the plan, not a rule the run enforces**. The
+    manager picks the plan; the app shows the volume derived from the child's enrollments
+    beside the picker so a mismatch is visible at the moment the price is set (§5.10).
 
     **Versioned by `active_from`/`active_to`, never edited in place**, so a price change
     never rewrites history. §5.15's rollover reviews prices with old plans **closed, not
@@ -98,9 +110,7 @@ class PricePlan(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
 
     __tablename__ = "price_plan"
     __tenant_table_args__ = (
-        CheckConstraint(
-            "group_id IS NOT NULL OR class_id IS NOT NULL", name="price_plan_has_a_scope"
-        ),
+        CheckConstraint("sessions_per_week > 0", name="price_plan_sessions_per_week"),
         CheckConstraint(
             "active_to IS NULL OR active_to >= active_from", name="price_plan_active_range"
         ),
@@ -108,13 +118,9 @@ class PricePlan(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
         Index("ix_price_plan_studio_id_active_from", "studio_id", "active_from"),
     )
 
-    group_id: Mapped[uuid.UUID | None] = mapped_column(
-        PGUUID(as_uuid=True), ForeignKey("group.id", ondelete="CASCADE")
-    )
-    class_id: Mapped[uuid.UUID | None] = mapped_column(
-        PGUUID(as_uuid=True), ForeignKey("class.id", ondelete="CASCADE")
-    )
     name: Mapped[str] = mapped_column(String(120), nullable=False)
+    #: C11 -- 'פעמיים בשבוע' is 2, 'כל יום' is 5. What the club actually charges by.
+    sessions_per_week: Mapped[int] = mapped_column(Integer, nullable=False)
     monthly_amount_agorot: Mapped[int] = mapped_column(Integer, nullable=False)
     #: §5.10 -- 'Registration fees are charged once, on the first billing run after
     #: enrollment.' Nullable: most plans have none.
@@ -172,14 +178,20 @@ class Charge(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
         # §5.10 step 5, and invariant 5's structural half: 're-running for the same period
         # creates no duplicates'. Partial, because only periodic charges have a period --
         # a manual charge may legitimately repeat.
+        #
+        # **Keyed on student_id, not enrollment_id -- that is C11.** Tuition is priced per
+        # student by training volume, so a child in two groups gets ONE charge. Keying this
+        # on the enrollment is precisely what would let the second enrollment raise a second
+        # charge, which is why the index is the structural half of the rule rather than a
+        # nicety beside it.
         Index(
-            "uq_charge_enrollment_period_kind",
-            "enrollment_id",
+            "uq_charge_student_period_kind",
+            "student_id",
             "period_year",
             "period_month",
             "kind",
             unique=True,
-            postgresql_where=text("enrollment_id IS NOT NULL AND period_year IS NOT NULL"),
+            postgresql_where=text("student_id IS NOT NULL AND period_year IS NOT NULL"),
         ),
         # §5.10's debt list and the parent payments screen: everything this person owes.
         Index(
@@ -196,11 +208,11 @@ class Charge(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
     payer_person_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True), ForeignKey("person.id", ondelete="RESTRICT"), nullable=False
     )
+    #: C11 -- the billing run's unit of work. There is deliberately **no `enrollment_id`**:
+    #: a tuition charge covers a student for a period, not one of their group memberships,
+    #: and a column here would invite the per-enrollment run C11 exists to remove.
     student_id: Mapped[uuid.UUID | None] = mapped_column(
         PGUUID(as_uuid=True), ForeignKey("student.id", ondelete="SET NULL")
-    )
-    enrollment_id: Mapped[uuid.UUID | None] = mapped_column(
-        PGUUID(as_uuid=True), ForeignKey("enrollment.id", ondelete="SET NULL")
     )
     kind: Mapped[str] = mapped_column(String(15), nullable=False)
     period_year: Mapped[int | None] = mapped_column(Integer)

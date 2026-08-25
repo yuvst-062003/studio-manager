@@ -16,9 +16,15 @@ exactly the alerts M9 raises. The fan-out belongs behind the seam.
 from __future__ import annotations
 
 import uuid
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from app.models.comms import Notification
+# The model lives in `app/models/_pending/` until W5's contract commit migrates it, and
+# importing it at runtime would register `notification` in `Base.metadata` with no table behind
+# it -- which is `alembic check` red and a demo reset that fails on a missing relation.
+# `from __future__ import annotations` makes every annotation a string, so the guard costs
+# the signature nothing: mypy and the IDE resolve `Notification`, the interpreter never does.
+if TYPE_CHECKING:
+    from app.models._pending.comms import Notification
 
 
 class NotificationService:

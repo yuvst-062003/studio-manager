@@ -258,7 +258,9 @@ platform_admin       auth_identity_id
 student              studio_id, person_id UNIQUE,
                      status(lead|trial|pending_approval|active|frozen|left|lost),
                      source?, joined_on?, left_on?, current_belt_id?,
-                     health_status(missing|trial_signed|signed)
+                     health_status(missing|trial_signed|signed), price_plan_id?
+                     -- price_plan_id is per STUDENT, not per enrollment (C11).
+                     -- One student, one tuition price, however many groups.
 guardian             student_id, person_id, is_primary BOOL, relation
                      UNIQUE(student_id, person_id)
 student_freeze       student_id, from_date, to_date?, reason, created_by_person_id
@@ -305,7 +307,11 @@ session_note         session_id, author_person_id, body, deleted_at?
 
 ```
 enrollment           student_id, group_id, status(pending|active|frozen|ended),
-                     started_on, ended_on?, price_plan_id
+                     started_on, ended_on?, attends_weekdays SMALLINT[]?
+                     -- attends_weekdays is which of THIS group's weekly sessions the
+                     -- student is expected at, 0-6 matching group_schedule_rule.weekday.
+                     -- NULL means all of them, which is the common case and the default.
+                     -- It carries NO price: tuition is priced per student (C11).
 registration_request studio_id, source(public_link|parent_app|manager),
                      payload_encrypted, matched_person_id?, status(pending|approved|
                      rejected), submitted_at, reviewed_by_person_id?, reviewed_at?
@@ -359,14 +365,17 @@ event_exam_result    event_id, student_id, belt_rank_id, result(pass|fail),
 #### Billing ledger
 
 ```
-price_plan           studio_id, group_id?, class_id?, name,
+price_plan           studio_id, name, sessions_per_week,
                      monthly_amount_agorot, registration_fee_agorot?,
                      active_from, active_to?
+                     -- Scoped by TRAINING VOLUME, never by group (C11). "פעמיים בשבוע
+                     -- 300", "כל יום 500". A student attending two groups once each
+                     -- is on the twice-a-week plan and pays once.
 product              studio_id, name, description?, price_agorot, is_active
                      -- a catalog of sellable items (גי, חגורה, כפפות, דמי ביטוח).
                      -- Selling one creates a normal charge. NO stock counts:
                      -- inventory is a different product.
-charge               studio_id, payer_person_id, student_id?, enrollment_id?,
+charge               studio_id, payer_person_id, student_id?,
                      kind(tuition|registration|event|manual),
                      period_year?, period_month?, amount_agorot,
                      original_amount_agorot?, proration_note?, due_date,
@@ -498,7 +507,13 @@ returned to; progress is persisted so the wizard survives a closed app.
 ### 5.4 Enrollment
 
 A parent never enrolls *themselves* in anything. They register **children**, each child is
-enrolled in **one group**, and the parent sees those groups through their children.
+enrolled in **one or more groups**, and the parent sees those groups through their children.
+
+`enrollment` is a link table (§3.3) and always was — a child in the competition group *and*
+the teenagers group is two rows, which the club confirmed is normal. **Two enrollments are
+still one tuition charge**: tuition is priced per student by training volume, not per group
+(§5.10). Each enrollment carries `attends_weekdays`, which of that group's weekly sessions
+the child is actually expected at.
 
 **Enrollment is always a manager decision.** The public link's only job is to get someone
 through the door for a first lesson; nobody enrolls themselves.
@@ -765,6 +780,27 @@ assumption:
 | `absent_unexcused` | Marked absent by a coach; nobody warned us. |
 | `absent_excused` | A guardian pre-reported the absence, or a coach explicitly marked it excused. |
 
+**Who is expected, and who is merely enrolled.** A student enrolled in a group that trains
+twice a week may be signed up for only one of those days — the manager sets which, per
+student, in `enrollment.attends_weekdays`. That is **not a fifth attendance state.** The
+four above record what somebody *said*; expectation records what was *asked of them*, and
+the two are independent axes:
+
+- The roster lists the students **expected** at that session. Students enrolled in the group
+  but not expected today sit in a separate collapsed section beneath it, `לא אמורים להגיע
+  היום`, and can still be marked — a child who turns up on an extra day is a real child.
+- `סמן הכל נוכח` never touches that section, and its rows never count toward `לא סומן`.
+- Every denominator in §5.14 counts **expected** sessions only. A twice-a-week student who
+  attends both their days is at 100%, not 50%, and the at-risk rule counts consecutive
+  missed *expected* sessions.
+- `attends_weekdays IS NULL` means "all of this group's sessions", which is the default and
+  the common case. A group that trains once a week never needs the column set.
+
+**Money does not read this.** The monthly fee buys the slot, not the sessions (below), and
+tuition is priced per student by training volume (§5.10). `attends_weekdays` is what the
+manager and the child agreed to; it is the input to the volume the price is *set* against,
+never a per-session meter.
+
 **Parent pre-reporting.** A guardian taps "לא אגיע היום" on an upcoming session, optionally
 with a reason. This writes an `absence_report` and sets the attendance row to
 `absent_excused` with `source = parent`.
@@ -866,16 +902,32 @@ The application ledger is the source of truth. uPay is one of several ways money
 
 #### Pricing
 
-A `price_plan` attaches to a group (falling back to the class) and carries a
-`monthly_amount_agorot` and an optional `registration_fee_agorot`. Plans are versioned by
+A `price_plan` is **scoped by training volume and attaches to a student**, never to a
+group. It carries `sessions_per_week`, a `monthly_amount_agorot` and an optional
+`registration_fee_agorot` — "פעמיים בשבוע · 300", "כל יום · 500". Plans are versioned by
 `active_from`/`active_to` so a price change never rewrites history.
+
+**A group has no price.** The club prices by how often a child trains, independent of which
+groups those sessions belong to, so a child in two groups who comes twice a week pays the
+twice-a-week price once. Attaching the plan to the group instead would charge that child
+twice a month, at two different prices, silently and forever.
+
+The manager sets `student.price_plan_id` at conversion (§5.4). The app shows the child's
+**derived weekly volume** — the sessions per week implied by their enrollments'
+`attends_weekdays` — beside the plan picker, so a mismatch between what a child attends and
+what they are billed for is visible at the moment the price is set. It is a suggestion, not
+a computation: the manager decides, and a discount is a negative `manual` charge as it
+always was.
 
 #### The monthly billing run
 
 A worker job runs on a configurable day (default the 1st) for each active studio:
 
-1. For every `active` enrollment not covered by a `student_freeze`, create a `charge`
-   with `kind = 'tuition'` for that period.
+1. For every **student** with at least one `active` enrollment and not covered by a
+   `student_freeze`, create **one** `charge` with `kind = 'tuition'` for that period, at
+   their `price_plan`'s amount. **One student, one tuition charge, however many groups
+   they are enrolled in.** Walking enrollments instead is the C11 defect: it bills a child
+   in two groups twice.
 2. **First-month proration.** If the enrollment started mid-period:
    `amount = round(monthly × remaining_sessions ÷ total_sessions_in_period)`, using
    materialized sessions — not calendar days. The original amount and a human-readable
@@ -884,8 +936,11 @@ A worker job runs on a configurable day (default the 1st) for each active studio
    never change it.
 4. A frozen student generates nothing.
 5. The run is **idempotent**: re-running for the same period creates no duplicates
-   (unique on `enrollment_id, period_year, period_month, kind`).
-6. Registration fees are charged once, on the first billing run after enrollment.
+   (unique on `student_id, period_year, period_month, kind`). Keying this on
+   `enrollment_id` is what would let a second enrollment raise a second charge, so the
+   uniqueness index is the structural half of the rule above, not a nicety beside it.
+6. Registration fees are charged once per **student**, on the first billing run after
+   their first enrollment — never again when they add or change a group.
 
 #### How a parent pays
 
@@ -1174,9 +1229,11 @@ Live on the web dashboard, with CSV/XLSX export on every table.
 - Trials booked this week, and who hasn't been followed up
 
 **Operational**
-- Attendance rate per group, per student and per month
+- Attendance rate per group, per student and per month. **The denominator is sessions the
+  student was expected at** (§5.7), never every session the group held — a twice-a-week
+  student in a daily group is not at 40% attendance
 - **Sessions held vs planned** (this is why `unmarked` must be a real state)
-- Students at risk — three or more consecutive absences. **This fires a notification to
+- Students at risk — three or more consecutive **expected** sessions missed. **This fires a notification to
   the group's coaches and to managers with a one-tap "צור קשר עם ההורה"** — it is not left
   sitting in a report nobody opens
 - New enrollments, dropouts and net change per month

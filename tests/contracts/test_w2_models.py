@@ -15,6 +15,7 @@ import pytest
 import sqlalchemy as sa
 from app.core.encryption import EncryptedJSON
 from app.models.base import Base
+from sqlalchemy.dialects.postgresql import ARRAY
 
 W2_SCHEDULE_TABLES = (
     "training_year",
@@ -119,3 +120,46 @@ def test_no_w2_table_smuggles_in_a_float(table):
     added in."""
     for column in Base.metadata.tables[table].columns:
         assert not isinstance(column.type, (sa.Float, sa.Numeric)), column.name
+
+
+# -- C11 and C12, the two defects the club's real structure exposed -----------
+def test_an_enrollment_carries_which_days_the_student_actually_comes():
+    """C12 -- §5.7's four attendance states cannot say "not expected today". A student in a
+    twice-weekly group who attends once was `absent_unexcused` every week forever and read
+    as 50% attendance while attending everything they agreed to."""
+    column = Base.metadata.tables["enrollment"].c["attends_weekdays"]
+    assert isinstance(column.type, ARRAY)
+    assert column.nullable, "NULL means every session of the group -- the common case"
+
+
+def test_attends_weekdays_is_bounded_to_a_week_and_never_empty():
+    """0-6, matching `group_schedule_rule.weekday`. Empty is rejected rather than treated
+    as NULL: NULL means "every session", empty would silently mean "no session", and two
+    spellings of an enrollment expecting nothing is one too many."""
+    checks = {
+        c.name: str(c.sqltext)
+        for c in Base.metadata.tables["enrollment"].constraints
+        if isinstance(c, sa.CheckConstraint)
+    }
+    # `ck_` prefix and the table name come from the metadata naming convention.
+    body = checks["ck_enrollment_enrollment_attends_weekdays"]
+    assert "array_length(attends_weekdays, 1) > 0" in body
+    assert "ARRAY[0,1,2,3,4,5,6]" in body
+
+
+def test_an_enrollment_holds_no_price():
+    """C11 -- tuition is priced per student by training volume, so a child in two groups is
+    one charge. A `price_plan_id` here is what made them two."""
+    assert "price_plan_id" not in Base.metadata.tables["enrollment"].c
+    assert "price_plan_id" in Base.metadata.tables["student"].c
+
+
+def test_a_student_may_hold_more_than_one_live_enrollment():
+    """§5.4 used to open 'each child is enrolled in one group'. The schema never enforced
+    it, §3.3 calls `enrollment` a link table, and the club contradicts it outright -- so
+    the uniqueness that exists is per (student, GROUP), never per student."""
+    live = next(
+        i for i in Base.metadata.tables["enrollment"].indexes if i.name == "uq_enrollment_live"
+    )
+    assert live.unique is True
+    assert [c.name for c in live.columns] == ["student_id", "group_id"]

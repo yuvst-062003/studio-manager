@@ -16,14 +16,26 @@ yet. That is the point: the contract exists before either implementation does.
 from __future__ import annotations
 
 import inspect
+import json
+import subprocess
+import sys
+import textwrap
 import uuid
 from datetime import date
+from functools import cache
+from pathlib import Path
 from typing import Any
 
 import pytest
-from app.models.billing import Charge
 from app.models.schedule import Session
 from app.services.schedule import ScheduleService
+
+ROOT = Path(__file__).resolve().parents[2]
+
+#: The two seams whose return type is still in `app/models/_pending/`. Named once so the
+#: day W4 and W5 move their models up, the greps land here.
+_CREATE_CHARGE = "app.services.billing.BillingService.create_charge"
+_ENQUEUE = "app.services.comms.NotificationService.enqueue"
 
 
 def _signature(func):
@@ -36,6 +48,57 @@ def _signature(func):
     actually imports, not merely that someone typed the right characters.
     """
     return inspect.signature(func, eval_str=True)
+
+
+@cache
+def _pending_signature(dotted: str) -> dict[str, Any]:
+    """One seam's fully-resolved signature, computed in a **fresh interpreter**.
+
+    Two seams name models that live in `app/models/_pending/` until W4 and W5 migrate
+    them: `BillingService.create_charge -> Charge` and `NotificationService.enqueue ->
+    Notification`. Importing either **anywhere in this process** registers its table in
+    `Base.metadata` with nothing behind it -- and `DemoStudioService.wipe_plan` derives
+    the reset's wipe from that metadata, so it would then issue `DELETE FROM charge`
+    against a database holding no such relation, in whichever unrelated test happened to
+    run after this module. An order-dependent failure three suites away is the worst
+    possible way to pay for an import.
+
+    So the resolution happens somewhere the pollution cannot outlive it.
+    `tests/core/test_alembic_baseline.py` shells out to `alembic check` for the same
+    reason. The assertions keep their full strength -- every annotation is really resolved
+    against the really-imported class, `eval_str=True` and all -- they just compare
+    `repr`s, because a class cannot cross a process boundary. This helper is deleted the
+    day both models move up into `app/models/`.
+    """
+    script = textwrap.dedent(f"""
+        import inspect, json
+        from app.models._pending.billing import Charge      # noqa: F401 -- resolves the annotation
+        from app.models._pending.comms import Notification  # noqa: F401
+        module_name, class_name, method = {dotted!r}.rsplit(".", 2)
+        module = __import__(module_name, fromlist=[class_name])
+        signature = inspect.signature(
+            getattr(getattr(module, class_name), method),
+            eval_str=True,
+            # The seam imports these under `if TYPE_CHECKING`, so they are absent
+            # from its module globals at runtime -- which is where eval_str looks.
+            locals={{"Charge": Charge, "Notification": Notification}},
+        )
+        print(json.dumps({{
+            "order": list(signature.parameters),
+            "annotations": {{n: repr(p.annotation) for n, p in signature.parameters.items()}},
+            "kinds": {{n: p.kind.name for n, p in signature.parameters.items()}},
+            "defaults": {{
+                n: repr(p.default) for n, p in signature.parameters.items()
+                if p.default is not inspect.Parameter.empty
+            }},
+            "return": repr(signature.return_annotation),
+        }}))
+    """)
+    result = subprocess.run(
+        [sys.executable, "-c", script], cwd=ROOT, capture_output=True, text=True
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    return json.loads(result.stdout)
 
 
 # -- W2: ScheduleService.materialize_sessions ---------------------------------
@@ -94,10 +157,8 @@ def test_create_charge_takes_the_five_facts_a_charge_cannot_exist_without():
     """Plan W4 seam, verbatim. `studio_id` is explicit rather than read from the request
     context because the billing run is a **worker** (§5.10) -- there is no request, so
     `TenantSession` has nothing to infer from and the tenant has to be passed."""
-    from app.services.billing import BillingService
 
-    parameters = _signature(BillingService.create_charge).parameters
-    assert list(parameters) == [
+    assert _pending_signature(_CREATE_CHARGE)["order"] == [
         "self",
         "studio_id",
         "payer_person_id",
@@ -115,29 +176,28 @@ def test_student_and_event_are_keyword_only():
     `student_id` and type checking cannot see it -- the annotations are identical. M7's
     event fees are a pure caller of this method (plan W4), which makes M7 exactly the lane
     that would hit it. Keyword-only makes the mistake unspellable."""
-    from app.services.billing import BillingService
 
-    parameters = _signature(BillingService.create_charge).parameters
+    signature = _pending_signature(_CREATE_CHARGE)
     for name in ("student_id", "event_id"):
-        assert parameters[name].kind is inspect.Parameter.KEYWORD_ONLY, name
-        assert parameters[name].default is None, name
+        assert signature["kinds"][name] == "KEYWORD_ONLY", name
+        assert signature["defaults"][name] == repr(None), name
 
 
 def test_create_charge_is_typed_end_to_end():
     """`amount_agorot: int` is G2 stated in the signature: the seam cannot accept a float
     without the annotation being changed by someone who has to notice they are doing it."""
     from app.schemas.billing import ChargeKind
-    from app.services.billing import BillingService
 
-    signature = _signature(BillingService.create_charge)
-    assert signature.parameters["studio_id"].annotation is uuid.UUID
-    assert signature.parameters["payer_person_id"].annotation is uuid.UUID
-    assert signature.parameters["kind"].annotation == ChargeKind
-    assert signature.parameters["amount_agorot"].annotation is int
-    assert signature.parameters["due_date"].annotation is date
-    assert signature.parameters["student_id"].annotation == uuid.UUID | None
-    assert signature.parameters["event_id"].annotation == uuid.UUID | None
-    assert signature.return_annotation is Charge
+    annotations = _pending_signature(_CREATE_CHARGE)["annotations"]
+    assert annotations["studio_id"] == repr(uuid.UUID)
+    assert annotations["payer_person_id"] == repr(uuid.UUID)
+    assert annotations["kind"] == repr(ChargeKind)
+    assert annotations["amount_agorot"] == repr(int)
+    assert annotations["due_date"] == repr(date)
+    assert annotations["student_id"] == repr(uuid.UUID | None)
+    assert annotations["event_id"] == repr(uuid.UUID | None)
+    # The class itself cannot cross the process boundary; the subprocess resolved it.
+    assert _pending_signature(_CREATE_CHARGE)["return"].endswith("billing.Charge'>")
 
 
 def test_recompute_charge_status_takes_a_charge_and_returns_nothing():
@@ -145,12 +205,10 @@ def test_recompute_charge_status_takes_a_charge_and_returns_nothing():
     one place". Returning the Charge would invite a caller to read the status off the
     return value and cache it, which is how a derived field acquires a second reader that
     later becomes a second writer."""
-    from app.services.billing import BillingService
-
-    signature = _signature(BillingService.recompute_charge_status)
-    assert list(signature.parameters) == ["self", "charge_id"]
-    assert signature.parameters["charge_id"].annotation is uuid.UUID
-    assert signature.return_annotation is None
+    signature = _pending_signature("app.services.billing.BillingService.recompute_charge_status")
+    assert signature["order"] == ["self", "charge_id"]
+    assert signature["annotations"]["charge_id"] == repr(uuid.UUID)
+    assert signature["return"] == repr(None)
 
 
 def test_the_billing_seams_refuse_rather_than_returning_nothing():
@@ -172,26 +230,22 @@ def test_enqueue_takes_a_person_a_kind_and_a_message():
     M9's at-risk and retention jobs are pure callers of this (plan W5), which is what lets
     the REPORTS lane raise a notification without opening a single file in the COMMS lane.
     """
-    from app.services.comms import NotificationService
-
-    parameters = _signature(NotificationService.enqueue).parameters
-    assert list(parameters) == ["self", "person_id", "kind", "title", "body", "payload"]
+    order = _pending_signature(_ENQUEUE)["order"]
+    assert order == ["self", "person_id", "kind", "title", "body", "payload"]
 
 
 def test_enqueue_is_typed_end_to_end():
     """`-> Notification`, not `-> None`. §5.11 fans one notification out to both channels,
     and a caller that wants the delivery report for what it just sent needs the row's
     identity — returning nothing would force M9 to re-query by guesswork."""
-    from app.models.comms import Notification
-    from app.services.comms import NotificationService
-
-    signature = _signature(NotificationService.enqueue)
-    assert signature.parameters["person_id"].annotation is uuid.UUID
-    assert signature.parameters["kind"].annotation is str
-    assert signature.parameters["title"].annotation is str
-    assert signature.parameters["body"].annotation is str
-    assert signature.parameters["payload"].annotation == dict[str, Any]
-    assert signature.return_annotation is Notification
+    signature = _pending_signature(_ENQUEUE)
+    annotations = signature["annotations"]
+    assert annotations["person_id"] == repr(uuid.UUID)
+    assert annotations["kind"] == repr(str)
+    assert annotations["title"] == repr(str)
+    assert annotations["body"] == repr(str)
+    assert annotations["payload"] == repr(dict[str, Any])
+    assert signature["return"].endswith("comms.Notification'>")
 
 
 def test_enqueue_is_the_only_way_in_and_refuses_rather_than_returning_nothing():

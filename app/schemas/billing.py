@@ -60,12 +60,15 @@ SubscriptionStatus = Literal["active", "cancelled"]
 # -- catalogue ----------------------------------------------------------------
 class PricePlanOut(BaseModel):
     """§5.10 step 1 prices from here. `active_to` is null for the current plan, which is
-    what lets a mid-year price change leave last month's charges explainable."""
+    what lets a mid-year price change leave last month's charges explainable.
+
+    **No `group_id` and no `class_id`** — C11. A plan is scoped by training volume and
+    chosen per student (`StudentOut.price_plan_id`); a group has no price."""
 
     id: uuid.UUID
-    group_id: uuid.UUID | None
-    class_id: uuid.UUID | None
     name: str
+    #: C11 — 'פעמיים בשבוע' is 2, 'כל יום' is 5.
+    sessions_per_week: int
     monthly_amount_agorot: int
     registration_fee_agorot: int
     active_from: date
@@ -91,8 +94,9 @@ class ChargeOut(BaseModel):
 
     id: uuid.UUID
     payer_person_id: uuid.UUID
+    #: C11 — no `enrollment_id`. Tuition covers a student for a period, not one of their
+    #: group memberships, so a child in two groups has one charge and not two.
     student_id: uuid.UUID | None
-    enrollment_id: uuid.UUID | None
     kind: ChargeKind
     period_year: int | None
     period_month: int | None = Field(default=None, ge=1, le=12)

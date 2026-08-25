@@ -50,6 +50,11 @@ RELOADABLE = (
     # this harness must not leave frozen to whichever environment imported it first.
     "app.core.tenancy",
     "app.routers.health",
+    # W2's contract session -- the OAuth callback's GET arm resolves the app it must send
+    # the browser back to with app_origin(transaction.app, settings.ENV), so identity.py
+    # now reads .ENV off a module-scope `settings` binding like the entries above it.
+    # Freezing that binding would send a staging sign-in home to a development host.
+    "app.routers.identity",
     "app.routers.dev",
     "app.main",
     # Not part of app.main's import graph -- this harness never reaches it, and

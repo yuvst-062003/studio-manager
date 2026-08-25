@@ -100,13 +100,50 @@ def test_a_charge_keeps_the_original_amount_when_prorated():
 
 def test_the_billing_run_cannot_double_charge_a_period():
     """§5.10 step 5 — 'The run is **idempotent**: re-running for the same period creates no
-    duplicates (unique on `enrollment_id, period_year, period_month, kind`).'
+    duplicates (unique on `student_id, period_year, period_month, kind`).'
 
     This is invariant 5's structural half. Without the constraint, idempotency is a
     property of the code that anyone can regress; with it, the database refuses.
+
+    **Keyed on the student — C11.** This test asserted `enrollment_id` until the club's
+    real structure arrived: it prices per student by training volume, so a child in the
+    competition group *and* the teenagers group is one charge. An enrollment-keyed index
+    does not merely fail to prevent the double charge, it *permits* it, which is the worst
+    kind of green.
     """
     indexes = {index.name for index in Base.metadata.tables["charge"].indexes}
-    assert "uq_charge_enrollment_period_kind" in indexes
+    assert "uq_charge_student_period_kind" in indexes
+    index = next(
+        i
+        for i in Base.metadata.tables["charge"].indexes
+        if i.name == "uq_charge_student_period_kind"
+    )
+    assert index.unique is True
+    assert [c.name for c in index.columns] == ["student_id", "period_year", "period_month", "kind"]
+
+
+def test_a_tuition_charge_covers_a_student_and_not_an_enrollment():
+    """C11's negative half. The index above is only unforgeable while there is nothing on
+    `charge` inviting the per-enrollment run back — a nullable `enrollment_id` beside a
+    student-keyed unique index is an ambiguity somebody resolves the wrong way at 2am."""
+    assert "enrollment_id" not in Base.metadata.tables["charge"].c
+
+
+def test_a_price_plan_is_scoped_by_training_volume_and_never_by_group():
+    """C11 — '§5.10 attaches a `price_plan` to a group (falling back to the class)'; the
+    club prices by how often a child trains, independent of which groups those sessions
+    belong to. A group-scoped plan is what charges a child in two groups twice."""
+    columns = Base.metadata.tables["price_plan"].c
+    assert "sessions_per_week" in columns
+    assert "group_id" not in columns
+    assert "class_id" not in columns
+
+
+def test_the_price_is_chosen_on_the_student():
+    """C11's other consequence — 'the amount must hang off something the manager sets per
+    student'. §5.4's conversion is where they set it."""
+    assert "price_plan_id" in Base.metadata.tables["student"].c
+    assert "price_plan_id" not in Base.metadata.tables["enrollment"].c
 
 
 def test_a_charge_records_who_owed_it_at_the_time():
