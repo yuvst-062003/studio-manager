@@ -46,6 +46,10 @@ waves:
         title: OAuth, the JWT, and the request context
         status: shipped
         on: 2026-08-25
+      - id: M1.3
+        title: The platform console and the trial health template
+        status: shipped
+        on: 2026-08-25
   - id: W2
     milestone: M2 ∥ M3
     title: Schedule ∥ People and funnel
@@ -269,9 +273,9 @@ holdbacks:
       health_form_template.kind is already (full|trial) in §4.3. Seeding the trial
       template in M1 is what unblocks M3's trial booking without pulling M4 forward.
     blocks: M1
-    status: open
+    status: closed
     opened: 2026-08-24
-    closed: null
+    closed: 2026-08-25
     source: docs/plan/milestone-plan.md Part 5
   - id: HB-c5-rollover-artboard
     kind: conflict

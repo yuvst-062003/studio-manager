@@ -54,6 +54,12 @@ CROSS_STUDIO_CALLERS: dict[str, str] = {
     "app/services/demo/fixtures.py": (
         "seeds the demo studio's own tenant root, for the same reason"
     ),
+    "app/services/identity/platform.py": (
+        "SPEC 18.1 -- the console operates above every studio because 5.1 makes it the "
+        "only thing that can create one. 19.7 is about reports and totals; this is the "
+        "operator's own inventory, and hiding the demo studio from the one screen that "
+        "lists studios would make it unmanageable"
+    ),
     "app/services/identity/resolution.py": (
         "SPEC 5.2's login resolver answers 'which studios are yours?' before any studio "
         "is in context, and 3.3 requires one identity to reach several. It is not a "

@@ -109,6 +109,66 @@
         "title": "HealthResponse",
         "type": "object"
       },
+      "InvitationOut": {
+        "description": "§5.3's token, returned exactly once.\n\nOnly its SHA-256 is stored, so nothing can reproduce this value later -- which is why\nthe list endpoint has no field for it and why a re-send has to issue a new one.",
+        "properties": {
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "token": {
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "expires_at",
+          "token"
+        ],
+        "title": "InvitationOut",
+        "type": "object"
+      },
+      "InviteOwnerRequest": {
+        "properties": {
+          "email": {
+            "maxLength": 320,
+            "pattern": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
+            "title": "Email",
+            "type": "string"
+          },
+          "first_name": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "First Name",
+            "type": "string"
+          },
+          "last_name": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Last Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "first_name",
+          "last_name"
+        ],
+        "title": "InviteOwnerRequest",
+        "type": "object"
+      },
       "MeResponse": {
         "properties": {
           "access": {
@@ -201,6 +261,41 @@
         "title": "ProviderOut",
         "type": "object"
       },
+      "ProvisionStudioRequest": {
+        "properties": {
+          "default_locale": {
+            "default": "he",
+            "pattern": "^(he|en|ru)$",
+            "title": "Default Locale",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "slug": {
+            "maxLength": 80,
+            "minLength": 2,
+            "pattern": "^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$",
+            "title": "Slug",
+            "type": "string"
+          },
+          "timezone": {
+            "default": "Asia/Jerusalem",
+            "maxLength": 64,
+            "title": "Timezone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "slug"
+        ],
+        "title": "ProvisionStudioRequest",
+        "type": "object"
+      },
       "SessionResponse": {
         "description": "The access token lives in the body, never in a cookie (§10.3).\n\nThe client holds it in memory and replays it, which is what keeps it out of\nautomatic-credential territory -- a cookie-borne access token is sent by the browser\non every request, which is what makes CSRF possible at all. The refresh token is in\nthe Set-Cookie header and never here.",
         "properties": {
@@ -245,6 +340,22 @@
         "title": "SessionResponse",
         "type": "object"
       },
+      "StudioListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/StudioOut"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "StudioListResponse",
+        "type": "object"
+      },
       "StudioMembershipOut": {
         "properties": {
           "is_guardian": {
@@ -286,6 +397,69 @@
           "is_guardian"
         ],
         "title": "StudioMembershipOut",
+        "type": "object"
+      },
+      "StudioOut": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by_identity_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By Identity Id"
+          },
+          "default_locale": {
+            "title": "Default Locale",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_demo": {
+            "title": "Is Demo",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "timezone": {
+            "title": "Timezone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "timezone",
+          "default_locale",
+          "status",
+          "is_demo",
+          "created_by_identity_id",
+          "created_at"
+        ],
+        "title": "StudioOut",
         "type": "object"
       },
       "SwitchStudioRequest": {
@@ -606,6 +780,166 @@
         "summary": "Read Health",
         "tags": [
           "health"
+        ]
+      }
+    },
+    "/api/v1/platform/studios": {
+      "get": {
+        "description": "§18.3's studio list, M1's subset: the rows, not the health chips (C4 -- M9 owns\nthose, and the operations board with them).",
+        "operationId": "get_studios_api_v1_platform_studios_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Studios",
+        "tags": [
+          "platform"
+        ]
+      },
+      "post": {
+        "description": "§5.1 -- 'Studios are provisioned by the platform operator, never self-created.\nThere is no צור סטודיו button anywhere in the staff app.'",
+        "operationId": "create_studio_api_v1_platform_studios_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProvisionStudioRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Studio",
+        "tags": [
+          "platform"
+        ]
+      }
+    },
+    "/api/v1/platform/studios/{studio_id}/invite-owner": {
+      "post": {
+        "description": "§5.1 -- 'and sends an invitation to the person who will be its owner.'\n\nThe token comes back in this response and nowhere else, ever. Only its hash is stored.",
+        "operationId": "create_owner_invitation_api_v1_platform_studios__studio_id__invite_owner_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "studio_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Studio Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InviteOwnerRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvitationOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Owner Invitation",
+        "tags": [
+          "platform"
+        ]
+      }
+    },
+    "/api/v1/platform/studios/{studio_id}/suspend": {
+      "post": {
+        "description": "§18.3's suspend action. A suspended studio disappears from every switcher, because\n`studios_for_identity` skips a non-active one.",
+        "operationId": "suspend_api_v1_platform_studios__studio_id__suspend_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "studio_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Studio Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Suspend",
+        "tags": [
+          "platform"
         ]
       }
     }

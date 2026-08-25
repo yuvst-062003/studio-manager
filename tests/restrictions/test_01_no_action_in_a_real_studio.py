@@ -126,6 +126,13 @@ SESSION_DEP_ALLOWLIST: dict[str, str] = {
         "app/core/auth_context.py puts it on request.state, and every OTHER router "
         "takes TenantSessionDep and fails closed on it."
     ),
+    "platform.py": (
+        "SPEC 18.1 puts the platform console above every studio: 5.1 makes it the only "
+        "thing that can create one, so it cannot itself be scoped to one. Its own "
+        "dependency, require_platform_admin, is what guards it -- and that dependency "
+        "re-confirms against the database rather than trusting the token's claim, "
+        "because removing an operator must not wait fifteen minutes to take effect."
+    ),
 }
 
 

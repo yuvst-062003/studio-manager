@@ -189,6 +189,75 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/platform/studios": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Studios
+         * @description §18.3's studio list, M1's subset: the rows, not the health chips (C4 -- M9 owns
+         *     those, and the operations board with them).
+         */
+        get: operations["get_studios_api_v1_platform_studios_get"];
+        put?: never;
+        /**
+         * Create Studio
+         * @description §5.1 -- 'Studios are provisioned by the platform operator, never self-created.
+         *     There is no צור סטודיו button anywhere in the staff app.'
+         */
+        post: operations["create_studio_api_v1_platform_studios_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/studios/{studio_id}/invite-owner": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Owner Invitation
+         * @description §5.1 -- 'and sends an invitation to the person who will be its owner.'
+         *
+         *     The token comes back in this response and nowhere else, ever. Only its hash is stored.
+         */
+        post: operations["create_owner_invitation_api_v1_platform_studios__studio_id__invite_owner_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/studios/{studio_id}/suspend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Suspend
+         * @description §18.3's suspend action. A suspended studio disappears from every switcher, because
+         *     `studios_for_identity` skips a non-active one.
+         */
+        post: operations["suspend_api_v1_platform_studios__studio_id__suspend_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -238,6 +307,38 @@ export interface components {
             /** Status */
             status: string;
         };
+        /**
+         * InvitationOut
+         * @description §5.3's token, returned exactly once.
+         *
+         *     Only its SHA-256 is stored, so nothing can reproduce this value later -- which is why
+         *     the list endpoint has no field for it and why a re-send has to issue a new one.
+         */
+        InvitationOut: {
+            /** Email */
+            email: string;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Token */
+            token: string;
+        };
+        /** InviteOwnerRequest */
+        InviteOwnerRequest: {
+            /** Email */
+            email: string;
+            /** First Name */
+            first_name: string;
+            /** Last Name */
+            last_name: string;
+        };
         /** MeResponse */
         MeResponse: {
             access: components["schemas"]["AppAccessOut"];
@@ -274,6 +375,23 @@ export interface components {
             /** Start Url */
             start_url: string;
         };
+        /** ProvisionStudioRequest */
+        ProvisionStudioRequest: {
+            /**
+             * Default Locale
+             * @default he
+             */
+            default_locale: string;
+            /** Name */
+            name: string;
+            /** Slug */
+            slug: string;
+            /**
+             * Timezone
+             * @default Asia/Jerusalem
+             */
+            timezone: string;
+        };
         /**
          * SessionResponse
          * @description The access token lives in the body, never in a cookie (§10.3).
@@ -293,6 +411,11 @@ export interface components {
             expires_in: number;
             /** Studios */
             studios: components["schemas"]["StudioMembershipOut"][];
+        };
+        /** StudioListResponse */
+        StudioListResponse: {
+            /** Items */
+            items: components["schemas"]["StudioOut"][];
         };
         /** StudioMembershipOut */
         StudioMembershipOut: {
@@ -314,6 +437,33 @@ export interface components {
             studio_is_demo: boolean;
             /** Studio Name */
             studio_name: string;
+        };
+        /** StudioOut */
+        StudioOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Created By Identity Id */
+            created_by_identity_id: string | null;
+            /** Default Locale */
+            default_locale: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Demo */
+            is_demo: boolean;
+            /** Name */
+            name: string;
+            /** Slug */
+            slug: string;
+            /** Status */
+            status: string;
+            /** Timezone */
+            timezone: string;
         };
         /** SwitchStudioRequest */
         SwitchStudioRequest: {
@@ -541,6 +691,125 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthResponse"];
+                };
+            };
+        };
+    };
+    get_studios_api_v1_platform_studios_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudioListResponse"];
+                };
+            };
+        };
+    };
+    create_studio_api_v1_platform_studios_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProvisionStudioRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudioOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_owner_invitation_api_v1_platform_studios__studio_id__invite_owner_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                studio_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InviteOwnerRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvitationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    suspend_api_v1_platform_studios__studio_id__suspend_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                studio_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudioOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
