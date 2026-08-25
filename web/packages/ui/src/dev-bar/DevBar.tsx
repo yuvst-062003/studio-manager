@@ -6,6 +6,15 @@ import { StatusChip } from '../primitives/StatusChip'
 import { useSlot } from '../slots'
 import { PENDING_TOOLS } from './tools'
 import type { DevToolKey, DevToolProps } from './tools'
+// Task 17: registers timeTravel and simulateIpn into the 'dev-bar' slot at module
+// load. Imported here rather than from ./index.ts's top level: this file is reachable
+// only through index.ts's `enabled` branch, so when a production build folds that
+// branch away, this module — and the registration it causes — leaves with it. A bare
+// side-effect import at index.ts's own top level would NOT be dropped (rollup can't
+// prove a side-effect-only import is safe to remove, the same reason a CSS import
+// survives); putting it here, inside the conditionally-reachable subtree, is what
+// makes it droppable. Measured by web/tools/__tests__/dev-bar-bundle.test.ts.
+import './devTools'
 
 /**
  * §19.4 — the dev bar. "Rendered only when the authenticated identity has

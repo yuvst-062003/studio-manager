@@ -12,4 +12,9 @@ describe('staff app', () => {
     render(<App />)
     expect(screen.getByTestId('display-mode')).toBeInTheDocument()
   })
+
+  it('renders no dev bar without a developer identity', () => {
+    render(<App />)
+    expect(screen.queryByTestId('studio-dev-bar')).toBeNull()
+  })
 })
