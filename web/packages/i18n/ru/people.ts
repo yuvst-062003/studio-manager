@@ -101,6 +101,8 @@ export const people: Bundle = {
   "enrollment.status.frozen": "Заморожена",
   "enrollment.status.ended": "Завершена",
   "enrollment.moveGroup": "Перевод в другую группу",
+  "enrollment.group": "Группа",
+  "enrollment.noGroupYet": "Пока нет",
   "enrollment.empty": "Записей нет",
 
   "request.title": "Заявки на вступление",

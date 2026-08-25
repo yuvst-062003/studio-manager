@@ -9,6 +9,9 @@ export type WeekdayOptions = components['schemas']['EnrollmentWeekdayOptionsOut'
 export type RegistrationRequestOut = components['schemas']['RegistrationRequestOut']
 export type TrialBookingRow = components['schemas']['TrialBookingRow']
 export type StatusHistoryOut = components['schemas']['StudentStatusHistoryOut']
+/** Only what `3c`'s picker renders. M1 owns `GroupOut`; naming the two fields this screen
+ *  reads keeps the form independent of fields another lane may add or move. */
+export type GroupOption = { id: string; name: string }
 
 export type Fetcher = (path: string, init?: RequestInit) => Promise<Response>
 
@@ -56,6 +59,10 @@ export function makeDashboardPeopleClient(fetcher: Fetcher) {
         json<{ items: StatusHistoryOut[] }>,
       ),
 
+    /** M1's group list. `3c` needs it because §5.4(a)'s form asks for a group, and the
+     *  enrolment it creates has to name one that exists. */
+    groups: () => fetcher('/api/v1/groups').then(json<{ items: GroupOption[] }>),
+
     weekdayOptions: (groupId: string) =>
       fetcher(`/api/v1/enrollments/weekday-options?group_id=${groupId}`).then(
         json<WeekdayOptions>,
@@ -66,6 +73,11 @@ export function makeDashboardPeopleClient(fetcher: Fetcher) {
       first_name: string
       last_name: string
       birthdate?: string | null
+      /** §5.4(a) — 'child details AND GROUP ... creates everything immediately'. Absent
+       *  leaves a lead with no enrollment, which is the phone-enquiry case. */
+      group_id?: string | null
+      /** C12 — NULL means every session of that group, which is the default. */
+      attends_weekdays?: number[] | null
       guardian: {
         first_name: string
         last_name: string

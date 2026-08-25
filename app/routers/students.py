@@ -285,6 +285,11 @@ def create_student(
 
     L6: manager-or-owner, and there is no self-service equivalent. The public link's only
     job is a first lesson.
+
+    Naming a group enrols the child here, in the same transaction -- §5.4(a) is 'child
+    details AND GROUP -> save. Creates everything immediately.' Omitting one is the
+    phone-enquiry case and leaves a lead with no enrollment, which is what §5.4a says a
+    lead is.
     """
     if body.guardian is None:
         # §5.3 makes at least one guardian structural; the schema cannot say so, because
@@ -304,7 +309,20 @@ def create_student(
             relation=body.guardian.relation,
             at=now(),
             actor_person_id=getattr(request.state, "person_id", None),
+            group_id=body.group_id,
+            attends_weekdays=body.attends_weekdays,
+            schedule=schedule_reader(),
         )
+    except NotFoundError as exc:
+        raise _not_found() from exc
+    except RefusedError as exc:
+        # C12 -- a weekday the group does not train on. Same code and status the
+        # `/enrollments` route answers with, because it is the same refusal from the same
+        # validator; a second shape here would be a second thing for a client to handle.
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={"code": "not_a_training_day", "message": str(exc)},
+        ) from exc
     except ConflictError as exc:
         raise _conflict(str(exc)) from exc
     token = created.invitation_token

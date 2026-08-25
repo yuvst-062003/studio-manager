@@ -40,6 +40,7 @@ from app.models.people import (
 from app.models.person import Guardian, Invitation, Person
 from app.models.structure import Group, GroupStaff
 from app.services.audit import AuditService
+from app.services.people.enrollments import EnrollmentService
 from app.services.people.errors import ConflictError, NotFoundError, RefusedError
 from app.services.people.group_days import ScheduleReader
 from app.services.people.matching import match_person
@@ -57,6 +58,10 @@ class CreatedStudent:
     #: guardian was matched to an existing login -- §5.4a: "No second invitation, no
     #: second account, no second login."
     invitation_token: str | None
+    #: §5.4(a) -- 'creates everything immediately'. `None` when the manager named no group,
+    #: which is the phone-enquiry case: a real student in an early status, with no
+    #: enrollment, exactly as §5.4a describes a lead.
+    enrollment: Enrollment | None = None
 
 
 @dataclass
@@ -100,6 +105,9 @@ class StudentService:
         relation: str = "parent",
         status: str = "lead",
         source: str | None = "manager",
+        group_id: uuid.UUID | None = None,
+        attends_weekdays: list[int] | None = None,
+        schedule: ScheduleReader | None = None,
     ) -> CreatedStudent:
         """§5.4(a) -- the manager-added student, created immediately.
 
@@ -109,7 +117,16 @@ class StudentService:
         The guardian is matched before being created (L7). A match means an existing
         Person with a verified address, so no invitation is issued -- they already have a
         login and the child simply appears in the app they are already using.
+
+        `group_id` makes this "creates EVERYTHING immediately": the enrollment is written
+        here, in the same transaction, and the student opens as `active` rather than
+        `lead`. Naming no group is the other half of the same sentence -- §5.4a's lead is
+        "a real student who simply has no enrollment" -- so the student stays a lead and
+        no enrollment is invented. `attends_weekdays` rides along because C12 makes it part
+        of every enrolment form; L6 still holds, because every caller of this is a manager.
         """
+        if group_id is not None and schedule is None:  # pragma: no cover - a wiring error
+            raise ValueError("group_id needs a schedule reader to validate the pattern")
         child = Person(
             first_name=first_name.strip(),
             last_name=last_name.strip(),
@@ -177,7 +194,34 @@ class StudentService:
             diff={"source": source, "status": status, "guardian_matched": matched is not None},
         )
         session.flush()
-        return CreatedStudent(student=student, invitation_token=token)
+
+        enrollment: Enrollment | None = None
+        if group_id is not None:
+            assert schedule is not None  # guarded at the top of this method
+            # EnrollmentService owns C12's validation and the duplicate-enrollment check,
+            # so this path goes through it rather than writing the row itself -- a second
+            # writer is a second answer to which weekdays are legal.
+            enrollment = EnrollmentService.create(
+                session,
+                student_id=student.id,
+                group_id=group_id,
+                started_on=at.date(),
+                attends_weekdays=attends_weekdays,
+                at=at,
+                actor_person_id=actor_person_id,
+                schedule=schedule,
+            )
+            if student.status != "active":
+                StudentStatusService.transition(
+                    session,
+                    student=student,
+                    to_status="active",
+                    at=at,
+                    actor_person_id=actor_person_id,
+                    reason="enrolled by a manager at creation",
+                )
+            session.flush()
+        return CreatedStudent(student=student, invitation_token=token, enrollment=enrollment)
 
     @staticmethod
     def _issue_invitation(
@@ -744,8 +788,6 @@ class StudentService:
         written, or a refused conversion leaves the student in a group they were never
         put in.
         """
-        from app.services.people.enrollments import EnrollmentService
-
         student, _person = StudentService.get(session, student_id=student_id)
         StudentStatusService.transition(
             session,

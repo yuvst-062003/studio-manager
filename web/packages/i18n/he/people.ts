@@ -122,6 +122,8 @@ export const people: Bundle = {
   "enrollment.status.frozen": "מוקפא",
   "enrollment.status.ended": "הסתיים",
   "enrollment.moveGroup": "מעבר קבוצה",
+  "enrollment.group": "קבוצה",
+  "enrollment.noGroupYet": "עדיין לא",
   "enrollment.empty": "אין רישומים",
 
   // -- the approval queue (dashboard 6c) ----------------------------------------

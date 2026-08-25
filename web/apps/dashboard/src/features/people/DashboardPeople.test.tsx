@@ -118,7 +118,17 @@ function makeClient(over: Partial<DashboardPeopleClient> = {}): DashboardPeopleC
         ],
       }),
     ),
-    weekdayOptions: vi.fn(),
+    groups: vi.fn(() =>
+      Promise.resolve({
+        items: [
+          { id: 'g1', name: 'מתחילים' },
+          { id: 'g2', name: 'נבחרת' },
+        ],
+      }),
+    ),
+    weekdayOptions: vi.fn(() =>
+      Promise.resolve({ group_id: 'g1', group_name: 'מתחילים', training_weekdays: [0, 3] }),
+    ),
     createStudent: vi.fn(() =>
       Promise.resolve(
         new Response(JSON.stringify({ invitation_token: 'tok-123' }), {
@@ -251,6 +261,75 @@ describe('AddStudentScreen — 3c', () => {
     expect(screen.getByTestId('add-student-parent-hint')).toHaveTextContent(
       t('he', 'people.request.matchedHint'),
     )
+  })
+
+  it('offers a group, and enrols the child into it in the same save', async () => {
+    // §5.4(a) — 'parent details -> child details AND GROUP -> save. Creates everything
+    // immediately.' The API accepted a group_id and silently dropped it, so this form
+    // never sent one and every manager-added student arrived as a lead with no enrollment.
+    const user = userEvent.setup()
+    const client = makeClient()
+    render(<AddStudentScreen locale="he" client={client} />)
+    const [parentFirst, parentLast] = screen.getAllByLabelText(t('he', 'people.student.firstName'))
+    await user.type(parentFirst!, 'יעל')
+    await user.type(screen.getAllByLabelText(t('he', 'people.student.lastName'))[0]!, 'כהן')
+    await user.type(parentLast!, 'דנה')
+    await user.type(screen.getAllByLabelText(t('he', 'people.student.lastName'))[1]!, 'כהן')
+    await user.selectOptions(await screen.findByTestId('add-student-group-0'), 'g1')
+    await user.click(screen.getByTestId('add-student-submit'))
+
+    await waitFor(() => expect(client.createStudent).toHaveBeenCalled())
+    const body = vi.mocked(client.createStudent).mock.calls[0]![0]
+    expect(body.group_id).toBe('g1')
+  })
+
+  it('collects C12’s weekdays over the chosen group’s real training days', async () => {
+    // C12 — 'EVERY enrolment form collects attends_weekdays as checkboxes over the group's
+    // scheduled weekdays, all ticked by default.' All ticked sends NULL, because an array
+    // freezes today's timetable into the row and §5.6 rewrites future sessions.
+    const user = userEvent.setup()
+    const client = makeClient()
+    render(<AddStudentScreen locale="he" client={client} />)
+    const [parentFirst, parentLast] = screen.getAllByLabelText(t('he', 'people.student.firstName'))
+    await user.type(parentFirst!, 'יעל')
+    await user.type(screen.getAllByLabelText(t('he', 'people.student.lastName'))[0]!, 'כהן')
+    await user.type(parentLast!, 'דנה')
+    await user.type(screen.getAllByLabelText(t('he', 'people.student.lastName'))[1]!, 'כהן')
+    await user.selectOptions(await screen.findByTestId('add-student-group-0'), 'g1')
+
+    // The group trains Sunday and Wednesday, both ticked by default.
+    expect(await screen.findByTestId('weekday-0')).toBeChecked()
+    expect(screen.getByTestId('weekday-3')).toBeChecked()
+    await user.click(screen.getByTestId('weekday-3'))
+    await user.click(screen.getByTestId('add-student-submit'))
+
+    await waitFor(() => expect(client.createStudent).toHaveBeenCalled())
+    expect(vi.mocked(client.createStudent).mock.calls[0]![0].attends_weekdays).toEqual([0])
+  })
+
+  it('sends no group when the manager picked none, rather than inventing one', async () => {
+    // §5.4a — a lead is 'a real student who simply has no enrollment'. The phone-enquiry
+    // case must stay reachable from this form.
+    const user = userEvent.setup()
+    const client = makeClient()
+    render(<AddStudentScreen locale="he" client={client} />)
+    const [parentFirst, parentLast] = screen.getAllByLabelText(t('he', 'people.student.firstName'))
+    await user.type(parentFirst!, 'יעל')
+    await user.type(screen.getAllByLabelText(t('he', 'people.student.lastName'))[0]!, 'כהן')
+    await user.type(parentLast!, 'דנה')
+    await user.type(screen.getAllByLabelText(t('he', 'people.student.lastName'))[1]!, 'כהן')
+    await user.click(screen.getByTestId('add-student-submit'))
+
+    await waitFor(() => expect(client.createStudent).toHaveBeenCalled())
+    const body = vi.mocked(client.createStudent).mock.calls[0]![0]
+    expect(body.group_id ?? null).toBeNull()
+  })
+
+  it('renders no price on the add form', () => {
+    // L2 — the price is on the STUDENT and `price_plan` is W4's table. A group picker is
+    // the closest this screen gets to money, and it stops there.
+    render(<AddStudentScreen locale="he" client={makeClient()} />)
+    expect(document.body.textContent ?? '').not.toMatch(/₪/)
   })
 
   it('sends the address and never a person_id it guessed', async () => {

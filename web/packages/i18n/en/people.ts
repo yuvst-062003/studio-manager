@@ -97,6 +97,8 @@ export const people: Bundle = {
   "enrollment.status.frozen": "Frozen",
   "enrollment.status.ended": "Ended",
   "enrollment.moveGroup": "Move group",
+  "enrollment.group": "Group",
+  "enrollment.noGroupYet": "Not yet",
   "enrollment.empty": "No enrolments",
 
   "request.title": "Join requests",

@@ -12,9 +12,35 @@ for `GET /students/{id}` on day one.
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, datetime
 
+import pytest
 from app.main import app
-from tests.people.conftest import Caller
+from app.models.people import Enrollment
+from sqlalchemy import select
+from tests.people.conftest import Caller, FakeSchedule, make_session
+
+SUNDAY = datetime(2026, 9, 6, 14, 0, tzinfo=UTC)
+WEDNESDAY = datetime(2026, 9, 9, 14, 0, tzinfo=UTC)
+
+
+@pytest.fixture
+def twice_weekly(monkeypatch, studio, a_group, a_training_year):
+    """A group that trains Sunday and Wednesday, read through L5's seam."""
+    import app.routers.students as students_router
+
+    fake = FakeSchedule()
+    fake.sessions[a_group] = [
+        make_session(
+            studio_id=studio.id,
+            group_id=a_group,
+            training_year_id=a_training_year,
+            starts_at=moment,
+        )
+        for moment in (SUNDAY, WEDNESDAY)
+    ]
+    monkeypatch.setattr(students_router, "schedule_reader", lambda: fake)
+    return fake
 
 #: Coach-reachable, and therefore inside invariant 3's guard.
 COACH_ROUTES = [
@@ -60,6 +86,71 @@ def test_a_manager_creates_a_student(client, as_manager):
     assert body["student"]["status"] == "lead"
     assert body["student"]["health_status"] == "missing"
     assert body["invitation_token"]
+
+
+def test_a_manager_who_names_a_group_gets_an_enrollment_immediately(
+    client, as_manager, a_group, twice_weekly, app_session
+):
+    """§5.4(a) -- 'parent details -> child details AND GROUP -> save. Creates everything
+    immediately.' The API accepted `group_id` and dropped it, so every manager-added
+    student landed as a `lead` with no enrollment and the manager had to enrol them again
+    on a second screen."""
+    payload = _payload() | {"group_id": str(a_group)}
+    body = _create(client, as_manager, payload)
+    assert body["student"]["status"] == "active"
+
+    enrollment = app_session.execute(
+        select(Enrollment).where(Enrollment.student_id == uuid.UUID(body["student"]["id"]))
+    ).scalar_one()
+    assert enrollment.group_id == a_group
+    assert enrollment.ended_on is None
+    # C12 -- not asked for, so NULL, which means every session of that group.
+    assert enrollment.attends_weekdays is None
+
+
+def test_the_manager_may_narrow_which_days_the_child_comes(
+    client, as_manager, a_group, twice_weekly, app_session
+):
+    """C12 -- 'EVERY enrolment form collects attends_weekdays.' A group training Sunday and
+    Wednesday, a child who only comes on Sunday."""
+    payload = _payload() | {"group_id": str(a_group), "attends_weekdays": [0]}
+    body = _create(client, as_manager, payload)
+    enrollment = app_session.execute(
+        select(Enrollment).where(Enrollment.student_id == uuid.UUID(body["student"]["id"]))
+    ).scalar_one()
+    assert enrollment.attends_weekdays == [0]
+
+
+def test_a_day_the_group_does_not_train_is_refused(client, as_manager, a_group, twice_weekly):
+    """C12 -- the pattern is validated against the group's REAL schedule, read through the
+    seam. Monday is not one of this group's days."""
+    payload = _payload() | {"group_id": str(a_group), "attends_weekdays": [2]}
+    response = client.post("/api/v1/students", json=payload, headers=as_manager.headers)
+    assert response.status_code == 422, response.text
+
+
+def test_a_student_created_with_no_group_is_still_a_lead(client, as_manager, app_session):
+    """§5.4a -- 'a lead is just a student in an early status ... a trial person is a real
+    student who simply has no enrollment.' Naming no group is the phone-enquiry case, and
+    it must not invent one."""
+    body = _create(client, as_manager)
+    assert body["student"]["status"] == "lead"
+    assert (
+        app_session.execute(
+            select(Enrollment).where(
+                Enrollment.student_id == uuid.UUID(body["student"]["id"])
+            )
+        ).first()
+        is None
+    )
+
+
+def test_a_group_in_another_studio_is_refused(client, as_manager, other_studio_group_id):
+    """TenantSession fails closed, and a manager naming a group they cannot see gets a 404
+    rather than an enrollment pointing across a tenant boundary."""
+    payload = _payload() | {"group_id": str(other_studio_group_id)}
+    response = client.post("/api/v1/students", json=payload, headers=as_manager.headers)
+    assert response.status_code == 404, response.text
 
 
 def test_a_coach_may_not_create_a_student(client, as_lead_coach):

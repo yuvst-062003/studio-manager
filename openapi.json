@@ -5846,7 +5846,7 @@
         ]
       },
       "post": {
-        "description": "§5.4(a) -- `+ תלמיד חדש`. Dashboard `3c`.\n\nL6: manager-or-owner, and there is no self-service equivalent. The public link's only\njob is a first lesson.",
+        "description": "§5.4(a) -- `+ תלמיד חדש`. Dashboard `3c`.\n\nL6: manager-or-owner, and there is no self-service equivalent. The public link's only\njob is a first lesson.\n\nNaming a group enrols the child here, in the same transaction -- §5.4(a) is 'child\ndetails AND GROUP -> save. Creates everything immediately.' Omitting one is the\nphone-enquiry case and leaves a lead with no enrollment, which is what §5.4a says a\nlead is.",
         "operationId": "create_student_api_v1_students_post",
         "parameters": [
           {

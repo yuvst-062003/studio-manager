@@ -12,14 +12,28 @@
 //
 // **No price field** (L2). `price_plan` is W4's table; the conversion screen stores an id,
 // and the prices screen is M6's.
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { CSSProperties, FormEvent } from 'react'
 import { Alert, Button, TextField } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
-import type { DashboardPeopleClient } from './peopleClient'
+import { WeekdayPicker, attendsWeekdaysFor } from './WeekdayPicker'
+import type { DashboardPeopleClient, GroupOption } from './peopleClient'
 
-type Child = { first_name: string; last_name: string; birthdate: string }
+//: §5.4(a) is 'child details AND GROUP -> save'. `group_id` empty is the phone-enquiry
+//: case: §5.4a's lead is 'a real student who simply has no enrollment', so the form must
+//: keep letting a manager say 'not yet' rather than forcing a group nobody chose.
+type Child = {
+  first_name: string
+  last_name: string
+  birthdate: string
+  group_id: string
+  /** C12 — which of the group's training days this child comes to. `null` is 'untouched',
+   *  which RENDERS as every day ticked. Storing the selection as null-until-touched keeps
+   *  'all ticked by default' derived from the days as they load, instead of writing them
+   *  into state from an effect the moment they arrive. */
+  weekdays: number[] | null
+}
 
 const formStyle: CSSProperties = {
   display: 'flex',
@@ -28,7 +42,13 @@ const formStyle: CSSProperties = {
   maxInlineSize: '40rem',
 }
 
-const blank = (): Child => ({ first_name: '', last_name: '', birthdate: '' })
+const blank = (): Child => ({
+  first_name: '',
+  last_name: '',
+  birthdate: '',
+  group_id: '',
+  weekdays: null,
+})
 
 export function AddStudentScreen({
   locale,
@@ -44,10 +64,48 @@ export function AddStudentScreen({
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
   const [children, setChildren] = useState<Child[]>([blank()])
+  const [groups, setGroups] = useState<GroupOption[]>([])
+  // Keyed by group, so two children in the same group share one lookup.
+  const [daysByGroup, setDaysByGroup] = useState<Record<string, number[]>>({})
   const [sending, setSending] = useState(false)
   const [failed, setFailed] = useState(false)
   const [invitationToken, setInvitationToken] = useState<string | null>(null)
   const [done, setDone] = useState(false)
+
+  useEffect(() => {
+    let live = true
+    client
+      .groups()
+      .then((body) => live && setGroups(body.items ?? []))
+      // A group list that fails to load is not a reason to block the form: a student with
+      // no group is a legal outcome, so the picker degrades to 'not yet' rather than
+      // trapping the manager on a screen they cannot submit.
+      .catch(() => live && setGroups([]))
+    return () => {
+      live = false
+    }
+  }, [client])
+
+  // C12's checkboxes are 'over the GROUP'S scheduled weekdays', so the days come from the
+  // schedule seam once a group is chosen — never from a hardcoded week.
+  const chosenGroups = [...new Set(children.map((child) => child.group_id).filter(Boolean))]
+  const groupKey = [...chosenGroups].sort().join(',')
+  useEffect(() => {
+    if (!groupKey) return
+    let live = true
+    Promise.all(
+      groupKey.split(',').map((groupId) =>
+        client
+          .weekdayOptions(groupId)
+          .then((body) => [groupId, body.training_weekdays ?? []] as const),
+      ),
+    )
+      .then((pairs) => live && setDaysByGroup(Object.fromEntries(pairs)))
+      .catch(() => live && setDaysByGroup({}))
+    return () => {
+      live = false
+    }
+  }, [client, groupKey])
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()
@@ -59,10 +117,17 @@ export function AddStudentScreen({
       // approves once." Each child is its own request; the SERVER matches them onto the
       // same parent by the verified address, which is what stops a second Person appearing.
       for (const child of children) {
+        const trainingDays = daysByGroup[child.group_id] ?? []
         const response = await client.createStudent({
           first_name: child.first_name,
           last_name: child.last_name,
           birthdate: child.birthdate || null,
+          // §5.4(a) — naming a group enrols the child in the same save. The server
+          // validates the pattern against the group's real schedule.
+          group_id: child.group_id || null,
+          attends_weekdays: child.group_id
+            ? attendsWeekdaysFor(child.weekdays ?? trainingDays, trainingDays)
+            : null,
           guardian: {
             first_name: parentFirst,
             last_name: parentLast,
@@ -174,6 +239,44 @@ export function AddStudentScreen({
               )
             }
           />
+          {/* §5.4(a) — 'child details AND GROUP'. Optional, because a lead with no
+              enrollment is a real and common outcome (§5.4a). */}
+          <label>
+            {t(locale, 'people.enrollment.group')}
+            <select
+              value={child.group_id}
+              onChange={(event) =>
+                setChildren((current) =>
+                  current.map((c, i) =>
+                    // Changing the group clears the day selection: the ticks belonged to
+                    // the old group's timetable and mean nothing against the new one.
+                    i === index ? { ...c, group_id: event.target.value, weekdays: null } : c,
+                  ),
+                )
+              }
+              data-testid={`add-student-group-${index}`}
+            >
+              <option value="">{t(locale, 'people.enrollment.noGroupYet')}</option>
+              {groups.map((group) => (
+                <option key={group.id} value={group.id}>
+                  {group.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          {child.group_id ? (
+            <WeekdayPicker
+              locale={locale}
+              trainingWeekdays={daysByGroup[child.group_id] ?? []}
+              // C12 — 'all ticked by default'. Derived, not stored.
+              selected={child.weekdays ?? daysByGroup[child.group_id] ?? []}
+              onChange={(next) =>
+                setChildren((current) =>
+                  current.map((c, i) => (i === index ? { ...c, weekdays: next } : c)),
+                )
+              }
+            />
+          ) : null}
         </fieldset>
       ))}
 

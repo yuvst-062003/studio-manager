@@ -791,6 +791,11 @@ export interface paths {
          *
          *     L6: manager-or-owner, and there is no self-service equivalent. The public link's only
          *     job is a first lesson.
+         *
+         *     Naming a group enrols the child here, in the same transaction -- §5.4(a) is 'child
+         *     details AND GROUP -> save. Creates everything immediately.' Omitting one is the
+         *     phone-enquiry case and leaves a lead with no enrollment, which is what §5.4a says a
+         *     lead is.
          */
         post: operations["create_student_api_v1_students_post"];
         delete?: never;
