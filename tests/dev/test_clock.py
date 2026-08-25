@@ -28,6 +28,7 @@ section for the drill evidence.
 
 from __future__ import annotations
 
+import ast
 import asyncio
 import re
 from datetime import UTC, datetime
@@ -211,8 +212,50 @@ def _reads_wall_clock_directly(line: str) -> bool:
     Matches both the `datetime` module's `.now()` / `.utcnow()` / `.today()` and a bare
     `date.today()`, which targets the `date` class directly and so slipped past the
     original pattern entirely -- Task 11 avoided it only because its brief hand-held
-    the line."""
+    the line.
+
+    Kept for the two line-level self-tests below, which prove the pattern itself fires.
+    The real gate now uses `wall_clock_call_lines`, which reads the parse tree instead --
+    see its docstring for what a line-based scan could not tell apart."""
     return bool(_WALL_CLOCK_CALL.search(line))
+
+
+#: `datetime.now` / `.utcnow` / `.today`, and a bare `date.today` -- the same four the
+#: regex above matched.
+_WALL_CLOCK_ATTRS = {
+    ("datetime", "now"),
+    ("datetime", "utcnow"),
+    ("datetime", "today"),
+    ("date", "today"),
+}
+
+
+def wall_clock_call_lines(path: Path) -> list[int]:
+    """Every line in one file that actually CALLS the wall clock.
+
+    Reads the parse tree, not the text. A line-based scan cannot tell a call from a
+    sentence about a call -- and M1 hit exactly that: the docstring of
+    app/services/identity/tokens.py explains that the module must never call
+    datetime.now(), and the old scan read that explanation as a violation. A gate that
+    fires on accurate documentation does not get better code, it gets vaguer comments,
+    and the rule stops being written down in the modules that obey it.
+
+    A syntax error is reported as no calls rather than swallowed differently: `app/` is
+    imported by the rest of the suite, so an unparseable file there is already a much
+    louder failure than this gate.
+    """
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+    except SyntaxError:  # pragma: no cover -- app/ failing to parse fails elsewhere first
+        return []
+    return sorted(
+        node.lineno
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and isinstance(node.func.value, ast.Name)
+        and (node.func.value.id, node.func.attr) in _WALL_CLOCK_ATTRS
+    )
 
 
 def test_nothing_outside_the_clock_module_reads_the_wall_clock():
@@ -228,9 +271,9 @@ def test_nothing_outside_the_clock_module_reads_the_wall_clock():
     for path in sorted((ROOT / "app").rglob("*.py")):
         if path.name == "clock.py":
             continue
-        for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
-            if _reads_wall_clock_directly(line):
-                offenders.append(f"{path.relative_to(ROOT)}:{lineno}")
+        offenders.extend(
+            f"{path.relative_to(ROOT)}:{lineno}" for lineno in wall_clock_call_lines(path)
+        )
     assert offenders == [], (
         "these read the wall clock directly and so cannot be time-travelled -- "
         f"use app.core.clock.now(): {offenders}"
@@ -264,3 +307,53 @@ def test_the_discipline_gate_would_flag_a_bare_date_today(tmp_path):
         if _reads_wall_clock_directly(line)
     ]
     assert hits == ["x = date.today()"]
+
+
+# -- and proven NOT to fire on prose that describes the rule ------------------
+# M1 found this. `app/services/identity/tokens.py`'s docstring explains that the module
+# must not call datetime.now() -- and the line-based scan read that sentence as a call,
+# so the gate forbade any module from writing down the very rule it was obeying. A gate
+# that punishes accurate documentation gets vaguer documentation, not better code.
+def test_the_gate_ignores_a_call_written_inside_a_docstring(tmp_path):
+    probe = tmp_path / "probe.py"
+    probe.write_text(
+        '"""This module must never call datetime.now() -- use app.core.clock."""\n'
+        "import app.core.clock as clock\n"
+        "x = clock.now()\n",
+        encoding="utf-8",
+    )
+    assert wall_clock_call_lines(probe) == []
+
+
+def test_the_gate_ignores_a_call_written_inside_a_comment(tmp_path):
+    probe = tmp_path / "probe.py"
+    probe.write_text("# never datetime.now() here\nx = 1\n", encoding="utf-8")
+    assert wall_clock_call_lines(probe) == []
+
+
+def test_the_gate_still_flags_a_real_call_in_a_file_that_also_documents_the_rule(tmp_path):
+    """The other half. A detector taught to ignore prose has to be shown still catching
+    the call sitting three lines below the prose, or the fix is just a hole."""
+    probe = tmp_path / "probe.py"
+    probe.write_text(
+        '"""Never call datetime.now() -- use app.core.clock.now()."""\n'
+        "from datetime import datetime\n"
+        "x = datetime.now()\n",
+        encoding="utf-8",
+    )
+    assert wall_clock_call_lines(probe) == [3]
+
+
+def test_the_gate_flags_every_shape_the_regex_did(tmp_path):
+    """The AST rule must not be narrower than the pattern it replaced: both the
+    `datetime` module's three and a bare `date.today()`."""
+    probe = tmp_path / "probe.py"
+    probe.write_text(
+        "from datetime import date, datetime\n"
+        "a = datetime.now()\n"
+        "b = datetime.utcnow()\n"
+        "c = datetime.today()\n"
+        "d = date.today()\n",
+        encoding="utf-8",
+    )
+    assert wall_clock_call_lines(probe) == [2, 3, 4, 5]
