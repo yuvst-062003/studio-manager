@@ -33,6 +33,8 @@ from sqlalchemy.orm import Session
 
 from app.models.studio import Studio
 from app.services.demo import DEMO_STUDIO_NAME, DEMO_STUDIO_SETTINGS, DEMO_STUDIO_SLUG
+from app.services.demo.personas import SEEDED_AT, seed_personas
+from app.services.structure.health_templates import ensure_trial_template
 
 
 @dataclass(frozen=True)
@@ -110,8 +112,15 @@ def _seed_studio(session: Session, studio_id: uuid.UUID) -> None:
     )
 
 
+def _seed_trial_template(session: Session, studio_id: uuid.UUID) -> None:
+    """Conflict C3. Seeded into the demo studio for the same reason
+    `provision_studio` seeds it into every new one: §5.4a's funnel puts a trial
+    declaration at step 3 of five, and `dev+trial` exists to walk that funnel."""
+    ensure_trial_template(session, studio_id, at=SEEDED_AT)
+
+
 _V1 = FixtureSet(
-    version="2026-08-24.1",
+    version="2026-08-25.1",
     studio=StudioFixture(
         name=DEMO_STUDIO_NAME,
         slug=DEMO_STUDIO_SLUG,
@@ -130,6 +139,22 @@ _V1 = FixtureSet(
             tables=("studio",),
             seed=_seed_studio,
         ),
+        FixtureLayer(
+            name="personas",
+            milestone="M1",
+            # `auth_identity` is deliberately absent. It has no `studio_id`, so it is not
+            # in `wipe_plan()` -- which is correct, because a reset must not invalidate a
+            # developer's live session -- and this list is asserted against what the wipe
+            # can reach. The layer reattaches those rows instead of recreating them.
+            tables=("person", "role_assignment", "guardian"),
+            seed=seed_personas,
+        ),
+        FixtureLayer(
+            name="health_templates",
+            milestone="M1",
+            tables=("health_form_template",),
+            seed=_seed_trial_template,
+        ),
     ),
 )
 
@@ -139,11 +164,6 @@ LATEST_VERSION: str = _V1.version
 #: §19.3 in full, and the milestone that lands each part. An entry moves into
 #: `_V1.layers` (and out of here) when its milestone's models exist.
 PLANNED_LAYERS: tuple[PlannedLayer, ...] = (
-    PlannedLayer(
-        "personas",
-        "M1",
-        "the nine §19.3 personas, their auth identities, role assignments and guardian links",
-    ),
     PlannedLayer(
         "structure",
         "M2",

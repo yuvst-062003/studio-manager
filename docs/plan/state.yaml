@@ -54,6 +54,10 @@ waves:
         title: Classes, groups, locations and coach assignment
         status: shipped
         on: 2026-08-25
+      - id: M1.5
+        title: The §19.3 personas as a real fixture layer
+        status: shipped
+        on: 2026-08-25
   - id: W2
     milestone: M2 ∥ M3
     title: Schedule ∥ People and funnel
@@ -255,9 +259,9 @@ holdbacks:
       test_no_layer_is_both_planned_and_present fails if the planned entry is left behind
       once the real layer lands.
     blocks: M1
-    status: open
+    status: closed
     opened: 2026-08-24
-    closed: null
+    closed: 2026-08-25
     source: docs/plan/next-session.md — what M1 inherits
   - id: HB-m1-role-switcher
     kind: carried

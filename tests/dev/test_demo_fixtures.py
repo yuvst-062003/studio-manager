@@ -99,13 +99,22 @@ def test_no_layer_is_both_planned_and_present():
 
 def test_the_full_19_3_fixture_set_is_accounted_for():
     """Every part of §19.3's paragraph is either seeded or explicitly owed. Written as
-    an exact set so adding a layer without deciding where it belongs fails."""
+    an exact set so adding a layer without deciding where it belongs fails.
+
+    `health_templates` is the one entry §19.3's paragraph does not name, and it is here
+    deliberately rather than folded into `personas`. It exists for conflict C3 -- §5.4a's
+    trial funnel needs a `kind='trial'` template that §14 would otherwise not deliver
+    until M4 -- and hiding it inside another layer would make the reason invisible the
+    day M4 arrives and has to decide what it now owns. The M4 `health` layer below is
+    declarations, which is a different thing entirely.
+    """
     accounted = {layer.name for layer in SEEDS[LATEST_VERSION].layers} | {
         p.name for p in PLANNED_LAYERS
     }
     assert accounted == {
         "studio",
         "personas",
+        "health_templates",
         "structure",
         "students",
         "health",
