@@ -10,7 +10,7 @@
 // hash route makes them work as links — back button, opening in a new tab, the lot —
 // without adding a dependency, which .claude/rules/ui-rtl-a11y.md says not to do without
 // asking").
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { EmptyState } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
@@ -56,6 +56,10 @@ export function ScheduleSection({
   const needsYear = route.view === 'closures'
 
   const [groups, setGroups] = useState<GroupSummary[] | null>(null)
+  // `groups ?? []` inline would mint a fresh array on every render while the fetch is in
+  // flight, and `GroupsAndCycles` has `groups` in an effect's dependency list — so the
+  // table would re-fetch itself for as long as this component re-rendered.
+  const groupList = useMemo(() => groups ?? [], [groups])
   const [year, setYear] = useState<TrainingYear | null>(null)
   const [yearLoaded, setYearLoaded] = useState(false)
 
@@ -133,7 +137,7 @@ export function ScheduleSection({
       <GroupsAndCycles
         locale={locale}
         client={client}
-        groups={groups ?? []}
+        groups={groupList}
         today={today}
         hrefForGroup={(groupId) => `#/groups/${groupId}`}
       />

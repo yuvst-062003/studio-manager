@@ -116,8 +116,12 @@ export function GroupsAndCycles({
     return () => {
       live = false
     }
-    // `groupIds` rather than `groups`: a fresh array literal every render would re-fetch
-    // the whole table forever.
+    // `groups` is in the list because the body iterates it and exhaustive-deps is right to
+    // insist. `groupIds` is here too as the value that actually changes when the SET of
+    // groups does — but neither buys anything unless the caller passes a stable array and a
+    // stable `today`, which is why `ScheduleSection` memoizes the one and `useToday`
+    // stabilises the other. An earlier version of this comment claimed `groupIds` alone was
+    // the mitigation; it was not, and the effect re-ran on every parent render.
   }, [client, groupIds, groups, today])
 
   if (groups.length === 0) {

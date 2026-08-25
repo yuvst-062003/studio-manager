@@ -25,6 +25,7 @@ import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { ScheduleSection } from './features/schedule/ScheduleSection'
 import { makeScheduleClient } from './features/schedule/client'
+import { useToday } from './features/schedule/useToday'
 import { StaffScreen } from './features/staff/StaffScreen'
 import { SettingsScreen } from './features/settings/SettingsScreen'
 
@@ -72,6 +73,10 @@ export default function App() {
   // object every render would re-fetch progress forever.
   const setupClient = useMemo(() => makeSetupClient(apiFetch), [])
   const scheduleClient = useMemo(() => makeScheduleClient(apiFetch), [])
+  // Stable for as long as the studio's day is. `new Date().toISOString()` in this
+  // render body was a new value every render, and downstream that is an effect
+  // dependency worth `1 + 3N` requests.
+  const today = useToday()
 
   // §6.5 deliberately does NOT gate the dashboard on standalone mode the way the two
   // phone apps are gated. It is the desktop surface: a manager opens it in a browser tab
@@ -118,7 +123,7 @@ export default function App() {
               locale={locale}
               client={scheduleClient}
               hash={hash}
-              today={new Date().toISOString()}
+              today={today}
             />
           ) : null}
           {route === 'staff' ? <StaffScreen locale={locale} /> : null}

@@ -116,6 +116,58 @@ describe('ScheduleSection', () => {
     expect(await screen.findByText(t('he', 'schedule.group.noActiveYear'))).toBeInTheDocument()
   })
 
+  it('refetches the table when `today` changes, by one millisecond or by a day', async () => {
+    // **A characterization test, and the justification for `useToday`.** Measured, not
+    // assumed: a one-millisecond change to `today` re-runs the table's effect and costs
+    // `1 + 3N` requests, `N` of them sequentially awaited previews.
+    //
+    // That is correct behaviour — a new day really does change which session is "next" —
+    // and it is exactly why `App.tsx` must not hand this a fresh `new Date().toISOString()`
+    // on every render. The guarantee that it does not lives in `useToday.test.ts`.
+    const client = stub()
+    const { rerender } = render(
+      <ScheduleSection locale="he" client={client} hash="#/groups" today="2026-11-03T12:00:00Z" />,
+    )
+    await waitFor(() => expect(screen.getAllByTestId('group-row')).toHaveLength(1))
+    const before = vi.mocked(client.putSchedule).mock.calls.length
+
+    rerender(
+      <ScheduleSection
+        locale="he"
+        client={client}
+        hash="#/groups"
+        today="2026-11-03T12:00:00.001Z"
+      />,
+    )
+    await waitFor(() =>
+      expect(vi.mocked(client.putSchedule).mock.calls.length).toBeGreaterThan(before),
+    )
+  })
+
+  it('does not refetch when nothing its effects depend on has changed', async () => {
+    // The other half of the pair. On its own this is nearly trivial — once loaded, `groups`
+    // is a stable state reference — but together with the test above it states the contract
+    // the caller has to meet: stable inputs in, no requests out.
+    const client = stub()
+    const view = (
+      <ScheduleSection locale="he" client={client} hash="#/groups" today="2026-11-03T12:00:00Z" />
+    )
+    const { rerender } = render(view)
+    await waitFor(() => expect(screen.getAllByTestId('group-row')).toHaveLength(1))
+
+    const groupCalls = vi.mocked(client.listGroups).mock.calls.length
+    const previewCalls = vi.mocked(client.putSchedule).mock.calls.length
+    expect(previewCalls).toBeGreaterThan(0)
+
+    rerender(view)
+    rerender(view)
+    await waitFor(() => expect(screen.getAllByTestId('group-row')).toHaveLength(1))
+
+    expect(vi.mocked(client.listGroups).mock.calls).toHaveLength(groupCalls)
+    expect(vi.mocked(client.putSchedule).mock.calls).toHaveLength(previewCalls)
+  })
+
+
   it('uses no physical CSS', async () => {
     const { container } = render(
       <ScheduleSection
