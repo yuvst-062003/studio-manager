@@ -35,8 +35,13 @@ waves:
     mode: sequential
     lanes: []
     exit_gate: both apps sign in, refuse correctly, and route to the wizard
-    status: pending
-    pieces: []
+    status: active
+    opened: 2026-08-25
+    pieces:
+      - id: M1.1
+        title: The identity and structure schema
+        status: shipped
+        on: 2026-08-25
   - id: W2
     milestone: M2 ∥ M3
     title: Schedule ∥ People and funnel
@@ -214,9 +219,9 @@ holdbacks:
       column exists, and carries a test whose failure message says to delete it at that
       point. A restriction proven against a column that does not exist proves nothing.
     blocks: M1
-    status: open
+    status: closed
     opened: 2026-08-24
-    closed: null
+    closed: 2026-08-25
     source: docs/plan/next-session.md — what M1 inherits
   - id: HB-m1-request-state
     kind: carried

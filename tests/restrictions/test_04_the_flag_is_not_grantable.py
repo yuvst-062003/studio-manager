@@ -2,15 +2,18 @@
 §19.2: 'is_developer is set only by a database seed or migration. There is no API, no UI
 and no admin screen that can grant it. A test asserts no route can write the column.'
 
-FULLY VACUOUS TODAY, both detectors, and deliberately so. `auth_identity` is M1's table:
-no schema names is_developer and no code assigns it, so both detectors find nothing.
-They exist now so that M1 cannot land the first violation unnoticed -- the same reason
-tests/invariants 3 and 5 exist while the things they guard do not.
+NOT VACUOUS since M1's revision 0005 created `auth_identity.is_developer`. Both detectors
+now guard a real column: the schema detector walks every request body FastAPI publishes,
+and the source detector scans every .py file outside `alembic/versions/` and
+`app/services/demo/` -- §19.2's two legal writers, and nothing else.
 
-TRIGGER: M1's contract commit creating auth_identity.is_developer. From that commit on,
-the day a request schema exposes the field or a service assigns it, these go red.
+The test that recorded the vacuity was deleted when its own failure message said to, and
+replaced by its complement: a search that finds nothing because the column was DELETED
+looks identical to a search that found no violation, so one test asserts the column is
+still there.
 
-The self-tests at the bottom are what make a currently-empty gate worth having.
+The self-tests at the bottom are what made the gate worth having while it was empty, and
+they are what keeps it honest now that it is not.
 
 Deviation from the brief: this file omits ``from __future__ import annotations``
 (present in most of this repo's modules, absent already in test_02 and several
@@ -140,20 +143,21 @@ def test_no_code_outside_a_seed_or_a_migration_assigns_it():
     )
 
 
-def test_the_gate_is_currently_empty_and_says_so():
-    """Records the vacuity rather than hiding it. When M1 lands auth_identity this goes
-    red, and the correct fix is to delete this test -- the two assertions above stop
-    being vacuous at that point."""
+def test_the_column_the_two_detectors_guard_actually_exists():
+    """The complement of the test this replaced, and the reason it is not simply gone.
+
+    Both detectors above are searches, and a search finds nothing when the thing it
+    guards has been DELETED just as reliably as when nothing violates it. The test that
+    used to sit here recorded the opposite vacuity -- that the column did not exist yet
+    -- and its own failure message said to delete it once M1 landed. This is the same
+    gate pointed the other way, so the pair can never both be silent for the wrong
+    reason.
+    """
     import app.models
 
-    assert COLUMN not in {
-        column.name
-        for table in app.models.base.Base.metadata.tables.values()
-        for column in table.columns
-    }, (
-        f"auth_identity.{COLUMN} now exists -- delete this test; the assertions above "
-        "are no longer vacuous"
-    )
+    assert COLUMN in {
+        column.name for column in app.models.base.Base.metadata.tables["auth_identity"].columns
+    }, f"auth_identity.{COLUMN} is gone; the two detectors above are vacuous again"
 
 
 # -- proven to fire ----------------------------------------------------------
