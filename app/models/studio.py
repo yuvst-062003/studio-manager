@@ -1,17 +1,20 @@
 """The tenant root. Not itself tenant-scoped -- it *is* the tenant, so it carries no
 `studio_id` and does not inherit TenantMixin.
 
-SPEC §4.3's `created_by_identity_id` is deliberately absent: it references
-`auth_identity`, which M1 owns. M1 adds the column and the foreign key in the same
-revision that creates the table it points at.
+SPEC §4.3's `created_by_identity_id` was deferred out of M0 because it references
+`auth_identity`, which M1 owns. It landed in revision 0005, the same revision that
+creates the table it points at -- the pattern app/models/audit.py's actor columns used
+for the same reason.
 """
 
 from __future__ import annotations
 
+import uuid
 from typing import Any
 
-from sqlalchemy import Boolean, CheckConstraint, String
+from sqlalchemy import Boolean, CheckConstraint, ForeignKey, String
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampColumns, UUIDPrimaryKey
@@ -34,4 +37,11 @@ class Studio(UUIDPrimaryKey, TimestampColumns, Base):
     is_demo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     settings: Mapped[dict[str, Any]] = mapped_column(
         JSONB, nullable=False, default=dict, server_default="{}"
+    )
+    # §4.3, and §5.1's chain of authority made durable: a studio is provisioned by the
+    # platform operator, never self-created, so this records which identity did it.
+    # Nullable because revision 0003 created the demo studio before any identity existed
+    # to attribute it to.
+    created_by_identity_id: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("auth_identity.id", ondelete="RESTRICT")
     )

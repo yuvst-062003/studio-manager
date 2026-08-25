@@ -18,6 +18,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+import pytest
 import sqlalchemy as sa
 from app.core.demo import CROSS_STUDIO_CALLERS, exclude_demo_studios
 from app.models.studio import Studio
@@ -25,6 +26,20 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 ROOT = Path(__file__).resolve().parents[2]
+
+#: A *use* of the escape hatch, not a mention of it. Both shapes, and the comment that
+#: used to sit at the call site still applies to both: `with_all_tenants(reason=...)` is
+#: the broad context manager (app/core/tenancy.py), and
+#: `.execution_options(with_all_tenants=True)` is the narrow per-statement flag
+#: (app/services/demo/service.py and fixtures.py). Do not narrow this to one of them.
+#:
+#: What it deliberately does NOT match is the bare name in prose. M1's
+#: app/models/person.py carries the accurate comment "this index is read under
+#: with_all_tenants", and a substring search read that as a cross-studio query in a file
+#: holding no query at all. This detector already requires the MITIGATION to be a call
+#: rather than a name; holding the hazard to a lower standard just teaches people to
+#: write vaguer comments.
+HATCH_USE = re.compile(r"with_all_tenants\s*\(|with_all_tenants\s*=\s*True")
 
 
 def test_the_filter_removes_the_demo_studio(migrated):
@@ -91,21 +106,64 @@ def test_every_cross_studio_call_site_is_accounted_for():
     # fixtures.py) -- they share the literal string "with_all_tenants" and both are
     # cross-studio escape hatches this gate must catch. Do not narrow this to match
     # only one of them.
-    pattern = re.compile(r"with_all_tenants")
-    call_pattern = re.compile(r"exclude_demo_studios\s*\(")
-    unaccounted = []
-    for path in sorted((ROOT / "app").rglob("*.py")):
-        rel = str(path.relative_to(ROOT))
-        if rel in CROSS_STUDIO_CALLERS:
-            continue
-        text = path.read_text(encoding="utf-8")
-        if pattern.search(text) and not call_pattern.search(text):
-            unaccounted.append(rel)
+    unaccounted = _unaccounted(ROOT / "app")
     assert unaccounted == [], (
         "these reach across studios without excluding the demo studio (§19.7). Apply "
         "exclude_demo_studios, or add the file to CROSS_STUDIO_CALLERS with the reason "
         f"it is exempt: {unaccounted}"
     )
+
+
+def _unaccounted(root: Path) -> list[str]:
+    """The scan, extracted so the two self-tests below can drive it over a probe tree
+    instead of over app/. Extracted in M1, when the detector fired on a file that only
+    NAMED the hatch in a comment."""
+    call_pattern = re.compile(r"exclude_demo_studios\s*\(")
+    unaccounted = []
+    for path in sorted(root.rglob("*.py")):
+        try:
+            rel = str(path.relative_to(ROOT))
+        except ValueError:
+            rel = str(path.relative_to(root))
+        if rel in CROSS_STUDIO_CALLERS:
+            continue
+        text = path.read_text(encoding="utf-8")
+        if HATCH_USE.search(text) and not call_pattern.search(text):
+            unaccounted.append(rel)
+    return unaccounted
+
+
+def test_a_file_that_only_names_the_hatch_in_a_comment_is_not_a_caller(tmp_path):
+    """M1 found this the expensive way. app/models/person.py carries the comment
+    "this index is read under with_all_tenants", which is an accurate note about how a
+    query elsewhere uses the index -- and a bare substring search read it as a
+    cross-studio query in a file that contains no query at all.
+
+    The detector already holds the MITIGATION to 'a call, not a name'. The hazard gets
+    the same standard, or the gate teaches people to write vaguer comments.
+    """
+    (tmp_path / "probe.py").write_text(
+        '"""This index is read under with_all_tenants by the login resolver."""\n'
+        "# see with_all_tenants in app/core/tenancy.py\n",
+        encoding="utf-8",
+    )
+    assert _unaccounted(tmp_path) == []
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        'with with_all_tenants(reason="a report"):',
+        "stmt.execution_options(with_all_tenants=True)",
+        "session.with_all_tenants(reason='x')",
+    ],
+)
+def test_a_real_use_of_the_hatch_is_still_caught(tmp_path, line):
+    """The other half. A detector narrowed until it stops false-positiving has to be
+    shown still catching both hatch shapes -- the broad context manager and the narrow
+    per-statement flag -- or the fix is just a deletion."""
+    (tmp_path / "probe.py").write_text(f"{line}\n", encoding="utf-8")
+    assert _unaccounted(tmp_path) == ["probe.py"]
 
 
 def test_every_allowlisted_caller_still_exists_and_carries_a_reason():
