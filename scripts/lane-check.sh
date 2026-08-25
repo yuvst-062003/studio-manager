@@ -48,8 +48,10 @@ case "$V" in
     # follow the per-vertical convention. Listed explicitly rather than by widening to
     # all of app/routers: a lane's own router belongs to that lane's check, not to
     # core's.
-    py_candidates=(app/core app/models app/services app/routers/dev.py app/integrations app/workers)
-    test_candidates=(tests/core tests/config tests/dev)
+    # tools/cockpit is here for the same reason as the explicit router paths above:
+    # it lives outside app/ entirely, so no other vertical would ever reach it.
+    py_candidates=(app/core app/models app/services app/routers/dev.py app/integrations app/workers tools/cockpit)
+    test_candidates=(tests/core tests/config tests/dev tests/cockpit)
     ;;
   *)
     py_candidates=("app/services/$V" "app/routers/$V.py" "app/models/$V.py")

@@ -118,3 +118,11 @@ def test_the_dry_run_still_reports_six_scoped_gates_for_core():
     result = _run("core", "--dry-run")
     assert result.returncode == 0, result.stderr
     assert "6 scoped gates" in result.stdout
+
+
+def test_core_scopes_the_cockpit_so_its_tests_are_not_a_gate_that_never_runs():
+    """tools/ is outside every per-vertical convention, so without this it is linted
+    by nothing, typechecked by nothing and tested by nothing."""
+    stdout = _run("core", "--dry-run").stdout
+    for expected in ("tools/cockpit", "tests/cockpit"):
+        assert expected in stdout, f"core's plan omits {expected}\n{stdout}"

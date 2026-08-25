@@ -10,8 +10,8 @@ echo "── database ──"
 .venv/bin/alembic upgrade head
 
 echo "── backend: lint, format, types, tests ──"
-.venv/bin/ruff check app scripts tests
-.venv/bin/ruff format --check app scripts tests
+.venv/bin/ruff check app scripts tests tools
+.venv/bin/ruff format --check app scripts tests tools
 .venv/bin/mypy app scripts
 .venv/bin/pytest
 
