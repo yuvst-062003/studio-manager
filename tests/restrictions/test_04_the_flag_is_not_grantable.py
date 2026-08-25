@@ -29,6 +29,7 @@ import re
 from pathlib import Path
 from typing import Any
 
+import pytest
 from app.main import app
 from fastapi import APIRouter, FastAPI
 from pydantic import BaseModel
@@ -86,14 +87,32 @@ def writable_properties(application: FastAPI) -> list[str]:
 def source_writers(root: Path) -> list[str]:
     """Every assignment to the column outside a seed or a migration.
 
-    Requires whitespace before the ``=`` -- this project's `.venv/bin/ruff format`
-    writes assignments as ``x = y`` and keyword arguments as ``x=y`` (no space), and
-    that formatting is enforced (DoD: ``ruff format --check``). Without this, the
-    pattern also fires on every legitimate ``developer_may_act(is_developer=...)`` /
-    ``dev_tools_allowed(is_developer=...)`` call this task itself adds -- a call is a
-    read, not a grant, and §19.2 is about grants.
+    Two independent patterns, ORed together, because one pattern cannot catch every
+    grant shape without also catching a read:
+
+    * ``x.is_developer = ...`` / bare ``is_developer = ...``, whitespace before the
+      ``=`` required. This project's `.venv/bin/ruff format` writes assignments as
+      ``x = y`` and keyword arguments as ``x=y`` (no space), and that formatting is
+      enforced (DoD: ``ruff format --check``). Without the whitespace requirement, this
+      half of the pattern also fires on every legitimate
+      ``developer_may_act(is_developer=...)`` / ``dev_tools_allowed(is_developer=...)``
+      call this task itself adds -- a call is a read, not a grant, and §19.2 is about
+      grants.
+    * ``is_developer=True`` / ``is_developer=1`` with **no** whitespace requirement, so
+      it reaches a constructor kwarg (``AuthIdentity(is_developer=True)``) and an ORM
+      ``.values(is_developer=True)`` call -- neither is caught by the whitespace form
+      above, because ruff format writes both with no space around ``=``, the same as a
+      keyword read. What tells a grant from a read here is not spacing but the RHS: a
+      literal ``True``/``1`` can only be a grant, while ``is_developer=bool(x)`` or
+      ``is_developer=some_var`` -- a read passed through -- is left alone because
+      neither literal appears on its right-hand side.
+
+    tests/restrictions/test_04... 's own self-tests pin the six-case table this was
+    built against: two grant shapes an earlier fix already caught, two grant shapes it
+    missed (the hole this closes), and two reads that must never be flagged (the false
+    positive an earlier fix was written to remove, and must not reintroduce).
     """
-    pattern = re.compile(rf"(\.{COLUMN}\s+=(?!=)|\b{COLUMN}\s+=(?!=))")
+    pattern = re.compile(rf"(\.{COLUMN}\s+=(?!=)|\b{COLUMN}\s+=(?!=)|\b{COLUMN}\s*=\s*(True|1)\b)")
     found = []
     for path in sorted(root.rglob("*.py")):
         try:
@@ -181,3 +200,30 @@ def test_the_source_detector_leaves_a_comparison_alone(tmp_path):
         "if identity.is_developer == True:\n    pass\n", encoding="utf-8"
     )
     assert source_writers(tmp_path) == []
+
+
+# -- the six-case table -------------------------------------------------------
+# An earlier fix changed `\s*=` to `\s+=` to stop false-positiving on a *read* passed
+# as a keyword (`developer_may_act(is_developer=bool(...))`). That removed the false
+# positive and introduced a false negative on the two grant shapes M1 will actually
+# use: a constructor kwarg and an ORM `.values(...)` call, both written with no space
+# around `=` by ruff format -- the same as a keyword read. This table pins all six
+# cases together so a fix to one half cannot regress the other without this file
+# noticing.
+SIX_CASES = [
+    pytest.param("identity.is_developer = True", True, id="attribute assign"),
+    pytest.param("is_developer = True", True, id="bare assign"),
+    pytest.param("AuthIdentity(is_developer=True)", True, id="constructor kwarg"),
+    pytest.param("update(AuthIdentity).values(is_developer=True)", True, id="update .values"),
+    pytest.param("if identity.is_developer == True:", False, id="comparison (read)"),
+    pytest.param("developer_may_act(is_developer=bool(x))", False, id="passing a read"),
+]
+
+
+@pytest.mark.parametrize("line, should_be_caught", SIX_CASES)
+def test_the_detector_gets_all_six_cases_right(tmp_path, line, should_be_caught):
+    (tmp_path / "probe.py").write_text(f"{line}\n", encoding="utf-8")
+    caught = bool(source_writers(tmp_path))
+    assert caught is should_be_caught, (
+        f"{line!r}: expected caught={should_be_caught}, got caught={caught}"
+    )
