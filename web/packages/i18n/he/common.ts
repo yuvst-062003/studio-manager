@@ -28,7 +28,20 @@ export const common: Bundle = {
   'dev.title': 'פיתוח',
   'dev.actingAs': 'פועל בתור',
   'dev.noPersona': 'אין פרסונה פעילה',
-  'dev.personaSwitcherPending': 'מחליף התפקידים מגיע ב-M1, יחד עם טבלת הזהויות',
+  // §19.4's persona switcher. These are §19.4's own labels, verbatim from the artboard:
+  //   בעלים · מנהל · מאמן ראשי · מאמן משנה
+  //   הורה (3 ילדים) · הורה (ילד אחד) · הורה (ניסיון) · הורה+מאמן · ללא הרשאות
+  'dev.persona.label': 'פועל בתור',
+  'dev.persona.placeholder': 'בחר פרסונה',
+  'dev.persona.owner': 'בעלים',
+  'dev.persona.manager': 'מנהל',
+  'dev.persona.lead': 'מאמן ראשי',
+  'dev.persona.assistant': 'מאמן משנה',
+  'dev.persona.parent3': 'הורה (3 ילדים)',
+  'dev.persona.parent1': 'הורה (ילד אחד)',
+  'dev.persona.trial': 'הורה (ניסיון)',
+  'dev.persona.both': 'הורה+מאמן',
+  'dev.persona.none': 'ללא הרשאות',
   // §19.3 — 'There is no student persona, because students have no login in v1, and
   // the dev bar says so explicitly, so the gap is visible rather than confusing.'
   'dev.noStudentPersona': 'אין פרסונת תלמיד — לתלמידים אין התחברות בגרסה 1',

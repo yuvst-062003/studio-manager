@@ -13,12 +13,23 @@ import type { ComponentType } from 'react'
 import type { Locale } from '@studio/i18n'
 import { registerSlot, useSlot } from '../slots'
 
-export type DevToolKey = 'offline' | 'slow' | 'timeTravel' | 'runJob' | 'resetDemo' | 'simulateIpn'
+export type DevToolKey =
+  | 'actAs'
+  | 'offline'
+  | 'slow'
+  | 'timeTravel'
+  | 'runJob'
+  | 'resetDemo'
+  | 'simulateIpn'
 
 export type DevToolProps = { locale: Locale }
 
 /** §19.4's layout order: [📴 offline] [🐌 slow] [⏩ +1 month] [↺ reset] [simulate IPN ▾]. */
 export const DEV_TOOL_ORDER: Record<DevToolKey, number> = {
+  // §19.4 draws the persona row ABOVE the tool row, so the switcher sorts before
+  // everything M0.4 registered. This file is the registry the milestone plan says lanes
+  // extend by adding one file — DevBar.tsx, the container, is untouched.
+  actAs: 5,
   offline: 10,
   slow: 20,
   timeTravel: 30,

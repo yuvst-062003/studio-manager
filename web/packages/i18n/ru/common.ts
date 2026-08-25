@@ -36,7 +36,18 @@ export const common: Bundle = {
   'dev.title': 'РАЗРАБОТКА',
   'dev.actingAs': 'действует как',
   'dev.noPersona': 'нет активной роли',
-  'dev.personaSwitcherPending': 'переключатель ролей появится в M1, вместе с таблицей личностей',
+  // §19.4's persona switcher.
+  'dev.persona.label': 'действует как',
+  'dev.persona.placeholder': 'выберите роль',
+  'dev.persona.owner': 'владелец',
+  'dev.persona.manager': 'менеджер',
+  'dev.persona.lead': 'главный тренер',
+  'dev.persona.assistant': 'помощник тренера',
+  'dev.persona.parent3': 'родитель (3 ребёнка)',
+  'dev.persona.parent1': 'родитель (один ребёнок)',
+  'dev.persona.trial': 'родитель (пробное)',
+  'dev.persona.both': 'родитель + тренер',
+  'dev.persona.none': 'без прав',
   // §19.3 — 'There is no student persona, because students have no login in v1, and
   // the dev bar says so explicitly, so the gap is visible rather than confusing.'
   'dev.noStudentPersona': 'нет роли ученика — у учеников нет входа в версии 1',

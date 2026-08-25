@@ -58,6 +58,10 @@ waves:
         title: The §19.3 personas as a real fixture layer
         status: shipped
         on: 2026-08-25
+      - id: M1.6
+        title: The §19.4 role switcher, backend and dev bar
+        status: shipped
+        on: 2026-08-25
   - id: W2
     milestone: M2 ∥ M3
     title: Schedule ∥ People and funnel
@@ -270,9 +274,9 @@ holdbacks:
       Registers into the dev-bar slot with registerDevTool; the container is not
       reopened. Without it the demo studio has personas nobody can become.
     blocks: M1
-    status: open
+    status: closed
     opened: 2026-08-24
-    closed: null
+    closed: 2026-08-25
     source: docs/plan/next-session.md — what M1 inherits · SPEC §19.4
   - id: HB-c3-trial-template
     kind: conflict

@@ -28,7 +28,18 @@ export const common: Bundle = {
   'dev.title': 'DEV',
   'dev.actingAs': 'acting as',
   'dev.noPersona': 'no active persona',
-  'dev.personaSwitcherPending': 'the role switcher arrives in M1, with the identity table',
+  // §19.4's persona switcher.
+  'dev.persona.label': 'acting as',
+  'dev.persona.placeholder': 'choose a persona',
+  'dev.persona.owner': 'owner',
+  'dev.persona.manager': 'manager',
+  'dev.persona.lead': 'lead coach',
+  'dev.persona.assistant': 'assistant coach',
+  'dev.persona.parent3': 'parent (3 children)',
+  'dev.persona.parent1': 'parent (one child)',
+  'dev.persona.trial': 'parent (trial)',
+  'dev.persona.both': 'parent + coach',
+  'dev.persona.none': 'no permissions',
   // §19.3 — 'There is no student persona, because students have no login in v1, and
   // the dev bar says so explicitly, so the gap is visible rather than confusing.'
   'dev.noStudentPersona': 'no student persona — students have no login in v1',

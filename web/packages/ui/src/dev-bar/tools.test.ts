@@ -36,8 +36,11 @@ describe('the dev-bar tool registry (seam 4)', () => {
   })
 
   it('names every §19.4 tool exactly once', () => {
+    // `actAs` joined in M1 — §19.4's persona row, which the artboard draws ABOVE the
+    // tool row. An exact list rather than a subset, so a tool added without deciding
+    // where it sits in that layout fails here.
     expect(Object.keys(DEV_TOOL_ORDER).sort()).toEqual(
-      ['offline', 'resetDemo', 'runJob', 'simulateIpn', 'slow', 'timeTravel'].sort(),
+      ['actAs', 'offline', 'resetDemo', 'runJob', 'simulateIpn', 'slow', 'timeTravel'].sort(),
     )
   })
 

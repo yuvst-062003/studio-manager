@@ -39,6 +39,10 @@ async function post(path: string, body: unknown): Promise<Response> {
   return fetch(`${DEV_BASE}${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...devHeaders() },
+    // §19.4 writes the persona onto the caller's refresh row, so the switch has to reach
+    // the server with the httpOnly cookie attached — without this it silently switches
+    // only the access token and reverts on the next rotation.
+    credentials: 'include',
     body: JSON.stringify(body),
   })
 }
@@ -57,4 +61,42 @@ export function simulateIpn(input: {
     order_public_ref: input.orderPublicRef,
     expected_amount_agorot: input.expectedAmountAgorot,
   })
+}
+
+/** §19.4's persona list. `tests` carries §19.3's "what this exists to test" column. */
+export type DevPersona = {
+  key: string | null
+  person_id: string
+  studio_id: string
+  label: string
+  roles: string[]
+  is_guardian: boolean
+  tests: string
+}
+
+export type DevPersonaList = {
+  items: DevPersona[]
+  /** §19.3 — the missing student persona, stated by the server so the bar cannot drift
+   *  from the spec's own wording. */
+  no_student_persona_note: string
+}
+
+export async function listPersonas(): Promise<DevPersonaList> {
+  const response = await fetch(`${DEV_BASE}/personas`, {
+    headers: devHeaders(),
+    credentials: 'include',
+  })
+  if (!response.ok) throw new Error(`personas: ${response.status}`)
+  return (await response.json()) as DevPersonaList
+}
+
+/**
+ * §19.4 — switch persona. Returns a NEW access token; the caller replaces the one it
+ * holds. The server does not mutate the old one (see app/routers/dev.py), so a client
+ * that ignored this return value would keep acting as whoever it was before.
+ */
+export async function actAs(personId: string): Promise<{ access_token: string; persona_label: string }> {
+  const response = await post(`/act-as/${personId}`, {})
+  if (!response.ok) throw new Error(`act-as: ${response.status}`)
+  return (await response.json()) as { access_token: string; persona_label: string }
 }
