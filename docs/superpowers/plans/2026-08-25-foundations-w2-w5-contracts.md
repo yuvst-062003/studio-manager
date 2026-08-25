@@ -413,17 +413,17 @@ where `IpnVerdict` is `success | amount_mismatch | forged_ref | duplicate`.
 > written now so each wave's exit gate is a file that already exists rather than one written
 > under pressure at the end of the wave.
 
-- [ ] **Step 1:** `e2e/01-registration-to-active.spec.ts` — public registration → health
+- [x] **Step 1:** `e2e/01-registration-to-active.spec.ts` — public registration → health
       declaration → manager approval → student active (W2/W3 gate).
-- [ ] **Step 2:** `e2e/02-offline-attendance.spec.ts` — coach marks **offline** → reconnects →
+- [x] **Step 2:** `e2e/02-offline-attendance.spec.ts` — coach marks **offline** → reconnects →
       marks sync → dashboard reflects them (W3 gate).
-- [ ] **Step 3:** `e2e/03-upay-happy-path.spec.ts` — parent selects 3 months → uPay order →
+- [x] **Step 3:** `e2e/03-upay-happy-path.spec.ts` — parent selects 3 months → uPay order →
       simulated IPN → charges settled → parent sees paid (W4 gate).
-- [ ] **Step 4:** `e2e/04-forged-ipn.spec.ts` — forged/tampered IPN → `amount_mismatch` →
+- [x] **Step 4:** `e2e/04-forged-ipn.spec.ts` — forged/tampered IPN → `amount_mismatch` →
       charges **not** settled → manager alerted (W4 gate).
-- [ ] **Step 5:** `e2e/05-schedule-change.spec.ts` — manager changes a group's schedule → future
+- [x] **Step 5:** `e2e/05-schedule-change.spec.ts` — manager changes a group's schedule → future
       sessions update, **past and `is_manually_edited` sessions do not** (W2 gate).
-- [ ] **Step 6: Commit.** `test(e2e): SPEC §13's five flows, ahead of their implementations`
+- [x] **Step 6: Commit.** `test(e2e): SPEC §13's five flows, ahead of their implementations`
 
 ## Task 18 — `docs/design/specs/`: component specs for M2–M9 artboards
 
