@@ -126,3 +126,34 @@ def test_core_scopes_the_cockpit_so_its_tests_are_not_a_gate_that_never_runs():
     stdout = _run("core", "--dry-run").stdout
     for expected in ("tools/cockpit", "tests/cockpit"):
         assert expected in stdout, f"core's plan omits {expected}\n{stdout}"
+
+
+def test_identity_resolves_every_path_that_vertical_actually_owns():
+    """SPEC 7 puts auth under /auth and the console under /platform, so the router
+    filenames do not match the vertical name the way `attendance` does. The default
+    branch would type-check app/routers/identity.py and silently skip
+    app/routers/platform.py and app/core/auth_context.py -- a green that checked less
+    than it claimed."""
+    text = SCRIPT.read_text(encoding="utf-8")
+    for path in (
+        "app/routers/platform.py",
+        "app/core/auth_context.py",
+        "app/models/person.py",
+    ):
+        assert path in text, f"{path} is invisible to lane-check.sh identity"
+
+
+def test_structure_resolves_the_health_template_it_owns_in_m1():
+    """Conflict C3 puts health_form_template in M1 to unblock M3's trial booking. It
+    lives in app/models/health.py, which no vertical named `structure` would reach by
+    convention."""
+    assert "app/models/health.py" in SCRIPT.read_text(encoding="utf-8")
+
+
+def test_identity_and_structure_fail_closed_before_their_source_exists():
+    """Adding a case must not hand a vertical a free green. Until the files land, every
+    scoped gate skips and the script must exit non-zero."""
+    for vertical in ("identity", "structure"):
+        result = _run(vertical, "--dry-run")
+        if result.returncode != 0:
+            assert "nothing was checked" in (result.stdout + result.stderr)

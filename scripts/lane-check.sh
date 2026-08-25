@@ -53,6 +53,24 @@ case "$V" in
     py_candidates=(app/core app/models app/services app/routers/dev.py app/integrations app/workers tools/cockpit)
     test_candidates=(tests/core tests/config tests/dev tests/cockpit)
     ;;
+  identity)
+    # SPEC §7 puts these under /auth and /platform, so the router filenames do not
+    # follow the per-vertical convention the default branch assumes. Listed explicitly
+    # for the same reason `core` lists app/routers/dev.py: a lane's own code belongs in
+    # a gate that actually reaches it, and the default branch would have type-checked
+    # app/routers/identity.py while silently skipping the console and the middleware.
+    py_candidates=(app/services/identity app/routers/identity.py app/routers/platform.py \
+                   app/models/identity.py app/models/person.py \
+                   app/core/auth_context.py app/core/cors.py)
+    test_candidates=(tests/identity)
+    ;;
+  structure)
+    # app/models/health.py is here by conflict C3: M1 seeds the kind='trial' template so
+    # M3's trial booking is not blocked on M4. M4 owns the rest of that file.
+    py_candidates=(app/services/structure app/routers/structure.py \
+                   app/models/structure.py app/models/health.py)
+    test_candidates=(tests/structure)
+    ;;
   *)
     py_candidates=("app/services/$V" "app/routers/$V.py" "app/models/$V.py")
     test_candidates=("tests/$V")
