@@ -1,0 +1,190 @@
+// The schedule vertical's own view of the API.
+//
+// **Why these types are declared here and not imported from `@studio/api-client`.** That
+// package is generated from `openapi.json`, and `openapi.json` is regenerated on `main`
+// after both W2 lanes merge — regenerating it inside one lane guarantees a conflict with
+// the other in a file neither of them owns. `packages/ui/src/setup-wizard/client.ts`
+// already takes the same route for the same reason. When the client is regenerated these
+// interfaces become a compile-time cross-check of it rather than dead weight.
+//
+// The fetcher is injected rather than imported so a test can drive a screen without a
+// network, which is also what `SetupClient` does.
+import { t } from '@studio/i18n'
+import type { Locale } from '@studio/i18n'
+
+export type Fetcher = (path: string, init?: RequestInit) => Promise<Response>
+
+export interface SessionStaff {
+  person_id: string
+  display_name: string
+  role: 'lead_coach' | 'assistant_coach'
+  is_substitute: boolean
+}
+
+/** Mirrors `app/schemas/schedule.py::SessionOut`, field for field. */
+export interface SessionRow {
+  id: string
+  group_id: string
+  group_name: string
+  training_year_id: string
+  starts_at: string
+  ends_at: string
+  location_id: string | null
+  location_name: string | null
+  status: 'scheduled' | 'cancelled' | 'completed'
+  is_manually_edited: boolean
+  is_ad_hoc: boolean
+  cancel_reason: string | null
+  staff: SessionStaff[]
+  attendance_taken: boolean
+}
+
+export interface ScheduleRule {
+  id?: string
+  group_id?: string
+  weekday: number
+  start_time: string
+  end_time: string
+  location_id: string | null
+  effective_from: string
+  effective_to?: string | null
+}
+
+export interface ProtectedSession {
+  id: string
+  starts_at: string
+  ends_at: string
+}
+
+/** Mirrors `ScheduleImpactPreview`, including C12's `students_left_unscheduled`. */
+export interface ImpactPreview {
+  sessions_to_create: number
+  sessions_to_update: number
+  sessions_to_cancel: number
+  sessions_protected_past: number
+  sessions_protected_manually_edited: number
+  sessions_protected_ad_hoc: number
+  first_affected_date: string | null
+  protected_manually_edited_sessions: ProtectedSession[]
+  students_left_unscheduled: number
+}
+
+export interface HolidayPreset {
+  key: string
+  name: string
+  date_from: string
+  date_to: string
+}
+
+export interface TrainingYear {
+  id: string
+  name: string
+  starts_on: string
+  ends_on: string
+  status: 'draft' | 'active' | 'closed'
+}
+
+export interface Closure {
+  id: string
+  training_year_id: string
+  date_from: string
+  date_to: string
+  reason: string
+  source: 'holiday_preset' | 'manual'
+}
+
+export interface ScheduleClient {
+  listSessions(query: {
+    from: string
+    to: string
+    groupId?: string
+    coachPersonId?: string
+  }): Promise<SessionRow[]>
+  getSchedule(groupId: string): Promise<ScheduleRule[]>
+  putSchedule(
+    groupId: string,
+    body: { rules: ScheduleRule[]; effective_from: string; apply: boolean },
+  ): Promise<ImpactPreview>
+  listTrainingYears(): Promise<TrainingYear[]>
+  listClosures(trainingYearId: string): Promise<Closure[]>
+  createClosure(body: Omit<Closure, 'id'>): Promise<{ sessions_cancelled: number }>
+  listHolidayPresets(year: number): Promise<HolidayPreset[]>
+}
+
+const API = '/api/v1'
+
+async function json<T>(response: Response): Promise<T> {
+  if (!response.ok) throw new Error(String(response.status))
+  return (await response.json()) as T
+}
+
+export function makeScheduleClient(fetcher: Fetcher): ScheduleClient {
+  return {
+    async listSessions({ from, to, groupId, coachPersonId }) {
+      const params = new URLSearchParams({ from, to })
+      if (groupId) params.set('group_id', groupId)
+      if (coachPersonId) params.set('coach_person_id', coachPersonId)
+      const body = await json<{ items: SessionRow[] }>(
+        await fetcher(`${API}/sessions?${params.toString()}`),
+      )
+      return body.items
+    },
+    async getSchedule(groupId) {
+      const body = await json<{ rules: ScheduleRule[] }>(
+        await fetcher(`${API}/groups/${groupId}/schedule`),
+      )
+      return body.rules
+    },
+    async putSchedule(groupId, body) {
+      return json<ImpactPreview>(
+        await fetcher(`${API}/groups/${groupId}/schedule`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        }),
+      )
+    },
+    async listTrainingYears() {
+      const body = await json<{ items: TrainingYear[] }>(await fetcher(`${API}/training-years`))
+      return body.items
+    },
+    async listClosures(trainingYearId) {
+      const body = await json<{ items: Closure[] }>(
+        await fetcher(`${API}/closures?training_year_id=${trainingYearId}`),
+      )
+      return body.items
+    },
+    async createClosure(body) {
+      return json<{ sessions_cancelled: number }>(
+        await fetcher(`${API}/closures`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        }),
+      )
+    },
+    async listHolidayPresets(year) {
+      return json<HolidayPreset[]>(await fetcher(`${API}/holiday-presets?year=${year}`))
+    },
+  }
+}
+
+/** `t()` returns the raw string; the `{{count}}` convention is filled here. */
+export function fill(template: string, values: Record<string, string | number>): string {
+  return template.replace(/\{\{(\w+)\}\}/g, (whole, key) =>
+    key in values ? String(values[key]) : whole,
+  )
+}
+
+/**
+ * D-M2-3 — a cancellation the server generated writes `system:schedule_change` or
+ * `system:closure`; a manager's reason is the text they typed. Mapping the tokens here is
+ * what keeps `app/` free of a second Hebrew string table §9 cannot reach.
+ */
+export function cancelReasonLabel(locale: Locale, reason: string | null): string {
+  if (!reason) return ''
+  if (reason === 'system:schedule_change')
+    return t(locale, 'schedule.session.cancelReason.scheduleChange')
+  if (reason === 'system:closure') return t(locale, 'schedule.session.cancelReason.closure')
+  return reason
+}
