@@ -10,6 +10,11 @@ RUN pip install --no-cache-dir -r requirements-dev.txt
 
 COPY app ./app
 
+# app/core/cors.py resolves this as parents[2] and reads it at import, so a missing file
+# is not a degraded allowlist -- it is a container that cannot boot. Copied as the single
+# file rather than infra/ so the runtime image carries no runbook and no jobs.json.
+COPY infra/railway/domains.json ./infra/railway/domains.json
+
 ENV PORT=8000
 EXPOSE 8000
 
