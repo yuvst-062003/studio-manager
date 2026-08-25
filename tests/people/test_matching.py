@@ -32,13 +32,15 @@ from app.services.people.matching import (
 #: negative tests exist to rule out.
 
 
-def _identity(app_session, *, email: str | None, verified: bool) -> uuid.UUID:
+def _identity(
+    app_session, *, email: str | None, verified: bool, private_relay: bool = False
+) -> uuid.UUID:
     row = AuthIdentity(
         provider="fake",
         provider_subject=f"s-{uuid.uuid4()}",
         email=email,
         email_verified=verified,
-        is_private_relay=False,
+        is_private_relay=private_relay,
     )
     app_session.add(row)
     app_session.flush()
@@ -83,6 +85,18 @@ def test_a_person_with_no_login_never_matches_on_email(app_session, studio):
     assert match_person(app_session, email=email) is None
 
 
+def test_an_apple_private_relay_address_never_matches(app_session, studio):
+    """§5.2: 'Apple's private-relay addresses are stored as-is and never used for
+    matching.' A relay address is a per-app alias Apple mints on the parent's behalf, not
+    an address the parent actually reads -- matching on one would let the alias attach
+    children to an account that never confirmed it."""
+    email = f"relay-{uuid.uuid4().hex[:8]}@privaterelay.appleid.com"
+    identity = _identity(app_session, email=email, verified=True, private_relay=True)
+    _person(app_session, studio, email=email, auth_identity_id=identity)
+
+    assert match_person(app_session, email=email) is None
+
+
 def test_a_phone_matches_across_formatting(app_session, studio):
     # A fresh 9-digit local number each run, so this test's phone can never collide with
     # another run's still-durable row. Both variants below normalize to the same digits.
@@ -98,10 +112,26 @@ def test_a_phone_matches_across_formatting(app_session, studio):
     assert match.matched_on == "phone"
 
 
+def test_a_person_with_no_login_never_matches_on_phone(app_session, studio):
+    """The phone-side mirror of `test_a_person_with_no_login_never_matches_on_email`.
+    §5.2 has no phone-verification provider in v1, so the proxy for 'verified' is 'this
+    Person has a login' -- a pre-created Person's phone is a manager's typing, exactly
+    like a pre-created Person's email, and matching on it would attach a child to
+    whichever account first claims that number."""
+    local9 = f"5{uuid.uuid4().int % 10**8:08d}"
+    raw = "0" + local9
+    _person(app_session, studio, phone=raw, auth_identity_id=None)
+
+    assert match_person(app_session, phone=raw) is None
+
+
 def test_a_genuinely_new_family_matches_nobody(app_session, studio):
     """§5.4a: 'None is a genuinely new family, and that is the common case rather than an
     error.'"""
-    assert match_person(app_session, email="nobody@example.invalid", phone="0500000000") is None
+    email = f"nobody-{uuid.uuid4().hex[:8]}@example.invalid"
+    local9 = f"5{uuid.uuid4().int % 10**8:08d}"
+    phone = "0" + local9
+    assert match_person(app_session, email=email, phone=phone) is None
 
 
 def test_matching_never_reaches_another_studio(app_session, studio):
