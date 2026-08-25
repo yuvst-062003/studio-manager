@@ -13,11 +13,12 @@ malformed token, or that left stale state behind after a failed verification, wo
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 from typing import Annotated
 
 import pytest
 from app.core.auth_context import AuthContextMiddleware
+from app.core.clock import now
 from app.core.config import settings
 from app.core.tenancy import studio_id_from_request
 from app.services.identity.tokens import AccessClaims, mint_access_token
@@ -26,10 +27,18 @@ from fastapi.testclient import TestClient
 from pydantic import SecretStr
 from tests.conftest import TEST_JWT_KEY
 
-T0 = datetime(2026, 8, 25, 12, 0, tzinfo=UTC)
 
-
+# Every token here is anchored on `now()` rather than on a fixed instant, and that is
+# load-bearing. The middleware verifies `exp` against `app.core.clock.now()`, and the probe
+# app below mounts AuthContextMiddleware WITHOUT DevClockMiddleware -- there is no X-Dev-Now
+# to shift, so `now()` is the real wall clock. A token anchored at a hardcoded datetime is
+# therefore valid for the fifteen real minutes that follow it and expired for the rest of
+# history: this file was written green and went red the same afternoon, with four tests
+# reporting 401 for reasons that had nothing to do with the wiring they assert. Anchoring on
+# the one clock the middleware reads is what makes them deterministic -- and keeps them
+# correct under a shift, which a `datetime.now()` here would not.
 def _token(**overrides: object) -> str:
+    at = now()
     base: dict[str, object] = {
         "identity_id": uuid.uuid4(),
         "person_id": uuid.uuid4(),
@@ -39,8 +48,8 @@ def _token(**overrides: object) -> str:
         "is_developer": False,
         "studio_is_demo": False,
         "is_platform_admin": False,
-        "issued_at": T0,
-        "expires_at": T0 + timedelta(minutes=15),
+        "issued_at": at,
+        "expires_at": at + timedelta(minutes=15),
     }
     return mint_access_token(
         AccessClaims(**{**base, **overrides}),  # type: ignore[arg-type]
@@ -100,7 +109,7 @@ def test_an_expired_token_grants_nothing(probe):
     """5.2's fifteen minutes are enforced here too, not only in the token module: a
     middleware that verified the signature and skipped the clock would accept a
     year-old token."""
-    expired = _token(issued_at=T0 - timedelta(days=400), expires_at=T0 - timedelta(days=399))
+    expired = _token(issued_at=now() - timedelta(days=400), expires_at=now() - timedelta(days=399))
     body = probe.get("/probe", headers={"Authorization": f"Bearer {expired}"}).json()
     assert body["identity_id"] == "None"
 
@@ -116,8 +125,8 @@ def test_a_token_signed_with_another_key_grants_nothing(probe):
             is_developer=True,
             studio_is_demo=True,
             is_platform_admin=True,
-            issued_at=T0,
-            expires_at=T0 + timedelta(minutes=15),
+            issued_at=now(),
+            expires_at=now() + timedelta(minutes=15),
         ),
         key="the-attackers-key-also-32-bytes!!!!",
     )
