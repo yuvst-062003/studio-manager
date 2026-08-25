@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, Query, Request, status
 
 from app.core.auth_context import AnyStaff, ManagerOrOwner
 from app.core.clock import now
@@ -30,14 +30,33 @@ from app.schemas.schedule import (
     ClosurePage,
     GenerateSessionsOut,
     HolidayPresetOut,
+    ScheduleImpactPreview,
+    SchedulePutIn,
+    ScheduleRuleOut,
+    ScheduleRulesOut,
     TrainingYearCreate,
     TrainingYearOut,
     TrainingYearPage,
 )
 from app.services.schedule.holidays import presets_for_year
+from app.services.schedule.rules import jerusalem_date
 from app.services.schedule.service import ConflictError, NotFoundError, ScheduleService
 
 router = APIRouter(tags=["schedule"])
+
+
+def _actor(request: Request) -> tuple[uuid.UUID | None, uuid.UUID | None]:
+    """The audit actor, read from the verified claims the auth middleware wrote.
+
+    Copied from `app/routers/studio.py` rather than imported: a cross-router import for
+    six lines would couple two lanes' files for no gain.
+    """
+    person_id = getattr(request.state, "person_id", None)
+    identity_id = getattr(request.state, "identity_id", None)
+    return (
+        person_id if isinstance(person_id, uuid.UUID) else None,
+        identity_id if isinstance(identity_id, uuid.UUID) else None,
+    )
 
 
 def _not_found() -> HTTPException:
@@ -193,3 +212,57 @@ def generate_sessions(
     return GenerateSessionsOut(
         training_year_id=training_year_id, groups=groups, sessions_created=created
     )
+
+
+# -- the weekly rules, and §5.6's impact preview -------------------------------
+@router.get("/groups/{group_id}/schedule", response_model=ScheduleRulesOut)
+def get_group_schedule(
+    _: AnyStaff, group_id: uuid.UUID, session: TenantSessionDep
+) -> ScheduleRulesOut:
+    service = ScheduleService(session)
+    try:
+        service.require_group(group_id)
+    except NotFoundError as exc:
+        raise _not_found() from exc
+    rows = service.live_rules(group_id, on=jerusalem_date(now()))
+    return ScheduleRulesOut(
+        group_id=group_id,
+        rules=[ScheduleRuleOut.model_validate(r, from_attributes=True) for r in rows],
+    )
+
+
+@router.put("/groups/{group_id}/schedule", response_model=ScheduleImpactPreview)
+def put_group_schedule(
+    _: ManagerOrOwner,
+    group_id: uuid.UUID,
+    body: SchedulePutIn,
+    request: Request,
+    session: TenantSessionDep,
+    idempotency_key: IdempotencyKey = None,
+) -> ScheduleImpactPreview:
+    """§7 — 'PUT returns an impact preview before applying.'
+
+    One endpoint serves both halves because `apply` is the only difference, and defaulting
+    it to `false` means a caller that forgets the field gets a preview rather than an
+    unreviewed rewrite of a whole training year.
+    """
+    service = ScheduleService(session)
+    at = now()
+    try:
+        if not body.apply:
+            return service.preview_schedule_change(
+                group_id, rules=body.rules, effective_from=body.effective_from, at=at
+            )
+        person_id, identity_id = _actor(request)
+        preview = service.apply_schedule_change(
+            group_id,
+            rules=body.rules,
+            effective_from=body.effective_from,
+            at=at,
+            actor_person_id=person_id,
+            actor_identity_id=identity_id,
+        )
+    except NotFoundError as exc:
+        raise _not_found() from exc
+    session.commit()
+    return preview

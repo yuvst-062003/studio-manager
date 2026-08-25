@@ -18,11 +18,13 @@ and reminder test in this product depends on.
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
 from datetime import UTC, date, datetime, timedelta
 
 from sqlalchemy import Select, select
 from sqlalchemy.orm import Session as OrmSession
 
+from app.models.people import Enrollment
 from app.models.schedule import (
     GroupScheduleRule,
     Session,
@@ -30,8 +32,27 @@ from app.models.schedule import (
     TrainingYear,
 )
 from app.models.structure import Group
-from app.services.schedule.impact import SYSTEM_CANCEL_CLOSURE
-from app.services.schedule.rules import ClosureSpec, RuleSpec, expand_rules, jerusalem_date
+from app.schemas.schedule import (
+    ProtectedSessionOut,
+    ScheduleImpactPreview,
+    ScheduleRuleIn,
+)
+from app.services.audit import AuditService
+from app.services.schedule.impact import (
+    SYSTEM_CANCEL_CLOSURE,
+    SYSTEM_CANCEL_SCHEDULE_CHANGE,
+    ChangePlan,
+    ExistingSession,
+    plan_change,
+    students_left_unscheduled,
+)
+from app.services.schedule.rules import (
+    ClosureSpec,
+    RuleSpec,
+    expand_rules,
+    jerusalem_date,
+    rule_weekdays,
+)
 
 
 class NotFoundError(LookupError):
@@ -104,7 +125,7 @@ class ScheduleService:
             for r in rows
         ]
 
-    def _require_group(self, group_id: uuid.UUID) -> Group:
+    def require_group(self, group_id: uuid.UUID) -> Group:
         row = self.session.get(Group, group_id)
         if row is None:
             raise NotFoundError(str(group_id))
@@ -168,7 +189,7 @@ class ScheduleService:
         session is `apply_schedule_change`'s job, and keeping the two apart is what makes
         "only the future is rewritten" a property of one function rather than a habit.
         """
-        self._require_group(group_id)
+        self.require_group(group_id)
         years = list(self.session.execute(select(TrainingYear)).scalars().all())
         closures = [spec for year in years for spec in self.closure_specs(year.id)]
         occurrences = expand_rules(self.rule_specs(group_id), from_date, to_date, closures)
@@ -369,3 +390,268 @@ class ScheduleService:
             after = len(self.materialize_sessions(group.id, year.starts_on, year.ends_on))
             created += after - before
         return len(groups), created
+
+    # -- §5.6's impact preview, and the change itself ------------------------------
+    def live_rules(self, group_id: uuid.UUID, *, on: date) -> list[GroupScheduleRule]:
+        rows = (
+            self.session.execute(
+                select(GroupScheduleRule)
+                .where(GroupScheduleRule.group_id == group_id)
+                .order_by(GroupScheduleRule.weekday, GroupScheduleRule.start_time)
+            )
+            .scalars()
+            .all()
+        )
+        return [
+            r
+            for r in rows
+            if r.effective_from <= on and (r.effective_to is None or r.effective_to >= on)
+        ]
+
+    def _enrollment_patterns(self, group_id: uuid.UUID) -> list[tuple[uuid.UUID, list[int] | None]]:
+        """C12's input: one `(student_id, attends_weekdays)` pair per **active** enrollment.
+
+        `app/models/people.py` is lane PEOPLE's file and is read, never written, from here.
+        The intersection itself is not reimplemented — `students_left_unscheduled` reads
+        through `app/services/people/attendance_pattern.py`, the seam W2's contract commit
+        landed so both lanes share one definition of "expected".
+        """
+        rows = self.session.execute(
+            select(Enrollment.student_id, Enrollment.attends_weekdays).where(
+                Enrollment.group_id == group_id,
+                Enrollment.status == "active",
+                Enrollment.ended_on.is_(None),
+            )
+        ).all()
+        return [(student_id, attends) for student_id, attends in rows]
+
+    @staticmethod
+    def change_window_start(effective_from: date, at: datetime) -> date:
+        """The first date a schedule change actually bites.
+
+        **Not simply the date the manager typed.** §5.6 rewrites only sessions with
+        `starts_at > now()`, so a change dated back to the start of the training year still
+        begins having effect today — and the rule rows have to say the same thing the
+        sessions do. Deriving it in one place is what keeps the preview and the apply from
+        disagreeing about which day that is.
+        """
+        return max(effective_from, jerusalem_date(at))
+
+    @staticmethod
+    def _specs_from_input(rules: Sequence[ScheduleRuleIn], effective_from: date) -> list[RuleSpec]:
+        """The manager's date, not `window_start`.
+
+        **Setting a schedule and changing one are different operations sharing an
+        endpoint.** §5.6 says both: "when a group's schedule is set, sessions are generated
+        for the entire training year", and "changing a rule rewrites only sessions with
+        `starts_at > now()`". The rule row therefore covers the whole period the manager
+        named — so a later full materialize can fill in September for a club that set its
+        schedule in November — while the *rewrite* of sessions that already exist stays
+        future-only, because that restriction lives in `plan_change` and nowhere else.
+        """
+        return [
+            RuleSpec(
+                weekday=r.weekday,
+                start_time=r.start_time,
+                end_time=r.end_time,
+                location_id=r.location_id,
+                effective_from=max(r.effective_from, effective_from),
+                effective_to=None,
+                rule_id=None,
+            )
+            for r in rules
+        ]
+
+    def rules_not_closed_before(self, group_id: uuid.UUID, on: date) -> list[GroupScheduleRule]:
+        """Every rule still in force on `on` **or starting after it**.
+
+        Wider than `live_rules` on purpose: a change dated from September supersedes a rule
+        somebody dated to start in January too, and leaving that one behind would give the
+        group two live rules on the same weekday from January onward — which the next full
+        materialize would turn into two sessions a week.
+        """
+        rows = (
+            self.session.execute(
+                select(GroupScheduleRule).where(GroupScheduleRule.group_id == group_id)
+            )
+            .scalars()
+            .all()
+        )
+        return [r for r in rows if r.effective_to is None or r.effective_to >= on]
+
+    def _preview(
+        self,
+        group_id: uuid.UUID,
+        *,
+        specs: Sequence[RuleSpec],
+        effective_from: date,
+        at: datetime,
+    ) -> tuple[ScheduleImpactPreview, ChangePlan]:
+        year = self.active_training_year()
+        window_start = self.change_window_start(effective_from, at)
+        desired = expand_rules(specs, window_start, year.ends_on, self.closure_specs(year.id))
+        existing = [
+            ExistingSession(
+                id=row.id,
+                starts_at=row.starts_at,
+                ends_at=row.ends_at,
+                location_id=row.location_id,
+                status=row.status,
+                is_manually_edited=row.is_manually_edited,
+                is_ad_hoc=row.is_ad_hoc,
+            )
+            for row in self.sessions_between(group_id, year.starts_on, year.ends_on)
+        ]
+        plan = plan_change(existing, desired, now=at, effective_from=window_start)
+        stranded = students_left_unscheduled(
+            self._enrollment_patterns(group_id), rule_weekdays(specs, window_start)
+        )
+        preview = ScheduleImpactPreview(
+            sessions_to_create=len(plan.to_create),
+            sessions_to_update=len(plan.to_update),
+            sessions_to_cancel=len(plan.to_cancel),
+            sessions_protected_past=len(plan.protected_past),
+            sessions_protected_manually_edited=len(plan.protected_manually_edited),
+            sessions_protected_ad_hoc=len(plan.protected_ad_hoc),
+            first_affected_date=plan.first_affected_date,
+            protected_manually_edited_sessions=[
+                ProtectedSessionOut(id=p.id, starts_at=p.starts_at, ends_at=p.ends_at)
+                for p in plan.protected_manually_edited
+            ],
+            students_left_unscheduled=stranded,
+        )
+        return preview, plan
+
+    def preview_schedule_change(
+        self,
+        group_id: uuid.UUID,
+        *,
+        rules: Sequence[ScheduleRuleIn],
+        effective_from: date,
+        at: datetime,
+    ) -> ScheduleImpactPreview:
+        """§5.6's dialog. **Writes nothing** — that is the entire contract."""
+        self.require_group(group_id)
+        preview, _ = self._preview(
+            group_id,
+            specs=self._specs_from_input(rules, effective_from),
+            effective_from=effective_from,
+            at=at,
+        )
+        return preview
+
+    def apply_schedule_change(
+        self,
+        group_id: uuid.UUID,
+        *,
+        rules: Sequence[ScheduleRuleIn],
+        effective_from: date,
+        at: datetime,
+        actor_person_id: uuid.UUID | None = None,
+        actor_identity_id: uuid.UUID | None = None,
+    ) -> ScheduleImpactPreview:
+        """Close the old rules, open the new ones, rewrite **only** the future.
+
+        The rules are inserted first and the plan recomputed against the saved rows, rather
+        than the created sessions being stamped from a map built by hand. Nothing about the
+        plan changes — the same dates, the same times — except that each occurrence now
+        carries the `rule_id` it came from, which is what makes a session traceable back to
+        the rule that produced it. Building that mapping by matching on (weekday, time,
+        location) would be the same answer reached by a route that can go wrong.
+        """
+        group = self.require_group(group_id)
+        year = self.active_training_year()
+        closes_on = effective_from - timedelta(days=1)
+
+        # §4.3 — versioned by date, never edited in place. A rule rewritten in place has
+        # already destroyed the "before" the preview exists to show.
+        #
+        # Two cases, and collapsing them is what breaks the check constraint. A rule whose
+        # own start is on or after the change's date is **entirely** superseded: closing it
+        # at `effective_from - 1` would end it before it began, which
+        # `ck_group_schedule_rule_effective_range` refuses outright. That is a manager
+        # correcting a schedule dated from the same day — the commonest edit there is — so
+        # the old row is deleted rather than mangled. Its past sessions keep their times
+        # (they are protected) and lose `generated_from_rule_id` through the FK's SET NULL,
+        # which is honest: the rule that produced them no longer exists.
+        #
+        # Otherwise the old rule closes the day before the new one opens: contiguous, no
+        # overlap, so a later full materialize cannot generate two sessions a week.
+        for existing_rule in self.rules_not_closed_before(group_id, effective_from):
+            if existing_rule.effective_from > closes_on:
+                self.session.delete(existing_rule)
+            else:
+                existing_rule.effective_to = closes_on
+        self.session.flush()
+        # The FK's SET NULL fired in the database, not in the identity map.
+        self.session.expire_all()
+
+        for spec in self._specs_from_input(rules, effective_from):
+            self.session.add(
+                GroupScheduleRule(
+                    group_id=group_id,
+                    weekday=spec.weekday,
+                    start_time=spec.start_time,
+                    end_time=spec.end_time,
+                    location_id=spec.location_id,
+                    effective_from=spec.effective_from,
+                    effective_to=None,
+                    created_at=at,
+                )
+            )
+        self.session.flush()
+
+        saved = [spec for spec in self.rule_specs(group_id) if spec.effective_to is None]
+        preview, plan = self._preview(group_id, specs=saved, effective_from=effective_from, at=at)
+
+        by_id = {
+            row.id: row for row in self.sessions_between(group_id, year.starts_on, year.ends_on)
+        }
+        for occurrence in plan.to_create:
+            self.session.add(
+                Session(
+                    group_id=group_id,
+                    training_year_id=year.id,
+                    starts_at=occurrence.starts_at,
+                    ends_at=occurrence.ends_at,
+                    location_id=occurrence.location_id,
+                    status="scheduled",
+                    is_manually_edited=False,
+                    generated_from_rule_id=occurrence.rule_id,
+                    is_ad_hoc=False,
+                    created_at=at,
+                )
+            )
+        for session_id, occurrence in plan.to_update:
+            row = by_id[session_id]
+            row.starts_at = occurrence.starts_at
+            row.ends_at = occurrence.ends_at
+            row.location_id = occurrence.location_id
+            row.generated_from_rule_id = occurrence.rule_id
+        for session_id in plan.to_cancel:
+            row = by_id[session_id]
+            row.status = "cancelled"
+            row.cancel_reason = SYSTEM_CANCEL_SCHEDULE_CHANGE
+
+        AuditService.record(
+            self.session,
+            action="group.schedule.changed",
+            entity_type="group",
+            entity_id=group.id,
+            studio_id=group.studio_id,
+            actor_person_id=actor_person_id,
+            actor_identity_id=actor_identity_id,
+            # Counts and dates only. A year's worth of session ids in an append-only table
+            # is a row nobody can ever prune, and the counts are what an auditor asks for.
+            diff={
+                "effective_from": effective_from.isoformat(),
+                "created": len(plan.to_create),
+                "updated": len(plan.to_update),
+                "cancelled": len(plan.to_cancel),
+                "protected_past": len(plan.protected_past),
+                "protected_manually_edited": len(plan.protected_manually_edited),
+                "students_left_unscheduled": preview.students_left_unscheduled,
+            },
+        )
+        self.session.flush()
+        return preview
