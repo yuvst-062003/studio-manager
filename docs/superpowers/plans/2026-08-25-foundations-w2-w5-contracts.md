@@ -434,7 +434,7 @@ where `IpnVerdict` is `success | amount_mismatch | forged_ref | duplicate`.
 > and notes the ▲ D9 corrections where they apply (`2b` chat cut, `7c` weight column cut, `12f`
 > retitled) and the D12 correction on `4h`'s `בוטל` chip.
 
-- [ ] **Step 1:** Specs for W2's artboards — `9a`, `9b`, `1d`, `3a`, `6a`, `4b`, `12b`;
+- [x] **Step 1:** Specs for W2's artboards — `9a`, `9b`, `1d`, `3a`, `6a`, `4b`, `12b`;
       `13a`–`13c`, `12j`, `12g`, `12i`, `2c`, `11b`, `9c`, `9h`, `3b`, `3c`, `4a`, `6c`.
 - [ ] **Step 2:** W3's — `2a`, `12a`, `1c`, `9f`, `9g`, `2d`, `4c`, `1e`, `12c`, `4e`.
 - [ ] **Step 3:** W4's — `1b`, `12e`, `12f`, `11a`, `3e`, `5a`, `5e`; `12d`, `12h`, `7d`, `9d`,

@@ -1,0 +1,142 @@
+# `13a` — דף נחיתה · the public trial-lesson page, mobile
+
+| | |
+|---|---|
+| **Surface** | Parent app, **public and unauthenticated** · 390×1935, full scroll |
+| **Canvas** | `docs/design/canvas/01-parent-app/Parent App.dc.html` |
+| **Wave · lane** | W2 · **M3 People & funnel** |
+| **i18n namespace** | `people` |
+| **Slot** | none |
+
+§5.4's public link. Its **only** job is a first lesson — nothing here promises a place, because
+enrolment is always a manager decision. The desktop rendering is [`13c`](13c-parent-landing-desktop.md);
+the confirmation is [`13b`](13b-parent-trial-confirmed.md).
+
+This is not the logged-in app shell: no nav, no tab bar, no back control.
+
+## Regions, in scroll order
+
+1. **Hero band** — inverted ground. Brand row (mark · club name · phone) · two-line headline ·
+   subheadline · a seven-segment belt strip with a caption.
+2. **Stats strip** — three tiles on a light band.
+3. **"How a trial lesson looks"** — heading + three numbered items.
+4. **"When you can come"** — heading + subtext + a card of three **read-only** group rows.
+5. **Reservation form card** — heading + subtext · child's name · age + parent's name (2-up) ·
+   phone · a "when suits you" chip group · submit · disclaimer.
+6. **Location card** — heading + address · a map placeholder · two buttons.
+7. **Footer band** — inverted ground. Club identity + the one-free-trial disclaimer.
+
+### The picker is one control, not two
+
+The "when you can come" card (region 4) is **informational only** — its rows carry no pointer
+affordance and no selected state. The only picker is the **chip group inside the form**, where each
+chip encodes day + time and sometimes a group hint. Do not build a two-step group→slot flow; the
+canvas has a one-step slot picker with the group folded into the label.
+
+Chip states: selected (ink fill) · unselected (outline) · **waitlist** (dashed `--pending` border,
+`--pending` text) · plus a "call me instead" escape hatch styled as unselected.
+
+## States
+
+| State | What renders |
+|---|---|
+| **No slots in this group** | **Not drawn.** `people.landing.noSlots` and `landing.noSlotsHint` exist for it. |
+| **Loading** | **Not drawn.** |
+| **Submitting** | **Not drawn** on the button. `people.landing.submitting` exists. |
+| **Validation error** | **Not drawn** on any field. |
+| **Submit failure** | **Not drawn**, and `13b` has no sad-path twin — so the failure has to live here, inline. |
+| **Group full** | Drawn as informational text on the group row, and as the waitlist chip variant. |
+
+**There is no sign-in affordance anywhere on this artboard.** No login, no "already registered".
+That matters: `people.landing.signInFirst` and `landing.signInHint` exist, and §5.4 is explicit that
+the flow is sign-in-first *so the parent can follow the lesson in the app*. **The canvas and the
+spec disagree** — see findings.
+
+## Tokens by role
+
+| Role | Token | Where |
+|---|---|---|
+| Ground | `--ground` | the page |
+| Ground, inverted | `--fg` | the hero and footer bands |
+| On-inverted | `--on-fg` (and reduced-opacity variants) | text on those bands |
+| Surface | `--surface` | the three cards and the stats band |
+| Ink | `--fg` | headlines, submit fill, selected chip fill |
+| Secondary text | `--text-secondary` | descriptions, subheadlines, stat captions, disclaimers |
+| Muted text | `--text-muted` | form labels and placeholders — **at D8's floor, with zero headroom** |
+| Semantic — full / waitlist | `--pending` | the "full" label and the waitlist chip's border |
+| Belt | `belt_rank.color_hex` via `BeltBar` | the hero strip; the group rows' accent bars |
+
+**The hero band uses three different opacities of on-inverted text.** Pick one role per job rather
+than three near-values. No D8-retired grey appears.
+
+> **▲ D7 — the hero belt strip carries no ring on any segment**, white included, and the group rows
+> ring only their first swatch. `BeltBar` rings unconditionally.
+>
+> **▲ Two belt palettes.** The hero strip and the group rows use *different hexes for the same
+> belts*. The strip's colours are lighter throughout, and its final segment — captioned "black" —
+> is drawn as a near-white cream. That last one is a design-file bug; the rest is palette drift.
+> Belt colour is `belt_rank.color_hex`, per-studio **data** (D3, §5.9). Render both from the same
+> source; do not transcribe either set.
+
+## RTL
+
+- **The hero belt strip's DOM order is already correct**: white first renders at the reading start
+  under `dir="rtl"`, matching the caption "from white to black". **Do not reverse the array to
+  "fix" apparent order** — that would break it.
+- The numbered badges and the group rows' accent bars sit at the logical start. Use
+  `margin-inline-start`, never `margin-left`.
+- **Must not mirror:** both phone numbers, all times, the stat digits, the age ranges. Each is a
+  numeral run inside a Hebrew sentence and needs bidi isolation so the digits do not reorder.
+- No back or forward chevron exists here — this page has no in-app navigation.
+
+## Primitives
+
+| Part | Primitive | Notes |
+|---|---|---|
+| The three cards | `Card` | |
+| Four form fields | `TextField` | `label`, `hint`, `error`. The phone field is drawn in an emphasised state — that is `TextField`'s focused or filled state, not a separate component. |
+| Submit, navigate, WhatsApp | `Button` | `primary` and `secondary`. |
+| Slot chip group | *feature-specific* | Single-select, **wrapping**, with a third "waitlist" visual state. `SegmentedControl` takes a flat `options` list and renders one track — it does not wrap and has no per-option variant. Build `SlotChips`. |
+| Hero belt strip | `BeltBar` | If `BeltBar` can render a full ladder with no "current" marker. If not, that is a variant to add, **not** a reason to draw bare swatches. |
+| Hero, stats, steps, group rows, map, footer | *feature-specific* | Marketing composition. `StudentRow` does not fit the group rows — those are anonymous public schedule rows, not enrolled students. |
+
+## Strings → keys
+
+| On screen | Key | Status |
+|---|---|---|
+| headline / subheadline | `people.landing.title` (`שיעור ניסיון חינם`) / `landing.subtitle` | **Wording differs** on both, and the artboard splits the headline across two lines with a `<br>`. A translated string cannot carry a line break; the layout must. |
+| `מסלול החגורות במועדון — מלבנה עד שחורה` | `events.belt.title` (`מערכת חגורות`) | **Cross-namespace (M7)** and wording differs. |
+| the three stat captions | — | **No keys.** Marketing copy with interpolated numbers. Finding. |
+| `איך נראה שיעור ניסיון` + three steps | — | **No keys.** Six strings. Finding. |
+| `מתי אפשר להגיע` | `people.landing.chooseSlot` (`בחירת מועד`) | Wording differs; the concept matches. |
+| `בחרו קבוצה לפי גיל — הזמנים קבועים כל שבוע.` | `people.landing.chooseGroup` | Wording differs. |
+| `גילאי 5–7` | `people.landing.ageRange` (`גילאים`) | The label exists; the range is data. |
+| `ראשון וחמישי · 16:00` | `people.landing.weeklySchedule` (`מתאמנים בימים`) | The label exists; the composed line does not. |
+| `6 מקומות` / `מלאה` | — | **No key.** §5.4 makes capacity near-irrelevant (children enrol, they do not book) yet the public page shows remaining places. Worth confirming that is intended. |
+| `נשמור לכם מקום` | — | **No key** for the form heading. |
+| `שם הילד` | `people.student.firstName` (`שם פרטי`) | Wording differs. |
+| `גיל` | `people.student.age` | exact |
+| `שם ההורה` | `people.guardian.one` (`הורה`) | Needs a name-of-parent key. |
+| `טלפון` | `people.student.phone` | exact |
+| `מתי נוח לכם` | `people.landing.chooseSlot` | Wording differs. |
+| `17:00 — רשימת המתנה` | — | **No waitlist key anywhere.** Finding. |
+| `שתדברו איתי` | — | **No key.** |
+| `שריון מקום לשיעור ניסיון` | `people.landing.submit` (`שריון מקום לשיעור`) | Near-exact. |
+| the disclaimer under submit | — | **No key**, and it makes two promises: we will contact you, and the health declaration is signed before training. The second is M4's. |
+| `איפה אנחנו` / address / `מפה` / `ניווט` / `וואטסאפ` | — | **No keys.** Five strings. |
+| the footer band | — | **No keys.** |
+
+## Findings for the lane
+
+1. **Sign-in is missing from the artboard and present in the keys.** §5.4 and `people.landing.signInFirst`
+   both say sign-in-first. The canvas shows a bare lead-capture form. One of them is wrong, and it
+   changes the whole flow. **Settle before building.**
+2. **Roughly twenty strings have no key**, almost all of them marketing copy in the hero, steps,
+   location and footer. `people` was written for the product, not the landing page. Either it grows
+   a `landing.*` block or the public page gets a decision that its copy is studio-editable content
+   rather than translated UI. That is a real question: club name, address and phone are per-studio
+   *data*, and so, arguably, is the pitch.
+3. **Two belt palettes and a black belt drawn near-white.** Render from `belt_rank.color_hex`.
+4. **No error state and no submit-failure path**, on either this screen or `13b`.
+5. **The public page shows remaining capacity**, which §5.4 says is near-irrelevant to this product.
+6. **`landing.noSlots` / `noSlotsHint` / `submitting` have keys and no drawn state.**
