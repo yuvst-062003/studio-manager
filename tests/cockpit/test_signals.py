@@ -52,9 +52,7 @@ def test_a_run_round_trips_through_disk(tmp_path, monkeypatch):
 def test_only_the_newest_run_per_command_survives(tmp_path, monkeypatch):
     monkeypatch.setattr(signals, "RUNS_DIR", tmp_path)
     for started, code in (("2026-08-25T09:00:00+00:00", 1), ("2026-08-25T09:30:00+00:00", 0)):
-        signals.save_run(
-            signals.RunRecord("pytest", (".venv/bin/pytest",), code, started, 1.0, "")
-        )
+        signals.save_run(signals.RunRecord("pytest", (".venv/bin/pytest",), code, started, 1.0, ""))
     assert signals.latest_runs()["pytest"].exit_code == 0
 
 

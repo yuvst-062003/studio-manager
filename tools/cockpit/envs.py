@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import socket
+import ssl
 import urllib.error
 import urllib.request
 from collections.abc import Callable
@@ -37,8 +38,27 @@ def targets(domains_json: dict[str, Any]) -> dict[str, str]:
     return {name: str(conf["api"]) for name, conf in domains_json.get("environments", {}).items()}
 
 
+def _ssl_context() -> ssl.SSLContext | None:
+    """A CA bundle, if one can be found without requiring a dependency.
+
+    macOS python.org builds ship no trust store -- ssl.get_default_verify_paths().cafile
+    is None -- so every HTTPS probe fails verification and staging reads `unknown`
+    forever while curl fetches the same URL fine. certifi is already present as a
+    transitive dependency, but the import is guarded: this package must still boot when
+    nothing third-party is installed, so a missing certifi falls back to the default
+    context rather than raising.
+    """
+    try:
+        import certifi
+    except ImportError:
+        return None
+    return ssl.create_default_context(cafile=certifi.where())
+
+
 def fetch_json(url: str, timeout: float) -> dict[str, Any]:
-    with urllib.request.urlopen(f"{url}/api/v1/health", timeout=timeout) as response:
+    request = f"{url}/api/v1/health"
+    context = _ssl_context() if request.startswith("https://") else None
+    with urllib.request.urlopen(request, timeout=timeout, context=context) as response:
         body: dict[str, Any] = json.loads(response.read().decode("utf-8"))
     return body
 

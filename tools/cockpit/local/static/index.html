@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Studio Manager · cockpit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;600;700&display=swap">
+<style>
+/* Values lifted from web/packages/ui/src/tokens.css. Copied, not imported: this page
+   must render when the workspace will not build, which is exactly when you need it. */
+:root{
+  --ground:#f7f5f1;--surface:#fffefb;--fg:#17150f;--on-fg:#f7f5f1;
+  --text-secondary:#55524a;--text-muted:#6f6b62;--border:#e6e1d6;--border-strong:#8d8674;
+  --accent:#1f6b3f;--on-accent:#fffefb;--debt:#b3261e;--paid:#1f6b3f;--pending:#8a5a00;
+  --cancelled-tint:#f3f2ef;--focus-ring:#2f6fa8;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --ground:#141311;--surface:#1e1d1a;--fg:#fffefb;--on-fg:#141311;
+    --text-secondary:#a8a49a;--text-muted:#8f8b82;--border:#3a3833;--border-strong:#726e65;
+    --accent:#4a9b5e;--on-accent:#141311;--debt:#ff8a7d;--paid:#4a9b5e;--pending:#e5b44f;
+    --cancelled-tint:#292825;--focus-ring:#6aa9e0;
+  }
+}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--fg);font-family:'Rubik',system-ui,-apple-system,sans-serif;font-size:14px}
+:focus-visible{outline:2px solid var(--focus-ring);outline-offset:2px}
+.chrome,.envbar{display:flex;align-items:center;gap:14px;padding:0 20px;background:var(--surface);border-bottom:1px solid var(--border)}
+.chrome{height:50px}
+.envbar{height:58px;gap:22px}
+.eyebrow{font-size:12px;font-weight:600;letter-spacing:.09em;text-transform:uppercase}
+.muted{color:var(--text-muted)}
+.sep{width:1px;height:20px;background:var(--border)}
+.grow{flex-grow:1}
+.grid{display:grid;grid-template-columns:320px minmax(0,1fr) 424px;gap:16px;padding:16px;align-items:start}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:9px;overflow:hidden}
+.card h2{margin:0;padding:13px 15px 11px;border-bottom:1px solid var(--border);font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted)}
+.row{display:flex;align-items:center;gap:10px;padding:11px 15px;border-bottom:1px solid var(--border)}
+.row:last-child{border-bottom:none}
+.tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:16px}
+.tile{display:flex;flex-direction:column;gap:6px;padding:13px 14px}
+.tile .k{font-size:10px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--text-muted)}
+.tile .v{font-size:20px;font-weight:600;line-height:1.1}
+.tile .s{font-size:11px;color:var(--text-secondary)}
+.bar{height:4px;border-radius:999px;background:var(--border);overflow:hidden}
+.bar>i{display:block;height:4px;background:var(--accent)}
+.dot{width:8px;height:8px;border-radius:50%;flex:none}
+.pill{font-size:10px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--text-muted);background:var(--cancelled-tint);border-radius:3px;padding:3px 7px;white-space:nowrap}
+button{font-family:inherit;font-size:13px;font-weight:500;border-radius:6px;padding:10px 12px;cursor:pointer;background:var(--surface);color:var(--fg);border:1px solid var(--border-strong)}
+button.primary{background:var(--accent);color:var(--on-accent);border-color:transparent}
+button[disabled]{opacity:.45;cursor:not-allowed}
+.cmds{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:0 15px 15px}
+.verts{display:flex;gap:4px;flex-wrap:wrap;padding:12px 15px}
+.vert{font-size:11px;padding:5px 10px;border-radius:999px;border:1px solid var(--border);cursor:pointer;background:transparent;color:var(--text-muted)}
+.vert[aria-pressed="true"]{background:var(--fg);color:var(--on-fg);border-color:transparent}
+#out{background:var(--fg);border-radius:9px;overflow:hidden;margin:0 16px 16px}
+#out header{display:flex;align-items:center;gap:9px;padding:11px 14px;border-bottom:1px solid #3a3833;color:var(--on-fg);font-size:12px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+#out pre{margin:0;padding:13px 14px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;line-height:1.65;color:#d9d5cc;white-space:pre-wrap;max-height:340px;overflow:auto}
+.banner{padding:11px 20px;background:var(--cancelled-tint);border-bottom:1px solid var(--border);font-size:13px;color:var(--pending)}
+</style>
+</head>
+<body>
+<div class="chrome">
+  <span class="eyebrow">Studio Manager</span><span class="eyebrow muted">cockpit</span>
+  <span class="sep"></span>
+  <span id="git" class="muted">…</span>
+  <span class="grow"></span>
+  <button id="refresh">refresh</button>
+</div>
+<div class="envbar">
+  <span class="eyebrow muted">Environments</span>
+  <span id="envs" class="muted">probing…</span>
+</div>
+<div id="stale"></div>
+<div class="grid">
+  <section class="card"><h2>Waves</h2><div id="waves"></div></section>
+  <section>
+    <div class="tiles" id="tiles"></div>
+    <div class="card"><h2>Holdbacks</h2><div id="holdbacks"></div></div>
+  </section>
+  <section>
+    <div class="card">
+      <h2>Run</h2>
+      <div class="verts" id="verts"></div>
+      <div class="cmds" id="cmds"></div>
+    </div>
+    <div id="out" hidden><header><span id="outcmd"></span><span class="grow"></span><span id="outcode"></span></header><pre id="outlog"></pre></div>
+  </section>
+</div>
+<script>
+const TOKEN = "{{TOKEN}}";
+const H = { "X-Cockpit-Token": TOKEN };
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+let vertical = "core";
+let running = false;
+
+const DOT = { up: "var(--paid)", down: "var(--debt)", unknown: "var(--pending)", not_deployed: "var(--text-muted)", local: "var(--text-muted)" };
+
+async function api(path, options) {
+  const response = await fetch(path, { ...options, headers: { ...H, ...(options?.headers || {}) } });
+  return response;
+}
+
+function renderWaves(s) {
+  $("waves").innerHTML = s.waves.map((w) => {
+    const on = w.status === "active";
+    const pieces = on ? w.pieces.map((p) =>
+      `<div style="display:flex;gap:9px;align-items:center;font-size:12px;padding:3px 0">
+         <span class="dot" style="background:${p.status === "shipped" ? "var(--paid)" : p.status === "active" ? "var(--pending)" : "transparent"};border:1px solid ${p.status === "pending" ? "var(--text-muted)" : "transparent"}"></span>
+         <span style="color:var(--text-secondary)">${esc(p.id)} ${esc(p.title)}</span>
+       </div>`).join("") : "";
+    return `<div class="row" style="flex-direction:column;align-items:stretch;gap:8px;${on ? "background:var(--cancelled-tint)" : ""}">
+      <div style="display:flex;gap:8px;align-items:baseline">
+        <b style="font-size:13px">${esc(w.id)}</b>
+        <span style="font-size:13px;${on ? "" : "color:var(--text-muted)"};flex-grow:1">${esc(w.milestone)} ${esc(w.title)}</span>
+        <span style="font-size:11px;color:${on ? "var(--pending)" : "var(--text-muted)"}">${on ? "active" : w.mode === "parallel" ? "2 lanes" : "seq"}</span>
+      </div>
+      ${on ? `<div class="bar"><i style="width:${Math.round(w.progress.done / Math.max(1, w.progress.total) * 100)}%"></i></div>${pieces}` : ""}
+    </div>`;
+  }).join("");
+}
+
+function renderTiles(s) {
+  const open = Object.values(s.holdbacks).flat();
+  const w = s.waves.find((x) => x.status === "active");
+  const runs = Object.values(s.runs);
+  const failing = runs.filter((r) => r.exit_code !== 0).length;
+  const tile = (k, v, sub, colour) =>
+    `<div class="card tile"><span class="k">${k}</span><span class="v" ${colour ? `style="color:${colour}"` : ""}>${esc(v)}</span><span class="s">${esc(sub)}</span></div>`;
+  $("tiles").innerHTML =
+    tile("Milestone", s.active.piece ? s.active.piece.id : w ? w.milestone : "—", w ? `${w.progress.done} of ${w.progress.total} pieces` : "") +
+    tile("Holdbacks", open.length, `${s.holdbacks.external.length} external`, open.length ? "var(--debt)" : null) +
+    tile("Gates", runs.length ? (failing ? "red" : "green") : "—", runs.length ? `${runs.length} recorded` : "not run here", runs.length ? (failing ? "var(--debt)" : "var(--paid)") : null) +
+    tile("Worktrees", s.git.worktrees, s.git.dirty ? "tree dirty" : "tree clean");
+}
+
+function renderHoldbacks(s) {
+  $("holdbacks").innerHTML = Object.entries(s.holdbacks).flatMap(([kind, items]) =>
+    items.map((h) => `<div class="row">
+        <span style="font-size:13px;font-weight:500;width:290px">${esc(h.title)}</span>
+        <span style="font-size:12px;color:var(--text-secondary);flex-grow:1">${esc(h.why)}</span>
+        <span class="pill">${esc(kind)}</span>
+        <span style="font-size:12px;font-weight:600;width:70px;text-align:end;color:${kind === "external" ? "var(--debt)" : "var(--text-muted)"}">${esc(h.blocks)}</span>
+      </div>`)).join("");
+}
+
+function renderCommands(s) {
+  $("verts").innerHTML = `<span style="font-size:12px;color:var(--text-secondary);align-self:center">vertical</span>` +
+    ["core", "identity", "structure", "schedule", "people", "health", "attendance", "billing", "events", "belts", "comms", "reports", "privacy"]
+      .map((v) => `<button class="vert" data-v="${v}" aria-pressed="${v === vertical}">${v}</button>`).join("");
+  $("verts").querySelectorAll(".vert").forEach((b) => b.onclick = () => { vertical = b.dataset.v; renderCommands(s); });
+  $("cmds").innerHTML = s.commands.map((c) =>
+    `<button data-c="${c.id}" ${c.id === "lane-check" ? 'class="primary"' : ""}>${esc(c.label)}</button>`).join("");
+  $("cmds").querySelectorAll("button").forEach((b) => b.onclick = () => run(b.dataset.c));
+}
+
+async function run(id, nonce) {
+  if (running) return;
+  const response = await api("/api/run", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ command: id, vertical: id === "lane-check" ? vertical : null, nonce: nonce || null }),
+  });
+  const body = await response.json();
+  if (body.error === "confirm_required") {
+    if (confirm(`${id} destroys data. Run it?`)) run(id, body.nonce);
+    return;
+  }
+  if (body.error === "busy") { alert("A run is already in flight."); return; }
+  if (body.error) { alert(`${body.error}: ${body.detail || ""}`); return; }
+  stream(id, body.run);
+}
+
+async function stream(id, runId) {
+  running = true;
+  $("out").hidden = false;
+  $("outcmd").textContent = id === "lane-check" ? `lane-check.sh ${vertical}` : id;
+  $("outcode").textContent = "running…";
+  $("outlog").textContent = "";
+  // fetch, not EventSource: EventSource cannot send headers, so using it would mean a
+  // second way to authenticate this server — a token in a URL — for one route only.
+  const response = await api(`/api/run/${runId}/stream`);
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const frames = buffer.split("\n\n");
+    buffer = frames.pop();
+    for (const frame of frames) {
+      if (!frame.startsWith("data: ")) continue;
+      const line = JSON.parse(frame.slice(6));
+      if (line.startsWith("__exit__:")) {
+        const code = line.slice(9);
+        $("outcode").textContent = `exit ${code}`;
+        $("outcode").style.color = code === "0" ? "var(--paid)" : "var(--debt)";
+      } else {
+        $("outlog").textContent += line + "\n";
+        $("outlog").scrollTop = $("outlog").scrollHeight;
+      }
+    }
+  }
+  running = false;
+  load();
+}
+
+async function load() {
+  const s = await (await api("/api/state")).json();
+  $("git").textContent = `${s.git.branch} · ${s.git.head} · ${s.git.dirty ? "dirty" : "clean"}`;
+  $("stale").innerHTML = s.staleness.is_stale
+    ? `<div class="banner">state.yaml last updated ${s.staleness.commits_behind} commit(s) ago — the numbers below may lag what has shipped.</div>` : "";
+  renderWaves(s); renderTiles(s); renderHoldbacks(s); renderCommands(s);
+}
+
+async function loadEnvs() {
+  const { envs } = await (await api("/api/envs")).json();
+  $("envs").innerHTML = envs.map((e) =>
+    `<span style="display:inline-flex;align-items:center;gap:8px;margin-inline-end:22px">
+       <span class="dot" style="background:${DOT[e.state] || "var(--text-muted)"}"></span>
+       <b style="font-size:13px;font-weight:500;color:var(--fg)">${esc(e.name)}</b>
+       <span style="font-size:12px">${esc(e.revision ? "rev " + e.revision : e.detail || e.state)}</span>
+     </span>`).join("");
+}
+
+$("refresh").onclick = () => { load(); loadEnvs(); };
+load();
+loadEnvs();
+</script>
+</body>
+</html>

@@ -83,6 +83,11 @@ a bare `python3`/`pytest` resolves to an old 3.8 interpreter earlier on PATH.
 - Health declarations contain personal data about minors. Never log their contents.
 
 ## Workflow
+- When you finish a piece of the active milestone, tick it in `docs/plan/state.yaml`
+  **in the same commit as the work**. The cockpit reads that file; a piece finished but
+  not ticked is progress nobody can see. Never write anything measurable there — no test
+  results, no branch, no environment health. Those are computed, and a declaration that
+  contradicts a measurement is how a status board stops being trusted.
 - Write a failing test before fixing a bug.
 - Typecheck and lint after a series of edits.
 - Prefer running a single test file over the whole suite.

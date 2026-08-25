@@ -3,7 +3,9 @@ never do is render a red dot for something it simply cannot see."""
 
 from __future__ import annotations
 
+import inspect
 import socket
+import ssl
 import urllib.error
 
 from tools.cockpit import envs
@@ -129,3 +131,17 @@ def test_every_state_it_can_return_is_declared():
 
     for result in envs.probe_all(envs.targets(DOMAINS), fetch, is_remote=True):
         assert result.state in envs.STATES
+
+
+def test_the_certificate_bundle_is_optional_not_required():
+    """C3 -- this package must boot with nothing third-party installed. certifi makes
+    HTTPS verification work on a macOS Python that ships no trust store, but a missing
+    certifi falls back rather than raising."""
+    context = envs._ssl_context()
+    assert context is None or isinstance(context, ssl.SSLContext)
+
+
+def test_plain_http_needs_no_context():
+    """Passing an SSL context to an http:// request is meaningless, and building one
+    costs a file read on every local probe."""
+    assert "startswith" in inspect.getsource(envs.fetch_json)

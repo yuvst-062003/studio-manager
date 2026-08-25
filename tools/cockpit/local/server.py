@@ -174,7 +174,10 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream")
         self.send_header("Cache-Control", "no-cache")
-        self.send_header("Connection", "keep-alive")
+        # close, not keep-alive: there is no Content-Length on a stream, so closing the
+        # connection is the only thing that tells the client the body has ended. With
+        # keep-alive the last frame arrives and then both curl and fetch wait forever.
+        self.send_header("Connection", "close")
         self.end_headers()
         try:
             for line in RUNNER.stream(run_id):
