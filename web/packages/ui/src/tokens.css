@@ -142,6 +142,28 @@ body {
   margin: 0;
 }
 
+/* Form controls do NOT inherit `font-family`. The UA stylesheet gives button, input,
+ * select and textarea their own, so `html { font-family: var(--font-sans) }` above
+ * reaches every element on the page except the ones a person actually operates.
+ *
+ * D6 makes Rubik the only family covering he+en+ru, so without this an un-classed
+ * <button> renders Hebrew in the system font — a different typeface for the label than
+ * for the heading above it, and for a Russian parent a fallback that may not carry base
+ * Cyrillic at all. The design-system primitives each set `font-family: inherit`
+ * themselves; this is the same rule for every control that is not one of them.
+ *
+ * Family only, deliberately: the shorthand `font: inherit` would also overwrite
+ * font-size, and a control's UA size is load-bearing for controls the token layer does
+ * not style.
+ */
+button,
+input,
+select,
+textarea,
+optgroup {
+  font-family: inherit;
+}
+
 :focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;

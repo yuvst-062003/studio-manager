@@ -91,3 +91,16 @@ describe('D6/G14 — one family, one loading strategy', () => {
     expect(fontSans).toMatch(/sans-serif/)
   })
 })
+
+describe('D6 — the family reaches the controls too', () => {
+  it('resets font-family on form controls, which do not inherit it', () => {
+    // Found by web/scripts/check-installability.mjs: the dashboard rendered only Hebrew
+    // headings and Latin BUTTON labels, so the Latin subset never loaded and the gate
+    // reported that Rubik had not loaded at all. The buttons were rendering in Arial.
+    const rule = /(^|})\s*button\s*,[^{}]*\{[^}]*font-family\s*:\s*inherit/m.exec(tokens)
+    expect(rule).not.toBeNull()
+    for (const control of ['input', 'select', 'textarea']) {
+      expect(rule?.[0]).toContain(control)
+    }
+  })
+})

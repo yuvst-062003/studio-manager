@@ -17,6 +17,7 @@ import type { Session } from '@studio/core'
 import { apiFetch } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
+import { ParentHome } from '../home/ParentHome'
 
 /** Where the staff app lives, so §6.1's second refusal is a link rather than a dead end. */
 const STAFF_APP_URL = '/staff'
@@ -90,9 +91,14 @@ export function Resolve({ session, locale }: { session: Session; locale: Locale 
   }
 
   return (
-    // §6.1's home. Steps 5 and 6 — terms and privacy, then a health declaration per
-    // child whose health_status is `missing` — are M4's blocking gates and land in front
-    // of this. M5 enriches the home itself with the day strip (artboard 2a).
-    <section data-testid="parent-home" />
+    // §6.1's home — artboard 1a, the BASE one. Steps 5 and 6 (terms and privacy, then a
+    // health declaration per child whose health_status is `missing`) are M4's blocking
+    // gates and land in FRONT of this. M5 enriches the home itself into 2a with the day
+    // strip and past attendance; neither is built here.
+    //
+    // `access.parent` IS §6.1's query — EXISTS(guardian WHERE person_id = :me) — so it is
+    // the honest input to 'do you have children here'. It answers whether and not how
+    // many: guardian.student_id has no foreign key (D-M1-1) because `student` is M3's.
+    <ParentHome locale={locale} hasChildren={session.access.parent} />
   )
 }

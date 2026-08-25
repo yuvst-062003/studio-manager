@@ -221,4 +221,20 @@ export const common: Bundle = {
   'settings.parentLocale.off': 'לא מוצג',
   'settings.defaultLocale': 'שפת ברירת מחדל',
   'settings.defaultLocaleLocked': 'שפת ברירת המחדל מוצגת תמיד',
+  // Parent artboard 1a — the BASE home. 2a is the same screen enriched with the day strip
+  // and past attendance, and belongs to M5.
+  'home.title': 'הילדים שלי',
+  'home.settings': 'הגדרות',
+  'home.upcoming': 'השיעורים הקרובים',
+  'home.alerts': 'התראות',
+  'home.noChildren': 'עדיין אין ילדים משויכים לחשבון הזה.',
+  'home.childrenComeLater': 'מנהל הסטודיו משייך ילד לחשבון בעת ההרשמה.',
+  'home.noUpcoming': 'אין עדיין שיעורים מתוזמנים.',
+  'home.upcomingComeLater': 'לוח השיעורים יופיע כאן ברגע שהמועדון יבנה את מערכת השעות.',
+  'home.noAlerts': 'אין התראות פתוחות.',
+  'home.tab.home': 'בית',
+  'home.tab.payments': 'תשלומים',
+  'home.tab.messages': 'הודעות',
+  'home.tab.profile': 'פרופיל',
+  'home.tabsComeLater': 'תשלומים, הודעות ופרופיל ייפתחו בהמשך.',
 }

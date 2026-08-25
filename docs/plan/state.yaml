@@ -80,7 +80,8 @@ waves:
         on: 2026-08-25
       - id: M1.11
         title: Parent home — artboard 1a
-        status: pending
+        status: shipped
+        on: 2026-08-25
       - id: M1.12
         title: studio_app connects as studio_app on staging
         status: pending
