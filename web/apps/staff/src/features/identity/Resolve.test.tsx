@@ -1,8 +1,14 @@
 // §6.1's staff first-launch branch, all three arms:
 //
-//   owner of a studio with no classes yet → studio setup wizard, resumable
-//   manager / coach with role assignments → 3-screen tour → offline priming → Today
-//   no role assignment anywhere           → the refusal screen
+//   owner who has not dismissed the wizard → studio setup wizard, resumable
+//   manager / coach with role assignments  → 3-screen tour → offline priming → Today
+//   no role assignment anywhere            → the refusal screen
+//
+// §6.1 words the first arm as 'owner of a studio with no classes yet', which is what this
+// file used to route on. That reading has a defect §5.1 makes visible: 'each step can be
+// skipped'. An owner who skips step 3 has no classes, so a classes-based rule throws them
+// back into the wizard on every launch, forever. `dismissed_at` is the persisted
+// signal §5.1 actually asks for, and it is what this routes on now.
 import { render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Resolve, decideOutcome } from './Resolve'
@@ -35,33 +41,50 @@ function session(over: Partial<Session> = {}): Session {
   } as Session
 }
 
-function stubClasses(items: unknown[]) {
+function stubSetup(dismissedAt: string | null, status = 200) {
   vi.stubGlobal(
     'fetch',
-    vi.fn(async () => new Response(JSON.stringify({ items }), { status: 200 })),
+    vi.fn(
+      async () =>
+        new Response(JSON.stringify({ steps: [], complete: false, dismissed_at: dismissedAt }), {
+          status,
+        }),
+    ),
   )
 }
 
 describe('decideOutcome', () => {
   it('refuses an identity with no role assignment anywhere', () => {
     // §3.1 — the staff app asks 'do you hold any role assignment?', which is a QUERY.
-    expect(decideOutcome(session({ access: { staff: false, parent: true } }), true)).toBe('refused')
+    expect(
+      decideOutcome(session({ access: { staff: false, parent: true } }), '2026-08-25T10:00:00+00:00'),
+    ).toBe('refused')
   })
 
-  it('refuses before it even asks about classes', () => {
+  it('refuses before it even asks about setup', () => {
     // The refusal does not depend on the studio's state, so it must not wait on a request
     // that will never be authorised anyway.
-    expect(decideOutcome(session({ access: { staff: false, parent: false } }), null)).toBe(
+    expect(decideOutcome(session({ access: { staff: false, parent: false } }), undefined)).toBe(
       'refused',
     )
   })
 
-  it('routes an owner with no classes to the wizard', () => {
-    expect(decideOutcome(session(), false)).toBe('wizard')
+  it('waits rather than flashing the wizard while the answer is unknown', () => {
+    expect(decideOutcome(session(), undefined)).toBe('loading')
   })
 
-  it('routes an owner whose studio already has classes to the tour', () => {
-    expect(decideOutcome(session(), true)).toBe('tour')
+  it('routes an owner who has not dismissed the wizard into it', () => {
+    expect(decideOutcome(session(), null)).toBe('wizard')
+  })
+
+  it('routes an owner who dismissed the wizard to the tour', () => {
+    expect(decideOutcome(session(), '2026-08-25T10:00:00+00:00')).toBe('tour')
+  })
+
+  it('does not re-open the wizard for an owner who SKIPPED every step', () => {
+    // The defect this rule replaces. Under 'does this studio have classes?', an owner who
+    // skipped step 3 has no classes and is thrown back in on every launch, forever.
+    expect(decideOutcome(session(), '2026-08-25T10:00:00+00:00')).toBe('tour')
   })
 
   it('never routes a coach to the wizard', () => {
@@ -70,7 +93,7 @@ describe('decideOutcome', () => {
     const coach = session({
       studios: [{ ...BASE_STUDIO, roles: ['lead_coach'] }],
     })
-    expect(decideOutcome(coach, false)).toBe('tour')
+    expect(decideOutcome(coach, null)).toBe('tour')
   })
 
   it('never routes a manager to the wizard either', () => {
@@ -79,7 +102,7 @@ describe('decideOutcome', () => {
     const manager = session({
       studios: [{ ...BASE_STUDIO, roles: ['manager'] }],
     })
-    expect(decideOutcome(manager, false)).toBe('tour')
+    expect(decideOutcome(manager, null)).toBe('tour')
   })
 })
 
@@ -95,20 +118,28 @@ describe('Resolve', () => {
     await waitFor(() => expect(screen.getByTestId('staff-refusal')).toBeInTheDocument())
   })
 
-  it('routes an owner with no classes into the wizard', async () => {
-    stubClasses([])
+  it('routes an owner who has never dismissed the wizard into it', async () => {
+    stubSetup(null)
     render(<Resolve session={session()} locale="he" wizard={<p data-testid="wizard-stub" />} />)
-    await waitFor(() => expect(screen.getByTestId('setup-wizard')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByTestId('staff-wizard')).toBeInTheDocument())
   })
 
-  it('routes an owner with classes into the tour', async () => {
-    stubClasses([{ id: 'c', name: "ג'ודו" }])
+  it('routes an owner who dismissed it into the tour', async () => {
+    stubSetup('2026-08-25T10:00:00+00:00')
     render(<Resolve session={session()} locale="he" wizard={<p data-testid="wizard-stub" />} />)
     await waitFor(() => expect(screen.getByTestId('staff-tour')).toBeInTheDocument())
   })
 
-  it('assumes the studio is set up when the question cannot be answered', async () => {
-    // §10.2 — the staff app works offline. Routing a returning coach into a setup wizard
+  it('survives the wizard being reopened by hand after a dismiss', async () => {
+    // The rail's own entry points stay reachable from Settings; what dismiss stops is the
+    // AUTO-routing, which is exactly the distinction §5.1 draws.
+    stubSetup('2026-08-25T10:00:00+00:00')
+    render(<Resolve session={session()} locale="he" wizard={<p data-testid="wizard-stub" />} />)
+    await waitFor(() => expect(screen.queryByTestId('staff-wizard')).not.toBeInTheDocument())
+  })
+
+  it('assumes the wizard was dismissed when the question cannot be answered', async () => {
+    // §10.2 — the staff app works offline. Routing a returning owner into a setup wizard
     // because their train went into a tunnel would be far worse than skipping it.
     vi.stubGlobal(
       'fetch',

@@ -383,6 +383,91 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/setup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Setup */
+        get: operations["read_setup_api_v1_setup_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/setup/dismiss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Dismiss Setup
+         * @description §5.1's exit at step 6. Stops auto-routing; says nothing about completeness.
+         */
+        post: operations["dismiss_setup_api_v1_setup_dismiss_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/setup/steps/{step_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Step */
+        patch: operations["update_step_api_v1_setup_steps__step_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/studio": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Studio
+         * @description Every staff role. Rendering the club's own name and logo is not a settings read in
+         *     the §3.2 sense, and a coach app that could not do it would be enforcing a rule about
+         *     writes by breaking a read.
+         */
+        get: operations["read_studio_api_v1_studio_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Studio
+         * @description The wizard's step 1 (פרטי מועדון) and the dashboard's הגדרות panel write through
+         *     the same route -- there is one studio row and it should have one writer.
+         *
+         *     `exclude_unset` and not `exclude_none`: the two differ for a field a client sends
+         *     explicitly as null, and treating "not mentioned" and "cleared" alike would make the
+         *     הגדרות autosave blank every field it did not happen to include.
+         */
+        patch: operations["update_studio_api_v1_studio_patch"];
+        trace?: never;
+    };
     "/api/v1/studio/logo": {
         parameters: {
             query?: never;
@@ -763,18 +848,61 @@ export interface components {
             /** Studios */
             studios: components["schemas"]["StudioMembershipOut"][];
         };
+        /**
+         * SetupProgressOut
+         * @description What all three setup routes return, so a caller never has to re-fetch.
+         *
+         *     `complete` and `dismissed_at` are separate on purpose -- SPEC §5.1 states two
+         *     different things and app/services/structure/setup.py carries the reasoning.
+         */
+        SetupProgressOut: {
+            /**
+             * Complete
+             * @description Every one of the six steps is done.
+             */
+            complete: boolean;
+            /**
+             * Dismissed At
+             * @description The owner chose an exit at step 6. Auto-routing stops.
+             */
+            dismissed_at?: string | null;
+            /** Steps */
+            steps: components["schemas"]["SetupStepOut"][];
+        };
+        /** SetupStepIn */
+        SetupStepIn: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "done" | "skipped";
+        };
+        /** SetupStepOut */
+        SetupStepOut: {
+            /** At */
+            at?: string | null;
+            /** Id */
+            id: string;
+            /** Order */
+            order: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "done" | "skipped";
+        };
         /** StudioListResponse */
         StudioListResponse: {
             /** Items */
-            items: components["schemas"]["StudioOut"][];
+            items: components["schemas"]["app__schemas__platform__StudioOut"][];
         };
         /**
          * StudioLogoOut
          * @description What POST /studio/logo returns.
          *
-         *     A URL and not a key. The key is an internal address that no client should learn, let
-         *     alone send back -- §2.5 constructs every key server-side precisely so that no request
-         *     ever carries one.
+         *     A URL and not a key. The key is an internal address no client should learn, let alone
+         *     send back -- §2.5 constructs every key server-side precisely so that no request ever
+         *     carries one.
          */
         StudioLogoOut: {
             /**
@@ -804,8 +932,47 @@ export interface components {
             /** Studio Name */
             studio_name: string;
         };
+        /**
+         * StudioUpdate
+         * @description Every field optional -- the wizard writes what the owner filled in, and the
+         *     הגדרות panel autosaves one field at a time. `exclude_unset` in the router is what
+         *     turns that into a partial write rather than a blanking one.
+         */
+        StudioUpdate: {
+            /** Address */
+            address?: string | null;
+            /** Name */
+            name?: string | null;
+            /** Parent Locales */
+            parent_locales?: string[] | null;
+            /** Phone */
+            phone?: string | null;
+            /** Sport */
+            sport?: string | null;
+        };
+        /** SwitchStudioRequest */
+        SwitchStudioRequest: {
+            /**
+             * Studio Id
+             * Format: uuid
+             */
+            studio_id: string;
+        };
+        /** ValidationError */
+        ValidationError: {
+            /** Context */
+            ctx?: Record<string, never>;
+            /** Input */
+            input?: unknown;
+            /** Location */
+            loc: (string | number)[];
+            /** Message */
+            msg: string;
+            /** Error Type */
+            type: string;
+        };
         /** StudioOut */
-        StudioOut: {
+        app__schemas__platform__StudioOut: {
             /**
              * Created At
              * Format: date-time
@@ -831,26 +998,35 @@ export interface components {
             /** Timezone */
             timezone: string;
         };
-        /** SwitchStudioRequest */
-        SwitchStudioRequest: {
+        /**
+         * StudioOut
+         * @description The merged column-and-settings view both the wizard's step 1 and the dashboard's
+         *     הגדרות panel read.
+         */
+        app__schemas__studio__StudioOut: {
+            /** Address */
+            address?: string | null;
+            /** Default Locale */
+            default_locale: string;
             /**
-             * Studio Id
+             * Id
              * Format: uuid
              */
-            studio_id: string;
-        };
-        /** ValidationError */
-        ValidationError: {
-            /** Context */
-            ctx?: Record<string, never>;
-            /** Input */
-            input?: unknown;
-            /** Location */
-            loc: (string | number)[];
-            /** Message */
-            msg: string;
-            /** Error Type */
-            type: string;
+            id: string;
+            /** Logo Url */
+            logo_url?: string | null;
+            /** Name */
+            name: string;
+            /** Parent Locales */
+            parent_locales: string[];
+            /** Phone */
+            phone?: string | null;
+            /** Slug */
+            slug: string;
+            /** Sport */
+            sport?: string | null;
+            /** Timezone */
+            timezone: string;
         };
     };
     responses: never;
@@ -1426,7 +1602,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["StudioOut"];
+                    "application/json": components["schemas"]["app__schemas__platform__StudioOut"];
                 };
             };
             /** @description Validation Error */
@@ -1492,7 +1668,135 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["StudioOut"];
+                    "application/json": components["schemas"]["app__schemas__platform__StudioOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_setup_api_v1_setup_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SetupProgressOut"];
+                };
+            };
+        };
+    };
+    dismiss_setup_api_v1_setup_dismiss_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SetupProgressOut"];
+                };
+            };
+        };
+    };
+    update_step_api_v1_setup_steps__step_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                step_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetupStepIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SetupProgressOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_studio_api_v1_studio_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["app__schemas__studio__StudioOut"];
+                };
+            };
+        };
+    };
+    update_studio_api_v1_studio_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StudioUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["app__schemas__studio__StudioOut"];
                 };
             };
             /** @description Validation Error */

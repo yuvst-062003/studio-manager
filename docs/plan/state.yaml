@@ -72,7 +72,8 @@ waves:
         on: 2026-08-25
       - id: M1.9
         title: The §5.1 studio setup wizard
-        status: pending
+        status: shipped
+        on: 2026-08-25
       - id: M1.10
         title: The dashboard app — shell, 3d צוות and 3f הגדרות
         status: pending

@@ -912,11 +912,102 @@
         "title": "SessionResponse",
         "type": "object"
       },
+      "SetupProgressOut": {
+        "description": "What all three setup routes return, so a caller never has to re-fetch.\n\n`complete` and `dismissed_at` are separate on purpose -- SPEC §5.1 states two\ndifferent things and app/services/structure/setup.py carries the reasoning.",
+        "properties": {
+          "complete": {
+            "description": "Every one of the six steps is done.",
+            "title": "Complete",
+            "type": "boolean"
+          },
+          "dismissed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The owner chose an exit at step 6. Auto-routing stops.",
+            "title": "Dismissed At"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/SetupStepOut"
+            },
+            "title": "Steps",
+            "type": "array"
+          }
+        },
+        "required": [
+          "steps",
+          "complete"
+        ],
+        "title": "SetupProgressOut",
+        "type": "object"
+      },
+      "SetupStepIn": {
+        "properties": {
+          "status": {
+            "enum": [
+              "done",
+              "skipped"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "SetupStepIn",
+        "type": "object"
+      },
+      "SetupStepOut": {
+        "properties": {
+          "at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "order": {
+            "title": "Order",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "done",
+              "skipped"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "order",
+          "status"
+        ],
+        "title": "SetupStepOut",
+        "type": "object"
+      },
       "StudioListResponse": {
         "properties": {
           "items": {
             "items": {
-              "$ref": "#/components/schemas/StudioOut"
+              "$ref": "#/components/schemas/app__schemas__platform__StudioOut"
             },
             "title": "Items",
             "type": "array"
@@ -929,7 +1020,7 @@
         "type": "object"
       },
       "StudioLogoOut": {
-        "description": "What POST /studio/logo returns.\n\nA URL and not a key. The key is an internal address that no client should learn, let\nalone send back -- §2.5 constructs every key server-side precisely so that no request\never carries one.",
+        "description": "What POST /studio/logo returns.\n\nA URL and not a key. The key is an internal address no client should learn, let alone\nsend back -- §2.5 constructs every key server-side precisely so that no request ever\ncarries one.",
         "properties": {
           "logo_url": {
             "description": "The scoped read route, cache-busted by updated_at.",
@@ -986,7 +1077,131 @@
         "title": "StudioMembershipOut",
         "type": "object"
       },
-      "StudioOut": {
+      "StudioUpdate": {
+        "description": "Every field optional -- the wizard writes what the owner filled in, and the\nהגדרות panel autosaves one field at a time. `exclude_unset` in the router is what\nturns that into a partial write rather than a blanking one.",
+        "properties": {
+          "address": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "parent_locales": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Locales"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "sport": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sport"
+          }
+        },
+        "title": "StudioUpdate",
+        "type": "object"
+      },
+      "SwitchStudioRequest": {
+        "properties": {
+          "studio_id": {
+            "format": "uuid",
+            "title": "Studio Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "studio_id"
+        ],
+        "title": "SwitchStudioRequest",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      },
+      "app__schemas__platform__StudioOut": {
         "properties": {
           "created_at": {
             "format": "date-time",
@@ -1049,58 +1264,91 @@
         "title": "StudioOut",
         "type": "object"
       },
-      "SwitchStudioRequest": {
+      "app__schemas__studio__StudioOut": {
+        "description": "The merged column-and-settings view both the wizard's step 1 and the dashboard's\nהגדרות panel read.",
         "properties": {
-          "studio_id": {
-            "format": "uuid",
-            "title": "Studio Id",
+          "address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "default_locale": {
+            "title": "Default Locale",
             "type": "string"
-          }
-        },
-        "required": [
-          "studio_id"
-        ],
-        "title": "SwitchStudioRequest",
-        "type": "object"
-      },
-      "ValidationError": {
-        "properties": {
-          "ctx": {
-            "title": "Context",
-            "type": "object"
           },
-          "input": {
-            "title": "Input"
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
           },
-          "loc": {
+          "logo_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Logo Url"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "parent_locales": {
             "items": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "integer"
-                }
-              ]
+              "type": "string"
             },
-            "title": "Location",
+            "title": "Parent Locales",
             "type": "array"
           },
-          "msg": {
-            "title": "Message",
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "slug": {
+            "title": "Slug",
             "type": "string"
           },
-          "type": {
-            "title": "Error Type",
+          "sport": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sport"
+          },
+          "timezone": {
+            "title": "Timezone",
             "type": "string"
           }
         },
         "required": [
-          "loc",
-          "msg",
-          "type"
+          "id",
+          "name",
+          "slug",
+          "timezone",
+          "default_locale",
+          "parent_locales"
         ],
-        "title": "ValidationError",
+        "title": "StudioOut",
         "type": "object"
       }
     }
@@ -1916,7 +2164,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/StudioOut"
+                  "$ref": "#/components/schemas/app__schemas__platform__StudioOut"
                 }
               }
             },
@@ -2014,7 +2262,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/StudioOut"
+                  "$ref": "#/components/schemas/app__schemas__platform__StudioOut"
                 }
               }
             },
@@ -2034,6 +2282,163 @@
         "summary": "Suspend",
         "tags": [
           "platform"
+        ]
+      }
+    },
+    "/api/v1/setup": {
+      "get": {
+        "operationId": "read_setup_api_v1_setup_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetupProgressOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Read Setup",
+        "tags": [
+          "setup"
+        ]
+      }
+    },
+    "/api/v1/setup/dismiss": {
+      "post": {
+        "description": "§5.1's exit at step 6. Stops auto-routing; says nothing about completeness.",
+        "operationId": "dismiss_setup_api_v1_setup_dismiss_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetupProgressOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Dismiss Setup",
+        "tags": [
+          "setup"
+        ]
+      }
+    },
+    "/api/v1/setup/steps/{step_id}": {
+      "patch": {
+        "operationId": "update_step_api_v1_setup_steps__step_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "step_id",
+            "required": true,
+            "schema": {
+              "title": "Step Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetupStepIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetupProgressOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Step",
+        "tags": [
+          "setup"
+        ]
+      }
+    },
+    "/api/v1/studio": {
+      "get": {
+        "description": "Every staff role. Rendering the club's own name and logo is not a settings read in\nthe §3.2 sense, and a coach app that could not do it would be enforcing a rule about\nwrites by breaking a read.",
+        "operationId": "read_studio_api_v1_studio_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/app__schemas__studio__StudioOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Read Studio",
+        "tags": [
+          "studio"
+        ]
+      },
+      "patch": {
+        "description": "The wizard's step 1 (פרטי מועדון) and the dashboard's הגדרות panel write through\nthe same route -- there is one studio row and it should have one writer.\n\n`exclude_unset` and not `exclude_none`: the two differ for a field a client sends\nexplicitly as null, and treating \"not mentioned\" and \"cleared\" alike would make the\nהגדרות autosave blank every field it did not happen to include.",
+        "operationId": "update_studio_api_v1_studio_patch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StudioUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/app__schemas__studio__StudioOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Studio",
+        "tags": [
+          "studio"
         ]
       }
     },

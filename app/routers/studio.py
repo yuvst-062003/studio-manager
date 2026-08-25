@@ -1,4 +1,9 @@
-"""M1.8's three scoped studio-logo routes.
+"""`/api/v1/studio` -- the active studio's details, and its logo.
+
+Everything under the `/studio` path lives here, so a reader looking for who owns a path
+finds one answer. The design doc lists `PATCH /api/v1/studio` under its setup-API heading
+because the wizard's step 1 is its caller, not because the route belongs to the setup
+router; `app/routers/setup.py` owns `/setup/*` and nothing else.
 
 **There is no generic `GET /files/{key}`, and there must never be one.** A generic file
 route invites both path traversal and enumeration across tenants. Reads are scoped routes
@@ -22,7 +27,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, UploadFile, status
 
-from app.core.auth_context import ManagerOrOwner
+from app.core.auth_context import AnyStaff, ManagerOrOwner
 from app.core.storage import (
     MAX_UPLOAD_BYTES,
     ObjectStore,
@@ -30,7 +35,7 @@ from app.core.storage import (
     build_object_store,
 )
 from app.core.tenancy import TenantSessionDep, require_current_studio_id
-from app.schemas.studio import StudioLogoOut
+from app.schemas.studio import StudioLogoOut, StudioOut, StudioUpdate
 from app.services.structure import logo as logo_service
 
 router = APIRouter(tags=["studio"])
@@ -81,6 +86,39 @@ async def _read_capped(upload: UploadFile) -> bytes:
             raise _too_large()
         chunks.append(chunk)
     return b"".join(chunks)
+
+
+@router.get("/studio", response_model=StudioOut)
+def read_studio(_: AnyStaff, session: TenantSessionDep) -> StudioOut:
+    """Every staff role. Rendering the club's own name and logo is not a settings read in
+    the §3.2 sense, and a coach app that could not do it would be enforcing a rule about
+    writes by breaking a read."""
+    studio = logo_service.active_studio(session, require_current_studio_id())
+    return StudioOut.model_validate(logo_service.studio_public_fields(studio))
+
+
+@router.patch("/studio", response_model=StudioOut)
+def update_studio(
+    _: ManagerOrOwner, body: StudioUpdate, request: Request, session: TenantSessionDep
+) -> StudioOut:
+    """The wizard's step 1 (פרטי מועדון) and the dashboard's הגדרות panel write through
+    the same route -- there is one studio row and it should have one writer.
+
+    `exclude_unset` and not `exclude_none`: the two differ for a field a client sends
+    explicitly as null, and treating "not mentioned" and "cleared" alike would make the
+    הגדרות autosave blank every field it did not happen to include.
+    """
+    person_id, identity_id = _actor(request)
+    studio = logo_service.update_studio_fields(
+        session,
+        studio_id=require_current_studio_id(),
+        fields=body.model_dump(exclude_unset=True),
+        actor_person_id=person_id,
+        actor_identity_id=identity_id,
+    )
+    session.commit()
+    session.refresh(studio)
+    return StudioOut.model_validate(logo_service.studio_public_fields(studio))
 
 
 @router.post("/studio/logo", response_model=StudioLogoOut)

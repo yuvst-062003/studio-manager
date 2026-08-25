@@ -9,9 +9,10 @@ leave a stale PNG on the volume forever.
 from __future__ import annotations
 
 import uuid
+from typing import Any
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, attributes
 
 from app.core.storage import (
     ObjectNotFoundError,
@@ -21,6 +22,7 @@ from app.core.storage import (
     studio_logo_key,
 )
 from app.models.studio import Studio
+from app.schemas.studio import SUPPORTED_LOCALES
 from app.services.audit import AuditService
 
 
@@ -28,7 +30,7 @@ class NoLogoError(Exception):
     """The studio has never had a logo, or the object behind the pointer is gone."""
 
 
-def _studio(session: Session, studio_id: uuid.UUID) -> Studio:
+def active_studio(session: Session, studio_id: uuid.UUID) -> Studio:
     # Studio is the tenant, not a tenant-scoped row, so it carries no TenantMixin and the
     # default filter does not reach it. The id comes from the verified JWT via
     # require_current_studio_id(), which is what makes this scoped anyway.
@@ -53,7 +55,7 @@ def store_logo(
     if content_type is None:
         raise UnsupportedImageError("not a PNG, JPEG or WebP")
 
-    studio = _studio(session, studio_id)
+    studio = active_studio(session, studio_id)
     previous = studio.logo_object_key
     key = studio_logo_key(studio_id, content_type)
     store.put(key, data, content_type=content_type)
@@ -79,7 +81,7 @@ def store_logo(
 
 
 def read_logo(session: Session, store: ObjectStore, *, studio_id: uuid.UUID) -> tuple[bytes, str]:
-    studio = _studio(session, studio_id)
+    studio = active_studio(session, studio_id)
     if not studio.logo_object_key:
         raise NoLogoError(str(studio_id))
     try:
@@ -99,7 +101,7 @@ def delete_logo(
     actor_identity_id: uuid.UUID | None = None,
 ) -> None:
     """Idempotent -- a DELETE on a studio with no logo is a 204, not a 404."""
-    studio = _studio(session, studio_id)
+    studio = active_studio(session, studio_id)
     key = studio.logo_object_key
     if not key:
         return
@@ -136,6 +138,86 @@ def current_logo_url(session: Session, *, studio_id: uuid.UUID) -> str | None:
     busts the cache is computed by Postgres and the in-memory row still holds the previous
     one. Skipping it would return the URL of the image that was just replaced.
     """
-    studio = _studio(session, studio_id)
+    studio = active_studio(session, studio_id)
     session.refresh(studio)
     return logo_url(studio)
+
+
+# -- step 1's fields, and the הגדרות panel that reads the same row ------------
+#: What `PATCH /studio` puts in the JSONB rather than in a column. §4.3 pins the column
+#: list, and "settings includes:" describes what the column holds rather than closing it.
+SETTINGS_FIELDS = ("sport", "address", "phone", "parent_locales")
+
+
+def studio_public_fields(studio: Studio) -> dict[str, Any]:
+    """The merged view. `parent_locales` falls back to the studio's own default so a row
+    written before M1.9 still answers the question."""
+    blob = studio.settings or {}
+    return {
+        "id": studio.id,
+        "name": studio.name,
+        "slug": studio.slug,
+        "timezone": studio.timezone,
+        "default_locale": studio.default_locale,
+        "logo_url": logo_url(studio),
+        "sport": blob.get("sport"),
+        "address": blob.get("address"),
+        "phone": blob.get("phone"),
+        "parent_locales": blob.get("parent_locales") or [studio.default_locale],
+    }
+
+
+def update_studio_fields(
+    session: Session,
+    *,
+    studio_id: uuid.UUID,
+    fields: dict[str, Any],
+    actor_person_id: uuid.UUID | None = None,
+    actor_identity_id: uuid.UUID | None = None,
+) -> Studio:
+    """`name` to its column, the rest into `settings`. Merged, never replaced.
+
+    `settings` is shared JSONB -- setup_progress, standing_order_link, billing_day and
+    retention_months all live there -- so a whole-column assignment would drop them
+    silently, and the loss would surface somewhere else entirely.
+    """
+    studio = active_studio(session, studio_id)
+    changed: list[str] = []
+
+    if "name" in fields and fields["name"] is not None:
+        if studio.name != fields["name"]:
+            changed.append("name")
+        studio.name = fields["name"]
+
+    blob = dict(studio.settings or {})
+    for key in SETTINGS_FIELDS:
+        if key in fields and fields[key] is not None:
+            if blob.get(key) != fields[key]:
+                changed.append(key)
+            blob[key] = fields[key]
+
+    # §9's fallback chain resolves through the studio's default_locale, so dropping it
+    # from the offered set would leave the fallback pointing at a language the studio
+    # says it does not offer.
+    locales = blob.get("parent_locales")
+    if locales and studio.default_locale not in locales:
+        blob["parent_locales"] = [
+            locale for locale in SUPPORTED_LOCALES if locale in {*locales, studio.default_locale}
+        ]
+
+    studio.settings = blob
+    attributes.flag_modified(studio, "settings")
+
+    AuditService.record(
+        session,
+        action="studio.details.updated",
+        entity_type="studio",
+        entity_id=studio_id,
+        studio_id=studio_id,
+        actor_person_id=actor_person_id,
+        actor_identity_id=actor_identity_id,
+        # The field NAMES, not the values. A club phone number in an append-only table is
+        # a phone number that can never be corrected out of it.
+        diff={"fields": sorted(set(changed))},
+    )
+    return studio

@@ -6,13 +6,28 @@
 // onboarding, not an afterthought" — and for the staff app §10.6 makes it load-bearing
 // rather than nice, because `pending_ops` must never be reclaimed and only a home-screen
 // web app is exempt from Safari's 7-day script-storage cap.
-import { useEffect, useState } from 'react'
-import { useDisplayMode, useSession } from '@studio/core'
-import { AppShell, InstallWalkthrough, LanguagePicker, SignIn, ThemeProvider } from '@studio/ui'
+import { useEffect, useMemo, useState } from 'react'
+import { apiFetch, useDisplayMode, useSession } from '@studio/core'
+import {
+  AppShell,
+  InstallWalkthrough,
+  LanguagePicker,
+  SetupWizard,
+  SignIn,
+  ThemeProvider,
+  makeSetupClient,
+  registerM1WizardSteps,
+} from '@studio/ui'
 import { DevBar } from '@studio/ui/dev-bar'
 import type { InstallPromptEvent } from '@studio/ui'
 import type { Locale } from '@studio/i18n'
 import { Resolve } from './features/identity/Resolve'
+
+// §5.1 — 'the staff app and dashboard route them into a resumable wizard'. Both mount the
+// SAME wizard from @studio/ui; no step lives in one app's feature directory. Registered
+// at module load so the slot is populated before anything renders, and `apiFetch` is
+// passed in because @studio/ui must not depend on @studio/core.
+registerM1WizardSteps(apiFetch)
 
 const NAV = [
   { key: 'today', labelKey: 'common.nav.today', href: '/' },
@@ -32,6 +47,9 @@ export default function App() {
   const installed = displayMode !== 'browser'
   const [locale, setLocale] = useState<Locale>('he')
   const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null)
+  // Memoised: SetupWizard reads through this in an effect keyed on the client, so a fresh
+  // object every render would re-fetch progress forever.
+  const setupClient = useMemo(() => makeSetupClient(apiFetch), [])
 
   useEffect(() => {
     // Chromium fires this when it considers the app installable; iOS never does, which
@@ -93,7 +111,11 @@ export default function App() {
             />
           }
         >
-          <Resolve session={session} locale={locale} wizard={null} />
+          <Resolve
+            session={session}
+            locale={locale}
+            wizard={<SetupWizard client={setupClient} locale={locale} />}
+          />
         </AppShell>
       ) : null}
     </ThemeProvider>

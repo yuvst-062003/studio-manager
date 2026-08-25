@@ -65,3 +65,29 @@ export type { SignInProvider } from './first-run/SignIn'
 export { RefusalScreen } from './first-run/RefusalScreen'
 export { InstallWalkthrough, isIosSafari } from './first-run/InstallWalkthrough'
 export type { InstallPromptEvent } from './first-run/InstallWalkthrough'
+
+// §5.1's setup wizard. The container reads useSlot('setup-wizard') — the id M0 already
+// declared — so M7's belts step and M6's prices step land as one file plus one line in
+// setup-wizard/register.ts, and SetupWizard.tsx is never reopened.
+//
+// It lives in @studio/ui and not in an app feature directory because §5.1 says "the staff
+// app and dashboard route them into" it: both mount the same wizard in place.
+export { SetupWizard } from './setup-wizard/SetupWizard'
+export type { SetupClient } from './setup-wizard/SetupWizard'
+export { registerM1WizardSteps } from './setup-wizard/register'
+export {
+  makeSetupClient,
+  makeStaffClient,
+  makeStructureClient,
+  makeStudentsClient,
+  makeStudioClient,
+} from './setup-wizard/client'
+export type { Fetcher } from './setup-wizard/client'
+export { WIZARD_STEP_ORDER } from './setup-wizard/types'
+export type {
+  SetupProgress,
+  WizardStep,
+  WizardStepId,
+  WizardStepProps,
+  WizardStepStatus,
+} from './setup-wizard/types'
