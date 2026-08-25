@@ -51,15 +51,14 @@ def test_one_coach_holds_at_most_one_live_assignment_per_group():
     assert "uq_group_staff_live" in names
 
 
-def test_m1_ships_none_of_m2s_schedule_tables():
-    """The boundary, asserted. M2 owns training_year, studio_closure,
-    group_schedule_rule, session and session_staff -- and W2's contract commit is where
-    they land, on main, before either worktree exists."""
-    for name in (
-        "training_year",
-        "studio_closure",
-        "group_schedule_rule",
-        "session",
-        "session_staff",
-    ):
-        assert name not in Base.metadata.tables, f"{name} is M2's, not M1's"
+# -- `test_m1_ships_none_of_m2s_schedule_tables` was removed here, deliberately ---------
+# It asserted that `training_year`, `studio_closure`, `group_schedule_rule`, `session`
+# and `session_staff` were absent, and its own docstring named the moment it expired:
+# "W2's contract commit is where they land". This branch is that contract commit -- the
+# five tables arrive in `app/models/schedule.py` under Task 1 of
+# docs/superpowers/plans/2026-08-25-foundations-w2-w5-contracts.md.
+#
+# It was a "not yet" marker, not a safety property, and nothing replaces it because
+# nothing needs to: `tests/contracts/test_w2_models.py` now asserts the shape of every
+# one of those tables, and `tests/invariants/test_02` asserts each carries `studio_id`
+# with its leading composite index. The boundary was crossed on purpose, not eroded.

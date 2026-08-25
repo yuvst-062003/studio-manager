@@ -1,4 +1,87 @@
 import type { Bundle } from '../types'
 
-/** Owned by the ATTENDANCE lane. Empty until that milestone. */
-export const attendance: Bundle = {}
+/** Mirrors `he/attendance.ts`. `en` is `strict` in the parity check — a missing key fails. */
+export const attendance: Bundle = {
+  'roster.title': 'Attendance',
+  'roster.empty': 'No students in this group',
+  'roster.present': 'Present',
+  'roster.absent': 'Absent',
+  'roster.absentExcused': 'Absent — excused',
+  'roster.absentUnexcused': 'Absent — unexcused',
+  'roster.unmarked': 'Not marked',
+  'roster.unmarkedCount': '{{count}} students not marked',
+  'roster.markAllPresent': 'Mark everyone present',
+  'roster.tapToToggle': 'Tap a row to change it',
+  'roster.saved': 'Attendance saved',
+  'roster.editAnytime': 'Attendance can be edited at any time',
+  'roster.markedBy': 'Marked by',
+  'roster.markedAt': 'Marked at',
+  'roster.addNote': 'Add a note',
+
+  'source.coach': 'The coach',
+  'source.parent': 'The guardian',
+  'source.bulk': 'Bulk marking',
+  'source.system': 'The system',
+  'source.preReported': 'Reported in advance',
+  'source.preReportedHint':
+    'The guardian reported in advance. Bulk marking will not overwrite it',
+
+  'absence.title': 'Report an absence',
+  'absence.subtitle': 'Until the class starts',
+  'absence.chooseSession': 'Choose a class',
+  'absence.reason': 'Reason',
+  'absence.reasonOptional': 'Reason — optional',
+  'absence.submit': 'Send the report',
+  'absence.submitted': 'Report sent',
+  'absence.tooLate': 'The class has already started',
+  'absence.alreadyReported': 'You have already reported this class',
+  'absence.cancel': 'Cancel the report',
+  'absence.requiresConnection': 'Reporting an absence needs an internet connection',
+  'absence.requiresConnectionHint':
+    'The report will not be saved offline. Try again when you have a connection',
+
+  'network.online': 'Online',
+  'network.offline': 'Offline',
+  'network.intermittent': 'Unstable connection',
+  'network.slow': 'Slow connection',
+  'network.offlineHint': 'Marks are saved on the device and will sync when the connection returns',
+  'network.intermittentHint':
+    'There is a network but no answer from the server. Marks are saved on the device',
+
+  'sync.pending': 'Waiting to sync',
+  'sync.pendingCount': '{{count}} marks waiting to sync',
+  'sync.syncing': 'Syncing…',
+  'sync.synced': 'Everything is synced',
+  'sync.syncedAt': 'Last synced at',
+  'sync.retry': 'Try syncing again',
+  'sync.failed': 'Sync failed',
+  'sync.staleWarning': 'Some marks have not synced for over a day',
+  'sync.staleBody': 'Connect to the internet to save these marks before they are lost',
+  'sync.staleAction': 'Sync now',
+  'stale.title': 'This information is out of date',
+  'stale.body': 'Last loaded at {{time}}',
+
+  'priming.title': 'Preparing the app',
+  'priming.body': 'Loading today’s and tomorrow’s classes so they work without a network',
+  'priming.failed': 'Preparation failed',
+  'priming.retry': 'Try again',
+
+  'conflict.title': 'Marking conflict',
+  'conflict.sessionCancelled': 'The class was cancelled while you were marking',
+  'conflict.sessionCancelledBody': 'Your marks were saved but not applied. A manager must decide',
+  'conflict.otherCoach': 'Another coach marked this class',
+  'conflict.differentPerson': 'You signed in as a different user',
+  'conflict.differentPersonBody': 'There are unsynced marks from the previous user',
+  'conflict.keepMine': 'Keep my marks',
+  'conflict.keepTheirs': 'Keep the existing marks',
+  'conflict.review': 'Review the conflict',
+
+  'report.title': 'Attendance',
+  'report.unmarkedSessions': 'Classes not marked',
+  'report.consecutiveAbsences': 'Absent in a row',
+  'report.attendanceRate': 'Attendance rate',
+  'report.sessionsHeld': 'Classes held',
+  'report.sessionsPlanned': 'Classes planned',
+  'report.empty': 'No attendance data for this period',
+  'report.export': 'Export',
+}

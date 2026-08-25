@@ -625,3 +625,81 @@ button.studio-row:focus-visible {
   block-size: 26px;
   inline-size: 5px;
 }
+
+/* MoneyDisplay — the tone is a semantic token and is never overridable (D2, G13). */
+.studio-money {
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+}
+
+.studio-money[data-tone="debt"] {
+  color: var(--debt);
+}
+
+.studio-money[data-tone="paid"] {
+  color: var(--paid);
+}
+
+.studio-money[data-tone="pending"] {
+  color: var(--pending);
+}
+
+.studio-money[data-tone="cancelled"] {
+  color: var(--cancelled);
+}
+
+/* DateRangePicker — logical properties only (D10 / G12). `flex-direction: row` follows
+   the document direction, so the "from" field sits on the right in `he` and on the left
+   in `en` with no direction-aware rule anywhere. */
+.studio-date-range {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.studio-date-range__field {
+  display: flex;
+  flex: 1 1 10rem;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-inline-size: 0;
+}
+
+.studio-date-range__label {
+  color: var(--text-secondary);
+  font-size: var(--text-label);
+  font-weight: var(--weight-medium);
+}
+
+.studio-date-range__input {
+  background: var(--surface);
+  border: var(--border-width-strong) solid var(--border-strong);
+  border-radius: var(--radius-md);
+  color: var(--fg);
+  font: inherit;
+  inline-size: 100%;
+  padding-block: var(--control-pad-block);
+  padding-inline: var(--field-pad-inline);
+}
+
+.studio-date-range__input:focus-visible {
+  outline: var(--border-width-strong) solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.studio-date-range__input[aria-invalid="true"] {
+  border-color: var(--danger);
+}
+
+.studio-date-range__input:disabled {
+  background: var(--disabled-surface);
+  color: var(--text-muted);
+}
+
+.studio-date-range__error {
+  color: var(--danger);
+  flex-basis: 100%;
+  font-size: var(--text-caption);
+  margin: 0;
+}

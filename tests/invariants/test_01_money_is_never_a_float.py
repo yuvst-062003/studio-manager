@@ -4,8 +4,11 @@ Two failure modes, not one. A float column is the obvious one. The quieter one i
 money column that does not say `_agorot`, because the next person to read it will assume
 shekels and divide by a hundred somewhere.
 
-Both detectors currently find nothing -- no money column exists until M6. The self-tests
-at the bottom are what make an empty gate worth having.
+W4's contract commit is where this stopped being an empty gate: the billing ledger is the
+first schema in the product with real money columns, and both detectors now have something
+to bite on. The self-tests at the bottom are what kept it worth having until then, and what
+keep each exemption below honest -- every skip is paired with a test proving the detector
+still fires on the thing the skip is not meant to cover.
 """
 
 from __future__ import annotations
@@ -16,7 +19,7 @@ import app.models  # noqa: F401 -- seam 2 discovery populates the metadata
 import pytest
 import sqlalchemy as sa
 from app.models.base import Base
-from sqlalchemy import Column, Integer, MetaData, Numeric, Table
+from sqlalchemy import Column, Integer, MetaData, Numeric, String, Table
 
 INTEGER_TYPES = (sa.Integer, sa.BigInteger, sa.SmallInteger)
 
@@ -29,6 +32,21 @@ MONEY_WORDS = re.compile(r"(amount|price|fee|balance|total|sum|cost)$", re.IGNOR
 
 # Counts, not money. `max_payments` is how many instalments, not how many shekels.
 NOT_MONEY = frozenset({"max_payments", "charges_created", "payments_count"})
+
+# Qualified `table.column` exemptions: a column that really does hold an amount, but
+# deliberately does not hold agorot. Qualified rather than bare, because a bare `amount`
+# in NOT_MONEY would exempt every table's `amount` -- the exact column this gate exists
+# to catch.
+NOT_MONEY_QUALIFIED = frozenset(
+    {
+        # uPay's inbound rendering, kept byte-for-byte as evidence of what actually
+        # arrived (app/models/billing.py). It is text on purpose; the integer is parsed
+        # out by `app.integrations.upay.ipn.agorot_from_ipn_amount`, and storing only
+        # that would lose the evidence. Renaming cannot dodge the rule either -- any
+        # name carrying an `amount` token trips it.
+        "upay_ipn_record.amount",
+    }
+)
 
 
 def float_money_columns(metadata: sa.MetaData) -> list[str]:
@@ -46,6 +64,13 @@ def mis_named_money_columns(metadata: sa.MetaData) -> list[str]:
         for column in table.columns:
             name = column.name
             if name in NOT_MONEY or name.endswith("_agorot"):
+                continue
+            if f"{table.name}.{name}" in NOT_MONEY_QUALIFIED:
+                continue
+            # A reference, not an amount. W2's `enrollment.price_plan_id` is a UUID
+            # pointing at a `price_plan` row, and `price` is a token in it. No money
+            # column in this schema ends in `_id`.
+            if name.endswith("_id"):
                 continue
             if any(MONEY_WORDS.search(token) for token in name.split("_")):
                 bad.append(f"{table.name}.{name} looks like money but does not end in _agorot")
@@ -113,4 +138,42 @@ def test_the_naming_detector_still_catches_a_real_misname(name):
     Table("probe", probe, Column(name, Integer))
     assert mis_named_money_columns(probe) == [
         f"probe.{name} looks like money but does not end in _agorot"
+    ]
+
+
+# -- and proven NOT to fire on a reference column -----------------------------
+# W2 brought `enrollment.price_plan_id`: a UUID pointing at W4's `price_plan` row. It is
+# a reference, not an amount, and the token rule flags it because `price` is a token. The
+# fix is structural rather than another NOT_MONEY entry -- `*_plan_id`, `*_price_id` and
+# `*_fee_id` would each have to be enumerated, leaving the next one to be rediscovered.
+# No money column in this schema ends in `_id`.
+@pytest.mark.parametrize("name", ["price_plan_id", "fee_schedule_id", "total_run_id"])
+def test_the_naming_detector_leaves_a_reference_column_alone(name):
+    probe = MetaData()
+    Table("probe", probe, Column(name, Integer))
+    assert mis_named_money_columns(probe) == []
+
+
+def test_the_id_rule_does_not_blind_the_detector():
+    """The other half of the `_id` exemption. It skips the whole column, so it has to be
+    shown that dropping the suffix brings the same name straight back into the net --
+    otherwise the rule is indistinguishable from deleting the check."""
+    probe = MetaData()
+    Table("probe", probe, Column("unit_price", Integer), Column("unit_price_id", Integer))
+    assert mis_named_money_columns(probe) == [
+        "probe.unit_price looks like money but does not end in _agorot"
+    ]
+
+
+def test_the_named_exception_is_scoped_to_one_table():
+    """`upay_ipn_record.amount` is uPay's inbound rendering kept verbatim as evidence of
+    what arrived (app/models/billing.py) -- text on purpose, parsed to agorot by
+    `app.integrations.upay.ipn.agorot_from_ipn_amount`. A bare `amount` entry in
+    NOT_MONEY would exempt *every* table's `amount`, which is precisely the column this
+    gate exists to catch. The exemption is therefore qualified by table."""
+    probe = MetaData()
+    Table("upay_ipn_record", probe, Column("amount", String(30)))
+    Table("invoice", probe, Column("amount", Integer))
+    assert mis_named_money_columns(probe) == [
+        "invoice.amount looks like money but does not end in _agorot"
     ]

@@ -1,4 +1,124 @@
 import type { Bundle } from '../types'
 
-/** Owned by the REPORTS lane. Empty until that milestone. */
-export const reports: Bundle = {}
+/** Mirror of `he/reports.ts`, privacy included under `privacy.*`. `en` is `strict`. */
+export const reports: Bundle = {
+  // -- the reports screen (dashboard 4g) -----------------------------------------
+  'title': 'Reports',
+  'empty': 'No data for the selected period',
+  'period': 'Period',
+  'period.thisMonth': 'This month',
+  'period.lastMonth': 'Last month',
+  'period.last12Months': 'Last 12 months',
+  'period.custom': 'Custom range',
+  'export': 'Export',
+  'export.csv': 'Export to CSV',
+  'export.xlsx': 'Export to Excel',
+  'export.ready': 'Your file is ready',
+
+  // -- studio overview (§5.14) -----------------------------------------------------
+  'overview.title': 'Overview',
+  'overview.activeStudents': 'Active students',
+  'overview.activeGroups': 'Active groups',
+  'overview.sessionsThisWeek': 'Sessions this week',
+  'overview.attendanceToday': 'Attendance today',
+  'overview.openRegistrations': 'Open registration requests',
+  'overview.outstandingDebt': 'Outstanding debt',
+
+  // -- financial (§5.14) ------------------------------------------------------------
+  'financial.title': 'Financial report',
+  'financial.collectedVsExpected': 'Collected vs expected',
+  'financial.collected': 'Collected',
+  'financial.expected': 'Expected',
+  'financial.trend12m': '12-month trend',
+  'financial.debtByPayer': 'Debt by payer',
+  'financial.byMethod': 'Payments by method',
+  'financial.chargesCreated': 'Charges created',
+  'financial.chargesSettled': 'Charges settled',
+  'financial.chargesVoided': 'Charges voided',
+  'financial.chargesWrittenOff': 'Charges written off',
+  'financial.unreconciled': 'Unmatched payments',
+  'financial.pendingOrders': 'Orders pending over 24 hours',
+
+  // -- funnel (§5.14, from student_status_history) -----------------------------------
+  'funnel.title': 'Registration funnel',
+  'funnel.enquiries': 'Enquiries',
+  'funnel.trialsBooked': 'Trials booked',
+  'funnel.trialsAttended': 'Trials attended',
+  'funnel.converted': 'Converted',
+  'funnel.conversionRate': 'Conversion rate',
+  'funnel.daysToConvert': 'Average days to convert',
+  'funnel.bySource': 'By source',
+  'funnel.trialsThisWeek': 'Trials this week',
+  'funnel.notFollowedUp': 'Not followed up',
+
+  // -- operational (§5.14) ------------------------------------------------------------
+  'operational.title': 'Operational report',
+  'operational.attendanceRate': 'Attendance rate',
+  'operational.byGroup': 'By group',
+  'operational.byStudent': 'By student',
+  'operational.sessionsHeld': 'Sessions held vs planned',
+  'attendance.unmarkedExcluded': 'Sessions nobody marked are not counted as absences',
+  'operational.newEnrollments': 'New enrolments',
+  'operational.dropouts': 'Dropouts',
+  'operational.netChange': 'Net change',
+  'operational.missingHealth': 'Missing health declaration',
+  'operational.coachSessionCounts': 'Sessions by coach',
+
+  // -- at risk (§5.14) ------------------------------------------------------------------
+  'atRisk.title': 'Students at risk',
+  'atRisk.subtitle': 'Three or more consecutive absences',
+  'atRisk.consecutiveAbsences': '{{count}} consecutive absences',
+  'atRisk.contactParent': 'Contact the parent',
+  'atRisk.empty': 'No students at risk',
+  'atRisk.contacted': 'Contacted',
+
+  // -- §11.3's data export ------------------------------------------------------------
+  'privacy.title': 'Privacy and personal data',
+  'privacy.export.title': 'Data export request',
+  'privacy.export.description': 'Everything held about your children, in one file',
+  'privacy.export.request': 'Request an export',
+  'privacy.export.requested': 'Request received',
+  'privacy.export.status.pending': 'Pending',
+  'privacy.export.status.running': 'Preparing',
+  'privacy.export.status.completed': 'Ready to download',
+  'privacy.export.status.failed': 'Preparation failed',
+  'privacy.export.status.expired': 'The link has expired',
+  'privacy.export.download': 'Download the file',
+  'privacy.export.linkExpires': 'The link is available for a limited time',
+  'privacy.export.requestAgain': 'Request again',
+  'privacy.export.preparingHint': 'Preparation can take a few minutes',
+
+  // -- §11.4's anonymization -----------------------------------------------------------
+  'privacy.anonymize.title': 'Erase personal details',
+  'privacy.anonymize.action': 'Erase details',
+  'privacy.anonymize.confirm': 'Confirm erasure',
+  'privacy.anonymize.done': 'Details erased',
+  'privacy.anonymize.whatHappens': 'Name, date of birth, phone, email and photo are erased. Health declarations and signatures are destroyed',
+  'privacy.anonymize.whatRemains': 'Charge and payment records are retained as the law requires, without a name',
+  'privacy.anonymize.irreversible': 'This cannot be undone',
+
+  // -- §11.5's retention ----------------------------------------------------------------
+  'privacy.retention.title': 'Data retention',
+  'privacy.retention.setting': 'Erase automatically after',
+  'privacy.retention.months': '{{count}} months',
+  'privacy.retention.preview': 'What the next run will erase',
+  'privacy.retention.previewCount': '{{count}} students who left',
+  'privacy.retention.exempt': 'Exempt from erasure',
+  'privacy.retention.exempted': 'Exempted',
+  'privacy.retention.empty': 'Nothing due for erasure',
+
+  // -- §11.6's consent -------------------------------------------------------------------
+  'privacy.consent.title': 'Consents',
+  'privacy.consent.version': 'Version',
+  'privacy.consent.givenAt': 'Given on',
+  'privacy.consent.revoke': 'Withdraw consent',
+  'privacy.consent.revokedRecorded': 'The withdrawal was recorded',
+  'privacy.consent.type.terms': 'Terms of service',
+  'privacy.consent.type.privacy_policy': 'Privacy policy',
+  'privacy.consent.type.photo': 'Publishing photos',
+  'privacy.consent.type.medical_flags': 'Sharing health flags with coaches',
+  'privacy.consent.type.event': 'Event participation',
+  'privacy.photo.allowed': 'Photos may be published',
+  'privacy.photo.notAllowed': 'Photos may not be published',
+  'privacy.photo.notRecorded': 'No consent recorded',
+}

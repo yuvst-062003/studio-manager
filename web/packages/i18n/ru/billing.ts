@@ -1,4 +1,163 @@
 import type { Bundle } from '../types'
 
-/** Owned by the BILLING lane. Empty until that milestone. */
-export const billing: Bundle = {}
+/**
+ * Mirror of `he/billing.ts`. `ru` is `report` in the parity policy until SPEC §15 item 9's
+ * native-speaker review (HB-ru-review); the keys are complete so the gate can be flipped to
+ * `strict` by changing one word rather than by writing a namespace.
+ */
+export const billing: Bundle = {
+  // -- the parent payments screen (parent 12f ▲ D9.3, 1b) -----------------------
+  'title': 'Платежи',
+  'openDebts.title': 'Открытая задолженность',
+  'openDebts.empty': 'Задолженности нет',
+  'openDebts.total': 'Всего к оплате',
+  'openDebts.forStudent': 'За {{name}}',
+  'howToPay.title': 'Как вы хотите оплатить?',
+
+  'method.card': 'Кредитная карта',
+  'method.standingOrder': 'Постоянное поручение',
+  'method.cash': 'Наличные',
+  'method.bankTransfer': 'Банковский перевод',
+  'method.creditAdjustment': 'Зачёт',
+
+  'card.selectMonths': 'Выберите месяцы',
+  'card.installments': 'Платежей по карте',
+  'card.total': 'Итого',
+  'card.pay': 'Оплатить',
+  'card.coveredElsewhere': 'Уже включено в начатый платёж',
+  'card.nothingSelectable': 'Нет начислений, доступных к оплате картой',
+  'card.oldestFirst': 'Выбираются самые старые начисления по всем детям, за которых вы платите',
+
+  'standingOrder.link': 'Оформить постоянное поручение',
+  'standingOrder.instructions': 'Поручение оформляется на сайте платёжной компании',
+  'standingOrder.activeWarning': 'Активное постоянное поручение уже есть — проверьте, что не платите дважды',
+  'standingOrder.notConfirmable': 'Платёж по поручению записывается клубом после поступления',
+
+  'cash.instructions': 'Оплатите тренеру в начале месяца',
+
+  'receipt.email': 'Отправить квитанцию на почту',
+  'receipt.cardOnly': 'Налоговая квитанция выдаётся только для платежей картой',
+  'receipt.externalNumber': 'Внешний номер квитанции',
+  'history.title': 'Совершённые платежи',
+  'history.empty': 'Платежи ещё не записаны',
+
+  // -- a charge -----------------------------------------------------------------
+  'charge.kind.tuition': 'Обучение',
+  'charge.kind.registration': 'Регистрационный сбор',
+  'charge.kind.event': 'Мероприятие',
+  'charge.kind.manual': 'Ручное начисление',
+  'charge.status.open': 'Открыто',
+  'charge.status.settled': 'Оплачено',
+  'charge.status.void': 'Аннулировано',
+  'charge.status.written_off': 'Списано',
+  'charge.period': 'Период',
+  'charge.dueDate': 'Оплатить до',
+  'charge.amount': 'Сумма',
+  'charge.overdue': 'Просрочено',
+  'charge.proration': 'За {{covered}} из {{total}} занятий',
+  'charge.originalAmount': 'Полная цена',
+  'charge.credit': 'Зачёт',
+  'charge.addManual': 'Ручное начисление или зачёт',
+  'charge.reason': 'Причина',
+  'charge.reasonRequired': 'Для ручного начисления нужна причина',
+  'charge.negativeHint': 'Отрицательная сумма — это зачёт или скидка',
+  'charge.writeOff': 'Списать долг',
+
+  // -- recording a payment (dashboard 3e) ---------------------------------------
+  'payment.record': 'Записать платёж',
+  'payment.date': 'Дата платежа',
+  'payment.amount': 'Полученная сумма',
+  'payment.note': 'Примечание',
+  'payment.saved': 'Платёж записан',
+  'payment.allocatedOldestFirst': 'Зачтено в самые старые начисления',
+  'payment.unallocated': 'Нераспределённый остаток',
+
+  // -- the monthly billing run (§5.10) ------------------------------------------
+  'run.title': 'Ежемесячный расчёт',
+  'run.period': 'Месяц начисления',
+  'run.runNow': 'Запустить сейчас',
+  'run.status.running': 'Выполняется',
+  'run.status.completed': 'Завершён',
+  'run.status.failed': 'Ошибка',
+  'run.chargesCreated': 'Создано начислений: {{count}}',
+  'run.frozenSkipped': 'Ученики на заморозке не начислялись',
+  'run.idempotentHint': 'Повторный запуск за тот же месяц не создаёт дублей',
+  'run.lastRun': 'Последний запуск',
+  'run.never': 'Ещё не запускался',
+
+  // -- collection and the debt ladder (dashboard 3e) ----------------------------
+  'debt.title': 'Платежи и сборы',
+  'debt.byHousehold': 'Задолженность по семьям',
+  'debt.empty': 'По клубу задолженности нет',
+  'debt.total': 'Всего задолженности',
+  'debt.aging.title': 'Возраст долга',
+  'debt.aging.0_30': '0–30 дней',
+  'debt.aging.31_60': '31–60 дней',
+  'debt.aging.60_plus': 'Более 60 дней',
+  'debt.sendReminder': 'Отправить напоминание',
+  'debt.reminderSent': 'Напоминание отправлено',
+  'debt.escalation.day3': 'Первое напоминание',
+  'debt.escalation.day7': 'Второе напоминание',
+  'debt.escalation.day14': 'Последнее уведомление',
+  'debt.escalation.none': 'Напоминание ещё не отправлялось',
+
+  // -- uPay orders --------------------------------------------------------------
+  'order.status.pending': 'Ожидает подтверждения',
+  'order.status.paid': 'Оплачено',
+  'order.status.failed': 'Не прошёл',
+  'order.status.amount_mismatch': 'Сумма не совпадает',
+  'order.status.expired': 'Истёк срок',
+  'order.verifying': 'Получено, проверяем платёж…',
+  'order.verifyingHint': 'Окно можно закрыть — подтверждение придёт и без него',
+  'order.mismatchAlert': 'Поступил платёж на другую сумму — требуется проверка',
+  'order.mismatchHint': 'Платёж записан полностью и ни к чему не привязан',
+  'order.stale': 'Ожидает более 24 часов — сверьте с отчётами платёжной компании',
+
+  // -- standing-order reconciliation (§5.10) ------------------------------------
+  'reconciliation.title': 'Сопоставление платежей',
+  'reconciliation.unmatched': 'Платежи без привязки',
+  'reconciliation.expected': 'Ожидаемые плательщики в этом месяце',
+  'reconciliation.cardOwner': 'Владелец карты',
+  'reconciliation.last4': 'Последние 4 цифры',
+  'reconciliation.suggestion': 'Предлагаемое совпадение',
+  'reconciliation.confidence': 'Уверенность',
+  'reconciliation.confirm': 'Подтвердить',
+  'reconciliation.ignore': 'Пропустить',
+  'reconciliation.matched': 'Привязка записана',
+  'reconciliation.empty': 'Нет платежей, ожидающих привязки',
+  'reconciliation.neverAuto': 'Привязка записывается только после подтверждения человеком',
+  'reconciliation.overpayment': 'Переплата',
+  'reconciliation.carryForward': 'Перенести на следующий месяц',
+
+  // -- who the manager knows is on a standing order ------------------------------
+  'subscription.title': 'Постоянные поручения',
+  'subscription.status.active': 'Активно',
+  'subscription.status.cancelled': 'Отменено',
+  'subscription.add': 'Записать поручение',
+  'subscription.amount': 'Ежемесячная сумма',
+  'subscription.managerRecordHint': 'Только запись клуба — родитель её не задаёт',
+
+  // -- prices and plans (dashboard 5a, wizard 5e) --------------------------------
+  'plan.title': 'Цены и тарифы',
+  'plan.add': 'Новый тариф',
+  'plan.name': 'Название тарифа',
+  'plan.monthlyAmount': 'Ежемесячная цена',
+  'plan.registrationFee': 'Регистрационный сбор',
+  'plan.activeFrom': 'Действует с',
+  'plan.activeTo': 'Действует до',
+  'plan.appliesTo': 'Применяется к',
+  'plan.empty': 'Тарифы не заданы',
+  'plan.versionedHint': 'Изменение цены закрывает текущий тариф и открывает новый. Прошлые начисления сохраняются',
+  'plan.closeCurrent': 'Закрыть текущий тариф',
+
+  // -- the product catalog and handing an item over (12e, 11a) -------------------
+  'product.title': 'Товары',
+  'product.add': 'Новый товар',
+  'product.name': 'Название',
+  'product.price': 'Цена',
+  'product.empty': 'Товары не заданы',
+  'product.handOut': 'Выдать товар',
+  'product.handedOut': 'Товар выдан, начисление создано',
+  'product.order': 'Заказ товаров',
+  'product.noStockHint': 'Учёта склада нет — выбор товара только создаёт начисление',
+}
