@@ -82,6 +82,30 @@ class StudentOut(BaseModel):
     guardians: list[GuardianOut] = Field(default_factory=list)
 
 
+class GuardianCreate(BaseModel):
+    """§5.3 — guardians are invited by email or phone, and the invitation carries a token
+    binding the accepting identity to the pre-created Person.
+
+    Declared above `StudentCreate` because that shape references it: `from __future__
+    import annotations` makes the annotation a string, but Pydantic resolves it when the
+    model class is built, so the name has to exist by then.
+    """
+
+    first_name: str = Field(min_length=1, max_length=80)
+    last_name: str = Field(min_length=1, max_length=80)
+    relation: str = Field(default="parent", max_length=40)
+    phone: str | None = Field(default=None, max_length=40)
+    email: str | None = Field(default=None, max_length=255)
+    #: §5.3 — this decides bill addressing and הוראת קבע matching, and nothing else.
+    is_primary: bool = False
+
+    @model_validator(mode="after")
+    def _a_guardian_is_reachable(self) -> GuardianCreate:
+        if not self.email and not self.phone:
+            raise ValueError("a guardian needs an email or a phone to be invited on")
+        return self
+
+
 class StudentCreate(BaseModel):
     first_name: str = Field(min_length=1, max_length=100)
     last_name: str = Field(min_length=1, max_length=100)
@@ -90,6 +114,14 @@ class StudentCreate(BaseModel):
     email: str | None = Field(default=None, max_length=255)
     #: §5.4 — a manager adding a student directly. The public link cannot reach this.
     group_id: uuid.UUID | None = None
+    #: §5.4(a) — 'parent details → child details and group'. One request, because a
+    #: student with no guardian is a child nobody can be contacted about, and §5.3 makes
+    #: at least one guardian structural rather than optional.
+    #:
+    #: Optional on the shape rather than required, because §5.4a's trial booking reuses
+    #: `StudentCreate` for its `children[]` and supplies the parent once for the whole
+    #: submission. `POST /students` rejects an absent guardian at the router.
+    guardian: GuardianCreate | None = None
 
 
 class StudentUpdate(BaseModel):
@@ -242,3 +274,189 @@ StudentPage = CursorPage[StudentOut]
 EnrollmentPage = CursorPage[EnrollmentOut]
 RegistrationRequestPage = CursorPage[RegistrationRequestOut]
 TrialBookingPage = CursorPage[TrialBookingOut]
+
+
+# -- M3's own shapes, appended by lane PEOPLE. The contract shapes above are unchanged
+# apart from `StudentCreate.guardian`, which §5.4(a) needs in the same request.
+#
+# **Where `price_plan_id` may and may not appear.** Invariant 3 forbids a financial field
+# on any coach-scoped response, and `tests/invariants/test_03`'s detector matches the
+# property name against `^price` — so `price_plan_id` IS a financial field as far as the
+# gate is concerned, whatever the contract's own docstring intended. `StudentOut` carries
+# it and is therefore returned only from manager-scoped routes; every shape a coach can
+# reach is built without it. `StudentPricePlanOut` is the manager's way to read it, and it
+# carries the C11 volume suggestion beside it because that is the number §5.10 shows when
+# the plan is chosen.
+
+
+class StudentSummaryOut(BaseModel):
+    """The row dashboard `3b` and staff `9h` render, and the only student shape a coach
+    receives from a list.
+
+    `group_names` and not `group_ids`: C11 makes several live enrollments normal, and
+    `3b`'s column shows what a manager reads rather than what a client would have to join.
+    """
+
+    id: uuid.UUID
+    person_id: uuid.UUID
+    first_name: str
+    last_name: str
+    birthdate: date | None
+    status: str = Field(pattern=STUDENT_STATUS_PATTERN)
+    health_status: str = Field(pattern=HEALTH_STATUS_PATTERN)
+    joined_on: date | None
+    left_on: date | None
+    current_belt_id: uuid.UUID | None = None
+    current_belt_name: str | None = None
+    current_belt_color_hex: str | None = None
+    group_names: list[str] = Field(default_factory=list)
+    #: §5.4's freeze shows guardians "מוקפא" with the return date. `None` on an
+    #: open-ended freeze, which is a real state a manager sets deliberately.
+    frozen_until: date | None = None
+    guardian_display_names: list[str] = Field(default_factory=list)
+
+
+class StudentDetailOut(BaseModel):
+    """One student in full, for staff `9c` and dashboard `4a` — and **coach-reachable**.
+
+    `StudentOut` minus `price_plan_id`. §3.2 gives every staff role "View students in own
+    groups", so `GET /students/{id}` is a coach route, and invariant 3's detector reads
+    `price_plan_id` as financial. The price is not omitted to be coy: a coach has no use
+    for it, and a shape that cannot carry it is cheaper to guarantee than a filter that
+    has to remember to.
+    """
+
+    id: uuid.UUID
+    person_id: uuid.UUID
+    first_name: str
+    last_name: str
+    birthdate: date | None
+    phone: str | None = None
+    email: str | None = None
+    status: str = Field(pattern=STUDENT_STATUS_PATTERN)
+    health_status: str = Field(pattern=HEALTH_STATUS_PATTERN)
+    joined_on: date | None
+    left_on: date | None
+    current_belt_id: uuid.UUID | None = None
+    current_belt_name: str | None = None
+    current_belt_color_hex: str | None = None
+    frozen_until: date | None = None
+    guardians: list[GuardianOut] = Field(default_factory=list)
+
+
+class StudentPricePlanOut(BaseModel):
+    """C11's two numbers, manager-scoped. **Never** returned from a `coach`-tagged route.
+
+    `weekly_volume` is what §5.10 shows beside the plan picker so a mismatch between what
+    a child attends and what they are billed for is visible at the moment the price is
+    set. It is a suggestion, not a computation — the manager picks the plan.
+
+    No amount, because `price_plan` is W4's table and does not exist yet (L2).
+    """
+
+    student_id: uuid.UUID
+    price_plan_id: uuid.UUID | None
+    weekly_volume: int
+
+
+class GuardianListResponse(BaseModel):
+    items: list[GuardianOut]
+
+
+class StudentConvertIn(BaseModel):
+    """§5.4a step 5 — 'Manager converts → picks group, sets price, status=active,
+    enrollment created.' Three decisions in one request, because they are one decision."""
+
+    group_id: uuid.UUID
+    started_on: date
+    #: C11, L2 — an opaque id. `price_plan` is W4's table, so this is stored and never
+    #: resolved, and no endpoint in this lane returns an amount.
+    price_plan_id: uuid.UUID | None = None
+    #: C12 — offered as checkboxes over the group's training weekdays, all ticked by
+    #: default. `None` means all of them.
+    attends_weekdays: list[Weekday] | None = Field(default=None, min_length=1)
+    reason: str | None = Field(default=None, max_length=200)
+
+
+class StudentMarkLostIn(BaseModel):
+    """§5.4a — 'No conversion after N days → status=lost, with a reason.' Required here
+    and optional in the job, because a manager pressing the button knows why and the job
+    only knows that time passed."""
+
+    reason: str = Field(min_length=1, max_length=200)
+
+
+class StudentCreateResult(BaseModel):
+    """§5.4(a) — 'Creates everything immediately with health_status = missing, and sends
+    the parent an invitation.'
+
+    `invitation_token` is returned **once**, to the manager who just created the student,
+    so the dashboard can render a copyable link for a parent standing at the desk. Only
+    its SHA-256 hash reaches `invitation.token_hash`, and it is never logged.
+
+    Manager-scoped, so `StudentOut` (with `price_plan_id`) is safe here.
+    """
+
+    student: StudentOut
+    invitation_token: str | None = None
+
+
+class StudentStatusHistoryListResponse(BaseModel):
+    items: list[StudentStatusHistoryOut]
+
+
+class PublicGroupOut(BaseModel):
+    """§7 — `GET /public/studios/{slug}/groups`, unauthenticated.
+
+    A deliberately narrow projection, for the same reason `TrialSlotOut` is one: this is a
+    shop window on the open internet. No class id, no staff, no enrollment count.
+    `training_weekdays` is here because parent `13a` shows "מתאמנים בימים" beside each
+    group, and because §5.4a filters groups by the child's age where a range is set.
+    """
+
+    id: uuid.UUID
+    name: str
+    description: str | None
+    age_min: int | None
+    age_max: int | None
+    training_weekdays: list[Weekday] = Field(default_factory=list)
+
+
+class PublicGroupListResponse(BaseModel):
+    """Not a `CursorPage`: a club has a dozen groups, not a growing list somebody pages
+    through, and the landing page renders all of them at once."""
+
+    items: list[PublicGroupOut]
+
+
+class PublicLandingOut(BaseModel):
+    """§5.4a ① — 'a public LANDING PAGE at /t/{studio-slug} — the club's shop window, not
+    a form.'"""
+
+    studio_name: str
+    slug: str
+    logo_url: str | None
+    default_locale: str
+    #: §5.4a: "Logo, photos, what the club does, where and when". Read from
+    #: `studio.settings`, the JSONB M1's setup wizard already writes.
+    headline: str | None
+    about: str | None
+    address: str | None
+    photo_urls: list[str] = Field(default_factory=list)
+    groups: list[PublicGroupOut] = Field(default_factory=list)
+
+
+class EnrollmentWeekdayOptionsOut(BaseModel):
+    """C12's checkboxes. The enrolment form asks this before it can draw the day list.
+
+    `training_weekdays` comes through `ScheduleService.materialize_sessions()` (L5), so an
+    empty list means "this group has no schedule yet" and the form says exactly that.
+    """
+
+    group_id: uuid.UUID
+    group_name: str
+    training_weekdays: list[Weekday] = Field(default_factory=list)
+
+
+class StudentSummaryPage(CursorPage[StudentSummaryOut]):
+    pass

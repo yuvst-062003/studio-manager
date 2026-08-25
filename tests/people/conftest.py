@@ -19,6 +19,8 @@ from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta
 
 import pytest
+from app.core.db import get_engine
+from app.core.tenancy import TenantSession, use_studio
 from app.models.identity import AuthIdentity
 from app.models.person import Guardian, Person, RoleAssignment
 from app.models.schedule import Session as SessionRow
@@ -258,3 +260,19 @@ def other_studio_group_id(app_session: Session) -> uuid.UUID:
     app_session.add(group)
     app_session.commit()
     return group.id
+
+
+@pytest.fixture
+def tenant_session(studio: Studio) -> Iterator[TenantSession]:
+    """A session scoped to `studio`, the way every request-scoped path runs.
+
+    Services in this lane are written against `TenantSession`: it filters every query by
+    the active studio and fails closed when there is none. `app_session` is a plain,
+    unscoped `Session` — fine for arranging fixture rows, wrong for exercising a service,
+    because a list assertion made through it sees every studio's rows including those
+    committed by earlier tests and by the other lane sharing this database.
+
+    Arrange with `app_session`, act and assert through this.
+    """
+    with use_studio(studio.id), TenantSession(bind=get_engine(), expire_on_commit=False) as s:
+        yield s

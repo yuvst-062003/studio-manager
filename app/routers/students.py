@@ -1,0 +1,322 @@
+"""SPEC §7's `/students` and `/me/students`.
+
+**The `coach` tag is per-route, not per-router.** `.claude/rules/api.md`: "A router serving
+coaches is tagged `coach`. SPEC §13's third invariant -- no coach-scoped endpoint returns
+any financial field -- is enforced against that tag, so an untagged coach router is an
+unguarded one." Staff `9c` and `9h` make the reads here coach-reachable, so those routes
+carry the tag.
+
+The writes deliberately do **not**. `tests/invariants/test_03`'s detector matches a
+response property against `^price`, which makes `price_plan_id` a financial field as far
+as the gate is concerned -- whatever `StudentOut`'s own docstring intended by it. So the
+coach-reachable reads return `StudentSummaryOut` / `StudentDetailOut`, neither of which has
+the field, and `StudentOut` appears only behind `ManagerOrOwner`. Tagging the whole router
+would have made invariant 3 red for `GET /students/{id}` on the day this landed, and the
+fix would have been to weaken either the tag or the shape.
+
+**§3.2's viewer split is resolved once, in a dependency**, and handed to the service as
+`viewer_group_ids`. Authorization stays in the router; what the service receives is a
+scope, not a caller -- which is what lets the follow-up worker call the same methods with
+no request anywhere in sight.
+
+Every route takes `TenantSessionDep`, which fails closed. That is why nothing here passes a
+`studio_id`, and why a cross-studio reference is 404 rather than 403: the row is invisible,
+not merely forbidden, and a 403 would confirm it exists.
+"""
+
+from __future__ import annotations
+
+import uuid
+from enum import Enum
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+
+from app.core.auth_context import AnyStaff, ManagerOrOwner
+from app.core.clock import now
+from app.core.tenancy import TenantSession, TenantSessionDep
+from app.models.people import Student
+from app.models.person import Person
+from app.schemas._pagination import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, IdempotencyKey
+from app.schemas.people import (
+    GuardianOut,
+    StudentCreate,
+    StudentCreateResult,
+    StudentDetailOut,
+    StudentOut,
+    StudentStatusHistoryListResponse,
+    StudentSummaryOut,
+    StudentSummaryPage,
+    StudentUpdate,
+)
+from app.services.people.errors import ConflictError, NotFoundError
+from app.services.people.students import StudentRow, StudentService
+
+router = APIRouter(tags=["people"])
+
+#: SPEC §7 lists `/me/students` beside `/students`, and both live here. The tag that
+#: matters is per-route; see the module docstring.
+COACH: list[str | Enum] = ["people", "coach"]
+
+
+def _not_found() -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail={"code": "not_found", "message": "no such student"},
+    )
+
+
+def _conflict(message: str) -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_409_CONFLICT, detail={"code": "conflict", "message": message}
+    )
+
+
+def _refused(code: str, message: str) -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+        detail={"code": code, "message": message},
+    )
+
+
+def _person_id(request: Request) -> uuid.UUID:
+    person_id = getattr(request.state, "person_id", None)
+    if not isinstance(person_id, uuid.UUID):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={"code": "unauthenticated", "message": "sign in first"},
+        )
+    return person_id
+
+
+def viewer_scope(request: Request, session: TenantSessionDep) -> list[uuid.UUID] | None:
+    """§3.2 -- `None` for owner and manager, a group list for a coach.
+
+    Read from the verified JWT's `roles` claim and `group_staff`. Resolved here rather
+    than inside the service because it is an authorization decision, and
+    `.claude/rules/api.md` puts those in the router.
+    """
+    roles = set(getattr(request.state, "roles", ()) or ())
+    return StudentService.viewer_group_ids(session, person_id=_person_id(request), roles=roles)
+
+
+ViewerScope = Annotated[list[uuid.UUID] | None, Depends(viewer_scope)]
+
+
+def _summary(row: StudentRow) -> StudentSummaryOut:
+    return StudentSummaryOut(**row.__dict__)
+
+
+def _detail(session: TenantSession, student: Student, person: Person) -> StudentDetailOut:
+    """§5.3's guardians, ordered primary-first because that is the order `2c` and `4a`
+    render them in -- not because the primary is privileged. L8: nothing branches."""
+    from sqlalchemy import select
+
+    from app.models.person import Guardian
+
+    guardians = session.execute(
+        select(Guardian, Person)
+        .join(Person, Guardian.person_id == Person.id)
+        .where(Guardian.student_id == student.id)
+        .order_by(Guardian.is_primary.desc(), Person.first_name)
+    ).all()
+    row = StudentService._project(session, student, person)
+    return StudentDetailOut(
+        id=student.id,
+        person_id=person.id,
+        first_name=person.first_name,
+        last_name=person.last_name,
+        birthdate=person.birthdate,
+        phone=person.phone,
+        email=person.email,
+        status=student.status,
+        health_status=student.health_status,
+        joined_on=student.joined_on,
+        left_on=student.left_on,
+        current_belt_id=student.current_belt_id,
+        frozen_until=row.frozen_until,
+        guardians=[
+            GuardianOut(
+                person_id=g.person_id,
+                student_id=g.student_id,
+                display_name=f"{p.first_name} {p.last_name}",
+                relation=g.relation,
+                is_primary=g.is_primary,
+                phone=p.phone,
+                email=p.email,
+            )
+            for g, p in guardians
+        ],
+    )
+
+
+def _out(session: TenantSession, student: Student, person: Person) -> StudentOut:
+    """Manager-scoped only -- this is the shape that carries `price_plan_id`."""
+    detail = _detail(session, student, person)
+    return StudentOut(
+        id=detail.id,
+        person_id=detail.person_id,
+        first_name=detail.first_name,
+        last_name=detail.last_name,
+        birthdate=detail.birthdate,
+        status=detail.status,
+        health_status=detail.health_status,
+        joined_on=detail.joined_on,
+        left_on=detail.left_on,
+        current_belt_id=detail.current_belt_id,
+        price_plan_id=student.price_plan_id,
+        guardians=detail.guardians,
+    )
+
+
+# -- reads (coach-reachable) ---------------------------------------------------
+@router.get("/students", response_model=StudentSummaryPage, tags=COACH)
+def list_students(
+    _: AnyStaff,
+    scope: ViewerScope,
+    session: TenantSessionDep,
+    status_filter: str | None = Query(default=None, alias="status"),
+    group_id: uuid.UUID | None = None,
+    health_status: str | None = None,
+    q: str | None = Query(default=None, max_length=100),
+    after: uuid.UUID | None = None,
+    limit: int = Query(default=DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
+) -> StudentSummaryPage:
+    """Dashboard `3b` and staff `9h`."""
+    rows, next_cursor = StudentService.list_students(
+        session,
+        viewer_group_ids=scope,
+        status=status_filter,
+        group_id=group_id,
+        health_status=health_status,
+        q=q,
+        after=after,
+        limit=limit,
+    )
+    return StudentSummaryPage(
+        items=[_summary(row) for row in rows],
+        next_cursor=next_cursor,
+        has_more=next_cursor is not None,
+    )
+
+
+@router.get("/students/{student_id}", response_model=StudentDetailOut, tags=COACH)
+def get_student(
+    _: AnyStaff, student_id: uuid.UUID, scope: ViewerScope, session: TenantSessionDep
+) -> StudentDetailOut:
+    """Staff `9c` and dashboard `4a`. No price here -- see the module docstring."""
+    try:
+        student, person = StudentService.get(session, student_id=student_id, viewer_group_ids=scope)
+    except NotFoundError as exc:
+        raise _not_found() from exc
+    return _detail(session, student, person)
+
+
+@router.get(
+    "/students/{student_id}/status-history",
+    response_model=StudentStatusHistoryListResponse,
+    tags=COACH,
+)
+def student_status_history(
+    _: AnyStaff, student_id: uuid.UUID, scope: ViewerScope, session: TenantSessionDep
+) -> StudentStatusHistoryListResponse:
+    """§5.4a's funnel is computed from these rows; dashboard `4a` renders them as a
+    timeline. Task 6 fills in the service method."""
+    from app.schemas.people import StudentStatusHistoryOut
+
+    try:
+        StudentService.get(session, student_id=student_id, viewer_group_ids=scope)
+    except NotFoundError as exc:
+        raise _not_found() from exc
+    return StudentStatusHistoryListResponse(
+        items=[
+            StudentStatusHistoryOut.model_validate(row, from_attributes=True)
+            for row in StudentService.status_history(session, student_id=student_id)
+        ]
+    )
+
+
+# -- writes (manager-only) -----------------------------------------------------
+@router.post("/students", response_model=StudentCreateResult, status_code=status.HTTP_201_CREATED)
+def create_student(
+    _: ManagerOrOwner,
+    body: StudentCreate,
+    request: Request,
+    session: TenantSessionDep,
+    idempotency_key: IdempotencyKey = None,
+) -> StudentCreateResult:
+    """§5.4(a) -- `+ תלמיד חדש`. Dashboard `3c`.
+
+    L6: manager-or-owner, and there is no self-service equivalent. The public link's only
+    job is a first lesson.
+    """
+    if body.guardian is None:
+        # §5.3 makes at least one guardian structural; the schema cannot say so, because
+        # §5.4a's trial booking reuses this shape with the parent supplied once for the
+        # whole submission.
+        raise _refused("guardian_required", "a student needs at least one guardian")
+    try:
+        created = StudentService.create(
+            session,
+            first_name=body.first_name,
+            last_name=body.last_name,
+            birthdate=body.birthdate,
+            guardian_first_name=body.guardian.first_name,
+            guardian_last_name=body.guardian.last_name,
+            guardian_email=body.guardian.email,
+            guardian_phone=body.guardian.phone,
+            relation=body.guardian.relation,
+            at=now(),
+            actor_person_id=getattr(request.state, "person_id", None),
+        )
+    except ConflictError as exc:
+        raise _conflict(str(exc)) from exc
+    token = created.invitation_token
+    session.commit()
+    student, person = StudentService.get(session, student_id=created.student.id)
+    return StudentCreateResult(student=_out(session, student, person), invitation_token=token)
+
+
+@router.patch("/students/{student_id}", response_model=StudentOut)
+def update_student(
+    _: ManagerOrOwner,
+    student_id: uuid.UUID,
+    body: StudentUpdate,
+    request: Request,
+    session: TenantSessionDep,
+    idempotency_key: IdempotencyKey = None,
+) -> StudentOut:
+    try:
+        student, person = StudentService.update(
+            session,
+            student_id=student_id,
+            at=now(),
+            actor_person_id=getattr(request.state, "person_id", None),
+            first_name=body.first_name,
+            last_name=body.last_name,
+            birthdate=body.birthdate,
+            phone=body.phone,
+            email=body.email,
+        )
+    except NotFoundError as exc:
+        raise _not_found() from exc
+    session.commit()
+    return _out(session, student, person)
+
+
+# -- the parent's own children -------------------------------------------------
+@router.get("/me/students", response_model=StudentSummaryPage)
+def my_students(request: Request, session: TenantSessionDep) -> StudentSummaryPage:
+    """§6.3's home, and L9 verbatim.
+
+    **No role dependency**, deliberately. §3.1: "guardian is not a role"; §6.1 makes parent
+    access `EXISTS(guardian WHERE person_id = :me)`. `require_roles` here would refuse
+    every guardian in the product and admit every coach with no children.
+
+    L8 -- no `is_primary` branch. Every guardian on a student sees the same list.
+
+    Not paginated: this is one person's children. G16 is about lists that grow, and a
+    family that outgrows one page is not a case the product has.
+    """
+    rows = StudentService.for_guardian(session, person_id=_person_id(request))
+    return StudentSummaryPage(items=[_summary(row) for row in rows], has_more=False)

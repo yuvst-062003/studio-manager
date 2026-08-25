@@ -411,6 +411,35 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/students": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Students
+         * @description §6.3's home, and L9 verbatim.
+         *
+         *     **No role dependency**, deliberately. §3.1: "guardian is not a role"; §6.1 makes parent
+         *     access `EXISTS(guardian WHERE person_id = :me)`. `require_roles` here would refuse
+         *     every guardian in the product and admit every coach with no children.
+         *
+         *     L8 -- no `is_primary` branch. Every guardian on a student sees the same list.
+         *
+         *     Not paginated: this is one person's children. G16 is about lists that grow, and a
+         *     family that outgrows one page is not a case the product has.
+         */
+        get: operations["my_students_api_v1_me_students_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/platform/studios": {
         parameters: {
             query?: never;
@@ -614,6 +643,75 @@ export interface paths {
         };
         /** List Staff */
         get: operations["list_staff_api_v1_staff_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/students": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Students
+         * @description Dashboard `3b` and staff `9h`.
+         */
+        get: operations["list_students_api_v1_students_get"];
+        put?: never;
+        /**
+         * Create Student
+         * @description §5.4(a) -- `+ תלמיד חדש`. Dashboard `3c`.
+         *
+         *     L6: manager-or-owner, and there is no self-service equivalent. The public link's only
+         *     job is a first lesson.
+         */
+        post: operations["create_student_api_v1_students_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/students/{student_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Student
+         * @description Staff `9c` and dashboard `4a`. No price here -- see the module docstring.
+         */
+        get: operations["get_student_api_v1_students__student_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Student */
+        patch: operations["update_student_api_v1_students__student_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/students/{student_id}/status-history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Student Status History
+         * @description §5.4a's funnel is computed from these rows; dashboard `4a` renders them as a
+         *     timeline. Task 6 fills in the service method.
+         */
+        get: operations["student_status_history_api_v1_students__student_id__status_history_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1065,6 +1163,64 @@ export interface components {
             role: string;
             /** To Date */
             to_date: string | null;
+        };
+        /**
+         * GuardianCreate
+         * @description §5.3 — guardians are invited by email or phone, and the invitation carries a token
+         *     binding the accepting identity to the pre-created Person.
+         *
+         *     Declared above `StudentCreate` because that shape references it: `from __future__
+         *     import annotations` makes the annotation a string, but Pydantic resolves it when the
+         *     model class is built, so the name has to exist by then.
+         */
+        GuardianCreate: {
+            /** Email */
+            email?: string | null;
+            /** First Name */
+            first_name: string;
+            /**
+             * Is Primary
+             * @default false
+             */
+            is_primary: boolean;
+            /** Last Name */
+            last_name: string;
+            /** Phone */
+            phone?: string | null;
+            /**
+             * Relation
+             * @default parent
+             */
+            relation: string;
+        };
+        /**
+         * GuardianOut
+         * @description §4.3's `guardian` link, projected.
+         *
+         *     `is_primary` is reported because the parent app shows whose name the bill carries
+         *     (§5.10) — not because anything is gated on it. See the module docstring.
+         */
+        GuardianOut: {
+            /** Display Name */
+            display_name: string;
+            /** Email */
+            email?: string | null;
+            /** Is Primary */
+            is_primary: boolean;
+            /**
+             * Person Id
+             * Format: uuid
+             */
+            person_id: string;
+            /** Phone */
+            phone?: string | null;
+            /** Relation */
+            relation: string;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -1688,6 +1844,234 @@ export interface components {
              * @description Always null in M1. Weekly load is group_schedule_rule × session, both W2 contract models. Zero would report an idle coach rather than a missing measurement.
              */
             weekly_hours?: number | null;
+        };
+        /** StudentCreate */
+        StudentCreate: {
+            /** Birthdate */
+            birthdate?: string | null;
+            /** Email */
+            email?: string | null;
+            /** First Name */
+            first_name: string;
+            /** Group Id */
+            group_id?: string | null;
+            guardian?: components["schemas"]["GuardianCreate"] | null;
+            /** Last Name */
+            last_name: string;
+            /** Phone */
+            phone?: string | null;
+        };
+        /**
+         * StudentCreateResult
+         * @description §5.4(a) — 'Creates everything immediately with health_status = missing, and sends
+         *     the parent an invitation.'
+         *
+         *     `invitation_token` is returned **once**, to the manager who just created the student,
+         *     so the dashboard can render a copyable link for a parent standing at the desk. Only
+         *     its SHA-256 hash reaches `invitation.token_hash`, and it is never logged.
+         *
+         *     Manager-scoped, so `StudentOut` (with `price_plan_id`) is safe here.
+         */
+        StudentCreateResult: {
+            /** Invitation Token */
+            invitation_token?: string | null;
+            student: components["schemas"]["StudentOut"];
+        };
+        /**
+         * StudentDetailOut
+         * @description One student in full, for staff `9c` and dashboard `4a` — and **coach-reachable**.
+         *
+         *     `StudentOut` minus `price_plan_id`. §3.2 gives every staff role "View students in own
+         *     groups", so `GET /students/{id}` is a coach route, and invariant 3's detector reads
+         *     `price_plan_id` as financial. The price is not omitted to be coy: a coach has no use
+         *     for it, and a shape that cannot carry it is cheaper to guarantee than a filter that
+         *     has to remember to.
+         */
+        StudentDetailOut: {
+            /** Birthdate */
+            birthdate: string | null;
+            /** Current Belt Color Hex */
+            current_belt_color_hex?: string | null;
+            /** Current Belt Id */
+            current_belt_id?: string | null;
+            /** Current Belt Name */
+            current_belt_name?: string | null;
+            /** Email */
+            email?: string | null;
+            /** First Name */
+            first_name: string;
+            /** Frozen Until */
+            frozen_until?: string | null;
+            /** Guardians */
+            guardians?: components["schemas"]["GuardianOut"][];
+            /** Health Status */
+            health_status: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Joined On */
+            joined_on: string | null;
+            /** Last Name */
+            last_name: string;
+            /** Left On */
+            left_on: string | null;
+            /**
+             * Person Id
+             * Format: uuid
+             */
+            person_id: string;
+            /** Phone */
+            phone?: string | null;
+            /** Status */
+            status: string;
+        };
+        /**
+         * StudentOut
+         * @description One student, as every surface reads them.
+         *
+         *     `health_status` is here and `derived_flags` is **not**. That split is §5.5's whole
+         *     privacy model: the status is a three-valued fact a coach may see, the flags are health
+         *     data and travel only on the roster payload a coach is already authorised for
+         *     (`BootstrapPayload.roster[]`, W3). A general-purpose student shape that carried flags
+         *     would leak them into every screen that happens to list students.
+         */
+        StudentOut: {
+            /** Birthdate */
+            birthdate: string | null;
+            /** Current Belt Color Hex */
+            current_belt_color_hex?: string | null;
+            /** Current Belt Id */
+            current_belt_id: string | null;
+            /** Current Belt Name */
+            current_belt_name?: string | null;
+            /** First Name */
+            first_name: string;
+            /** Guardians */
+            guardians?: components["schemas"]["GuardianOut"][];
+            /** Health Status */
+            health_status: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Joined On */
+            joined_on: string | null;
+            /** Last Name */
+            last_name: string;
+            /** Left On */
+            left_on: string | null;
+            /**
+             * Person Id
+             * Format: uuid
+             */
+            person_id: string;
+            /** Price Plan Id */
+            price_plan_id?: string | null;
+            /** Status */
+            status: string;
+        };
+        /** StudentStatusHistoryListResponse */
+        StudentStatusHistoryListResponse: {
+            /** Items */
+            items: components["schemas"]["StudentStatusHistoryOut"][];
+        };
+        /** StudentStatusHistoryOut */
+        StudentStatusHistoryOut: {
+            /**
+             * Changed At
+             * Format: date-time
+             */
+            changed_at: string;
+            /** From Status */
+            from_status: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Reason */
+            reason: string | null;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+            /** To Status */
+            to_status: string;
+        };
+        /**
+         * StudentSummaryOut
+         * @description The row dashboard `3b` and staff `9h` render, and the only student shape a coach
+         *     receives from a list.
+         *
+         *     `group_names` and not `group_ids`: C11 makes several live enrollments normal, and
+         *     `3b`'s column shows what a manager reads rather than what a client would have to join.
+         */
+        StudentSummaryOut: {
+            /** Birthdate */
+            birthdate: string | null;
+            /** Current Belt Color Hex */
+            current_belt_color_hex?: string | null;
+            /** Current Belt Id */
+            current_belt_id?: string | null;
+            /** Current Belt Name */
+            current_belt_name?: string | null;
+            /** First Name */
+            first_name: string;
+            /** Frozen Until */
+            frozen_until?: string | null;
+            /** Group Names */
+            group_names?: string[];
+            /** Guardian Display Names */
+            guardian_display_names?: string[];
+            /** Health Status */
+            health_status: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Joined On */
+            joined_on: string | null;
+            /** Last Name */
+            last_name: string;
+            /** Left On */
+            left_on: string | null;
+            /**
+             * Person Id
+             * Format: uuid
+             */
+            person_id: string;
+            /** Status */
+            status: string;
+        };
+        /** StudentSummaryPage */
+        StudentSummaryPage: {
+            /**
+             * Has More
+             * @default false
+             */
+            has_more: boolean;
+            /** Items */
+            items: components["schemas"]["StudentSummaryOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** StudentUpdate */
+        StudentUpdate: {
+            /** Birthdate */
+            birthdate?: string | null;
+            /** Email */
+            email?: string | null;
+            /** First Name */
+            first_name?: string | null;
+            /** Last Name */
+            last_name?: string | null;
+            /** Phone */
+            phone?: string | null;
         };
         /** StudioListResponse */
         StudioListResponse: {
@@ -2602,6 +2986,26 @@ export interface operations {
             };
         };
     };
+    my_students_api_v1_me_students_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudentSummaryPage"];
+                };
+            };
+        };
+    };
     get_studios_api_v1_platform_studios_get: {
         parameters: {
             query?: never;
@@ -3063,6 +3467,178 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StaffListResponse"];
+                };
+            };
+        };
+    };
+    list_students_api_v1_students_get: {
+        parameters: {
+            query?: {
+                status?: string | null;
+                group_id?: string | null;
+                health_status?: string | null;
+                q?: string | null;
+                after?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudentSummaryPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_student_api_v1_students_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StudentCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudentCreateResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_student_api_v1_students__student_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudentDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_student_api_v1_students__student_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StudentUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    student_status_history_api_v1_students__student_id__status_history_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudentStatusHistoryListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

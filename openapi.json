@@ -763,6 +763,122 @@
         "title": "GroupStaffOut",
         "type": "object"
       },
+      "GuardianCreate": {
+        "description": "§5.3 — guardians are invited by email or phone, and the invitation carries a token\nbinding the accepting identity to the pre-created Person.\n\nDeclared above `StudentCreate` because that shape references it: `from __future__\nimport annotations` makes the annotation a string, but Pydantic resolves it when the\nmodel class is built, so the name has to exist by then.",
+        "properties": {
+          "email": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "first_name": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "First Name",
+            "type": "string"
+          },
+          "is_primary": {
+            "default": false,
+            "title": "Is Primary",
+            "type": "boolean"
+          },
+          "last_name": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Last Name",
+            "type": "string"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "relation": {
+            "default": "parent",
+            "maxLength": 40,
+            "title": "Relation",
+            "type": "string"
+          }
+        },
+        "required": [
+          "first_name",
+          "last_name"
+        ],
+        "title": "GuardianCreate",
+        "type": "object"
+      },
+      "GuardianOut": {
+        "description": "§4.3's `guardian` link, projected.\n\n`is_primary` is reported because the parent app shows whose name the bill carries\n(§5.10) — not because anything is gated on it. See the module docstring.",
+        "properties": {
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "is_primary": {
+            "title": "Is Primary",
+            "type": "boolean"
+          },
+          "person_id": {
+            "format": "uuid",
+            "title": "Person Id",
+            "type": "string"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "relation": {
+            "title": "Relation",
+            "type": "string"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "person_id",
+          "student_id",
+          "display_name",
+          "relation",
+          "is_primary"
+        ],
+        "title": "GuardianOut",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -2052,6 +2168,717 @@
           "status"
         ],
         "title": "StaffMemberOut",
+        "type": "object"
+      },
+      "StudentCreate": {
+        "properties": {
+          "birthdate": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Birthdate"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "first_name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "First Name",
+            "type": "string"
+          },
+          "group_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Group Id"
+          },
+          "guardian": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GuardianCreate"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "last_name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Last Name",
+            "type": "string"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          }
+        },
+        "required": [
+          "first_name",
+          "last_name"
+        ],
+        "title": "StudentCreate",
+        "type": "object"
+      },
+      "StudentCreateResult": {
+        "description": "§5.4(a) — 'Creates everything immediately with health_status = missing, and sends\nthe parent an invitation.'\n\n`invitation_token` is returned **once**, to the manager who just created the student,\nso the dashboard can render a copyable link for a parent standing at the desk. Only\nits SHA-256 hash reaches `invitation.token_hash`, and it is never logged.\n\nManager-scoped, so `StudentOut` (with `price_plan_id`) is safe here.",
+        "properties": {
+          "invitation_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invitation Token"
+          },
+          "student": {
+            "$ref": "#/components/schemas/StudentOut"
+          }
+        },
+        "required": [
+          "student"
+        ],
+        "title": "StudentCreateResult",
+        "type": "object"
+      },
+      "StudentDetailOut": {
+        "description": "One student in full, for staff `9c` and dashboard `4a` — and **coach-reachable**.\n\n`StudentOut` minus `price_plan_id`. §3.2 gives every staff role \"View students in own\ngroups\", so `GET /students/{id}` is a coach route, and invariant 3's detector reads\n`price_plan_id` as financial. The price is not omitted to be coy: a coach has no use\nfor it, and a shape that cannot carry it is cheaper to guarantee than a filter that\nhas to remember to.",
+        "properties": {
+          "birthdate": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Birthdate"
+          },
+          "current_belt_color_hex": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Belt Color Hex"
+          },
+          "current_belt_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Belt Id"
+          },
+          "current_belt_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Belt Name"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "first_name": {
+            "title": "First Name",
+            "type": "string"
+          },
+          "frozen_until": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Frozen Until"
+          },
+          "guardians": {
+            "items": {
+              "$ref": "#/components/schemas/GuardianOut"
+            },
+            "title": "Guardians",
+            "type": "array"
+          },
+          "health_status": {
+            "pattern": "^(missing|trial_signed|signed)$",
+            "title": "Health Status",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "joined_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Joined On"
+          },
+          "last_name": {
+            "title": "Last Name",
+            "type": "string"
+          },
+          "left_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Left On"
+          },
+          "person_id": {
+            "format": "uuid",
+            "title": "Person Id",
+            "type": "string"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "status": {
+            "pattern": "^(lead|trial|pending_approval|active|frozen|left|lost)$",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "person_id",
+          "first_name",
+          "last_name",
+          "birthdate",
+          "status",
+          "health_status",
+          "joined_on",
+          "left_on"
+        ],
+        "title": "StudentDetailOut",
+        "type": "object"
+      },
+      "StudentOut": {
+        "description": "One student, as every surface reads them.\n\n`health_status` is here and `derived_flags` is **not**. That split is §5.5's whole\nprivacy model: the status is a three-valued fact a coach may see, the flags are health\ndata and travel only on the roster payload a coach is already authorised for\n(`BootstrapPayload.roster[]`, W3). A general-purpose student shape that carried flags\nwould leak them into every screen that happens to list students.",
+        "properties": {
+          "birthdate": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Birthdate"
+          },
+          "current_belt_color_hex": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Belt Color Hex"
+          },
+          "current_belt_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Belt Id"
+          },
+          "current_belt_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Belt Name"
+          },
+          "first_name": {
+            "title": "First Name",
+            "type": "string"
+          },
+          "guardians": {
+            "items": {
+              "$ref": "#/components/schemas/GuardianOut"
+            },
+            "title": "Guardians",
+            "type": "array"
+          },
+          "health_status": {
+            "pattern": "^(missing|trial_signed|signed)$",
+            "title": "Health Status",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "joined_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Joined On"
+          },
+          "last_name": {
+            "title": "Last Name",
+            "type": "string"
+          },
+          "left_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Left On"
+          },
+          "person_id": {
+            "format": "uuid",
+            "title": "Person Id",
+            "type": "string"
+          },
+          "price_plan_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Plan Id"
+          },
+          "status": {
+            "pattern": "^(lead|trial|pending_approval|active|frozen|left|lost)$",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "person_id",
+          "first_name",
+          "last_name",
+          "birthdate",
+          "status",
+          "health_status",
+          "joined_on",
+          "left_on",
+          "current_belt_id"
+        ],
+        "title": "StudentOut",
+        "type": "object"
+      },
+      "StudentStatusHistoryListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/StudentStatusHistoryOut"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "StudentStatusHistoryListResponse",
+        "type": "object"
+      },
+      "StudentStatusHistoryOut": {
+        "properties": {
+          "changed_at": {
+            "format": "date-time",
+            "title": "Changed At",
+            "type": "string"
+          },
+          "from_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Status"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          },
+          "to_status": {
+            "title": "To Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "student_id",
+          "from_status",
+          "to_status",
+          "reason",
+          "changed_at"
+        ],
+        "title": "StudentStatusHistoryOut",
+        "type": "object"
+      },
+      "StudentSummaryOut": {
+        "description": "The row dashboard `3b` and staff `9h` render, and the only student shape a coach\nreceives from a list.\n\n`group_names` and not `group_ids`: C11 makes several live enrollments normal, and\n`3b`'s column shows what a manager reads rather than what a client would have to join.",
+        "properties": {
+          "birthdate": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Birthdate"
+          },
+          "current_belt_color_hex": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Belt Color Hex"
+          },
+          "current_belt_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Belt Id"
+          },
+          "current_belt_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Belt Name"
+          },
+          "first_name": {
+            "title": "First Name",
+            "type": "string"
+          },
+          "frozen_until": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Frozen Until"
+          },
+          "group_names": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Group Names",
+            "type": "array"
+          },
+          "guardian_display_names": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Guardian Display Names",
+            "type": "array"
+          },
+          "health_status": {
+            "pattern": "^(missing|trial_signed|signed)$",
+            "title": "Health Status",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "joined_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Joined On"
+          },
+          "last_name": {
+            "title": "Last Name",
+            "type": "string"
+          },
+          "left_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Left On"
+          },
+          "person_id": {
+            "format": "uuid",
+            "title": "Person Id",
+            "type": "string"
+          },
+          "status": {
+            "pattern": "^(lead|trial|pending_approval|active|frozen|left|lost)$",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "person_id",
+          "first_name",
+          "last_name",
+          "birthdate",
+          "status",
+          "health_status",
+          "joined_on",
+          "left_on"
+        ],
+        "title": "StudentSummaryOut",
+        "type": "object"
+      },
+      "StudentSummaryPage": {
+        "properties": {
+          "has_more": {
+            "default": false,
+            "title": "Has More",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/StudentSummaryOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "StudentSummaryPage",
+        "type": "object"
+      },
+      "StudentUpdate": {
+        "properties": {
+          "birthdate": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Birthdate"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "first_name": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Name"
+          },
+          "last_name": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Name"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          }
+        },
+        "title": "StudentUpdate",
         "type": "object"
       },
       "StudioListResponse": {
@@ -3615,6 +4442,28 @@
         ]
       }
     },
+    "/api/v1/me/students": {
+      "get": {
+        "description": "§6.3's home, and L9 verbatim.\n\n**No role dependency**, deliberately. §3.1: \"guardian is not a role\"; §6.1 makes parent\naccess `EXISTS(guardian WHERE person_id = :me)`. `require_roles` here would refuse\nevery guardian in the product and admit every coach with no children.\n\nL8 -- no `is_primary` branch. Every guardian on a student sees the same list.\n\nNot paginated: this is one person's children. G16 is about lists that grow, and a\nfamily that outgrows one page is not a case the product has.",
+        "operationId": "my_students_api_v1_me_students_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentSummaryPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "My Students",
+        "tags": [
+          "people"
+        ]
+      }
+    },
     "/api/v1/platform/studios": {
       "get": {
         "description": "§18.3's studio list, M1's subset: the rows, not the health chips (C4 -- M9 owns\nthose, and the operations board with them).",
@@ -4398,6 +5247,360 @@
         "summary": "List Staff",
         "tags": [
           "staff"
+        ]
+      }
+    },
+    "/api/v1/students": {
+      "get": {
+        "description": "Dashboard `3b` and staff `9h`.",
+        "operationId": "list_students_api_v1_students_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "group_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Group Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "health_status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Health Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 100,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "After"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentSummaryPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Students",
+        "tags": [
+          "people",
+          "people",
+          "coach"
+        ]
+      },
+      "post": {
+        "description": "§5.4(a) -- `+ תלמיד חדש`. Dashboard `3c`.\n\nL6: manager-or-owner, and there is no self-service equivalent. The public link's only\njob is a first lesson.",
+        "operationId": "create_student_api_v1_students_post",
+        "parameters": [
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StudentCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentCreateResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Student",
+        "tags": [
+          "people"
+        ]
+      }
+    },
+    "/api/v1/students/{student_id}": {
+      "get": {
+        "description": "Staff `9c` and dashboard `4a`. No price here -- see the module docstring.",
+        "operationId": "get_student_api_v1_students__student_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentDetailOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Student",
+        "tags": [
+          "people",
+          "people",
+          "coach"
+        ]
+      },
+      "patch": {
+        "operationId": "update_student_api_v1_students__student_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StudentUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Student",
+        "tags": [
+          "people"
+        ]
+      }
+    },
+    "/api/v1/students/{student_id}/status-history": {
+      "get": {
+        "description": "§5.4a's funnel is computed from these rows; dashboard `4a` renders them as a\ntimeline. Task 6 fills in the service method.",
+        "operationId": "student_status_history_api_v1_students__student_id__status_history_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentStatusHistoryListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Student Status History",
+        "tags": [
+          "people",
+          "people",
+          "coach"
         ]
       }
     },
