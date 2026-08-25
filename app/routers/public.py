@@ -22,7 +22,7 @@ so a test can substitute a reader without monkeypatching the shared service clas
 from __future__ import annotations
 
 import uuid
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 
@@ -102,8 +102,9 @@ def _landing(slug: str, session: SessionDep) -> PublicLandingOut:
     except NotImplementedError as exc:
         raise _schedule_unavailable() from exc
 
-    blob = studio.settings if isinstance(studio.settings, dict) else {}
-    landing_blob = blob.get("landing") if isinstance(blob.get("landing"), dict) else {}
+    blob: dict[str, Any] = studio.settings if isinstance(studio.settings, dict) else {}
+    nested = blob.get("landing")
+    landing_blob: dict[str, Any] = nested if isinstance(nested, dict) else {}
     return PublicLandingOut(
         studio_name=studio.name,
         slug=studio.slug,

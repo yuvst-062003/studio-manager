@@ -126,6 +126,17 @@ SESSION_DEP_ALLOWLIST: dict[str, str] = {
         "app/core/auth_context.py puts it on request.state, and every OTHER router "
         "takes TenantSessionDep and fails closed on it."
     ),
+    "public.py": (
+        "SPEC 6.1 -- 'Parent-app access needs no provisioning at all, because booking a "
+        "trial creates the guardian row itself. That is the only self-service entry point "
+        "in the system.' These routes run for a stranger holding a flyer: no token, no "
+        "`sid` claim, and therefore no studio for TenantSessionDep to resolve, so a "
+        "tenant-scoped session would 401 the shop window rather than protect it. "
+        "Restriction 1 is not bypassed, it is replaced by something narrower: every query "
+        "in app/services/people/landing.py names its studio EXPLICITLY, resolved from the "
+        "slug or the group the caller supplied, and the module never calls "
+        "with_all_tenants -- so nothing here can reach past the one studio the URL names."
+    ),
     "platform.py": (
         "SPEC 18.1 puts the platform console above every studio: 5.1 makes it the only "
         "thing that can create one, so it cannot itself be scoped to one. Its own "

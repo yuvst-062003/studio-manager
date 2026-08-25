@@ -98,9 +98,7 @@ def test_linking_an_already_linked_person_twice_is_a_conflict(
         _add(tenant_session, a_student.id, email=parent.email)
 
 
-def test_an_unverified_address_is_not_a_match_and_makes_a_second_person(
-    tenant_session, a_student
-):
+def test_an_unverified_address_is_not_a_match_and_makes_a_second_person(tenant_session, a_student):
     """The other side of L7, and the reason the test above needs a signed-in guardian: the
     Person created alongside a student has no login, so its email is a manager's typing and
     never a key. Re-entering it is a genuinely new guardian, not a duplicate.
@@ -274,8 +272,14 @@ def test_is_primary_is_confined_to_the_guardian_management_methods():
     source = (Path(__file__).resolve().parents[2] / "app/services/people/students.py").read_text(
         encoding="utf-8"
     )
-    allowed = {"create", "add_guardian", "set_primary_guardian", "remove_guardian",
-               "list_guardians", "_project"}
+    allowed = {
+        "create",
+        "add_guardian",
+        "set_primary_guardian",
+        "remove_guardian",
+        "list_guardians",
+        "_project",
+    }
     offenders = []
     for node in ast.walk(ast.parse(source)):
         if not isinstance(node, ast.FunctionDef) or node.name in allowed:
