@@ -42,6 +42,12 @@ run()  {
 # web/apps/*/src/features/<v>/, web/packages/i18n/<locale>/<v>.ts).
 py_candidates=()
 test_candidates=()
+# Frontend feature directories this lane owns. Defaults to one named for the vertical.
+# A lane whose UI does not all live under features/<vertical>/ overrides this in its own
+# case branch below. A directory this lane owns but does not name here is a directory the
+# gate silently skips -- which is worse than a red gate, because it reads as covered.
+feature_dirs=("$V")
+
 case "$V" in
   core)
     # §19's code is spread across routers/, integrations/ and workers/, none of which
@@ -90,6 +96,13 @@ case "$V" in
                    app/routers/public.py app/routers/trial_bookings.py \
                    app/workers/followups.py app/models/people.py)
     test_candidates=(tests/people)
+    # §5.4a's public trial page is in this lane's ownership but lives under
+    # features/landing/, not features/people/ -- it is the parent app's only
+    # unauthenticated screen, which is why it has its own directory. Without this line the
+    # frontend and lint gates skip all four of its test files and the check still prints
+    # green, so a regression in the booking flow would go unnoticed by the exact command
+    # meant to catch it.
+    feature_dirs=(people landing)
     ;;
   *)
     py_candidates=("app/services/$V" "app/routers/$V.py" "app/models/$V.py")
@@ -117,8 +130,10 @@ if [ "$V" = "core" ]; then
 else
   web_tests=$(
     {
-      find web/apps -path "*/src/features/$V/*" \
-        \( -name '*.test.ts' -o -name '*.test.tsx' \) 2>/dev/null || true
+      for fdir in ${feature_dirs[@]+"${feature_dirs[@]}"}; do
+        find web/apps -path "*/src/features/$fdir/*" \
+          \( -name '*.test.ts' -o -name '*.test.tsx' \) 2>/dev/null || true
+      done
       find "web/packages/core/src/$V" \
         \( -name '*.test.ts' -o -name '*.test.tsx' \) 2>/dev/null || true
     } | sed 's|^web/||' | sort
@@ -131,8 +146,10 @@ if [ "$V" = "core" ]; then
 else
   eslint_targets=$(
     {
-      for path in web/apps/*/src/features/"$V"; do
-        if [ -d "$path" ]; then echo "${path#web/}"; fi
+      for fdir in ${feature_dirs[@]+"${feature_dirs[@]}"}; do
+        for path in web/apps/*/src/features/"$fdir"; do
+          if [ -d "$path" ]; then echo "${path#web/}"; fi
+        done
       done
       for locale in he en ru; do
         if [ -f "web/packages/i18n/$locale/$V.ts" ]; then echo "packages/i18n/$locale/$V.ts"; fi
@@ -218,10 +235,16 @@ if [ "$V" = "core" ]; then
   fi
 elif [ -n "$eslint_targets" ]; then
   SCOPED_GATES=$((SCOPED_GATES + 1))
+  # One glob per owned feature directory, quoted so stylelint expands them rather than
+  # the shell -- same reason the single-glob version was quoted.
+  css_globs=()
+  for fdir in ${feature_dirs[@]+"${feature_dirs[@]}"}; do
+    css_globs[${#css_globs[@]}]="apps/*/src/features/$fdir/**/*.css"
+  done
   if [ "$DRY_RUN" = 1 ]; then
-    printf '   would run: (cd web && stylelint "apps/*/src/features/%s/**/*.css")\n' "$V"
+    printf '   would run: (cd web && stylelint %s)\n' "$(printf '"%s" ' ${css_globs[@]+"${css_globs[@]}"})"
   else
-    ( cd web && npx stylelint "apps/*/src/features/$V/**/*.css" --allow-empty-input )
+    ( cd web && npx stylelint ${css_globs[@]+"${css_globs[@]}"} --allow-empty-input )
   fi
 else
   skip "no CSS for $V"
