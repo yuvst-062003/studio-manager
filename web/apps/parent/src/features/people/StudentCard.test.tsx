@@ -88,7 +88,9 @@ describe('StudentCard — the 2c container', () => {
     registerSlot<StudentCardSectionProps>('student-card', {
       key: 'documents',
       order: 40,
-      render: () => <p data-testid="future-section">מסמכים</p>,
+      // Deliberately not a real user-facing string: G4's eslint rule reaches test files
+      // too, and this stands in for a section M4 has not written yet.
+      render: () => <p data-testid="future-section" />,
     })
     render(<StudentCard student={STUDENT} locale="he" />)
     expect(screen.getByTestId('future-section')).toBeInTheDocument()
