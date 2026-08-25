@@ -35,6 +35,7 @@ from pathlib import Path
 
 import httpx
 from app.core.clock import X_DEV_NOW_HEADER, now, parse_dev_now, use_dev_now
+from app.core.dev_account import DEV_TOKEN_HEADER
 from fastapi.testclient import TestClient
 from tests.dev.conftest import app_in_env
 
@@ -130,6 +131,54 @@ def test_production_ignores_the_header_entirely():
         )
     assert response.status_code == 200
     assert now().year != 2027
+
+
+def test_a_configured_token_refuses_an_unauthenticated_shift(monkeypatch):
+    """Staging is a public HTTPS origin (§15 item 3, app/core/config.py's own reasoning
+    for DEV_TOOLS_TOKEN existing). Before this fix, X-Dev-Now honoured any caller on any
+    non-production environment -- including staging -- with no token check at all, even
+    though app.core.dev_account.dev_tools_allowed already required one for every other
+    /dev/* route on the same environment. This is the branch where a token IS configured
+    and none is presented: the shift must not apply."""
+    monkeypatch.setenv("DEV_TOOLS_TOKEN", "s3cret")
+    with app_in_env("staging") as application:
+        response = TestClient(application).get(
+            "/api/v1/health", headers={X_DEV_NOW_HEADER: TRAVELLED}
+        )
+    assert response.status_code == 403
+    assert now().year != 2027
+
+
+def test_a_configured_token_refuses_a_wrong_one_too(monkeypatch):
+    """The control for the case above: a caller presenting *some* token still must not
+    get through with the wrong one."""
+    monkeypatch.setenv("DEV_TOOLS_TOKEN", "s3cret")
+    with app_in_env("staging") as application:
+        response = TestClient(application).get(
+            "/api/v1/health",
+            headers={X_DEV_NOW_HEADER: TRAVELLED, DEV_TOKEN_HEADER: "wrong"},
+        )
+    assert response.status_code == 403
+    assert now().year != 2027
+
+
+def test_a_matching_configured_token_still_shifts_the_clock(monkeypatch):
+    """The other branch: a token IS configured and the caller presents the matching
+    one -- the shift must still apply, the same as it always did. Hits /dev/clock
+    rather than /health so the response also proves the shift landed, not just that the
+    request was let through."""
+    monkeypatch.setenv("DEV_TOOLS_TOKEN", "s3cret")
+    with app_in_env("staging") as application:
+        body = (
+            TestClient(application)
+            .get(
+                "/api/v1/dev/clock",
+                headers={X_DEV_NOW_HEADER: TRAVELLED, DEV_TOKEN_HEADER: "s3cret"},
+            )
+            .json()
+        )
+    assert body["now"].startswith("2027-03-01T09:00:00")
+    assert body["shifted"] is True
 
 
 def test_the_middleware_is_installed_conditionally_not_guarded():

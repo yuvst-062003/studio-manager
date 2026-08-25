@@ -30,6 +30,7 @@ G3: always timezone-aware UTC. Rendering in Asia/Jerusalem happens at the edge.
 
 from __future__ import annotations
 
+import secrets
 from collections.abc import Awaitable, Callable, Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
@@ -38,6 +39,8 @@ from datetime import UTC, datetime
 from fastapi import Request, Response
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
+
+from app.core.dev_account import DEV_TOKEN_HEADER
 
 X_DEV_NOW_HEADER = "X-Dev-Now"
 
@@ -74,7 +77,18 @@ def parse_dev_now(raw: str) -> datetime:
 class DevClockMiddleware(BaseHTTPMiddleware):
     """Installed only when ENV != production (app/main.py). The internal guard below is
     defence in depth, not the mechanism: §19.2's standard is that the capability does
-    not exist in production, not that it is switched off there."""
+    not exist in production, not that it is switched off there.
+
+    Staging is a public HTTPS origin (app/core/config.py's own reasoning for
+    DEV_TOOLS_TOKEN existing at all), so this header must answer to the same rule
+    app.core.dev_account.dev_tools_allowed already enforces for every /dev/* route:
+    when a token is configured, a caller must present a matching one. Without this,
+    the router-level check and this middleware reached opposite conclusions about the
+    same exposure -- a caller with no token at all could still shift the clock a
+    developer session on staging is gated behind. When no token is configured (local
+    development, where there is no auth layer to authenticate against yet), the shift
+    applies unconditionally, exactly as before.
+    """
 
     async def dispatch(
         self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
@@ -84,6 +98,22 @@ class DevClockMiddleware(BaseHTTPMiddleware):
         raw = request.headers.get(X_DEV_NOW_HEADER)
         if raw is None or settings.ENV == "production":
             return await call_next(request)
+
+        configured = settings.DEV_TOOLS_TOKEN
+        if configured is not None:
+            presented = request.headers.get(DEV_TOKEN_HEADER)
+            if presented is None or not secrets.compare_digest(
+                presented, configured.get_secret_value()
+            ):
+                return JSONResponse(
+                    status_code=403,
+                    content={
+                        "code": "dev_token_required",
+                        "message": f"{X_DEV_NOW_HEADER} requires a matching "
+                        f"{DEV_TOKEN_HEADER} header on this environment",
+                    },
+                )
+
         try:
             shifted = parse_dev_now(raw)
         except ValueError:
