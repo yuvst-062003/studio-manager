@@ -247,3 +247,84 @@ class ScheduleRulesOut(BaseModel):
 
     group_id: uuid.UUID
     rules: list[ScheduleRuleOut] = Field(default_factory=list)
+
+
+class SessionStaffIn(BaseModel):
+    """Who is actually on the mat for this one session. Distinct from `group_staff`, which
+    is who normally coaches the group — §5.14's 'sessions without a coach' report is the
+    difference between the two."""
+
+    person_id: uuid.UUID
+    role: str = Field(pattern=SESSION_STAFF_ROLE_PATTERN)
+    is_substitute: bool = False
+
+
+class SessionCreate(BaseModel):
+    """§5.6 — 'They can also add an ad-hoc session that belongs to no rule.'
+
+    `is_ad_hoc` is not a field a caller may set: every session created here is ad-hoc by
+    construction, and a flag the client controlled would let a caller mint a session that a
+    regenerate then silently destroys.
+    """
+
+    group_id: uuid.UUID
+    training_year_id: uuid.UUID
+    starts_at: datetime
+    ends_at: datetime
+    location_id: uuid.UUID | None = None
+    staff: list[SessionStaffIn] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _the_session_ends_after_it_starts(self) -> SessionCreate:
+        if self.ends_at <= self.starts_at:
+            raise ValueError("ends_at must be after starts_at")
+        return self
+
+
+class SessionPatch(BaseModel):
+    """§5.6's per-session override.
+
+    **Every field is optional and absence is not `null`.** `location_id: null` clears the
+    location; omitting `location_id` leaves it alone. The service distinguishes them with
+    `model_fields_set`, which is the only way to express "remove the room" and "do not
+    touch the room" in one shape.
+
+    Times move as a pair. A start without an end would silently redefine the duration, and
+    "the class is an hour shorter now" is not something anyone typed.
+    """
+
+    starts_at: datetime | None = None
+    ends_at: datetime | None = None
+    location_id: uuid.UUID | None = None
+    staff: list[SessionStaffIn] | None = None
+
+    @model_validator(mode="after")
+    def _times_move_together(self) -> SessionPatch:
+        moved = {"starts_at", "ends_at"} & self.model_fields_set
+        if moved and len(moved) != 2:
+            raise ValueError("starts_at and ends_at must be given together")
+        if self.starts_at and self.ends_at and self.ends_at <= self.starts_at:
+            raise ValueError("ends_at must be after starts_at")
+        return self
+
+
+class SessionCancelIn(BaseModel):
+    """§5.6 — 'or cancel it with a reason'. The reason is required by the column's own
+    check constraint, so a blank one is refused here rather than at the database."""
+
+    reason: str = Field(min_length=1, max_length=200)
+
+
+class SessionNoteCreate(BaseModel):
+    body: str = Field(min_length=1)
+
+
+class SessionNoteOut(BaseModel):
+    id: uuid.UUID
+    session_id: uuid.UUID
+    author_person_id: uuid.UUID
+    body: str
+    created_at: datetime
+
+
+SessionNotePage = CursorPage[SessionNoteOut]

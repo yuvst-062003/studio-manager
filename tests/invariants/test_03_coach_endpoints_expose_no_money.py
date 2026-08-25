@@ -98,19 +98,27 @@ def test_no_coach_scoped_endpoint_returns_a_financial_field():
     assert leaks(app) == []
 
 
-def test_the_gate_is_currently_empty_and_says_so():
-    """Records the vacuity rather than hiding it. When M1 lands the first coach router
-    this goes red, and the correct fix is to delete this test -- the assertion above
-    stops being vacuous at that point."""
+def test_the_gate_is_no_longer_vacuous():
+    """This file used to end with `test_the_gate_is_currently_empty_and_says_so`, which
+    asserted that **no** coach-tagged route existed and whose docstring said: "When M1 lands
+    the first coach router this goes red, and the correct fix is to delete this test."
+
+    W2's lane SCHEDULE landed it — `app/routers/sessions.py`, §7's coach-facing block. So
+    the tripwire is spent, and this replaces it with the opposite assertion. The point of
+    both is the same and worth keeping: a gate with nothing to check is a gate that passes
+    while verifying nothing, and the day the last coach route is deleted is a day somebody
+    should notice rather than inherit a green tick.
+    """
     tagged = [
         path
         for path, operations in app.openapi()["paths"].items()
         for operation in operations.values()
         if COACH_TAG in (operation.get("tags") or [])
     ]
-    assert tagged == [], (
-        "a coach-scoped route now exists -- delete this test; the real assertion above is "
-        "no longer vacuous"
+    assert tagged, (
+        "no coach-scoped route is tagged any more -- either the tag was dropped from a "
+        "router that still serves coaches, in which case invariant 3 is now unguarded, or "
+        "the routes are gone and this test should say so deliberately"
     )
 
 

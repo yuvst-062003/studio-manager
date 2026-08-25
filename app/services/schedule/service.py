@@ -25,17 +25,25 @@ from sqlalchemy import Select, select
 from sqlalchemy.orm import Session as OrmSession
 
 from app.models.people import Enrollment
+from app.models.person import Guardian, Person
 from app.models.schedule import (
     GroupScheduleRule,
     Session,
+    SessionNote,
+    SessionStaff,
     StudioClosure,
     TrainingYear,
 )
-from app.models.structure import Group
+from app.models.structure import Group, Location
 from app.schemas.schedule import (
     ProtectedSessionOut,
     ScheduleImpactPreview,
     ScheduleRuleIn,
+    SessionCreate,
+    SessionOut,
+    SessionPatch,
+    SessionStaffIn,
+    SessionStaffOut,
 )
 from app.services.audit import AuditService
 from app.services.schedule.impact import (
@@ -655,3 +663,254 @@ class ScheduleService:
         )
         self.session.flush()
         return preview
+
+    # -- projection ----------------------------------------------------------------
+    def project_sessions(self, rows: Sequence[Session]) -> list[SessionOut]:
+        """ORM rows -> `SessionOut`, with the names a client needs to draw them.
+
+        Three batch queries, never one per row: the staff app's Today screen and the
+        dashboard's week view both render dozens at once, and an N+1 here is felt on a
+        phone on a bus.
+
+        `attendance_taken` is `False` for every row in W2. The `attendance` table is W3's
+        and lives in `app/models/_pending/`, which this lane never imports — M5 fills the
+        field, and the shape does not change when it does.
+        """
+        if not rows:
+            return []
+        # A comprehension rather than `dict(result)`: a `Row` is not a 2-tuple to mypy, so
+        # `dict(...)` over the result infers `dict[Never, Never]` and every lookup below
+        # becomes an error about a type nothing can be. `.tuples()` fixes the typing and
+        # breaks at runtime — `dict()` cannot consume a `TupleResult` — so the unpacking is
+        # written out, which satisfies both.
+        group_names: dict[uuid.UUID, str] = {
+            group_id: name
+            for group_id, name in self.session.execute(
+                select(Group.id, Group.name).where(Group.id.in_({r.group_id for r in rows}))
+            ).all()
+        }
+        location_ids = {r.location_id for r in rows if r.location_id is not None}
+        location_names: dict[uuid.UUID, str] = (
+            {
+                location_id: name
+                for location_id, name in self.session.execute(
+                    select(Location.id, Location.name).where(Location.id.in_(location_ids))
+                ).all()
+            }
+            if location_ids
+            else {}
+        )
+        staff_rows = self.session.execute(
+            select(SessionStaff, Person.first_name, Person.last_name)
+            .join(Person, Person.id == SessionStaff.person_id)
+            .where(SessionStaff.session_id.in_({r.id for r in rows}))
+        ).all()
+        staff_by_session: dict[uuid.UUID, list[SessionStaffOut]] = {}
+        for assignment, first_name, last_name in staff_rows:
+            staff_by_session.setdefault(assignment.session_id, []).append(
+                SessionStaffOut(
+                    person_id=assignment.person_id,
+                    display_name=f"{first_name} {last_name}",
+                    role=assignment.role,
+                    is_substitute=assignment.is_substitute,
+                )
+            )
+
+        return [
+            SessionOut(
+                id=row.id,
+                group_id=row.group_id,
+                group_name=group_names.get(row.group_id, ""),
+                training_year_id=row.training_year_id,
+                starts_at=row.starts_at,
+                ends_at=row.ends_at,
+                location_id=row.location_id,
+                location_name=location_names.get(row.location_id) if row.location_id else None,
+                status=row.status,
+                is_manually_edited=row.is_manually_edited,
+                is_ad_hoc=row.is_ad_hoc,
+                cancel_reason=row.cancel_reason,
+                staff=staff_by_session.get(row.id, []),
+                attendance_taken=False,
+            )
+            for row in rows
+        ]
+
+    # -- reading -------------------------------------------------------------------
+    def groups_visible_to_guardian(self, person_id: uuid.UUID) -> set[uuid.UUID]:
+        """Artboard 12b's authorization, in one query.
+
+        §3.3 makes 'my children' exactly `SELECT student_id FROM guardian WHERE
+        person_id = :me`, and a child's groups are their active enrollments. Both tables
+        belong to other lanes and are **read, never written**, from here — a parent's
+        calendar that cannot load is a screen that was not delivered.
+        """
+        rows = (
+            self.session.execute(
+                select(Enrollment.group_id)
+                .join(Guardian, Guardian.student_id == Enrollment.student_id)
+                .where(Guardian.person_id == person_id, Enrollment.ended_on.is_(None))
+            )
+            .scalars()
+            .all()
+        )
+        return set(rows)
+
+    def list_sessions(
+        self,
+        *,
+        from_date: date,
+        to_date: date,
+        group_id: uuid.UUID | None = None,
+        coach_person_id: uuid.UUID | None = None,
+        visible_group_ids: set[uuid.UUID] | None = None,
+        cursor: uuid.UUID | None = None,
+        limit: int = 50,
+    ) -> tuple[list[Session], uuid.UUID | None]:
+        """`GET /sessions?from&to&group_id`.
+
+        `visible_group_ids` is `None` for staff — they see the whole studio — and a set for
+        a guardian. An **empty** set is not the same as `None`: it means "this caller has no
+        children enrolled anywhere", and it must return nothing rather than everything.
+        Making that distinction a type rather than a falsy check is the difference between a
+        quiet bug and a screen that shows one family another family's calendar.
+        """
+        lower = datetime.combine(from_date - timedelta(days=1), datetime.min.time(), tzinfo=UTC)
+        upper = datetime.combine(to_date + timedelta(days=2), datetime.min.time(), tzinfo=UTC)
+        stmt = (
+            select(Session)
+            .where(Session.starts_at >= lower, Session.starts_at < upper)
+            .order_by(Session.starts_at, Session.id)
+        )
+        if group_id is not None:
+            stmt = stmt.where(Session.group_id == group_id)
+        if visible_group_ids is not None:
+            # An empty set has to produce an impossible predicate rather than no predicate.
+            stmt = stmt.where(Session.group_id.in_(visible_group_ids or {uuid.UUID(int=0)}))
+        if coach_person_id is not None:
+            stmt = stmt.where(
+                Session.id.in_(
+                    select(SessionStaff.session_id).where(SessionStaff.person_id == coach_person_id)
+                )
+            )
+        rows = [
+            row
+            for row in self.session.execute(stmt).scalars().all()
+            if from_date <= jerusalem_date(row.starts_at) <= to_date
+        ]
+        if cursor is not None:
+            # Keyed on the row's position rather than on its id, because the ordering is by
+            # `starts_at` and a keyset on the primary key would page in the wrong sequence.
+            seen = [i for i, row in enumerate(rows) if row.id == cursor]
+            rows = rows[seen[0] + 1 :] if seen else rows
+        if len(rows) > limit:
+            return rows[:limit], rows[limit - 1].id
+        return rows, None
+
+    def get_session(self, session_id: uuid.UUID) -> Session:
+        row = self.session.get(Session, session_id)
+        if row is None:
+            raise NotFoundError(str(session_id))
+        return row
+
+    # -- writing one session --------------------------------------------------------
+    def _set_staff(self, session_id: uuid.UUID, staff: Sequence[SessionStaffIn]) -> None:
+        for existing_row in (
+            self.session.execute(select(SessionStaff).where(SessionStaff.session_id == session_id))
+            .scalars()
+            .all()
+        ):
+            self.session.delete(existing_row)
+        self.session.flush()
+        for member in staff:
+            self.session.add(
+                SessionStaff(
+                    session_id=session_id,
+                    person_id=member.person_id,
+                    role=member.role,
+                    is_substitute=member.is_substitute,
+                )
+            )
+
+    def create_ad_hoc_session(self, body: SessionCreate, *, at: datetime) -> Session:
+        """§5.6 — 'add an ad-hoc session that belongs to no rule'.
+
+        `is_manually_edited` is set as well as `is_ad_hoc`. Both are true and both matter:
+        the first says a human decided this, the second says no rule owns it. A regenerate
+        checks either and stops — and `plan_change` tests `is_ad_hoc` first, because the two
+        protections behave differently.
+        """
+        self.require_group(body.group_id)
+        self.get_training_year(body.training_year_id)
+        row = Session(
+            group_id=body.group_id,
+            training_year_id=body.training_year_id,
+            starts_at=body.starts_at,
+            ends_at=body.ends_at,
+            location_id=body.location_id,
+            status="scheduled",
+            is_manually_edited=True,
+            generated_from_rule_id=None,
+            is_ad_hoc=True,
+            created_at=at,
+        )
+        self.session.add(row)
+        self.session.flush()
+        self._set_staff(row.id, body.staff)
+        self.session.flush()
+        return row
+
+    def patch_session(self, session_id: uuid.UUID, body: SessionPatch, *, at: datetime) -> Session:
+        """§5.6's per-session override. **Any change here sets `is_manually_edited`.**
+
+        That flag is the whole of the second protection: a later rule change reads it to
+        decide what it may not touch. A PATCH that forgot to set it would leave a coach's
+        deliberate change looking machine-made, and the next schedule edit would quietly
+        undo it — which is the exact failure §5.6 spends a paragraph on.
+        """
+        row = self.get_session(session_id)
+        given = body.model_fields_set
+        if "starts_at" in given and body.starts_at and body.ends_at:
+            row.starts_at = body.starts_at
+            row.ends_at = body.ends_at
+        if "location_id" in given:
+            row.location_id = body.location_id
+        if "staff" in given and body.staff is not None:
+            self._set_staff(row.id, body.staff)
+        row.is_manually_edited = True
+        row.updated_at = at
+        self.session.flush()
+        return row
+
+    def cancel_session(self, session_id: uuid.UUID, *, reason: str, at: datetime) -> Session:
+        row = self.get_session(session_id)
+        row.status = "cancelled"
+        row.cancel_reason = reason
+        row.is_manually_edited = True
+        row.updated_at = at
+        self.session.flush()
+        return row
+
+    # -- notes ----------------------------------------------------------------------
+    def list_notes(
+        self, session_id: uuid.UUID, *, cursor: uuid.UUID | None = None, limit: int = 50
+    ) -> tuple[list[SessionNote], uuid.UUID | None]:
+        self.get_session(session_id)
+        stmt = (
+            select(SessionNote)
+            .where(SessionNote.session_id == session_id, SessionNote.deleted_at.is_(None))
+            .order_by(SessionNote.id)
+        )
+        rows = self.session.execute(_paged(stmt, cursor=cursor, limit=limit)).scalars().all()
+        return _page_out(list(rows), limit)
+
+    def add_note(
+        self, session_id: uuid.UUID, *, body: str, author_person_id: uuid.UUID, at: datetime
+    ) -> SessionNote:
+        self.get_session(session_id)
+        row = SessionNote(
+            session_id=session_id, author_person_id=author_person_id, body=body, created_at=at
+        )
+        self.session.add(row)
+        self.session.flush()
+        return row
