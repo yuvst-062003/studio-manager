@@ -1271,6 +1271,42 @@ export interface components {
             /** Name */
             name: string;
         };
+        /** CursorPage[RegistrationRequestOut] */
+        CursorPage_RegistrationRequestOut_: {
+            /**
+             * Has More
+             * @default false
+             */
+            has_more: boolean;
+            /** Items */
+            items: components["schemas"]["RegistrationRequestOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** CursorPage[StudentSummaryOut] */
+        CursorPage_StudentSummaryOut_: {
+            /**
+             * Has More
+             * @default false
+             */
+            has_more: boolean;
+            /** Items */
+            items: components["schemas"]["StudentSummaryOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** CursorPage[TrialBookingRow] */
+        CursorPage_TrialBookingRow_: {
+            /**
+             * Has More
+             * @default false
+             */
+            has_more: boolean;
+            /** Items */
+            items: components["schemas"]["TrialBookingRow"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
         /** EnrollmentCreate */
         EnrollmentCreate: {
             /** Attends Weekdays */
@@ -1826,18 +1862,6 @@ export interface components {
              */
             submitted_at: string;
         };
-        /** RegistrationRequestPageOut */
-        RegistrationRequestPageOut: {
-            /**
-             * Has More
-             * @default false
-             */
-            has_more: boolean;
-            /** Items */
-            items: components["schemas"]["RegistrationRequestOut"][];
-            /** Next Cursor */
-            next_cursor?: string | null;
-        };
         /**
          * SessionResponse
          * @description The access token lives in the body, never in a cookie (§10.3).
@@ -2250,18 +2274,6 @@ export interface components {
             /** Status */
             status: string;
         };
-        /** StudentSummaryPage */
-        StudentSummaryPage: {
-            /**
-             * Has More
-             * @default false
-             */
-            has_more: boolean;
-            /** Items */
-            items: components["schemas"]["StudentSummaryOut"][];
-            /** Next Cursor */
-            next_cursor?: string | null;
-        };
         /** StudentUpdate */
         StudentUpdate: {
             /** Birthdate */
@@ -2428,18 +2440,6 @@ export interface components {
              * Format: uuid
              */
             student_id: string;
-        };
-        /** TrialBookingRowPage */
-        TrialBookingRowPage: {
-            /**
-             * Has More
-             * @default false
-             */
-            has_more: boolean;
-            /** Items */
-            items: components["schemas"]["TrialBookingRow"][];
-            /** Next Cursor */
-            next_cursor?: string | null;
         };
         /**
          * TrialBookingSelfIn
@@ -3345,7 +3345,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["StudentSummaryPage"];
+                    "application/json": components["schemas"]["CursorPage_StudentSummaryOut_"];
                 };
             };
         };
@@ -3679,7 +3679,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["RegistrationRequestPageOut"];
+                    "application/json": components["schemas"]["CursorPage_RegistrationRequestOut_"];
                 };
             };
             /** @description Validation Error */
@@ -3917,7 +3917,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["StudentSummaryPage"];
+                    "application/json": components["schemas"]["CursorPage_StudentSummaryOut_"];
                 };
             };
             /** @description Validation Error */
@@ -4529,7 +4529,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["TrialBookingRowPage"];
+                    "application/json": components["schemas"]["CursorPage_TrialBookingRow_"];
                 };
             };
             /** @description Validation Error */

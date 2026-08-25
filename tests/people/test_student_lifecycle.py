@@ -505,17 +505,16 @@ def test_an_illegal_transition_through_the_api_is_422_not_500(client, as_manager
 def test_the_status_history_route_is_readable_by_a_coach(
     client, as_manager, as_lead_coach, assign_coach, a_group, app_session, studio
 ):
-    from app.models.people import Enrollment as E
-    from tests.people.conftest import TODAY as T
+    from app.models.people import Enrollment
 
     student = _api_student(client, as_manager)
     app_session.add(
-        E(
+        Enrollment(
             studio_id=studio.id,
             student_id=uuid.UUID(student),
             group_id=a_group,
             status="active",
-            started_on=T,
+            started_on=TODAY,
         )
     )
     app_session.commit()

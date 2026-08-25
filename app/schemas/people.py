@@ -466,8 +466,9 @@ class EnrollmentWeekdayOptionsOut(BaseModel):
     training_weekdays: list[Weekday] = Field(default_factory=list)
 
 
-class StudentSummaryPage(CursorPage[StudentSummaryOut]):
-    pass
+#: G16 -- an alias, never a subclass. `class X(CursorPage[T])` carries no generic origin,
+#: so tests/contracts/test_w2_schemas.py reads it as a hand-rolled envelope.
+StudentSummaryPage = CursorPage[StudentSummaryOut]
 
 
 class TrialBookingSelfResult(BaseModel):
@@ -525,8 +526,7 @@ class TrialBookingRow(BaseModel):
     is_override: bool
 
 
-class TrialBookingRowPage(CursorPage[TrialBookingRow]):
-    pass
+TrialBookingRowPage = CursorPage[TrialBookingRow]
 
 
 class ChildMatchOut(BaseModel):
@@ -568,8 +568,7 @@ class SiblingRequestIn(BaseModel):
     preferred_group_id: uuid.UUID | None = None
 
 
-class RegistrationRequestPageOut(CursorPage[RegistrationRequestOut]):
-    pass
+RegistrationRequestPageOut = CursorPage[RegistrationRequestOut]
 
 
 class RegistrationDecisionOut(BaseModel):

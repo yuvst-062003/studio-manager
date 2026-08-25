@@ -257,6 +257,105 @@
         "title": "ClassOut",
         "type": "object"
       },
+      "CursorPage_RegistrationRequestOut_": {
+        "properties": {
+          "has_more": {
+            "default": false,
+            "title": "Has More",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RegistrationRequestOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "CursorPage[RegistrationRequestOut]",
+        "type": "object"
+      },
+      "CursorPage_StudentSummaryOut_": {
+        "properties": {
+          "has_more": {
+            "default": false,
+            "title": "Has More",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/StudentSummaryOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "CursorPage[StudentSummaryOut]",
+        "type": "object"
+      },
+      "CursorPage_TrialBookingRow_": {
+        "properties": {
+          "has_more": {
+            "default": false,
+            "title": "Has More",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TrialBookingRow"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "CursorPage[TrialBookingRow]",
+        "type": "object"
+      },
       "EnrollmentCreate": {
         "properties": {
           "attends_weekdays": {
@@ -1618,39 +1717,6 @@
         "title": "RegistrationRequestOut",
         "type": "object"
       },
-      "RegistrationRequestPageOut": {
-        "properties": {
-          "has_more": {
-            "default": false,
-            "title": "Has More",
-            "type": "boolean"
-          },
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/RegistrationRequestOut"
-            },
-            "title": "Items",
-            "type": "array"
-          },
-          "next_cursor": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Next Cursor"
-          }
-        },
-        "required": [
-          "items"
-        ],
-        "title": "RegistrationRequestPageOut",
-        "type": "object"
-      },
       "SessionResponse": {
         "description": "The access token lives in the body, never in a cookie (§10.3).\n\nThe client holds it in memory and replays it, which is what keeps it out of\nautomatic-credential territory -- a cookie-borne access token is sent by the browser\non every request, which is what makes CSRF possible at all. The refresh token is in\nthe Set-Cookie header and never here.",
         "properties": {
@@ -2756,39 +2822,6 @@
         "title": "StudentSummaryOut",
         "type": "object"
       },
-      "StudentSummaryPage": {
-        "properties": {
-          "has_more": {
-            "default": false,
-            "title": "Has More",
-            "type": "boolean"
-          },
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/StudentSummaryOut"
-            },
-            "title": "Items",
-            "type": "array"
-          },
-          "next_cursor": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Next Cursor"
-          }
-        },
-        "required": [
-          "items"
-        ],
-        "title": "StudentSummaryPage",
-        "type": "object"
-      },
       "StudentUpdate": {
         "properties": {
           "birthdate": {
@@ -3207,39 +3240,6 @@
           "is_override"
         ],
         "title": "TrialBookingRow",
-        "type": "object"
-      },
-      "TrialBookingRowPage": {
-        "properties": {
-          "has_more": {
-            "default": false,
-            "title": "Has More",
-            "type": "boolean"
-          },
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/TrialBookingRow"
-            },
-            "title": "Items",
-            "type": "array"
-          },
-          "next_cursor": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Next Cursor"
-          }
-        },
-        "required": [
-          "items"
-        ],
-        "title": "TrialBookingRowPage",
         "type": "object"
       },
       "TrialBookingSelfIn": {
@@ -4724,7 +4724,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/StudentSummaryPage"
+                  "$ref": "#/components/schemas/CursorPage_StudentSummaryOut_"
                 }
               }
             },
@@ -5227,7 +5227,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/RegistrationRequestPageOut"
+                  "$ref": "#/components/schemas/CursorPage_RegistrationRequestOut_"
                 }
               }
             },
@@ -5661,7 +5661,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/StudentSummaryPage"
+                  "$ref": "#/components/schemas/CursorPage_StudentSummaryOut_"
                 }
               }
             },
@@ -6678,7 +6678,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TrialBookingRowPage"
+                  "$ref": "#/components/schemas/CursorPage_TrialBookingRow_"
                 }
               }
             },
