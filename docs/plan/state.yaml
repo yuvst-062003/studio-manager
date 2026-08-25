@@ -201,12 +201,19 @@ holdbacks:
     kind: external
     title: Studio branding — logo and colours
     why: >-
-      D1 ships one fixed design in v1 and per-studio colour is v2, so what is actually
-      needed here is the logo. The setup wizard has nowhere to put a placeholder.
+      Closed 2026-08-25. The club supplied its mark — a white judogi with a black belt on
+      a teal disc — and it is the brand asset every app icon is now rasterised from
+      (web/packages/ui/src/brand/mark.png, replacing M0's placeholder). The apps are named
+      from it too: Gladiator for parents, Gladiator Coach for staff, Gladiator Manager for
+      the dashboard. Only the logo was ever actually needed: D1 ships one fixed design in
+      v1 and per-studio colour is v2, so there was no colour to collect. The setup wizard's
+      drop-zone is a separate thing and is not waiting on this — it takes a logo a manager
+      uploads per studio, which is data rather than a repository asset, and M1.9 shipped it
+      working against an empty column.
     blocks: M1
-    status: open
+    status: closed
     opened: 2026-08-24
-    closed: null
+    closed: 2026-08-25
     source: SPEC §15 item 7
   - id: HB-price-list
     kind: external

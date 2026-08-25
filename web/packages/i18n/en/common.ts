@@ -2,9 +2,11 @@ import type { Bundle } from '../types'
 
 export const common: Bundle = {
   hello: 'Hello',
-  'appName.staff': 'Studio — Staff',
-  'appName.parent': 'Studio — Parents',
-  'appName.dashboard': 'Studio — Management',
+  // The club's brand. Identical in all three locales on purpose — a brand name is not
+  // translated, and 'Gladiator' is what is printed on the mat.
+  'appName.staff': 'Gladiator Coach',
+  'appName.parent': 'Gladiator',
+  'appName.dashboard': 'Gladiator Manager',
   'hello.title': 'The foundation works',
   'hello.fontProof.hebrew': 'אבגד הוזח',
   'hello.fontProof.latin': 'ABCD efgh',

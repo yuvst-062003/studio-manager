@@ -1,4 +1,4 @@
 # Generated
 
 Do not edit by hand. Run `node scripts/generate-icons.mjs`
-after replacing `web/packages/ui/src/brand/mark.svg` (§15 item 7).
+after replacing `web/packages/ui/src/brand/mark.png`.

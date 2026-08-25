@@ -7,9 +7,9 @@ describe('dashboard manifest (§6.5 — the install is the product, not boilerpl
     expect(manifest.display).toBe('standalone')
   })
 
-  it('names the app in Hebrew, with a short_name that fits under a home-screen icon', () => {
-    expect(manifest.name).toBe('סטודיו — ניהול')
-    expect(manifest.short_name).toBe('ניהול')
+  it('carries the brand, with a short_name that fits under a home-screen icon', () => {
+    expect(manifest.name).toBe('Gladiator Manager')
+    expect(manifest.short_name).toBe('Manager')
     expect(manifest.short_name.length).toBeLessThanOrEqual(12)
   })
 

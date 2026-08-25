@@ -7,9 +7,9 @@ describe('parent manifest (§6.5 — the install is the product, not boilerplate
     expect(manifest.display).toBe('standalone')
   })
 
-  it('names the app in Hebrew, with a short_name that fits under a home-screen icon', () => {
-    expect(manifest.name).toBe('סטודיו — הורים')
-    expect(manifest.short_name).toBe('הורים')
+  it('carries the brand, with a short_name that fits under a home-screen icon', () => {
+    expect(manifest.name).toBe('Gladiator')
+    expect(manifest.short_name).toBe('Gladiator')
     expect(manifest.short_name.length).toBeLessThanOrEqual(12)
   })
 

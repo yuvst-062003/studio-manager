@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { auditManifest } from '../../scripts/check-installability.mjs'
 
 const valid = {
-  name: 'סטודיו — צוות',
+  name: 'Gladiator Coach',
   short_name: 'צוות',
   start_url: '/',
   scope: '/',

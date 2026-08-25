@@ -27,6 +27,7 @@ external.
 | The wizard resumes | it lands on the first unanswered step, not on step 1 |
 | A later lane can add a step | a fake step registers at order 2 and lands between studio and groups with the container untouched |
 | `audit_log` is append-only by grant **locally** | `scripts/verify-db-roles.py` prints `connected as : studio_app` |
+| The apps carry the club's brand | `HB-logo` closed — the mark ships as every icon, and the three apps are named from it |
 
 ### Not proved, and why
 
@@ -35,7 +36,6 @@ external.
 | **HB-devices** | The OAuth round trip on a real iPhone in standalone mode. §6.5 makes this the one place install mode changes auth behaviour, and a simulator does not exercise it. |
 | **HB-domain** | `infra/railway/domains.json` still has `base_domain: null`. `up.railway.app` is a public suffix, so §11.7's refresh cookie is third-party to the app hosts and Safari drops it. Localhost hides this because a port is not part of a site. |
 | **HB-staging-superuser** | The code shipped and the check runs on every boot; what remains is three Railway commands, written out in `docs/deploy/railway-runbook.md` § Open item. The holdback closes when the verifier has printed `connected as : studio_app` **against staging** — not when the code was written. |
-| **HB-logo** | The club has not supplied a logo file. The drop-zone works before there is anything to drop into it, which is the right order. |
 
 ### Two decisions taken during the work, recorded rather than buried
 
