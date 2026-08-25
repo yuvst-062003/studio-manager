@@ -383,6 +383,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/studio/logo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Logo
+         * @description Any signed-in member of the studio, coaches and guardians included.
+         *
+         *     Reading is not a settings write. A staff app that could not render the club's own logo
+         *     would be enforcing a rule about writes by breaking a read.
+         */
+        get: operations["read_logo_api_v1_studio_logo_get"];
+        put?: never;
+        /** Upload Logo */
+        post: operations["upload_logo_api_v1_studio_logo_post"];
+        /**
+         * Delete Logo
+         * @description Idempotent -- a DELETE on a studio with no logo is a 204, not a 404.
+         */
+        delete: operations["delete_logo_api_v1_studio_logo_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -413,6 +441,14 @@ export interface components {
             parent: boolean;
             /** Staff */
             staff: boolean;
+        };
+        /** Body_upload_logo_api_v1_studio_logo_post */
+        Body_upload_logo_api_v1_studio_logo_post: {
+            /**
+             * File
+             * @description PNG, JPEG or WebP. Never SVG.
+             */
+            file: string;
         };
         /** CallbackRequest */
         CallbackRequest: {
@@ -731,6 +767,21 @@ export interface components {
         StudioListResponse: {
             /** Items */
             items: components["schemas"]["StudioOut"][];
+        };
+        /**
+         * StudioLogoOut
+         * @description What POST /studio/logo returns.
+         *
+         *     A URL and not a key. The key is an internal address that no client should learn, let
+         *     alone send back -- §2.5 constructs every key server-side precisely so that no request
+         *     ever carries one.
+         */
+        StudioLogoOut: {
+            /**
+             * Logo Url
+             * @description The scoped read route, cache-busted by updated_at.
+             */
+            logo_url: string;
         };
         /** StudioMembershipOut */
         StudioMembershipOut: {
@@ -1452,6 +1503,77 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+        };
+    };
+    read_logo_api_v1_studio_logo_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    upload_logo_api_v1_studio_logo_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_logo_api_v1_studio_logo_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudioLogoOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_logo_api_v1_studio_logo_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

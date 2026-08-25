@@ -36,6 +36,21 @@
         "title": "AppAccessOut",
         "type": "object"
       },
+      "Body_upload_logo_api_v1_studio_logo_post": {
+        "properties": {
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "description": "PNG, JPEG or WebP. Never SVG.",
+            "title": "File",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_upload_logo_api_v1_studio_logo_post",
+        "type": "object"
+      },
       "CallbackRequest": {
         "properties": {
           "code": {
@@ -911,6 +926,21 @@
           "items"
         ],
         "title": "StudioListResponse",
+        "type": "object"
+      },
+      "StudioLogoOut": {
+        "description": "What POST /studio/logo returns.\n\nA URL and not a key. The key is an internal address that no client should learn, let\nalone send back -- §2.5 constructs every key server-side precisely so that no request\never carries one.",
+        "properties": {
+          "logo_url": {
+            "description": "The scoped read route, cache-busted by updated_at.",
+            "title": "Logo Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "logo_url"
+        ],
+        "title": "StudioLogoOut",
         "type": "object"
       },
       "StudioMembershipOut": {
@@ -2004,6 +2034,78 @@
         "summary": "Suspend",
         "tags": [
           "platform"
+        ]
+      }
+    },
+    "/api/v1/studio/logo": {
+      "delete": {
+        "description": "Idempotent -- a DELETE on a studio with no logo is a 204, not a 404.",
+        "operationId": "delete_logo_api_v1_studio_logo_delete",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Delete Logo",
+        "tags": [
+          "studio"
+        ]
+      },
+      "get": {
+        "description": "Any signed-in member of the studio, coaches and guardians included.\n\nReading is not a settings write. A staff app that could not render the club's own logo\nwould be enforcing a rule about writes by breaking a read.",
+        "operationId": "read_logo_api_v1_studio_logo_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Read Logo",
+        "tags": [
+          "studio"
+        ]
+      },
+      "post": {
+        "operationId": "upload_logo_api_v1_studio_logo_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_logo_api_v1_studio_logo_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioLogoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Upload Logo",
+        "tags": [
+          "studio"
         ]
       }
     }

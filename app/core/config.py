@@ -76,6 +76,20 @@ class Settings(BaseSettings):
     # other half of what HB-domain gates (infra/railway/README.md § The domain).
     OAUTH_REDIRECT_BASE_URL: str = "http://localhost:8000"
 
+    # M1.8 -- where app/core/storage.py files bytes. SPEC §4.3 has six `object_key`
+    # columns and no storage layer ever scoped for them; the design doc §2.2 settles the
+    # backend as a configuration value so moving to Cloudflare R2 later is env vars and
+    # not a rewrite.
+    #
+    # `filesystem` in every environment today, on a Railway volume in the deployed ones.
+    # The volume mounts to ONE service instance, so horizontal scaling of the API is
+    # blocked while it is in use -- stated here rather than discovered at the replica
+    # count that breaks it.
+    STORAGE_BACKEND: Literal["filesystem", "s3"] = "filesystem"
+    #: Relative paths resolve against the process working directory, which is the repo
+    #: root locally and /app in the container. .gitignore covers var/.
+    STORAGE_ROOT: str = "var/storage"
+
     LOG_LEVEL: str = "INFO"
 
 

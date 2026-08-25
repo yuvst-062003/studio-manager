@@ -67,7 +67,14 @@ case "$V" in
   structure)
     # app/models/health.py is here by conflict C3: M1 seeds the kind='trial' template so
     # M3's trial booking is not blocked on M4. M4 owns the rest of that file.
+    #
+    # app/routers/studio.py and app/routers/setup.py are here because §3.2 groups
+    # 'Studio settings' with 'Create/edit classes, groups, schedules' on one row, and
+    # because W1's exit gate runs identity and structure and nothing else -- a router in
+    # neither list is a router the stated gate does not reach. app/core/storage.py is
+    # already covered by the `core` vertical's app/core.
     py_candidates=(app/services/structure app/routers/structure.py \
+                   app/routers/studio.py app/routers/setup.py \
                    app/models/structure.py app/models/health.py)
     test_candidates=(tests/structure)
     ;;

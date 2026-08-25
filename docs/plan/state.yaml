@@ -66,6 +66,22 @@ waves:
         title: §6.1 first run — language, sign-in, the two refusals and the install gate
         status: shipped
         on: 2026-08-25
+      - id: M1.8
+        title: The object-storage seam and the studio logo
+        status: shipped
+        on: 2026-08-25
+      - id: M1.9
+        title: The §5.1 studio setup wizard
+        status: pending
+      - id: M1.10
+        title: The dashboard app — shell, 3d צוות and 3f הגדרות
+        status: pending
+      - id: M1.11
+        title: Parent home — artboard 1a
+        status: pending
+      - id: M1.12
+        title: studio_app connects as studio_app on staging
+        status: pending
   - id: W2
     milestone: M2 ∥ M3
     title: Schedule ∥ People and funnel

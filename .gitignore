@@ -12,6 +12,9 @@ __pycache__/
 .ruff_cache/
 tools/cockpit/local/runs/
 
+# M1.8 -- the local object store (STORAGE_ROOT). Uploaded bytes, never source.
+var/
+
 # Node
 node_modules/
 dist/
