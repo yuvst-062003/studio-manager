@@ -17,7 +17,7 @@ node_modules/
 dist/
 
 # Claude Code (machine-local)
-.claude/settings.local.json
+.claude/settings.local*.json
 
 # OS
 .DS_Store

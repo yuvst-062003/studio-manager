@@ -6,6 +6,7 @@ mandated command prompts on every call.
 """
 
 import json
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -106,3 +107,16 @@ def test_the_allowlist_never_blanket_allows_alembic():
     settings = json.loads((ROOT / ".claude/settings.json").read_text(encoding="utf-8"))
     assert "Bash(.venv/bin/alembic:*)" not in settings["permissions"]["allow"]
     assert "Bash(alembic:*)" not in settings["permissions"]["allow"]
+
+
+def test_no_local_claude_settings_are_tracked():
+    """`.claude/settings.local*.json` is machine-local: it carries an allowlist built
+    from one developer's session and absolute paths under their home directory. This
+    repo is public, and `.claude/settings.local 2.json` — a Finder duplicate whose name
+    the old exact-match ignore rule did not cover — was tracked for 75 commits before
+    anyone looked. The glob is the fix; this is what stops the next variant."""
+    tracked = subprocess.run(
+        ["git", "ls-files", ".claude/"], cwd=ROOT, capture_output=True, text=True, check=True
+    ).stdout.split()
+    offenders = [f for f in tracked if "settings.local" in f]
+    assert not offenders, f"machine-local settings are tracked: {offenders}"
