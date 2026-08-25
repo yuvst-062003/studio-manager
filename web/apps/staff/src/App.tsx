@@ -25,6 +25,7 @@ import { Resolve } from './features/identity/Resolve'
 import { ScheduleSection } from './features/schedule/ScheduleSection'
 import { makeStaffScheduleClient } from './features/schedule/client'
 import { useToday } from './features/schedule/useToday'
+import { StudentsSearch, makeStaffPeopleClient } from './features/people'
 
 // §5.1 — 'the staff app and dashboard route them into a resumable wizard'. Both mount the
 // SAME wizard from @studio/ui; no step lives in one app's feature directory. Registered
@@ -34,8 +35,11 @@ registerM1WizardSteps(apiFetch)
 
 const NAV = [
   { key: 'today', labelKey: 'common.nav.today', href: '/' },
+  // Both W2 lanes moved their entry from a path to a hash, independently and for the
+  // same reason: there is no server route behind the path form, so `/schedule` and
+  // `/students` were links to a 404.
   { key: 'schedule', labelKey: 'common.nav.schedule', href: '#/schedule' },
-  { key: 'students', labelKey: 'common.nav.students', href: '/students' },
+  { key: 'students', labelKey: 'common.nav.students', href: '#/students' },
   { key: 'attendance', labelKey: 'common.nav.attendance', href: '/attendance' },
   { key: 'announcements', labelKey: 'common.nav.announcements', href: '/announcements' },
   { key: 'settings', labelKey: 'common.nav.settings', href: '/settings' },
@@ -69,6 +73,7 @@ export default function App() {
   // object every render would re-fetch progress forever.
   const setupClient = useMemo(() => makeSetupClient(apiFetch), [])
   const scheduleClient = useMemo(() => makeStaffScheduleClient(apiFetch), [])
+  const peopleClient = useMemo(() => makeStaffPeopleClient(apiFetch), [])
   const hash = useHash()
   const today = useToday()
   // 9a's filter defaults from who is looking: a coach opening the app wants their own day,
@@ -78,6 +83,15 @@ export default function App() {
   const membership = session.studios.find((s) => s.studio_id === session.activeStudioId)
   const viewerIsCoach =
     membership?.roles.some((role) => role === 'lead_coach' || role === 'assistant_coach') ?? false
+  // Staff `9h` is one hash away from Today. The card (`9c`) and the mid-lesson trial
+  // (`11b`) open from a roster row, which is M5's screen — they are exported from
+  // features/people for that lane to mount without reopening this file.
+  //
+  // Read off `useHash()` rather than `globalThis.location.hash` directly: both W2 lanes
+  // put a screen behind a hash in this shell, and a plain read is not reactive — the
+  // screen would change only when something else happened to re-render App. One
+  // subscription serves both lanes' routes.
+  const onStudents = hash === '#/students'
 
   useEffect(() => {
     // Chromium fires this when it considers the app installable; iOS never does, which
@@ -139,10 +153,15 @@ export default function App() {
             />
           }
         >
-          {/* §6.1's first-run routing still owns the default screen: `Resolve` decides
-              between the setup wizard, the tour and the refusal. A coach who has navigated
-              to #/schedule is past first run — but `access.staff` is re-checked here so the
-              hash can never route around §6.1's third arm, the refusal. */}
+          {/* §6.1's first-run routing still owns the DEFAULT screen: `Resolve` decides
+              between the setup wizard, the tour and the refusal. Both W2 lanes hang a
+              screen off a hash in front of it, and neither claims the fallback — an
+              unknown hash still falls through to `Resolve`.
+
+              `access.staff` guards lane SCHEDULE's branch because a hash is typed by
+              whoever is holding the phone, so the check cannot live in the link. Lane
+              PEOPLE's branch inherits the same protection from being below it: a person
+              without staff access takes the `Resolve` arm and gets §6.1's refusal. */}
           {session.access.staff && hash.startsWith('#/schedule') ? (
             <ScheduleSection
               locale={locale}
@@ -152,6 +171,8 @@ export default function App() {
               viewerPersonId={membership?.person_id}
               viewerIsCoach={viewerIsCoach}
             />
+          ) : session.access.staff && onStudents ? (
+            <StudentsSearch locale={locale} client={peopleClient} />
           ) : (
             <Resolve
               session={session}

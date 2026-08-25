@@ -1,0 +1,6 @@
+export { StudentsSearch, chipToneFor } from './StudentsSearch'
+export { StaffStudentCard } from './StaffStudentCard'
+export { TrialInClass } from './TrialInClass'
+export { WeekdayPicker, attendsWeekdaysFor } from './WeekdayPicker'
+export { makeStaffPeopleClient } from './peopleClient'
+export type { StaffPeopleClient, StudentSummary, StudentDetail } from './peopleClient'
