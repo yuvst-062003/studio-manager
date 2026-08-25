@@ -14,6 +14,7 @@ import pkgutil
 from fastapi import APIRouter, FastAPI
 
 from app import routers as routers_pkg
+from app.core.auth_context import AuthContextMiddleware
 from app.core.clock import DevClockMiddleware
 from app.core.config import settings
 from app.core.logging import configure_logging
@@ -29,6 +30,16 @@ app = FastAPI(title="Studio Manager API", version="0.1.0")
 # exactly as configure_logging() above is not one.
 if settings.ENV != "production":
     app.add_middleware(DevClockMiddleware)
+
+# Holdback 2 -- request.state.is_developer / studio_is_demo from the verified JWT, which
+# app/core/tenancy.py::studio_id_from_request has expected since M0.2. Not a registration:
+# seam 2's discovery loop below is untouched, exactly as configure_logging() above and
+# DevClockMiddleware are not registrations.
+#
+# Added AFTER DevClockMiddleware, so it runs BEFORE it (Starlette runs the last-added
+# outermost). That order is deliberate but not load-bearing: neither reads what the other
+# writes. It is stated so a later reader does not have to re-derive that it is safe.
+app.add_middleware(AuthContextMiddleware)
 
 v1 = APIRouter(prefix="/api/v1")
 for _module in pkgutil.iter_modules(routers_pkg.__path__):

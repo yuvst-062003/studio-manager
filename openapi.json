@@ -1,6 +1,72 @@
 {
   "components": {
     "schemas": {
+      "AppAccessOut": {
+        "description": "§6.1's two queries, as the client sees them.\n\nTwo booleans and nothing else. A count of students or studios in the *other* app\nwould leak what §6.1 says neither refusal screen may: \"Neither screen leaks whether\nthe account exists in the other app.\"",
+        "properties": {
+          "parent": {
+            "title": "Parent",
+            "type": "boolean"
+          },
+          "staff": {
+            "title": "Staff",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "staff",
+          "parent"
+        ],
+        "title": "AppAccessOut",
+        "type": "object"
+      },
+      "CallbackRequest": {
+        "properties": {
+          "code": {
+            "maxLength": 2048,
+            "minLength": 1,
+            "title": "Code",
+            "type": "string"
+          },
+          "invitation_token": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invitation Token"
+          },
+          "state": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "state"
+        ],
+        "title": "CallbackRequest",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
       "HealthResponse": {
         "properties": {
           "env": {
@@ -42,6 +108,239 @@
         ],
         "title": "HealthResponse",
         "type": "object"
+      },
+      "MeResponse": {
+        "properties": {
+          "access": {
+            "$ref": "#/components/schemas/AppAccessOut"
+          },
+          "acting_as_person_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Acting As Person Id"
+          },
+          "active_studio_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active Studio Id"
+          },
+          "dev_tools": {
+            "title": "Dev Tools",
+            "type": "boolean"
+          },
+          "identity_id": {
+            "format": "uuid",
+            "title": "Identity Id",
+            "type": "string"
+          },
+          "studios": {
+            "items": {
+              "$ref": "#/components/schemas/StudioMembershipOut"
+            },
+            "title": "Studios",
+            "type": "array"
+          }
+        },
+        "required": [
+          "identity_id",
+          "access",
+          "studios",
+          "active_studio_id",
+          "dev_tools",
+          "acting_as_person_id"
+        ],
+        "title": "MeResponse",
+        "type": "object"
+      },
+      "ProviderListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ProviderOut"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "ProviderListResponse",
+        "type": "object"
+      },
+      "ProviderOut": {
+        "description": "One sign-in button the client may render.\n\nOnly configured providers are listed (app/services/identity/providers.py). A button\nfor a provider whose credentials are absent fails one step *after* the user has\npicked their account, which is worse than a button that is not there.",
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "start_url": {
+            "title": "Start Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "start_url"
+        ],
+        "title": "ProviderOut",
+        "type": "object"
+      },
+      "SessionResponse": {
+        "description": "The access token lives in the body, never in a cookie (§10.3).\n\nThe client holds it in memory and replays it, which is what keeps it out of\nautomatic-credential territory -- a cookie-borne access token is sent by the browser\non every request, which is what makes CSRF possible at all. The refresh token is in\nthe Set-Cookie header and never here.",
+        "properties": {
+          "access": {
+            "$ref": "#/components/schemas/AppAccessOut"
+          },
+          "access_token": {
+            "title": "Access Token",
+            "type": "string"
+          },
+          "active_studio_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active Studio Id"
+          },
+          "expires_in": {
+            "title": "Expires In",
+            "type": "integer"
+          },
+          "studios": {
+            "items": {
+              "$ref": "#/components/schemas/StudioMembershipOut"
+            },
+            "title": "Studios",
+            "type": "array"
+          }
+        },
+        "required": [
+          "access_token",
+          "expires_in",
+          "access",
+          "studios",
+          "active_studio_id"
+        ],
+        "title": "SessionResponse",
+        "type": "object"
+      },
+      "StudioMembershipOut": {
+        "properties": {
+          "is_guardian": {
+            "title": "Is Guardian",
+            "type": "boolean"
+          },
+          "person_id": {
+            "format": "uuid",
+            "title": "Person Id",
+            "type": "string"
+          },
+          "roles": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Roles",
+            "type": "array"
+          },
+          "studio_id": {
+            "format": "uuid",
+            "title": "Studio Id",
+            "type": "string"
+          },
+          "studio_is_demo": {
+            "title": "Studio Is Demo",
+            "type": "boolean"
+          },
+          "studio_name": {
+            "title": "Studio Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "studio_id",
+          "studio_name",
+          "studio_is_demo",
+          "person_id",
+          "roles",
+          "is_guardian"
+        ],
+        "title": "StudioMembershipOut",
+        "type": "object"
+      },
+      "SwitchStudioRequest": {
+        "properties": {
+          "studio_id": {
+            "format": "uuid",
+            "title": "Studio Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "studio_id"
+        ],
+        "title": "SwitchStudioRequest",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
       }
     }
   },
@@ -51,6 +350,243 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/auth/logout": {
+      "post": {
+        "description": "Ends the session server-side, not merely locally.\n\nRevoking the family is what makes this different from clearing a cookie: a copy of\nthe cookie taken before logout would otherwise still refresh.",
+        "operationId": "logout_api_v1_auth_logout_post",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Logout",
+        "tags": [
+          "identity"
+        ]
+      }
+    },
+    "/api/v1/auth/me": {
+      "get": {
+        "description": "§6.1's resolve step.\n\n`access` and `studios` are re-derived from the database rather than read off the\ntoken. §3.1's \"a query, not a role check\" is only true if this endpoint asks -- a\ncached answer here is how a revoked coach keeps their app for fifteen more minutes.",
+        "operationId": "me_api_v1_auth_me_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Me",
+        "tags": [
+          "identity"
+        ]
+      }
+    },
+    "/api/v1/auth/providers": {
+      "get": {
+        "description": "The sign-in buttons the client may render.\n\nOnly configured providers. §5.2 keeps Apple in scope and HB-apple-developer keeps it\nunconfigurable, so this is what stops an Apple button appearing on a deployment that\ncannot complete an Apple sign-in.",
+        "operationId": "list_providers_api_v1_auth_providers_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProviderListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Providers",
+        "tags": [
+          "identity"
+        ]
+      }
+    },
+    "/api/v1/auth/refresh": {
+      "post": {
+        "description": "§5.2's rotation.\n\nEvery failure is the same 401 with no reason. `RefreshRejectedError.reason` goes to\nthe log and nowhere else: telling a caller *why* their token failed tells an attacker\nwhether the token existed at all.",
+        "operationId": "refresh_api_v1_auth_refresh_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Refresh",
+        "tags": [
+          "identity"
+        ]
+      }
+    },
+    "/api/v1/auth/switch-studio": {
+      "post": {
+        "description": "§5.2 -- 'A person belonging to more than one studio gets a studio switcher.'\n\nThe target is checked against this identity's own memberships. A switch endpoint that\ntrusted its input would be a cross-tenant read with a friendly name.",
+        "operationId": "switch_studio_api_v1_auth_switch_studio_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SwitchStudioRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Switch Studio",
+        "tags": [
+          "identity"
+        ]
+      }
+    },
+    "/api/v1/auth/{provider}/callback": {
+      "post": {
+        "description": "§5.2's server-side exchange, and §6.1 step 3's identity resolution.",
+        "operationId": "callback_api_v1_auth__provider__callback_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider",
+            "required": true,
+            "schema": {
+              "title": "Provider",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CallbackRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Callback",
+        "tags": [
+          "identity"
+        ]
+      }
+    },
+    "/api/v1/auth/{provider}/start": {
+      "get": {
+        "description": "§5.2 -- 'a standard top-level redirect, then PKCE code exchange server-side.'\n\nA 307 to the provider and never a rendered interstitial: an interstitial is one step\ncloser to a webview, and Google answers `disallowed_useragent` inside one.",
+        "operationId": "start_api_v1_auth__provider__start_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider",
+            "required": true,
+            "schema": {
+              "title": "Provider",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "app",
+            "required": false,
+            "schema": {
+              "default": "parent",
+              "title": "App",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "return_path",
+            "required": false,
+            "schema": {
+              "default": "/",
+              "title": "Return Path",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start",
+        "tags": [
+          "identity"
+        ]
+      }
+    },
     "/api/v1/health": {
       "get": {
         "description": "Liveness. Deliberately carries no tenant data and needs no auth.\n\n`revision` is best-effort and never affects `status`: this endpoint answers \"is this\nprocess alive\", and a database it cannot reach does not make it dead. Letting the\nfailure propagate would turn every database blip into a page.",

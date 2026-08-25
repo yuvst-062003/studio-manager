@@ -117,6 +117,15 @@ SESSION_DEP_ALLOWLIST: dict[str, str] = {
         "before/around the studio's own scoped state exists, not inside a "
         "TenantSession that fails closed the moment no studio is in context."
     ),
+    "identity.py": (
+        "SPEC 5.2's auth routes run BEFORE a studio exists -- there is no tenant in "
+        "context between the redirect out and the callback back -- and 3.3 requires one "
+        "identity to reach several studios, so the login resolver has to see all of "
+        "them to answer 'which ones are yours?'. Restriction 1 is not bypassed, it is "
+        "deferred: the moment a studio is chosen it lands in the JWT's `sid` claim, "
+        "app/core/auth_context.py puts it on request.state, and every OTHER router "
+        "takes TenantSessionDep and fails closed on it."
+    ),
 }
 
 

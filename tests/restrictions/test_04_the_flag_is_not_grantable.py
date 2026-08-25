@@ -28,7 +28,7 @@ installed fastapi/pydantic before removing the import; every other name in this 
 project's Python 3.14, so nothing else in the file depends on the deferred form.
 """
 
-import re
+import ast
 from pathlib import Path
 from typing import Any
 
@@ -115,7 +115,6 @@ def source_writers(root: Path) -> list[str]:
     missed (the hole this closes), and two reads that must never be flagged (the false
     positive an earlier fix was written to remove, and must not reintroduce).
     """
-    pattern = re.compile(rf"(\.{COLUMN}\s+=(?!=)|\b{COLUMN}\s+=(?!=)|\b{COLUMN}\s*=\s*(True|1)\b)")
     found = []
     for path in sorted(root.rglob("*.py")):
         try:
@@ -127,10 +126,82 @@ def source_writers(root: Path) -> list[str]:
             rel = str(path.relative_to(root))
         if rel.startswith(ALLOWED_WRITERS):
             continue
-        for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
-            if pattern.search(line):
-                found.append(f"{rel}:{lineno}")
+        found.extend(f"{rel}:{lineno}" for lineno in grant_lines(path))
     return found
+
+
+def _is_request_state(node: ast.expr) -> bool:
+    """`request.state.<x>` -- the one attribute chain that is not a database row."""
+    return (
+        isinstance(node, ast.Attribute)
+        and node.attr == "state"
+        and isinstance(node.value, ast.Name)
+        and node.value.id == "request"
+    )
+
+
+def _is_literal_true(node: ast.expr) -> bool:
+    return isinstance(node, ast.Constant) and node.value in (True, 1)
+
+
+def grant_lines(path: Path) -> list[int]:
+    """Every line in one file that GRANTS the flag.
+
+    Reads the parse tree, not the text, and the reason is the same one that moved
+    tests/dev/test_clock.py and tests/restrictions/test_19_7 to AST during M1: a text
+    scan cannot tell a grant from a sentence about a grant. This detector fired on
+    app/core/auth_context.py's own docstring -- the paragraph explaining why that
+    middleware must never write ``is_developer = False`` -- so the gate guarding §19.2
+    forbade documenting §19.2 in the module that obeys it.
+
+    Three shapes are grants, and all three survive the move:
+
+    * ``identity.is_developer = ...`` and a bare ``is_developer = ...`` -- an assignment;
+    * ``AuthIdentity(is_developer=True)`` -- a constructor keyword with a literal;
+    * ``update(AuthIdentity).values(is_developer=True)`` -- an ORM keyword with a literal.
+
+    Two shapes are not, and both are the reason the RHS matters rather than the spacing:
+
+    * ``developer_may_act(is_developer=bool(x))`` -- a read passed through as a keyword;
+    * ``request.state.is_developer = claims.is_developer`` -- §19.6's rule is about the
+      COLUMN, and `request.state` is not a row. app/core/auth_context.py copies a
+      VERIFIED claim onto the request so app/core/tenancy.py can read it under the name
+      M0 already chose; renaming that attribute to dodge this detector would change a
+      contract tests/restrictions/test_01 drives directly, to satisfy a gate about
+      something else entirely. The carve-out is exactly that narrow --
+      ``request.state.is_developer = True`` is still a grant, because there is no
+      legitimate reason to hard-code it anywhere.
+    """
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+    except SyntaxError:  # pragma: no cover -- app/ failing to parse fails elsewhere first
+        return []
+
+    lines: set[int] = set()
+    for node in ast.walk(tree):
+        # A plain assignment only. An ANNOTATED one (`is_developer: Mapped[bool] =
+        # mapped_column(...)`, `is_developer: bool` in a dataclass) is a DECLARATION, and
+        # declaring the column is precisely what app/models/identity.py must do -- §19.2
+        # forbids granting the flag, not having one. The old regex never saw these
+        # because a declaration writes `name: type =` rather than `name =`; the AST walk
+        # does, so the distinction has to be made explicitly rather than by accident.
+        if isinstance(node, ast.Assign):
+            targets = node.targets
+            value = node.value
+            for target in targets:
+                if isinstance(target, ast.Name) and target.id == COLUMN:
+                    lines.add(node.lineno)
+                elif isinstance(target, ast.Attribute) and target.attr == COLUMN:
+                    if _is_request_state(target.value) and not (
+                        value is not None and _is_literal_true(value)
+                    ):
+                        continue
+                    lines.add(node.lineno)
+        elif isinstance(node, ast.Call):
+            for keyword in node.keywords:
+                if keyword.arg == COLUMN and _is_literal_true(keyword.value):
+                    lines.add(node.lineno)
+    return sorted(lines)
 
 
 def test_no_route_can_write_the_flag():
@@ -219,8 +290,31 @@ SIX_CASES = [
     pytest.param("is_developer = True", True, id="bare assign"),
     pytest.param("AuthIdentity(is_developer=True)", True, id="constructor kwarg"),
     pytest.param("update(AuthIdentity).values(is_developer=True)", True, id="update .values"),
-    pytest.param("if identity.is_developer == True:", False, id="comparison (read)"),
+    pytest.param("if identity.is_developer == True:\n    pass", False, id="comparison (read)"),
     pytest.param("developer_may_act(is_developer=bool(x))", False, id="passing a read"),
+    # M1's addition, and the reason it is not a seventh arbitrary case: §19.6's rule is
+    # about the COLUMN, and `request.state` is not a row. app/core/auth_context.py copies
+    # a verified claim onto the request so app/core/tenancy.py can read it under the name
+    # M0 already chose -- renaming that attribute to dodge this detector would change a
+    # contract tests/restrictions/test_01 drives directly, to satisfy a gate about
+    # something else entirely.
+    pytest.param(
+        "request.state.is_developer = claims.is_developer", False, id="request.state (not a row)"
+    ),
+    # ...and the carve-out is exactly that narrow. A literal on the right-hand side is a
+    # grant no matter where it is written, and any other attribute target still is one.
+    pytest.param("request.state.is_developer = True", True, id="request.state, literal"),
+    pytest.param("session.identity.is_developer = flag", True, id="other attribute chain"),
+    # Declarations. §19.2 forbids GRANTING the flag, not having one — and
+    # app/models/identity.py has to declare the column for there to be anything to
+    # guard. The regex never saw these (a declaration writes `name: type =`, not
+    # `name =`); the AST walk does, so the distinction is explicit rather than accidental.
+    pytest.param(
+        "is_developer: Mapped[bool] = mapped_column(Boolean, nullable=False)",
+        False,
+        id="column declaration",
+    ),
+    pytest.param("is_developer: bool", False, id="dataclass field"),
 ]
 
 

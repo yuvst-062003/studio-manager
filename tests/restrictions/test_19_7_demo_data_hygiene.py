@@ -15,6 +15,7 @@ here, and the docstrings say which is which:
 
 from __future__ import annotations
 
+import ast
 import re
 from pathlib import Path
 
@@ -27,19 +28,51 @@ from sqlalchemy.orm import Session
 
 ROOT = Path(__file__).resolve().parents[2]
 
-#: A *use* of the escape hatch, not a mention of it. Both shapes, and the comment that
-#: used to sit at the call site still applies to both: `with_all_tenants(reason=...)` is
-#: the broad context manager (app/core/tenancy.py), and
-#: `.execution_options(with_all_tenants=True)` is the narrow per-statement flag
-#: (app/services/demo/service.py and fixtures.py). Do not narrow this to one of them.
-#:
-#: What it deliberately does NOT match is the bare name in prose. M1's
-#: app/models/person.py carries the accurate comment "this index is read under
-#: with_all_tenants", and a substring search read that as a cross-studio query in a file
-#: holding no query at all. This detector already requires the MITIGATION to be a call
-#: rather than a name; holding the hazard to a lower standard just teaches people to
-#: write vaguer comments.
-HATCH_USE = re.compile(r"with_all_tenants\s*\(|with_all_tenants\s*=\s*True")
+HATCH = "with_all_tenants"
+
+
+def hatch_use_lines(path: Path) -> list[int]:
+    """Every line in one file that actually USES the escape hatch.
+
+    Reads the parse tree, not the text, and it took two attempts to get here -- both
+    recorded because the second is the interesting one.
+
+    A bare substring search flagged app/models/person.py for the accurate *comment*
+    "this index is read under with_all_tenants". Requiring call syntax fixed that and
+    then flagged app/routers/identity.py, whose docstring **quotes** the call as
+    ``with_all_tenants(reason=...)`` while the file itself never opens the hatch. Text
+    matching cannot tell code from an accurate description of code, and a gate that
+    fires on accurate documentation gets vaguer documentation rather than safer code.
+
+    Both real shapes are matched, and neither may be dropped:
+
+    * ``with_all_tenants(reason=...)`` -- the broad context manager (app/core/tenancy.py),
+      including the ``session.with_all_tenants(...)`` method form;
+    * ``.execution_options(with_all_tenants=True)`` -- the narrow per-statement flag
+      (app/services/demo/service.py and fixtures.py).
+    """
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+    except SyntaxError:  # pragma: no cover -- app/ failing to parse fails elsewhere first
+        return []
+
+    lines: set[int] = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        if (isinstance(func, ast.Name) and func.id == HATCH) or (
+            isinstance(func, ast.Attribute) and func.attr == HATCH
+        ):
+            lines.add(node.lineno)
+        for keyword in node.keywords:
+            if (
+                keyword.arg == HATCH
+                and isinstance(keyword.value, ast.Constant)
+                and keyword.value.value is True
+            ):
+                lines.add(node.lineno)
+    return sorted(lines)
 
 
 def test_the_filter_removes_the_demo_studio(migrated):
@@ -115,9 +148,9 @@ def test_every_cross_studio_call_site_is_accounted_for():
 
 
 def _unaccounted(root: Path) -> list[str]:
-    """The scan, extracted so the two self-tests below can drive it over a probe tree
-    instead of over app/. Extracted in M1, when the detector fired on a file that only
-    NAMED the hatch in a comment."""
+    """The scan, extracted so the self-tests below can drive it over a probe tree instead
+    of over app/. Extracted in M1, when the detector fired on a file that only NAMED the
+    hatch in a comment -- and then again on one whose docstring quoted the call."""
     call_pattern = re.compile(r"exclude_demo_studios\s*\(")
     unaccounted = []
     for path in sorted(root.rglob("*.py")):
@@ -128,9 +161,22 @@ def _unaccounted(root: Path) -> list[str]:
         if rel in CROSS_STUDIO_CALLERS:
             continue
         text = path.read_text(encoding="utf-8")
-        if HATCH_USE.search(text) and not call_pattern.search(text):
+        if hatch_use_lines(path) and not call_pattern.search(text):
             unaccounted.append(rel)
     return unaccounted
+
+
+def test_a_docstring_that_quotes_the_call_is_not_a_caller(tmp_path):
+    """The second false positive. app/routers/identity.py's docstring explains that the
+    resolver "wraps each one in with_all_tenants(reason=...)" -- describing what a
+    DIFFERENT module does -- and a call-shaped text match read it as a call here."""
+    (tmp_path / "probe.py").write_text(
+        '"""The resolver wraps each query in with_all_tenants(reason=...).\n\n'
+        '    .execution_options(with_all_tenants=True) is the narrow form.\n    """\n'
+        "x = 1\n",
+        encoding="utf-8",
+    )
+    assert _unaccounted(tmp_path) == []
 
 
 def test_a_file_that_only_names_the_hatch_in_a_comment_is_not_a_caller(tmp_path):
@@ -153,7 +199,10 @@ def test_a_file_that_only_names_the_hatch_in_a_comment_is_not_a_caller(tmp_path)
 @pytest.mark.parametrize(
     "line",
     [
-        'with with_all_tenants(reason="a report"):',
+        # Valid Python, because the detector parses rather than greps -- a fragment that
+        # does not parse would be reported as "no uses" and the test would pass for
+        # entirely the wrong reason.
+        'with with_all_tenants(reason="a report"):\n    pass',
         "stmt.execution_options(with_all_tenants=True)",
         "session.with_all_tenants(reason='x')",
     ],

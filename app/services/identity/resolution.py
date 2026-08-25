@@ -23,7 +23,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.tenancy import with_all_tenants
-from app.models.identity import AuthIdentity
+from app.models.identity import AuthIdentity, PlatformAdmin
 from app.models.person import Guardian, Invitation, Person, RoleAssignment
 from app.models.studio import Studio
 from app.services.identity.providers import ProviderIdentity
@@ -140,6 +140,24 @@ def upsert_identity(
         session.add(row)
         session.flush()
         return row
+
+
+def is_platform_admin(session: Session, identity_id: uuid.UUID) -> bool:
+    """§3.1 -- `platform_admin` is 'Seeded manually'.
+
+    Lives here rather than in `platform.py` because it is an identity question, asked on
+    every sign-in and every refresh, long before anything touches the console. §18.1 puts
+    the platform operator above every studio, which is why the read is unscoped.
+    """
+    with with_all_tenants(reason=_LOGIN_SCOPE):
+        return (
+            session.execute(
+                select(PlatformAdmin.id)
+                .where(PlatformAdmin.auth_identity_id == identity_id)
+                .limit(1)
+            ).first()
+            is not None
+        )
 
 
 def persons_for_identity(session: Session, identity_id: uuid.UUID) -> list[Person]:

@@ -4,6 +4,167 @@
  */
 
 export interface paths {
+    "/api/v1/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Logout
+         * @description Ends the session server-side, not merely locally.
+         *
+         *     Revoking the family is what makes this different from clearing a cookie: a copy of
+         *     the cookie taken before logout would otherwise still refresh.
+         */
+        post: operations["logout_api_v1_auth_logout_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Me
+         * @description §6.1's resolve step.
+         *
+         *     `access` and `studios` are re-derived from the database rather than read off the
+         *     token. §3.1's "a query, not a role check" is only true if this endpoint asks -- a
+         *     cached answer here is how a revoked coach keeps their app for fifteen more minutes.
+         */
+        get: operations["me_api_v1_auth_me_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/providers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Providers
+         * @description The sign-in buttons the client may render.
+         *
+         *     Only configured providers. §5.2 keeps Apple in scope and HB-apple-developer keeps it
+         *     unconfigurable, so this is what stops an Apple button appearing on a deployment that
+         *     cannot complete an Apple sign-in.
+         */
+        get: operations["list_providers_api_v1_auth_providers_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Refresh
+         * @description §5.2's rotation.
+         *
+         *     Every failure is the same 401 with no reason. `RefreshRejectedError.reason` goes to
+         *     the log and nowhere else: telling a caller *why* their token failed tells an attacker
+         *     whether the token existed at all.
+         */
+        post: operations["refresh_api_v1_auth_refresh_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/switch-studio": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Switch Studio
+         * @description §5.2 -- 'A person belonging to more than one studio gets a studio switcher.'
+         *
+         *     The target is checked against this identity's own memberships. A switch endpoint that
+         *     trusted its input would be a cross-tenant read with a friendly name.
+         */
+        post: operations["switch_studio_api_v1_auth_switch_studio_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/{provider}/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Callback
+         * @description §5.2's server-side exchange, and §6.1 step 3's identity resolution.
+         */
+        post: operations["callback_api_v1_auth__provider__callback_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/{provider}/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Start
+         * @description §5.2 -- 'a standard top-level redirect, then PKCE code exchange server-side.'
+         *
+         *     A 307 to the provider and never a rendered interstitial: an interstitial is one step
+         *     closer to a webview, and Google answers `disallowed_useragent` inside one.
+         */
+        get: operations["start_api_v1_auth__provider__start_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/health": {
         parameters: {
             query?: never;
@@ -32,6 +193,34 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * AppAccessOut
+         * @description §6.1's two queries, as the client sees them.
+         *
+         *     Two booleans and nothing else. A count of students or studios in the *other* app
+         *     would leak what §6.1 says neither refusal screen may: "Neither screen leaks whether
+         *     the account exists in the other app."
+         */
+        AppAccessOut: {
+            /** Parent */
+            parent: boolean;
+            /** Staff */
+            staff: boolean;
+        };
+        /** CallbackRequest */
+        CallbackRequest: {
+            /** Code */
+            code: string;
+            /** Invitation Token */
+            invitation_token?: string | null;
+            /** State */
+            state: string;
+        };
+        /** HTTPValidationError */
+        HTTPValidationError: {
+            /** Detail */
+            detail?: components["schemas"]["ValidationError"][];
+        };
         /** HealthResponse */
         HealthResponse: {
             /**
@@ -49,6 +238,104 @@ export interface components {
             /** Status */
             status: string;
         };
+        /** MeResponse */
+        MeResponse: {
+            access: components["schemas"]["AppAccessOut"];
+            /** Acting As Person Id */
+            acting_as_person_id: string | null;
+            /** Active Studio Id */
+            active_studio_id: string | null;
+            /** Dev Tools */
+            dev_tools: boolean;
+            /**
+             * Identity Id
+             * Format: uuid
+             */
+            identity_id: string;
+            /** Studios */
+            studios: components["schemas"]["StudioMembershipOut"][];
+        };
+        /** ProviderListResponse */
+        ProviderListResponse: {
+            /** Items */
+            items: components["schemas"]["ProviderOut"][];
+        };
+        /**
+         * ProviderOut
+         * @description One sign-in button the client may render.
+         *
+         *     Only configured providers are listed (app/services/identity/providers.py). A button
+         *     for a provider whose credentials are absent fails one step *after* the user has
+         *     picked their account, which is worse than a button that is not there.
+         */
+        ProviderOut: {
+            /** Name */
+            name: string;
+            /** Start Url */
+            start_url: string;
+        };
+        /**
+         * SessionResponse
+         * @description The access token lives in the body, never in a cookie (§10.3).
+         *
+         *     The client holds it in memory and replays it, which is what keeps it out of
+         *     automatic-credential territory -- a cookie-borne access token is sent by the browser
+         *     on every request, which is what makes CSRF possible at all. The refresh token is in
+         *     the Set-Cookie header and never here.
+         */
+        SessionResponse: {
+            access: components["schemas"]["AppAccessOut"];
+            /** Access Token */
+            access_token: string;
+            /** Active Studio Id */
+            active_studio_id: string | null;
+            /** Expires In */
+            expires_in: number;
+            /** Studios */
+            studios: components["schemas"]["StudioMembershipOut"][];
+        };
+        /** StudioMembershipOut */
+        StudioMembershipOut: {
+            /** Is Guardian */
+            is_guardian: boolean;
+            /**
+             * Person Id
+             * Format: uuid
+             */
+            person_id: string;
+            /** Roles */
+            roles: string[];
+            /**
+             * Studio Id
+             * Format: uuid
+             */
+            studio_id: string;
+            /** Studio Is Demo */
+            studio_is_demo: boolean;
+            /** Studio Name */
+            studio_name: string;
+        };
+        /** SwitchStudioRequest */
+        SwitchStudioRequest: {
+            /**
+             * Studio Id
+             * Format: uuid
+             */
+            studio_id: string;
+        };
+        /** ValidationError */
+        ValidationError: {
+            /** Context */
+            ctx?: Record<string, never>;
+            /** Input */
+            input?: unknown;
+            /** Location */
+            loc: (string | number)[];
+            /** Message */
+            msg: string;
+            /** Error Type */
+            type: string;
+        };
     };
     responses: never;
     parameters: never;
@@ -58,6 +345,186 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    logout_api_v1_auth_logout_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    me_api_v1_auth_me_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeResponse"];
+                };
+            };
+        };
+    };
+    list_providers_api_v1_auth_providers_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderListResponse"];
+                };
+            };
+        };
+    };
+    refresh_api_v1_auth_refresh_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionResponse"];
+                };
+            };
+        };
+    };
+    switch_studio_api_v1_auth_switch_studio_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SwitchStudioRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    callback_api_v1_auth__provider__callback_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                provider: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CallbackRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_api_v1_auth__provider__start_get: {
+        parameters: {
+            query?: {
+                app?: string;
+                return_path?: string;
+            };
+            header?: never;
+            path: {
+                provider: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     read_health_api_v1_health_get: {
         parameters: {
             query?: never;
