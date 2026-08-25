@@ -49,9 +49,19 @@ class StudioFixture:
 class FixtureLayer:
     """One milestone's worth of demo data.
 
-    `tables` is documentation with teeth: the reset asserts it can actually reach every
-    table a layer claims, so a layer that seeds a table nobody wipes is a red build
-    rather than data that survives a reset and hides a bug.
+    `tables` is documentation with teeth: `tests/dev/test_demo_fixtures.py`
+    asserts that every name a layer claims here is actually reachable -- either
+    through `DemoStudioService.wipe_plan()` or `NEVER_WIPED` (service.py) -- so a
+    layer that seeds a table nobody wipes is a red build rather than data that
+    survives a reset and hides a bug.
+
+    `seed` runs against a **plain `Session`, not `TenantSession`**
+    (`DemoStudioService.seed` in service.py) -- TenantMixin's `before_flush` stamping
+    is registered on `TenantSession` only and never runs on this path. **A layer's
+    `seed` callable must therefore set `studio_id` on every row it creates itself.**
+    `_seed_studio` below is exempt only because it UPDATEs the one row that has no
+    `studio_id` column of its own (the tenant root); every layer after it creates
+    rows on tenant-scoped tables and does not get a free pass.
     """
 
     name: str

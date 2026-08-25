@@ -118,14 +118,28 @@ class DemoStudioService:
         `SEEDS[version]` raises KeyError on an unknown version deliberately: a reset
         that quietly upgrades you to a newer fixture set is a reset that hides the
         regression you were bisecting.
+
+        **TenantMixin's stamping does NOT apply on this path.** `session` here is a
+        plain `Session` -- both callers (app/core/db.py's `get_session`, and
+        app/workers/demo_reset.py) pass one, never `TenantSession` -- and
+        `_stamp_and_guard_writes` / `_apply_tenant_filter` are registered against
+        `TenantSession` only (`event.contains(Session, "before_flush",
+        _stamp_and_guard_writes)` is `False`). `use_studio` below sets the
+        `current_studio_id` ContextVar, but nothing on this path reads it: no listener
+        is attached to a plain `Session` to consult it, so it neither stamps a new
+        row's `studio_id` nor refuses a write aimed at a different studio. **Every
+        layer must therefore set `studio_id` on every row it creates itself** -- see
+        `FixtureLayer`'s docstring in fixtures.py, which is where a layer author reads
+        the contract. Swapping to `TenantSession` here is deliberately out of scope:
+        it fails closed in ways the wipe's cross-cutting deletes above would have to be
+        re-reasoned about, this late in the milestone.
         """
         fixture_set = SEEDS[version]
         studio_id = DemoStudioService.studio_id(session)
         seeded: list[str] = []
-        # The seed runs inside the studio it is seeding, so TenantMixin's before_flush
-        # stamps studio_id on every row a layer creates and refuses one that targets a
-        # different studio. `with_all_tenants` is deliberately NOT used: the escape
-        # hatch is for cross-studio work, and this is the opposite of that.
+        # Kept for any tenant-scoped SELECT a layer's own seed function needs to run
+        # (e.g. looking up a row it is about to UPDATE) -- NOT because it makes writes
+        # safe. It does not: see the docstring above.
         with use_studio(studio_id):
             for layer in fixture_set.layers:
                 layer.seed(session, studio_id)

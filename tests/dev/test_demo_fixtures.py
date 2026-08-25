@@ -20,6 +20,7 @@ from app.services.demo.fixtures import (
     PLANNED_LAYERS,
     SEEDS,
 )
+from app.services.demo.service import NEVER_WIPED, DemoStudioService
 
 MILESTONES = {f"M{n}" for n in range(12)}
 
@@ -119,3 +120,23 @@ def test_an_unknown_version_raises_rather_than_silently_seeding_the_latest():
     the regression you were bisecting."""
     with pytest.raises(KeyError):
         SEEDS["1999-01-01.0"]
+
+
+def test_every_layer_can_actually_reach_the_tables_it_claims():
+    """`FixtureLayer.tables` is documentation with teeth (its docstring in
+    fixtures.py): the reset must actually be able to reach every table a layer claims
+    to seed, or the claim is a comment nobody checks. 'Reachable' means named in
+    `DemoStudioService.wipe_plan()` -- the wipe -- or in `NEVER_WIPED`, the two ways a
+    table's contents survive or do not survive a reset. Today the only layer is
+    `studio`, which claims `("studio",)`; that name is in `NEVER_WIPED` because the
+    tenant root is restored in place rather than deleted, so this passes -- and it
+    becomes load-bearing the moment a later layer claims a table the wipe cannot
+    reach."""
+    reachable = set(DemoStudioService.wipe_plan()) | NEVER_WIPED
+    for layer in SEEDS[LATEST_VERSION].layers:
+        for table in layer.tables:
+            assert table in reachable, (
+                f"layer {layer.name!r} claims table {table!r}, which is neither in "
+                "DemoStudioService.wipe_plan() nor NEVER_WIPED -- the reset cannot "
+                "actually reach it"
+            )
