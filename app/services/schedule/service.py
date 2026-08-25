@@ -18,14 +18,20 @@ and reminder test in this product depends on.
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime
+from datetime import UTC, date, datetime, timedelta
 
 from sqlalchemy import Select, select
 from sqlalchemy.orm import Session as OrmSession
 
-from app.models.schedule import Session, StudioClosure, TrainingYear
+from app.models.schedule import (
+    GroupScheduleRule,
+    Session,
+    StudioClosure,
+    TrainingYear,
+)
+from app.models.structure import Group
 from app.services.schedule.impact import SYSTEM_CANCEL_CLOSURE
-from app.services.schedule.rules import ClosureSpec, jerusalem_date
+from app.services.schedule.rules import ClosureSpec, RuleSpec, expand_rules, jerusalem_date
 
 
 class NotFoundError(LookupError):
@@ -70,6 +76,74 @@ class ScheduleService:
     def __init__(self, session: OrmSession) -> None:
         self.session = session
 
+    # -- rules and lookups ----------------------------------------------------
+    def rule_specs(self, group_id: uuid.UUID) -> list[RuleSpec]:
+        """Every rule row for a group, live and superseded alike.
+
+        `expand_rules` honours `effective_from`/`effective_to` per date, so handing it the
+        full history is what makes "the schedule as it was in October" answerable from the
+        same code path as "the schedule now". Filtering here would throw that away.
+        """
+        rows = (
+            self.session.execute(
+                select(GroupScheduleRule).where(GroupScheduleRule.group_id == group_id)
+            )
+            .scalars()
+            .all()
+        )
+        return [
+            RuleSpec(
+                weekday=r.weekday,
+                start_time=r.start_time,
+                end_time=r.end_time,
+                location_id=r.location_id,
+                effective_from=r.effective_from,
+                effective_to=r.effective_to,
+                rule_id=r.id,
+            )
+            for r in rows
+        ]
+
+    def _require_group(self, group_id: uuid.UUID) -> Group:
+        row = self.session.get(Group, group_id)
+        if row is None:
+            raise NotFoundError(str(group_id))
+        return row
+
+    @staticmethod
+    def _year_covering(day: date, years: list[TrainingYear]) -> TrainingYear | None:
+        for year in years:
+            if year.starts_on <= day <= year.ends_on:
+                return year
+        return None
+
+    def sessions_between(
+        self, group_id: uuid.UUID, from_date: date, to_date: date
+    ) -> list[Session]:
+        """The group's sessions whose **Jerusalem** day falls in the range, in start order.
+
+        The window is widened by a day at each end before the database sees it and narrowed
+        in Python afterwards: a 00:30 Jerusalem class is the previous day in UTC, and a
+        naive `starts_at >= from_date` would drop it. Widening and re-filtering keeps the
+        index scan while making the boundary the one the client is actually asking about.
+        """
+        lower = datetime.combine(from_date - timedelta(days=1), datetime.min.time(), tzinfo=UTC)
+        upper = datetime.combine(to_date + timedelta(days=2), datetime.min.time(), tzinfo=UTC)
+        rows = (
+            self.session.execute(
+                select(Session)
+                .where(
+                    Session.group_id == group_id,
+                    Session.starts_at >= lower,
+                    Session.starts_at < upper,
+                )
+                .order_by(Session.starts_at)
+            )
+            .scalars()
+            .all()
+        )
+        return [r for r in rows if from_date <= jerusalem_date(r.starts_at) <= to_date]
+
     # -- the seam -------------------------------------------------------------
     def materialize_sessions(
         self,
@@ -79,13 +153,54 @@ class ScheduleService:
     ) -> list[Session]:
         """Every session for `group_id` in `[from_date, to_date]`, in start order.
 
-        **Still the contract commit's stub, and moved here verbatim with the class.** The
-        body arrives in the next commit; `tests/contracts/test_seams.py` asserts all three
-        halves of the contract until then, and a stub that returned `[]` would let M3 build
-        against a lie and pass its own tests while the picker showed an empty list in
-        production.
+        Materialized, not projected: the rows exist in `session` before this returns, so a
+        caller may hold their ids. M3's `trial_booking.session_id` points at one of them,
+        and a computed slot would be a booking pointing at nothing.
+
+        Closures (§5.6) are skipped — a date the studio is closed produces no session, which
+        is why a parent's month view shows a gap there rather than a cancelled row.
+
+        **Idempotent.** A session already sitting at the wanted instant is kept, not
+        duplicated: `POST /training-years/{id}/generate-sessions` is a button a manager can
+        press twice, and pressing it twice must not double a year.
+
+        **This does not rewrite anything.** It creates what is missing. Moving an existing
+        session is `apply_schedule_change`'s job, and keeping the two apart is what makes
+        "only the future is rewritten" a property of one function rather than a habit.
         """
-        raise NotImplementedError("M2 — lane SCHEDULE owns app/services/schedule/**")
+        self._require_group(group_id)
+        years = list(self.session.execute(select(TrainingYear)).scalars().all())
+        closures = [spec for year in years for spec in self.closure_specs(year.id)]
+        occurrences = expand_rules(self.rule_specs(group_id), from_date, to_date, closures)
+
+        taken = {row.starts_at for row in self.sessions_between(group_id, from_date, to_date)}
+
+        for occurrence in occurrences:
+            if occurrence.starts_at in taken:
+                continue
+            year = self._year_covering(occurrence.on_date, years)
+            if year is None:
+                # `session.training_year_id` is non-null, so a date outside every declared
+                # year cannot become a row. Silently skipped rather than raised: a rule
+                # that runs past the end of the year is ordinary, not an error.
+                continue
+            self.session.add(
+                Session(
+                    group_id=group_id,
+                    training_year_id=year.id,
+                    starts_at=occurrence.starts_at,
+                    ends_at=occurrence.ends_at,
+                    location_id=occurrence.location_id,
+                    status="scheduled",
+                    is_manually_edited=False,
+                    generated_from_rule_id=occurrence.rule_id,
+                    is_ad_hoc=False,
+                )
+            )
+            taken.add(occurrence.starts_at)
+
+        self.session.flush()
+        return self.sessions_between(group_id, from_date, to_date)
 
     # -- training years -------------------------------------------------------
     def list_training_years(
@@ -210,3 +325,47 @@ class ScheduleService:
 
         self.session.flush()
         return row, cancelled
+
+    # -- §5.15's wizard steps 1 and 6 ---------------------------------------------
+    def activate_training_year(self, training_year_id: uuid.UUID, *, at: datetime) -> TrainingYear:
+        """§5.15 — 'nothing is visible to guardians until it is activated'.
+
+        The incumbent is closed in the same transaction. `uq_training_year_one_active` is a
+        partial unique index, so doing it in two steps would fail at the database with a
+        constraint name rather than a sentence.
+        """
+        year = self.get_training_year(training_year_id)
+        if year.status == "closed":
+            raise ConflictError("a closed year cannot be reactivated")
+        for other in (
+            self.session.execute(select(TrainingYear).where(TrainingYear.status == "active"))
+            .scalars()
+            .all()
+        ):
+            if other.id != year.id:
+                other.status = "closed"
+        self.session.flush()
+        year.status = "active"
+        year.updated_at = at
+        self.session.flush()
+        return year
+
+    def generate_sessions_for_year(
+        self, training_year_id: uuid.UUID, *, at: datetime
+    ) -> tuple[int, int]:
+        """§5.15 step 6 — 'materialize every session for the year, skipping closures, and
+        show a summary of what was created'. Returns (groups, sessions created).
+
+        Every **active** group: a retired one (§5.15 step 3) keeps its history and gains no
+        future.
+        """
+        year = self.get_training_year(training_year_id)
+        groups = list(
+            self.session.execute(select(Group).where(Group.is_active.is_(True))).scalars().all()
+        )
+        created = 0
+        for group in groups:
+            before = len(self.sessions_between(group.id, year.starts_on, year.ends_on))
+            after = len(self.materialize_sessions(group.id, year.starts_on, year.ends_on))
+            created += after - before
+        return len(groups), created

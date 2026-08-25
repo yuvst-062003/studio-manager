@@ -28,6 +28,7 @@ from app.schemas.schedule import (
     ClosureCreatedOut,
     ClosureOut,
     ClosurePage,
+    GenerateSessionsOut,
     HolidayPresetOut,
     TrainingYearCreate,
     TrainingYearOut,
@@ -152,3 +153,43 @@ def list_holiday_presets(
         HolidayPresetOut(key=p.key, name=p.name, date_from=p.date_from, date_to=p.date_to)
         for p in presets_for_year(year)
     ]
+
+
+@router.post("/training-years/{training_year_id}/activate", response_model=TrainingYearOut)
+def activate_training_year(
+    _: ManagerOrOwner,
+    training_year_id: uuid.UUID,
+    session: TenantSessionDep,
+    idempotency_key: IdempotencyKey = None,
+) -> TrainingYearOut:
+    try:
+        row = ScheduleService(session).activate_training_year(training_year_id, at=now())
+    except NotFoundError as exc:
+        raise _not_found() from exc
+    except ConflictError as exc:
+        raise _conflict(str(exc)) from exc
+    session.commit()
+    return TrainingYearOut.model_validate(row, from_attributes=True)
+
+
+@router.post(
+    "/training-years/{training_year_id}/generate-sessions", response_model=GenerateSessionsOut
+)
+def generate_sessions(
+    _: ManagerOrOwner,
+    training_year_id: uuid.UUID,
+    session: TenantSessionDep,
+    idempotency_key: IdempotencyKey = None,
+) -> GenerateSessionsOut:
+    """§5.15 step 6. Safe to press twice — `materialize_sessions` keeps a session already
+    sitting at the wanted instant rather than adding a second one."""
+    try:
+        groups, created = ScheduleService(session).generate_sessions_for_year(
+            training_year_id, at=now()
+        )
+    except NotFoundError as exc:
+        raise _not_found() from exc
+    session.commit()
+    return GenerateSessionsOut(
+        training_year_id=training_year_id, groups=groups, sessions_created=created
+    )
