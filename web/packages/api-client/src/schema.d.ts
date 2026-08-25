@@ -665,6 +665,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/students/{student_id}/guardians": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Guardians
+         * @description Staff `9c`'s card shows how to reach the parent. Coach-reachable, and safe to tag:
+         *     §5.3 gives `GuardianOut` no permission field and no financial one.
+         */
+        get: operations["list_guardians_api_v1_students__student_id__guardians_get"];
+        put?: never;
+        /** Add Guardian */
+        post: operations["add_guardian_api_v1_students__student_id__guardians_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/students/{student_id}/guardians/{person_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove Guardian
+         * @description Returns the remaining guardians rather than 204, because removing the primary
+         *     promotes another and the client needs to know which.
+         */
+        delete: operations["remove_guardian_api_v1_students__student_id__guardians__person_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/students/{student_id}/guardians/{person_id}/set-primary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Set Primary Guardian
+         * @description L8 -- this changes whose name the bill carries and which person a הוראת קבע matches.
+         *     It changes no permission, because there is none attached to it.
+         */
+        post: operations["set_primary_guardian_api_v1_students__student_id__guardians__person_id__set_primary_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/students/{student_id}/leave": {
         parameters: {
             query?: never;
@@ -1096,6 +1160,11 @@ export interface components {
              * @default parent
              */
             relation: string;
+        };
+        /** GuardianListResponse */
+        GuardianListResponse: {
+            /** Items */
+            items: components["schemas"]["GuardianOut"][];
         };
         /**
          * GuardianOut
@@ -2986,6 +3055,142 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StudentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_guardians_api_v1_students__student_id__guardians_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GuardianListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_guardian_api_v1_students__student_id__guardians_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GuardianCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GuardianListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_guardian_api_v1_students__student_id__guardians__person_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+                person_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GuardianListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_primary_guardian_api_v1_students__student_id__guardians__person_id__set_primary_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                student_id: string;
+                person_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GuardianListResponse"];
                 };
             };
             /** @description Validation Error */

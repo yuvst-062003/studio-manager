@@ -725,6 +725,22 @@
         "title": "GuardianCreate",
         "type": "object"
       },
+      "GuardianListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/GuardianOut"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "GuardianListResponse",
+        "type": "object"
+      },
       "GuardianOut": {
         "description": "§4.3's `guardian` link, projected.\n\n`is_primary` is reported because the parent app shows whose name the bill carries\n(§5.10) — not because anything is gated on it. See the module docstring.",
         "properties": {
@@ -4516,6 +4532,249 @@
           }
         },
         "summary": "Freeze Student",
+        "tags": [
+          "people"
+        ]
+      }
+    },
+    "/api/v1/students/{student_id}/guardians": {
+      "get": {
+        "description": "Staff `9c`'s card shows how to reach the parent. Coach-reachable, and safe to tag:\n§5.3 gives `GuardianOut` no permission field and no financial one.",
+        "operationId": "list_guardians_api_v1_students__student_id__guardians_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GuardianListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Guardians",
+        "tags": [
+          "people",
+          "people",
+          "coach"
+        ]
+      },
+      "post": {
+        "operationId": "add_guardian_api_v1_students__student_id__guardians_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GuardianCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GuardianListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Guardian",
+        "tags": [
+          "people"
+        ]
+      }
+    },
+    "/api/v1/students/{student_id}/guardians/{person_id}": {
+      "delete": {
+        "description": "Returns the remaining guardians rather than 204, because removing the primary\npromotes another and the client needs to know which.",
+        "operationId": "remove_guardian_api_v1_students__student_id__guardians__person_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "person_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Person Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GuardianListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove Guardian",
+        "tags": [
+          "people"
+        ]
+      }
+    },
+    "/api/v1/students/{student_id}/guardians/{person_id}/set-primary": {
+      "post": {
+        "description": "L8 -- this changes whose name the bill carries and which person a הוראת קבע matches.\nIt changes no permission, because there is none attached to it.",
+        "operationId": "set_primary_guardian_api_v1_students__student_id__guardians__person_id__set_primary_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "person_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Person Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GuardianListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Primary Guardian",
         "tags": [
           "people"
         ]

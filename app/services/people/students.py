@@ -40,7 +40,7 @@ from app.models.people import (
 from app.models.person import Guardian, Invitation, Person
 from app.models.structure import Group, GroupStaff
 from app.services.audit import AuditService
-from app.services.people.errors import NotFoundError
+from app.services.people.errors import ConflictError, NotFoundError, RefusedError
 from app.services.people.group_days import ScheduleReader
 from app.services.people.matching import match_person
 from app.services.people.status import StudentStatusService
@@ -403,6 +403,200 @@ class StudentService:
         )
 
     # -- writes ----------------------------------------------------------------
+    @staticmethod
+    def list_guardians(session: Session, *, student_id: uuid.UUID) -> list[tuple[Guardian, Person]]:
+        """L8 -- ordered primary-first because that is the order `2c` and `4a` render them
+        in, not because the primary is privileged. Nothing downstream branches."""
+        StudentService.get(session, student_id=student_id)
+        return [
+            (guardian, person)
+            for guardian, person in session.execute(
+                select(Guardian, Person)
+                .join(Person, Guardian.person_id == Person.id)
+                .where(Guardian.student_id == student_id)
+                .order_by(Guardian.is_primary.desc(), Person.first_name)
+            )
+        ]
+
+    @staticmethod
+    def add_guardian(
+        session: Session,
+        *,
+        student_id: uuid.UUID,
+        first_name: str,
+        last_name: str,
+        email: str | None,
+        phone: str | None,
+        relation: str,
+        is_primary: bool,
+        at: datetime,
+        actor_person_id: uuid.UUID | None,
+    ) -> Guardian:
+        """§5.3 -- 'Guardians are invited by email or phone.'
+
+        L7 first: a verified match is linked, never recreated. §5.4a is emphatic that a
+        matched parent is never duplicated, and duplicating one here would produce two
+        accounts holding the same child and two bills addressed to the same person.
+        """
+        student, _person = StudentService.get(session, student_id=student_id)
+        matched = match_person(session, email=email, phone=phone)
+        if matched is not None:
+            person_id = matched.person_id
+        else:
+            person = Person(
+                first_name=first_name.strip(),
+                last_name=last_name.strip(),
+                email=email,
+                phone=phone,
+                created_at=at,
+            )
+            session.add(person)
+            session.flush()
+            person_id = person.id
+
+        already = session.execute(
+            select(Guardian).where(
+                Guardian.student_id == student.id, Guardian.person_id == person_id
+            )
+        ).scalar_one_or_none()
+        if already is not None:
+            raise ConflictError("this person is already a guardian of this student")
+
+        if matched is None:
+            StudentService._issue_invitation(
+                session,
+                student_id=student.id,
+                email=email,
+                phone=phone,
+                at=at,
+                actor_person_id=actor_person_id,
+            )
+
+        row = Guardian(
+            student_id=student.id,
+            person_id=person_id,
+            is_primary=False,
+            relation=relation,
+            created_at=at,
+        )
+        session.add(row)
+        session.flush()
+        if is_primary:
+            StudentService.set_primary_guardian(
+                session,
+                student_id=student.id,
+                person_id=person_id,
+                at=at,
+                actor_person_id=actor_person_id,
+            )
+        AuditService.record(
+            session,
+            action="guardian.linked",
+            entity_type="student",
+            entity_id=student.id,
+            studio_id=student.studio_id,
+            actor_person_id=actor_person_id,
+            diff={
+                "person_id": str(person_id),
+                "relation": relation,
+                "matched": matched is not None,
+            },
+        )
+        session.flush()
+        return row
+
+    @staticmethod
+    def set_primary_guardian(
+        session: Session,
+        *,
+        student_id: uuid.UUID,
+        person_id: uuid.UUID,
+        at: datetime,
+        actor_person_id: uuid.UUID | None,
+    ) -> Guardian:
+        """§5.3 -- exactly one primary. L8 -- and it means exactly two things.
+
+        The old primary is cleared and the new one set **before the flush**, because
+        `uq_guardian_one_primary_per_student` is a partial unique index: two primaries
+        existing even momentarily inside one flush is an IntegrityError.
+        """
+        rows = list(
+            session.execute(select(Guardian).where(Guardian.student_id == student_id)).scalars()
+        )
+        target = next((r for r in rows if r.person_id == person_id), None)
+        if target is None:
+            raise NotFoundError(f"{person_id} is not a guardian of {student_id}")
+        # Two statements, two flushes, and the order is load-bearing. The index is partial
+        # on `is_primary`, so it is checked per UPDATE: momentarily having ZERO primaries is
+        # legal, having two never is. Assigning both in one flush lets SQLAlchemy batch them
+        # in whichever order it likes -- and it picks the one that violates the index.
+        for row in rows:
+            if row.person_id != person_id:
+                row.is_primary = False
+        session.flush()
+        target.is_primary = True
+        session.flush()
+        AuditService.record(
+            session,
+            action="guardian.primary.set",
+            entity_type="student",
+            entity_id=student_id,
+            actor_person_id=actor_person_id,
+            # §5.3's two consequences, named so an audit reader knows what changed and what
+            # did not: no permission moved, because there is none attached to this flag.
+            diff={"person_id": str(person_id), "affects": ["bill_addressing", "standing_order"]},
+        )
+        session.flush()
+        return target
+
+    @staticmethod
+    def remove_guardian(
+        session: Session,
+        *,
+        student_id: uuid.UUID,
+        person_id: uuid.UUID,
+        at: datetime,
+        actor_person_id: uuid.UUID | None,
+    ) -> None:
+        """The last guardian cannot be removed, and removing the primary promotes another.
+
+        Neither rule is expressible in the schema -- `UNIQUE(student_id, person_id)` says
+        nothing about a minimum, and the partial index says nothing about what happens when
+        the primary row disappears. A student with no primary is a bill addressed to nobody
+        (§5.10); a student with no guardian is a child nobody can be contacted about (§5.3).
+        """
+        student, _person = StudentService.get(session, student_id=student_id)
+        rows = list(
+            session.execute(select(Guardian).where(Guardian.student_id == student.id)).scalars()
+        )
+        target = next((r for r in rows if r.person_id == person_id), None)
+        if target is None:
+            raise NotFoundError(f"{person_id} is not a guardian of {student_id}")
+        if len(rows) == 1:
+            raise RefusedError("a student must keep at least one guardian")
+
+        was_primary = target.is_primary
+        successor = next(r for r in rows if r.person_id != person_id)
+        # Same partial-index dance as `set_primary_guardian`: vacate first, flush, then
+        # promote. Doing both in one flush lets the batch order decide whether the index
+        # sees two primaries at once.
+        target.is_primary = False
+        session.flush()
+        if was_primary:
+            successor.is_primary = True
+            session.flush()
+        session.delete(target)
+        AuditService.record(
+            session,
+            action="guardian.unlinked",
+            entity_type="student",
+            entity_id=student.id,
+            studio_id=student.studio_id,
+            actor_person_id=actor_person_id,
+            diff={"person_id": str(person_id), "was_primary": was_primary},
+        )
+        session.flush()
+
     @staticmethod
     def freeze(
         session: Session,

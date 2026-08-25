@@ -21,7 +21,7 @@ COACH_ROUTES = [
     ("/api/v1/students", "get"),
     ("/api/v1/students/{student_id}", "get"),
     ("/api/v1/students/{student_id}/status-history", "get"),
-    # `/guardians` joins this list in Task 7, when the route exists.
+    ("/api/v1/students/{student_id}/guardians", "get"),
 ]
 
 #: Manager-only, and deliberately NOT tagged `coach` -- these may return a price.

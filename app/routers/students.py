@@ -39,6 +39,8 @@ from app.models.people import Student
 from app.models.person import Person
 from app.schemas._pagination import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, IdempotencyKey
 from app.schemas.people import (
+    GuardianCreate,
+    GuardianListResponse,
     GuardianOut,
     StudentConvertIn,
     StudentCreate,
@@ -477,6 +479,129 @@ def student_price_plan(
     return StudentPricePlanOut(
         student_id=student.id, price_plan_id=student.price_plan_id, weekly_volume=volume
     )
+
+
+def _guardian_list(session: TenantSession, student_id: uuid.UUID) -> GuardianListResponse:
+    """Shared by every guardian route. A plain helper, never another route function: a
+    route called positionally past its own dependencies breaks the moment one is added."""
+    return GuardianListResponse(
+        items=[
+            GuardianOut(
+                person_id=guardian.person_id,
+                student_id=guardian.student_id,
+                display_name=f"{person.first_name} {person.last_name}",
+                relation=guardian.relation,
+                is_primary=guardian.is_primary,
+                phone=person.phone,
+                email=person.email,
+            )
+            for guardian, person in StudentService.list_guardians(session, student_id=student_id)
+        ]
+    )
+
+
+@router.get("/students/{student_id}/guardians", response_model=GuardianListResponse, tags=COACH)
+def list_guardians(
+    _: AnyStaff, student_id: uuid.UUID, scope: ViewerScope, session: TenantSessionDep
+) -> GuardianListResponse:
+    """Staff `9c`'s card shows how to reach the parent. Coach-reachable, and safe to tag:
+    §5.3 gives `GuardianOut` no permission field and no financial one."""
+    try:
+        StudentService.get(session, student_id=student_id, viewer_group_ids=scope)
+    except NotFoundError as exc:
+        raise _not_found() from exc
+    return _guardian_list(session, student_id)
+
+
+@router.post(
+    "/students/{student_id}/guardians",
+    response_model=GuardianListResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def add_guardian(
+    _: ManagerOrOwner,
+    student_id: uuid.UUID,
+    body: GuardianCreate,
+    request: Request,
+    session: TenantSessionDep,
+    idempotency_key: IdempotencyKey = None,
+) -> GuardianListResponse:
+    try:
+        StudentService.add_guardian(
+            session,
+            student_id=student_id,
+            first_name=body.first_name,
+            last_name=body.last_name,
+            email=body.email,
+            phone=body.phone,
+            relation=body.relation,
+            is_primary=body.is_primary,
+            at=now(),
+            actor_person_id=getattr(request.state, "person_id", None),
+        )
+    except NotFoundError as exc:
+        raise _not_found() from exc
+    except ConflictError as exc:
+        raise _conflict(str(exc)) from exc
+    session.commit()
+    return _guardian_list(session, student_id)
+
+
+@router.delete(
+    "/students/{student_id}/guardians/{person_id}",
+    response_model=GuardianListResponse,
+)
+def remove_guardian(
+    _: ManagerOrOwner,
+    student_id: uuid.UUID,
+    person_id: uuid.UUID,
+    request: Request,
+    session: TenantSessionDep,
+) -> GuardianListResponse:
+    """Returns the remaining guardians rather than 204, because removing the primary
+    promotes another and the client needs to know which."""
+    try:
+        StudentService.remove_guardian(
+            session,
+            student_id=student_id,
+            person_id=person_id,
+            at=now(),
+            actor_person_id=getattr(request.state, "person_id", None),
+        )
+    except NotFoundError as exc:
+        raise _not_found() from exc
+    except RefusedError as exc:
+        raise _refused("refused", str(exc)) from exc
+    session.commit()
+    return _guardian_list(session, student_id)
+
+
+@router.post(
+    "/students/{student_id}/guardians/{person_id}/set-primary",
+    response_model=GuardianListResponse,
+)
+def set_primary_guardian(
+    _: ManagerOrOwner,
+    student_id: uuid.UUID,
+    person_id: uuid.UUID,
+    request: Request,
+    session: TenantSessionDep,
+    idempotency_key: IdempotencyKey = None,
+) -> GuardianListResponse:
+    """L8 -- this changes whose name the bill carries and which person a הוראת קבע matches.
+    It changes no permission, because there is none attached to it."""
+    try:
+        StudentService.set_primary_guardian(
+            session,
+            student_id=student_id,
+            person_id=person_id,
+            at=now(),
+            actor_person_id=getattr(request.state, "person_id", None),
+        )
+    except NotFoundError as exc:
+        raise _not_found() from exc
+    session.commit()
+    return _guardian_list(session, student_id)
 
 
 # -- the parent's own children -------------------------------------------------
