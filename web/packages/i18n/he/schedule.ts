@@ -130,4 +130,67 @@ export const schedule: Bundle = {
   'closure.preset.subtitle': 'סמנו את הימים שבהם המועדון סגור',
   'closure.preset.apply': 'הוספת הימים המסומנים',
   'closure.preset.none': 'לא נבחרו ימים',
+
+  // -- the impact preview, continued: C12 ---------------------------------------
+  // C12 — a change that empties a student's pattern takes them off the roster and stops
+  // counting them absent, which looks exactly like the feature working. The ⚠ is NOT in
+  // the string: it is the Alert primitive's icon, which carries an accessible name. A
+  // glyph inside a translated sentence is invisible to a screen reader.
+  'impact.studentsUnscheduled': '{{count}} תלמידים לא רשומים לאף יום אחרי השינוי',
+  'impact.studentsUnscheduledOne': 'תלמיד אחד לא רשום לאף יום אחרי השינוי',
+  'impact.studentsUnscheduledHint':
+    'תלמיד שאינו רשום לאף יום יורד מרשימת הנוכחות ואינו נספר כנעדר',
+  'impact.studentsUnscheduledIcon': 'אזהרה',
+  'impact.protectedManualList': 'השיעורים שנערכו ידנית',
+  'impact.close': 'סגירה',
+
+  // -- what the server cancelled, and why (D-M2-3) --------------------------------
+  'session.cancelReason.scheduleChange': 'שינוי בלו״ז השבועי',
+  'session.cancelReason.closure': 'המועדון סגור',
+  'session.editTime': 'שינוי שעה',
+  'session.save': 'שמירה',
+  'session.saved': 'השיעור עודכן',
+  'session.adHocStart': 'שעת התחלה',
+  'session.adHocEnd': 'שעת סיום',
+  'session.adHocDate': 'תאריך',
+
+  // -- holiday presets, by key (D-M2-4) -------------------------------------------
+  'closure.preset.rosh_hashanah': 'ראש השנה',
+  'closure.preset.yom_kippur': 'יום כיפור',
+  'closure.preset.sukkot': 'סוכות',
+  'closure.preset.pesach': 'פסח',
+  'closure.preset.yom_haatzmaut': 'יום העצמאות',
+  'closure.preset.shavuot': 'שבועות',
+  'closure.preset.summer_break': 'חופש גדול',
+  'closure.cancelled': 'בוטלו {{count}} שיעורים',
+  'closure.endBeforeStart': 'תאריך הסיום אינו יכול להקדים את תאריך ההתחלה',
+
+  // -- the parent's month (12b) ----------------------------------------------------
+  'calendar.title': 'לוח הילד',
+  'calendar.previousMonth': 'חודש קודם',
+  'calendar.nextMonth': 'חודש הבא',
+  'calendar.upcoming': 'שיעורים קרובים',
+  'calendar.past': 'שיעורים שהיו',
+  'calendar.empty': 'אין שיעורים בחודש הזה',
+  'calendar.emptyHint': 'לוח השיעורים נקבע על ידי המועדון',
+  'calendar.attendanceComesLater': 'הנוכחות שהייתה תוצג בהמשך',
+
+  // -- groups and cycles (4b) ------------------------------------------------------
+  'groups.title': 'קבוצות ומחזורים',
+  'groups.weeklySchedule': 'לו״ז שבועי',
+  'groups.nextSession': 'השיעור הבא',
+  'groups.noNextSession': 'אין שיעור מתוכנן',
+  'groups.unscheduledStudents': 'תלמידים ללא יום',
+  'groups.beltRangeComesLater': 'טווח החגורות יוצג עם מערכת החגורות',
+  'groups.capacityComesLater': 'תפוסה תוצג עם רשימת החניכים',
+  'groups.empty': 'לא הוגדרו קבוצות',
+  'groups.caption': 'קבוצות המועדון והלו״ז שלהן',
+
+  // -- the group page (6a) ---------------------------------------------------------
+  'group.scheduleTitle': 'לו״ז הקבוצה',
+  'group.sessions': 'שיעורים',
+  'group.changeFrom': 'השינוי בתוקף מתאריך',
+  'group.reviewChange': 'בדיקת השינוי',
+  'group.noActiveYear': 'לא הוגדרה שנת פעילות פעילה',
+  'group.noActiveYearHint': 'שנת פעילות פעילה נדרשת לפני קביעת לו״ז',
 }
