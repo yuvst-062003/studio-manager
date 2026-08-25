@@ -85,6 +85,21 @@ def test_no_module_level_path_escapes_what_the_image_ships():
     )
 
 
+def test_the_image_can_run_the_migrations_it_is_asked_to_run():
+    """Railway's pre-deploy step runs `alembic upgrade head` in this image.
+
+    The database host is private to Railway's network, so migrations cannot be run from a
+    laptop and the image is the only place they happen. `alembic` is a dependency, but
+    alembic.ini and the revisions are files -- without them the command fails on missing
+    config, which reads like a migration problem and is not one.
+    """
+    sources = _copy_sources()
+    for needed in (Path("alembic.ini"), Path("alembic/env.py")):
+        assert _is_shipped(needed, sources), (
+            f"{needed} is not copied into the image, so `alembic upgrade head` cannot run"
+        )
+
+
 def test_the_parser_reads_the_dockerfile_that_is_actually_used():
     """A detector that finds nothing proves nothing. Anchor it to a real COPY."""
     sources = _copy_sources()
