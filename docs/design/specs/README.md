@@ -80,7 +80,17 @@ each wave's contract commit, or every lane will assume the container handles it.
 
 ## W4 — money, events and belts
 
-*Pending.*
+**M6 Money** · [`1b`](1b-parent-payments-pay.md) · [`12e`](12e-parent-order-items.md) ·
+[`12f`](12f-parent-payments-history.md) · [`11a`](11a-staff-hand-over.md) ·
+[`3e`](3e-dashboard-collections.md) · [`5a`](5a-dashboard-prices-plans.md) ·
+[`5e`](5e-wizard-step4-prices.md)
+
+**M7 Events & belts** · [`12d`](12d-parent-belt-progress.md) · [`12h`](12h-parent-events.md) ·
+[`7d`](7d-parent-event-invite.md) · [`9d`](9d-staff-belt-exam.md) · [`9i`](9i-staff-events.md) ·
+[`7a`](7a-dashboard-events.md) · [`7b`](7b-dashboard-create-event.md) ·
+[`7c`](7c-dashboard-event-page.md) · [`6b`](6b-dashboard-belt-exams.md) ·
+[`4d`](4d-dashboard-belt-eligibility.md) · [`5b`](5b-dashboard-belt-system.md) ·
+[`5d`](5d-wizard-step2-belts.md)
 
 ## W5 — communication, reports and privacy
 
@@ -137,12 +147,18 @@ from the body, a **leading icon**, a **trailing meta slot** and an **action slot
 
 | Missing | Wanted by |
 |---|---|
-| **Chip-select / `FilterChip`** — wrapping, single-select, per-option variants | `13a` `13c` `12a` `12i` `11b` `9h` `3b` `4e` `6c` `1e` |
+| **Chip-select / `FilterChip`** — wrapping, single/multi-select, per-option variants | `13a` `13c` `12a` `12i` `11b` `9h` `3b` `4e` `6c` `1e` `5a` `7b` `6b` |
 | **Avatar** (with a no-photo placeholder) | `12i` `11b` `3c` `4a` `2d` |
 | **Stepper** — discrete steps, not a linear fill | `3c` `12j` `5c`–`5f` |
-| **Single-date field** — `DateRangePicker` is for ranges | `12g` `3c` `12i` |
+| **Single-date field** — `DateRangePicker` is for ranges | `12g` `3c` `12i` `9d` `7b` `6b` |
 | **Bottom sheet / modal** | `12i` `9c` |
-| **Tabs**, **pagination**, **select/enum**, **icon-only button** | `6a` `3b` `3c` |
+| **Tabs**, **pagination**, **select/enum**, **icon-only button** | `6a` `3b` `3c` `5a` `5b` `3e` `9b` |
+| **`SignaturePad`** | `12c` `12j` |
+| **`ActionRow`** — icon + title + subline + chevron | `9g` `9i` `9h` `12i` `9c` `1b` `7d` |
+| **`ColourSwatchPicker`** — bounded, the product's only colour control | `5b` `12e` |
+| **`BeltTransition`** — two `BeltBar`s and a directional chevron | `4d` `9d` `12d` |
+| **Stat tile** | ten artboards — see finding 26 |
+| **Time field**, **dashed add-affordance**, **drag-to-reorder** | `9d` `6b` · `5a` `5b` `5e` `6b` `7b` `4f` · `5b` |
 
 ### 6 · The app shell's navigation has no i18n keys, anywhere
 

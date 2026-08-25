@@ -437,7 +437,7 @@ where `IpnVerdict` is `success | amount_mismatch | forged_ref | duplicate`.
 - [x] **Step 1:** Specs for W2's artboards — `9a`, `9b`, `1d`, `3a`, `6a`, `4b`, `12b`;
       `13a`–`13c`, `12j`, `12g`, `12i`, `2c`, `11b`, `9c`, `9h`, `3b`, `3c`, `4a`, `6c`.
 - [x] **Step 2:** W3's — `2a`, `12a`, `1c`, `9f`, `9g`, `2d`, `4c`, `1e`, `12c`, `4e`.
-- [ ] **Step 3:** W4's — `1b`, `12e`, `12f`, `11a`, `3e`, `5a`, `5e`; `12d`, `12h`, `7d`, `9d`,
+- [x] **Step 3:** W4's — `1b`, `12e`, `12f`, `11a`, `3e`, `5a`, `5e`; `12d`, `12h`, `7d`, `9d`,
       `9i`, `7a`, `7b`, `7c`, `6b`, `4d`, `5b`, `5d`.
 - [ ] **Step 4:** W5's — `2b`, `4f`, `4g`.
 - [ ] **Step 5: Commit.** `docs(design): component specs for the M2–M9 artboards`
