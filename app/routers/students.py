@@ -44,6 +44,7 @@ from app.schemas.people import (
     StudentCreateResult,
     StudentDetailOut,
     StudentOut,
+    StudentPricePlanOut,
     StudentStatusHistoryListResponse,
     StudentSummaryOut,
     StudentSummaryPage,
@@ -302,6 +303,38 @@ def update_student(
         raise _not_found() from exc
     session.commit()
     return _out(session, student, person)
+
+
+@router.get("/students/{student_id}/price-plan", response_model=StudentPricePlanOut)
+def student_price_plan(
+    _: ManagerOrOwner, student_id: uuid.UUID, session: TenantSessionDep
+) -> StudentPricePlanOut:
+    """C11's two numbers, for dashboard `4a`'s plan field.
+
+    Manager-only and deliberately **untagged**: `price_plan_id` is what invariant 3's
+    detector reads as a financial field, so this shape must never be reachable from a
+    coach route. `weekly_volume` is §5.10's suggestion beside the plan picker -- a count of
+    sessions, never an amount. `price_plan` is W4's table and this lane never resolves it.
+    """
+    from app.services.people.enrollments import EnrollmentService
+    from app.services.schedule import ScheduleService
+
+    try:
+        student, _person = StudentService.get(session, student_id=student_id)
+    except NotFoundError as exc:
+        raise _not_found() from exc
+    try:
+        volume = EnrollmentService.weekly_volume_for_student(
+            session, student_id=student_id, since=now().date(), schedule=ScheduleService()
+        )
+    except NotImplementedError:
+        # L5's seam. Until lane SCHEDULE merges there is no calendar to observe, so the
+        # honest answer is "no suggestion" rather than a fabricated number. The plan field
+        # still works; only the hint beside it is absent.
+        volume = 0
+    return StudentPricePlanOut(
+        student_id=student.id, price_plan_id=student.price_plan_id, weekly_volume=volume
+    )
 
 
 # -- the parent's own children -------------------------------------------------
