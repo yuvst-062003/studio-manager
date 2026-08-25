@@ -1,3 +1,6 @@
+export { StudentCard } from './StudentCard'
+export type { StudentCardSectionProps } from './StudentCard'
+export { registerPeopleSections } from './register'
 export { FirstRegistration } from './FirstRegistration'
 export type { FirstRegistrationSource } from './FirstRegistration'
 export { TrialHome, daysUntil } from './TrialHome'
