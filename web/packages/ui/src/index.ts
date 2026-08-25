@@ -47,3 +47,11 @@ export { Switch } from './primitives/Switch'
 export { TextField } from './primitives/TextField'
 export { ThemeControl } from './primitives/ThemeControl'
 export { Toast } from './primitives/Toast'
+
+// The shell both apps mount (§6.2, §6.3). The drawer is the one component here whose
+// layout is direction-dependent, which is why G12 matters most in it.
+export { AppShell } from './shell/AppShell'
+export { NavDrawer } from './shell/NavDrawer'
+export type { NavItem } from './shell/NavDrawer'
+export { StudioSwitcher } from './shell/StudioSwitcher'
+export type { SwitchableStudio } from './shell/StudioSwitcher'

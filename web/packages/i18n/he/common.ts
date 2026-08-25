@@ -28,6 +28,21 @@ export const common: Bundle = {
   'dev.title': 'פיתוח',
   'dev.actingAs': 'פועל בתור',
   'dev.noPersona': 'אין פרסונה פעילה',
+  // The shell and the nav drawer. §6.2's staff screens and §6.3's parent screens name
+  // these; a lane adds its own entries beside them as its screens land.
+  'nav.menu': 'תפריט',
+  'nav.closeMenu': 'סגירת התפריט',
+  'nav.studioSwitcher': 'סטודיו',
+  'nav.demoStudio': 'הדגמה',
+  'nav.today': 'היום',
+  'nav.schedule': 'מערכת שעות',
+  'nav.students': 'תלמידים',
+  'nav.attendance': 'נוכחות',
+  'nav.announcements': 'הודעות',
+  'nav.payments': 'תשלומים',
+  'nav.myChildren': 'הילדים שלי',
+  'nav.settings': 'הגדרות',
+  'nav.signOut': 'התנתקות',
   // §19.4's persona switcher. These are §19.4's own labels, verbatim from the artboard:
   //   בעלים · מנהל · מאמן ראשי · מאמן משנה
   //   הורה (3 ילדים) · הורה (ילד אחד) · הורה (ניסיון) · הורה+מאמן · ללא הרשאות
