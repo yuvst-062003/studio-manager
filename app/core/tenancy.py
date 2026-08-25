@@ -107,7 +107,14 @@ class TenantMixin:
 
     #: Declared, not defined -- the concrete model supplies it. Without this mypy
     #: cannot see the attribute the index name below is built from.
-    __tablename__: ClassVar[str]
+    #:
+    #: Annotated `str` and deliberately NOT `ClassVar[str]`, which is what it said until
+    #: M1 became the first milestone to actually subclass this mixin. DeclarativeBase
+    #: declares `__tablename__` as an instance variable, and mypy refuses to let a
+    #: subclass override an instance variable with a class variable -- so every concrete
+    #: model's `__tablename__ = "..."` was an error waiting for the first subclass. The
+    #: plain annotation keeps exactly the property this line was added for.
+    __tablename__: str
     __tenant_table_args__: ClassVar[tuple[Any, ...]] = ()
 
     @declared_attr
