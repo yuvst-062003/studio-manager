@@ -175,6 +175,20 @@ class SchedulePutIn(BaseModel):
     apply: bool = False
 
 
+class ProtectedSessionOut(BaseModel):
+    """One session the change will not touch, named rather than merely counted.
+
+    §5.6's dialog prints the manually-edited ones as bullets — `· 15.11 אימון ים 90 דק'` —
+    because "2 sessions were manually edited" tells a manager nothing about which two. The
+    shape carries no title: `session` has no name column, and inventing one here would be a
+    field with nothing behind it. The client renders the date and the time range.
+    """
+
+    id: uuid.UUID
+    starts_at: datetime
+    ends_at: datetime
+
+
 class ScheduleImpactPreview(BaseModel):
     """§5.6's impact dialog: "showing exactly what will change before it changes."
 
@@ -193,6 +207,14 @@ class ScheduleImpactPreview(BaseModel):
     sessions_protected_manually_edited: int
     sessions_protected_ad_hoc: int
     first_affected_date: date | None = None
+    #: §5.6's bullet list. Only the manually-edited ones: the past is a count (there is
+    #: nothing to decide about it) and an ad-hoc session was never going to be touched.
+    protected_manually_edited_sessions: list[ProtectedSessionOut] = Field(default_factory=list)
+    #: **C12.** Students this change leaves expecting nothing — `attends_weekdays` no
+    #: longer intersects any day the group trains on. They vanish off the roster and stop
+    #: being counted absent, which looks exactly like the feature working. The dialog says
+    #: `⚠ 3 תלמידים לא רשומים לאף יום אחרי השינוי`; this is the 3.
+    students_left_unscheduled: int = 0
 
 
 SessionPage = CursorPage[SessionOut]
