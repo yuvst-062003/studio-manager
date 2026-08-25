@@ -94,7 +94,9 @@ each wave's contract commit, or every lane will assume the container handles it.
 
 ## W5 — communication, reports and privacy
 
-*Pending.*
+**M8 Communication** · [`2b`](2b-parent-inbox.md) · [`4f`](4f-dashboard-announcements.md)
+
+**M9 Reports & privacy** · [`4g`](4g-dashboard-reports.md)
 
 ---
 

@@ -439,8 +439,8 @@ where `IpnVerdict` is `success | amount_mismatch | forged_ref | duplicate`.
 - [x] **Step 2:** W3's — `2a`, `12a`, `1c`, `9f`, `9g`, `2d`, `4c`, `1e`, `12c`, `4e`.
 - [x] **Step 3:** W4's — `1b`, `12e`, `12f`, `11a`, `3e`, `5a`, `5e`; `12d`, `12h`, `7d`, `9d`,
       `9i`, `7a`, `7b`, `7c`, `6b`, `4d`, `5b`, `5d`.
-- [ ] **Step 4:** W5's — `2b`, `4f`, `4g`.
-- [ ] **Step 5: Commit.** `docs(design): component specs for the M2–M9 artboards`
+- [x] **Step 4:** W5's — `2b`, `4f`, `4g`.
+- [x] **Step 5: Commit.** `docs(design): component specs for the M2–M9 artboards`
 
 ## Task 19 — Migration drafts (plain files, NOT alembic revisions)
 
@@ -661,3 +661,101 @@ finding is in `w4-draft.py`: W2's two FK-less UUID columns must gain their `Fore
 constraint the migration has and the models do not leaves
 `test_the_migrations_match_the_models` red forever on a schema that is actually correct, and
 the obvious fix for that red is to weaken the test.
+
+---
+
+## Session log — Task 18, and the plan's completion
+
+Written by the session that started Task 18 fresh, as deviation 6 asked, and finished it.
+**This plan is complete: every task 1–20 is done and every checkbox above matches a commit.**
+
+| Task | Commit |
+|---|---|
+| 18 · W2's 21 specs + the README index | `3d46226` |
+| 18 · W3's 10 specs | `8fee0ea` |
+| 18 · W4's 19 specs | `4c16736` |
+| 18 · W5's 3 specs + this log | this commit |
+
+**53 specs and a README, in `docs/design/specs/`.** Coverage was checked mechanically, not by eye:
+all 53 ids present, no duplicates, no extras, every README link and every cross-spec link resolves.
+
+**The gates did not move**, as a documentation-only task requires. Measured, not assumed:
+
+| Gate | Result | Task 20's baseline |
+|---|---|---|
+| `pytest tests/contracts tests/invariants tests/restrictions tests/structure tests/upay` | **433 passed, 1 skipped** | 433 passed, 1 skipped |
+| `cd web && npx vitest run` | **674 passed**, 55 files | 674 passed |
+
+**No shared gate was edited**, and the standing rule — stop and ask before touching
+`tests/invariants/`, `tests/restrictions/` or `tests/structure/` — never had to fire.
+This session's three commits touched `docs/design/specs/**` and this plan's checkboxes, and
+nothing else; the ownership boundary was verified with `git diff --name-only` against the
+forbidden-path list rather than trusted.
+
+### Deviations and findings
+
+**12. The `.dc.html` files were never opened by this session.** Every artboard was read by a
+`canvas-porter` subagent, one artboard per invocation, up to twenty concurrently — 53 invocations.
+The one thing worth passing on: **a porter's report is evidence, not a verdict.** Several
+misreported the same rule in the same direction, and each was checked before it reached a spec.
+Three examples, all corrected in the specs: that D7's ring is "reserved for low-contrast belts"
+(it is unconditional — D7 says a belt bar is never fill-only, and D12 adds that five belts fail
+across the two modes, not three); that `MoneyDisplay`, `Radio` and `DateRangePicker` do not exist
+in this worktree (all eighteen primitives do); and that the canvas's dark-mode hexes are the token
+values (they are not — D12 changed `--paid` dark deliberately, to stop it colliding with `4h`'s
+green belt).
+
+**13. `HB-c9-canvas` is not accurate as written, and the difference matters.** The opening prompt
+says the canvas still shows the pre-D9 state. **It does not.** Verified directly against the export
+in this worktree rather than taken from a porter:
+
+- **D9.1 (`2b`) — fully applied.** No chat tab, no two-tab switcher, no reply affordance anywhere.
+  The artboard's own inventory label carries the annotation. `comms` holds no `reply.*` or `chat.*` key.
+- **D9.2 (`7c`) — fully applied.** Six columns, no weight, no category. `events` holds no such key.
+- **D9.3 (`12f`) — half applied.** The retitle landed and the disclaimer copy is present. **The
+  structural half did not:** `שליחה למייל` occurs exactly once, as a **global footer button** rather
+  than a card-row affordance, and of the three rows carrying a receipt icon only two are card
+  payments — the third's method reads `הסעה`. A global "email the receipts" button beneath a
+  disclaimer saying only card payments have one is the same false promise the retitle removed, moved
+  down the screen. `billing.receipt.email` is already singular, so the key encodes the intent the
+  markup does not.
+
+So each affected spec carries a ▲ line, but it says what is **true** rather than what the prompt
+predicted: for `2b` and `7c` it records the cut as verified so nobody re-adds it, and for `12f` it
+records precisely which half is missing.
+
+**14. The specs found more than they were asked to.** The task's value was meant to be leverage — a
+lane reads 120 lines instead of a 300 KB export. It turned out to be larger, because reading 53
+artboards **together** surfaces things no single artboard shows. Thirty-two cross-cutting findings
+are in `docs/design/specs/README.md`; these are the ones that are not documentation gaps but
+**contradictions between what ships and what is drawn**, and each needs a decision before the lane
+that meets it starts:
+
+- **`5a` offers automatic recurring billing.** G8 and the provider both say a הוראת קבע cannot be
+  created or charged in code, and `billing.subscription.managerRecordHint` ships that sentence.
+- **`9f`'s bulk "mark all present" discards every parent's advance notice**, directly beneath a hint
+  row announcing them — against `attendance.source.preReportedHint` and §10.5.
+- **Three artboards tell a parent or a coach that a child may not train** without a declaration
+  (`11b`, `2d`, `2b`). §5.5 says nothing on the mat is ever blocked and
+  `health.badge.missingHint` ships the opposite sentence.
+- **`4e` lets a manager upload a completed declaration**, which is the shape D11 rejected: no
+  structured answers, so no `derived_flags`, so no coach badge and no missing-declaration list.
+- **`11a` builds the inventory §5.10 says does not exist** — a count, a decrement, a blocking
+  out-of-stock state — and queues a hand-over offline, putting a charge through M5's attendance queue.
+- **Eight artboards show a health declaration that expires**, including `12c`, the declaration screen
+  itself. `health.declaration.noExpiry` says none does.
+- **Six artboards make attendance an exam-eligibility criterion** where §5.9 says rank and time held,
+  and `4d`/`6b` add debt and a missing declaration as promotion blockers — M6 and M4 data gating an
+  M7 outcome.
+- **`5a` edits a plan in place** where §5.10 versions it; four keys exist for the versioned model.
+
+And two **screens that do not exist at all**, invisible until the keys were read against the canvas:
+**§5.11's delivery report** (thirteen keys, including the three reasons a message did not land) and
+**§11's privacy kit** (twenty-nine keys across export, anonymization, retention and consent). Both
+must be designed from the spec; neither can be ported.
+
+**15. Six primitives are missing and each is wanted by three or more artboards** — a chip-select, an
+avatar, a stepper, a single-date field, a bottom sheet, and an action row — plus `ChipStatus` and
+`AlertTone` both being too narrow for the screens, and a stat tile that recurs on ten artboards.
+All are **shared files**, so all belong in a contract commit rather than in whichever lane hits one
+first. The full list, with the artboards that want each, is in the README.
