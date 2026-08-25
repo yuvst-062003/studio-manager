@@ -5,25 +5,47 @@ Companion to [milestone-plan.md](../milestone-plan.md) W1 · M1 and to
 
 ---
 
-## Where the wave actually stands (2026-08-25)
+## Where the wave actually stands
 
-Seven pieces are shipped and `docs/plan/state.yaml` records them. All three lane checks are
-green, `./scripts/ci-local.sh` exits 0, and the suite is 744 backend / 655 frontend.
+> **Updated 2026-08-25, after the session below ran.** The table that used to be here
+> listed five things as owed. All five have shipped as M1.8–M1.12. What is left is the
+> part no keyboard can produce, and it is listed at the bottom of this section.
 
-**W1 is still `active` anyway**, because the milestone plan's own *Delivers* list has four
-entries with no code behind them and one holdback M1 was supposed to close.
+**W1 is still `active`, and must stay that way.** Every piece is ticked, every gate is
+green, and the wave's exit gate still is not met — because two of its conditions are
+external.
 
-| Still owed | Where the plan says so |
+### Proved
+
+| | Evidence |
 |---|---|
-| Studio setup wizard container + steps 1, 3, 5, 6 | W1 *Delivers*, artboards `5c` `5f` |
-| The object-storage seam the logo needs | six `object_key` fields, no storage layer |
-| Dashboard app shell + `3d` צוות + `3f` הגדרות | W1 *Artboards* — the app is still `HelloProof` |
-| Parent home `1a` | W1 *Artboards* — `Resolve.tsx` renders an empty `parent-home` |
-| `studio_app` login password from a Railway secret | **HB-staging-superuser**, m1.md task 5 |
+| `./scripts/lane-check.sh identity` | green, 6 scoped gates |
+| `./scripts/lane-check.sh structure` | green, 3 scoped gates |
+| `./scripts/ci-local.sh` | exit 0 — every gate CI runs |
+| Both apps sign in and refuse correctly | §6.1's two refusal screens, `Resolve.test.tsx` in both apps |
+| An owner routes into a wizard that exists | `staff-wizard`, and the dashboard mounts the same one |
+| The wizard resumes | it lands on the first unanswered step, not on step 1 |
+| A later lane can add a step | a fake step registers at order 2 and lands between studio and groups with the container untouched |
+| `audit_log` is append-only by grant **locally** | `scripts/verify-db-roles.py` prints `connected as : studio_app` |
 
-Two things the gate needs that a keyboard cannot produce: **HB-devices** (the real-device
-OAuth round trip in standalone mode) and, separately, **HB-domain**, which m1.md already
-escalated and which is still `base_domain: null`.
+### Not proved, and why
+
+| | What it needs |
+|---|---|
+| **HB-devices** | The OAuth round trip on a real iPhone in standalone mode. §6.5 makes this the one place install mode changes auth behaviour, and a simulator does not exercise it. |
+| **HB-domain** | `infra/railway/domains.json` still has `base_domain: null`. `up.railway.app` is a public suffix, so §11.7's refresh cookie is third-party to the app hosts and Safari drops it. Localhost hides this because a port is not part of a site. |
+| **HB-staging-superuser** | The code shipped and the check runs on every boot; what remains is three Railway commands, written out in `docs/deploy/railway-runbook.md` § Open item. The holdback closes when the verifier has printed `connected as : studio_app` **against staging** — not when the code was written. |
+| **HB-logo** | The club has not supplied a logo file. The drop-zone works before there is anything to drop into it, which is the right order. |
+
+### Two decisions taken during the work, recorded rather than buried
+
+* **The wizard routes on `dismissed_at`, not on "does this studio have classes?"** §6.1
+  words the arm the second way, and it is a trap once §5.1's "each step can be skipped"
+  is real: an owner who skips step 3 has no classes and is thrown back into the wizard on
+  every launch, forever. It is also not `complete`, which would rebuild the same trap.
+* **Artboard `3f`'s חסימת השתתפות ללא הצהרת בריאות toggle was not built.** SPEC §5.5 says
+  in as many words that there is no such setting. Recorded as conflict **C10** in
+  `state.yaml`, in the same family as C9.
 
 ---
 
