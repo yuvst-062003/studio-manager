@@ -185,7 +185,11 @@ softer mitigation; if it proves insufficient, the hook is the escalation.
 ### 4.4 Seeding
 
 The initial file is transcribed by hand from `milestone-plan.md` Part 2 and Part 3, SPEC §15's
-prerequisites, Part 5's C1–C9, and the Railway runbook's open item. That transcription is a
+prerequisites, Part 5's C1–C9, the Railway runbook's open item, and the four obligations M0.4
+hands to M1. It must record M0 honestly: all four pieces are **shipped**, but the wave is
+**not exited** — `verification-log.md` states the iOS simulator proved the rendering half and
+none of the install half, and the Android emulator was never run. A state file that marks M0
+complete because its code is complete would be the first lie in the system. That transcription is a
 task in the implementation plan, not a runtime feature — neither surface ever parses the prose
 documents.
 
@@ -301,6 +305,13 @@ carried from that file's deny list: **`alembic downgrade` is absent and must sta
 
 - `subprocess.Popen` with an **argv list** and `shell=False`. There is no shell string, so there
   is nothing to inject into.
+- **`COMPOSE_PROJECT_NAME=studio-manager` is set in the environment of every command that
+  reaches docker compose** — `db-up`, `db-reset` and `ci-local`. M0.4's retrospective found
+  this the hard way: `docker-compose.yml` pins `container_name`, so invoking compose from a
+  second worktree creates a *new* project with an empty volume and then claims the running
+  container. The cockpit is a second entry point into those scripts and would reproduce the
+  fault exactly. Without the variable, `db-reset` from the cockpit can wipe a volume the
+  running database is not even using.
 - `cwd` pinned to the repository root, resolved from `__file__`, never from the caller's cwd.
 - **One run at a time.** A second request while a run is in flight returns 409 and is refused,
   not queued — two concurrent `alembic upgrade head` calls is not a state worth supporting.
@@ -438,9 +449,9 @@ worker — a separate origin and scope from the three product apps, so no confli
 
 No browser test on either surface. For a single-user tool the maintenance cost outweighs it.
 
-**`lane-check.sh` must be amended** so these tests run at all. Its `core` case scopes to
-`tests/core` and `tests/config`; without adding `tests/cockpit`, the tests exist and no gate
-executes them — the exact "green that verified nothing" failure that script's own header warns
+**`lane-check.sh` must be amended** so these tests run at all. As of M0.4 its `core` case
+scopes to `tests/core`, `tests/config` and `tests/dev`; without adding `tests/cockpit`, the
+tests exist and no gate executes them — the exact "green that verified nothing" failure that script's own header warns
 about. This is a change to a shared file owned by `main`; it is legal here because this work is
 sequential on `main`, and it must land before the first cockpit test.
 
