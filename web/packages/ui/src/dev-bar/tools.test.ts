@@ -19,6 +19,13 @@ describe('the dev-bar tool registry (seam 4)', () => {
     expect(devToolKeys()).toEqual(['offline', 'timeTravel', 'simulateIpn'])
   })
 
+  it('puts reset demo data after time travel and before the IPN simulator', () => {
+    registerDevTool('simulateIpn', Stub)
+    registerDevTool('resetDemo', Stub)
+    registerDevTool('timeTravel', Stub)
+    expect(devToolKeys()).toEqual(['timeTravel', 'resetDemo', 'simulateIpn'])
+  })
+
   it('lets a later lane replace a tool without reopening the container', () => {
     registerDevTool('offline', Stub)
     const Replacement = () => null
@@ -30,7 +37,7 @@ describe('the dev-bar tool registry (seam 4)', () => {
 
   it('names every §19.4 tool exactly once', () => {
     expect(Object.keys(DEV_TOOL_ORDER).sort()).toEqual(
-      ['offline', 'runJob', 'simulateIpn', 'slow', 'timeTravel'].sort(),
+      ['offline', 'resetDemo', 'runJob', 'simulateIpn', 'slow', 'timeTravel'].sort(),
     )
   })
 

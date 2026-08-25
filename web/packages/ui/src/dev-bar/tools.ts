@@ -13,7 +13,7 @@ import type { ComponentType } from 'react'
 import type { Locale } from '@studio/i18n'
 import { registerSlot, useSlot } from '../slots'
 
-export type DevToolKey = 'offline' | 'slow' | 'timeTravel' | 'runJob' | 'simulateIpn'
+export type DevToolKey = 'offline' | 'slow' | 'timeTravel' | 'runJob' | 'resetDemo' | 'simulateIpn'
 
 export type DevToolProps = { locale: Locale }
 
@@ -22,6 +22,7 @@ export const DEV_TOOL_ORDER: Record<DevToolKey, number> = {
   offline: 10,
   slow: 20,
   timeTravel: 30,
+  resetDemo: 35,
   runJob: 40,
   simulateIpn: 50,
 }
