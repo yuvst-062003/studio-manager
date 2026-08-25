@@ -48,16 +48,13 @@ describe('DevBar', () => {
   })
 
   it('renders a tool a lane registered, in slot order', () => {
-    // G4 reaches this directory's .tsx files, including tests (Task 14) — the stub
-    // text below is test scaffolding, not product copy, so it goes through an
-    // expression container rather than a JSXText node the rule scans.
-    registerDevTool('offline', () => <span>{'offline-tool'}</span>)
+    registerDevTool('offline', () => <span>offline-tool</span>)
     renderIn(<DevBar identity={DEVELOPER} />)
     expect(screen.getByText('offline-tool')).toBeInTheDocument()
   })
 
   it('drops the pending marker once a lane registers that tool', () => {
-    registerDevTool('offline', () => <span>{'offline-tool'}</span>)
+    registerDevTool('offline', () => <span>offline-tool</span>)
     renderIn(<DevBar identity={DEVELOPER} />)
     expect(screen.queryByTestId('dev-tool-pending-offline')).toBeNull()
   })

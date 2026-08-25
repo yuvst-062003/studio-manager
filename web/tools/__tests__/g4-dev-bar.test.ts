@@ -44,4 +44,14 @@ describe('G4 covers the dev bar', () => {
     const out = await lint(INLINE_HEBREW, 'apps/staff/src/Fixture.tsx')
     expect(out).toMatch(/no user-facing string is inlined/)
   })
+
+  // Round 1 fix: a dev-bar `.test.tsx` fixture string is test scaffolding, never
+  // shipped and never translated, so G4 has nothing to protect there. Pinned here so
+  // the `ignores: ['**/*.test.tsx']` line in eslint.config.js's dev-bar block cannot
+  // be dropped silently — without this case, removing it surfaces only as a confusing
+  // lint failure in someone else's unrelated change.
+  it('does not flag a .test.tsx fixture in the dev-bar directory', async () => {
+    const out = await lint(INLINE_HEBREW, 'packages/ui/src/dev-bar/DevBar.test.tsx')
+    expect(out).not.toMatch(/no user-facing string is inlined/)
+  })
 })

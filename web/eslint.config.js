@@ -79,7 +79,17 @@ export default tseslint.config(
     // own role names, so inline Hebrew here would be a second set that drifts from
     // `people`'s the day M1 lands. Extended rather than exempted: an ESLint hole in
     // developer-only code is a precedent a later lane can cite.
+    //
+    // Test files are excluded from that extension. A dev-bar `.test.tsx` fixture string
+    // (a stub tool's stand-in label, asserted with getByText) is never shipped, never
+    // reaches a translator, and never needs locale parity — G4 has nothing to protect
+    // there. Forcing it through t() anyway does not add a real translation; it launders
+    // a bare literal through an expression container so the JSXText selector stops
+    // seeing it, which is worse: it plants a pattern someone will copy onto real copy
+    // in a file G4 *does* need to police. The exclusion is scoped to this one block —
+    // `apps/*/src/**/*.tsx` still covers app test files, unchanged.
     files: ['packages/ui/src/dev-bar/**/*.tsx'],
+    ignores: ['**/*.test.tsx'],
     rules: {
       'no-restricted-syntax': ['error', ...physicalPropertySyntax, inlineStringSyntax],
     },
