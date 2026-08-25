@@ -337,14 +337,14 @@ fees are a pure caller of `create_charge`.
 
 **Files:** `web/packages/i18n/{he,en,ru}/{billing,events}.ts`.
 
-- [ ] **Step 1:** Hebrew from `12f` תשלומים (**D9.3** — titled תשלומים, not קבלות ותשלומים, and
+- [x] **Step 1:** Hebrew from `12f` תשלומים (**D9.3** — titled תשלומים, not קבלות ותשלומים, and
       the email affordance is card-rows-only), `3e` תשלומים וגבייה, `5a` מחירים ומסלולים,
       `7a`/`7b`/`7c` אירועים (**D9.2** — no משקל/קטגוריה strings), `5b` מערכת חגורות,
       `12d` התקדמות חגורה. **Belt strings go into `events.ts` under `belt.*`** — there is no
       `belts` namespace and `index.ts` is not editable.
-- [ ] **Step 2:** Mirror to `en`/`ru`.
-- [ ] **Step 3:** Parity per namespace.
-- [ ] **Step 4: Commit.** `feat(i18n): billing and events namespaces, belts under events.belt.*`
+- [x] **Step 2:** Mirror to `en`/`ru`.
+- [x] **Step 3:** Parity per namespace.
+- [x] **Step 4: Commit.** `feat(i18n): billing and events namespaces, belts under events.belt.*`
 
 ## Task 14 — uPay: IPN parsing and the four §5.10 security verdicts, TDD
 

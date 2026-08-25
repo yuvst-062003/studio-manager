@@ -1,4 +1,159 @@
 import type { Bundle } from '../types'
 
-/** Owned by the BILLING lane. Empty until that milestone. */
-export const billing: Bundle = {}
+/** Mirror of `he/billing.ts`. `en` is `strict` in the parity policy — a gap fails the build. */
+export const billing: Bundle = {
+  // -- the parent payments screen (parent 12f ▲ D9.3, 1b) -----------------------
+  'title': 'Payments',
+  'openDebts.title': 'Outstanding balance',
+  'openDebts.empty': 'Nothing outstanding',
+  'openDebts.total': 'Total owed',
+  'openDebts.forStudent': 'For {{name}}',
+  'howToPay.title': 'How would you like to pay?',
+
+  'method.card': 'Credit card',
+  'method.standingOrder': 'Standing order',
+  'method.cash': 'Cash',
+  'method.bankTransfer': 'Bank transfer',
+  'method.creditAdjustment': 'Credit',
+
+  'card.selectMonths': 'Choose months',
+  'card.installments': 'Card instalments',
+  'card.total': 'Total',
+  'card.pay': 'Pay',
+  'card.coveredElsewhere': 'Already covered by a payment in progress',
+  'card.nothingSelectable': 'No charges are available to pay by card',
+  'card.oldestFirst': 'The oldest charges are selected, across every child you pay for',
+
+  'standingOrder.link': 'Set up a standing order',
+  'standingOrder.instructions': 'The mandate is created on the payment provider’s site',
+  'standingOrder.activeWarning': 'A standing order is already active — check you are not paying twice',
+  'standingOrder.notConfirmable': 'Standing-order payments are recorded by the club once received',
+
+  'cash.instructions': 'Pay the coach at the start of the month',
+
+  'receipt.email': 'Email the receipt',
+  'receipt.cardOnly': 'A tax receipt is issued for card payments only',
+  'receipt.externalNumber': 'External receipt number',
+  'history.title': 'Payments made',
+  'history.empty': 'No payments recorded yet',
+
+  // -- a charge -----------------------------------------------------------------
+  'charge.kind.tuition': 'Tuition',
+  'charge.kind.registration': 'Registration fee',
+  'charge.kind.event': 'Event',
+  'charge.kind.manual': 'Manual charge',
+  'charge.status.open': 'Open',
+  'charge.status.settled': 'Paid',
+  'charge.status.void': 'Void',
+  'charge.status.written_off': 'Written off',
+  'charge.period': 'Period',
+  'charge.dueDate': 'Due',
+  'charge.amount': 'Amount',
+  'charge.overdue': 'Overdue',
+  'charge.proration': 'For {{covered}} of {{total}} sessions',
+  'charge.originalAmount': 'Full price',
+  'charge.credit': 'Credit',
+  'charge.addManual': 'Manual charge or credit',
+  'charge.reason': 'Reason',
+  'charge.reasonRequired': 'A manual charge requires a reason',
+  'charge.negativeHint': 'A negative amount is a credit or discount',
+  'charge.writeOff': 'Write off',
+
+  // -- recording a payment (dashboard 3e) ---------------------------------------
+  'payment.record': 'Record a payment',
+  'payment.date': 'Payment date',
+  'payment.amount': 'Amount received',
+  'payment.note': 'Note',
+  'payment.saved': 'Payment recorded',
+  'payment.allocatedOldestFirst': 'Allocated to the oldest charges first',
+  'payment.unallocated': 'Unallocated balance',
+
+  // -- the monthly billing run (§5.10) ------------------------------------------
+  'run.title': 'Monthly billing run',
+  'run.period': 'Billing month',
+  'run.runNow': 'Run now',
+  'run.status.running': 'Running',
+  'run.status.completed': 'Completed',
+  'run.status.failed': 'Failed',
+  'run.chargesCreated': '{{count}} charges created',
+  'run.frozenSkipped': 'Frozen students were not charged',
+  'run.idempotentHint': 'Re-running the same month creates no duplicate charges',
+  'run.lastRun': 'Last run',
+  'run.never': 'Never run',
+
+  // -- collection and the debt ladder (dashboard 3e) ----------------------------
+  'debt.title': 'Payments and collection',
+  'debt.byHousehold': 'Balance by household',
+  'debt.empty': 'Nothing outstanding across the club',
+  'debt.total': 'Total outstanding',
+  'debt.aging.title': 'Debt age',
+  'debt.aging.0_30': '0–30 days',
+  'debt.aging.31_60': '31–60 days',
+  'debt.aging.60_plus': 'Over 60 days',
+  'debt.sendReminder': 'Send a reminder',
+  'debt.reminderSent': 'Reminder sent',
+  'debt.escalation.day3': 'First reminder',
+  'debt.escalation.day7': 'Second reminder',
+  'debt.escalation.day14': 'Final notice',
+  'debt.escalation.none': 'No reminder sent yet',
+
+  // -- uPay orders --------------------------------------------------------------
+  'order.status.pending': 'Awaiting confirmation',
+  'order.status.paid': 'Paid',
+  'order.status.failed': 'Failed',
+  'order.status.amount_mismatch': 'Amount mismatch',
+  'order.status.expired': 'Expired',
+  'order.verifying': 'Received, verifying payment…',
+  'order.verifyingHint': 'You can close this window — confirmation arrives even if you leave',
+  'order.mismatchAlert': 'A payment arrived for a different amount than expected — needs review',
+  'order.mismatchHint': 'The payment was recorded in full and allocated to nothing',
+  'order.stale': 'Pending over 24 hours — verify against the provider’s own reports',
+
+  // -- standing-order reconciliation (§5.10) ------------------------------------
+  'reconciliation.title': 'Payment matching',
+  'reconciliation.unmatched': 'Unmatched payments',
+  'reconciliation.expected': 'Payers expected this month',
+  'reconciliation.cardOwner': 'Card owner',
+  'reconciliation.last4': 'Last 4 digits',
+  'reconciliation.suggestion': 'Suggested match',
+  'reconciliation.confidence': 'Confidence',
+  'reconciliation.confirm': 'Confirm match',
+  'reconciliation.ignore': 'Ignore',
+  'reconciliation.matched': 'Match recorded',
+  'reconciliation.empty': 'No payments waiting to be matched',
+  'reconciliation.neverAuto': 'A match is recorded only after a human confirms it',
+  'reconciliation.overpayment': 'Overpayment',
+  'reconciliation.carryForward': 'Carry forward to next month',
+
+  // -- who the manager knows is on a standing order ------------------------------
+  'subscription.title': 'Standing orders',
+  'subscription.status.active': 'Active',
+  'subscription.status.cancelled': 'Cancelled',
+  'subscription.add': 'Record a standing order',
+  'subscription.amount': 'Monthly amount',
+  'subscription.managerRecordHint': 'A club record only — the parent never sets this',
+
+  // -- prices and plans (dashboard 5a, wizard 5e) --------------------------------
+  'plan.title': 'Prices and plans',
+  'plan.add': 'New plan',
+  'plan.name': 'Plan name',
+  'plan.monthlyAmount': 'Monthly price',
+  'plan.registrationFee': 'Registration fee',
+  'plan.activeFrom': 'Effective from',
+  'plan.activeTo': 'Effective to',
+  'plan.appliesTo': 'Applies to',
+  'plan.empty': 'No plans defined',
+  'plan.versionedHint': 'Changing a price closes the current plan and opens a new one. Past charges are preserved',
+  'plan.closeCurrent': 'Close the current plan',
+
+  // -- the product catalog and handing an item over (12e, 11a) -------------------
+  'product.title': 'Items for sale',
+  'product.add': 'New item',
+  'product.name': 'Item name',
+  'product.price': 'Price',
+  'product.empty': 'No items defined',
+  'product.handOut': 'Hand out an item',
+  'product.handedOut': 'Item handed out and charged',
+  'product.order': 'Order items',
+  'product.noStockHint': 'No stock tracking — choosing an item only creates a charge',
+}
