@@ -54,4 +54,11 @@ CROSS_STUDIO_CALLERS: dict[str, str] = {
     "app/services/demo/fixtures.py": (
         "seeds the demo studio's own tenant root, for the same reason"
     ),
+    "app/services/identity/resolution.py": (
+        "SPEC 5.2's login resolver answers 'which studios are yours?' before any studio "
+        "is in context, and 3.3 requires one identity to reach several. It is not a "
+        "report and feeds no total, so 19.7 does not apply -- and excluding the demo "
+        "studio here would make it unreachable to the developer account, which is the "
+        "opposite of what 19.1 exists for"
+    ),
 }
