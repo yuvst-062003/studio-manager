@@ -17,6 +17,7 @@ import { Resolve } from './features/identity/Resolve'
 import { ScheduleSection, isCalendarRoute } from './features/schedule/ScheduleSection'
 import { makeParentScheduleClient } from './features/schedule/client'
 import { useToday } from './features/schedule/useToday'
+import { PublicLanding, makeLandingClient, matchLandingPath } from './features/landing'
 
 const NAV = [
   { key: 'myChildren', labelKey: 'common.nav.myChildren', href: '/' },
@@ -50,9 +51,11 @@ export default function App() {
   const installed = displayMode !== 'browser'
   const [locale, setLocale] = useState<Locale>('he')
   const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null)
-  // Memoised: ChildCalendar reads through this in an effect keyed on the client, so a
-  // fresh object every render would re-fetch the month forever.
+  // Both memoised for the same reason: each screen reads through its client in an effect
+  // keyed on the client, so a fresh object every render would re-fetch forever — the
+  // month for 12b, the club for 13a.
   const scheduleClient = useMemo(() => makeParentScheduleClient(apiFetch), [])
+  const landingClient = useMemo(() => makeLandingClient(apiFetch), [])
   const hash = useHash()
   const today = useToday()
 
@@ -64,6 +67,30 @@ export default function App() {
     globalThis.addEventListener('beforeinstallprompt', onPrompt)
     return () => globalThis.removeEventListener('beforeinstallprompt', onPrompt)
   }, [])
+
+  // §5.4a ① — the shop window is a marketing asset on the open internet, so it renders
+  // AHEAD of every gate. A stranger tapping an Instagram link must see the club, not an
+  // install walkthrough for an app they have no reason to want yet; §6.5's install prompt
+  // belongs on `13b`, after they have booked, which is the moment they are most willing.
+  //
+  // A real path and not a hash: the URL goes in a bio and on a printed QR, and Vite's PWA
+  // config already sets `navigateFallback: 'index.html'` so the deep link resolves.
+  const landingRoute = matchLandingPath(globalThis.location?.pathname ?? '/')
+  if (landingRoute) {
+    return (
+      <ThemeProvider>
+        {/* Language before login (§6.1): a Russian-speaking parent cannot read a Hebrew
+            offer any more than a Hebrew consent screen. */}
+        <LanguagePicker locale={locale} onChoose={setLocale} />
+        <PublicLanding
+          slug={landingRoute.slug}
+          locale={locale}
+          client={landingClient}
+          signedIn={session.status === 'signed-in'}
+        />
+      </ThemeProvider>
+    )
+  }
 
   if (!installed) {
     return (
