@@ -18,12 +18,14 @@ import { ScheduleSection, isCalendarRoute } from './features/schedule/ScheduleSe
 import { makeParentScheduleClient } from './features/schedule/client'
 import { useToday } from './features/schedule/useToday'
 import { PublicLanding, makeLandingClient, matchLandingPath } from './features/landing'
+import { AddSibling, makePeopleClient } from './features/people'
 
 const NAV = [
   { key: 'myChildren', labelKey: 'common.nav.myChildren', href: '/' },
   { key: 'calendar', labelKey: 'schedule.calendar.title', href: '#/calendar' },
   { key: 'payments', labelKey: 'common.nav.payments', href: '/payments' },
   { key: 'announcements', labelKey: 'common.nav.announcements', href: '/announcements' },
+  { key: 'addChild', labelKey: 'people.sibling.title', href: '#/add-child' },
   { key: 'settings', labelKey: 'common.nav.settings', href: '/settings' },
 ]
 
@@ -56,8 +58,17 @@ export default function App() {
   // month for 12b, the club for 13a.
   const scheduleClient = useMemo(() => makeParentScheduleClient(apiFetch), [])
   const landingClient = useMemo(() => makeLandingClient(apiFetch), [])
+  const peopleClient = useMemo(() => makePeopleClient(apiFetch), [])
   const hash = useHash()
   const today = useToday()
+  // §5.4(c)'s add-a-sibling is one hash away from home. Hash and not a path: it is an
+  // in-app screen, unlike the landing page, which has to be shareable.
+  //
+  // Read off `useHash()` rather than `globalThis.location.hash` directly: both W2 lanes
+  // put a screen behind a hash in this shell, and a plain read is not reactive — the
+  // screen would change only when something else happened to re-render App. One
+  // subscription serves both lanes' routes.
+  const addingChild = hash === '#/add-child'
 
   useEffect(() => {
     const onPrompt = (event: Event): void => {
@@ -135,10 +146,15 @@ export default function App() {
             />
           }
         >
-          {/* §6.1's first-run routing still owns the default screen — `Resolve` decides
-              between the studio picker, the blocking consents and home. A guardian who has
-              navigated to #/calendar is past that, and `access.parent` is re-checked here
-              so the hash cannot route around §6.1's refusal arm. */}
+          {/* §6.1's first-run routing still owns the DEFAULT screen — `Resolve` decides
+              between the studio picker, the blocking consents and home. Both W2 lanes
+              hang one screen off a hash in front of it, and neither claims the fallback:
+              an unknown hash still falls through to `Resolve`.
+
+              `access.parent` guards lane SCHEDULE's branch because a hash is typed by
+              whoever is holding the phone, so the check cannot live in the link. Lane
+              PEOPLE's branch needs no such guard — `AddSibling` is behind §6.1's refusal
+              already, since a person with no guardian row never reaches this shell. */}
           {session.access.parent && isCalendarRoute(hash) ? (
             <ScheduleSection
               locale={locale}
@@ -146,6 +162,8 @@ export default function App() {
               hash={hash}
               today={today}
             />
+          ) : addingChild ? (
+            <AddSibling locale={locale} client={peopleClient} />
           ) : (
             <Resolve session={session} locale={locale} />
           )}

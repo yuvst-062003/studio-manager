@@ -11,19 +11,25 @@
 // composites and this is not one of them, so inventing a sixth SlotId here would be
 // speculative design in a file (`slots.ts`) the plan says is authored once. M4 decides
 // its own shape; what M1 owes it is a container with an obvious place to land.
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { RefusalScreen, StudioSwitcher } from '@studio/ui'
 import type { Session } from '@studio/core'
 import { apiFetch } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { ParentHome } from '../home/ParentHome'
+import { everyChildIsOnATrial, makePeopleClient, useMyStudents } from '../people'
+import { TrialHome } from '../people'
 
 /** Where the staff app lives, so §6.1's second refusal is a link rather than a dead end. */
 const STAFF_APP_URL = '/staff'
 
 export function Resolve({ session, locale }: { session: Session; locale: Locale }) {
   const [code, setCode] = useState('')
+  // Memoised: `useMyStudents` reads through this in an effect keyed on the client, so a
+  // fresh object every render would re-fetch forever.
+  const peopleClient = useMemo(() => makePeopleClient(apiFetch), [])
+  const mine = useMyStudents(peopleClient)
 
   // §3.1 — the parent app asks 'do you have any guardian rows?', which is what
   // `access.parent` reports. A role check here would let a manager with no children in.
@@ -62,6 +68,15 @@ export function Resolve({ session, locale }: { session: Session; locale: Locale 
         </section>
       </>
     )
+  }
+
+  // §6.3's trial state — 'A guardian whose children are ALL trial sees a reduced home.'
+  //
+  // Every child, not any: a family mid-conversion must keep the app they are already using.
+  // Once a manager converts them "the full app appears with no further action from the
+  // parent", which is this condition simply ceasing to hold.
+  if (mine.status === 'ready' && everyChildIsOnATrial(mine.students)) {
+    return <TrialHome students={mine.students} locale={locale} />
   }
 
   // §6.1 step 4 — 'only shown if she belongs to more than one studio'. StudioSwitcher

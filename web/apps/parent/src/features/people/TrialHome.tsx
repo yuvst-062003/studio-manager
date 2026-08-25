@@ -1,0 +1,110 @@
+// §6.3's trial state — the reduced home.
+//
+// "A guardian whose children are all `trial` sees a reduced home: the booked session with a
+// countdown, an add-to-calendar button, directions to the studio, and what to bring. **No
+// payments screen** (they have no charges), **no attendance history, no belt strip.** After
+// the lesson the home shows 'איך היה?' and, once a manager converts them, the full app
+// appears with no further action from the parent."
+//
+// The three absences are the design. A trial family has no charges — §5.4a: the billing run
+// only walks active enrollments — so a payments tab would open on an empty screen and invite
+// the question "what do I owe?" at exactly the wrong moment.
+import type { CSSProperties } from 'react'
+import { Card } from '@studio/ui'
+import { formatDateInStudioZone, formatTimeInStudioZone, studioDayKey } from '@studio/core'
+import { t } from '@studio/i18n'
+import type { Locale } from '@studio/i18n'
+import type { StudentSummary } from './peopleClient'
+
+const pageStyle: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 'var(--space-4)',
+  maxInlineSize: '30rem',
+  marginInline: 'auto',
+  inlineSize: '100%',
+}
+
+/**
+ * Whole **calendar days** from `now` to the lesson, in the studio's timezone. Negative once
+ * it has happened.
+ *
+ * Calendar days, not 24-hour blocks. A lesson 29 hours away is "tomorrow" to a parent and
+ * "2 days" to arithmetic, and the parent is the one reading it. G3 makes Asia/Jerusalem the
+ * rendering zone regardless of locale, so the comparison happens there — a countdown that
+ * flipped at midnight UTC would say "tomorrow" for two hours of the wrong evening.
+ */
+export function daysUntil(startsAt: string, now: Date): number {
+  const day = 24 * 60 * 60 * 1000
+  const asUtcMidnight = (iso: string | Date) => Date.parse(`${studioDayKey(iso)}T00:00:00Z`)
+  return Math.round((asUtcMidnight(startsAt) - asUtcMidnight(now)) / day)
+}
+
+export function TrialHome({
+  students,
+  locale,
+  sessionStartsAt = null,
+  attended = false,
+  now = new Date(),
+}: {
+  students: StudentSummary[]
+  locale: Locale
+  sessionStartsAt?: string | null
+  /** §5.4a ④ — after the lesson the home asks "איך היה?". */
+  attended?: boolean
+  now?: Date
+}) {
+  const days = sessionStartsAt ? daysUntil(sessionStartsAt, now) : null
+
+  return (
+    <section style={pageStyle} aria-labelledby="trial-home-title" data-testid="trial-home">
+      <h1 id="trial-home-title">{t(locale, 'people.trialHome.title')}</h1>
+
+      <Card>
+        <ul>
+          {students.map((student) => (
+            <li key={student.id}>
+              <bdi>{`${student.first_name} ${student.last_name}`}</bdi>
+            </li>
+          ))}
+        </ul>
+        {sessionStartsAt ? (
+          <>
+            {/* G3 — stored UTC, rendered Asia/Jerusalem regardless of locale. */}
+            <p data-testid="trial-home-when">
+              {formatDateInStudioZone(sessionStartsAt, locale)}{' '}
+              {formatTimeInStudioZone(sessionStartsAt, locale)}
+            </p>
+            <p data-testid="trial-home-countdown">
+              {days !== null && days <= 0
+                ? t(locale, 'people.trialHome.today')
+                : days === 1
+                  ? t(locale, 'people.trialHome.tomorrow')
+                  : t(locale, 'people.trialHome.countdown').replace('{n}', String(days))}
+            </p>
+          </>
+        ) : (
+          <p data-testid="trial-home-waiting">{t(locale, 'people.trialHome.waitingForClub')}</p>
+        )}
+      </Card>
+
+      <a href="#/calendar" data-testid="trial-home-calendar">
+        {t(locale, 'people.trialHome.addToCalendar')}
+      </a>
+      <a href="#/directions" data-testid="trial-home-directions">
+        {t(locale, 'people.trialHome.directions')}
+      </a>
+
+      <section aria-labelledby="trial-home-bring">
+        <h2 id="trial-home-bring">{t(locale, 'people.trialHome.whatToBring')}</h2>
+        <p data-testid="trial-home-bring-hint">{t(locale, 'people.trialHome.whatToBringHint')}</p>
+      </section>
+
+      {attended ? (
+        // §5.4a ④ — 'After the lesson the home shows "איך היה?"'. The conversion decision
+        // is the manager's; this asks nothing of the parent but an opinion.
+        <p data-testid="trial-home-how-was-it">{t(locale, 'people.trialHome.howWasIt')}</p>
+      ) : null}
+    </section>
+  )
+}
