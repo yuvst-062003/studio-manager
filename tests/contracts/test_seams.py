@@ -29,6 +29,7 @@ from typing import Any
 import pytest
 from app.models.schedule import Session
 from app.services.schedule import ScheduleService
+from sqlalchemy.orm import Session as OrmSession
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -118,11 +119,24 @@ def test_materialize_sessions_is_typed_end_to_end():
     assert signature.return_annotation == list[Session]
 
 
-def test_materialize_sessions_refuses_rather_than_returning_nothing():
-    """A stub returning `[]` would let M3 pass its own tests against a lie and ship a
-    permanently empty picker. `NotImplementedError` cannot be mistaken for an answer."""
-    with pytest.raises(NotImplementedError):
-        ScheduleService().materialize_sessions(uuid.uuid4(), date(2026, 9, 1), date(2026, 9, 30))
+def test_materialize_sessions_is_reached_through_a_session_bound_service():
+    """How M3 actually calls the seam: `ScheduleService(session).materialize_sessions(...)`.
+
+    The seam's signature has no room for a database session — it takes a group and two
+    dates and nothing else, and W2's contract commit fixed that before either worktree
+    existed — so M2 put the session on the constructor rather than widening the method and
+    breaking the contract. That constructor is now part of what M3 builds against, which is
+    why it is asserted here beside the method it serves.
+
+    **This replaces an assertion that the body raised `NotImplementedError`.** That was the
+    right test while the body was a stub: a seam returning `[]` would have let M3 pass its
+    own tests against a lie and ship a permanently empty trial-slot picker. Now that lane
+    SCHEDULE has filled it in, the behaviour is owned by `tests/schedule/test_materialization.py`,
+    and asserting it here too would give two files an opinion about one rule.
+    """
+    parameters = _signature(ScheduleService.__init__).parameters
+    assert list(parameters) == ["self", "session"]
+    assert parameters["session"].annotation is OrmSession
 
 
 # -- W3: HealthService.recompute_derived_flags --------------------------------

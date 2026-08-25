@@ -220,3 +220,30 @@ class ScheduleImpactPreview(BaseModel):
 SessionPage = CursorPage[SessionOut]
 TrainingYearPage = CursorPage[TrainingYearOut]
 ClosurePage = CursorPage[ClosureOut]
+
+
+class ClosureCreatedOut(ClosureOut):
+    """§5.6 — 'adding one cancels the affected sessions and notifies the affected
+    guardians'. The count is returned rather than left for the client to discover on the
+    next fetch, because a manager who has just closed a fortnight needs to see how many
+    lessons that cost before they navigate away. The notification is §5.11's and lands
+    in W5."""
+
+    sessions_cancelled: int = 0
+
+
+class GenerateSessionsOut(BaseModel):
+    """§5.15 step 6 — 'materialize every session for the year … and show a summary of what
+    was created'."""
+
+    training_year_id: uuid.UUID
+    groups: int
+    sessions_created: int
+
+
+class ScheduleRulesOut(BaseModel):
+    """`GET /groups/{id}/schedule`. Only rules still in force: a superseded rule is history
+    the editor must not offer back for editing."""
+
+    group_id: uuid.UUID
+    rules: list[ScheduleRuleOut] = Field(default_factory=list)
