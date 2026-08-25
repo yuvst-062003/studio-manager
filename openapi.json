@@ -13,6 +13,22 @@
             "title": "Env",
             "type": "string"
           },
+          "revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision"
+          },
+          "started_at": {
+            "format": "date-time",
+            "title": "Started At",
+            "type": "string"
+          },
           "status": {
             "title": "Status",
             "type": "string"
@@ -20,7 +36,9 @@
         },
         "required": [
           "status",
-          "env"
+          "env",
+          "revision",
+          "started_at"
         ],
         "title": "HealthResponse",
         "type": "object"
@@ -35,7 +53,7 @@
   "paths": {
     "/api/v1/health": {
       "get": {
-        "description": "Liveness. Deliberately carries no tenant data and needs no auth.",
+        "description": "Liveness. Deliberately carries no tenant data and needs no auth.\n\n`revision` is best-effort and never affects `status`: this endpoint answers \"is this\nprocess alive\", and a database it cannot reach does not make it dead. Letting the\nfailure propagate would turn every database blip into a page.",
         "operationId": "read_health_api_v1_health_get",
         "responses": {
           "200": {

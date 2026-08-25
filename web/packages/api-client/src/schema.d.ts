@@ -14,6 +14,10 @@ export interface paths {
         /**
          * Read Health
          * @description Liveness. Deliberately carries no tenant data and needs no auth.
+         *
+         *     `revision` is best-effort and never affects `status`: this endpoint answers "is this
+         *     process alive", and a database it cannot reach does not make it dead. Letting the
+         *     failure propagate would turn every database blip into a page.
          */
         get: operations["read_health_api_v1_health_get"];
         put?: never;
@@ -35,6 +39,13 @@ export interface components {
              * @enum {string}
              */
             env: "development" | "staging" | "production" | "test";
+            /** Revision */
+            revision: string | null;
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
             /** Status */
             status: string;
         };

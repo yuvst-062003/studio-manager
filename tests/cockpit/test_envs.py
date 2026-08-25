@@ -30,7 +30,8 @@ def test_a_healthy_endpoint_reports_up_with_its_revision():
             "started_at": "2026-08-25T05:11:00Z",
         }
 
-    result = envs.classify("staging", DOMAINS["environments"]["staging"]["api"], fetch, is_remote=True)
+    url = DOMAINS["environments"]["staging"]["api"]
+    result = envs.classify("staging", url, fetch, is_remote=True)
     assert result.state == "up"
     assert result.revision == "0003"
     assert result.started_at == "2026-08-25T05:11:00Z"
@@ -40,7 +41,10 @@ def test_a_placeholder_host_is_not_deployed_never_an_error():
     def fetch(url, timeout):
         raise AssertionError("must not be called for a placeholder host")
 
-    assert envs.classify("production", "https://PENDING-production-services", fetch, is_remote=True).state == "not_deployed"
+    result = envs.classify(
+        "production", "https://PENDING-production-services", fetch, is_remote=True
+    )
+    assert result.state == "not_deployed"
 
 
 def test_localhost_from_a_remote_surface_is_local_not_down():
@@ -50,14 +54,16 @@ def test_localhost_from_a_remote_surface_is_local_not_down():
     def fetch(url, timeout):
         raise AssertionError("must not be called for localhost from a remote surface")
 
-    assert envs.classify("development", "http://localhost:8000", fetch, is_remote=True).state == "local"
+    result = envs.classify("development", "http://localhost:8000", fetch, is_remote=True)
+    assert result.state == "local"
 
 
 def test_localhost_from_the_laptop_is_probed_normally():
     def fetch(url, timeout):
         return {"status": "ok", "env": "development", "revision": "0003", "started_at": None}
 
-    assert envs.classify("development", "http://localhost:8000", fetch, is_remote=False).state == "up"
+    result = envs.classify("development", "http://localhost:8000", fetch, is_remote=False)
+    assert result.state == "up"
 
 
 def test_a_timeout_is_unknown_not_down():
@@ -117,6 +123,7 @@ def test_probe_all_never_raises_even_when_every_target_fails():
 
 def test_every_state_it_can_return_is_declared():
     """A state the page has no styling for renders as nothing at all."""
+
     def fetch(url, timeout):
         return {"status": "ok"}
 
