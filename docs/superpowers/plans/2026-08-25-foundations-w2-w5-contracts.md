@@ -387,14 +387,14 @@ where `IpnVerdict` is `success | amount_mismatch | forged_ref | duplicate`.
 `NotificationService.enqueue(person_id: UUID, kind: str, title: str, body: str, payload: dict) -> Notification`
 — M9's at-risk and retention jobs are pure callers.
 
-- [ ] **Step 1: Write the failing test.** `notification_delivery.status` includes `no_token` and
+- [x] **Step 1: Write the failing test.** `notification_delivery.status` includes `no_token` and
       `denied` — §5.11/§12: push is opt-in, so **some parents will never receive alerts** and the
       delivery report is how the office learns who to phone. `calendar_feed.token` is unique
       (the feed URL is the only credential). Seam signature asserted.
-- [ ] **Step 2: Run it** → FAIL.
-- [ ] **Step 3: Implement.**
-- [ ] **Step 4: Run it** → PASS. `.venv/bin/mypy app`.
-- [ ] **Step 5: Commit.** `feat(contract): W5 comms and reports models, schemas and the notify seam`
+- [x] **Step 2: Run it** → FAIL.
+- [x] **Step 3: Implement.**
+- [x] **Step 4: Run it** → PASS. `.venv/bin/mypy app`.
+- [x] **Step 5: Commit.** `feat(contract): W5 comms and reports models, schemas and the notify seam`
 
 ## Task 16 — W5 i18n: comms + reports (privacy inside reports)
 

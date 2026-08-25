@@ -18,6 +18,7 @@ from __future__ import annotations
 import inspect
 import uuid
 from datetime import date
+from typing import Any
 
 import pytest
 from app.models.billing import Charge
@@ -161,3 +162,40 @@ def test_the_billing_seams_refuse_rather_than_returning_nothing():
         )
     with pytest.raises(NotImplementedError):
         BillingService().recompute_charge_status(uuid.uuid4())
+
+
+# -- W5: NotificationService.enqueue ------------------------------------------
+def test_enqueue_takes_a_person_a_kind_and_a_message():
+    """Plan W5 seam, verbatim:
+    `NotificationService.enqueue(person_id, kind, title, body, payload) -> Notification`.
+
+    M9's at-risk and retention jobs are pure callers of this (plan W5), which is what lets
+    the REPORTS lane raise a notification without opening a single file in the COMMS lane.
+    """
+    from app.services.comms import NotificationService
+
+    parameters = _signature(NotificationService.enqueue).parameters
+    assert list(parameters) == ["self", "person_id", "kind", "title", "body", "payload"]
+
+
+def test_enqueue_is_typed_end_to_end():
+    """`-> Notification`, not `-> None`. §5.11 fans one notification out to both channels,
+    and a caller that wants the delivery report for what it just sent needs the row's
+    identity — returning nothing would force M9 to re-query by guesswork."""
+    from app.models.comms import Notification
+    from app.services.comms import NotificationService
+
+    signature = _signature(NotificationService.enqueue)
+    assert signature.parameters["person_id"].annotation is uuid.UUID
+    assert signature.parameters["kind"].annotation is str
+    assert signature.parameters["title"].annotation is str
+    assert signature.parameters["body"].annotation is str
+    assert signature.parameters["payload"].annotation == dict[str, Any]
+    assert signature.return_annotation is Notification
+
+
+def test_enqueue_is_the_only_way_in_and_refuses_rather_than_returning_nothing():
+    from app.services.comms import NotificationService
+
+    with pytest.raises(NotImplementedError):
+        NotificationService().enqueue(uuid.uuid4(), "belt_awarded", "t", "b", {})
