@@ -7,8 +7,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { t } from '@studio/i18n'
 import { GroupsAndCycles } from './GroupsAndCycles'
-import type { GroupSummary } from './GroupsAndCycles'
-import type { ScheduleClient } from './client'
+import type { GroupSummary, ScheduleClient } from './client'
 
 const GROUPS: GroupSummary[] = [
   { id: 'g1', name: 'מתחילים', className: "ג'ודו" },

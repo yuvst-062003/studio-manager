@@ -99,6 +99,26 @@ waves:
         title: The contract commit — revision 0006, C11 and C12, the attendance-pattern seam
         status: shipped
         on: 2026-08-25
+      - id: M2.1
+        title: Israeli holiday presets, rule expansion and the §5.6 impact diff
+        status: shipped
+        on: 2026-08-26
+      - id: M2.2
+        title: Training years, closures, and session materialization for the whole year
+        status: shipped
+        on: 2026-08-26
+      - id: M2.3
+        title: PUT /groups/{id}/schedule — the impact preview, and C12's stranded students
+        status: shipped
+        on: 2026-08-26
+      - id: M2.4
+        title: /sessions — per-session overrides, ad-hoc sessions, notes, completion worker
+        status: shipped
+        on: 2026-08-26
+      - id: M2.5
+        title: Artboards — dashboard 3a/6a/4b, staff 9a/1d/9b, parent 12b
+        status: shipped
+        on: 2026-08-26
   - id: W3
     milestone: M4 ∥ M5
     title: Health ∥ Attendance

@@ -72,10 +72,15 @@ const dayStyle: CSSProperties = {
   fontSize: 'var(--text-caption)',
 }
 
+// Longhand for the same reason DatePickerScreen uses it: `dayStyle` carries no border at
+// all, so a shorthand here would be added and removed as days gain and lose lessons, and
+// React warns that mixing the two forms leaves stale values behind.
 const trainingDayStyle: CSSProperties = {
   ...dayStyle,
   background: 'var(--surface)',
-  border: 'var(--border-width-strong) solid var(--accent)',
+  borderStyle: 'solid',
+  borderWidth: 'var(--border-width-strong)',
+  borderColor: 'var(--accent)',
   fontWeight: 'var(--weight-semibold)' as CSSProperties['fontWeight'],
 }
 

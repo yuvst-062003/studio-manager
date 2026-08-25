@@ -19,14 +19,7 @@ import { EmptyState } from '@studio/ui'
 import { formatDateInStudioZone, formatTimeInStudioZone } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
-import type { ScheduleClient, ScheduleRule, SessionRow } from './client'
-
-/** What 4b needs about a group. Names come from M1's `/groups`; this lane adds the rest. */
-export interface GroupSummary {
-  id: string
-  name: string
-  className: string
-}
+import type { GroupSummary, ScheduleClient, ScheduleRule, SessionRow } from './client'
 
 interface GroupFacts {
   rules: ScheduleRule[]
@@ -69,12 +62,19 @@ export function GroupsAndCycles({
   client,
   groups,
   today,
+  hrefForGroup,
 }: {
   locale: Locale
   client: ScheduleClient
   groups: GroupSummary[]
   /** An ISO instant. A prop, not `new Date()` — the "next session" cell depends on it. */
   today: string
+  /**
+   * Where a group's own page lives, if it has one. Optional so the table renders standalone
+   * in a test and in any future screen that has nowhere to send the reader — a link to
+   * nothing is worse than plain text.
+   */
+  hrefForGroup?: (groupId: string) => string
 }) {
   const [facts, setFacts] = useState<Record<string, GroupFacts>>({})
   const groupIds = useMemo(() => groups.map((group) => group.id).join(','), [groups])
@@ -154,7 +154,11 @@ export function GroupsAndCycles({
             return (
               <tr key={group.id} data-testid="group-row">
                 <th scope="row" style={cellStyle}>
-                  {group.name}
+                  {hrefForGroup ? (
+                    <a href={hrefForGroup(group.id)}>{group.name}</a>
+                  ) : (
+                    group.name
+                  )}
                   <div style={laterStyle}>{group.className}</div>
                 </th>
                 <td style={cellStyle} data-testid={`schedule-${group.id}`}>

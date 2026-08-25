@@ -73,12 +73,18 @@ const headerCellStyle: CSSProperties = {
   color: 'var(--text-secondary)',
 }
 
+// Longhand, not the `border` shorthand. `hasSessionsStyle` overrides only the colour and
+// the width, and React warns that removing a longhand while a conflicting shorthand is set
+// "can lead to styling bugs" — a day would keep the accent ring after it stopped having a
+// lesson. Three properties consistently beats one plus two exceptions.
 const dayStyle: CSSProperties = {
   // §6.2's thumb rule applies to a calendar more than to anything else on the phone.
   minBlockSize: '44px',
   minInlineSize: '44px',
   borderRadius: 'var(--radius-sm)',
-  border: 'var(--border-width-hairline) solid var(--border)',
+  borderStyle: 'solid',
+  borderWidth: 'var(--border-width-hairline)',
+  borderColor: 'var(--border)',
   background: 'var(--surface)',
 }
 

@@ -93,7 +93,15 @@ export interface Closure {
   source: 'holiday_preset' | 'manual'
 }
 
+/** What 4b needs about a group. `/groups` and `/classes` are M1's, read-only from here. */
+export interface GroupSummary {
+  id: string
+  name: string
+  className: string
+}
+
 export interface ScheduleClient {
+  listGroups(): Promise<GroupSummary[]>
   listSessions(query: {
     from: string
     to: string
@@ -120,6 +128,22 @@ async function json<T>(response: Response): Promise<T> {
 
 export function makeScheduleClient(fetcher: Fetcher): ScheduleClient {
   return {
+    async listGroups() {
+      // Two reads rather than one, because `/groups` carries `class_id` and 4b shows the
+      // class name. Both are M1's endpoints and neither is written from this lane.
+      const [groups, classes] = await Promise.all([
+        json<{ items: { id: string; name: string; class_id: string }[] }>(
+          await fetcher(`${API}/groups`),
+        ),
+        json<{ items: { id: string; name: string }[] }>(await fetcher(`${API}/classes`)),
+      ])
+      const classNames = new Map(classes.items.map((klass) => [klass.id, klass.name]))
+      return groups.items.map((group) => ({
+        id: group.id,
+        name: group.name,
+        className: classNames.get(group.class_id) ?? '',
+      }))
+    },
     async listSessions({ from, to, groupId, coachPersonId }) {
       const params = new URLSearchParams({ from, to })
       if (groupId) params.set('group_id', groupId)
