@@ -236,13 +236,61 @@ holdbacks:
     kind: external
     title: The club's real class and group structure, and the weekly schedule
     why: >-
-      M2 materialises sessions from this. Building it against invented groups means the
-      first real rollover is also the first real test.
+      Closed 2026-08-25. The club described it and the model was checked against it. Most
+      of it fits with no change: per-weekday start and end times (Tue 15:00-17:00, Fri
+      15:00-19:00) are one group_schedule_rule row each, 1-on-1 sessions are §5.8 events
+      rather than sessions, and moving a student between groups is one enrollment ending
+      and another starting. Two things did NOT fit and are recorded as C11 and C12. The
+      holdback was filed as 'M2 cannot be built without this', which was wrong — the
+      structure is data a manager enters through §5.1's wizard, and none of it is compiled
+      in. The instinct underneath was right for a different reason: checking the design
+      against a real club before building it found two defects while they were still cheap.
     blocks: M2
-    status: open
+    status: closed
     opened: 2026-08-24
+    closed: 2026-08-25
+    source: SPEC §15 item 10 · C11 and C12
+  - id: HB-c11-pricing-is-per-student
+    kind: conflict
+    title: C11 — §5.10 prices per group; the club prices per student by training volume
+    why: >-
+      §5.10 attaches a price_plan to a GROUP, falling back to the class, and the billing
+      run creates one charge for every active enrollment. The club prices differently: the
+      manager sets an amount per STUDENT from how often they train — about 300 for twice a
+      week, about 500 for daily — independent of which groups those sessions belong to.
+      Under the spec's rule a student in both the competition group and the teenagers group
+      receives two tuition charges every month, at two different group prices, silently and
+      forever. §5.4's prose compounds it by asserting 'each child is enrolled in one group';
+      the schema never enforced that, §3.3 describes enrollment as a link table, and the
+      club contradicts it outright. The sentence is simply wrong. Two consequences land in
+      W2's contract commit, because that is where enrollment is built: the billing run must
+      produce ONE tuition charge per student per period rather than one per enrollment, and
+      the amount must hang off something the manager sets per student.
+    blocks: W2
+    status: open
+    opened: 2026-08-25
     closed: null
-    source: SPEC §15 item 10
+    source: SPEC §5.4, §5.10 · the club, 2026-08-25
+  - id: HB-c12-partial-attendance
+    kind: conflict
+    title: C12 — a student may attend only some of their group's weekly sessions
+    why: >-
+      §5.7's four attendance states have no way to say 'this student was not expected
+      today'. A student enrolled in a group that trains twice a week who attends once is
+      marked absent_unexcused every week forever, and reads as fifty percent attendance
+      while attending everything they signed up for — so §5.14's gap count becomes noise and
+      a manager chases parents who are missing nothing. Money is already correct: §5.7 says
+      the monthly fee buys the slot rather than the sessions. Reporting is not. The club
+      confirmed the manager sets, per student, which day or days they come, so `enrollment`
+      has to carry that pattern and `enrollment` is built in W2's contract commit. It is the
+      same input C11 depends on — 'twice a week' is both what a student attends and what
+      they pay for — so the two must be settled together or the second will contradict the
+      first.
+    blocks: W2
+    status: open
+    opened: 2026-08-25
+    closed: null
+    source: SPEC §5.7, §5.14 · the club, 2026-08-25
   - id: HB-ru-review
     kind: external
     title: A native speaker to review the machine-translated ru strings
