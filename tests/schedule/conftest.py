@@ -23,7 +23,6 @@ from app.models.person import Person, RoleAssignment
 from app.models.schedule import TrainingYear
 from app.models.structure import Class, Group, Location
 from app.models.studio import Studio
-from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from tests.conftest import sign_in
