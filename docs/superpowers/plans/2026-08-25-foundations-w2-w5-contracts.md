@@ -466,20 +466,53 @@ where `IpnVerdict` is `success | amount_mismatch | forged_ref | duplicate`.
 > Run the scoped commands below. Then confirm the residue is *only* the known set, so a
 > genuine new breakage cannot hide inside it.
 
-- [ ] `.venv/bin/pytest tests/contracts tests/invariants tests/restrictions tests/structure tests/upay -q`
-- [ ] `cd web && npx vitest run --reporter=dot` — from `web/`, not the repo root: these
+- [x] `.venv/bin/pytest tests/contracts tests/invariants tests/restrictions tests/structure tests/upay -q`
+- [x] `cd web && npx vitest run --reporter=dot` — from `web/`, not the repo root: these
       specs resolve fixture paths from `cwd`, and `--root web` from above makes six files
       fail on ENOENT that pass from inside.
-- [ ] `npm --prefix web run typecheck && .venv/bin/mypy app`
-- [ ] `.venv/bin/ruff check --fix app tests && .venv/bin/ruff format app tests && npm --prefix web run lint`
-- [ ] `for ns in schedule people health attendance billing events comms reports; do node web/scripts/i18n-parity.mjs $ns; done`
-- [ ] `.venv/bin/pytest -q` **for the count only.** Expected residue at the end of this
+- [x] `npm --prefix web run typecheck && .venv/bin/mypy app`
+- [x] `.venv/bin/ruff check --fix app tests && .venv/bin/ruff format app tests && npm --prefix web run lint`
+- [x] `for ns in schedule people health attendance billing events comms reports; do node web/scripts/i18n-parity.mjs $ns; done`
+- [x] `.venv/bin/pytest -q` **for the count only.** Expected residue at the end of this
       plan: the `tests/dev/**` family plus
       `test_alembic_baseline.py::test_the_migrations_match_the_models` (the migration
       gap), and the five failures inherited from `fad71db` listed in deviation 4. Any
       failure outside that set is this session's, and is a real one.
 
 ---
+
+
+### Result, 2026-08-25
+
+Run at `e16a6ec`, with Task 18 deliberately not started — see § Session log, deviation 6.
+
+| Gate | Result |
+|---|---|
+| `pytest tests/contracts tests/invariants tests/restrictions tests/structure tests/upay` | **433 passed, 1 skipped** |
+| `cd web && npx vitest run` | **674 passed**, 55 files |
+| `npm --prefix web run typecheck` · `mypy app` | clean, 78 source files |
+| `ruff check` · `ruff format --check` · `npm --prefix web run lint` | clean, 156 files formatted |
+| i18n parity, all eight namespaces | green; `en` strict, `ru` complete and on `report` |
+
+**The residue was measured, not assumed.** The full suite is **38 red** — 14 failed and 24
+errored. The same suite was run at `beb93cc`, the commit this session started from, in a
+throwaway worktree: **also 38 red, and the failing set is identical, test for test.** This
+session therefore added none of it. `passed` went 901 → 970 and `skipped` went 3 → 1, the
+latter because `test_each_landed_vertical_exposes_at_least_one_cursor_page` stops skipping
+`comms` and `reports` once their schema modules exist.
+
+The 38 break down exactly as this task predicted:
+
+- **31 · `tests/dev/**`** — 7 failures plus all 24 errors (`test_act_as.py`,
+  `test_personas_layer.py`, `test_demo_service.py`, `test_demo_reset_worker.py`,
+  `test_dev_router.py`). Every one reflects `Base.metadata` against a live database.
+- **1 · `test_the_migrations_match_the_models`** — the migration gap itself. Task 19's
+  drafts are the handover; `main` closes it with revisions 0006–0009.
+- **5 · inherited from `fad71db`** — four in `tests/identity/test_auth_context.py` and
+  `test_alembic_baseline.py::test_the_demo_studio_row_exists_after_migration`. Not the
+  migration gap and not this branch's to fix; they belong to the W1 · M1 session.
+
+Nothing red sits outside that set.
 
 ## Self-review notes
 
@@ -548,3 +581,83 @@ is real. Unresolved, SQLAlchemy drops both constraints from its topological sort
 left `DemoStudioService.wipe_plan()` deleting those two tables in an arbitrary order and
 would have emitted `CREATE TABLE` in an order Postgres rejects. `use_alter` on the
 reconciliation side, with an explicit constraint name so Alembic can drop it.
+
+---
+
+## Session log — Tasks 13–17, 19 and 20
+
+Written by the session that resumed at Task 13 on 2026-08-25 and carried the plan to Task 20,
+leaving **Task 18 deliberately unstarted**.
+
+| Tasks | Commit |
+|---|---|
+| 13 · W4 i18n — billing, events, belts under `events.belt.*` | `bcb1d3f` |
+| 14 · uPay IPN parsing and the four §5.10 verdicts | `520572c` |
+| 15 · W5 comms/reports models, schemas, `NotificationService` seam | `d97c3de` |
+| 16 · W5 i18n — comms, reports, privacy under `reports.privacy.*` | `79e547c` |
+| 17 · `e2e/` — SPEC §13's five flows | `8b269cf` |
+| 19 · migration drafts for W2–W5 | `e16a6ec` |
+
+**No shared gate was edited.** The standing rule from the opening prompt — stop and ask
+before touching `tests/invariants/`, `tests/restrictions/` or `tests/structure/` — never had
+to fire. The two W5 tables §4.3 leaves unscoped were resolved by *scoping them*, not by
+adding an exemption; see deviation 3.
+
+### Deviations and findings
+
+**6. Task 18 was not started, on the plan's own instruction.** The opening prompt says: "Task
+18 is ~60 artboard specs and is far larger than the rest. If the session is getting long,
+finish 13–17 and 19, then start 18 fresh rather than rushing it." Sixty specs written in the
+tail of a long session would be sixty shallow ones, and their whole value is that a lane reads
+them instead of opening an 856 KB `.dc.html`. It is the only task left in this plan.
+
+**7. `verify_ipn` refuses two inputs rather than answering them, and both are additions to
+what Task 14 prescribed.** The plan named four verdicts and the module has exactly four; these
+are the two cases where returning one of them would have been a lie.
+
+- *A callback with no order reference* raises rather than returning `forged_ref`. §5.10's
+  recurring path arrives with no `public_ref` by confirmed provider limitation, and those are
+  legitimate payments from real parents — `forged_ref` would fire a fraud alert on every
+  הוראת קבע payment in the club. They belong in the reconciliation queue, which is M6's route.
+- *A `providererrorcode` other than `0`* raises. IPNs for failed payments are **[NOT COVERED]**
+  — never observed in three live tests. `success` would settle charges for money that did not
+  arrive; a failure verdict invents a shape nobody has seen. `ipn.py` already raises rather
+  than coerces on an unknown amount format, and §5.10 persists the raw callback before any of
+  this runs, so refusing costs nothing.
+
+Also, the source IP is **not a parameter of `verify_ipn`** — it is `source_ip_is_known()`, and
+a test asserts the parameter's absence. §5.10 calls the IP "one weak layer, not proof", and
+keeping it out of the signature means no later edit can quietly make it a gate that refuses
+real money from an address that changed.
+
+**8. `notification_delivery` and `push_token` carry `studio_id`, which §4.3's shorthand omits.**
+Both are children of tenant-scoped rows, and `TenantSession` filters on the mixin — a child
+without it is a table the tenant filter cannot see. Invariant 2 states the rule as closed
+(scoped, or named in `CROSS_TENANT_TABLES` with a reason) and neither has a reason to be
+global. This branch had already made the same call for `event_target` and `payment_allocation`.
+The consequence for `push_token` is written into the model rather than left to be discovered:
+its `token` is unique product-wide because that is what an FCM registration is, so one device
+registers to one studio's `person` row at a time and M8 re-points it on sign-in.
+
+**9. `data_export_request.status` is chosen, not quoted.** §4.3 enumerates nothing. The five
+values and the reason for each are in `EXPORT_STATUSES`. `expired` is the one a shorter list
+drops: §11.3 promises a *time-limited* link, and an expired export is not a failed one — the
+remedy is asking again rather than an investigation.
+
+**10. `@playwright/test` is not installed, and Task 17 did not install it.** `web/package.json`
+carries `playwright`, the driver library the installability check uses — a different package
+from the test runner the specs import. Adding it means regenerating `web/package-lock.json`
+while a concurrent session owns `web/apps/**`, and a regenerated lockfile is the single file
+most guaranteed to conflict. The exact commands and the `test:e2e` script are written into
+`e2e/playwright.config.ts`'s header instead. The specs live at the repository root, outside
+`tsc --noEmit` and `eslint .`, so they cannot redden a gate that is green today.
+
+**11. The migration drafts are not fake autogenerate output.** A copied `CREATE TABLE` block
+is stale the day a lane adds a column, and autogenerate produces the bodies correctly anyway.
+What it cannot produce is the list of things it gets wrong, so each draft carries `TABLES`,
+`HAND_CHECK` and `VERIFY`, and `upgrade()` raises rather than looking runnable. The sharpest
+finding is in `w4-draft.py`: W2's two FK-less UUID columns must gain their `ForeignKey` on the
+**models** in W4's contract commit, not by a hand-written `op.create_foreign_key` — a
+constraint the migration has and the models do not leaves
+`test_the_migrations_match_the_models` red forever on a schema that is actually correct, and
+the obvious fix for that red is to weaken the test.
