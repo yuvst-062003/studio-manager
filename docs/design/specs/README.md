@@ -71,7 +71,12 @@ each wave's contract commit, or every lane will assume the container handles it.
 
 ## W3 — health and attendance
 
-*Pending.*
+**M4 Health** · [`12c`](12c-parent-health-declaration.md) · [`4e`](4e-dashboard-documents.md)
+
+**M5 Attendance** · [`2a`](2a-parent-home.md) · [`12a`](12a-parent-report-absence.md) ·
+[`1c`](1c-staff-roster.md) · [`9f`](9f-staff-attendance.md) · [`9g`](9g-staff-session-summary.md) ·
+[`2d`](2d-staff-student-card.md) · [`4c`](4c-dashboard-attendance.md) ·
+[`1e`](1e-dashboard-week-quickview.md)
 
 ## W4 — money, events and belts
 
@@ -111,8 +116,9 @@ asserts it. **Use the primitive; never port the helper.** Affected: `4b` `6a` `9
 
 D12 notes the retired grey on `4h`'s `בוטל` chip and calls it "one correction to the canvas". It is
 on **`3a` twice** (the cancelled indicator and the cancelled block's dot), **`4b` once** (the frozen
-row's capacity-bar fill) and **`1e` twice**. `--cancelled` supersedes it everywhere, as D12 says —
-but nobody should read D12 as a single-artboard patch.
+row's capacity-bar fill) and **`1e` twice** — **five instances across the dashboard export.**
+`--cancelled` supersedes it everywhere, as D12 says, but nobody should read D12 as a
+single-artboard patch.
 
 ### 3 · `ChipStatus` does not cover the screens
 
@@ -148,8 +154,9 @@ authored once and a lane never edits it, so this has to land in a contract commi
 ### 7 · Five artboards show a health declaration that expires. §5.5 says none does.
 
 `health.declaration.noExpiry` reads `ההצהרה תקפה ללא הגבלת זמן`. But `12j` promises an annual
-renewal reminder, and `2c`, `9c`, `3b` and `4a` all render a validity date or an "expiring soon"
-state. **Five screens against one key.** Either §5.5 is wrong or five artboards are; this is not a
+renewal reminder; `2c`, `9c`, `3b`, `4a` and `2d` render a validity date; `12c`'s own subtitle says
+"valid for a year"; and `4e` filters by "expiring soon". **Eight screens against one key** —
+including the declaration screen itself. Either §5.5 is wrong or eight artboards are; this is not a
 per-spec patch.
 
 ### 8 · Hebrew gender and person are product decisions, not translation ones
