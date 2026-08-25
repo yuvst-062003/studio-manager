@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -179,3 +180,64 @@ def test_migrating_twice_does_not_create_a_second_demo_studio(app_session):
         {"slug": DEMO_STUDIO_SLUG},
     ).scalar_one()
     assert count == 1
+
+
+def _hook_bash(command: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [str(ROOT / ".claude/hooks/block-protected.sh")],
+        input=json.dumps({"tool_input": {"command": command}}),
+        text=True,
+        capture_output=True,
+    )
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "cat > alembic/versions/0005_sneaky.py <<'EOF'\nrevision = '0005'\nEOF",
+        "echo x >> alembic/versions/0001_baseline.py",
+        "sed -i '' 's/0001/9999/' alembic/versions/0001_baseline.py",
+        "rm alembic/versions/0001_baseline.py",
+        "cp /tmp/x.py alembic/versions/0005_sneaky.py",
+        "printf 'x' > .env",
+        "cd /repo && cat > ./alembic/versions/0005_x.py <<'EOF'\nEOF",
+    ],
+)
+def test_a_shell_write_to_a_protected_path_is_blocked(command: str):
+    """A guard wired only to Edit|Write is not a guard: every file in this repo can be
+    written with a heredoc, which the file-tool matcher never sees."""
+    result = _hook_bash(command)
+    assert result.returncode == 2, f"the hook allowed: {command}"
+    assert "protected" in result.stderr.lower()
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "cat alembic/versions/0001_baseline.py",
+        "grep -n revision alembic/versions/0001_baseline.py",
+        "sed -n '1,20p' alembic/versions/0001_baseline.py",
+        "git add alembic/versions/0004_grant_alembic_version_select.py",
+        "git diff -- alembic/versions/",
+        ".venv/bin/alembic upgrade head",
+        "rm -rf web/dist-old",
+        "echo hello > /tmp/notes.txt",
+    ],
+)
+def test_reads_and_staging_of_protected_paths_stay_allowed(command: str):
+    """Blocking reads would make an authorized migration impossible to inspect, and
+    blocking `git add` would make it impossible to commit."""
+    assert _hook_bash(command).returncode == 0, f"the hook wrongly blocked: {command}"
+
+
+def test_the_bash_arm_cannot_see_a_write_performed_inside_another_program():
+    """The boundary, asserted rather than implied. A heredoc handed to python is opaque
+    to any inspection of the command string, so this arm catches shell writes only. The
+    Edit/Write matcher and review remain the real guarantee; a detector that pretended
+    to catch every form would be the more dangerous artefact -- the same reasoning
+    M0.4 recorded for the is_developer static detector."""
+    write_inside_python = "Path('alembic/versions/0005_x.py').write_text('')"
+    command = f"python3 - <<'PY'\nfrom pathlib import Path\n{write_inside_python}\nPY"
+    assert _hook_bash(command).returncode == 0, (
+        "if this now blocks, the arm got smarter and this test should record the new boundary"
+    )
