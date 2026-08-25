@@ -129,17 +129,17 @@ New files, grouped by the task that creates them.
 `TrialBooking`, `Enrollment`, `RegistrationRequest` — all inheriting
 `UUIDPrimaryKey, TimestampColumns, TenantMixin, Base` and discovered by Seam 2.
 
-- [ ] **Step 1: Write the failing test.** Assert every §4.3 column exists with the right type,
+- [x] **Step 1: Write the failing test.** Assert every §4.3 column exists with the right type,
       that `Session` carries `is_manually_edited` and `is_ad_hoc` (E2E-5 rests on both), that
       `registration_request.payload_encrypted` uses `EncryptedJSON`, and that soft-deletable
       user content (`session_note`) has `deleted_at` (G15).
-- [ ] **Step 2: Run it.** `.venv/bin/pytest tests/contracts/test_w2_models.py -q` → FAIL, no module.
-- [ ] **Step 3: Implement both modules.** `student.person_id` UNIQUE; `guardian` already exists
+- [x] **Step 2: Run it.** `.venv/bin/pytest tests/contracts/test_w2_models.py -q` → FAIL, no module.
+- [x] **Step 3: Implement both modules.** `student.person_id` UNIQUE; `guardian` already exists
       in `app/models/person.py` and is **not** re-declared. `student.health_status` is the W3
       seam field and is declared here because M5 reads it through `BootstrapPayload`.
-- [ ] **Step 4: Run it.** Expect PASS. Then `.venv/bin/pytest tests/invariants -q` — invariant 2
+- [x] **Step 4: Run it.** Expect PASS. Then `.venv/bin/pytest tests/invariants -q` — invariant 2
       (studio_id + leading composite index) now has twelve new tables to assert against.
-- [ ] **Step 5: Commit.** `feat(contract): W2 schedule and people models`
+- [x] **Step 5: Commit.** `feat(contract): W2 schedule and people models`
 
 ## Task 2 — W2 contract: schemas + the ScheduleService seam
 
@@ -152,24 +152,24 @@ New files, grouped by the task that creates them.
 — M3's trial-slot picker is a pure reader through this. `CursorPage[T]` with `items`,
 `next_cursor`, `has_more`.
 
-- [ ] **Step 1: Write the failing test** asserting the seam signature by
+- [x] **Step 1: Write the failing test** asserting the seam signature by
       `inspect.signature`, that the body raises `NotImplementedError`, and that every `*Out`
       list response is a `CursorPage` (G16).
-- [ ] **Step 2: Run it** → FAIL.
-- [ ] **Step 3: Implement.** Empty bodies, real return types.
-- [ ] **Step 4: Run it** → PASS. `.venv/bin/mypy app`.
-- [ ] **Step 5: Commit.** `feat(contract): W2 schemas and the ScheduleService seam`
+- [x] **Step 2: Run it** → FAIL.
+- [x] **Step 3: Implement.** Empty bodies, real return types.
+- [x] **Step 4: Run it** → PASS. `.venv/bin/mypy app`.
+- [x] **Step 5: Commit.** `feat(contract): W2 schemas and the ScheduleService seam`
 
 ## Task 3 — W2 i18n: schedule + people, he → en/ru
 
 **Files:** `web/packages/i18n/{he,en,ru}/{schedule,people}.ts`.
 
-- [ ] **Step 1:** Write `he/schedule.ts` and `he/people.ts` with real Hebrew drawn from the
+- [x] **Step 1:** Write `he/schedule.ts` and `he/people.ts` with real Hebrew drawn from the
       artboards (`9a` היום, `9b` בחירת תאריך, `3b` חניכים, `13a` דף נחיתה, `12j` הרשמה ראשונה).
-- [ ] **Step 2:** Mirror every key into `en/` and `ru/`.
-- [ ] **Step 3:** `node web/scripts/i18n-parity.mjs schedule && node web/scripts/i18n-parity.mjs people`
+- [x] **Step 2:** Mirror every key into `en/` and `ru/`.
+- [x] **Step 3:** `node web/scripts/i18n-parity.mjs schedule && node web/scripts/i18n-parity.mjs people`
       → no errors. `en` is `strict`, `ru` is `report`.
-- [ ] **Step 4: Commit.** `feat(i18n): schedule and people namespaces`
+- [x] **Step 4: Commit.** `feat(i18n): schedule and people namespaces`
 
 ## Task 4 — W3 contract: attendance + health models
 
@@ -182,15 +182,15 @@ New files, grouped by the task that creates them.
 > legitimately need to change scope; if they fail in a way that cannot be resolved without
 > editing an M1-owned test, **stop and report** rather than weakening them.
 
-- [ ] **Step 1: Write the failing test.** `attendance` has `UNIQUE(session_id, student_id)` **and**
+- [x] **Step 1: Write the failing test.** `attendance` has `UNIQUE(session_id, student_id)` **and**
       a second unique index on `client_mark_id` (§4.3, offline idempotency). Status includes
       `unmarked` as a real state (§5.14 — a report must never treat unmarked as absent).
       `answers_encrypted`/`signature_image_encrypted` are `EncryptedBytes`; `derived_flags` is
       JSONB holding booleans only.
-- [ ] **Step 2: Run it** → FAIL.
-- [ ] **Step 3: Implement.**
-- [ ] **Step 4: Run it** → PASS, plus `tests/invariants` and `tests/restrictions`.
-- [ ] **Step 5: Commit.** `feat(contract): W3 attendance and health models`
+- [x] **Step 2: Run it** → FAIL.
+- [x] **Step 3: Implement.**
+- [x] **Step 4: Run it** → PASS, plus `tests/invariants` and `tests/restrictions`.
+- [x] **Step 5: Commit.** `feat(contract): W3 attendance and health models`
 
 ## Task 5 — W3 contract: schemas + the two health seams
 
@@ -205,23 +205,23 @@ New files, grouped by the task that creates them.
 This is §1.3 seam 4 in data form: M5 renders both fields, M4 populates them, neither opens the
 other's file.
 
-- [ ] **Step 1: Write the failing test** asserting `RosterEntry` carries both fields, that
+- [x] **Step 1: Write the failing test** asserting `RosterEntry` carries both fields, that
       `derived_flags` rejects a non-boolean value (G7 — never free text), and the seam signature.
-- [ ] **Step 2: Run it** → FAIL.
-- [ ] **Step 3: Implement.** `BatchAttendanceIn` carries `client_mark_id` per mark.
-- [ ] **Step 4: Run it** → PASS. `.venv/bin/mypy app`.
-- [ ] **Step 5: Commit.** `feat(contract): W3 schemas, the roster seam and HealthService`
+- [x] **Step 2: Run it** → FAIL.
+- [x] **Step 3: Implement.** `BatchAttendanceIn` carries `client_mark_id` per mark.
+- [x] **Step 4: Run it** → PASS. `.venv/bin/mypy app`.
+- [x] **Step 5: Commit.** `feat(contract): W3 schemas, the roster seam and HealthService`
 
 ## Task 6 — W3 i18n: health + attendance
 
 **Files:** `web/packages/i18n/{he,en,ru}/{health,attendance}.ts`.
 
-- [ ] **Step 1:** Hebrew from `12c` הצהרת בריאות, `4e` מסמכים והצהרות, `1c`/`9f` נוכחות,
+- [x] **Step 1:** Hebrew from `12c` הצהרת בריאות, `4e` מסמכים והצהרות, `1c`/`9f` נוכחות,
       `12a` דיווח היעדרות. Include `⚠ הצהרת בריאות חסרה` and `שלח תזכורת להורה` — §5.5's
       staff surface is these strings.
-- [ ] **Step 2:** Mirror to `en`/`ru`.
-- [ ] **Step 3:** Parity per namespace.
-- [ ] **Step 4: Commit.** `feat(i18n): health and attendance namespaces`
+- [x] **Step 2:** Mirror to `en`/`ru`.
+- [x] **Step 3:** Parity per namespace.
+- [x] **Step 4: Commit.** `feat(i18n): health and attendance namespaces`
 
 ## Task 7 — `web/packages/core`: money, TDD
 
@@ -231,16 +231,16 @@ other's file.
 **Interfaces produced:** `formatAgorot(agorot: number, opts?): string` ·
 `parseShekels(text: string): number` (returns agorot) · `AGOROT_PER_SHEKEL`.
 
-- [ ] **Step 1: Write the failing test.** `formatAgorot(32000) === '320₪'`,
+- [x] **Step 1: Write the failing test.** `formatAgorot(32000) === '320₪'`,
       `formatAgorot(32050) === '320.50₪'`, `parseShekels('320.50') === 32050`. The critical
       case: **no float ever appears** — `parseShekels('0.29')` must be exactly `29`, because
       `Math.round(parseFloat('0.29') * 100)` is the bug this exists to prevent (G2).
       Negative amounts round-trip (a credit adjustment is a negative charge, §5.10).
       Rejects `'abc'`, `''`, and more precision than agorot.
-- [ ] **Step 2: Run it.** `npx vitest run web/packages/core/src/money.test.ts --reporter=dot` → FAIL.
-- [ ] **Step 3: Implement** with integer string arithmetic, never `parseFloat`.
-- [ ] **Step 4: Run it** → PASS.
-- [ ] **Step 5: Commit.** `feat(core): agorot formatting and parsing, integers only`
+- [x] **Step 2: Run it.** `npx vitest run web/packages/core/src/money.test.ts --reporter=dot` → FAIL.
+- [x] **Step 3: Implement** with integer string arithmetic, never `parseFloat`.
+- [x] **Step 4: Run it** → PASS.
+- [x] **Step 5: Commit.** `feat(core): agorot formatting and parsing, integers only`
 
 ## Task 8 — `web/packages/core`: datetime, TDD
 
@@ -249,17 +249,17 @@ other's file.
 **Interfaces produced:** `STUDIO_TIMEZONE = 'Asia/Jerusalem'` ·
 `formatInStudioZone(iso: string, locale: Locale, opts?): string` · `studioDayKey(iso): string`.
 
-- [ ] **Step 1: Write the failing test.** G3's real requirement: the **same instant renders as
+- [x] **Step 1: Write the failing test.** G3's real requirement: the **same instant renders as
       the same wall-clock time in `he`, `en` and `ru`** — only the numerals and separators may
       differ, never the hour. Cover the Israel DST boundary (last Friday of March / last Sunday
       of October) and an instant that falls on a different calendar day in UTC than in
       Jerusalem — `studioDayKey('2026-03-14T22:30:00Z')` is `2026-03-15`, and a session strip
       that got this wrong would show a class on the wrong day.
-- [ ] **Step 2: Run it** → FAIL.
-- [ ] **Step 3: Implement** on `Intl.DateTimeFormat` with an explicit `timeZone`, never the
+- [x] **Step 2: Run it** → FAIL.
+- [x] **Step 3: Implement** on `Intl.DateTimeFormat` with an explicit `timeZone`, never the
       host zone.
-- [ ] **Step 4: Run it** → PASS.
-- [ ] **Step 5: Commit.** `feat(core): UTC to Asia/Jerusalem rendering, locale-independent`
+- [x] **Step 4: Run it** → PASS.
+- [x] **Step 5: Commit.** `feat(core): UTC to Asia/Jerusalem rendering, locale-independent`
 
 ## Task 9 — `web/packages/core`: pagination + permissions, TDD
 
@@ -268,13 +268,13 @@ other's file.
 **Interfaces produced:** `CursorPage<T>`, `mergeCursorPages`, `hasNextPage` ·
 `can(actor, action, resource): boolean` built from §3.2's matrix.
 
-- [ ] **Step 1: Write the failing tests.** Pagination: merging pages dedupes by id and never
+- [x] **Step 1: Write the failing tests.** Pagination: merging pages dedupes by id and never
       reorders. Permissions: the row that matters is **a coach can never read a financial
       field** — invariant 3. A coach scoped to a group sees only that group's students (§3.2).
-- [ ] **Step 2: Run them** → FAIL.
-- [ ] **Step 3: Implement.**
-- [ ] **Step 4: Run them** → PASS. `npm --prefix web run typecheck`.
-- [ ] **Step 5: Commit.** `feat(core): cursor pagination and permission predicates`
+- [x] **Step 2: Run them** → FAIL.
+- [x] **Step 3: Implement.**
+- [x] **Step 4: Run them** → PASS. `npm --prefix web run typecheck`.
+- [x] **Step 5: Commit.** `feat(core): cursor pagination and permission predicates`
 
 ## Task 10 — `web/packages/ui`: MoneyDisplay + DateRangePicker
 
@@ -284,31 +284,31 @@ Modify `primitives/primitives.css` and `src/index.ts` (append only).
 > Only these two. `BeltBar`, `StatusChip`, `EmptyState` and `StudentRow` already exist and are
 > correct — `BeltBar` already carries D7's unconditional ring with no opt-out prop.
 
-- [ ] **Step 1: Write the failing tests.** `MoneyDisplay` renders through `formatAgorot`, takes a
+- [x] **Step 1: Write the failing tests.** `MoneyDisplay` renders through `formatAgorot`, takes a
       semantic tone bound to `--debt`/`--paid`/`--pending`/`--cancelled` (never a hex, G13), and
       the amount is never conveyed by colour alone (SC 1.4.1). `DateRangePicker` uses **logical
       properties only** (G12/D10) and renders correctly in both `he` and `en` — the repo's
       `testing.tsx` helper renders in both directions.
-- [ ] **Step 2: Run them** → FAIL.
-- [ ] **Step 3: Implement.** Leaf primitives only — no composite rows, no screens.
-- [ ] **Step 4: Run them** → PASS. `npm --prefix web run lint` (the D10 ESLint rule and stylelint).
-- [ ] **Step 5: Commit.** `feat(ui): MoneyDisplay and DateRangePicker leaf primitives`
+- [x] **Step 2: Run them** → FAIL.
+- [x] **Step 3: Implement.** Leaf primitives only — no composite rows, no screens.
+- [x] **Step 4: Run them** → PASS. `npm --prefix web run lint` (the D10 ESLint rule and stylelint).
+- [x] **Step 5: Commit.** `feat(ui): MoneyDisplay and DateRangePicker leaf primitives`
 
 ## Task 11 — W4 contract: billing, events and belts models
 
 **Files:** Create `app/models/billing.py`, `app/models/events.py`, `app/models/belts.py`. Test
 `tests/contracts/test_w4_models.py`.
 
-- [ ] **Step 1: Write the failing test.** **Every money column is `*_agorot` and `Integer`** —
+- [x] **Step 1: Write the failing test.** **Every money column is `*_agorot` and `Integer`** —
       assert it by reflection over the three modules, so invariant 1 has real columns to bite on
       (G2). `payment_order.public_ref` is a UUID with a unique index (§5.10 — a sequential id
       here lets anyone mark any tuition paid). `charge` has the §5.10 idempotency key
       `UNIQUE(enrollment_id, period_year, period_month, kind)` so a re-run creates no duplicates.
       `belt_rank.color_hex` is data, not a token (D3).
-- [ ] **Step 2: Run it** → FAIL.
-- [ ] **Step 3: Implement** all eleven billing tables plus events and belts.
-- [ ] **Step 4: Run it** → PASS, plus `tests/invariants`.
-- [ ] **Step 5: Commit.** `feat(contract): W4 billing, events and belts models`
+- [x] **Step 2: Run it** → FAIL.
+- [x] **Step 3: Implement** all eleven billing tables plus events and belts.
+- [x] **Step 4: Run it** → PASS, plus `tests/invariants`.
+- [x] **Step 5: Commit.** `feat(contract): W4 billing, events and belts models`
 
 ## Task 12 — W4 contract: schemas + the two BillingService seams
 
@@ -453,12 +453,31 @@ where `IpnVerdict` is `success | amount_mismatch | forged_ref | duplicate`.
 - [ ] **Step 2:** Note in each header that it is a draft, not a revision.
 - [ ] **Step 3: Commit.** `docs(plan): migration drafts for W2–W5, one per wave`
 
-## Task 20 — Full-suite verification
+## Task 20 — Verification
 
-- [ ] `.venv/bin/pytest -q`
+> **The gate is narrower than `pytest -q`, and deliberately so** (decided 2026-08-25 —
+> see § Session log, deviation 1). This branch adds ~30 tables to `Base.metadata` and
+> cannot create the Alembic revision that would put them in the database: `main` owns
+> `alembic/versions/**` and `.claude/hooks/block-protected.sh` refuses the edit. Task 19
+> writes drafts instead. So every test that reflects metadata against a live database is
+> red here **by construction**, and stays red until `main` lands the per-wave revisions.
+> A gate that cannot go green is not a gate — it is a thing people learn to ignore.
+>
+> Run the scoped commands below. Then confirm the residue is *only* the known set, so a
+> genuine new breakage cannot hide inside it.
+
+- [ ] `.venv/bin/pytest tests/contracts tests/invariants tests/restrictions tests/structure tests/upay -q`
+- [ ] `cd web && npx vitest run --reporter=dot` — from `web/`, not the repo root: these
+      specs resolve fixture paths from `cwd`, and `--root web` from above makes six files
+      fail on ENOENT that pass from inside.
 - [ ] `npm --prefix web run typecheck && .venv/bin/mypy app`
-- [ ] `.venv/bin/ruff check --fix app && .venv/bin/ruff format app && npm --prefix web run lint`
+- [ ] `.venv/bin/ruff check --fix app tests && .venv/bin/ruff format app tests && npm --prefix web run lint`
 - [ ] `for ns in schedule people health attendance billing events comms reports; do node web/scripts/i18n-parity.mjs $ns; done`
+- [ ] `.venv/bin/pytest -q` **for the count only.** Expected residue at the end of this
+      plan: the `tests/dev/**` family plus
+      `test_alembic_baseline.py::test_the_migrations_match_the_models` (the migration
+      gap), and the five failures inherited from `fad71db` listed in deviation 4. Any
+      failure outside that set is this session's, and is a real one.
 
 ---
 
@@ -473,3 +492,59 @@ where `IpnVerdict` is `success | amount_mismatch | forged_ref | duplicate`.
 - **Known deviations from the milestone plan's letter**, all forced and all recorded above:
   `belts.ts`/`privacy.ts` namespaces do not exist and cannot be added; uPay has no HMAC; four of
   five named primitives already exist.
+
+
+---
+
+## Session log
+
+Written by the session that resumed this plan on 2026-08-25 from an uncommitted Task 11.
+Tasks 1–11 were already done, in seven commits from `b917227` to `833365d`, with no
+checkbox ticked — the commit log was the only progress record. The boxes above now match
+the commits.
+
+| Tasks | Commit |
+|---|---|
+| 1–2 · W2 models, schemas, ScheduleService seam | `fc259e2` (+ `449f713`, PEP 695 refactor) |
+| 3 · W2 i18n | `6d52563` |
+| 4–5 · W3 models, schemas, health seams | `5d6caf2` |
+| 6 · W3 i18n | `1cea2e9` |
+| 7–9 · core: money, datetime, pagination, permissions | `bb2923e` |
+| 10 · ui: MoneyDisplay, DateRangePicker | `833365d` |
+| 11 · W4 billing, events, belts models | `c23e3e8` |
+
+### Deviations and findings
+
+**1. Task 20's gate is scoped, not full-suite.** Rewritten above with the reasoning.
+Approved by the repo owner rather than assumed.
+
+**2. Invariant 1 was red from `fc259e2` onward, for six commits** — `9d18139`. Task 1
+Step 4 says to run `tests/invariants`; the result went unread. Two columns tripped the
+money-naming rule and neither is money: `enrollment.price_plan_id` is a reference, and
+`upay_ipn_record.amount` is uPay's inbound rendering kept as evidence. The detector was
+made narrower in two named ways, each paired with a test proving it still fires on what
+the narrowing does not cover. It was **not** weakened into silence.
+
+**3. Two M1 boundary markers were retired** — `f1005c5`. Both asserted "not built yet"
+about tables this plan builds on purpose, and both named their own expiry in their
+docstrings. This is the plan's own C3 note firing exactly as predicted; the removal was
+reported and approved, and a comment stands where each test did. G7's live protection is
+unchanged and is enumerated in that commit message.
+
+**4. Five failures pre-date this branch entirely.** At the fork point `fad71db` — the W1
+session's tip, before any contract work — the suite already had these, and they are
+**not** the migration gap:
+
+- `tests/identity/test_auth_context.py` — four failures. Pure middleware and JWT, no
+  database involved. Belongs to whoever owns M1.
+- `tests/core/test_alembic_baseline.py::test_the_demo_studio_row_exists_after_migration`
+
+They are not this plan's to fix — `web/apps/**` and M1's identity code are outside the
+ownership boundary — but they should reach the W1 session rather than sit here unmentioned.
+
+**5. A real bug, found and fixed in Task 11** — `c23e3e8`. `payment` and
+`upay_ipn_record` reference each other and both directions are §4.3 columns, so the cycle
+is real. Unresolved, SQLAlchemy drops both constraints from its topological sort, which
+left `DemoStudioService.wipe_plan()` deleting those two tables in an arbitrary order and
+would have emitted `CREATE TABLE` in an order Postgres rejects. `use_alter` on the
+reconciliation side, with an explicit constraint name so Alembic can drop it.
