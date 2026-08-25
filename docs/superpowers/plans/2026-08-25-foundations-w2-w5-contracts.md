@@ -449,9 +449,9 @@ where `IpnVerdict` is `success | amount_mismatch | forged_ref | duplicate`.
 > `main` owns `alembic/versions/**` and a hook blocks the edit. Each draft still has to become a
 > **real revision on main, one per wave, chained in order** — W2 → W3 → W4 → W5.
 
-- [ ] **Step 1:** Write the four drafts, each naming its `down_revision` as the previous wave's.
-- [ ] **Step 2:** Note in each header that it is a draft, not a revision.
-- [ ] **Step 3: Commit.** `docs(plan): migration drafts for W2–W5, one per wave`
+- [x] **Step 1:** Write the four drafts, each naming its `down_revision` as the previous wave's.
+- [x] **Step 2:** Note in each header that it is a draft, not a revision.
+- [x] **Step 3: Commit.** `docs(plan): migration drafts for W2–W5, one per wave`
 
 ## Task 20 — Verification
 
