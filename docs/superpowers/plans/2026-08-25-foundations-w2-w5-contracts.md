@@ -359,7 +359,7 @@ fees are a pure caller of `create_charge`.
 `verify_ipn(payload, *, expected_amount_agorot, known_public_ref, seen_transaction_ids) -> IpnVerdict`
 where `IpnVerdict` is `success | amount_mismatch | forged_ref | duplicate`.
 
-- [ ] **Step 1: Write four failing tests, one per §5.10 security case**, each built from
+- [x] **Step 1: Write four failing tests, one per §5.10 security case**, each built from
       `ipn.build_ipn_query(shape=...)` so the simulator and the parser are tested against the
       same bytes:
       - `success` → verdict `SUCCESS`, amount parses to exactly `expected_amount_agorot`.
@@ -371,12 +371,12 @@ where `IpnVerdict` is `success | amount_mismatch | forged_ref | duplicate`.
       parser reading either must reach the same verdict; and a whole-shekel `amount=1` must
       **not** be a mismatch against `1.00` — that regression would fire a fraud alert on every
       correct payment in the product.
-- [ ] **Step 2: Run them.** `.venv/bin/pytest tests/upay/test_callback.py -q` → FAIL.
-- [ ] **Step 3: Implement.** Parse into dataclasses, no models. Compare **integers** via
+- [x] **Step 2: Run them.** `.venv/bin/pytest tests/upay/test_callback.py -q` → FAIL.
+- [x] **Step 3: Implement.** Parse into dataclasses, no models. Compare **integers** via
       `agorot_from_ipn_amount`, never strings. An unrecognised amount format raises rather than
       coercing. Source IP is a returned signal field, **never a gate**.
-- [ ] **Step 4: Run them** → PASS. `.venv/bin/mypy app`.
-- [ ] **Step 5: Commit.** `feat(upay): IPN parsing and the four §5.10 security verdicts`
+- [x] **Step 4: Run them** → PASS. `.venv/bin/mypy app`.
+- [x] **Step 5: Commit.** `feat(upay): IPN parsing and the four §5.10 security verdicts`
 
 ## Task 15 — W5 contract: comms + reports models, schemas, NotificationService seam
 
