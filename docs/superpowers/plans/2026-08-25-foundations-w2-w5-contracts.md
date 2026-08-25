@@ -400,9 +400,9 @@ where `IpnVerdict` is `success | amount_mismatch | forged_ref | duplicate`.
 
 **Files:** `web/packages/i18n/{he,en,ru}/{comms,reports}.ts`.
 
-- [ ] **Step 1:** Hebrew from `2b` עדכוני מועדון (**D9.1** — inbox only, **no chat strings**),
+- [x] **Step 1:** Hebrew from `2b` עדכוני מועדון (**D9.1** — inbox only, **no chat strings**),
       `4f` הודעות, `4g` דוחות. **Privacy strings go into `reports.ts` under `privacy.*`.**
-- [ ] **Step 2:** Mirror to `en`/`ru`. **Step 3:** Parity. **Step 4: Commit.**
+- [x] **Step 2:** Mirror to `en`/`ru`. **Step 3:** Parity. **Step 4: Commit.**
       `feat(i18n): comms and reports namespaces, privacy under reports.privacy.*`
 
 ## Task 17 — `e2e/`: SPEC §13's five flows as specs
