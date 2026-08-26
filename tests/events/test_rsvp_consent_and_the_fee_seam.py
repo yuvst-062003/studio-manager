@@ -1,16 +1,16 @@
 """§5.8's three-way tie: the RSVP, the consent, and the fee that becomes a charge.
 
-**The seam is asserted by how it is CALLED, not by what it returns.** `create_charge` is
-still `NotImplementedError` on `main` -- lane MONEY fills it in -- so every test here
-substitutes a recording double and asserts the call shape. That is the stronger assertion
-anyway: `student_id` and `event_id` are keyword-only precisely because both are
-`UUID | None` in adjacent positions, so a positional call would bind an event id to
-`student_id` and no type checker would see it. A test that only checked a return value
-would pass on exactly that bug.
+**The seam runs the REAL `BillingService` now.** Lane MONEY has landed, so the recording
+double that stood in for `create_charge` is gone -- `billing` is a spy that records the
+call and then delegates to the real method, which writes a real `charge` row on the
+request's own session. Both halves are asserted: the call shape, and the row.
 
-The double is a real class with the real signature rather than a `MagicMock`, for the same
-reason: a mock accepts a positional `event_id` happily, which is the one mistake this seam
-was shaped to make unspellable.
+The call shape is still asserted directly rather than inferred from the row, because
+`student_id` and `event_id` are keyword-only precisely because both are `UUID | None` in
+adjacent positions -- a positional call would bind an event id to `student_id` and no type
+checker would see it. The spy declares the real signature rather than `*args, **kwargs`
+for that reason: a positional call raises `TypeError` here, in the test, where it is
+visible.
 
 **Confirmation is derived, not stored** (§5.8): an RSVP does not count as confirmed until
 the parent signs, so `rsvp='yes'` is always recorded and the charge waits for the pair.
@@ -21,6 +21,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass, field
 from datetime import date
+from types import SimpleNamespace
 
 import pytest
 from app.models.billing import Charge
@@ -28,34 +29,28 @@ from app.models.events import Event
 from app.models.health import ConsentRecord
 from app.models.people import Enrollment, Student
 from app.models.person import Person
+from app.services.billing import BillingService
 from sqlalchemy import select
-from sqlalchemy.orm import Session
 from tests.events.conftest import EVENT_FEE_AGOROT, T0, YEAR_STARTS
 
 
 @dataclass
 class RecordingBilling:
-    """A stand-in for `BillingService` with `create_charge`'s real signature.
+    """A recording spy over the **real** `BillingService`.
 
-    Keyword-only `student_id` and `event_id`, exactly as the contract declares them: a
-    positional call raises `TypeError` here, in the test, where it is visible. A
-    `MagicMock` would accept one happily, which is the single mistake this seam was shaped
-    to make unspellable.
+    It declares `create_charge`'s real signature -- keyword-only `student_id` and
+    `event_id`, exactly as the contract does -- so a positional call raises `TypeError`
+    here rather than binding an event id to `student_id` in silence. A `MagicMock` would
+    accept one happily, which is the single mistake this seam was shaped to make
+    unspellable.
 
-    **It writes a real `charge` row, and that is not this lane writing a billing table.**
-    It is the double doing what the method it replaces does.
-    `fk_event_registration_charge_id_charge` means Postgres rejects a fabricated id, so a
-    double that returned one could never prove `charge_id` is persisted at all -- and that
-    is the guarantee worth having. The rule the plan states is about M7's production code,
-    and `app/services/events/**` still contains no billing write: `tests/events/conftest.py`
-    is still free of any charge fixture, and `a_registered_student` still starts null.
-
-    The row is deliberately minimal -- the columns `charge` cannot be inserted without.
-    Nothing here models M6's proration, its idempotency key or its status derivation. When
-    lane MONEY lands, this double is deleted rather than kept in step with it.
+    It records, then delegates. Nothing is faked: the charge row is written by M6's own
+    method, on the request's own session, under the request's own studio scope. That is
+    what makes this a test of the two lanes together rather than of M7 against a
+    stand-in -- W4's merge is the first time either half has met the other.
     """
 
-    session: Session
+    inner: BillingService
     calls: list[dict] = field(default_factory=list)
 
     def create_charge(
@@ -80,28 +75,31 @@ class RecordingBilling:
                 "event_id": event_id,
             }
         )
-        row = Charge(
-            studio_id=studio_id,
-            payer_person_id=payer_person_id,
+        return self.inner.create_charge(
+            studio_id,
+            payer_person_id,
+            kind,
+            amount_agorot,
+            due_date,
             student_id=student_id,
-            kind=kind,
-            amount_agorot=amount_agorot,
-            due_date=due_date,
-            status="open",
-            created_by="event",
+            event_id=event_id,
         )
-        # Its own session, committed immediately: the row has to exist before the request's
-        # flush writes `charge_id` and Postgres checks the foreign key.
-        self.session.add(row)
-        self.session.commit()
-        return row
 
 
 @pytest.fixture
-def billing(monkeypatch, app_session):
-    double = RecordingBilling(session=app_session)
-    monkeypatch.setattr("app.services.events.fees.BillingService", lambda: double, raising=True)
-    return double
+def billing(monkeypatch):
+    """Substitutes the spy for the class, sharing one `calls` list across constructions.
+
+    `charge_if_confirmed` builds a `BillingService(session)` per call, so the factory has
+    to hand back a fresh spy each time while `calls` accumulates for the whole test.
+    """
+    calls: list[dict] = []
+    monkeypatch.setattr(
+        "app.services.events.fees.BillingService",
+        lambda session: RecordingBilling(inner=BillingService(session), calls=calls),
+        raising=True,
+    )
+    return SimpleNamespace(calls=calls)
 
 
 def test_a_guardian_answers_for_their_own_child(
@@ -455,3 +453,53 @@ def test_attendance_is_recorded_against_the_event_and_touches_no_charge(
     # attended is distinct from rsvp: saying yes and turning up are different facts, and
     # §5.8's post-event report is about the second one.
     assert row.rsvp == "pending"
+
+
+def test_the_fee_becomes_a_real_charge_row_in_m6s_ledger(
+    client, app_session, as_guardian_of, a_student, studio, an_event, a_registered_student, billing
+):
+    """W4's merge seam, asserted on the row rather than on the call.
+
+    Both lanes tested this boundary against a stand-in -- MONEY against no caller, EVENTS
+    against a double -- so until the two were merged nobody had run M7's fee through M6's
+    real `create_charge`. This is that test: a confirmed RSVP puts an actual `charge` in
+    the ledger, and `event_registration.charge_id` resolves to it.
+
+    `period_year` and `period_month` are NULL on purpose (D-M6-8): only `tuition` and
+    `registration` are periodic, and the partial unique index that makes the monthly run
+    idempotent is written with a `postgresql_where` that skips the rest. An event fee that
+    carried a period would collide with the tuition charge for the same student and month.
+    """
+    from app.models.events import EventRegistration
+
+    parent = as_guardian_of(a_student)
+    client.post(
+        f"/api/v1/events/{an_event}/rsvp",
+        headers=parent.headers,
+        json={"student_id": str(a_student), "rsvp": "yes"},
+    )
+    response = client.post(
+        f"/api/v1/events/{an_event}/consent",
+        headers=parent.headers,
+        json={"student_id": str(a_student)},
+    )
+    assert response.status_code == 200, response.text
+
+    app_session.expire_all()
+    # Scoped to this studio: `app_session` is not the tenant-filtered session, and every
+    # test in this file commits, so an unscoped `select(Charge)` reads the whole database.
+    charge = (
+        app_session.execute(select(Charge).where(Charge.studio_id == studio.id)).scalars().one()
+    )
+    assert charge.kind == "event"
+    assert charge.amount_agorot == EVENT_FEE_AGOROT
+    assert charge.payer_person_id == parent.person_id
+    assert charge.student_id == a_student
+    assert charge.status == "open"
+    # M6 derives this from the kind, so it is the ledger agreeing the charge came from M7.
+    assert charge.created_by == "event"
+    assert charge.period_year is None and charge.period_month is None
+
+    # The FK actually resolves -- the row the registration points at is the row above.
+    registration = app_session.get(EventRegistration, a_registered_student)
+    assert registration.charge_id == charge.id

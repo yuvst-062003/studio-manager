@@ -326,9 +326,13 @@ def test_a_failure_in_settlement_never_discards_the_raw_callback(
 
     assert response.status_code == 200
     tenant_session.expire_all()
-    record = tenant_session.execute(
-        select(UpayIpnRecord).where(UpayIpnRecord.transactionid == _txn(order, "BOOM"))
-    ).scalars().one()
+    record = (
+        tenant_session.execute(
+            select(UpayIpnRecord).where(UpayIpnRecord.transactionid == _txn(order, "BOOM"))
+        )
+        .scalars()
+        .one()
+    )
     assert record.raw_query, "the verbatim bytes are the whole point of the row"
     assert record.match_status == "unmatched", "nothing was settled, so nothing is matched"
     # Untouched: settlement never ran.

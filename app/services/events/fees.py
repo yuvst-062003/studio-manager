@@ -96,7 +96,7 @@ class EventFeeService:
             )
             return None
 
-        charge = BillingService().create_charge(
+        charge = BillingService(session).create_charge(
             studio_id=require_current_studio_id(),
             payer_person_id=payer_person_id,
             kind="event",
