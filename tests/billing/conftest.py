@@ -893,3 +893,41 @@ def a_demo_tenant_session(a_demo_studio: Studio) -> Iterator[TenantSession]:
         TenantSession(bind=get_engine(), expire_on_commit=False) as scoped,
     ):
         yield scoped
+
+
+@dataclass
+class OrderedCharges:
+    """A `payment_order` and the charges it covers, so an IPN test can assert on both."""
+
+    order: object
+    charge_ids: tuple[uuid.UUID, ...]
+
+
+@pytest.fixture
+def an_order(app_session: Session, studio: Studio, a_priced_student: PricedStudent, an_open_charge):
+    """One pending order over one open tuition charge, at MONTHLY_AGOROT.
+
+    Built through `OrderService` rather than by hand: a hand-made order would carry no
+    `payment_order_charge` rows, and the settlement path reads exactly those -- so the IPN
+    tests would pass against an order that could never settle anything in production.
+    """
+    from app.core.db import get_engine
+    from app.services.billing.orders import OrderService
+
+    with (
+        use_studio(studio.id),
+        TenantSession(bind=get_engine(), expire_on_commit=False) as scoped,
+    ):
+        service = OrderService(scoped)
+        order = service.create(
+            studio.id,
+            payer_person_id=a_priced_student.payer_person_id,
+            charge_ids=[an_open_charge],
+            max_payments=1,
+            at=T0,
+        )
+        charge_ids = tuple(service.charge_ids_of(order.id))
+        scoped.commit()
+        scoped.refresh(order)
+        scoped.expunge(order)
+    return OrderedCharges(order=order, charge_ids=charge_ids)

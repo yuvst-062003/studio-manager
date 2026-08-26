@@ -135,6 +135,33 @@ or not it lands, **Task 5's `OrderService.form_fields` raises when the merchant 
 missing or blank** — refusing to build a form is always better than building one that charges
 nobody, and that check lives in a file this lane owns.
 
+**D-M6-13 — §19.5's IPN simulator never delivers, and cannot. Two bugs, both in
+`app/routers/dev.py` (the core lane's file).** ⚠ *Blocks E2E-3 and E2E-4.*
+
+Found in Task 6, once `GET /webhooks/upay/{public_ref}` was mounted and the simulator
+should have started working "with no change here", as its own docstring promises.
+
+1. **The mounted check can never match.** `simulate_ipn` builds
+   `path = f"/api/v1/webhooks/upay/{body.order_public_ref}"` — a **concrete** UUID — and
+   tests `path in request.app.openapi()["paths"]`, whose keys are **templated**
+   (`/api/v1/webhooks/upay/{public_ref}`). Verified: concrete `in paths` is `False`,
+   templated is `True`. So `delivered` is `false` forever and the note keeps naming M6 as
+   unlanded, which is the exact failure mode the docstring says the OpenAPI check was
+   chosen to avoid.
+2. **Nothing is delivered even when the check passes.** The handler computes `mounted`,
+   picks a `note`, and returns the query. It never issues the GET. `delivered: true` would
+   therefore be a claim rather than an action.
+
+Both matter to this lane specifically: §19.5 calls the simulator "the important one", and
+W4's exit gate — E2E-3 and E2E-4 — is meant to be driven from it. `tests/dev/test_ipn_
+simulator.py::test_the_endpoint_reports_honestly_that_m6_has_not_landed` still passes and
+its docstring says going red is "the signal to delete it"; it will never go red.
+
+The fix is a few lines in `app/routers/dev.py` plus that test. **Not this lane's file**, and
+this lane already stepped outside its boundary once for the clock middleware, so it is
+recorded rather than done. The lane's own coverage does not depend on it:
+`tests/upay/test_webhook.py` drives all four shapes straight at the endpoint.
+
 ---
 
 ## File structure

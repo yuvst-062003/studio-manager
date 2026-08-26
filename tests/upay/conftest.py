@@ -27,6 +27,7 @@ from tests.billing.conftest import (  # noqa: F401 -- re-exported for pytest to 
     a_priced_student,
     a_two_child_family,
     an_open_charge,
+    an_order,
     as_manager,
     studio,
     tenant_session,

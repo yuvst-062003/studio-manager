@@ -126,6 +126,18 @@ SESSION_DEP_ALLOWLIST: dict[str, str] = {
         "app/core/auth_context.py puts it on request.state, and every OTHER router "
         "takes TenantSessionDep and fails closed on it."
     ),
+    "webhooks.py": (
+        "GET /webhooks/upay/{public_ref} is SPEC 12's consequence: uPay calls it, so it "
+        "is unauthenticated by necessity and there is no `sid` to resolve a studio from. "
+        "TenantSessionDep fails closed and would 401 every real payment in the club. The "
+        "unscoped session is used for exactly ONE read -- the payment_order carrying that "
+        "public_ref -- and 5.10 makes that reference a UUIDv4 precisely so knowing one is "
+        "the same as being authorised for it: `uq_payment_order_public_ref` is globally "
+        "unique, so the lookup cannot return another studio's row by accident. Every "
+        "write that follows happens inside use_studio(order.studio_id), so the rows are "
+        "stamped and guarded exactly as on any other route. This is the only route in "
+        "the file."
+    ),
     "trial_bookings.py": (
         "One route in this file -- POST /trial-bookings/self -- is SPEC 6.1's single "
         "self-service entry point: 'booking a trial creates the guardian row itself'. The "

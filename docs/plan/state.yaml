@@ -254,6 +254,10 @@ waves:
         title: uPay payment orders, the double-payment guard and the form
         status: shipped
         on: 2026-08-26
+      - id: M6.6
+        title: The uPay IPN endpoint — persist, 200, then settle
+        status: shipped
+        on: 2026-08-26
   - id: W5
     milestone: M8 ∥ M9
     title: Communication ∥ Reports and privacy completion
