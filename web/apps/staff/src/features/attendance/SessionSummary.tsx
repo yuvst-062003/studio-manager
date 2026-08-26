@@ -72,7 +72,10 @@ export function SessionSummary({
 
       <Card caption={t(locale, 'schedule.note.title')}>
         <TextField
-          label={t(locale, 'schedule.note.title')}
+          // The card's caption is already `schedule.note.title`; labelling the field with
+          // the same string gives the screen two elements with one accessible name, which
+          // is ambiguous to a screen reader and to `getByLabelText` alike.
+          label={t(locale, 'schedule.note.add')}
           onChange={(event) => setNote(event.target.value)}
           placeholder={t(locale, 'schedule.note.placeholder')}
           value={note}

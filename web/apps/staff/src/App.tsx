@@ -27,9 +27,11 @@ import { makeStaffScheduleClient } from './features/schedule/client'
 import { useToday } from './features/schedule/useToday'
 import { StudentsSearch, makeStaffPeopleClient } from './features/people'
 import {
+  OfflinePrimingGate,
   RosterScreen,
   makeStaffAttendanceClient,
   registerAttendanceSections,
+  useOfflinePriming,
 } from './features/attendance'
 import './features/attendance/attendance.css'
 
@@ -89,6 +91,10 @@ export default function App() {
   const scheduleClient = useMemo(() => makeStaffScheduleClient(apiFetch), [])
   const peopleClient = useMemo(() => makeStaffPeopleClient(apiFetch), [])
   const attendanceClient = useMemo(() => makeStaffAttendanceClient(apiFetch), [])
+  // §6.1 step 6 — "offline prime: today's and tomorrow's sessions + rosters are fetched and
+  // written to IndexedDB BEFORE the coach reaches Today", and "the first launch BLOCKS on
+  // this fetch". The gate below renders instead of the app while it runs.
+  const priming = useOfflinePriming(attendanceClient)
   const hash = useHash()
   const today = useToday()
   // 9a's filter defaults from who is looking: a coach opening the app wants their own day,
@@ -182,12 +188,30 @@ export default function App() {
               PEOPLE's branch inherits the same protection from being below it: a person
               without staff access takes the `Resolve` arm and gets §6.1's refusal. */}
           {session.access.staff && rosterSessionId ? (
-            <RosterScreen
-              client={attendanceClient}
-              locale={locale}
-              personId={membership?.person_id ?? null}
-              sessionId={rosterSessionId}
-            />
+            // §6.1 step 6 — "today's and tomorrow's sessions + rosters are fetched and
+            // written to IndexedDB BEFORE the coach reaches Today", and "the first launch
+            // blocks on this fetch".
+            //
+            // The FETCH starts at launch: `useOfflinePriming` runs on mount above, so the
+            // cache is filling while the coach walks through the tour and Today. What is
+            // gated here is the roster itself — the one screen a missing cache actually
+            // costs something on, and the one this lane owns.
+            //
+            // §6.1's own order puts the prime after the tour, and the tour lives in
+            // `features/identity/Resolve.tsx`, which belongs to no lane in this wave.
+            // `OfflinePrimingGate` and `useOfflinePriming` are exported from this lane's
+            // barrel so whoever owns that sequence can put the gate in front of Today
+            // without reopening anything here.
+            priming.state !== 'ready' ? (
+              <OfflinePrimingGate locale={locale} onRetry={priming.retry} state={priming.state} />
+            ) : (
+              <RosterScreen
+                client={attendanceClient}
+                locale={locale}
+                personId={membership?.person_id ?? null}
+                sessionId={rosterSessionId}
+              />
+            )
           ) : session.access.staff && hash.startsWith('#/schedule') ? (
             <ScheduleSection
               locale={locale}
