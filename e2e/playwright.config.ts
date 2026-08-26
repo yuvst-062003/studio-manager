@@ -59,13 +59,24 @@ import { API_ORIGIN, ORIGINS } from './origins'
  *    projects can express; the second one has to be absolute. `./origins.ts` holds them so
  *    the rewrite has one place to read them from.
  *
- * 2. **Every spec currently runs in all three projects** — `testDir` is this directory and
- *    no project narrows it, so the five files are collected three times. That is 45 skips
- *    today and would be 45 *runs* the moment the bodies are un-gated. It is left wrong on
- *    purpose: the flows are named for journeys rather than apps, so no filename filter
- *    splits them correctly, and guessing one now would bake a wrong assumption into the
- *    file the harness session is about to rewrite. Narrowing belongs in that session,
- *    with the bodies in front of it.
+ * 2. **Each spec now runs in exactly one project**, which is the decision the contract
+ *    commit deferred to this session. It was right to defer: the flows are named for
+ *    journeys rather than apps, so no filename filter splits them, and the thing that does
+ *    split them is only visible with the bodies in front of you — **whose surface the
+ *    flow's actor is on**.
+ *
+ *    | Spec | Project | Why |
+ *    |---|---|---|
+ *    | `01-registration-to-active` | `parent` | It starts with a stranger on the public landing, and §6.1 walks that funnel on a phone. |
+ *    | `02-offline-attendance`     | `staff`  | The actor is a coach on the mat. |
+ *    | `03-upay-happy-path`        | `parent` | A parent choosing months and pressing pay. |
+ *    | `04-forged-ipn`             | `dashboard` | The assertions are the manager's ledger, the IPN log and the alert centre. |
+ *    | `05-schedule-change`        | `dashboard` | A manager changing a group's rules. |
+ *
+ *    Fifteen runs instead of forty-five, and each test runs under the device profile the
+ *    person in it is actually holding. The other apps a flow touches are reached by
+ *    absolute `ORIGINS`, which is what finding 1 above is about — so narrowing costs no
+ *    coverage, it only stops walking each journey three times to learn the same thing.
  *
  * The mobile profile is on `parent` alone: §6.1 walks flow 1 on a phone and §6.5 ships the
  * parent app as a phone product. The staff app is *also* used on a phone, on the mat — that
@@ -137,17 +148,21 @@ export default defineConfig({
     {
       //: Managers + coaches. Desktop until someone decides otherwise — see the docstring.
       name: 'staff',
+      testMatch: /02-offline-attendance\.spec\.ts$/,
       use: { ...devices['Desktop Chrome'], baseURL: ORIGINS.staff },
     },
     {
       //: §6.1 and §6.5 — the parent app is a phone product and flow 1 is walked on one.
       //: A registration funnel that only works at 1440px is a funnel that leaks.
       name: 'parent',
+      testMatch: /0(1-registration-to-active|3-upay-happy-path)\.spec\.ts$/,
       use: { ...devices['Pixel 7'], baseURL: ORIGINS.parent },
     },
     {
-      //: Manager web. The one surface that genuinely is a desktop product.
+      //: Manager web. The one surface that genuinely is a desktop product. It also carries
+      //: the two fixture specs, which address the API rather than any one app.
       name: 'dashboard',
+      testMatch: /(0(4-forged-ipn|5-schedule-change)|fixtures\/(fixtures|scenario))\.spec\.ts$/,
       use: { ...devices['Desktop Chrome'], baseURL: ORIGINS.dashboard },
     },
   ],
