@@ -23,6 +23,7 @@ import {
   ParentEventsScreen,
   makeParentEventsClient,
 } from './features/events'
+import { BeltProgressScreen, makeParentBeltsClient } from './features/belts'
 import { AddSibling, makePeopleClient } from './features/people'
 
 const NAV = [
@@ -79,6 +80,7 @@ export default function App() {
   const landingClient = useMemo(() => makeLandingClient(apiFetch), [])
   const peopleClient = useMemo(() => makePeopleClient(apiFetch), [])
   const eventsClient = useMemo(() => makeParentEventsClient(apiFetch), [])
+  const beltsClient = useMemo(() => makeParentBeltsClient(apiFetch), [])
   const hash = useHash()
   const today = useToday()
   // §5.4(c)'s add-a-sibling is one hash away from home. Hash and not a path: it is an
@@ -94,6 +96,9 @@ export default function App() {
   // competition has two answers to give, and an event id alone cannot say which.
   const onEvents = hash === '#/events'
   const invite = hash.startsWith('#/events/') ? hash.slice('#/events/'.length).split('/') : []
+  // 12d, per child per class: a ladder belongs to a class (§5.9), so a child who trains
+  // in two disciplines has two progressions to look at.
+  const belts = hash.startsWith('#/belts/') ? hash.slice('#/belts/'.length).split('/') : []
 
   useEffect(() => {
     const onPrompt = (event: Event): void => {
@@ -189,6 +194,13 @@ export default function App() {
             />
           ) : addingChild ? (
             <AddSibling locale={locale} client={peopleClient} />
+          ) : belts.length === 2 ? (
+            <BeltProgressScreen
+              classId={belts[1]!}
+              client={beltsClient}
+              locale={locale}
+              studentId={belts[0]!}
+            />
           ) : invite.length === 2 ? (
             <EventInviteScreen
               client={eventsClient}
