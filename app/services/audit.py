@@ -10,6 +10,7 @@ Postgres permission error in production.
 
 from __future__ import annotations
 
+import ipaddress
 import uuid
 from typing import Any
 
@@ -17,6 +18,32 @@ from sqlalchemy import event
 from sqlalchemy.orm import Session
 
 from app.models.audit import AuditLog
+
+
+def _storable_ip(value: str | None) -> str | None:
+    """``audit_log.actor_ip`` is ``INET``; a caller has whatever the request had.
+
+    Routers pass ``request.client.host``, which is not guaranteed to be an address --
+    under Starlette's ``TestClient`` it is the literal ``testclient``, a proxy that could
+    not resolve a peer sends ``unknown``, and an ASGI scope with no client yields nothing
+    at all. Postgres rejects each of them, and the failed INSERT fails the audited action
+    around it.
+
+    §11.2 wants the trail to be reliable, so the address gives way rather than the entry:
+    the address is context, the entry is the record. Dropping it is visible (the column is
+    NULL) in a way a lost row is not.
+
+    Found by lane HEALTH (M4) writing §11.2's every-read entry. It lives here rather than
+    in a router because this is the one function every lane funnels through, and two lanes
+    each carrying their own ``_client_ip`` helper is how one of them gets it subtly wrong.
+    """
+    if value is None:
+        return None
+    try:
+        ipaddress.ip_address(value)
+    except ValueError:
+        return None
+    return value
 
 
 class AuditLogImmutableError(RuntimeError):
@@ -43,6 +70,9 @@ class AuditService:
         ``diff`` is written verbatim, so a caller must never put a health declaration's
         contents in it (G7). Pass the derived booleans or the names of the fields that
         changed -- never the answers.
+
+        ``actor_ip`` is sanitised rather than trusted -- see ``_storable_ip``. A caller may
+        hand over ``request.client.host`` without checking it first.
         """
         entry = AuditLog(
             action=action,
@@ -51,7 +81,7 @@ class AuditService:
             studio_id=studio_id,
             actor_person_id=actor_person_id,
             actor_identity_id=actor_identity_id,
-            actor_ip=actor_ip,
+            actor_ip=_storable_ip(actor_ip),
             is_sensitive=is_sensitive,
             diff=diff,
         )

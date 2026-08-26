@@ -162,3 +162,68 @@ def test_the_entity_lookup_index_leads_with_studio_id(migrated: Engine):
     indexes = inspect(migrated).get_indexes("audit_log")
     leading = {tuple(i["column_names"])[0] for i in indexes}
     assert "studio_id" in leading, indexes
+
+
+# -- actor_ip is INET, and callers hand it whatever the request had -------------------
+@pytest.mark.parametrize(
+    "not_an_address",
+    [
+        # Starlette's TestClient sets request.client.host to this. Every audited route
+        # exercised by a test therefore passes it, and INET rejects it -- taking the
+        # audited write, and the request around it, down with it.
+        "testclient",
+        # A proxy that could not resolve a peer. Seen in the wild as a literal.
+        "unknown",
+        # An empty client host, which is what an ASGI scope with no client yields.
+        "",
+    ],
+)
+def test_a_non_address_actor_ip_is_dropped_rather_than_breaking_the_write(
+    app_session: Session, not_an_address: str
+):
+    """`audit_log.actor_ip` is INET. A caller passes `request.client.host`, which is not
+    guaranteed to be an address -- under TestClient it is the literal `testclient`.
+
+    Postgres rejects it and the INSERT fails, which fails the audited action too. §11.2
+    wants the trail to be reliable; a service that lets an unparseable client host destroy
+    the write has the reliability backwards. The address is context, the entry is the
+    record -- so the address is what gives way.
+
+    Found by lane HEALTH (M4), which hit it writing §11.2's every-read entry and worked
+    around it in its own routers. Fixed here instead: `AuditService.record` is the one
+    place every lane funnels through, and two lanes each carrying their own `_client_ip`
+    helper is how one of them gets it subtly wrong.
+    """
+    entry = AuditService.record(
+        app_session,
+        action="probe.non_address_ip",
+        entity_type="student",
+        entity_id=uuid.uuid4(),
+        studio_id=None,
+        actor_ip=not_an_address,
+    )
+    app_session.commit()
+    assert entry.actor_ip is None
+
+
+@pytest.mark.parametrize("address", ["203.0.113.7", "::1", "2001:db8::1", "127.0.0.1"])
+def test_a_real_address_still_survives(app_session: Session, address: str):
+    """The other half. A sanitiser that dropped every address would satisfy the test above
+    and delete the column's reason for existing -- §18.2's break-glass trail is worth less
+    without the peer it came from. IPv6 is included because the naive fix is a dotted-quad
+    regex.
+
+    Compared as text because psycopg adapts INET back to an `ipaddress` object on read, so
+    the round-tripped value is `IPv4Address('203.0.113.7')` and not the `str` the model
+    types the column as. Worth knowing before anyone writes `actor_ip.startswith(...)`.
+    """
+    entry = AuditService.record(
+        app_session,
+        action="probe.real_ip",
+        entity_type="student",
+        entity_id=uuid.uuid4(),
+        studio_id=None,
+        actor_ip=address,
+    )
+    app_session.commit()
+    assert str(entry.actor_ip) == address
