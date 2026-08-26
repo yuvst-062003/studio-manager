@@ -2,7 +2,7 @@
 # comments across a round-trip, so every explanation belongs in a `why:` or
 # `source:` field rather than in a comment that would silently disappear.
 version: 1
-updated: 2026-08-25
+updated: 2026-08-26
 waves:
   - id: W0
     milestone: M0
@@ -92,8 +92,9 @@ waves:
     mode: parallel
     lanes: [SCHEDULE, PEOPLE]
     exit_gate: E2E-5 schedule change · E2E-1a registration → approval → active
-    status: active
+    status: shipped
     opened: 2026-08-25
+    closed: 2026-08-26
     pieces:
       - id: W2.0
         title: The contract commit — revision 0006, C11 and C12, the attendance-pattern seam
@@ -119,8 +120,40 @@ waves:
         title: Artboards — dashboard 3a/6a/4b, staff 9a/1d/9b, parent 12b
         status: shipped
         on: 2026-08-26
-      - id: M3
-        title: Students, guardians, the lead funnel and the public trial page
+      - id: M2.6
+        title: The staff and parent shells mount their artboards, and the api-client catches up
+        status: shipped
+        on: 2026-08-26
+      - id: M3.1
+        title: Students, §3.2's viewer split, and the first coach-tagged routes
+        status: shipped
+        on: 2026-08-26
+      - id: M3.2
+        title: Guardians — all equal, never duplicated, exactly one primary
+        status: shipped
+        on: 2026-08-26
+      - id: M3.3
+        title: C11 and C12 — several enrollments, one price, and the days a child comes
+        status: shipped
+        on: 2026-08-26
+      - id: M3.4
+        title: §5.4a's shop window, sign-in-first booking, and the trial-slot picker
+        status: shipped
+        on: 2026-08-26
+      - id: M3.5
+        title: The approval queue, and an approval that is one transaction
+        status: shipped
+        on: 2026-08-26
+      - id: M3.6
+        title: Lead and trial statuses, freeze, leave, convert, and the day 1/3/7 ladder
+        status: shipped
+        on: 2026-08-26
+      - id: M3.7
+        title: Artboards — parent 13a/13b/13c/12j/12g/12i/2c, staff 11b/9c/9h, dashboard 3b/3c/4a/6c
+        status: shipped
+        on: 2026-08-26
+      - id: M3.8
+        title: The schedule seam threaded through — the request's session, and public.py's own scope
         status: shipped
         on: 2026-08-26
   - id: W3
@@ -164,6 +197,45 @@ waves:
     status: pending
     pieces: []
 holdbacks:
+  - id: HB-w2-e2e-gate
+    kind: carried
+    title: W2 closed with its E2E exit gate unmet, and the W2 subsets owed in W3
+    why: >-
+      W2's stated exit gate is E2E-5 (a schedule change rewrites only the future) and
+      E2E-1a (registration → approval → active). Neither was met. The wave closed on its
+      lane work instead, deliberately, and this entry is the record that the gate is
+      outstanding rather than passed.
+
+      Both spec files exist, and both were authored as the W3-COMPLETE flows rather than as
+      W2 subsets — which is why running them as written cannot be W2's gate.
+      e2e/01-registration-to-active.spec.ts states its own scope on line 7: "Gate for: W2
+      (as E2E-1a, without the health step) and W3 (complete, with it)". The health step is
+      M4's and does not exist yet, so the file as written is W3's flow, and the W2 subset of
+      it has never been written down. E2E-5 has the same shape for a second and independent
+      reason: its first test finishes by asserting `attendance-taken` on a past session,
+      which is W3's attendance work in M5 — so even the pure schedule flow, whose product
+      code did ship this wave, cannot pass end to end against W2's code alone.
+
+      The alternative was to author two throwaway W2-scoped specs now and rewrite both in
+      W3 when the real flows land. That was weighed and declined: it buys a green tick this
+      week for two files that are deleted next week, and it is the kind of gate that teaches
+      people to stop reading gates. Un-fixme'ing the existing specs was declined for the
+      plainer reason that it would put a permanently red gate in front of work nobody has
+      been asked to do yet.
+
+      What is owed in W3, and what closes this: the W2 subset of E2E-5 — the schedule
+      change, the impact preview's three named protections, and the parent calendar —
+      without the attendance assertion; and the W2 subset of E2E-1a — the landing page,
+      sign-in-first booking, the approval queue and the student going active — without the
+      health step. W3's own gate already names the complete versions of both flows, so
+      these ride in beside them rather than needing a wave of their own.
+    blocks: W3
+    status: open
+    opened: 2026-08-26
+    closed: null
+    source: >-
+      SPEC §13 flows 1 and 5 · docs/plan/milestone-plan.md §2.1 ·
+      e2e/01-registration-to-active.spec.ts:7 · e2e/05-schedule-change.spec.ts
   - id: HB-devices
     kind: external
     title: One iPhone and one Android to test the install on

@@ -61,6 +61,11 @@ class Wave:
     status: str
     lanes: tuple[str, ...] = ()
     opened: date | None = None
+    #: The day the wave was closed out. Mirrors `Holdback.closed` rather than inventing a
+    #: second spelling. A wave reaches `shipped` when its lanes are merged, which is not
+    #: always the day its exit gate was met -- W2 closed with its gate deferred to W3 --
+    #: so the date is recorded separately from the status rather than inferred from it.
+    closed: date | None = None
     pieces: tuple[Piece, ...] = ()
 
 
@@ -139,6 +144,7 @@ def _parse_wave(raw: dict[str, Any]) -> Wave:
         status=_one_of(raw.get("status"), STATUSES, "status", where),
         lanes=tuple(str(lane) for lane in raw.get("lanes") or []),
         opened=_date(raw.get("opened")),
+        closed=_date(raw.get("closed")),
         pieces=tuple(_parse_piece(piece, where) for piece in raw.get("pieces") or []),
     )
 
@@ -199,6 +205,8 @@ def _wave_to_dict(wave: Wave) -> dict[str, Any]:
     }
     if wave.opened is not None:
         out["opened"] = wave.opened
+    if wave.closed is not None:
+        out["closed"] = wave.closed
     out["pieces"] = [_piece_to_dict(p) for p in wave.pieces]
     return out
 

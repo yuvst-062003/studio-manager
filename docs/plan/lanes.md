@@ -156,8 +156,8 @@ git merge --no-ff feat/m3-people
 .venv/bin/pytest -q && npm run typecheck && .venv/bin/mypy app && npm run lint
 
 # wave exit gate — the E2E flows for this wave (milestone-plan.md §2.1)
-npx playwright test e2e/flow-05-schedule-change.spec.ts
-npx playwright test e2e/flow-01-registration.spec.ts
+npx playwright test e2e/05-schedule-change.spec.ts
+npx playwright test e2e/01-registration-to-active.spec.ts
 
 git push
 git worktree remove ../sm-schedule && git worktree remove ../sm-people

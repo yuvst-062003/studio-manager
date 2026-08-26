@@ -95,6 +95,35 @@ def test_round_trip_is_value_stable(tmp_path):
     assert st.load(path) == once
 
 
+def test_a_closed_wave_keeps_its_closing_date_across_a_round_trip(tmp_path):
+    """The failure this guards is silent, not loud.
+
+    `_wave_to_dict` builds an explicit dict, so a key the Wave dataclass does not carry is
+    not rejected on load -- it is dropped on the next machine WRITE. A closing date added
+    to state.yaml by hand would survive every read, look correct in review, and vanish the
+    first time the cockpit rewrote the file. `status` alone cannot stand in for it: a wave
+    reaches `shipped` when its lanes merge, which is not always the day its exit gate was
+    met, and W2 is exactly that case.
+    """
+    closed = GOOD.replace("    status: active\n", "    status: shipped\n    closed: 2026-08-26\n")
+    path = _write(tmp_path, closed)
+    loaded = st.load(path)
+    assert loaded.waves[0].closed == date(2026, 8, 26)
+
+    st.dump(loaded, path)
+    assert "closed: 2026-08-26" in path.read_text(encoding="utf-8")
+    assert st.load(path) == loaded
+
+
+def test_a_wave_with_no_closing_date_does_not_grow_an_empty_one(tmp_path):
+    """`opened` is written only when set, and `closed` follows it. An unclosed wave that
+    round-tripped into `closed: null` would put a field on every pending wave in the file
+    for no reader's benefit."""
+    path = _write(tmp_path, GOOD)
+    st.dump(st.load(path), path)
+    assert "closed:" not in path.read_text(encoding="utf-8").split("holdbacks:")[0]
+
+
 def test_the_writer_stamps_a_header_saying_it_is_machine_written(tmp_path):
     path = _write(tmp_path, GOOD)
     st.dump(st.load(path), path)

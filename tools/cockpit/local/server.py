@@ -49,6 +49,11 @@ def build_state_payload() -> dict[str, Any]:
             {
                 **{k: v for k, v in asdict(wave).items() if k != "pieces"},
                 "opened": wave.opened.isoformat() if wave.opened else None,
+                # `asdict` spreads the raw `date` objects above; every one of them needs an
+                # override here or the payload is not JSON. tests/cockpit/test_server.py's
+                # serialisability test is what says so, and it is why `closed` is here
+                # rather than only in the dataclass.
+                "closed": wave.closed.isoformat() if wave.closed else None,
                 "progress": asdict(derive.wave_progress(wave)),
                 "pieces": [
                     {
