@@ -271,6 +271,45 @@ def _order_out(service: OrderService, order: PaymentOrder) -> PaymentOrderOut:
     )
 
 
+# -- what a payer may read about their own money ------------------------------
+#
+# §5.10's payments screen (`1b`/`12f`) needs three reads before it can render anything: the
+# open charges, the balance, and the payments already made. All three existed and all three
+# are `ManagerOrOwner`, so a parent opening the screen got 403 three times and it could not
+# load at all. `POST /payment-orders` below has always resolved the payer from the session
+# rather than the body, so the write half was already right; the read half is these three.
+# `/me/charges` and `/me/balance` live in `billing.py`, beside the projections they need.
+#
+# `/me/...`, matching `/me/students` and `/me/events`, which is the shape the parent app
+# already uses for "mine". Widening the manager routes instead would have been the smaller
+# diff and the wrong one: `?payer_person_id=` is a parameter, and a parameter that decides
+# whose money you see is one somebody will eventually pass another family's id to. Here
+# there is no id to pass -- the payer IS the caller, and `_caller` is the only source.
+#
+# No role dependency, for the reason `_caller`'s own docstring gives: §3.1 says "guardian
+# is not a role", so `require_roles` would refuse every parent in the product and admit
+# every coach with no children.
+
+
+@router.get("/me/payments", response_model=PaymentPage)
+def my_payments(
+    request: Request,
+    session: TenantSessionDep,
+    after: uuid.UUID | None = None,
+    limit: int = Query(default=DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
+) -> PaymentPage:
+    """`12f`'s history — what this person has already paid, by every route."""
+    service = PaymentService(session)
+    rows, next_cursor = service.list_payments(
+        payer_person_id=_caller(request), after=after, limit=limit
+    )
+    return PaymentPage(
+        items=[_out(service, row) for row in rows],
+        next_cursor=next_cursor,
+        has_more=next_cursor is not None,
+    )
+
+
 @router.post("/payment-orders", response_model=PaymentOrderOut, status_code=status.HTTP_201_CREATED)
 def create_payment_order(
     body: PaymentOrderCreateIn,

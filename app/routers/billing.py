@@ -554,6 +554,72 @@ def close_charge(
     return _charge_out(charge, service.allocated_agorot(charge_id))
 
 
+# -- what a payer may read about their own money ------------------------------
+#
+# §5.10's payments screen needs the open charges and the balance before it can render, and
+# both reads above are `ManagerOrOwner` -- so the screen 403'd and never loaded for the
+# person it was drawn for. `app/routers/payments.py` carries the third (`/me/payments`) and
+# the note explaining why this is a `/me/` route rather than a widened parameter.
+#
+# `_caller` and not `_actor`: an unauthenticated request must be 401 here, whereas `_actor`
+# answers `None` because it exists to stamp an audit row. Resolving "whose money" to `None`
+# would list every charge in the studio.
+
+
+def _caller(request: Request) -> uuid.UUID:
+    """The signed-in person, or a 401. No role dependency — §3.1: guardian is not a role."""
+    person_id = getattr(request.state, "person_id", None)
+    if not isinstance(person_id, uuid.UUID):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={"code": "unauthenticated", "message": "sign in first"},
+        )
+    return person_id
+
+
+@router.get("/me/charges", response_model=ChargePage)
+def my_charges(
+    request: Request,
+    session: TenantSessionDep,
+    charge_status: str | None = Query(default=None, alias="status"),
+    after: uuid.UUID | None = None,
+    limit: int = Query(default=DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
+) -> ChargePage:
+    """§5.10 — the months this person owes, oldest first, which is the order the card route
+    selects in.
+
+    `allocated_agorot` travels with each row because §4.3 settles a charge by summing its
+    allocations: a client rendering `amount_agorot` alone shows a part-paid charge as
+    wholly outstanding.
+    """
+    pairs, next_cursor = BillingService(session).list_charges(
+        payer_person_id=_caller(request),
+        status=charge_status,
+        after=after,
+        limit=limit,
+    )
+    return ChargePage(
+        items=[_charge_out(charge, allocated) for charge, allocated in pairs],
+        next_cursor=next_cursor,
+        has_more=next_cursor is not None,
+    )
+
+
+@router.get("/me/balance", response_model=PayerBalanceOut)
+def my_balance(request: Request, session: TenantSessionDep) -> PayerBalanceOut:
+    """`12f`'s summary card. Negative is a family in credit, and `MoneyDisplay` wraps the
+    amount in `<bdi>` precisely so that reads as a credit in a right-to-left sentence."""
+    payer_person_id = _caller(request)
+    charged, paid, open_count = BillingService(session).payer_balance(payer_person_id)
+    return PayerBalanceOut(
+        payer_person_id=payer_person_id,
+        charged_agorot=charged,
+        paid_agorot=paid,
+        balance_agorot=charged - paid,
+        open_charge_count=open_count,
+    )
+
+
 @router.get("/payers/{payer_person_id}/balance", response_model=PayerBalanceOut)
 def payer_balance(
     _: ManagerOrOwner, payer_person_id: uuid.UUID, session: TenantSessionDep

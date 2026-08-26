@@ -1212,6 +1212,52 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/balance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Balance
+         * @description `12f`'s summary card. Negative is a family in credit, and `MoneyDisplay` wraps the
+         *     amount in `<bdi>` precisely so that reads as a credit in a right-to-left sentence.
+         */
+        get: operations["my_balance_api_v1_me_balance_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/charges": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Charges
+         * @description §5.10 — the months this person owes, oldest first, which is the order the card route
+         *     selects in.
+         *
+         *     `allocated_agorot` travels with each row because §4.3 settles a charge by summing its
+         *     allocations: a client rendering `amount_agorot` alone shows a part-paid charge as
+         *     wholly outstanding.
+         */
+        get: operations["my_charges_api_v1_me_charges_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/events": {
         parameters: {
             query?: never;
@@ -1229,6 +1275,26 @@ export interface paths {
          *     screen.
          */
         get: operations["my_events_api_v1_me_events_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/payments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Payments
+         * @description `12f`'s history — what this person has already paid, by every route.
+         */
+        get: operations["my_payments_api_v1_me_payments_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -9016,6 +9082,59 @@ export interface operations {
             };
         };
     };
+    my_balance_api_v1_me_balance_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PayerBalanceOut"];
+                };
+            };
+        };
+    };
+    my_charges_api_v1_me_charges_get: {
+        parameters: {
+            query?: {
+                status?: string | null;
+                after?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CursorPage_ChargeOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     my_events_api_v1_me_events_get: {
         parameters: {
             query?: {
@@ -9035,6 +9154,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CursorPage_ParentEventOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_payments_api_v1_me_payments_get: {
+        parameters: {
+            query?: {
+                after?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CursorPage_PaymentOut_"];
                 };
             };
             /** @description Validation Error */

@@ -12676,6 +12676,107 @@
         ]
       }
     },
+    "/api/v1/me/balance": {
+      "get": {
+        "description": "`12f`'s summary card. Negative is a family in credit, and `MoneyDisplay` wraps the\namount in `<bdi>` precisely so that reads as a credit in a right-to-left sentence.",
+        "operationId": "my_balance_api_v1_me_balance_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PayerBalanceOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "My Balance",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/v1/me/charges": {
+      "get": {
+        "description": "§5.10 — the months this person owes, oldest first, which is the order the card route\nselects in.\n\n`allocated_agorot` travels with each row because §4.3 settles a charge by summing its\nallocations: a client rendering `amount_agorot` alone shows a part-paid charge as\nwholly outstanding.",
+        "operationId": "my_charges_api_v1_me_charges_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "After"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CursorPage_ChargeOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "My Charges",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
     "/api/v1/me/events": {
       "get": {
         "description": "`12h` -- the parent's own list, one row per child per event.\n\n**Drafts never appear.** §4.3 makes a draft invisible to guardians, and that is the\nwhole reason drafts exist: a manager builds an event over several sittings without a\nhalf-written one reaching the club. Filtered server-side rather than trusted to the\nscreen.",
@@ -12736,6 +12837,69 @@
         "summary": "My Events",
         "tags": [
           "events"
+        ]
+      }
+    },
+    "/api/v1/me/payments": {
+      "get": {
+        "description": "`12f`'s history — what this person has already paid, by every route.",
+        "operationId": "my_payments_api_v1_me_payments_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "After"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CursorPage_PaymentOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "My Payments",
+        "tags": [
+          "billing"
         ]
       }
     },
