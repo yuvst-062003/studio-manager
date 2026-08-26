@@ -12,5 +12,30 @@
   "exclude": [
     "**/dist/**",
     "**/node_modules/**"
-  ]
+  ],
+  "compilerOptions": {
+    "paths": {
+      "@studio/ui": [
+        "./packages/ui/src/index.ts"
+      ],
+      "@studio/ui/theme": [
+        "./packages/ui/src/theme.ts"
+      ],
+      "@studio/ui/manifest": [
+        "./packages/ui/src/manifest.ts"
+      ],
+      "@studio/ui/dev-bar": [
+        "./packages/ui/src/dev-bar/index.ts"
+      ],
+      "@studio/core": [
+        "./packages/core/src/index.ts"
+      ],
+      "@studio/api-client": [
+        "./packages/api-client/src/index.ts"
+      ],
+      "@studio/i18n": [
+        "./packages/i18n/index.ts"
+      ]
+    }
+  }
 }

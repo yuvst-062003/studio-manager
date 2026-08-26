@@ -71,6 +71,29 @@ describe('workspace aliases', () => {
     expect(findsOf(config.resolve!.alias)).toEqual(ALIASES.map((entry) => entry.find))
   })
 
+  it('is applied by tsconfig too, because tsc resolves through node_modules as well', () => {
+    // The third resolver. vite serves the app, vitest runs the tests, and `tsc --noEmit`
+    // typechecks — and all three follow `node_modules/@studio/*` unless told otherwise. A
+    // worktree with the vite alias but no tsconfig `paths` gets green tests and a red
+    // typecheck against MAIN's types, which is a confusing half-fix: the error names a
+    // property that provably exists in the file the editor is showing.
+    //
+    // `paths` cannot call a function, so it is the one hand-written copy of this map. That
+    // is what this assertion is for.
+    const tsconfig = JSON.parse(
+      readFileSync(resolve(WEB_ROOT, 'tsconfig.json'), 'utf8'),
+    ) as { compilerOptions?: { paths?: Record<string, string[]> } }
+    const paths = tsconfig.compilerOptions?.paths
+    expect(paths, 'tsconfig.json declares no @studio paths').toBeDefined()
+
+    for (const { find, replacement } of ALIASES) {
+      const target = paths![find]
+      expect(target, `tsconfig paths is missing ${find}`).toBeDefined()
+      expect(resolve(WEB_ROOT, target![0]!)).toBe(replacement)
+    }
+    expect(Object.keys(paths!).sort()).toEqual(ALIASES.map((e) => e.find).sort())
+  })
+
   it.each(['dashboard', 'parent', 'staff'])(
     'is applied by the %s app so the dev server and the build agree with the tests',
     async (app) => {
