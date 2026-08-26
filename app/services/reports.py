@@ -75,3 +75,32 @@ class ReportService:
             "overdue_agorot": overdue_agorot,
             "pending_agorot": pending_agorot,
         }
+
+    def student_charges(self, student_id: uuid.UUID) -> list[dict]:
+        """Get all charges for a student across all periods.
+
+        Used for invoice generation and charge history display.
+        Returns list of charge details sorted by period (newest first).
+        """
+        stmt = (
+            select(Charge)
+            .where(Charge.student_id == student_id)
+            .order_by(Charge.period_year.desc(), Charge.period_month.desc())
+        )
+        charges = self.session.execute(stmt).scalars().all()
+
+        return [
+            {
+                "charge_id": charge.id,
+                "student_id": charge.student_id,
+                "payer_person_id": charge.payer_person_id,
+                "kind": charge.kind,
+                "period_year": charge.period_year,
+                "period_month": charge.period_month,
+                "amount_agorot": charge.amount_agorot,
+                "due_date": charge.due_date.isoformat(),
+                "status": charge.status,
+                "created_at": charge.created_at.isoformat(),
+            }
+            for charge in charges
+        ]

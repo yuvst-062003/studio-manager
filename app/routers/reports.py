@@ -41,6 +41,28 @@ class MonthlyReportSummary(BaseModel):
     pending_agorot: int
 
 
+class ChargeDetail(BaseModel):
+    """Details of a single charge for invoice rendering."""
+
+    charge_id: uuid.UUID
+    student_id: uuid.UUID
+    payer_person_id: uuid.UUID
+    kind: str
+    period_year: int
+    period_month: int
+    amount_agorot: int
+    due_date: str
+    status: str
+    created_at: str
+
+
+class StudentChargeDetails(BaseModel):
+    """Charges for a student across all periods."""
+
+    student_id: uuid.UUID
+    charges: list[ChargeDetail]
+
+
 @router.get("/{studio_id}/monthly")
 def get_monthly_report(
     studio_id: uuid.UUID,
@@ -61,3 +83,22 @@ def get_monthly_report(
     """
     summary = ReportService(session).monthly_summary(year, month)
     return MonthlyReportSummary(**summary)
+
+
+@router.get("/{studio_id}/charges/{student_id}")
+def get_student_charges(
+    studio_id: uuid.UUID,
+    student_id: uuid.UUID,
+    _: ManagerOrOwner,
+    session: TenantSessionDep,
+) -> StudentChargeDetails:
+    """Fetch all charges for a student for invoice generation.
+
+    Returns charge details across all periods, sorted by period (newest first).
+    Only accessible to owner and manager roles.
+    """
+    charges = ReportService(session).student_charges(student_id)
+    return StudentChargeDetails(
+        student_id=student_id,
+        charges=[ChargeDetail(**charge) for charge in charges],
+    )
