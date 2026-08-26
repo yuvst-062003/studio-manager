@@ -48,6 +48,11 @@ class SimulateIpnResponse(BaseModel):
     delivered: bool
     target_url: str
     query: dict[str, str]
+    #: The webhook's own status code, or None when nothing was mounted to deliver to.
+    #: `delivered` says the GET was issued; this says what came back -- and the two are
+    #: separate because §5.10 makes that endpoint answer 200 to a forgery as readily as
+    #: to a success, so a status code alone is not a verdict.
+    webhook_status: int | None = None
     note: str
 
 

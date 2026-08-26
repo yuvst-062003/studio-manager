@@ -337,3 +337,43 @@ def test_a_failure_in_settlement_never_discards_the_raw_callback(
     assert record.match_status == "unmatched", "nothing was settled, so nothing is matched"
     # Untouched: settlement never ran.
     assert tenant_session.get(PaymentOrder, order.id).status == "pending"
+
+
+def test_the_dev_simulator_drives_a_real_settlement_end_to_end(client, an_order, tenant_session):
+    """§19.5 calls this tool "the important one", and W4's exit gate is driven from it.
+
+    It could not drive anything. It built a concrete path, tested it against OpenAPI's
+    templated keys so the check could never pass, and issued no GET even if it had. This
+    is the whole tool doing its whole job: one POST to the simulator settles a real order
+    through the real webhook, with no test client touching the webhook itself.
+    """
+    order = an_order.order
+    response = client.post(
+        "/api/v1/dev/upay/simulate-ipn",
+        json={
+            "shape": "success",
+            "order_public_ref": str(order.public_ref),
+            "expected_amount_agorot": order.expected_amount_agorot,
+            "transaction_id": _txn(order, "SIM"),
+        },
+        headers={"X-Dev-Now": T0.isoformat()},
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["delivered"] is True
+    assert body["webhook_status"] == 200
+
+    tenant_session.expire_all()
+    assert tenant_session.get(PaymentOrder, order.id).status == "paid"
+    record = (
+        tenant_session.execute(
+            select(UpayIpnRecord).where(UpayIpnRecord.transactionid == _txn(order, "SIM"))
+        )
+        .scalars()
+        .one()
+    )
+    assert record.match_status == "auto"
+    # §5.10's weak signal, sent by the simulator so a simulated row looks like a real one.
+    assert record.source_ip == IPN_SOURCE_IP
+    for charge_id in an_order.charge_ids:
+        assert tenant_session.get(Charge, charge_id).status == "settled"

@@ -3,10 +3,10 @@ shapes: a clean success, an amount mismatch, a forged order reference, and a dup
 transactionid. These are the four security requirements from §5.10, and without a
 simulator they are only testable against live money.'
 
-The payload shapes are asserted in full here. What is NOT asserted is what the server
-does with them -- M6 owns GET /webhooks/upay/{public_ref}, upay_ipn_record and the
-reconciliation worker. `delivered=False` in the response is the honest report of that,
-not a failure.
+The payload shapes are asserted in full here. **M6 has landed, so the endpoint now
+actually delivers**: it GETs the payload at GET /webhooks/upay/{public_ref} through the
+app's own ASGI stack and reports the webhook's status code. What the webhook then does
+with each shape is asserted in tests/upay/test_webhook.py, against real rows.
 """
 
 from __future__ import annotations
@@ -220,11 +220,19 @@ def test_the_endpoint_returns_the_query_it_would_send(shape):
     assert body["query"]["productdescription"]
 
 
-def test_the_endpoint_reports_honestly_that_m6_has_not_landed():
-    """`delivered: false` with a note naming the milestone, rather than a 200 that
-    implies something happened. The moment M6 mounts GET /webhooks/upay/{public_ref},
-    this flips to true with no change here -- and this test goes red, which is the
-    signal to delete it."""
+def test_the_endpoint_actually_delivers_now_that_m6_has_landed():
+    """The replacement for `..._reports_honestly_that_m6_has_not_landed`, which said its
+    own going-red was the signal to delete it. M6 has landed, so it did.
+
+    It never would have. The check compared a CONCRETE path against
+    `openapi()["paths"]`, which is keyed by the route TEMPLATE, so `delivered` was false
+    for ever -- and the handler issued no GET even when the check passed, so a true would
+    have been a claim rather than an action. Both are fixed, and this asserts the action:
+    the webhook answered, and its status code is on the response.
+
+    §5.10 makes that endpoint answer 200 to a forgery as readily as to a success, so
+    `webhook_status` is reported rather than interpreted. The verdict lives in the row.
+    """
     with app_in_env("development") as application:
         body = (
             TestClient(application)
@@ -238,8 +246,20 @@ def test_the_endpoint_reports_honestly_that_m6_has_not_landed():
             )
             .json()
         )
-    assert body["delivered"] is False
-    assert "M6" in body["note"]
+    assert body["delivered"] is True
+    assert body["webhook_status"] == 200
+    assert body["target_url"] == f"/api/v1/webhooks/upay/{REF}"
+
+
+def test_the_mounted_check_compares_against_the_template_not_a_concrete_path():
+    """The bug in one assertion. `openapi()["paths"]` is keyed by the route template, so
+    a concrete path is never in it and the old check could only ever answer False."""
+    from app.routers.dev import IPN_WEBHOOK_TEMPLATE
+
+    with app_in_env("development") as application:
+        paths = application.openapi()["paths"]
+    assert IPN_WEBHOOK_TEMPLATE in paths
+    assert f"/api/v1/webhooks/upay/{REF}" not in paths
 
 
 def test_the_endpoint_does_not_exist_in_production():

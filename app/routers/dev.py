@@ -19,6 +19,7 @@ from __future__ import annotations
 import uuid
 from datetime import timedelta
 
+import httpx
 from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy import select
@@ -28,7 +29,7 @@ from app.core.config import settings
 from app.core.cors import app_origin
 from app.core.db import SessionDep
 from app.core.dev_account import RequireDeveloper
-from app.integrations.upay.ipn import build_ipn_query
+from app.integrations.upay.ipn import IPN_SOURCE_IP, build_ipn_query
 from app.models.identity import RefreshToken
 from app.schemas.dev import (
     ActAsResponse,
@@ -118,23 +119,41 @@ def reset_demo_studio(
     )
 
 
+#: The webhook's path as OpenAPI names it. **Templated, not concrete.**
+#: `openapi()["paths"]` is keyed by the route template, so testing a concrete
+#: `/api/v1/webhooks/upay/<a-uuid>` against it can never match -- which is what made
+#: `delivered` false for ever, the exact failure the OpenAPI check was chosen to avoid.
+IPN_WEBHOOK_TEMPLATE = "/api/v1/webhooks/upay/{public_ref}"
+
+
 @router.post("/upay/simulate-ipn", response_model=SimulateIpnResponse)
-def simulate_ipn(
+async def simulate_ipn(
     _: RequireDeveloper, body: SimulateIpnRequest, request: Request
 ) -> SimulateIpnResponse:
-    """§19.5's fourth tool.
+    """§19.5's fourth tool, and the one W4's exit gate is driven from.
 
-    Delivery is best-effort and reported honestly. M6 owns
-    GET /webhooks/upay/{public_ref}; until it is mounted there is nothing to deliver
-    to, and `delivered: false` with a note naming the milestone is a more useful answer
-    than a 200 that implies something happened. When M6 lands, this starts delivering
-    with no change here.
+    **It delivers.** It used to compute a payload, decide it could not be delivered, and
+    return the query -- so `delivered: true` would have been a claim rather than an
+    action even once the check passed. Now the payload is actually GET-ed at the webhook
+    and the webhook's own status code comes back on the response, which is the difference
+    between a tool that reports the pipeline works and one that reports it would.
+
+    Delivery goes through the app's own ASGI stack rather than over the network: the same
+    routing, the same middleware, the same database, and no dependence on knowing our own
+    public origin or on a second worker being free to answer us. The webhook handler is
+    sync, so Starlette runs it in a threadpool and awaiting it here cannot deadlock.
 
     The mounted check reads `request.app.openapi()["paths"]`, not `request.app.routes`:
     `include_router` mounts each discovered router through an opaque `_IncludedRouter`
     that exposes no `.routes` in this FastAPI version (tests/invariants/test_03
-    documents the trap), so a `.routes` walk would report `False` forever even after M6
-    lands. The OpenAPI path set is the same source of truth restriction 2 uses.
+    documents the trap), so a `.routes` walk would report `False` forever. It is compared
+    against `IPN_WEBHOOK_TEMPLATE` -- see that constant.
+
+    Both dev headers are forwarded. The inner request is unauthenticated, so without
+    `X-Dev-Now` a simulated IPN fired under a clock shift would be stamped at the real
+    now while the order it settles lives in the travelled month; and on staging
+    `X-Dev-Token` is what `dev_tools_allowed` checks, so the delivery inherits exactly
+    the authority this caller already proved rather than asserting any of its own.
     """
     query = build_ipn_query(
         shape=body.shape,
@@ -143,19 +162,39 @@ def simulate_ipn(
         transaction_id=body.transaction_id or f"DEV-{body.order_public_ref.hex[:12]}",
     )
     path = f"/api/v1/webhooks/upay/{body.order_public_ref}"
-    mounted = path in request.app.openapi()["paths"]
-    note = (
-        "delivered to the webhook"
-        if mounted
-        else "M6 owns GET /webhooks/upay/{public_ref}; it is not mounted yet, so this "
-        "is the payload that would have been sent"
-    )
+
+    if IPN_WEBHOOK_TEMPLATE not in request.app.openapi()["paths"]:
+        return SimulateIpnResponse(
+            shape=body.shape,
+            delivered=False,
+            target_url=path,
+            query=query,
+            webhook_status=None,
+            note=(
+                f"nothing is mounted at {IPN_WEBHOOK_TEMPLATE}, so this is the payload "
+                "that would have been sent"
+            ),
+        )
+
+    # §5.10's weak signal, sent so a simulated delivery looks like a real one on the row
+    # rather than arriving from nowhere. It is recorded and never gated on.
+    headers = {"X-Forwarded-For": IPN_SOURCE_IP}
+    for header in ("X-Dev-Now", "X-Dev-Token"):
+        value = request.headers.get(header)
+        if value is not None:
+            headers[header] = value
+
+    transport = httpx.ASGITransport(app=request.app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://ipn-simulator") as client:
+        response = await client.get(path, params=query, headers=headers)
+
     return SimulateIpnResponse(
         shape=body.shape,
-        delivered=mounted,
+        delivered=True,
         target_url=path,
         query=query,
-        note=note,
+        webhook_status=response.status_code,
+        note=f"delivered to the webhook, which answered {response.status_code}",
     )
 
 
