@@ -102,6 +102,7 @@ class StudentService:
         guardian_phone: str | None,
         at: datetime,
         actor_person_id: uuid.UUID | None,
+        guardian_person_id: uuid.UUID | None = None,
         relation: str = "parent",
         status: str = "lead",
         source: str | None = "manager",
@@ -117,6 +118,18 @@ class StudentService:
         The guardian is matched before being created (L7). A match means an existing
         Person with a verified address, so no invitation is issued -- they already have a
         login and the child simply appears in the app they are already using.
+
+        **`guardian_person_id` short-circuits that match, and a caller who has it must pass
+        it.** Matching by address is how you find someone you do not already know; a caller
+        that resolved the parent itself -- the approval queue, which stores
+        `registration_request.matched_person_id` -- knows exactly who they are, and
+        round-tripping through an address can only lose them. It does lose them whenever
+        the matched `Person` carries no address of its own, which is normal: §5.4a keys on
+        the VERIFIED address held by `auth_identity`, and `matching.py` says outright that
+        "person.email alone is therefore never a key". Every §19.3 persona is that shape.
+        The result was a duplicate parent and an invitation with no recipient, which the
+        `invitation` check constraint rejected -- so the approval 500'd rather than
+        silently doing the wrong thing, which is the one mercy in it.
 
         `group_id` makes this "creates EVERYTHING immediately": the enrollment is written
         here, in the same transaction, and the student opens as `active` rather than
@@ -146,9 +159,15 @@ class StudentService:
         session.add(student)
         session.flush()
 
-        matched = match_person(session, email=guardian_email, phone=guardian_phone)
+        matched = (
+            None
+            if guardian_person_id is not None
+            else match_person(session, email=guardian_email, phone=guardian_phone)
+        )
         token: str | None = None
-        if matched is not None:
+        if guardian_person_id is not None:
+            pass  # already known by id; nothing to match and nobody to invite
+        elif matched is not None:
             guardian_person_id = matched.person_id
         else:
             parent = Person(

@@ -276,6 +276,58 @@ def test_approving_attaches_to_the_matched_parent_and_issues_no_second_invitatio
     )
 
 
+def test_approving_a_matched_parent_who_carries_no_address_of_their_own(
+    client, app_session, as_guardian, as_manager, a_group, trains_sundays
+):
+    """The matched parent is known by ID, so approval must not go looking for them by email.
+
+    §5.4a's matching rule is that an address is a key only when a signed-in identity
+    carries it and the provider verified it — `matching.py`: "person.email alone is
+    therefore never a key". A `Person` row's own email is a manager's typing, and it is
+    perfectly normal for it to be empty: every §19.3 persona is exactly this shape, with
+    the verified address on `auth_identity` and nothing on `person`.
+
+    `approve()` resolved the parent by id and then handed `parent.email` down to
+    `StudentService.create`, which matched on it again. With nothing there the second
+    lookup found nobody, invented a duplicate parent, and issued them an invitation with
+    no recipient — violating `ck_invitation_invitation_has_a_recipient`, so the whole
+    approval 500'd. In the demo studio that was every parent-app registration there is.
+    """
+    from app.models.person import Invitation
+
+    guardian = app_session.get(Person, as_guardian.person_id)
+    assert guardian is not None
+    # The identity keeps its verified address; the Person row has none. This is the shape
+    # `seed_personas` produces, and the one the fixtures happened never to produce.
+    guardian.email = None
+    guardian.phone = None
+    app_session.commit()
+
+    body = _submit(client, as_guardian, a_group)
+    approved = client.post(
+        f"/api/v1/registration-requests/{body['id']}/approve",
+        json={"group_id": str(a_group)},
+        headers=as_manager.headers,
+    )
+
+    assert approved.status_code == 200, approved.text
+    student_id = uuid.UUID(approved.json()["student_ids"][0])
+
+    # Attached to the parent who asked, not to a copy of them.
+    guardians = (
+        app_session.execute(select(Guardian).where(Guardian.student_id == student_id))
+        .scalars()
+        .all()
+    )
+    assert [row.person_id for row in guardians] == [as_guardian.person_id]
+
+    # §5.4a — 'No second invitation, no second account, no second login.'
+    assert (
+        app_session.execute(select(Invitation).where(Invitation.student_id == student_id)).first()
+        is None
+    )
+
+
 def test_approving_with_no_group_is_refused(client, as_guardian, as_manager, a_group):
     """§5.4 -- the group is the decision. An approval without one would create a student in
     no group, which is a `lead` with extra steps."""
