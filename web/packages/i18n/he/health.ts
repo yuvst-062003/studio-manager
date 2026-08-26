@@ -105,4 +105,50 @@ export const health: Bundle = {
   'consent.revoked': 'האישור בוטל',
   'consent.revoke': 'ביטול האישור',
   'consent.grantedOn': 'אושר בתאריך',
+
+  // -- states 12c does not draw, and one it draws wrongly -----------------------
+  // 12c finding 5, the most consequential gap on that artboard: "a declaration that defaults
+  // every question to no and gets signed is a health record nobody actually answered". A
+  // two-position Switch cannot express a third state, so the form uses SegmentedControl with
+  // neither option selected — and these are the strings that state needs.
+  'declaration.unanswered': 'טרם נענתה',
+  'declaration.answerRequired': 'יש לענות על כל השאלות',
+  'declaration.loading': 'טוען את הטופס…',
+  'declaration.error': 'לא הצלחנו לטעון את הטופס. נסו שוב',
+  // 12c finding 3: the paragraph the parent actually signs is an attestation, not an
+  // instruction, and `declaration.intro` is the instruction. This is the attestation.
+  'declaration.attestation':
+    'אני מצהיר/ה שהפרטים שמסרתי נכונים ומלאים, ושאין מניעה רפואית מהשתתפות הילד/ה באימונים',
+
+  // -- the manager view, the keys 4e found missing -------------------------------
+  'documents.all': 'הכל',
+  'documents.awaitingSignature': 'ממתין לחתימת הורה',
+  'documents.columnType': 'סוג מסמך',
+  'documents.columnValidity': 'תוקף',
+  'documents.sendRequest': 'שליחת בקשה',
+  'documents.summaryTotal': 'סך הכל',
+  'documents.requestGroupCount': 'בקשה קבוצתית',
+  'documents.filteredEmpty': 'אין תוצאות לסינון הזה',
+  'documents.loading': 'טוען…',
+  'documents.error': 'לא הצלחנו לטעון את הרשימה. נסו שוב',
+  'documents.trialOnly': 'הצהרת ניסיון בלבד',
+
+  // -- the template editor (D11) -------------------------------------------------
+  // `is_bundled_default` on the row is what picks between these two. A studio that has
+  // reworded every question is no longer editing ours, and saying otherwise is the opposite
+  // of D11's caveat.
+  'template.editingBundled': 'זהו השאלון המצורף למערכת',
+  'template.editingYours': 'זהו השאלון של המועדון',
+  'template.draft': 'טיוטה',
+  'template.draftHint': 'השינויים נשמרים כטיוטה. ההורים ימשיכו למלא את הגרסה הקיימת עד לפרסום',
+  'template.published': 'הגרסה פורסמה',
+  'template.recomputed': 'הצהרות עודכנו',
+  'template.flagQuestion': 'שאלה שמפיקה סימון למאמן',
+  'template.flagQuestionHint': 'סימון בוליאני בלבד. תוכן התשובה לעולם אינו מוצג למאמן',
+  'template.questionType.boolean': 'כן/לא',
+  'template.questionType.text': 'טקסט חופשי',
+  'template.questionType.phone': 'טלפון',
+  'template.sectionTitle': 'שם הפרק',
+  'template.save': 'שמירת טיוטה',
+  'template.saved': 'הטיוטה נשמרה',
 }

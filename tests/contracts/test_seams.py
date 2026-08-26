@@ -160,9 +160,21 @@ def test_recompute_derived_flags_returns_booleans():
 
 
 def test_recompute_derived_flags_refuses_rather_than_returning_nothing():
+    """**Updated by lane HEALTH (M4), which filled the body.**
+
+    Until M4 this read `pytest.raises(NotImplementedError)`, which encoded "nobody has written
+    this yet". The method is written now, and the property the test was really protecting is the
+    one below: a service with no `TenantSession` **refuses** rather than quietly returning `{}` or
+    opening a session of its own. §4.2's filter fails closed, and a service that chose its own
+    tenant would be a service whose guarantees depend on who imported it.
+
+    `NotImplementedError` subclasses `RuntimeError`, so this assertion is strictly weaker than the
+    one it replaces and would still have passed before M4 filled the body. The signature
+    assertions above are untouched — those are the seam.
+    """
     from app.services.health import HealthService
 
-    with pytest.raises(NotImplementedError):
+    with pytest.raises(RuntimeError):
         HealthService().recompute_derived_flags(uuid.uuid4())
 
 

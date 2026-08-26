@@ -76,4 +76,42 @@ export const health: Bundle = {
   'consent.revoked': 'Consent withdrawn',
   'consent.revoke': 'Withdraw consent',
   'consent.grantedOn': 'Consented on',
+
+  // -- states 12c does not draw, and one it draws wrongly -----------------------
+  'declaration.unanswered': 'Not answered yet',
+  'declaration.answerRequired': 'Every question needs an answer',
+  'declaration.loading': 'Loading the form…',
+  'declaration.error': 'We could not load the form. Try again',
+  'declaration.attestation':
+    'I declare that the details I have given are true and complete, and that there is no medical reason my child cannot train',
+
+  // -- the manager view, the keys 4e found missing -------------------------------
+  'documents.all': 'All',
+  'documents.awaitingSignature': 'Awaiting a parent signature',
+  'documents.columnType': 'Document type',
+  'documents.columnValidity': 'Validity',
+  'documents.sendRequest': 'Send a request',
+  'documents.summaryTotal': 'Total',
+  'documents.requestGroupCount': 'Group request',
+  'documents.filteredEmpty': 'Nothing matches this filter',
+  'documents.loading': 'Loading…',
+  'documents.error': 'We could not load the list. Try again',
+  'documents.trialOnly': 'Trial declaration only',
+
+  // -- the template editor (D11) -------------------------------------------------
+  'template.editingBundled': 'These are the questions the app ships with',
+  'template.editingYours': "These are your club's questions",
+  'template.draft': 'Draft',
+  'template.draftHint':
+    'Changes are saved as a draft. Parents keep filling in the published version until you publish',
+  'template.published': 'Version published',
+  'template.recomputed': 'declarations updated',
+  'template.flagQuestion': 'Raises a flag for the coach',
+  'template.flagQuestionHint': 'A boolean marker only. The answer itself is never shown to a coach',
+  'template.questionType.boolean': 'Yes/No',
+  'template.questionType.text': 'Free text',
+  'template.questionType.phone': 'Phone',
+  'template.sectionTitle': 'Section name',
+  'template.save': 'Save draft',
+  'template.saved': 'Draft saved',
 }

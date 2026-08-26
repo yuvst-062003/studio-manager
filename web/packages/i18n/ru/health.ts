@@ -30,8 +30,7 @@ export const health: Bundle = {
   'badge.missing': 'Нет медицинской декларации',
   'badge.trialSigned': 'Декларация для пробного занятия',
   'badge.signed': 'Декларация есть',
-  'badge.missingHint':
-    'Посещаемость всё равно можно отметить. Декларацию должен предоставить родитель',
+  'badge.missingHint': 'Посещаемость всё равно можно отметить. Декларацию должен предоставить родитель',
   'reminder.send': 'Отправить напоминание родителю',
   'reminder.sent': 'Напоминание отправлено',
   'reminder.sentOn': 'Последнее напоминание отправлено',
@@ -77,4 +76,42 @@ export const health: Bundle = {
   'consent.revoked': 'Согласие отозвано',
   'consent.revoke': 'Отозвать согласие',
   'consent.grantedOn': 'Согласие дано',
+
+  // -- states 12c does not draw, and one it draws wrongly -----------------------
+  'declaration.unanswered': 'Пока нет ответа',
+  'declaration.answerRequired': 'Нужно ответить на все вопросы',
+  'declaration.loading': 'Загружаем анкету…',
+  'declaration.error': 'Не удалось загрузить анкету. Попробуйте ещё раз',
+  'declaration.attestation':
+    'Я подтверждаю, что указанные сведения верны и полны и что нет медицинских противопоказаний к занятиям ребёнка',
+
+  // -- the manager view, the keys 4e found missing -------------------------------
+  'documents.all': 'Все',
+  'documents.awaitingSignature': 'Ожидает подписи родителя',
+  'documents.columnType': 'Тип документа',
+  'documents.columnValidity': 'Срок действия',
+  'documents.sendRequest': 'Отправить запрос',
+  'documents.summaryTotal': 'Всего',
+  'documents.requestGroupCount': 'Групповой запрос',
+  'documents.filteredEmpty': 'Ничего не найдено по этому фильтру',
+  'documents.loading': 'Загрузка…',
+  'documents.error': 'Не удалось загрузить список. Попробуйте ещё раз',
+  'documents.trialOnly': 'Только пробная декларация',
+
+  // -- the template editor (D11) -------------------------------------------------
+  'template.editingBundled': 'Это анкета, входящая в приложение',
+  'template.editingYours': 'Это анкета вашего клуба',
+  'template.draft': 'Черновик',
+  'template.draftHint':
+    'Изменения сохраняются как черновик. Родители заполняют опубликованную версию до публикации',
+  'template.published': 'Версия опубликована',
+  'template.recomputed': 'деклараций обновлено',
+  'template.flagQuestion': 'Формирует отметку для тренера',
+  'template.flagQuestionHint': 'Только логическая отметка. Сам ответ тренеру никогда не показывается',
+  'template.questionType.boolean': 'Да/Нет',
+  'template.questionType.text': 'Свободный текст',
+  'template.questionType.phone': 'Телефон',
+  'template.sectionTitle': 'Название раздела',
+  'template.save': 'Сохранить черновик',
+  'template.saved': 'Черновик сохранён',
 }
