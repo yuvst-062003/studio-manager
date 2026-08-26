@@ -21,20 +21,23 @@ from __future__ import annotations
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel
 
 from app.core.auth_context import AnyStaff, ManagerOrOwner, require_roles
+from app.core.clock import now
 from app.core.tenancy import TenantSessionDep
-from app.models.belts import BeltRank
+from app.models.belts import BeltRank, StudentBelt
 from app.schemas._pagination import (
     DEFAULT_PAGE_SIZE,
     MAX_PAGE_SIZE,
     CursorPage,
     IdempotencyKey,
 )
-from app.schemas.belts import BeltRankIn, BeltRankOut
+from app.schemas.belts import BeltRankIn, BeltRankOut, StudentBeltIn, StudentBeltOut
+from app.services.belts.awards import BeltAwardService
 from app.services.belts.errors import (
+    BeltAlreadyAwardedError,
     BeltRankIsHeldError,
     BeltRankNotFoundError,
     LadderAlreadySeededError,
@@ -45,6 +48,7 @@ from app.services.belts.errors import (
 )
 from app.services.belts.presets import BELT_PRESETS, BeltPresetService
 from app.services.belts.ranks import BeltRankService
+from app.services.events.rsvp import RsvpService
 
 router = APIRouter(tags=["belts"])
 
@@ -288,3 +292,115 @@ def seed_belt_ranks(
     items = _ladder_out(session, rows)
     session.commit()
     return LadderPage(items=items, next_cursor=None, has_more=False)
+
+
+# -- §5.9's awards. SPEC §7 puts them at /students/{id}/belts; see the module docstring. --
+StudentBeltPage = CursorPage[StudentBeltOut]
+
+
+def _student_belt_out(row: StudentBelt, rank: BeltRank) -> StudentBeltOut:
+    """`color_hex` comes from the rank, because `student_belt` has no colour column.
+
+    A studio recolouring its ladder therefore rewrites what a child was given years ago.
+    The contract's own test argues it should not; closing that needs `student_belt.
+    color_hex`, which is a migration and `main`'s. Stated here so the next reader finds the
+    gap written down rather than inferring it from a join.
+    """
+    return StudentBeltOut(
+        id=row.id,
+        student_id=row.student_id,
+        belt_rank_id=row.belt_rank_id,
+        belt_rank_name=rank.name,
+        color_hex=rank.color_hex,
+        secondary_color_hex=rank.secondary_color_hex,
+        awarded_on=row.awarded_on,
+        awarded_by_person_id=row.awarded_by_person_id,
+        event_id=row.event_id,
+        note=row.note,
+    )
+
+
+def _may_read_this_student(
+    request: Request, session: TenantSessionDep, student_id: uuid.UUID
+) -> None:
+    """Staff, or a guardian of this particular child.
+
+    The first route in this lane serving either, so it takes no role dependency and
+    resolves in the handler. §3.2 says the guardian column "is not a role -- it is the
+    permission set that applies to a person for the specific students they are a guardian
+    of, resolved per-record rather than granted", which is exactly a check that cannot be a
+    dependency over roles alone.
+    """
+    if getattr(request.state, "identity_id", None) is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={"code": "unauthenticated", "message": "sign in first"},
+        )
+    roles = set(getattr(request.state, "roles", ()) or ())
+    if roles & {"owner", "manager", "lead_coach", "assistant_coach"}:
+        return
+    person_id = getattr(request.state, "person_id", None)
+    if isinstance(person_id, uuid.UUID) and student_id in RsvpService.students_of_guardian(
+        session, person_id
+    ):
+        return
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail={"code": "not_your_student", "message": "this action is not yours"},
+    )
+
+
+@router.get("/students/{student_id}/belts", response_model=StudentBeltPage)
+def list_student_belts(
+    student_id: uuid.UUID, request: Request, session: TenantSessionDep
+) -> StudentBeltPage:
+    """`12d`'s timeline, oldest first.
+
+    The whole history rather than a page of it: `12d` renders a progression strip over the
+    class's ladder, and a truncated history would draw a child as having skipped the grades
+    that fell off the end. The largest preset is twelve rungs.
+    """
+    _may_read_this_student(request, session, student_id)
+    rows = BeltAwardService.history(session, student_id)
+    return StudentBeltPage(
+        items=[_student_belt_out(row, rank) for row, rank in rows],
+        next_cursor=None,
+        has_more=False,
+    )
+
+
+@router.post(
+    "/students/{student_id}/belts",
+    response_model=StudentBeltOut,
+    status_code=status.HTTP_201_CREATED,
+)
+def award_student_belt(
+    _: BeltAwarder,
+    student_id: uuid.UUID,
+    body: StudentBeltIn,
+    request: Request,
+    session: TenantSessionDep,
+    idempotency_key: IdempotencyKey = None,
+) -> StudentBeltOut:
+    """§5.9's award outside an exam -- `events.belt.awardOutsideExam`.
+
+    A coach awarding a stripe at the end of a session is a real thing in a children's club,
+    and requiring an event would make managers invent fake ones. The history row and
+    `student.current_belt_id` move together.
+    """
+    actor = getattr(request.state, "person_id", None)
+    try:
+        row, rank = BeltAwardService.award(
+            session,
+            student_id,
+            body,
+            by_person_id=actor if isinstance(actor, uuid.UUID) else None,
+            at=now(),
+        )
+    except BeltRankNotFoundError as exc:
+        raise _not_found() from exc
+    except BeltAlreadyAwardedError as exc:
+        raise _conflict("belt_already_awarded", "this student already holds that rank") from exc
+    out = _student_belt_out(row, rank)
+    session.commit()
+    return out
