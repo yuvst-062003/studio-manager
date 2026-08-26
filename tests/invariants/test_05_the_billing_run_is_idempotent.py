@@ -125,7 +125,12 @@ def _seed_a_billable_period(session: Session) -> tuple[uuid.UUID, int]:
         name="פעמיים בשבוע",
         sessions_per_week=2,
         monthly_amount_agorot=25_000,
-        registration_fee_agorot=None,
+        # A real fee, so the seeded period exercises BOTH idempotence mechanisms. The
+        # tuition charge is protected by `uq_charge_student_period_kind`; the registration
+        # fee carries a NULL period, so no index applies to it and §5.10 step 6's
+        # once-per-student rule is a plain query -- which makes it the more fragile of the
+        # two and exactly the one an invariant should be standing over.
+        registration_fee_agorot=10_000,
         active_from=date(2026, 9, 1),
     )
     child = Person(studio_id=studio.id, first_name="ילד", last_name="בודק")
@@ -163,7 +168,8 @@ def _seed_a_billable_period(session: Session) -> tuple[uuid.UUID, int]:
         ]
     )
     session.commit()
-    return studio.id, 1
+    # Two: the month's tuition and the once-ever registration fee.
+    return studio.id, 2
 
 
 def test_the_billing_run_is_idempotent(app_session):

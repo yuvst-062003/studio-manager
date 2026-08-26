@@ -6,7 +6,7 @@ import uuid
 from datetime import date
 
 import pytest
-from app.models.billing import Charge, Payment, PaymentAllocation
+from app.models.billing import Payment, PaymentAllocation
 from app.services.billing import BillingService
 from app.services.billing.errors import ConflictError, NotFoundError
 from tests.billing.conftest import MONTHLY_AGOROT, PERIOD, T0

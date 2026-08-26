@@ -34,13 +34,20 @@ def test_the_run_charges_one_student_once(
         studio.id, period_year=PERIOD[0], period_month=PERIOD[1], at=T0
     )
     assert run.status == "completed"
-    assert run.charges_created == 1
+    # Two charges, one of each kind: the month's tuition and the once-ever registration
+    # fee (§5.10 step 6). Asserted by KIND rather than by count, because "one charge per
+    # student" is a rule about tuition and a bare count cannot say which rule it is
+    # checking.
     charge = tenant_session.execute(
-        select(Charge).where(Charge.student_id == a_priced_student.student_id)
+        select(Charge).where(
+            Charge.student_id == a_priced_student.student_id, Charge.kind == "tuition"
+        )
     ).scalar_one()
     assert charge.amount_agorot == MONTHLY_AGOROT
     assert charge.due_date == date(2026, 11, 30)
     assert charge.created_by == "billing_run"
+    assert run.charges_created == 2
+    assert run.log["registrations"] == 1
 
 
 def test_the_charge_is_owed_by_the_primary_guardian(
@@ -51,7 +58,7 @@ def test_the_charge_is_owed_by_the_primary_guardian(
     BillingRunService(tenant_session).run(
         studio.id, period_year=PERIOD[0], period_month=PERIOD[1], at=T0
     )
-    charge = tenant_session.execute(select(Charge)).scalars().one()
+    charge = tenant_session.execute(select(Charge).where(Charge.kind == "tuition")).scalars().one()
     assert charge.payer_person_id == a_priced_student.payer_person_id
 
 
@@ -60,11 +67,18 @@ def test_a_student_in_two_groups_is_charged_once(
 ):
     """C11's whole point, and the defect the unique index makes unforgeable. Walking
     enrollments instead of students is what bills this child twice at two prices."""
-    run = BillingRunService(tenant_session).run(
+    BillingRunService(tenant_session).run(
         studio.id, period_year=PERIOD[0], period_month=PERIOD[1], at=T0
     )
-    assert run.charges_created == 1
-    assert tenant_session.execute(select(func.count()).select_from(Charge)).scalar_one() == 1
+    # ONE tuition charge, not two -- the whole of C11. Counted by kind, because the
+    # registration fee is a second charge and a bare count of 2 would pass whether it was
+    # tuition+registration (right) or tuition+tuition (the defect).
+    assert (
+        tenant_session.execute(
+            select(func.count()).select_from(Charge).where(Charge.kind == "tuition")
+        ).scalar_one()
+        == 1
+    )
 
 
 def test_a_student_with_no_price_plan_is_skipped_and_reported(
@@ -89,8 +103,11 @@ def test_rerunning_the_same_period_creates_no_duplicates(
     service.run(studio.id, period_year=PERIOD[0], period_month=PERIOD[1], at=T0)
     second = service.run(studio.id, period_year=PERIOD[0], period_month=PERIOD[1], at=T0)
     assert second.charges_created == 0
+    # Both the tuition charge and the registration fee were already there: the first is
+    # refused by the unique index, the second by §5.10 step 6's own query.
     assert second.log["already_charged"] == 1
-    assert tenant_session.execute(select(func.count()).select_from(Charge)).scalar_one() == 1
+    assert second.log["registrations"] == 0
+    assert tenant_session.execute(select(func.count()).select_from(Charge)).scalar_one() == 2
 
 
 def test_a_rerun_reuses_the_period_s_run_row(

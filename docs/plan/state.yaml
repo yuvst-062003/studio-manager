@@ -238,6 +238,10 @@ waves:
         title: The ledger core — create_charge, recompute_charge_status, the run's spine
         status: shipped
         on: 2026-08-26
+      - id: M6.2
+        title: Proration from materialized sessions, registration fees and freezes
+        status: shipped
+        on: 2026-08-26
   - id: W5
     milestone: M8 ∥ M9
     title: Communication ∥ Reports and privacy completion
