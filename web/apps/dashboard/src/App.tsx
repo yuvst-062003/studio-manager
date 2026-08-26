@@ -36,11 +36,28 @@ import {
   makeDashboardPeopleClient,
   registerPeopleAlerts,
 } from './features/people'
+import {
+  EventForm,
+  EventPage,
+  EventsScreen,
+  ExamEligibilityScreen,
+  ExamsScreen,
+  makeDashboardEventsClient,
+} from './features/events'
+import {
+  BeltSystemScreen,
+  makeDashboardBeltsClient,
+  registerBeltsWizardStep,
+} from './features/belts'
 
 registerM1WizardSteps(apiFetch)
 // Seam 4 — `6c` composes sections from four milestones. This lane registers the three it
 // owns; M4's, M5's and M6's land the same way without reopening AlertCentre.tsx.
 registerPeopleAlerts()
+// Seam 4 again — §5.1's wizard. One registerSlot call from this lane's own file, at the
+// order WIZARD_STEP_ORDER gives `belts`. SetupWizard.tsx is not reopened, and neither is
+// packages/ui/src/setup-wizard/register.ts, which registers M1's own four steps.
+registerBeltsWizardStep(makeDashboardBeltsClient(apiFetch))
 
 const NAV = [
   { key: 'schedule', labelKey: 'schedule.week.title', href: '#/schedule' },
@@ -48,6 +65,9 @@ const NAV = [
   { key: 'closures', labelKey: 'schedule.closure.title', href: '#/closures' },
   { key: 'students', labelKey: 'people.student.plural', href: '#/students' },
   { key: 'alerts', labelKey: 'people.alerts.title', href: '#/alerts' },
+  { key: 'events', labelKey: 'events.title', href: '#/events' },
+  { key: 'belts', labelKey: 'events.belt.title', href: '#/belts' },
+  { key: 'exams', labelKey: 'events.exam.plural', href: '#/exams' },
   { key: 'staff', labelKey: 'common.dash.nav.staff', href: '#/staff' },
   { key: 'settings', labelKey: 'common.dash.nav.settings', href: '#/settings' },
   { key: 'setup', labelKey: 'common.dash.nav.setup', href: '#/setup' },
@@ -55,6 +75,9 @@ const NAV = [
 
 export type DashboardRoute =
   | 'home'
+  | 'events'
+  | 'belts'
+  | 'exams'
   | 'staff'
   | 'settings'
   | 'setup'
@@ -74,7 +97,19 @@ export function routeFromHash(hash: string): DashboardRoute {
   if (name === 'schedule' || name === 'closures' || name.startsWith('groups')) return 'schedule'
   if (name.startsWith('students')) return 'students'
   if (name === 'alerts') return 'alerts'
+  // Lane EVENTS' family: `#/events`, `#/events/<id>` and `#/events/new`, decided in
+  // features/events/. Same shape as lane SCHEDULE's three hashes above.
+  if (name.startsWith('events')) return 'events'
+  // §5.9's ladder. `#/belts` today; `#/belts/<classId>` once a studio has two classes.
+  if (name.startsWith('belts')) return 'belts'
+  // §5.9's exams: `#/exams` is 6b's roundup, `#/exams/<id>` is 4d's eligibility table.
+  if (name.startsWith('exams')) return 'exams'
   return name === 'staff' || name === 'settings' || name === 'setup' ? name : 'home'
+}
+
+/** `#/events/<id>` → 7c; `#/events/new` → 7b; bare `#/events` → 7a's roundup. */
+export function eventRouteFrom(hash: string): string {
+  return hash.replace(/^#\/?events\/?/, '')
 }
 
 /** `#/students/<id>` → the card; `#/students/new` → 3c; bare `#/students` → the table. */
@@ -99,12 +134,30 @@ export default function App() {
   const session = useSession()
   const { route, hash } = useHashRoute()
   const studentRoute = studentRouteFrom(hash)
+  const eventRoute = eventRouteFrom(hash)
+  const beltsClassId = hash.replace(/^#\/?belts\/?/, '')
+  const examRoute = hash.replace(/^#\/?exams\/?/, '')
   const [locale, setLocale] = useState<Locale>('he')
+  // §3.2's hard rule, on the screen's side — and ONLY on the screen's side. The API has
+  // already redacted `fee_agorot` to null for a coach, so this cannot leak a price even if
+  // it were wrong. What it decides is narrower: whether an ABSENT fee may be rendered as
+  // "free". A redacted price and a genuinely free event are indistinguishable on the wire,
+  // and calling the first one free is worse than saying nothing.
+  //
+  // Read off the ACTIVE studio's membership: §19.4's persona switcher moves the active
+  // studio without a reload, and a role taken from the first membership in the list would
+  // then be somebody else's.
+  const canSeeMoney =
+    session.studios
+      .find((membership) => membership.studio_id === session.activeStudioId)
+      ?.roles.some((role) => role === 'owner' || role === 'manager') ?? false
   // Memoised: SetupWizard reads through this in an effect keyed on the client, so a fresh
   // object every render would re-fetch progress forever.
   const setupClient = useMemo(() => makeSetupClient(apiFetch), [])
   const scheduleClient = useMemo(() => makeScheduleClient(apiFetch), [])
   const peopleClient = useMemo(() => makeDashboardPeopleClient(apiFetch), [])
+  const eventsClient = useMemo(() => makeDashboardEventsClient(apiFetch), [])
+  const beltsClient = useMemo(() => makeDashboardBeltsClient(apiFetch), [])
   // Stable for as long as the studio's day is. `new Date().toISOString()` in this
   // render body was a new value every render, and downstream that is an effect
   // dependency worth `1 + 3N` requests.
@@ -179,6 +232,54 @@ export default function App() {
           ) : null}
           {route === 'alerts' ? (
             <AlertCentre locale={locale} client={peopleClient} />
+          ) : null}
+          {route === 'exams' && !examRoute ? (
+            <ExamsScreen
+              client={eventsClient}
+              locale={locale}
+              now={today}
+              onOpen={(id) => {
+                globalThis.location.hash = `#/exams/${id}`
+              }}
+            />
+          ) : null}
+          {route === 'exams' && examRoute ? (
+            <ExamEligibilityScreen client={eventsClient} eventId={examRoute} locale={locale} />
+          ) : null}
+          {route === 'belts' && beltsClassId ? (
+            <BeltSystemScreen classId={beltsClassId} client={beltsClient} locale={locale} />
+          ) : null}
+          {route === 'events' && eventRoute && eventRoute !== 'new' ? (
+            <EventPage
+              client={eventsClient}
+              eventId={eventRoute}
+              locale={locale}
+              seesMoney={canSeeMoney}
+            />
+          ) : null}
+          {route === 'events' && eventRoute === 'new' ? (
+            <EventForm
+              client={eventsClient}
+              locale={locale}
+              onSaved={(id) => {
+                globalThis.location.hash = `#/events/${id}`
+              }}
+              targets={[]}
+            />
+          ) : null}
+          {route === 'events' && !eventRoute ? (
+            <EventsScreen
+              client={eventsClient}
+              locale={locale}
+              now={today}
+              onCreate={() => {
+                globalThis.location.hash = '#/events/new'
+              }}
+              onOpen={(id) => {
+                globalThis.location.hash = `#/events/${id}`
+              }}
+              seesMoney={canSeeMoney}
+            />
           ) : null}
           {route === 'staff' ? <StaffScreen locale={locale} /> : null}
           {route === 'settings' ? <SettingsScreen locale={locale} /> : null}

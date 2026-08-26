@@ -286,6 +286,22 @@ waves:
         title: Lane close — i18n mirrors, the four IPN shapes measured, the handover
         status: shipped
         on: 2026-08-26
+      - id: M7.1
+        title: Events — create, publish, RSVP, the consent gate and the fee seam
+        status: shipped
+        on: 2026-08-26
+      - id: M7.2
+        title: Belts — the ladder, the seeded sets, awards and the one-transaction promotion
+        status: shipped
+        on: 2026-08-26
+      - id: M7.3
+        title: Artboards — dashboard 7a, 7b, 7c, 5b, 5d, 6b, 4d
+        status: shipped
+        on: 2026-08-26
+      - id: M7.4
+        title: Artboards — staff 9i, 9d and parent 12h, 7d, 12d
+        status: shipped
+        on: 2026-08-26
   - id: W5
     milestone: M8 ∥ M9
     title: Communication ∥ Reports and privacy completion

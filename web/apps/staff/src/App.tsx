@@ -27,6 +27,11 @@ import { makeStaffScheduleClient } from './features/schedule/client'
 import { useToday } from './features/schedule/useToday'
 import { StudentsSearch, makeStaffPeopleClient } from './features/people'
 import {
+  ExamResultsScreen,
+  StaffEventsScreen,
+  makeStaffEventsClient,
+} from './features/events'
+import {
   OfflinePrimingGate,
   RosterScreen,
   makeStaffAttendanceClient,
@@ -57,6 +62,9 @@ const NAV = [
   // A hash, not a path: there is no server route behind `/attendance`, so the path form was
   // a link to a 404 — the same correction both W2 lanes made independently.
   { key: 'attendance', labelKey: 'common.nav.attendance', href: '#/attendance' },
+  // 9i. A hash for the same reason the two above are: there is no server route behind
+  // `/events`, so the path form would be a link to a 404.
+  { key: 'events', labelKey: 'events.title', href: '#/events' },
   { key: 'announcements', labelKey: 'common.nav.announcements', href: '/announcements' },
   { key: 'settings', labelKey: 'common.nav.settings', href: '/settings' },
 ]
@@ -104,6 +112,7 @@ export default function App() {
   const setupClient = useMemo(() => makeSetupClient(apiFetch), [])
   const scheduleClient = useMemo(() => makeStaffScheduleClient(apiFetch), [])
   const peopleClient = useMemo(() => makeStaffPeopleClient(apiFetch), [])
+  const eventsClient = useMemo(() => makeStaffEventsClient(apiFetch), [])
   const attendanceClient = useMemo(() => makeStaffAttendanceClient(apiFetch), [])
   // §6.1 step 6 — "offline prime: today's and tomorrow's sessions + rosters are fetched and
   // written to IndexedDB BEFORE the coach reaches Today", and "the first launch BLOCKS on
@@ -131,6 +140,10 @@ export default function App() {
   // and a link survives a reload — the same shape both W2 lanes settled on, and the reason
   // NAV's `/attendance` entry became a hash below.
   const rosterSessionId = hash.startsWith('#/attendance/') ? hash.slice('#/attendance/'.length) : null
+  // 9i's list, and 9d's result sheet behind `#/events/<id>`. Same shape as the roster
+  // id above: the id is in the hash so the back button works and a link survives a reload.
+  const onEvents = hash === '#/events'
+  const examEventId = hash.startsWith('#/events/') ? hash.slice('#/events/'.length) : null
 
   useEffect(() => {
     // Chromium fires this when it considers the app installable; iOS never does, which
@@ -237,6 +250,17 @@ export default function App() {
             />
           ) : session.access.staff && onStudents ? (
             <StudentsSearch locale={locale} client={peopleClient} />
+          ) : session.access.staff && examEventId ? (
+            <ExamResultsScreen client={eventsClient} eventId={examEventId} locale={locale} />
+          ) : session.access.staff && onEvents ? (
+            <StaffEventsScreen
+              client={eventsClient}
+              locale={locale}
+              now={today}
+              onOpen={(id) => {
+                globalThis.location.hash = `#/events/${id}`
+              }}
+            />
           ) : (
             <Resolve
               session={session}

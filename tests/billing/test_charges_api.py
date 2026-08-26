@@ -313,9 +313,7 @@ def test_the_hand_over_charge_is_owed_by_the_primary_guardian(
         json={"product_id": product["id"], "student_id": str(a_priced_student.student_id)},
         headers=as_lead_coach.headers,
     ).json()
-    charge = client.get(
-        f"/api/v1/charges/{handed['charge_id']}", headers=as_manager.headers
-    ).json()
+    charge = client.get(f"/api/v1/charges/{handed['charge_id']}", headers=as_manager.headers).json()
     assert charge["payer_person_id"] == str(a_priced_student.payer_person_id)
     assert charge["amount_agorot"] == 6_000
     assert charge["kind"] == "manual"
@@ -351,9 +349,9 @@ def test_the_handout_options_carry_no_money_field(client, as_lead_coach, as_mana
         json={"name": "כפפות", "price_agorot": 4_000},
         headers=as_manager.headers,
     )
-    items = client.get(
-        "/api/v1/products/handout-options", headers=as_lead_coach.headers
-    ).json()["items"]
+    items = client.get("/api/v1/products/handout-options", headers=as_lead_coach.headers).json()[
+        "items"
+    ]
     assert items
     for item in items:
         assert set(item) == {"id", "name"}
