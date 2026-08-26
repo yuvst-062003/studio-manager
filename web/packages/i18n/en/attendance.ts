@@ -32,6 +32,7 @@ export const attendance: Bundle = {
 
   'absence.title': 'Report an absence',
   'absence.subtitle': 'Until the class starts',
+  'absence.chooseChild': 'Which child',
   'absence.chooseSession': 'Choose a class',
   'absence.reason': 'Reason',
   'absence.reasonOptional': 'Reason — optional',
@@ -94,6 +95,7 @@ export const attendance: Bundle = {
   'card.recentAttendance': 'Recent attendance',
   'card.markPresent': 'Mark present',
   'card.markAbsent': 'Mark absent',
+  'quickView.close': 'Close the quick view',
   'report.title': 'Attendance',
   'report.unmarkedSessions': 'Classes not marked',
   'report.consecutiveAbsences': 'Absent in a row',

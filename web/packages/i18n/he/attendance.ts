@@ -55,6 +55,9 @@ export const attendance: Bundle = {
   // -- parent absence reporting (parent 12a) -------------------------------------
   'absence.title': 'דיווח היעדרות',
   'absence.subtitle': 'עד תחילת השיעור',
+  // `12a` finding 7 and `12i` finding 9 — the parent's word for their own children is not
+  // `חניכים`. `people.student.plural` is the club's noun; this is the family's.
+  'absence.chooseChild': 'מי מהילדים',
   'absence.chooseSession': 'בחירת שיעור',
   'absence.reason': 'סיבה',
   'absence.reasonOptional': 'סיבה — לא חובה',
@@ -131,6 +134,10 @@ export const attendance: Bundle = {
   'card.recentAttendance': 'נוכחות אחרונה',
   'card.markPresent': 'סימון כנוכח',
   'card.markAbsent': 'סימון כנעדר',
+  // `1e` finding 3 — the popover's × carries no handler and there is no backdrop, so
+  // dismissal is undecided on the artboard. Decided here, and it needs an accessible name:
+  // `common` has only `nav.closeMenu`, which is the drawer's.
+  'quickView.close': 'סגירת התצוגה המהירה',
   'report.title': 'נוכחות',
   'report.unmarkedSessions': 'שיעורים שלא סומנו',
   'report.consecutiveAbsences': 'נעדרים ברצף',

@@ -32,6 +32,7 @@ export const attendance: Bundle = {
 
   'absence.title': 'Сообщить об отсутствии',
   'absence.subtitle': 'До начала занятия',
+  'absence.chooseChild': 'Кто из детей',
   'absence.chooseSession': 'Выбор занятия',
   'absence.reason': 'Причина',
   'absence.reasonOptional': 'Причина — необязательно',
@@ -96,6 +97,7 @@ export const attendance: Bundle = {
   'card.recentAttendance': 'Последняя посещаемость',
   'card.markPresent': 'Отметить присутствие',
   'card.markAbsent': 'Отметить отсутствие',
+  'quickView.close': 'Закрыть быстрый просмотр',
   'report.title': 'Посещаемость',
   'report.unmarkedSessions': 'Неотмеченные занятия',
   'report.consecutiveAbsences': 'Пропуски подряд',
