@@ -363,6 +363,59 @@ def sign_in_as(
         )
 
     at = now()
+    # Ship-audit D3 -- the reserved `platform` key, which is a DOOR and not a persona:
+    # §16's console sits above every studio, so it cannot be one of §19.3's nine, and
+    # `/dev/personas` deliberately does not list it. It signs in the seeded developer
+    # identity; whether that identity is a platform operator is the `platform_admin`
+    # table's answer (seeded outside production by `seed_personas`, never writable by any
+    # route), read by the same session derivation a real login uses. No studio in the
+    # session: the platform operator works outside every tenant, and TenantSession's
+    # fail-closed 401 on studio-scoped routes is correct for them.
+    if persona_key == "platform":
+        from app.models.identity import AuthIdentity, PlatformAdmin
+        from app.services.demo.personas import DEVELOPER_IDENTITY_SUBJECT
+
+        developer = session.execute(
+            select(AuthIdentity).where(AuthIdentity.provider_subject == DEVELOPER_IDENTITY_SUBJECT)
+        ).scalar_one_or_none()
+        holds_it = developer is not None and (
+            session.execute(
+                select(PlatformAdmin.id).where(PlatformAdmin.auth_identity_id == developer.id)
+            ).scalar_one_or_none()
+            is not None
+        )
+        if developer is None or not holds_it:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "code": "platform_admin_not_seeded",
+                    "message": "reset the demo studio first: the developer identity holds "
+                    "no platform_admin row yet",
+                },
+            )
+        issued = issue_refresh_token(
+            session,
+            identity_id=developer.id,
+            active_studio_id=None,
+            acting_as_person_id=None,
+            at=at,
+        )
+        AuditService.record(
+            session,
+            action="dev.sign_in_as",
+            entity_type="auth_identity",
+            entity_id=developer.id,
+            studio_id=None,
+            actor_identity_id=developer.id,
+            diff={"persona": "platform", "label": "platform admin", "roles": []},
+        )
+        session.commit()
+        redirect = RedirectResponse(
+            f"{origin}{return_path}", status_code=status.HTTP_307_TEMPORARY_REDIRECT
+        )
+        set_refresh_cookie(redirect, issued.secret)
+        return redirect
+
     # `switchable_personas` and not a direct query: it applies §19.6 restriction 1 itself,
     # so a persona this caller could not switch INTO is not offered here either. A second
     # lookup would be a second place that rule could be forgotten.

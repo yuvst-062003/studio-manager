@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 
 import { ORIGINS } from './origins'
 import { signInAs } from './fixtures/auth'
-import { buildScenario } from './fixtures/scenario'
+import { buildScenario, signAllDeclarations } from './fixtures/scenario'
 
 /**
  * SPEC §13, flow 1 — "Public registration → health declaration → manager approval →
@@ -152,12 +152,25 @@ test.describe('E2E-1 · registration to active student', () => {
         manager.getByTestId('detail-history').filter({ hasText: 'שיעור ניסיון' }),
       ).toHaveCount(1)
 
-      // And the family sees it, which is the half a manager cannot check for themselves.
-      // The calendar rather than home: `ParentHome` takes only "do you have children
-      // here" as a boolean (§6.3 — it answers whether, not how many), so the enrollment
-      // becomes visible to a parent as lessons on `12b` and nowhere else.
+      // -- §6.1 step 6, now that the child trains regularly ----------------------
+      // Conversion is the moment §5.4 stops accepting the SHORT trial form: "the manager
+      // never chases paper — the parent completes the full health declaration through
+      // the app gate (§5.5)". So the family's next visit is the gate and nothing else —
+      // this is the "with health" half of W3's E2E-1 gate, asserted against the shell
+      // rather than against a component nothing mounted (HB-w6-health-gate-unmounted).
       const calendar = await familyContext.newPage()
       await calendar.goto(`${ORIGINS.parent}/#/calendar`)
+      await expect(calendar.getByTestId('health-gate')).toBeVisible()
+      await expect(calendar.getByTestId('child-calendar')).not.toBeVisible()
+
+      // The form's own walk — three answer states, the drawn signature, the unanswered
+      // guards — is ParentHealth.test.tsx's job; what E2E owns is the ROUTING on both
+      // sides of the signature. The manager files it (§5.1's sanctioned path, the same
+      // door the fixture uses), and the app opens.
+      await signAllDeclarations(request)
+      await calendar.reload()
+
+      // And the family sees it, which is the half a manager cannot check for themselves.
       await expect(calendar.getByTestId('child-calendar')).toBeVisible()
       await expect(calendar.getByTestId('upcoming-session').first()).toBeVisible()
       expect(scenario.groupId).toBeTruthy()

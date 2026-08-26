@@ -8,6 +8,7 @@ import {
   readCharge,
   readOrder,
   recordStandingOrder,
+  tryOpenOrder,
 } from './fixtures/scenario'
 
 /**
@@ -47,12 +48,16 @@ import {
  * agora from ₪320 rather than from the order under test. It is the honest shape anyway: an
  * IPN is uPay's server-to-server callback, not something a person clicks.
  *
- * ── One assertion the screen still cannot make ────────────────────────────────────────
- * §5.10's "covered elsewhere" state is real and the server enforces it, but `ChargeOut`
- * carries no field saying a charge already sits inside an open order — so
- * `covered-elsewhere` cannot render for a parent, and the second test asserts the refusal
- * as the generic error the screen actually shows. The guard holds; the explanation does
- * not. Recorded on HB-e2e-parent-billing-api.
+ * ── The double-payment test addresses the server directly, and that is the point ──────
+ * Since W6, `/me/charges` serves `is_covered_elsewhere` and the screen renders covered
+ * rows unselectable — so the UI can no longer be walked into POSTing a claimed charge,
+ * which is the protection working, not a gap in it. The test that used to click "pay"
+ * twice was really asserting whatever the screen happened to select on the second click,
+ * and once scenario charges accumulate on a shared persona that selection is a DIFFERENT
+ * set of open months — a legitimate 201, and a red test that named no defect. What §5.10
+ * calls the primary guard is the server's, so the second attempt is now the second tab's
+ * actual request: the same charge_ids, POSTed directly, expecting 409 (`tryOpenOrder`).
+ * The screen's half — covered rows rendered unpayable — is asserted alongside it.
  */
 test.describe('E2E-3 · uPay happy path', () => {
   test('three months are selected, one order is created, and the IPN settles them all', async ({
@@ -171,22 +176,18 @@ test.describe('E2E-3 · uPay happy path', () => {
     const covered = (await readOrder(request, order)).charge_ids
     expect(covered.length).toBeGreaterThan(0)
 
-    // The second attempt, from what is effectively a second tab. The charge is still open —
-    // an order is not a payment — so the screen still offers it, and the guard has to be
-    // the server's.
+    // The second attempt, from what is effectively a second tab: one that loaded before
+    // the order existed still offers these exact charges, and its POST names them
+    // verbatim. The charge is still open — an order is not a payment — so the guard has
+    // to be the server's.
+    expect(await tryOpenOrder(request, scenario, covered)).toBe(409)
+
+    // And the screen's half of the same guard: after a reload the covered months render,
+    // but as unpayable — hiding them would leave a parent looking for a month they can
+    // see they owe (§5.10).
     await page.reload()
     await expect(page.getByTestId('debt-row').filter({ hasText: scenario.tag })).toHaveCount(1)
-
-    const second = page.waitForResponse(
-      (r) => r.url().includes('/api/v1/payment-orders') && r.request().method() === 'POST',
-    )
-    await page.getByTestId('pay-button').click()
-    expect((await second).status()).toBe(409)
-
-    // And the refusal reaches the parent rather than failing silently. The screen renders
-    // `common.error.generic` here — see the file docstring: it cannot yet say WHICH month
-    // is already covered, because the fact is not on `ChargeOut`.
-    await expect(page.getByRole('alert')).toBeVisible()
+    await expect(page.getByTestId('covered-elsewhere').first()).toBeVisible()
   })
 
   test('an active standing order warns before the card route, and does not block it', async ({

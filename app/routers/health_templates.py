@@ -150,11 +150,52 @@ async def _read_capped(upload: UploadFile) -> bytes:
     return b"".join(chunks)
 
 
+def require_template_reader(request: Request, session: TenantSessionDep) -> None:
+    """Manager/owner -- or a GUARDIAN, who must read the questions to answer them.
+
+    Ship-audit follow-on to B3: the moment §6.1's gate was mounted, the first family it
+    stopped could not load the form behind it -- both template reads answered 403 to the
+    exact person §5.5 exists for, and nothing could ever hit that while the gate was
+    unmounted. A blank template holds no answer about anyone, so §5.5's secrecy is not in
+    play here; what stays deliberate is the coach exclusion -- they see `derived_flags`
+    and nothing else, and widening the read to guardians must not widen it to staff.
+
+    The guardian half is a database EXISTS rather than a claim: `is_guardian` is not in
+    the JWT, and §3.1 says being a guardian IS the row, not a role.
+    """
+    if getattr(request.state, "identity_id", None) is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={"code": "unauthenticated", "message": "sign in first"},
+        )
+    roles = set(getattr(request.state, "roles", ()) or ())
+    if roles & {"owner", "manager"}:
+        return
+    from sqlalchemy import select
+
+    from app.models.person import Guardian
+
+    person_id = getattr(request.state, "person_id", None)
+    is_guardian = person_id is not None and (
+        session.execute(select(Guardian.id).where(Guardian.person_id == person_id).limit(1)).first()
+        is not None
+    )
+    if not is_guardian:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"code": "forbidden", "message": "this action is not yours"},
+        )
+
+
+TemplateReader = Annotated[None, Depends(require_template_reader)]
+
+
 @router.get("/health-templates/{template_id}", response_model=HealthFormTemplateOut)
 def read_health_template(
-    _: ManagerOrOwner, template_id: uuid.UUID, session: TenantSessionDep
+    _: TemplateReader, template_id: uuid.UUID, session: TenantSessionDep
 ) -> HealthFormTemplateOut:
-    """One template **including its questions**, which the editor cannot work without.
+    """One template **including its questions**, which the editor cannot work without --
+    and, since the §6.1 gate is mounted, neither can the parent filling it in.
 
     Additive rather than a change to the list route. `GET /health-templates` lives in
     app/routers/structure.py (M1, conflict C3) and its `HealthTemplateOut` carries `id`, `kind`
@@ -162,7 +203,8 @@ def read_health_template(
     able to hold an answer. Widening it would be an OpenAPI-visible change to a generated,
     committed client for the benefit of one screen; a new route beside it is neither.
 
-    Manager and owner only, matching the list route. A coach sees `derived_flags` (§5.5).
+    Managers, owners and guardians -- see `require_template_reader`. A coach still sees
+    `derived_flags` and nothing else (§5.5).
     """
     try:
         row = HealthTemplateService.read(session, template_id)

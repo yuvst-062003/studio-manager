@@ -35,71 +35,17 @@
  * any case.
  */
 
-import { execFileSync } from 'node:child_process'
-import path from 'node:path'
-
 import { request } from '@playwright/test'
 
 import { API_ORIGIN } from '../origins'
 import { resetDemoStudio } from './api'
 
-const REPO_ROOT = path.join(__dirname, '..', '..')
-
-/**
- * Which database the API is configured for, asked of the settings object rather than
- * hardcoded — the same resolution `scripts/e2e-backend.sh` uses, and for the same reason.
- * A name written down twice is a name that goes stale once: an earlier version of this file
- * truncated `studio_manager` while the stack had moved to `studio_manager_e2e`, so the
- * clearing silently did nothing and the reset went on failing for its original reason.
- */
-function databaseName(): string {
-  return execFileSync(
-    '.venv/bin/python',
-    [
-      '-c',
-      'from urllib.parse import urlparse\n' +
-        'from app.core.config import settings\n' +
-        'print(urlparse(settings.MIGRATION_DATABASE_URL.replace("+psycopg", "")).path.lstrip("/"))',
-    ],
-    { cwd: REPO_ROOT, encoding: 'utf8' },
-  ).trim()
-}
-
-/** The `audit_log` truncation, and the reason it is a named function rather than a line. */
-function clearAuditLog(): void {
-  console.log(
-    '\n[e2e] Clearing audit_log before the demo reset.\n' +
-      '[e2e]   WHY: audit_log is NEVER_WIPED, person is wiped, and the actor foreign key\n' +
-      '[e2e]        between them is ON DELETE RESTRICT — so one audited action makes every\n' +
-      '[e2e]        later /dev/demo/reset raise RestrictViolation.\n' +
-      '[e2e]   COST: this destroys §19.4 persona-switch evidence in the local database.\n' +
-      '[e2e]   FIX:  a migration setting audit_log.actor_person_id and .actor_identity_id\n' +
-      '[e2e]        to ON DELETE SET NULL. Until then this line stays, and stays loud.\n',
-  )
-  execFileSync(
-    'docker',
-    [
-      'compose',
-      '-f',
-      'docker-compose.yml',
-      'exec',
-      '-T',
-      'db',
-      'psql',
-      '-U',
-      'studio_migrator',
-      '-d',
-      databaseName(),
-      '-c',
-      'truncate audit_log',
-    ],
-    { cwd: REPO_ROOT, stdio: 'inherit' },
-  )
-}
-
+// `clearAuditLog()` is deliberately gone (ship-audit B6). It truncated `audit_log` here
+// because the actor foreign keys were ON DELETE RESTRICT and one audited action broke
+// every later `/dev/demo/reset`. Revision 0011 made both actor references SET NULL, so
+// the reset now survives its own history and §19.4's persona-switch evidence survives the
+// suite — which is what NEVER_WIPED promised all along.
 export default async function globalSetup(): Promise<void> {
-  clearAuditLog()
-
   const api = await request.newContext({ baseURL: API_ORIGIN })
   try {
     await resetDemoStudio(api)

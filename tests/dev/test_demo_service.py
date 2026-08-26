@@ -13,6 +13,7 @@ import uuid
 import pytest
 import sqlalchemy as sa
 from app.models.base import Base
+from app.services.audit import AuditService
 from app.services.demo import DEMO_STUDIO_SLUG
 from app.services.demo.fixtures import LATEST_VERSION
 from app.services.demo.service import (
@@ -66,6 +67,39 @@ def test_reset_reports_the_version_it_restored(session):
 def test_an_unknown_version_raises_rather_than_falling_back(session):
     with pytest.raises(KeyError):
         DemoStudioService.reset(session, version="1999-01-01.0")
+
+
+def test_reset_survives_an_audit_row_naming_a_demo_person(session):
+    """HB-e2e-demo-reset. audit_log is NEVER_WIPED and `person` is wiped, so the first
+    audited action a demo person takes used to make every later reset 500: the actor
+    foreign key was RESTRICT. `dev.act_as` rows never tripped it -- their actor is an
+    identity, not a person -- which is how the trail-survives test above stayed green
+    while the E2E harness could only ever reset once."""
+    studio_id = DemoStudioService.studio_id(session)
+    person_id = session.execute(
+        sa.text("SELECT id FROM person WHERE studio_id = :s LIMIT 1"), {"s": studio_id}
+    ).scalar_one()
+    AuditService.record(
+        session,
+        action="charge.create",
+        entity_type="charge",
+        entity_id=uuid.uuid4(),
+        studio_id=studio_id,
+        actor_person_id=person_id,
+    )
+    session.commit()
+
+    DemoStudioService.reset(session)
+    session.commit()
+
+    actor = session.execute(
+        sa.text(
+            "SELECT actor_person_id FROM audit_log WHERE action = 'charge.create' "
+            "AND studio_id = :s ORDER BY created_at DESC LIMIT 1"
+        ),
+        {"s": studio_id},
+    ).scalar_one()
+    assert actor is None  # the record survives; the deleted person is no longer named
 
 
 def test_the_wipe_is_derived_from_the_schema_not_from_a_list():

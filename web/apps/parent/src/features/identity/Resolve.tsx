@@ -11,15 +11,17 @@
 // composites and this is not one of them, so inventing a sixth SlotId here would be
 // speculative design in a file (`slots.ts`) the plan says is authored once. M4 decides
 // its own shape; what M1 owes it is a container with an obvious place to land.
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { RefusalScreen, StudioSwitcher } from '@studio/ui'
 import type { Session } from '@studio/core'
 import { apiFetch } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { ParentHome } from '../home/ParentHome'
+import type { HomeLesson } from '../home/ParentHome'
 import { everyChildIsOnATrial, makePeopleClient, useMyStudents } from '../people'
 import { TrialHome } from '../people'
+import { makeParentScheduleClient } from '../schedule/client'
 
 /** Where the staff app lives, so §6.1's second refusal is a link rather than a dead end. */
 const STAFF_APP_URL = '/staff'
@@ -30,6 +32,35 @@ export function Resolve({ session, locale }: { session: Session; locale: Locale 
   // fresh object every render would re-fetch forever.
   const peopleClient = useMemo(() => makePeopleClient(apiFetch), [])
   const mine = useMyStudents(peopleClient)
+  const scheduleClient = useMemo(() => makeParentScheduleClient(apiFetch), [])
+  // 2a's "upcoming" strip data, at 1a's depth: the next few lessons across the family's
+  // groups, this week. `null` while loading so the home stays quiet rather than flashing
+  // an empty state; a failed read renders the empty state, because a home that dies on a
+  // schedule hiccup is worse than one missing a list.
+  const [upcoming, setUpcoming] = useState<readonly HomeLesson[] | null>(null)
+  useEffect(() => {
+    if (!session.access.parent) return
+    let live = true
+    const now = new Date()
+    const weekOut = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
+    const day = (d: Date) => d.toISOString().slice(0, 10)
+    scheduleClient
+      .listSessions({ from: day(now), to: day(weekOut) })
+      .then((rows) => {
+        if (!live) return
+        setUpcoming(
+          rows
+            .filter((row) => row.status === 'scheduled' && new Date(row.starts_at) >= now)
+            .sort((a, b) => a.starts_at.localeCompare(b.starts_at))
+            .slice(0, 5)
+            .map((row) => ({ id: row.id, startsAt: row.starts_at, groupName: row.group_name })),
+        )
+      })
+      .catch(() => live && setUpcoming([]))
+    return () => {
+      live = false
+    }
+  }, [scheduleClient, session.access.parent])
 
   // §3.1 — the parent app asks 'do you have any guardian rows?', which is what
   // `access.parent` reports. A role check here would let a manager with no children in.
@@ -106,14 +137,23 @@ export function Resolve({ session, locale }: { session: Session; locale: Locale 
   }
 
   return (
-    // §6.1's home — artboard 1a, the BASE one. Steps 5 and 6 (terms and privacy, then a
-    // health declaration per child whose health_status is `missing`) are M4's blocking
-    // gates and land in FRONT of this. M5 enriches the home itself into 2a with the day
-    // strip and past attendance; neither is built here.
-    //
-    // `access.parent` IS §6.1's query — EXISTS(guardian WHERE person_id = :me) — so it is
-    // the honest input to 'do you have children here'. It answers whether and not how
-    // many: guardian.student_id has no foreign key (D-M1-1) because `student` is M3's.
-    <ParentHome locale={locale} hasChildren={session.access.parent} />
+    // §6.1's home — artboard 1a. The health gate (step 6) wraps this whole shell in
+    // App.tsx since the ship audit mounted it. The W1 `hasChildren` boolean is retired
+    // with it: `mine` has named the children since M3, so the home renders them.
+    <ParentHome
+      locale={locale}
+      students={
+        mine.status === 'ready'
+          ? mine.students.map((student) => ({
+              id: student.id,
+              displayName: `${student.first_name} ${student.last_name}`,
+              groupNames: student.group_names ?? [],
+            }))
+          : mine.status === 'error'
+            ? []
+            : null
+      }
+      upcoming={upcoming}
+    />
   )
 }

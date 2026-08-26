@@ -470,13 +470,25 @@ holdbacks:
       controls now live in the drawer, artboard 2e) but these two in-page links were left:
       removing a drawn affordance is a design call, and `#/directions` names a feature — the
       way to the dojo for a trial lesson — that was never built.
+
+      CLOSED 2026-08-27 by the ship-audit fix session, with exactly the shape this holdback
+      asked for: `App.tsx` wraps every routed branch in `HealthGate` (drawer links and typed
+      hashes included — "no other screen is reachable" is the routing expression, not one
+      screen), fed from `/me/students` and re-read on submit; `AppHealthGate.test.tsx`
+      asserts against the SHELL that a guardian with a `missing` child cannot reach home,
+      that `trial_signed` still gates, and that a fully signed family passes; and E2E-1 now
+      walks the gate live on both sides of the signature — blocked calendar, declaration
+      filed, calendar open — which is the "run E2E-1 against it" this entry said closing
+      required. 19/19 E2E green. The two dead in-page links (`#/settings` gear,
+      `#/directions`) remain the design call they were and are recorded in the ship-audit
+      report rather than kept holding this gate open.
     blocks: §5.5 · §6.1 step 6
-    status: open
+    status: closed
     opened: 2026-08-26
-    closed: null
+    closed: 2026-08-27
     source: >-
-      web/apps/parent/src/features/health/index.ts (exported, never imported) ·
-      web/apps/parent/src/App.tsx · web/apps/parent/src/features/identity/Resolve.tsx
+      web/apps/parent/src/App.tsx · web/apps/parent/src/AppHealthGate.test.tsx ·
+      e2e/01-registration-to-active.spec.ts · e2e/fixtures/scenario.ts
   - id: HB-e2e-demo-reset
     kind: carried
     title: POST /dev/demo/reset works once, then 500s for ever
@@ -532,12 +544,22 @@ holdbacks:
       being authorized by it, in a session with nobody to ask. Everything downstream is
       ready: when it lands, delete `clearAuditLog()` from `e2e/fixtures/global-setup.ts` and
       the suite resets per test instead of once per run.
+
+      CLOSED 2026-08-27 by the ship-audit fix session, on the owner's explicit "fix all the
+      blocked findings" — the per-file ask this holdback was waiting for. Landed as
+      `alembic/versions/0011_ship_audit_fixes.py` (both actor references to SET NULL, plus
+      the B1 role-LOGIN fix that shares the revision; the pending .txt is deleted).
+      Verified three ways: `test_reset_survives_an_audit_row_naming_a_demo_person` — an
+      audit row naming a demo person, then a reset that keeps the row and nulls only the
+      actor; a live double `POST /dev/demo/reset`, 200 then 200; and `clearAuditLog()`
+      removed from global-setup.ts with the whole E2E suite green after it, 19/19.
     blocks: §19.7 · E2E fixture isolation
-    status: open
+    status: closed
     opened: 2026-08-26
+    closed: 2026-08-27
     source: >-
-      app/services/demo/service.py NEVER_WIPED · fk_audit_log_actor_person_id_person ·
-      e2e/fixtures/global-setup.ts
+      alembic/versions/0011_ship_audit_fixes.py · app/models/audit.py ·
+      tests/dev/test_demo_service.py · e2e/fixtures/global-setup.ts
   - id: HB-e2e-parent-billing-api
     kind: carried
     title: The parent app's billing vertical has no parent-reachable API, so `12f` cannot load

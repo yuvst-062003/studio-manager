@@ -82,10 +82,14 @@ def _persona_key(subject: str | None) -> str | None:
 
 
 def _describe(session: Session, person: Person, studio: Studio) -> ResolvedPersona:
+    # DISTINCT (ship-audit D4): a lead coach holds one GROUP-scoped assignment per group,
+    # and after a long E2E run the switcher listed `lead_coach` nineteen times. This is a
+    # projection of what the persona IS; scope multiplicity is the assignments' business.
     roles = tuple(
         session.execute(
             select(RoleAssignment.role)
             .where(RoleAssignment.person_id == person.id, RoleAssignment.revoked_at.is_(None))
+            .distinct()
             .order_by(RoleAssignment.role)
         )
         .scalars()

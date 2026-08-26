@@ -36,6 +36,17 @@ def main() -> int:
     try:
         report = describe_runtime_role(engine)
     except Exception as exc:  # noqa: BLE001 -- the reason is the output
+        if "not permitted to log in" in str(exc):
+            # The W0-W6 ship audit's B1: the role exists NOLOGIN, which reads as a
+            # connection failure but is a role misconfiguration -- revision 0011 grants
+            # LOGIN, so a database at head cannot show this. Answer 1, not 2: this is
+            # "not enforced", measured, not "could not check".
+            print(
+                f"❌ the runtime role exists but cannot log in: {exc}\n"
+                "   run `.venv/bin/alembic upgrade head` (revision 0011 grants LOGIN)",
+                file=sys.stderr,
+            )
+            return 1
         print(f"?  could not reach the database: {exc}", file=sys.stderr)
         return 2
     finally:

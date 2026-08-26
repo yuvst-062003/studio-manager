@@ -18,13 +18,6 @@ export type PayerBalanceOut = components['schemas']['PayerBalanceOut']
 
 export type Fetcher = (path: string, init?: RequestInit) => Promise<Response>
 
-const JSON_HEADERS = { 'Content-Type': 'application/json' }
-
-async function json<T>(response: Response): Promise<T> {
-  if (!response.ok) throw new Error(`${response.status} ${response.url}`)
-  return (await response.json()) as T
-}
-
 /** The uPay form as data: an action and hidden fields the client posts. */
 export type UpayForm = { action: string; fields: Record<string, string> }
 
@@ -38,56 +31,30 @@ export type BillingClient = {
   orderStatus(publicRef: string): Promise<PaymentOrderOut>
 }
 
-export function makeBillingClient(fetcher: Fetcher): BillingClient {
-  return {
-    async openCharges(payerPersonId) {
-      const response = await fetcher(
-        `/api/v1/charges?payer_person_id=${payerPersonId}&status=open`,
-      )
-      return (await json<{ items: ChargeOut[] }>(response)).items
-    },
-    async balance(payerPersonId) {
-      return json<PayerBalanceOut>(await fetcher(`/api/v1/payers/${payerPersonId}/balance`))
-    },
-    async payments(payerPersonId) {
-      const response = await fetcher(`/api/v1/payments?payer_person_id=${payerPersonId}`)
-      return (await json<{ items: PaymentOut[] }>(response)).items
-    },
-    async products() {
-      return (await json<{ items: ProductOut[] }>(await fetcher('/api/v1/products'))).items
-    },
-    async createOrder(chargeIds, maxPayments) {
-      // `max_payments` is a query parameter and `charge_ids` the body: `PaymentOrderCreateIn`
-      // is W4's contract shape and carries only the ids. The payer is never sent — the
-      // server takes it from the session, because a body-supplied payer would let anyone
-      // open an order over anyone's charges.
-      return json<PaymentOrderOut>(
-        await fetcher(`/api/v1/payment-orders?max_payments=${maxPayments}`, {
-          method: 'POST',
-          headers: JSON_HEADERS,
-          body: JSON.stringify({ charge_ids: chargeIds }),
-        }),
-      )
-    },
-    async orderForm(publicRef) {
-      return json<UpayForm>(await fetcher(`/api/v1/payment-orders/${publicRef}/form`))
-    },
-    async orderStatus(publicRef) {
-      return json<PaymentOrderOut>(await fetcher(`/api/v1/payment-orders/${publicRef}`))
-    },
-  }
-}
+// There is deliberately no `makeBillingClient` here any more (ship-audit D5). The one
+// this module used to export called `/charges?payer_person_id=` and `/payers/{id}/balance`
+// — manager-only routes a parent answers 403 from — and was mounted by nothing; the
+// screen ships on `makeParentBillingClient` (PaymentsSection.tsx), which reads the
+// `/me/*` routes. A loaded trap with the same shape as the real client is exactly the
+// import autocomplete reaches for first.
 
 /**
  * §5.10's card route: 'Choosing N months selects the N oldest unpaid tuition charges across
  * every student this person is the payer for.'
- *
- * The charges arrive oldest-first from the server, so this is a `slice` and not a sort — a
- * second ordering here would be a second answer to "which months am I paying for", and the
- * one the server used is the one the order will actually cover.
  */
 export function oldestMonths(charges: readonly ChargeOut[], months: number): ChargeOut[] {
-  return charges.slice(0, months)
+  // Sorted here even though `/me/charges` now orders by (due_date, id) server-side
+  // (ship-audit B5): this slice decides which months a family's money settles, and a
+  // bare slice turns any upstream reordering — a cache, a merge, a regression — into
+  // silently paying the wrong months. ISO dates compare lexicographically; the id
+  // breaks ties so a re-render selects the same rows.
+  return [...charges]
+    .sort((a, b) =>
+      a.due_date === b.due_date
+        ? a.id.localeCompare(b.id)
+        : a.due_date.localeCompare(b.due_date),
+    )
+    .slice(0, months)
 }
 
 /** The total a selection comes to, in agorot. Integers throughout (G2). */

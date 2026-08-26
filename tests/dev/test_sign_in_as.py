@@ -149,3 +149,33 @@ def test_every_sign_in_is_audit_logged(client, app_session, demo_studio_id):
         )
 
     assert "dev.sign_in_as" in actions
+
+
+# -- the platform operator's door (ship-audit D3) -----------------------------
+def test_the_platform_key_signs_in_a_working_platform_admin(client, demo_studio_id):
+    """§16's console was unreachable in development: all nine §19.3 personas live inside
+    the demo studio, and `/dev/act-as` mints `is_platform_admin=False` unconditionally --
+    so the studio-creation flow could never be exercised locally at all. The reserved
+    `platform` key signs in the seeded developer identity, whose `platform_admin` row is
+    what the session derivation already reads. Proven by capability, not by claim: the
+    platform console itself must answer."""
+    response = client.get(f"{SIGN_IN}/platform?app=dashboard", follow_redirects=False)
+    assert response.status_code == 307, response.text
+
+    session = client.post("/api/v1/auth/refresh")
+    assert session.status_code == 200, session.text
+    token = session.json()["access_token"]
+
+    studios = client.get("/api/v1/platform/studios", headers={"Authorization": f"Bearer {token}"})
+    assert studios.status_code == 200, studios.text
+
+
+def test_a_persona_session_still_cannot_reach_the_platform_console(client, demo_studio_id):
+    """The complement, so the new door cannot have widened the old ones: an owner is the
+    demo studio's highest role and still not a platform operator."""
+    client.get(f"{SIGN_IN}/owner?app=dashboard", follow_redirects=False)
+    session = client.post("/api/v1/auth/refresh")
+    token = session.json()["access_token"]
+
+    studios = client.get("/api/v1/platform/studios", headers={"Authorization": f"Bearer {token}"})
+    assert studios.status_code == 403, studios.text

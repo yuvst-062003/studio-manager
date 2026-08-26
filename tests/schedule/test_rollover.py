@@ -440,9 +440,7 @@ def test_a_repricing_closes_the_old_plan_and_opens_a_successor(
     # Scoped to this studio: `app_session` is the raw fixture session with no tenant filter,
     # and the demo studio ships open plans of its own.
     successor = app_session.execute(
-        select(PricePlan).where(
-            PricePlan.studio_id == studio.id, PricePlan.active_to.is_(None)
-        )
+        select(PricePlan).where(PricePlan.studio_id == studio.id, PricePlan.active_to.is_(None))
     ).scalar_one()
     assert successor.id != old.id
     assert successor.monthly_amount_agorot == 27_000

@@ -257,3 +257,61 @@ def test_a_credit_is_settled_when_it_is_fully_allocated(tenant_session, studio, 
     _pay(tenant_session, studio, credit, -5_000, a_priced_student.payer_person_id)
     service.recompute_charge_status(credit.id)
     assert credit.status == "settled"
+
+
+# -- ordering (ship-audit B5) --------------------------------------------------
+def test_charges_list_oldest_first_regardless_of_insertion_or_id_order(
+    tenant_session, app_session, studio, a_priced_student
+):
+    """§5.10 — `/me/charges` promises "oldest first, which is the order the card route
+    selects in", and the client's `oldestMonths` slices without sorting on the strength
+    of that promise. The list was ordered by `Charge.id` — a random UUID4 — so "pay 2
+    months" selected arbitrary charges and could settle August while June stayed owed.
+
+    The ids are chosen so id-order is the exact REVERSE of due-date order: an id-ordered
+    implementation cannot pass by luck.
+    """
+    from app.models.billing import Charge
+
+    months = [
+        (2026, 9, date(2026, 9, 30)),
+        (2026, 10, date(2026, 10, 31)),
+        (2026, 11, date(2026, 11, 30)),
+    ]
+    # A fresh random prefix per run (fixed ids collide with rows a previous run left in
+    # the shared test database); only the last digits vary, so id-order inside the trio
+    # is still deterministic — and deliberately the reverse of due-date order.
+    prefix = uuid.uuid4().hex[:20]
+    ids = [uuid.UUID(prefix + f"{i:012d}") for i in (3, 2, 1)]
+    for (year, month, due), charge_id in zip(reversed(months), reversed(ids), strict=True):
+        app_session.add(
+            Charge(
+                id=charge_id,
+                studio_id=studio.id,
+                payer_person_id=a_priced_student.payer_person_id,
+                student_id=a_priced_student.student_id,
+                kind="tuition",
+                period_year=year,
+                period_month=month,
+                amount_agorot=MONTHLY_AGOROT,
+                due_date=due,
+                status="open",
+                created_by="billing_run",
+            )
+        )
+    app_session.commit()
+
+    pairs, _ = BillingService(tenant_session).list_charges(
+        payer_person_id=a_priced_student.payer_person_id, status="open"
+    )
+    assert [c.due_date for c, _ in pairs] == [due for _, _, due in months]
+
+    # And the cursor walks the same order: page size 2 splits [Sep, Oct] / [Nov].
+    page1, cursor = BillingService(tenant_session).list_charges(
+        payer_person_id=a_priced_student.payer_person_id, status="open", limit=2
+    )
+    assert cursor is not None
+    page2, _ = BillingService(tenant_session).list_charges(
+        payer_person_id=a_priced_student.payer_person_id, status="open", after=cursor
+    )
+    assert [c.due_date for c, _ in page1 + page2] == [due for _, _, due in months]

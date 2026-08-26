@@ -20,6 +20,7 @@ from fastapi import APIRouter, HTTPException, Query, Request, Response, status
 from app.core.auth_context import AnyStaff, ManagerOrOwner
 from app.core.clock import now
 from app.core.tenancy import TenantSessionDep
+from app.routers.health_templates import TemplateReader
 from app.schemas.structure import (
     DEFAULT_PAGE_SIZE,
     MAX_PAGE_SIZE,
@@ -207,13 +208,16 @@ def assign_group_staff(
 # -- health templates (conflict C3) -------------------------------------------
 @router.get("/health-templates", response_model=HealthTemplateListResponse)
 def list_health_templates(
-    _: ManagerOrOwner, session: TenantSessionDep, kind: str | None = None
+    _: TemplateReader, session: TenantSessionDep, kind: str | None = None
 ) -> HealthTemplateListResponse:
     """Conflict C3's read side, so M3 can find the trial template it must present.
 
-    Manager and owner only: §3.2 gives 'Read full health declaration' to those two, and
-    §6.4 puts the template editor on the manager dashboard. A coach has no business here
-    -- they see `derived_flags` and nothing else (§5.5).
+    Managers, owners and GUARDIANS -- `require_template_reader`, shared with the
+    questions route it always leads to. It was manager-only until the ship audit mounted
+    §6.1's gate and the first family it stopped got a 403 for the form's own list; a
+    parent must find the template to fill it. A coach still has no business here -- they
+    see `derived_flags` and nothing else (§5.5) -- and this shape holds no question text
+    anyway (`id`, `kind`, `version`; the questions live behind the sibling route).
     """
     from sqlalchemy import select
 

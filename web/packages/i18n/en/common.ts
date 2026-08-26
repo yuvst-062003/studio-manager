@@ -223,11 +223,10 @@ export const common: Bundle = {
   'home.noChildren': 'No children are linked to this account yet.',
   'home.childrenComeLater': 'The club links a child to your account when they enrol.',
   'home.noUpcoming': 'No lessons are scheduled yet.',
-  'home.upcomingComeLater': 'Lessons appear here once the club builds its weekly schedule.',
+  'home.noUpcomingWeek': 'No lessons are scheduled in the coming week.',
   'home.noAlerts': 'Nothing needs your attention.',
   'home.tab.home': 'Home',
   'home.tab.payments': 'Payments',
   'home.tab.messages': 'Messages',
   'home.tab.profile': 'Profile',
-  'home.tabsComeLater': 'Payments, messages and profile open later.',
 }

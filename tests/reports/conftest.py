@@ -214,7 +214,7 @@ def twelve_students_mixed_billing(
     students = []
 
     # Create 4 students with October charges (closed period)
-    for i in range(4):
+    for _i in range(4):
         student = _make_priced_student(app_session, studio, a_price_plan)
         students.append(student)
 
@@ -234,7 +234,7 @@ def twelve_students_mixed_billing(
     app_session.commit()
 
     # Create 4 students with October charges (overdue by 12 days as of Nov 12)
-    for i in range(4):
+    for _i in range(4):
         student = _make_priced_student(app_session, studio, a_price_plan)
         students.append(student)
 
@@ -254,7 +254,7 @@ def twelve_students_mixed_billing(
     app_session.commit()
 
     # Create 4 students with November charges (in-progress period)
-    for i in range(4):
+    for _i in range(4):
         student = _make_priced_student(app_session, studio, a_price_plan)
         students.append(student)
 

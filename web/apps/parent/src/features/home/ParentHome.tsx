@@ -3,31 +3,46 @@
 // 1a and 2a are the same screen at two milestones. 2a — the day strip and past attendance
 // — is M5's, and is deliberately NOT built here.
 //
-// **What 1a can honestly render in M1, and why the rest is an empty state rather than
-// mock data.** 1a draws three data regions above the tab bar: alert cards (a debt, a
-// missing health declaration), lessons grouped by day, and a chip per child. Every one of
-// them reads a table that does not exist yet:
-//
-//   the chips    — `guardian` exists, and §3.3 makes 'my children' exactly
-//                  `SELECT student_id FROM guardian WHERE person_id = me`. But
-//                  `guardian.student_id` carries no foreign key on purpose (D-M1-1):
-//                  `student` is M3's table, so M1 can count children and cannot name one.
-//   the lessons  — `session` and `enrollment` are W2 contract models.
-//   the alerts   — a charge is M6's and a health declaration is M4's.
-//
-// So the home ships its chrome and says what is missing, in the parent's own language,
-// rather than shipping a plausible-looking screen full of invented children. A parent who
-// opens this before their club has a schedule should read "the club has not built the
-// schedule yet", not an empty box.
+// **The W1 placeholders are retired (ship-audit B4).** This screen shipped through W6
+// still saying a child cannot be named (`student` was M3's table when that was written),
+// the lesson list would appear "when the club builds a schedule", and three of four tabs
+// were disabled under "ייפתחו בהמשך" — while `/me/students` named every child, the family
+// had a materialized schedule, and the payments screen behind the dead tab was the
+// subject of two green E2E flows. The home now renders what the product knows and the
+// tabs are links to the screens that exist. Data arrives by PROPS: `Resolve` owns the
+// fetches, so this stays the presentational component every test renders directly.
 import type { CSSProperties } from 'react'
+import { formatDateInStudioZone, formatTimeInStudioZone } from '@studio/core'
 import { Card, EmptyState } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 
-/** 1a's bottom bar. The three that are not home open in later milestones. */
 export const TABS = ['home', 'payments', 'messages', 'profile'] as const
 
 export type ParentTab = (typeof TABS)[number]
+
+/** Every tab routes somewhere real; a disabled tab over a working screen was B4. */
+export const TAB_ROUTES: Record<ParentTab, string> = {
+  home: '#/',
+  payments: '#/payments',
+  // The inbox route kept its §5.11 name; the tab keeps 1a's label. One screen, two words
+  // for it, and the route is the one that must not churn — it is in parents' history.
+  messages: '#/announcements',
+  profile: '#/profile',
+}
+
+export type HomeStudent = {
+  id: string
+  displayName: string
+  groupNames: readonly string[]
+}
+
+export type HomeLesson = {
+  id: string
+  /** UTC ISO — rendered in the studio zone here, per G3. */
+  startsAt: string
+  groupName: string
+}
 
 const pageStyle: CSSProperties = {
   display: 'flex',
@@ -55,6 +70,35 @@ const titleStyle: CSSProperties = {
   marginInlineEnd: 'auto',
 }
 
+const chipListStyle: CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: 'var(--space-2)',
+  listStyle: 'none',
+  margin: 0,
+  padding: 0,
+}
+
+const lessonListStyle: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 'var(--space-2)',
+  listStyle: 'none',
+  margin: 0,
+  padding: 0,
+}
+
+const lessonRowStyle: CSSProperties = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  gap: 'var(--space-3)',
+}
+
+const mutedStyle: CSSProperties = {
+  color: 'var(--text-muted)',
+  fontSize: 'var(--text-caption)',
+}
+
 const tabBarStyle: CSSProperties = {
   display: 'flex',
   listStyle: 'none',
@@ -70,6 +114,7 @@ const tabStyle: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',
+  justifyContent: 'center',
   gap: 'var(--space-1)',
   // §6.2's 44px rule is a phone rule, not a staff rule — it applies here for the same
   // reason: a thumb, one-handed, on a moving bus.
@@ -79,21 +124,16 @@ const tabStyle: CSSProperties = {
 
 export function ParentHome({
   locale,
-  hasChildren = false,
+  students = null,
+  upcoming = null,
   activeTab = 'home',
-  onSelectTab,
 }: {
   locale: Locale
-  /**
-   * A boolean and not a count, because a boolean is exactly what M1 knows. §6.1's parent
-   * query is `EXISTS(guardian WHERE person_id = :me)` — it answers *whether*, and
-   * `guardian.student_id` carries no foreign key (D-M1-1) because `student` is M3's
-   * table, so nothing here can turn that EXISTS into a number or a name. Rendering a
-   * fabricated `1` would be worse than rendering the truth.
-   */
-  hasChildren?: boolean
+  /** `null` while loading — the section stays quiet rather than flashing an empty state. */
+  students?: readonly HomeStudent[] | null
+  /** The next few lessons, already filtered and capped by the caller. `null` = loading. */
+  upcoming?: readonly HomeLesson[] | null
   activeTab?: ParentTab
-  onSelectTab?: (tab: ParentTab) => void
 }) {
   return (
     <section aria-labelledby="parent-home-title" data-testid="parent-home" style={pageStyle}>
@@ -110,58 +150,75 @@ export function ParentHome({
 
       <section aria-labelledby="parent-home-alerts-title">
         <h2 id="parent-home-alerts-title">{t(locale, 'common.home.alerts')}</h2>
-        {/* A charge is M6's and a declaration is M4's, so there is genuinely nothing to
-            raise. "Nothing needs your attention" is the truth today and stays correct
-            once those milestones land. */}
+        {/* Debt and health alerts are 2a's day-strip milestone territory; until then the
+            truth is stated rather than an empty box drawn. */}
         <p data-testid="parent-home-no-alerts">{t(locale, 'common.home.noAlerts')}</p>
       </section>
 
       <section aria-labelledby="parent-home-children-title">
         <h2 id="parent-home-children-title">{t(locale, 'common.home.title')}</h2>
-        {hasChildren ? (
-          <Card>
-            {/* 1a draws a chip per child. A chip needs a name, and `student` is M3's
-                table — so what lands here is the sentence that says when the names
-                arrive, not an invented roster. */}
-            <p data-testid="parent-home-children-pending">
-              {t(locale, 'common.home.childrenComeLater')}
-            </p>
-          </Card>
-        ) : (
+        {students === null ? null : students.length === 0 ? (
           <EmptyState
             title={t(locale, 'common.home.noChildren')}
             description={t(locale, 'common.home.childrenComeLater')}
           />
+        ) : (
+          <ul style={chipListStyle}>
+            {students.map((student) => (
+              <li key={student.id} data-testid="parent-home-child" style={{ flex: '1 1 12rem' }}>
+                <Card>
+                  <strong>
+                    <bdi>{student.displayName}</bdi>
+                  </strong>
+                  {student.groupNames.length > 0 ? (
+                    <p style={mutedStyle}>
+                      <bdi>{student.groupNames.join(' · ')}</bdi>
+                    </p>
+                  ) : null}
+                </Card>
+              </li>
+            ))}
+          </ul>
         )}
       </section>
 
       <section aria-labelledby="parent-home-upcoming-title">
         <h2 id="parent-home-upcoming-title">{t(locale, 'common.home.upcoming')}</h2>
-        <EmptyState
-          title={t(locale, 'common.home.noUpcoming')}
-          description={t(locale, 'common.home.upcomingComeLater')}
-        />
+        {upcoming === null ? null : upcoming.length === 0 ? (
+          <EmptyState
+            title={t(locale, 'common.home.noUpcoming')}
+            description={t(locale, 'common.home.noUpcomingWeek')}
+          />
+        ) : (
+          <ul style={lessonListStyle}>
+            {upcoming.map((lesson) => (
+              <li key={lesson.id} data-testid="parent-home-lesson" style={lessonRowStyle}>
+                <bdi>{lesson.groupName}</bdi>
+                <span style={{ fontVariantNumeric: 'tabular-nums' }}>
+                  {formatDateInStudioZone(lesson.startsAt, locale)}{' '}
+                  {formatTimeInStudioZone(lesson.startsAt, locale)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       <nav aria-label={t(locale, 'common.home.title')}>
         <ul style={tabBarStyle}>
           {TABS.map((tab) => (
-            <li key={tab} style={tabStyle}>
-              <button
-                type="button"
+            <li key={tab} style={{ flex: 1, display: 'flex' }}>
+              <a
+                href={TAB_ROUTES[tab]}
                 aria-current={tab === activeTab ? 'page' : undefined}
-                // The three that are not home open in later milestones. Disabled and
-                // explained beats a tab that navigates to a blank screen.
-                disabled={tab !== 'home'}
                 data-testid={`parent-tab-${tab}`}
-                onClick={() => onSelectTab?.(tab)}
+                style={tabStyle}
               >
                 {t(locale, `common.home.tab.${tab}`)}
-              </button>
+              </a>
             </li>
           ))}
         </ul>
-        <p data-testid="parent-tabs-note">{t(locale, 'common.home.tabsComeLater')}</p>
       </nav>
     </section>
   )

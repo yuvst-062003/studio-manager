@@ -232,11 +232,10 @@ export const common: Bundle = {
   'home.noChildren': 'עדיין אין ילדים משויכים לחשבון הזה.',
   'home.childrenComeLater': 'מנהל הסטודיו משייך ילד לחשבון בעת ההרשמה.',
   'home.noUpcoming': 'אין עדיין שיעורים מתוזמנים.',
-  'home.upcomingComeLater': 'לוח השיעורים יופיע כאן ברגע שהמועדון יבנה את מערכת השעות.',
+  'home.noUpcomingWeek': 'אין שיעורים מתוזמנים בשבוע הקרוב.',
   'home.noAlerts': 'אין התראות פתוחות.',
   'home.tab.home': 'בית',
   'home.tab.payments': 'תשלומים',
   'home.tab.messages': 'הודעות',
   'home.tab.profile': 'פרופיל',
-  'home.tabsComeLater': 'תשלומים, הודעות ופרופיל ייפתחו בהמשך.',
 }

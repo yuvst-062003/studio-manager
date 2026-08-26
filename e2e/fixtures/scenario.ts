@@ -74,6 +74,11 @@ const YEAR_ENDS = '2026-10-31'
  */
 export const PERIOD = { year: 2026, month: 8 } as const
 
+//: A 1×1 transparent PNG. The server sniffs the bytes for a PNG magic number and nothing
+//: more (`decode_signature`) — a drawn signature is a person's job, not a fixture's.
+const SIGNATURE_PNG =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
+
 /** §5.10's tuition price for the fixture group. Whole shekels — G2, integers throughout. */
 const MONTHLY_AGOROT = 32_000
 
@@ -174,6 +179,11 @@ class Api {
     private readonly request: APIRequestContext,
     private readonly token: string,
   ) {}
+
+  /** The bearer itself, for the one caller (`tryOpenOrder`) that needs a raw response. */
+  get bearer(): string {
+    return this.token
+  }
 
   /**
    * `at` sets §19.5's `X-Dev-Now`, which shifts `app.core.clock.now()` for that request
@@ -354,6 +364,15 @@ export async function buildScenario(
     studentIds.push(created.student.id)
   }
   const created = { student: { id: studentIds[0]! } }
+
+  // §5.5 — an ACTIVE student in a running club has a signed declaration, and W6 mounts
+  // the parent-app gate that enforces it. EVERY outstanding declaration in the studio is
+  // signed here, not only this scenario's children: §6.1 gates on "any linked student",
+  // so one fixture-seeded child left `missing` traps its parent persona behind the
+  // declaration form in whichever flow uses them next. The suite's steady state is a
+  // well-run club; the one test that needs an UNSIGNED child (E2E-1) creates it after
+  // this ran, which is also the order reality happens in.
+  await signOutstandingDeclarations(manager)
 
   // §5.10 step 1 — the run charges 'every active enrollment' IN THE STUDIO, not just this
   // scenario's child. So a run here also bills every other scenario's students for the
@@ -542,6 +561,76 @@ export async function openOrderFor(
   return payer.send<OrderRow>(`post`, `/payment-orders?max_payments=${maxPayments}`, {
     charge_ids: scenario.chargeIds,
   })
+}
+
+/**
+ * §5.5's paperwork, done: a full declaration filed for every student in the studio that
+ * still owes one, by the manager, on the guardians' behalf (§5.1 sanctions exactly this).
+ * All-clear answers, so no derived flag lands on rosters other tests assert against; the
+ * two consent booleans are the template's required yeses.
+ */
+async function signOutstandingDeclarations(manager: Api): Promise<void> {
+  const templates = await manager.send<{ items: { id: string }[] }>(
+    'get',
+    '/health-templates?kind=full',
+  )
+  const templateId = templates.items[0]!.id
+  const template = await manager.send<{
+    schema: { sections: { questions: { id: string; type: string }[] }[] }
+  }>('get', `/health-templates/${templateId}`)
+  const answers: Record<string, unknown> = {}
+  for (const section of template.schema.sections) {
+    for (const question of section.questions) {
+      answers[question.id] =
+        question.type === 'boolean' ? false : question.type === 'phone' ? '050-0000000' : ''
+    }
+  }
+  answers['fit_to_train'] = true
+  answers['notify_changes'] = true
+  for (const status of ['missing', 'trial_signed']) {
+    const unsigned = await manager.send<{ items: { id: string }[] }>(
+      'get',
+      `/students?health_status=${status}&limit=200`,
+    )
+    for (const student of unsigned.items) {
+      await manager.send(`post`, `/students/${student.id}/health-declaration`, {
+        template_id: templateId,
+        answers,
+        signature_image_base64: SIGNATURE_PNG,
+      })
+    }
+  }
+}
+
+/**
+ * The same sweep for a spec that created its own unsigned child mid-test: E2E-1's
+ * conversion puts a `trial_signed` student behind §6.1's gate — the spec asserts the gate
+ * fired, then calls this and asserts the app opened.
+ */
+export async function signAllDeclarations(request: APIRequestContext): Promise<void> {
+  await signOutstandingDeclarations(await asPersona(request, 'manager'))
+}
+
+/**
+ * The second-tab POST: an order over exactly `chargeIds`, as the payer, returning the raw
+ * status rather than throwing — E2E-3's double-payment test asserts the 409 itself.
+ *
+ * A tab that loaded before an order existed still offers the charges that order now
+ * covers; its POST names them verbatim. The screen's own selection can no longer produce
+ * that request (covered rows are unselectable since W6), which is exactly why the guard
+ * under test is the server's and the test must address it directly.
+ */
+export async function tryOpenOrder(
+  request: APIRequestContext,
+  scenario: Scenario,
+  chargeIds: string[],
+): Promise<number> {
+  const payer = await asPersona(request, scenario.parentPersona)
+  const response = await request.post(`${API_ORIGIN}/api/v1/payment-orders?max_payments=1`, {
+    headers: { Authorization: `Bearer ${payer.bearer}` },
+    data: { charge_ids: chargeIds },
+  })
+  return response.status()
 }
 
 /**

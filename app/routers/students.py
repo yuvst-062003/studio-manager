@@ -661,6 +661,32 @@ def my_students(request: Request, session: TenantSessionDep) -> StudentSummaryPa
     return StudentSummaryPage(items=[_summary(row) for row in rows], has_more=False)
 
 
+@router.get("/me/guardians", response_model=GuardianListResponse)
+def my_guardians(request: Request, session: TenantSessionDep) -> GuardianListResponse:
+    """Parent `12i`'s guardians section -- the FAMILY's guardians, read by one of them.
+
+    Ship-audit B4: `ProfileAndLeave` was built against `GET /students/{id}` -- a staff
+    route a parent gets 403 from -- which went unnoticed for as long as nothing mounted
+    the screen. This is the payer-side read it actually needed, shaped like every other
+    guardian list.
+
+    No role dependency, same reason as `/me/students`: §3.1 -- 'guardian is not a role'.
+    Deduplicated by person across the family's students (L8 -- one guardian view): two
+    children share their parents, and a screen that listed each parent once per child
+    would read as a bug in exactly the family it appears for.
+    """
+    person_id = _person_id(request)
+    seen: set[uuid.UUID] = set()
+    items = []
+    for row in StudentService.for_guardian(session, person_id=person_id):
+        for out in _guardian_list(session, row.id).items:
+            if out.person_id in seen:
+                continue
+            seen.add(out.person_id)
+            items.append(out)
+    return GuardianListResponse(items=items)
+
+
 @router.post(
     "/me/students",
     response_model=RegistrationRequestOut,

@@ -181,11 +181,19 @@ describe('1b — the pay screen', () => {
 })
 
 describe('the selection arithmetic', () => {
-  it('takes the oldest N and never re-sorts', () => {
-    // The server returns oldest-first, and re-sorting here would be a second answer to
-    // "which months am I paying for" — the server's is the one the order will cover.
-    const charges = [charge('a', 9), charge('b', 10), charge('c', 11)]
+  it('selects the N oldest by due date even when the list arrives shuffled', () => {
+    // Ship-audit B5. "Pay 2 months" is §5.10's money decision — the two OLDEST months —
+    // and this used to be a bare slice trusting the server's ordering, which was a
+    // random-UUID order in disguise: a parent could settle August while June stayed
+    // owed. Sorting here agrees with a correct server and corrects a broken one.
+    const charges = [charge('c', 11), charge('a', 9), charge('b', 10)]
     expect(oldestMonths(charges, 2).map((c) => c.id)).toEqual(['a', 'b'])
+  })
+
+  it('breaks due-date ties by id so a re-render selects the same months', () => {
+    const twin = { ...charge('z', 9), id: 'a2' }
+    const charges = [twin, charge('a1', 9), charge('b', 10)]
+    expect(oldestMonths(charges, 2).map((c) => c.id)).toEqual(['a1', 'a2'])
   })
 
   it('sums in agorot', () => {

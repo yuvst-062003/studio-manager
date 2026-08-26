@@ -233,11 +233,10 @@ export const common: Bundle = {
   'home.noChildren': 'К этому аккаунту пока не привязан ни один ребёнок.',
   'home.childrenComeLater': 'Клуб привязывает ребёнка к аккаунту при записи.',
   'home.noUpcoming': 'Занятия пока не запланированы.',
-  'home.upcomingComeLater': 'Занятия появятся здесь, когда клуб составит расписание.',
+  'home.noUpcomingWeek': 'На ближайшую неделю занятия не запланированы.',
   'home.noAlerts': 'Ничего не требует вашего внимания.',
   'home.tab.home': 'Главная',
   'home.tab.payments': 'Платежи',
   'home.tab.messages': 'Сообщения',
   'home.tab.profile': 'Профиль',
-  'home.tabsComeLater': 'Платежи, сообщения и профиль появятся позже.',
 }

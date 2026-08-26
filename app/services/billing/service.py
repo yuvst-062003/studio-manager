@@ -30,7 +30,7 @@ import uuid
 from datetime import date
 from typing import TYPE_CHECKING
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, tuple_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -187,7 +187,16 @@ class BillingService:
         after: uuid.UUID | None = None,
         limit: int = 50,
     ) -> tuple[list[tuple[Charge, int]], uuid.UUID | None]:
-        """Charges and how much of each is allocated, cursor-paginated on `charge.id`.
+        """Charges and how much of each is allocated, oldest first, cursor-paginated.
+
+        **Oldest first is a contract, not a nicety** (ship-audit B5): `/me/charges`
+        promises it in so many words, and the parent app's `oldestMonths` slices the
+        first N rows without sorting on the strength of that promise -- §5.10's "pay N
+        months selects the N oldest". This used to order by `Charge.id`, a random UUID4,
+        which made that selection arbitrary. Ordered by `(due_date, id)` -- the id
+        breaks ties between charges due the same day so a re-read pages identically --
+        and the cursor is the last row's id, resolved back to its due_date here so the
+        API shape (`after` is a bare charge id) did not have to change.
 
         The allocated sum travels WITH the row because `ChargeOut` carries it: §4.3 settles
         a charge by summing allocations, so a client rendering `amount_agorot` alone would
@@ -214,8 +223,17 @@ class BillingService:
         if kind is not None:
             stmt = stmt.where(Charge.kind == kind)
         if after is not None:
-            stmt = stmt.where(Charge.id > after)
-        rows = self._session.execute(stmt.order_by(Charge.id).limit(limit + 1)).all()
+            after_due = self._session.execute(
+                select(Charge.due_date).where(Charge.id == after)
+            ).scalar_one_or_none()
+            # A cursor naming a charge that has since vanished restarts from the top:
+            # under random-UUID comparison the old `id > after` continuation was already
+            # meaningless, and silently skipping rows is the one wrong answer here.
+            if after_due is not None:
+                stmt = stmt.where(tuple_(Charge.due_date, Charge.id) > (after_due, after))
+        rows = self._session.execute(
+            stmt.order_by(Charge.due_date, Charge.id).limit(limit + 1)
+        ).all()
         has_more = len(rows) > limit
         rows = rows[:limit]
         pairs = [(row[0], int(row[1])) for row in rows]

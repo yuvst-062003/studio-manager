@@ -30,7 +30,8 @@ from datetime import UTC, datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.identity import AuthIdentity
+from app.core.config import settings
+from app.models.identity import AuthIdentity, PlatformAdmin
 from app.models.person import Guardian, Person, RoleAssignment
 
 #: The one flagged identity. A stable subject so a reset does not orphan a session.
@@ -179,12 +180,27 @@ def seed_personas(session: Session, studio_id: uuid.UUID) -> None:
     survive and hide a bug rather than fail loudly.
     """
     # §19.2's one legal write of the flag, in one of its two legal places.
-    _identity_for(
+    developer = _identity_for(
         session,
         subject=DEVELOPER_IDENTITY_SUBJECT,
         email=DEVELOPER_IDENTITY_EMAIL,
         is_developer=True,
     )
+
+    # Ship-audit D3 -- §16's console was unreachable in development: every §19.3 persona
+    # lives inside the demo studio, so nothing could ever exercise studio creation
+    # locally. §3.1 says platform_admin is 'seeded manually', and a seed is exactly what
+    # this is -- there is still no route anywhere that creates one. Outside production
+    # only: the developer identity's subject is not a real OAuth subject, so this row
+    # would be inert in production, but a platform-admin row nobody can use is a row
+    # nobody should hold.
+    if settings.ENV != "production":
+        holds_it = session.execute(
+            select(PlatformAdmin).where(PlatformAdmin.auth_identity_id == developer.id)
+        ).scalar_one_or_none()
+        if holds_it is None:
+            session.add(PlatformAdmin(auth_identity_id=developer.id, created_at=SEEDED_AT))
+            session.flush()
 
     for persona in PERSONAS:
         identity = _identity_for(

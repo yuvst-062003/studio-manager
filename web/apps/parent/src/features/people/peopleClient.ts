@@ -32,6 +32,14 @@ export function makePeopleClient(fetcher: Fetcher) {
     myStudents: (): Promise<{ items: StudentSummary[] }> =>
       fetcher('/api/v1/me/students').then(json<{ items: StudentSummary[] }>),
 
+    /**
+     * 12i's guardians, from the payer-side read (ship-audit B4): `student(id)` below is
+     * a staff route a parent gets 403 from, which went unnoticed exactly as long as
+     * nothing mounted the profile screen. Deduplicated by person server-side.
+     */
+    myGuardians: (): Promise<{ items: GuardianOut[] }> =>
+      fetcher('/api/v1/me/guardians').then(json<{ items: GuardianOut[] }>),
+
     student: (id: string): Promise<StudentDetail> =>
       fetcher(`/api/v1/students/${id}`).then(json<StudentDetail>),
 

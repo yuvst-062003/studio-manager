@@ -33,10 +33,15 @@ import {
 } from './features/events'
 import { BeltProgressScreen, makeParentBeltsClient } from './features/belts'
 import { InboxScreen, makeParentCommsClient } from './features/comms'
-import { AddSibling, makePeopleClient } from './features/people'
+import { AddSibling, ProfileSection, makePeopleClient } from './features/people'
 // §5.10's payments tab. Mounted here because nothing imported it: `PaymentsScreen` is
 // artboard `12f`, the subject of E2E-3 and E2E-4, and it was unreachable in a running app.
 import { PaymentsSection } from './features/billing/PaymentsSection'
+// §6.1 step 6 — the BLOCKING declaration. Mounted here because nothing imported it
+// (HB-w6-health-gate-unmounted): the gate, the form and the pad were built and tested in
+// W3 and a guardian with an unsigned declaration still reached home.
+import { HealthGate, makeHealthClient } from './features/health'
+import type { GatedStudent } from './features/health'
 
 const NAV = [
   { key: 'myChildren', labelKey: 'common.nav.myChildren', href: '/' },
@@ -112,6 +117,43 @@ export default function App() {
   const eventsClient = useMemo(() => makeParentEventsClient(apiFetch), [])
   const beltsClient = useMemo(() => makeParentBeltsClient(apiFetch), [])
   const commsClient = useMemo(() => makeParentCommsClient(apiFetch), [])
+  const healthClient = useMemo(() => makeHealthClient(apiFetch), [])
+  // §6.1 step 6 — which children still owe a declaration. `null` until the answer
+  // arrives, and the shell renders NOTHING gated until it does: a home screen that
+  // flashes before the gate is a gate a fast finger gets past. On a fetch failure the
+  // gate stands aside — first login (the moment §6.1 gates) cannot happen offline, and
+  // a network blip locking a family out of the cached PWA would punish exactly the
+  // parent §6.5 worked hardest to keep.
+  const [gatedChildren, setGatedChildren] = useState<readonly GatedStudent[] | null>(null)
+  const [declarationsSigned, setDeclarationsSigned] = useState(0)
+  useEffect(() => {
+    if (session.status !== 'signed-in') return
+    let alive = true
+    void apiFetch('/api/v1/me/students')
+      .then((response) =>
+        response.ok
+          ? (response.json() as Promise<{
+              items: { id: string; first_name: string; last_name: string; health_status: GatedStudent['health_status'] }[]
+            }>)
+          : { items: [] },
+      )
+      .then((data) => {
+        if (!alive) return
+        setGatedChildren(
+          data.items.map((student) => ({
+            id: student.id,
+            display_name: `${student.first_name} ${student.last_name}`,
+            health_status: student.health_status,
+          })),
+        )
+      })
+      .catch(() => {
+        if (alive) setGatedChildren([])
+      })
+    return () => {
+      alive = false
+    }
+  }, [session.status, declarationsSigned])
   const hash = useHash()
   const today = useToday()
   // §5.4(c)'s add-a-sibling is one hash away from home. Hash and not a path: it is an
@@ -124,6 +166,8 @@ export default function App() {
   const addingChild = hash === '#/add-child'
   // §5.10's payments tab, and `12f`'s history one hash below it.
   const onPayments = hash === '#/payments'
+  // 12i — the profile tab's screen (ship-audit B4: built in W2, mounted by nothing).
+  const onProfile = hash === '#/profile'
   // 12h's list, and 7d's invite behind `#/events/<eventId>/<studentId>`. Both ids are in
   // the hash because 12h is per CHILD per event: a family with two children on one
   // competition has two answers to give, and an event id alone cannot say which.
@@ -221,6 +265,17 @@ export default function App() {
               whoever is holding the phone, so the check cannot live in the link. Lane
               PEOPLE's branch needs no such guard — `AddSibling` is behind §6.1's refusal
               already, since a person with no guardian row never reaches this shell. */}
+          {/* §6.1 step 6 wraps EVERY routed branch, not the default one: "no other
+              screen is reachable", and every drawer link and typed hash routes through
+              this expression. `null` while the children are still loading — see the
+              fetch above. */}
+          {gatedChildren === null ? null : (
+          <HealthGate
+            locale={locale}
+            client={healthClient}
+            students={gatedChildren}
+            onSigned={() => setDeclarationsSigned((count) => count + 1)}
+          >
           {session.access.parent && isCalendarRoute(hash) ? (
             <ScheduleSection
               locale={locale}
@@ -233,6 +288,8 @@ export default function App() {
             // screen resolve the payer from the session, so a person with no charges sees
             // an empty state rather than somebody else's money.
             <PaymentsSection locale={locale} />
+          ) : onProfile ? (
+            <ProfileSection locale={locale} />
           ) : addingChild ? (
             <AddSibling locale={locale} client={peopleClient} />
           ) : belts.length === 2 ? (
@@ -263,6 +320,8 @@ export default function App() {
             />
           ) : (
             <Resolve session={session} locale={locale} />
+          )}
+          </HealthGate>
           )}
         </AppShell>
       ) : null}

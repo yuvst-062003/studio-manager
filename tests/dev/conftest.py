@@ -63,6 +63,11 @@ RELOADABLE = (
     # assert the development cookie.
     "app.services.identity.refresh",
     "app.routers.dev",
+    # Ship-audit D3 -- seed_personas seeds the developer identity's platform_admin row
+    # outside production only, so this module now reads .ENV off a module-scope
+    # `settings` binding like the routers above it. Frozen, a production-env test would
+    # seed a platform operator the environment says it must not.
+    "app.services.demo.personas",
     "app.main",
     # Not part of app.main's import graph -- this harness never reaches it, and
     # tests/dev/test_demo_reset_worker.py monkeypatches settings.ENV on the live

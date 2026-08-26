@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Iterator
+from datetime import UTC, datetime
 
 import pytest
 from app.core.tenancy import with_all_tenants
@@ -263,3 +264,30 @@ def test_in_production_the_route_does_not_exist_at_all(production_client):
     paths = production_client.app.openapi()["paths"]
     assert "/api/v1/dev/act-as/{person_id}" not in paths
     assert "/api/v1/dev/personas" not in paths
+
+
+def test_a_role_held_in_many_scopes_is_listed_once(
+    client, app_session, persona_ids, demo_studio_id
+):
+    """Ship-audit D4. A lead coach holds one group-scoped assignment per group, so after a
+    long E2E run the switcher listed `lead_coach` nineteen times. The roles are a
+    projection of WHAT the persona is, not of how many places they are it."""
+    from app.models.person import RoleAssignment
+
+    with with_all_tenants(reason=_SCOPE):
+        app_session.add(
+            RoleAssignment(
+                studio_id=demo_studio_id,
+                person_id=persona_ids["lead"],
+                role="lead_coach",
+                scope_type="group",
+                scope_id=uuid.uuid4(),
+                granted_at=datetime(2026, 1, 1, tzinfo=UTC),
+                created_at=datetime(2026, 1, 1, tzinfo=UTC),
+            )
+        )
+        app_session.commit()
+
+    body = client.get("/api/v1/dev/personas").json()
+    lead = next(p for p in body["items"] if p["key"] == "lead")
+    assert lead["roles"] == ["lead_coach"]

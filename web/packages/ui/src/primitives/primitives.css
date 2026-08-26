@@ -720,3 +720,12 @@ button.studio-row:focus-visible {
   font-size: var(--text-caption);
   margin: 0;
 }
+
+/* Ship-audit D2: no rule in the system touched a bare anchor, so links rendered the UA
+ * default blue — which fails WCAG AA on the dark ground (axe: color-contrast on the
+ * parent home's settings link). The accent holds AA on both surfaces: #1f6b3f on
+ * #fffefb is 6.4:1, #4a9b5e on #1e1d1a is 4.9:1. Visited keeps the same color on
+ * purpose — these are app-chrome links, not a document's trail. */
+a {
+  color: var(--accent);
+}

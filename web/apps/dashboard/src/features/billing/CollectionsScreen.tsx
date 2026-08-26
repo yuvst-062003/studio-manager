@@ -171,7 +171,14 @@ export function CollectionsScreen({
             {households.map((row) => (
               <div key={row.payerPersonId} style={rowStyle} data-testid="household-row">
                 <Checkbox
-                  label={row.payerName}
+                  // Never empty (ship-audit D1): an empty label is an unnamed checkbox to
+                  // a screen reader. The students name the family when the payer read
+                  // came back short; the generic word is the floor, not the norm.
+                  label={
+                    row.payerName ||
+                    row.studentNames.join(', ') ||
+                    t(locale, 'billing.debt.household')
+                  }
                   checked={selected.includes(row.payerPersonId)}
                   onChange={(event) =>
                     setSelected((previous) =>

@@ -303,6 +303,33 @@ def test_me_students_needs_no_role(client, as_guardian):
     assert client.get("/api/v1/me/students", headers=as_guardian.headers).status_code == 200
 
 
+def test_me_guardians_lists_the_family_once_per_person(
+    client, app_session, as_manager, as_guardian
+):
+    """Ship-audit B4 -- 12i's payer-side read. `ProfileAndLeave` was built against the
+    staff route a parent gets 403 from; this is the read it needed. Two children share
+    their parents, so the list dedupes by person -- each guardian once, not once per
+    child."""
+    from app.models.person import Person
+
+    parent = app_session.get(Person, as_guardian.person_id)
+    for _ in range(2):
+        payload = _payload()
+        payload["guardian"]["email"] = parent.email
+        _create(client, as_manager, payload)
+
+    mine = client.get("/api/v1/me/guardians", headers=as_guardian.headers)
+    assert mine.status_code == 200
+    assert [row["person_id"] for row in mine.json()["items"]] == [str(as_guardian.person_id)]
+
+
+def test_me_guardians_never_leaks_another_family(client, as_manager, as_guardian):
+    _create(client, as_manager)
+    mine = client.get("/api/v1/me/guardians", headers=as_guardian.headers)
+    assert mine.status_code == 200
+    assert mine.json()["items"] == []
+
+
 # -- the tag, and the invariant it guards --------------------------------------
 
 

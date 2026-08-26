@@ -11,10 +11,13 @@ with no foreign key until M1 created those tables. Revision 0005 added both cons
 and this module now declares them, so ``alembic check`` stops proposing to drop what the
 migration just created.
 
-``ondelete="RESTRICT"``, like every other reference in this schema, and here it earns it
-twice over: §11.2 makes this table append-only, and a cascade would let deleting a person
-silently erase the record of what they did. §11.4's anonymization wipes the Person's
-fields and leaves the row -- which is exactly why RESTRICT never fires in practice.
+``actor_person_id`` is ``ondelete="SET NULL"`` since revision 0011, and the asymmetry
+against every other RESTRICT reference in this schema is the point: §11.2 makes this
+table append-only, so a cascade that erased rows would erase the record of what was done
+-- but the demo wipe (§19.7) deletes ``person`` rows while ``audit_log`` is NEVER_WIPED,
+and RESTRICT made the first audited action by a demo person break every later reset
+(HB-e2e-demo-reset). SET NULL keeps the record and clears only the pointer to a person
+who no longer exists. §11.4's GDPR path still anonymizes in place and never fires it.
 """
 
 from __future__ import annotations
@@ -48,10 +51,10 @@ class AuditLog(UUIDPrimaryKey, TimestampColumns, Base):
         PGUUID(as_uuid=True), ForeignKey("studio.id", ondelete="RESTRICT")
     )
     actor_person_id: Mapped[uuid.UUID | None] = mapped_column(
-        PGUUID(as_uuid=True), ForeignKey("person.id", ondelete="RESTRICT")
+        PGUUID(as_uuid=True), ForeignKey("person.id", ondelete="SET NULL")
     )
     actor_identity_id: Mapped[uuid.UUID | None] = mapped_column(
-        PGUUID(as_uuid=True), ForeignKey("auth_identity.id", ondelete="RESTRICT")
+        PGUUID(as_uuid=True), ForeignKey("auth_identity.id", ondelete="SET NULL")
     )
     actor_ip: Mapped[str | None] = mapped_column(INET)
 
