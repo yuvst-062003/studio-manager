@@ -41,8 +41,12 @@ from app.schemas._pagination import (
     CursorPage,
     IdempotencyKey,
 )
+from app.schemas.belts import BeltRankOut
 from app.schemas.events import (
     EventCreateIn,
+    EventExamResultIn,
+    EventExamResultOut,
+    EventExamResultPage,
     EventOut,
     EventPage,
     EventRegistrationOut,
@@ -50,16 +54,21 @@ from app.schemas.events import (
     EventType,
     EventUpdateIn,
 )
+from app.services.belts.eligibility import EligibilityService
+from app.services.belts.errors import BeltAlreadyAwardedError
 from app.services.events.errors import (
+    AlreadyExaminedError,
     ConsentNotRequiredError,
     EventNotEditableError,
     EventNotFoundError,
     EventNotPublishedError,
+    NotABeltExamError,
     NotRegisteredForEventError,
     NotThisGuardiansStudentError,
     RsvpDeadlinePassedError,
 )
 from app.services.events.events import EventService, redacts_fee
+from app.services.events.exams import ExamService
 from app.services.events.publish import EventPublishService
 from app.services.events.rsvp import RsvpService
 
@@ -298,12 +307,20 @@ class ParentEventOut(BaseModel):
 ParentEventPage = CursorPage[ParentEventOut]
 
 
+def _student_display_name(session: TenantSessionDep, student_id: uuid.UUID) -> str:
+    """`student` carries no name -- §4.3 puts it on `person`, because a student and their
+    guardian are the same kind of row about a different human. Empty string rather than
+    `None` for a student whose person has been anonymised (§11.5): the roster still lists
+    the row, because a charge and an attendance record survive anonymisation."""
+    student = session.get(Student, student_id)
+    person = session.get(Person, student.person_id) if student is not None else None
+    return f"{person.first_name} {person.last_name}".strip() if person else ""
+
+
 def _registration_out(
     session: TenantSessionDep, row: EventRegistration, *, redact_charge: bool
 ) -> EventRegistrationOut:
-    student = session.get(Student, row.student_id)
-    person = session.get(Person, student.person_id) if student is not None else None
-    display_name = f"{person.first_name} {person.last_name}".strip() if person else ""
+    display_name = _student_display_name(session, row.student_id)
     return EventRegistrationOut(
         id=row.id,
         event_id=row.event_id,
@@ -551,3 +568,131 @@ def my_events(
         next_cursor=items[-1].registration.id if items and has_more else None,
         has_more=has_more,
     )
+
+
+# -- §5.9's belt exam. An exam IS an event, so its routes live here. -------------------
+class CandidateOut(BaseModel):
+    """One candidate, and the evidence §5.9 names -- and nothing else.
+
+    **There is deliberately no attendance percentage, no debt and no blocker field.**
+    `events.exam.eligibleHint` says the current rank and the time held in it; `belt_rank`
+    carries no threshold column, so a criterion added here would have nowhere to be
+    configured. `6b`'s audit says that decision belonged in W4's contract commit, which did
+    not make it. A debt figure would also break §3.2's hard rule on a screen a lead coach
+    may open.
+
+    `months_at_rank` is reported for a manager to read, not compared against anything.
+    """
+
+    student_id: uuid.UUID
+    student_display_name: str
+    current_rank: BeltRankOut | None
+    next_rank: BeltRankOut | None
+    months_at_rank: int | None
+    eligible: bool
+
+
+class ExamResultsIn(BaseModel):
+    results: list[EventExamResultIn]
+
+
+@router.get("/events/{event_id}/eligibility", response_model=CursorPage[CandidateOut])
+def event_eligibility(
+    _: AnyStaff, event_id: uuid.UUID, session: TenantSessionDep
+) -> CursorPage[CandidateOut]:
+    """`4d`'s table and `6b`'s counters, over the event's own roster.
+
+    The whole roster rather than a page: `4d` pre-selects the eligible rows and promotes
+    everyone ticked, so a truncated list would silently exclude candidates from a bulk
+    action whose button names a count.
+    """
+    try:
+        EventService.read(session, event_id)
+    except EventNotFoundError as exc:
+        raise _not_found() from exc
+    candidates = EligibilityService.for_event(session, event_id, at=now())
+    return CursorPage[CandidateOut](
+        items=[
+            CandidateOut(
+                student_id=candidate.student_id,
+                student_display_name=candidate.student_display_name,
+                current_rank=(
+                    BeltRankOut.model_validate(candidate.current_rank, from_attributes=True)
+                    if candidate.current_rank is not None
+                    else None
+                ),
+                next_rank=(
+                    BeltRankOut.model_validate(candidate.next_rank, from_attributes=True)
+                    if candidate.next_rank is not None
+                    else None
+                ),
+                months_at_rank=candidate.months_at_rank,
+                eligible=candidate.eligible,
+            )
+            for candidate in candidates
+        ],
+        next_cursor=None,
+        has_more=False,
+    )
+
+
+@router.post(
+    "/events/{event_id}/exam-results",
+    response_model=EventExamResultPage,
+    status_code=status.HTTP_201_CREATED,
+)
+def record_exam_results(
+    _: EventsWriter,
+    event_id: uuid.UUID,
+    body: ExamResultsIn,
+    request: Request,
+    session: TenantSessionDep,
+    idempotency_key: IdempotencyKey = None,
+) -> EventExamResultPage:
+    """§5.9 step 3 -- the result, the belt row and the cache, in one transaction.
+
+    **The commit is here and nowhere inside the service**, which is what makes the batch
+    atomic: a failure on the fourth candidate leaves the first three unwritten rather than
+    promoted, so a coach never has to work out which half of a save landed.
+    """
+    actor = getattr(request.state, "person_id", None)
+    try:
+        rows = ExamService.record(
+            session,
+            event_id,
+            body.results,
+            examiner_person_id=actor if isinstance(actor, uuid.UUID) else None,
+            at=now(),
+        )
+    except EventNotFoundError as exc:
+        raise _not_found() from exc
+    except NotABeltExamError as exc:
+        raise _conflict("not_a_belt_exam", "this event is not a belt exam") from exc
+    except AlreadyExaminedError as exc:
+        raise _conflict(
+            "already_examined", "this student already has a result for this exam"
+        ) from exc
+    except NotRegisteredForEventError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "not_a_candidate", "message": "no such candidate on this exam"},
+        ) from exc
+    except BeltAlreadyAwardedError as exc:
+        raise _conflict("belt_already_awarded", "this student already holds that rank") from exc
+
+    items = [
+        EventExamResultOut(
+            id=row.id,
+            event_id=row.event_id,
+            student_id=row.student_id,
+            student_display_name=_student_display_name(session, row.student_id),
+            belt_rank_id=row.belt_rank_id,
+            belt_rank_name=rank.name,
+            result=row.result,
+            examiner_person_id=row.examiner_person_id,
+            note=row.note,
+        )
+        for row, rank in rows
+    ]
+    session.commit()
+    return EventExamResultPage(items=items, next_cursor=None, has_more=False)
