@@ -1,6 +1,6 @@
-from typing import Literal
+from typing import Any, Literal, get_args
 
-from pydantic import SecretStr
+from pydantic import SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 Env = Literal["development", "staging", "production", "test"]
@@ -91,6 +91,47 @@ class Settings(BaseSettings):
     STORAGE_ROOT: str = "var/storage"
 
     LOG_LEVEL: str = "INFO"
+
+    @model_validator(mode="before")
+    @classmethod
+    def _blank_optional_is_unset(cls, data: Any) -> Any:
+        """An empty optional setting is an **unset** one. `""` is not `None`.
+
+        The committed environment template ships eight optional keys with empty values and
+        instructs, in its own first line, that it be copied. Following it therefore
+        produced a value that is falsy but present, and every reader written as
+        `if setting is not None` got the wrong answer -- while every reader written as
+        `if setting` got the right one, which is why this survived so long.
+
+        It has bitten four times: `dev_tools_allowed` (728b665), then the second copy of
+        the same rule in `DevClockMiddleware` (b5cf3e1), then `GOOGLE_OAUTH_CLIENT_ID`,
+        which was the last red backend test on `main`; and lane MONEY defended
+        `UPAY_MERCHANT_EMAIL` against it by hand in `OrderService.form_fields`. Each fix
+        was correct and local, and the next optional key inherited none of them.
+
+        So the rule lives in the parser, once, and it is **derived rather than listed**:
+        any field whose annotation admits `None` gets it, including fields nobody has
+        added yet. A hand-maintained tuple of names is the same shape as the four fixes
+        above -- right today, silently incomplete at the next key.
+
+        Whitespace counts as empty. A key edited to a single space is as unset as one left
+        blank, and `secrets.compare_digest` would happily match a `SecretStr(" ")` against
+        a header carrying one space -- the same hole an empty token opened.
+
+        `mode="before"` because it has to run on the raw string from the environment: by
+        the time `SecretStr("")` exists, the emptiness is behind a wrapper whose `repr` is
+        `**********` and a validator would have to unwrap it to see anything at all.
+        """
+        if not isinstance(data, dict):
+            return data
+        cleaned = dict(data)
+        for name, field in cls.model_fields.items():
+            if type(None) not in get_args(field.annotation):
+                continue
+            value = cleaned.get(name)
+            if isinstance(value, str) and not value.strip():
+                cleaned[name] = None
+        return cleaned
 
 
 settings = Settings()
