@@ -308,8 +308,15 @@ waves:
     mode: parallel
     lanes: [COMMS, REPORTS]
     exit_gate: announcement delivered to push and inbox; every report exports
-    status: pending
-    pieces: []
+    status: active
+    opened: 2026-08-26
+    pieces:
+      - id: W5.0
+        title: >-
+          Contract commit — revision 0009, the comms and reports|privacy lane gates, and
+          the E2E harness W4 deferred. Lane fixtures are NOT in it; see HB-w5-lane-fixtures.
+        status: shipped
+        on: 2026-08-26
   - id: W6
     milestone: M10
     title: Rollover and polish
@@ -327,6 +334,34 @@ waves:
     status: pending
     pieces: []
 holdbacks:
+  - id: HB-w5-lane-fixtures
+    kind: carried
+    title: W5's lane fixtures (§2.2 item 8) are not written, and both lanes start without them
+    why: >-
+      §2.2 item 8 puts `tests/<vertical>/conftest.py` in the contract commit, and W4 shipped
+      exactly that as its own commit in the pre-worktree sequence — `test(w4): the fixtures
+      each W4 lane starts from`, 1000 lines across nine files, one conftest plus one
+      `test_the_lane_fixtures_build.py` per vertical. W5's contract commit did not carry the
+      equivalent for `comms`, `reports` and `privacy`.
+
+      The shape is not optional, and the reason is mechanical. A `tests/<vertical>/`
+      directory holding only a conftest collects no tests, and pytest exits 5 on that —
+      which `lane-check.sh` turns into a RED gate for a lane that has done nothing wrong.
+      That is why each W4 directory also carries a test that builds every fixture. Creating
+      the conftests without the smoke test would break the three lane gates this same commit
+      added.
+
+      What this costs if it is not closed first: both W5 lanes write their own caller
+      machinery, and they will not agree. W4's conftests pin one instant across billing and
+      events on purpose, because two conftests disagreeing about what month it is makes two
+      lanes' tests disagree about one flow. M8's notification and M9's at-risk job are a
+      caller/callee pair across exactly that seam.
+
+      What closes this: three conftests plus three fixture-build tests, on `main`, before the
+      worktrees are created. It is the same work W4 did and the same size.
+    blocks: W5 lane start
+    status: open
+    opened: 2026-08-26
   - id: HB-w3-e2e-harness
     kind: carried
     title: W3's E2E gate cannot be met by filling in the specs — the harness now runs, but the specs still address an app that was never built

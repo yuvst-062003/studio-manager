@@ -212,6 +212,65 @@ case "$V" in
     # i18n gate below therefore takes its "checking all nine" arm for `belts`, which is
     # strictly stronger than checking one.
     ;;
+  comms)
+    # SPEC §7 puts the ICS feed at /calendar-feeds and §5.11's fan-out is a job, so neither
+    # app/routers/calendar.py nor app/workers/notify.py follows the per-vertical convention
+    # the default branch assumes -- and the default would have type-checked
+    # app/services/comms and app/routers/comms.py while silently skipping BOTH. §5.12's feed
+    # is served from an UNAUTHENTICATED URL, which makes it the last file in this lane that
+    # should sit outside its own gate, and the notification worker is where every §5.11 send
+    # actually happens. Same reasoning as `people`'s followups.py and `health`'s
+    # health_reminders.py: a job outside every lane's check is a job nothing type-checks.
+    #
+    # app/routers/comms.py, app/routers/calendar.py and app/workers/notify.py do not exist
+    # yet; the `-e` filter below drops them until lane COMMS creates them. Listing them now
+    # IS the point -- the day they appear the gate reaches them without anyone remembering.
+    py_candidates=("app/services/$V" "app/routers/$V.py" "app/routers/calendar.py" \
+                   "app/workers/notify.py" "app/models/$V.py")
+    test_candidates=("tests/$V")
+    # Owns nothing under web/packages/core -- `attendance` owns the only piece of it in the
+    # plan. Said out loud rather than left to the default, which would have the CSS gate glob
+    # packages/core/src/comms/ and read as a claim on a directory M8 has no business in.
+    core_dirs=()
+    ;;
+  reports|privacy)
+    # Lane REPORTS owns BOTH verticals and runs both checks (§W5: `lane-check.sh reports &&
+    # lane-check.sh privacy`), so this branch serves each in turn through "$V" -- neither
+    # half claims the other's service, router, model or tests.
+    #
+    # Two paths the default branch reaches for NEITHER vertical:
+    #
+    #   app/workers/retention.py   §11.5's 24-month anonymization run. A job, so no default
+    #                              branch reaches it. Third time this file has had to say so,
+    #                              after followups.py and health_reminders.py. This one
+    #                              DESTROYS health declarations and signature images, which
+    #                              makes an untype-checked version of it the worst of the
+    #                              three.
+    #   app/routers/platform.py    §18.2's operations board and break-glass access.
+    #
+    # platform.py is ALSO in `identity`'s list, and the overlap is deliberate rather than an
+    # oversight anyone should tidy. Conflict C4: §14 puts the platform console in both M1 and
+    # M9. M1 built the console shell and M9 adds the operations board to it, so a file two
+    # milestones both write belongs in both their gates -- the alternative is one of them
+    # shipping changes its own check never reaches. A gate reads as ownership, and here two
+    # milestones genuinely own it.
+    py_candidates=("app/services/$V" "app/routers/$V.py" "app/models/$V.py" \
+                   app/workers/retention.py app/routers/platform.py)
+    test_candidates=("tests/$V")
+    core_dirs=()
+    # §18.2's board lives under features/platform/, which neither vertical is named for, so
+    # the default feature_dirs=($V) skips it in the frontend, lint and CSS gates while still
+    # printing green. Given to `reports` rather than to both halves so it is linted once and
+    # claimed once. `privacy` keeps the default, which resolves features/privacy/ in both the
+    # parent and dashboard apps.
+    if [ "$V" = "reports" ]; then feature_dirs=(reports platform); fi
+    # `privacy` has no i18n namespace of its own, deliberately, and the same way `belts` has
+    # none: privacy strings live in reports.ts under `privacy.*`. types.ts lists exactly nine
+    # namespaces and index.ts is authored once, so a lane could not add a tenth even if the
+    # W5 contract table said it should -- and both verticals here are ONE lane, so a second
+    # namespace would buy no isolation. The i18n gate below therefore takes its "checking all
+    # nine" arm for `privacy`, which is strictly stronger than checking one.
+    ;;
   *)
     py_candidates=("app/services/$V" "app/routers/$V.py" "app/models/$V.py")
     test_candidates=("tests/$V")
