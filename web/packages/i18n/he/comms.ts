@@ -115,9 +115,45 @@ export const comms: Bundle = {
   'calendar.rotated': 'הקישור הוחלף — הקישור הקודם כבר אינו פעיל',
   'calendar.rotateWarning': 'החלפת הקישור מנתקת כל יומן שכבר סונכרן',
   'calendar.lastRotated': 'הוחלף לאחרונה',
+  'calendar.rotateKeep': 'להשאיר את הקישור הנוכחי',
   // §5.12 — Google refreshes a subscribed calendar slowly. The feed answers "where do I
   // need to be next Tuesday", never "tonight is cancelled", and saying so here is what
   // keeps a parent from relying on it for the urgent case.
   'calendar.refreshDelay': 'יומן Google מתעדכן באיחור של עד יממה. ביטולים נשלחים תמיד בהתראה',
   'calendar.addSingleEvent': 'הוספת האירוע ליומן',
+
+  // -- §6.5's value pre-prompt, and the iOS path with no prompt at all ---------------
+  // §5.11: ask behind a value pre-prompt FIRST, then the OS dialog. Never the raw OS
+  // dialog on launch — on iOS a denial is permanent and cannot be re-requested in-app.
+  'push.prePrompt.title': 'שנודיע לכם?',
+  'push.prePrompt.body': 'נודיע לך אם שיעור מתבטל',
+  'push.prePrompt.accept': 'כן, הודיעו לי',
+  'push.prePrompt.decline': 'לא עכשיו',
+  // §6.5 — in a Safari tab the Push API is ABSENT, not denied. There is nothing to ask
+  // for, so the app teaches the install instead of showing a button that cannot work.
+  'push.iosTabHasNoApi': 'כדי לקבל התראות באייפון, יש להוסיף את האפליקציה למסך הבית',
+  'push.registered': 'המכשיר רשום לקבלת התראות',
+
+  // -- §6.5's install-state list, beside the delivery report -------------------------
+  'install.title': 'מי יכול לקבל התראות',
+  'install.installed': '{{count}} התקינו את האפליקציה',
+  'install.notInstalled': '{{count}} לא התקינו',
+  // §5.11 permits no email and no SMS fallback, so this list is reachable only by phone.
+  'install.callThem': 'אפשר להתקשר אליהם',
+  'install.emptyGood': 'כל המשפחות התקינו את האפליקציה',
+  'install.platform.ios': 'אייפון',
+  'install.platform.android': 'אנדרואיד',
+  'install.platform.web': 'דפדפן',
+
+  // -- §5.14's at-risk alert ---------------------------------------------------------
+  // 'It is not left sitting in a report nobody opens' — hence the one-tap contact.
+  'atRisk.title': 'תלמידים בסיכון',
+  'atRisk.body': '{{name}} נעדר {{count}} שיעורים ברצף',
+  'atRisk.contactParent': 'צור קשר עם ההורה',
+  'atRisk.noPhone': 'אין מספר טלפון בכרטיס',
+  'atRisk.empty': 'אין תלמידים בסיכון',
+
+  // §5.12's two feeds carry different things — a parent's children's lessons, a coach's own
+  // sessions — so the panel says which one you are looking at.
+  'calendar.coachSubtitle': 'השיעורים שאתם מעבירים יופיעו ביומן שלכם',
 }

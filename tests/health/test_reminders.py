@@ -72,7 +72,9 @@ def test_a_missing_declaration_is_chased_on_days_one_three_and_seven(
     chase_missing(tenant_session, at=T0, tally=tally)
     tenant_session.commit()
 
-    # The push is refused until lane COMMS lands, and that is counted rather than swallowed.
+    # Sent or refused, the ladder counts it either way -- and since M8 filled the seam in,
+    # `health.declaration_missing` is transactional (§5.11) so it goes out regardless of
+    # what this parent has switched off.
     assert tally.reminders + tally.undeliverable == 1
     entries = [e for e in audit_entries("student", student.id) if e.action == ACTION_REMINDER]
     assert len(entries) == 1
@@ -151,14 +153,22 @@ def test_every_guardian_is_chased_not_only_the_primary(
     assert tally.reminders + tally.undeliverable == 2
 
 
-def test_the_undeliverable_count_is_reported_rather_than_swallowed(tenant_session, a_family):
-    """Until lane COMMS lands, every message is refused. A run reporting '1 reminder sent' when
-    none were is worse than one that says so — the same reasoning followups.py applies."""
+def test_the_reminder_is_sent_and_the_count_is_reported_honestly(tenant_session, a_family):
+    """**Updated by lane COMMS (M8), which filled W5's seam in.**
+
+    This asserted `reminders == 0, undeliverable == 1` while `NotificationService.enqueue`
+    raised. The rule it protects is unchanged — a run reporting '1 reminder sent' when none
+    were is worse than one that says so — and the seam now sends, so the honest numbers are
+    the other way round.
+
+    §5.5's ladder is the one place this matters most: `health.declaration_missing` is
+    transactional (§5.11), so it goes out even to a parent who has muted everything else.
+    """
     a_family(days_ago=1)
     tally = Tally()
     chase_missing(tenant_session, at=T0, tally=tally)
-    assert tally.reminders == 0
-    assert tally.undeliverable == 1
+    assert tally.reminders == 1
+    assert tally.undeliverable == 0
 
 
 def test_chasing_never_changes_a_students_ability_to_be_marked_present(

@@ -58,11 +58,18 @@ def test_a_skipped_gate_says_so_out_loud():
     untrue was the whole of the lane's job, so the test had to move rather than be deleted:
     the RULE is about the script, not about billing.
 
-    `comms` is the vertical with gaps now -- W5 owns it and has not started, so it has an
-    i18n namespace and no backend, no tests and no frontend. When W5 fills it in, move this
-    to whichever vertical is then pending, exactly as this move was made.
+    **Re-pointed again by lane COMMS (M8)**, for the same reason and by the same instruction
+    the paragraph above leaves. It asked `comms`, which now has a router, a service package, a
+    worker, a test directory and three apps' worth of screens -- so every gate in it has
+    targets and nothing is skipped.
+
+    `reports` is the vertical with gaps now: lane REPORTS (M9) opens after this one merges, so
+    it has an i18n namespace, two files the `reports|privacy` branch already names, and no
+    `tests/reports/` and no frontend. When M9 fills it in, move this to whichever vertical is
+    then pending -- or, if none is, point it at a vertical that genuinely owns no frontend and
+    say so here.
     """
-    stdout = _run("comms", "--dry-run").stdout
+    stdout = _run("reports", "--dry-run").stdout
     assert "skipped" in stdout
 
 

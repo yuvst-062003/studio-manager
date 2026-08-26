@@ -58,7 +58,8 @@ export const comms: Bundle = {
   'pushDisabled.title': 'Notifications are off',
   'pushDisabled.body': 'You will not hear about cancelled classes',
   'pushDisabled.openSettings': 'Open settings',
-  'pushDisabled.iosNeedsInstall': 'On iPhone, add the app to your home screen to receive notifications',
+  'pushDisabled.iosNeedsInstall':
+    'On iPhone, add the app to your home screen to receive notifications',
   'pushEnabled.confirmation': 'Notifications are on',
   'push.enable': 'Turn on notifications',
 
@@ -88,6 +89,35 @@ export const comms: Bundle = {
   'calendar.rotated': 'Link replaced — the old one no longer works',
   'calendar.rotateWarning': 'Replacing the link disconnects every calendar already synced',
   'calendar.lastRotated': 'Last replaced',
-  'calendar.refreshDelay': 'Google Calendar can lag by up to a day. Cancellations are always sent as a notification',
+  'calendar.rotateKeep': 'Keep the current link',
+  'calendar.refreshDelay':
+    'Google Calendar can lag by up to a day. Cancellations are always sent as a notification',
   'calendar.addSingleEvent': 'Add this event to your calendar',
+
+  // -- §6.5's value pre-prompt, and the iOS path with no prompt at all ---------------
+  'push.prePrompt.title': 'Shall we let you know?',
+  'push.prePrompt.body': "We'll tell you if a class is cancelled",
+  'push.prePrompt.accept': 'Yes, notify me',
+  'push.prePrompt.decline': 'Not now',
+  'push.iosTabHasNoApi': 'To get notifications on iPhone, add the app to your home screen',
+  'push.registered': 'This device will receive notifications',
+
+  // -- §6.5's install-state list, beside the delivery report -------------------------
+  'install.title': 'Who can receive notifications',
+  'install.installed': '{{count}} installed the app',
+  'install.notInstalled': '{{count}} have not installed',
+  'install.callThem': 'These families can only be reached by phone',
+  'install.emptyGood': 'Every family has installed the app',
+  'install.platform.ios': 'iPhone',
+  'install.platform.android': 'Android',
+  'install.platform.web': 'Browser',
+
+  // -- §5.14's at-risk alert ---------------------------------------------------------
+  'atRisk.title': 'Students at risk',
+  'atRisk.body': '{{name}} has missed {{count}} classes in a row',
+  'atRisk.contactParent': 'Call the parent',
+  'atRisk.noPhone': 'No phone number on file',
+  'atRisk.empty': 'No students at risk',
+
+  'calendar.coachSubtitle': 'The sessions you teach appear in your calendar',
 }

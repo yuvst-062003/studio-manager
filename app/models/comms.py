@@ -28,6 +28,7 @@ from datetime import datetime
 from typing import Any
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     DateTime,
     ForeignKey,
@@ -72,6 +73,27 @@ PUSH_PLATFORMS = ("ios", "android", "web")
 #: §4.3 -- `calendar_feed  subject_type(guardian|coach)`. §5.12: a guardian's feed carries
 #: all their students' sessions and events, a coach's carries every session they staff.
 FEED_SUBJECTS = ("guardian", "coach")
+
+#: §5.11's eight switches, in the order `web/packages/i18n/he/comms.ts` renders them under
+#: `preferences.kind.*`. A group and not a kind: §5.11's trigger table has fifteen rows and
+#: grows every milestone, and a parent does not think in `billing.overdue.day7`.
+#:
+#: The two entries that are NOT freely switchable are still here, because the screen has to
+#: render them to say why. §5.11: "except health-declaration and payment-failure notices,
+#: which are transactional" -- `health` refuses to be turned off at all, and inside the
+#: mutable `payment` group the single kind `billing.payment_failed` still delivers. Omitting
+#: them from this tuple would leave a parent looking at six switches and wondering which
+#: notifications the missing two are.
+PREFERENCE_GROUPS = (
+    "session_cancelled",
+    "coach_substituted",
+    "announcement",
+    "event",
+    "payment",
+    "belt",
+    "attendance",
+    "health",
+)
 
 
 class Announcement(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
@@ -289,3 +311,52 @@ class CalendarFeed(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
     #: refresh token M1 already issues.
     token: Mapped[str] = mapped_column(String(64), nullable=False)
     rotated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class NotificationPreference(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
+    """§5.11 -- "Every notification type is individually mutable per user, except
+    health-declaration and payment-failure notices, which are transactional."
+
+    **§4.3 does not list this table and W5's contract commit did not create it.** It is added
+    by revision 0010, inside lane COMMS rather than in the wave's contract commit, by
+    agreement recorded in docs/superpowers/plans/2026-08-26-m8-comms.md. The alternative was
+    a settings screen that could read a preference and not write one, which is a switch that
+    lies to the person holding it.
+
+    **Absence means on.** A row exists only once somebody has changed something. That way a
+    new guardian receives everything without eight inserts at sign-up, and a preference group
+    added in a later milestone defaults to on for people who never saw the screen -- rather
+    than being silently off for every existing user because nobody backfilled them.
+
+    **`enabled`, not `muted`.** The screen reads as a switch (`preferences.on` /
+    `preferences.off`), and a column whose sense inverts between the database and the UI is a
+    bug waiting for a hurried reader. The one place the two genuinely differ -- a disabled
+    group still writing the inbox row, and recording the push as `denied` -- is stated in
+    `app/services/comms/notifications.py`, where the decision is actually taken.
+
+    **`kind_group` and not `kind`.** See PREFERENCE_GROUPS.
+    """
+
+    __tablename__ = "notification_preference"
+    __tenant_table_args__ = (
+        CheckConstraint(
+            "kind_group IN ('session_cancelled', 'coach_substituted', 'announcement', "
+            "'event', 'payment', 'belt', 'attendance', 'health')",
+            name="notification_preference_kind_group",
+        ),
+        # One answer per person per group. A second row is a second answer, and the fan-out
+        # would then depend on which one it happened to read first. Not per studio: a person
+        # IS tenant-scoped, so the pair is already unique within one.
+        Index(
+            "uq_notification_preference_person_id_kind_group",
+            "person_id",
+            "kind_group",
+            unique=True,
+        ),
+    )
+
+    person_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("person.id", ondelete="CASCADE"), nullable=False
+    )
+    kind_group: Mapped[str] = mapped_column(String(20), nullable=False)
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)

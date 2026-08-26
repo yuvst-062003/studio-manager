@@ -100,6 +100,217 @@
         "title": "AcceptInvitationRequest",
         "type": "object"
       },
+      "AnnouncementIn": {
+        "description": "§5.11's publish form. `scheduled_for` absent means send now.",
+        "properties": {
+          "body": {
+            "minLength": 1,
+            "title": "Body",
+            "type": "string"
+          },
+          "scheduled_for": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scheduled For"
+          },
+          "scope_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scope Id"
+          },
+          "scope_type": {
+            "enum": [
+              "studio",
+              "class",
+              "group"
+            ],
+            "title": "Scope Type",
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "body",
+          "scope_type"
+        ],
+        "title": "AnnouncementIn",
+        "type": "object"
+      },
+      "AnnouncementOut": {
+        "description": "What the publisher's list renders.\n\n`scheduled_for` and `published_at` are both here because three states matter and they\nare three different next actions: a draft to finish, a send that is queued, and one\nthat has already gone out and now has a delivery report.",
+        "properties": {
+          "author_person_id": {
+            "format": "uuid",
+            "title": "Author Person Id",
+            "type": "string"
+          },
+          "body": {
+            "title": "Body",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "published_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published At"
+          },
+          "scheduled_for": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scheduled For"
+          },
+          "scope_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scope Id"
+          },
+          "scope_type": {
+            "enum": [
+              "studio",
+              "class",
+              "group"
+            ],
+            "title": "Scope Type",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "author_person_id",
+          "title",
+          "body",
+          "scope_type",
+          "created_at"
+        ],
+        "title": "AnnouncementOut",
+        "type": "object"
+      },
+      "AnnouncementPatch": {
+        "description": "A partial edit to a draft. Every field optional, in the shape `app/routers/billing.py`\nalready uses for `ProductPatch`.\n\n`AnnouncementIn` is the CREATE shape and requires a title, a body and a scope. Reusing it\nhere would make `PATCH` mean `PUT` -- a manager fixing a typo would have to resend the\naudience, and forgetting to would silently re-scope the announcement.\n\n`scope_id` and `scheduled_for` are both nullable AND meaningful when null (a studio-wide\nscope names no row; an unscheduled announcement has no time), so \"was it sent\" is read\nfrom `model_fields_set` rather than from the value. That is what lets\n`{\"scheduled_for\": null}` mean `announcement.cancelSchedule` instead of \"leave it alone\".",
+        "properties": {
+          "body": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Body"
+          },
+          "scheduled_for": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scheduled For"
+          },
+          "scope_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scope Id"
+          },
+          "scope_type": {
+            "anyOf": [
+              {
+                "enum": [
+                  "studio",
+                  "class",
+                  "group"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scope Type"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "title": "AnnouncementPatch",
+        "type": "object"
+      },
       "AppAccessOut": {
         "description": "§6.1's two queries, as the client sees them.\n\nTwo booleans and nothing else. A count of students or studios in the *other* app\nwould leak what §6.1 says neither refusal screen may: \"Neither screen leaks whether\nthe account exists in the other app.\"",
         "properties": {
@@ -296,6 +507,50 @@
           "note"
         ],
         "title": "AttendanceOut",
+        "type": "object"
+      },
+      "AudienceQuery": {
+        "description": "A scope, before an announcement exists to carry it.\n\n`4f` shows `יגיע ל-{{count}} משפחות` while the manager is still choosing who to write to,\nso the count cannot hang off an announcement id -- there is no row yet, and creating a\ndraft per keystroke to ask \"how many\" would litter the list.",
+        "properties": {
+          "scope_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scope Id"
+          },
+          "scope_type": {
+            "enum": [
+              "studio",
+              "class",
+              "group"
+            ],
+            "title": "Scope Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "scope_type"
+        ],
+        "title": "AudienceQuery",
+        "type": "object"
+      },
+      "AudienceSizeOut": {
+        "properties": {
+          "recipient_count": {
+            "title": "Recipient Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "recipient_count"
+        ],
+        "title": "AudienceSizeOut",
         "type": "object"
       },
       "BatchAttendanceIn": {
@@ -837,6 +1092,64 @@
           "device_marked_at"
         ],
         "title": "BulkPresentIn",
+        "type": "object"
+      },
+      "CalendarFeedOut": {
+        "description": "The subscription, not its contents.\n\n§5.12: \"The feed contains no medical and no financial data.\" This shape holds a URL and\na rotation timestamp and has nowhere to put either, which is the durable version of\nthat sentence — the URL is unauthenticated and, once subscribed, is fetched by Google's\nservers on their schedule and outside our control.",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "rotated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rotated At"
+          },
+          "subject_type": {
+            "enum": [
+              "guardian",
+              "coach"
+            ],
+            "title": "Subject Type",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "subject_type",
+          "url"
+        ],
+        "title": "CalendarFeedOut",
+        "type": "object"
+      },
+      "CalendarFeedsOut": {
+        "description": "This person's subscriptions. A guardian has one, a coach has one, somebody who is both\nhas two — and §5.12's two carry different things, so neither contains the other.",
+        "properties": {
+          "feeds": {
+            "items": {
+              "$ref": "#/components/schemas/CalendarFeedOut"
+            },
+            "title": "Feeds",
+            "type": "array"
+          }
+        },
+        "required": [
+          "feeds"
+        ],
+        "title": "CalendarFeedsOut",
         "type": "object"
       },
       "CallbackRequest": {
@@ -1410,6 +1723,39 @@
         "title": "ClosureOut",
         "type": "object"
       },
+      "CursorPage_AnnouncementOut_": {
+        "properties": {
+          "has_more": {
+            "default": false,
+            "title": "Has More",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AnnouncementOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "CursorPage[AnnouncementOut]",
+        "type": "object"
+      },
       "CursorPage_AttendanceOut_": {
         "properties": {
           "has_more": {
@@ -1738,6 +2084,39 @@
           "items"
         ],
         "title": "CursorPage[LadderRankOut]",
+        "type": "object"
+      },
+      "CursorPage_NotificationOut_": {
+        "properties": {
+          "has_more": {
+            "default": false,
+            "title": "Has More",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/NotificationOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "CursorPage[NotificationOut]",
         "type": "object"
       },
       "CursorPage_ParentEventOut_": {
@@ -2167,6 +2546,45 @@
           "items"
         ],
         "title": "CursorPage[UpayIpnRecordOut]",
+        "type": "object"
+      },
+      "DeliveryReportOut": {
+        "description": "§5.11's post-send screen, for a cancellation or an announcement.\n\n`sent_count` is families targeted; `received_count` is those a push actually reached.\nThey are counted separately rather than derived from `len(missed)` because a send that\nis still in flight has neither — `queued` rows are not yet misses, and reporting them\nas such would send a manager chasing families whose phone is about to buzz.",
+        "properties": {
+          "missed": {
+            "items": {
+              "$ref": "#/components/schemas/MissedRecipientOut"
+            },
+            "title": "Missed",
+            "type": "array"
+          },
+          "missed_count": {
+            "title": "Missed Count",
+            "type": "integer"
+          },
+          "notification_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Notification Ids",
+            "type": "array"
+          },
+          "received_count": {
+            "title": "Received Count",
+            "type": "integer"
+          },
+          "sent_count": {
+            "title": "Sent Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "sent_count",
+          "received_count",
+          "missed_count"
+        ],
+        "title": "DeliveryReportOut",
         "type": "object"
       },
       "EnrollmentCreate": {
@@ -4102,6 +4520,71 @@
         "title": "HolidayPresetOut",
         "type": "object"
       },
+      "InstallStateOut": {
+        "description": "Who can receive a push at all, and the list to phone.\n\nSits beside §5.11's delivery report on the dashboard because they answer two halves of\none question, and this is the fixable half: a family here will be on every delivery\nreport until somebody calls them.",
+        "properties": {
+          "by_platform": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "By Platform",
+            "type": "object"
+          },
+          "installed_count": {
+            "title": "Installed Count",
+            "type": "integer"
+          },
+          "not_installed": {
+            "items": {
+              "$ref": "#/components/schemas/InstallStateRowOut"
+            },
+            "title": "Not Installed",
+            "type": "array"
+          },
+          "not_installed_count": {
+            "title": "Not Installed Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "installed_count",
+          "not_installed_count",
+          "by_platform",
+          "not_installed"
+        ],
+        "title": "InstallStateOut",
+        "type": "object"
+      },
+      "InstallStateRowOut": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "person_id": {
+            "format": "uuid",
+            "title": "Person Id",
+            "type": "string"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          }
+        },
+        "required": [
+          "person_id",
+          "name"
+        ],
+        "title": "InstallStateRowOut",
+        "type": "object"
+      },
       "InvitationOut": {
         "description": "§5.3's token, returned exactly once.\n\nOnly its SHA-256 is stored, so nothing can reproduce this value later -- which is why\nthe list endpoint has no field for it and why a re-send has to issue a new one.",
         "properties": {
@@ -4519,6 +5002,20 @@
         "title": "ManualPaymentIn",
         "type": "object"
       },
+      "MarkedReadOut": {
+        "description": "How many rows `read-all` actually changed.\n\nThe count the screen shows, and it counts what CHANGED rather than what exists —\nreporting \"12 marked read\" to a parent who had two unread would be a number they can see\nis wrong.",
+        "properties": {
+          "marked": {
+            "title": "Marked",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "marked"
+        ],
+        "title": "MarkedReadOut",
+        "type": "object"
+      },
       "MatchSuggestionOut": {
         "description": "One unmatched payment and the payer a fingerprint suggests.\n\n`confidence` is **advisory** (§5.10 step 5). Nothing acts on a threshold: it is a number\na manager reads before tapping, never a gate anything passes.",
         "properties": {
@@ -4659,6 +5156,47 @@
         "title": "MeResponse",
         "type": "object"
       },
+      "MissedRecipientOut": {
+        "description": "A family the message did not reach, and the number to phone.\n\nThe phone number is the point. §5.11 chose this over a WhatsApp Business integration —\n\"same outcome as automation, half a day of work, zero risk\" — and it only works if the\nmanager can copy the numbers.",
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "person_id": {
+            "format": "uuid",
+            "title": "Person Id",
+            "type": "string"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "reason": {
+            "enum": [
+              "no_token",
+              "denied",
+              "failed"
+            ],
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "person_id",
+          "name",
+          "reason"
+        ],
+        "title": "MissedRecipientOut",
+        "type": "object"
+      },
       "MyStandingOrderOut": {
         "description": "Whether §5.10's second double-payment guard applies to the person asking.",
         "properties": {
@@ -4671,6 +5209,120 @@
           "active"
         ],
         "title": "MyStandingOrderOut",
+        "type": "object"
+      },
+      "NotificationOut": {
+        "description": "One inbox row. §5.11: \"the inbox is where the message lives\" — no permission needed\nand it never expires.\n\nThere is no sender. Every one of §5.11's fifteen triggers is the system telling a\nperson something, and a `sender_person_id` here is the field a reply box would be\nbuilt on.",
+        "properties": {
+          "body": {
+            "title": "Body",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "payload": {
+            "additionalProperties": true,
+            "title": "Payload",
+            "type": "object"
+          },
+          "read_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Read At"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "body",
+          "created_at"
+        ],
+        "title": "NotificationOut",
+        "type": "object"
+      },
+      "NotificationPreferenceOut": {
+        "description": "One switch, as `preferences.kind.*` renders it.\n\n`always_on` travels as data rather than as a list hardcoded in a component. §5.11's\nexemption is a product rule, and a component that carried its own copy would be a second\nplace to change it -- and the likelier of the two to be missed.",
+        "properties": {
+          "always_on": {
+            "title": "Always On",
+            "type": "boolean"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "kind_group": {
+            "title": "Kind Group",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind_group",
+          "enabled",
+          "always_on"
+        ],
+        "title": "NotificationPreferenceOut",
+        "type": "object"
+      },
+      "NotificationPreferencePatch": {
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "kind_group": {
+            "maxLength": 20,
+            "minLength": 1,
+            "title": "Kind Group",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind_group",
+          "enabled"
+        ],
+        "title": "NotificationPreferencePatch",
+        "type": "object"
+      },
+      "NotificationPreferencesOut": {
+        "description": "All eight, always, in `PREFERENCE_GROUPS` order.\n\nWrapped in an object rather than returned as a bare list: this is not a paginated\ncollection (G16 is about lists that grow), and a top-level array leaves nowhere to add a\nfield later without breaking every generated client.",
+        "properties": {
+          "groups": {
+            "items": {
+              "$ref": "#/components/schemas/NotificationPreferenceOut"
+            },
+            "title": "Groups",
+            "type": "array"
+          }
+        },
+        "required": [
+          "groups"
+        ],
+        "title": "NotificationPreferencesOut",
         "type": "object"
       },
       "ParentEventOut": {
@@ -5587,6 +6239,86 @@
         "title": "PublicLandingOut",
         "type": "object"
       },
+      "PushTokenIn": {
+        "description": "What the client posts after the OS grants permission.\n\n`app` and `platform` are both required because the delivery report is only honest with\nthem: §6.5 makes an iOS parent's registration depend on the app being on the home\nscreen, so `ios` + `parent` registrations that never arrive are the install funnel\nfailing rather than the push service.",
+        "properties": {
+          "app": {
+            "enum": [
+              "staff",
+              "parent"
+            ],
+            "title": "App",
+            "type": "string"
+          },
+          "platform": {
+            "enum": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "title": "Platform",
+            "type": "string"
+          },
+          "token": {
+            "maxLength": 512,
+            "minLength": 1,
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token",
+          "app",
+          "platform"
+        ],
+        "title": "PushTokenIn",
+        "type": "object"
+      },
+      "PushTokenOut": {
+        "properties": {
+          "app": {
+            "enum": [
+              "staff",
+              "parent"
+            ],
+            "title": "App",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "last_seen_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Seen At"
+          },
+          "platform": {
+            "enum": [
+              "ios",
+              "android",
+              "web"
+            ],
+            "title": "Platform",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "app",
+          "platform"
+        ],
+        "title": "PushTokenOut",
+        "type": "object"
+      },
       "RecurringSubscriptionOut": {
         "description": "G8 — a record of a mandate that exists at the provider, not one we can create.\nNothing in the API creates or varies these; they are entered when a parent sets one up\nat the bank and cancelled when they stop.",
         "properties": {
@@ -5906,6 +6638,20 @@
           "ordered_ids"
         ],
         "title": "ReorderLadderIn",
+        "type": "object"
+      },
+      "ResendOut": {
+        "description": "How many sends `[ שלח שוב ]` could actually retry.\n\nA count and not a boolean, because it is frequently zero and the screen has to say so.\nOnly `failed` rows are retryable — see `DeliveryReporter.retry_failed` — so a report\nshowing five misses that are all `denied` retries nothing, and a button that claimed\notherwise would be lying to a manager in a hurry.",
+        "properties": {
+          "retried_count": {
+            "title": "Retried Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "retried_count"
+        ],
+        "title": "ResendOut",
         "type": "object"
       },
       "RosterEntry": {
@@ -9216,6 +9962,518 @@
         ]
       }
     },
+    "/api/v1/announcements": {
+      "get": {
+        "operationId": "list_announcements_api_v1_announcements_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "After"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CursorPage_AnnouncementOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Announcements",
+        "tags": [
+          "coach",
+          "comms"
+        ]
+      },
+      "post": {
+        "description": "§5.11's publish form. Creating is not sending -- `published_at` stays null until\n`/publish`, so a draft can be written now and checked before it reaches anybody.",
+        "operationId": "create_announcement_api_v1_announcements_post",
+        "parameters": [
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnnouncementIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnnouncementOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Announcement",
+        "tags": [
+          "coach",
+          "comms"
+        ]
+      }
+    },
+    "/api/v1/announcements/audience-preview": {
+      "post": {
+        "description": "`audience.recipients` -- `יגיע ל-{{count}} משפחות`.\n\nA POST rather than a GET with query parameters, because it is scoped by the same\n(scope_type, scope_id) pair the body of an announcement carries and splitting that across\ntwo shapes is how the two drift. It reads nothing and changes nothing.",
+        "operationId": "preview_audience_api_v1_announcements_audience_preview_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AudienceQuery"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AudienceSizeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview Audience",
+        "tags": [
+          "coach",
+          "comms"
+        ]
+      }
+    },
+    "/api/v1/announcements/{announcement_id}": {
+      "delete": {
+        "description": "Soft, per G15. Every recipient's inbox row names this announcement in its payload.",
+        "operationId": "delete_announcement_api_v1_announcements__announcement_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "announcement_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Announcement Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Announcement",
+        "tags": [
+          "coach",
+          "comms"
+        ]
+      },
+      "get": {
+        "operationId": "get_announcement_api_v1_announcements__announcement_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "announcement_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Announcement Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnnouncementOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Announcement",
+        "tags": [
+          "coach",
+          "comms"
+        ]
+      },
+      "patch": {
+        "description": "409 once it has been published: parents already hold it.\n\nThe patch is merged over the stored row here rather than in the service, so the service\nkeeps one `update(id, AnnouncementIn)` that always receives a complete, validated\nannouncement -- and so the §3.2 and audience checks below run against the scope this edit\nwould RESULT in, not the one it happened to mention.",
+        "operationId": "update_announcement_api_v1_announcements__announcement_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "announcement_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Announcement Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnnouncementPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnnouncementOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Announcement",
+        "tags": [
+          "coach",
+          "comms"
+        ]
+      }
+    },
+    "/api/v1/announcements/{announcement_id}/delivery": {
+      "get": {
+        "description": "§5.11's post-send screen.\n\n`ManagerOnly` rather than `AnnouncementPublisher`: this is a list of families' names and\ntelephone numbers, and §3.2 gives a coach the roster rather than the household directory.\nA lead coach can publish to their own group and cannot read the club's phone book, which\nis the same line §3.2 draws everywhere else.\n\nA draft returns zeroes rather than a 404. It has reached nobody, and that is the honest\nanswer to \"how did it go\" for something that has not gone.",
+        "operationId": "announcement_delivery_report_api_v1_announcements__announcement_id__delivery_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "announcement_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Announcement Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryReportOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Announcement Delivery Report",
+        "tags": [
+          "coach",
+          "comms"
+        ]
+      }
+    },
+    "/api/v1/announcements/{announcement_id}/publish": {
+      "post": {
+        "description": "The send. 409 on a second attempt -- see `AnnouncementService.publish`.",
+        "operationId": "publish_announcement_api_v1_announcements__announcement_id__publish_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "announcement_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Announcement Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnnouncementOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Publish Announcement",
+        "tags": [
+          "coach",
+          "comms"
+        ]
+      }
+    },
+    "/api/v1/announcements/{announcement_id}/resend": {
+      "post": {
+        "description": "`delivery.resend`. Re-queues the errored sends and nothing else.",
+        "operationId": "resend_announcement_api_v1_announcements__announcement_id__resend_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "announcement_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Announcement Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResendOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Resend Announcement",
+        "tags": [
+          "coach",
+          "comms"
+        ]
+      }
+    },
     "/api/v1/attendance/batch": {
       "post": {
         "description": "§7's `POST /attendance/batch  (idempotent)` — the offline queue drains here.\n\n**200 and not 201**, even when rows are created: the queue replays this request, and a\nclient that treated 201 as \"new work happened\" would raise a fresh toast on every\nreconnect for marks it made three hours ago.\n\nIdempotency is per *mark* on `client_mark_id`, not per request. `Idempotency-Key` is\naccepted for consistency with the rest of the API and is not what makes this safe — a\nrequest-level key would make the second attempt a no-op that silently dropped the marks\nthe first attempt never delivered.",
@@ -10185,6 +11443,108 @@
         ]
       }
     },
+    "/api/v1/calendar-feeds": {
+      "get": {
+        "description": "§5.12's `הוספה ליומן`. Issues a feed the first time it is asked for.\n\nIdempotent: the settings screen loads more than once, and a fresh token per page load\nwould break every calendar the parent had already subscribed.",
+        "operationId": "my_calendar_feeds_api_v1_calendar_feeds_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarFeedsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "My Calendar Feeds",
+        "tags": [
+          "comms"
+        ]
+      }
+    },
+    "/api/v1/calendar-feeds/{feed_id}/rotate": {
+      "post": {
+        "description": "§5.12 — \"rotating invalidates the old URL immediately\".\n\n404 rather than 403 for somebody else's feed. The id is a UUID a signed-in manager could\nguess at, and rotating a parent's feed would silently disconnect their family calendar —\nso the route does not confirm that the feed exists either.",
+        "operationId": "rotate_calendar_feed_api_v1_calendar_feeds__feed_id__rotate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "feed_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Feed Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarFeedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Rotate Calendar Feed",
+        "tags": [
+          "comms"
+        ]
+      }
+    },
+    "/api/v1/calendar/{token}.ics": {
+      "get": {
+        "description": "§5.12's subscription. Unauthenticated, token-secured, RFC 5545.\n\n**The 404 carries nothing.** No \"this studio has no such feed\", no distinction between a\ntoken that never existed and one that was rotated away — either would confirm something\nto whoever is guessing, and guessing is the only attack this endpoint has.\n\n`Cache-Control: no-store` because the feed is a live view of a timetable that changes: a\ncancelled session has to reach the subscriber on their next fetch rather than on their\nnext cache expiry. §5.12 is clear that even then the feed is not the urgent channel —\nGoogle refreshes on its own schedule, up to ~24h — which is why §5.11's push exists and\nwhy `calendar.refreshDelay` says so on the screen.",
+        "operationId": "calendar_feed_api_v1_calendar__token__ics_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "title": "Token",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Calendar Feed",
+        "tags": [
+          "comms"
+        ]
+      }
+    },
     "/api/v1/charges": {
       "get": {
         "description": "§7's `GET /charges?payer_person_id&status`. `allocated_agorot` travels with each row\nbecause §4.3 settles a charge by summing allocations -- a client rendering\n`amount_agorot` alone would show a fully-paid charge as outstanding.",
@@ -10866,6 +12226,29 @@
         "summary": "Create Closure",
         "tags": [
           "schedule"
+        ]
+      }
+    },
+    "/api/v1/comms/install-state": {
+      "get": {
+        "description": "§6.5 -- \"The dashboard lists guardians who have not installed, alongside the\npush-delivery report, so the office can see exactly who it needs to call.\"\n\n`ManagerOnly` for the same reason the delivery report is: it is a list of families' names\nand telephone numbers.",
+        "operationId": "install_state_api_v1_comms_install_state_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstallStateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Install State",
+        "tags": [
+          "coach",
+          "comms"
         ]
       }
     },
@@ -13056,6 +14439,299 @@
         ]
       }
     },
+    "/api/v1/notification-preferences": {
+      "get": {
+        "description": "§7's `GET /notification-preferences`.\n\nReturns every group whatever is stored, because absence means on: a screen rendering\nonly stored rows would show a guardian who has never touched it nothing at all.",
+        "operationId": "get_notification_preferences_api_v1_notification_preferences_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationPreferencesOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Notification Preferences",
+        "tags": [
+          "coach",
+          "comms"
+        ]
+      },
+      "patch": {
+        "description": "One switch at a time, and the whole set comes back.\n\nReturning all eight rather than the one that changed means the screen cannot drift out\nof step with the server -- which matters here because two of the eight do not do what\nthe switch implies, and §5.11's whole complaint about notification settings is people\nbelieving they turned something off.\n\n409 rather than 403 for a transactional group: the caller is permitted to ask, and the\nanswer is about the state of the world (§5.11 does not allow this to be off) rather than\nabout who they are.",
+        "operationId": "patch_notification_preferences_api_v1_notification_preferences_patch",
+        "parameters": [
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NotificationPreferencePatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationPreferencesOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Patch Notification Preferences",
+        "tags": [
+          "coach",
+          "comms"
+        ]
+      }
+    },
+    "/api/v1/notifications": {
+      "get": {
+        "description": "§7's `GET /notifications`. §5.11's \"permanent הודעות list\", newest first.\n\nThere is no `person_id` parameter and there will not be one: a notification is addressed\nto a person, and a route that let a caller name someone else would make another family's\nmessages one query string away.\n\n`kind` exists for §5.14's at-risk card, which asks this person's inbox for one kind rather\nthan reading a report. It is still scoped to the caller, so it widens nothing: the worst a\ncaller can do with it is see fewer of their own messages.",
+        "operationId": "list_notifications_api_v1_notifications_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "After"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "unread",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Unread",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "kind",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Kind"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CursorPage_NotificationOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Notifications",
+        "tags": [
+          "coach",
+          "comms"
+        ]
+      }
+    },
+    "/api/v1/notifications/read-all": {
+      "post": {
+        "description": "`inbox.markAllRead`.\n\n`read-all` cannot be shadowed by `/notifications/{notification_id}/read`, whatever order\nthe two are declared in: that route's path parameter is typed `uuid.UUID`, so a literal\n`read-all` fails to parse as one and never matches. Said out loud because the usual fix\nfor this class of collision is careful ordering, and here the types already settle it.",
+        "operationId": "mark_all_notifications_read_api_v1_notifications_read_all_post",
+        "parameters": [
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarkedReadOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Mark All Notifications Read",
+        "tags": [
+          "coach",
+          "comms"
+        ]
+      }
+    },
+    "/api/v1/notifications/{notification_id}/read": {
+      "post": {
+        "description": "404 rather than 403 for somebody else's message.\n\n403 would confirm that a notification with that id exists. For a message addressed to\nanother family, that confirmation is itself the leak — and a client cannot act on the\ndifference anyway.",
+        "operationId": "mark_notification_read_api_v1_notifications__notification_id__read_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "notification_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Notification Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Mark Notification Read",
+        "tags": [
+          "coach",
+          "comms"
+        ]
+      }
+    },
     "/api/v1/payers/{payer_person_id}/balance": {
       "get": {
         "description": "`12f`'s summary card and `3e`'s household row.\n\nNegative is a family in credit. `MoneyDisplay` wraps the amount in `<bdi>` precisely so\na negative reads as a credit in a right-to-left sentence rather than as a debt.",
@@ -14399,6 +16075,70 @@
         "summary": "Public Logo",
         "tags": [
           "public"
+        ]
+      }
+    },
+    "/api/v1/push-tokens": {
+      "post": {
+        "description": "§7's `POST /push-tokens`. §6.5's install funnel ends here.\n\n201 on a re-registration as well as a first one, deliberately. FCM hands the same token\nback to the same browser on every launch, so \"already registered\" is the ordinary path\nrather than a conflict -- and a 409 would make the client's launch sequence branch on a\nstate it cannot do anything about.\n\nThe token is not echoed back. The client already holds it, and a second representation\nof a credential is one more place for it to end up in a log.",
+        "operationId": "register_push_token_api_v1_push_tokens_post",
+        "parameters": [
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PushTokenIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushTokenOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Register Push Token",
+        "tags": [
+          "coach",
+          "comms"
         ]
       }
     },

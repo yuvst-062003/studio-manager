@@ -1,9 +1,11 @@
 """§5.10's jobs. Three of them, and one shared rule: **messages go through W5's seam.**
 
-`NotificationService.enqueue` still raises `NotImplementedError` until lane COMMS lands, so
-the refusals are COUNTED and reported, never swallowed. A run that reported "12 reminders
-sent" when none were is worse than one that says so -- the debt ladder is the feature a
-manager will most want to trust, and its failures are silent by nature.
+`NotificationService.enqueue` sends for real now -- lane COMMS (M8) filled W5's seam in.
+The refusals are still COUNTED and reported rather than swallowed, because a send can fail
+for reasons that are not "nobody implemented it": a parent with no registered device, a
+notification type they switched off, a push service that errored. A run that reported "12
+reminders sent" when none were is worse than one that says so -- the debt ladder is the
+feature a manager will most want to trust, and its failures are silent by nature.
 """
 
 from __future__ import annotations
@@ -128,14 +130,23 @@ def test_earlier_rungs_raise_no_manager_task(
         assert escalate_debt(tenant_session, at=T0).manager_tasks == 0
 
 
-def test_undeliverable_messages_are_counted_rather_than_swallowed(
+def test_the_seam_delivers_now_and_the_counter_still_reports_honestly(
     tenant_session, studio, a_priced_student, an_open_charge
 ):
-    """W5's seam raises until lane COMMS lands. The job must carry on -- the day-14 manager
-    task is a database fact and does not depend on comms -- and must say so."""
+    """**Updated by lane COMMS (M8), which filled W5's seam in.**
+
+    This read `tally.undeliverable == tally.reminders` while
+    `NotificationService.enqueue` raised -- every message refused, and the point was that the
+    job carried on and said so. The seam sends now, so the honest assertion is the mirror
+    image: nothing was refused, and the reminders were real.
+
+    `undeliverable` stays in the tally and `_notify`'s `except NotImplementedError` stays in
+    the worker. A send can still fail for reasons that are not "nobody implemented it", and a
+    run reporting "12 reminders sent" when none were is exactly as wrong as it ever was.
+    """
     _due(tenant_session, an_open_charge, T0.date() - timedelta(days=3))
     tally = escalate_debt(tenant_session, at=T0)
-    assert tally.undeliverable == tally.reminders
+    assert tally.undeliverable == 0
     assert tally.reminders > 0
 
 

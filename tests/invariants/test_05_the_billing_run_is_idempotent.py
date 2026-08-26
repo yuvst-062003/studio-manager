@@ -216,19 +216,31 @@ def test_the_billing_run_is_idempotent(app_session):
 
 
 # -- and the seam detector is proven to tell a stub from an implementation ----
-def test_the_seam_detector_recognises_a_contract_stub():
-    """The live case, asserted against a seam that is **still** a seam.
+def test_the_seam_detector_has_no_live_stub_left_to_point_at():
+    """**Retired, and this is the note the previous version asked for.**
 
-    This pointed at `BillingService.create_charge` until lane MONEY filled it in -- by
-    design: it was written to stop passing at exactly that moment, which is when the
-    tripwire above had to start firing. A detector proven only against the fixtures below
-    is a detector nobody has pointed at real code, so the live case moved to W5's
-    `NotificationService.enqueue`, which is still empty-bodied. When W5 fills that in, move
-    it again to whichever seam is then pending -- or retire it, and say so here.
+    The live case pointed at `BillingService.create_charge` until lane MONEY filled it in,
+    then moved to `NotificationService.enqueue` -- with the instruction "when W5 fills that
+    in, move it again to whichever seam is then pending -- or retire it, and say so here."
+
+    There is no third. W5 was the last wave with a cross-lane seam, and lane COMMS (M8)
+    filled `enqueue` in, so `app/services/` now holds no empty-bodied contract method at
+    all. That was checked with this file's own detector rather than by grep: every class in
+    every module under `app.services` was walked and `is_still_a_seam` returned False for
+    each of their methods.
+
+    What the retirement does NOT cost. The detector is still exercised, in both directions,
+    by the two fixture cases below -- one stub it must recognise, one real body it must
+    reject. And the tripwire it guards is asserted directly rather than by proxy:
+    `test_the_billing_seam_is_no_longer_a_stub` is what keeps
+    `test_the_billing_run_is_idempotent` from silently asserting over a method that raises.
+
+    If a later wave introduces a new seam, this is where its live case goes -- point this
+    test at it and delete this paragraph.
     """
     from app.services.comms import NotificationService
 
-    assert is_still_a_seam(NotificationService.enqueue)
+    assert not is_still_a_seam(NotificationService.enqueue)
 
 
 def test_the_billing_seam_is_no_longer_a_stub():

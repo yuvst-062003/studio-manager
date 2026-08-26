@@ -54,6 +54,150 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/announcements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Announcements */
+        get: operations["list_announcements_api_v1_announcements_get"];
+        put?: never;
+        /**
+         * Create Announcement
+         * @description §5.11's publish form. Creating is not sending -- `published_at` stays null until
+         *     `/publish`, so a draft can be written now and checked before it reaches anybody.
+         */
+        post: operations["create_announcement_api_v1_announcements_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/announcements/audience-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview Audience
+         * @description `audience.recipients` -- `יגיע ל-{{count}} משפחות`.
+         *
+         *     A POST rather than a GET with query parameters, because it is scoped by the same
+         *     (scope_type, scope_id) pair the body of an announcement carries and splitting that across
+         *     two shapes is how the two drift. It reads nothing and changes nothing.
+         */
+        post: operations["preview_audience_api_v1_announcements_audience_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/announcements/{announcement_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Announcement */
+        get: operations["get_announcement_api_v1_announcements__announcement_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Announcement
+         * @description Soft, per G15. Every recipient's inbox row names this announcement in its payload.
+         */
+        delete: operations["delete_announcement_api_v1_announcements__announcement_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Update Announcement
+         * @description 409 once it has been published: parents already hold it.
+         *
+         *     The patch is merged over the stored row here rather than in the service, so the service
+         *     keeps one `update(id, AnnouncementIn)` that always receives a complete, validated
+         *     announcement -- and so the §3.2 and audience checks below run against the scope this edit
+         *     would RESULT in, not the one it happened to mention.
+         */
+        patch: operations["update_announcement_api_v1_announcements__announcement_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/announcements/{announcement_id}/delivery": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Announcement Delivery Report
+         * @description §5.11's post-send screen.
+         *
+         *     `ManagerOnly` rather than `AnnouncementPublisher`: this is a list of families' names and
+         *     telephone numbers, and §3.2 gives a coach the roster rather than the household directory.
+         *     A lead coach can publish to their own group and cannot read the club's phone book, which
+         *     is the same line §3.2 draws everywhere else.
+         *
+         *     A draft returns zeroes rather than a 404. It has reached nobody, and that is the honest
+         *     answer to "how did it go" for something that has not gone.
+         */
+        get: operations["announcement_delivery_report_api_v1_announcements__announcement_id__delivery_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/announcements/{announcement_id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Publish Announcement
+         * @description The send. 409 on a second attempt -- see `AnnouncementService.publish`.
+         */
+        post: operations["publish_announcement_api_v1_announcements__announcement_id__publish_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/announcements/{announcement_id}/resend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resend Announcement
+         * @description `delivery.resend`. Re-queues the errored sends and nothing else.
+         */
+        post: operations["resend_announcement_api_v1_announcements__announcement_id__resend_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/attendance/batch": {
         parameters: {
             query?: never;
@@ -460,6 +604,83 @@ export interface paths {
         patch: operations["update_billing_settings_api_v1_billing_settings_patch"];
         trace?: never;
     };
+    "/api/v1/calendar-feeds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Calendar Feeds
+         * @description §5.12's `הוספה ליומן`. Issues a feed the first time it is asked for.
+         *
+         *     Idempotent: the settings screen loads more than once, and a fresh token per page load
+         *     would break every calendar the parent had already subscribed.
+         */
+        get: operations["my_calendar_feeds_api_v1_calendar_feeds_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/calendar-feeds/{feed_id}/rotate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rotate Calendar Feed
+         * @description §5.12 — "rotating invalidates the old URL immediately".
+         *
+         *     404 rather than 403 for somebody else's feed. The id is a UUID a signed-in manager could
+         *     guess at, and rotating a parent's feed would silently disconnect their family calendar —
+         *     so the route does not confirm that the feed exists either.
+         */
+        post: operations["rotate_calendar_feed_api_v1_calendar_feeds__feed_id__rotate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/calendar/{token}.ics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Calendar Feed
+         * @description §5.12's subscription. Unauthenticated, token-secured, RFC 5545.
+         *
+         *     **The 404 carries nothing.** No "this studio has no such feed", no distinction between a
+         *     token that never existed and one that was rotated away — either would confirm something
+         *     to whoever is guessing, and guessing is the only attack this endpoint has.
+         *
+         *     `Cache-Control: no-store` because the feed is a live view of a timetable that changes: a
+         *     cancelled session has to reach the subscriber on their next fetch rather than on their
+         *     next cache expiry. §5.12 is clear that even then the feed is not the urgent channel —
+         *     Google refreshes on its own schedule, up to ~24h — which is why §5.11's push exists and
+         *     why `calendar.refreshDelay` says so on the screen.
+         */
+        get: operations["calendar_feed_api_v1_calendar__token__ics_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/charges": {
         parameters: {
             query?: never;
@@ -610,6 +831,30 @@ export interface paths {
         put?: never;
         /** Create Closure */
         post: operations["create_closure_api_v1_closures_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/comms/install-state": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Install State
+         * @description §6.5 -- "The dashboard lists guardians who have not installed, alongside the
+         *     push-delivery report, so the office can see exactly who it needs to call."
+         *
+         *     `ManagerOnly` for the same reason the delivery report is: it is a list of families' names
+         *     and telephone numbers.
+         */
+        get: operations["install_state_api_v1_comms_install_state_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1373,6 +1618,119 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/notification-preferences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Notification Preferences
+         * @description §7's `GET /notification-preferences`.
+         *
+         *     Returns every group whatever is stored, because absence means on: a screen rendering
+         *     only stored rows would show a guardian who has never touched it nothing at all.
+         */
+        get: operations["get_notification_preferences_api_v1_notification_preferences_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Patch Notification Preferences
+         * @description One switch at a time, and the whole set comes back.
+         *
+         *     Returning all eight rather than the one that changed means the screen cannot drift out
+         *     of step with the server -- which matters here because two of the eight do not do what
+         *     the switch implies, and §5.11's whole complaint about notification settings is people
+         *     believing they turned something off.
+         *
+         *     409 rather than 403 for a transactional group: the caller is permitted to ask, and the
+         *     answer is about the state of the world (§5.11 does not allow this to be off) rather than
+         *     about who they are.
+         */
+        patch: operations["patch_notification_preferences_api_v1_notification_preferences_patch"];
+        trace?: never;
+    };
+    "/api/v1/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Notifications
+         * @description §7's `GET /notifications`. §5.11's "permanent הודעות list", newest first.
+         *
+         *     There is no `person_id` parameter and there will not be one: a notification is addressed
+         *     to a person, and a route that let a caller name someone else would make another family's
+         *     messages one query string away.
+         *
+         *     `kind` exists for §5.14's at-risk card, which asks this person's inbox for one kind rather
+         *     than reading a report. It is still scoped to the caller, so it widens nothing: the worst a
+         *     caller can do with it is see fewer of their own messages.
+         */
+        get: operations["list_notifications_api_v1_notifications_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/read-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark All Notifications Read
+         * @description `inbox.markAllRead`.
+         *
+         *     `read-all` cannot be shadowed by `/notifications/{notification_id}/read`, whatever order
+         *     the two are declared in: that route's path parameter is typed `uuid.UUID`, so a literal
+         *     `read-all` fails to parse as one and never matches. Said out loud because the usual fix
+         *     for this class of collision is careful ordering, and here the types already settle it.
+         */
+        post: operations["mark_all_notifications_read_api_v1_notifications_read_all_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/{notification_id}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark Notification Read
+         * @description 404 rather than 403 for somebody else's message.
+         *
+         *     403 would confirm that a notification with that id exists. For a message addressed to
+         *     another family, that confirmation is itself the leak — and a client cannot act on the
+         *     difference anyway.
+         */
+        post: operations["mark_notification_read_api_v1_notifications__notification_id__read_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/payers/{payer_person_id}/balance": {
         parameters: {
             query?: never;
@@ -1843,6 +2201,34 @@ export interface paths {
         get: operations["public_logo_api_v1_public_studios__slug__logo_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/push-tokens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Register Push Token
+         * @description §7's `POST /push-tokens`. §6.5's install funnel ends here.
+         *
+         *     201 on a re-registration as well as a first one, deliberately. FCM hands the same token
+         *     back to the same browser on every launch, so "already registered" is the ordinary path
+         *     rather than a conflict -- and a 409 would make the client's launch sequence branch on a
+         *     state it cannot do anything about.
+         *
+         *     The token is not echoed back. The client already holds it, and a second representation
+         *     of a credential is one more place for it to end up in a log.
+         */
+        post: operations["register_push_token_api_v1_push_tokens_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2995,6 +3381,91 @@ export interface components {
             token: string;
         };
         /**
+         * AnnouncementIn
+         * @description §5.11's publish form. `scheduled_for` absent means send now.
+         */
+        AnnouncementIn: {
+            /** Body */
+            body: string;
+            /** Scheduled For */
+            scheduled_for?: string | null;
+            /** Scope Id */
+            scope_id?: string | null;
+            /**
+             * Scope Type
+             * @enum {string}
+             */
+            scope_type: "studio" | "class" | "group";
+            /** Title */
+            title: string;
+        };
+        /**
+         * AnnouncementOut
+         * @description What the publisher's list renders.
+         *
+         *     `scheduled_for` and `published_at` are both here because three states matter and they
+         *     are three different next actions: a draft to finish, a send that is queued, and one
+         *     that has already gone out and now has a delivery report.
+         */
+        AnnouncementOut: {
+            /**
+             * Author Person Id
+             * Format: uuid
+             */
+            author_person_id: string;
+            /** Body */
+            body: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Published At */
+            published_at?: string | null;
+            /** Scheduled For */
+            scheduled_for?: string | null;
+            /** Scope Id */
+            scope_id?: string | null;
+            /**
+             * Scope Type
+             * @enum {string}
+             */
+            scope_type: "studio" | "class" | "group";
+            /** Title */
+            title: string;
+        };
+        /**
+         * AnnouncementPatch
+         * @description A partial edit to a draft. Every field optional, in the shape `app/routers/billing.py`
+         *     already uses for `ProductPatch`.
+         *
+         *     `AnnouncementIn` is the CREATE shape and requires a title, a body and a scope. Reusing it
+         *     here would make `PATCH` mean `PUT` -- a manager fixing a typo would have to resend the
+         *     audience, and forgetting to would silently re-scope the announcement.
+         *
+         *     `scope_id` and `scheduled_for` are both nullable AND meaningful when null (a studio-wide
+         *     scope names no row; an unscheduled announcement has no time), so "was it sent" is read
+         *     from `model_fields_set` rather than from the value. That is what lets
+         *     `{"scheduled_for": null}` mean `announcement.cancelSchedule` instead of "leave it alone".
+         */
+        AnnouncementPatch: {
+            /** Body */
+            body?: string | null;
+            /** Scheduled For */
+            scheduled_for?: string | null;
+            /** Scope Id */
+            scope_id?: string | null;
+            /** Scope Type */
+            scope_type?: ("studio" | "class" | "group") | null;
+            /** Title */
+            title?: string | null;
+        };
+        /**
          * AppAccessOut
          * @description §6.1's two queries, as the client sees them.
          *
@@ -3115,6 +3586,28 @@ export interface components {
              * Format: uuid
              */
             student_id: string;
+        };
+        /**
+         * AudienceQuery
+         * @description A scope, before an announcement exists to carry it.
+         *
+         *     `4f` shows `יגיע ל-{{count}} משפחות` while the manager is still choosing who to write to,
+         *     so the count cannot hang off an announcement id -- there is no row yet, and creating a
+         *     draft per keystroke to ask "how many" would litter the list.
+         */
+        AudienceQuery: {
+            /** Scope Id */
+            scope_id?: string | null;
+            /**
+             * Scope Type
+             * @enum {string}
+             */
+            scope_type: "studio" | "class" | "group";
+        };
+        /** AudienceSizeOut */
+        AudienceSizeOut: {
+            /** Recipient Count */
+            recipient_count: number;
         };
         /**
          * BatchAttendanceIn
@@ -3386,6 +3879,40 @@ export interface components {
              */
             respect_absence_reports: boolean;
         };
+        /**
+         * CalendarFeedOut
+         * @description The subscription, not its contents.
+         *
+         *     §5.12: "The feed contains no medical and no financial data." This shape holds a URL and
+         *     a rotation timestamp and has nowhere to put either, which is the durable version of
+         *     that sentence — the URL is unauthenticated and, once subscribed, is fetched by Google's
+         *     servers on their schedule and outside our control.
+         */
+        CalendarFeedOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Rotated At */
+            rotated_at?: string | null;
+            /**
+             * Subject Type
+             * @enum {string}
+             */
+            subject_type: "guardian" | "coach";
+            /** Url */
+            url: string;
+        };
+        /**
+         * CalendarFeedsOut
+         * @description This person's subscriptions. A guardian has one, a coach has one, somebody who is both
+         *     has two — and §5.12's two carry different things, so neither contains the other.
+         */
+        CalendarFeedsOut: {
+            /** Feeds */
+            feeds: components["schemas"]["CalendarFeedOut"][];
+        };
         /** CallbackRequest */
         CallbackRequest: {
             /** Code */
@@ -3649,6 +4176,18 @@ export interface components {
              */
             training_year_id: string;
         };
+        /** CursorPage[AnnouncementOut] */
+        CursorPage_AnnouncementOut_: {
+            /**
+             * Has More
+             * @default false
+             */
+            has_more: boolean;
+            /** Items */
+            items: components["schemas"]["AnnouncementOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
         /** CursorPage[AttendanceOut] */
         CursorPage_AttendanceOut_: {
             /**
@@ -3766,6 +4305,18 @@ export interface components {
             has_more: boolean;
             /** Items */
             items: components["schemas"]["LadderRankOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** CursorPage[NotificationOut] */
+        CursorPage_NotificationOut_: {
+            /**
+             * Has More
+             * @default false
+             */
+            has_more: boolean;
+            /** Items */
+            items: components["schemas"]["NotificationOut"][];
             /** Next Cursor */
             next_cursor?: string | null;
         };
@@ -3924,6 +4475,27 @@ export interface components {
             items: components["schemas"]["UpayIpnRecordOut"][];
             /** Next Cursor */
             next_cursor?: string | null;
+        };
+        /**
+         * DeliveryReportOut
+         * @description §5.11's post-send screen, for a cancellation or an announcement.
+         *
+         *     `sent_count` is families targeted; `received_count` is those a push actually reached.
+         *     They are counted separately rather than derived from `len(missed)` because a send that
+         *     is still in flight has neither — `queued` rows are not yet misses, and reporting them
+         *     as such would send a manager chasing families whose phone is about to buzz.
+         */
+        DeliveryReportOut: {
+            /** Missed */
+            missed?: components["schemas"]["MissedRecipientOut"][];
+            /** Missed Count */
+            missed_count: number;
+            /** Notification Ids */
+            notification_ids?: string[];
+            /** Received Count */
+            received_count: number;
+            /** Sent Count */
+            sent_count: number;
         };
         /** EnrollmentCreate */
         EnrollmentCreate: {
@@ -4790,6 +5362,38 @@ export interface components {
             name: string;
         };
         /**
+         * InstallStateOut
+         * @description Who can receive a push at all, and the list to phone.
+         *
+         *     Sits beside §5.11's delivery report on the dashboard because they answer two halves of
+         *     one question, and this is the fixable half: a family here will be on every delivery
+         *     report until somebody calls them.
+         */
+        InstallStateOut: {
+            /** By Platform */
+            by_platform: {
+                [key: string]: number;
+            };
+            /** Installed Count */
+            installed_count: number;
+            /** Not Installed */
+            not_installed: components["schemas"]["InstallStateRowOut"][];
+            /** Not Installed Count */
+            not_installed_count: number;
+        };
+        /** InstallStateRowOut */
+        InstallStateRowOut: {
+            /** Name */
+            name: string;
+            /**
+             * Person Id
+             * Format: uuid
+             */
+            person_id: string;
+            /** Phone */
+            phone?: string | null;
+        };
+        /**
          * InvitationOut
          * @description §5.3's token, returned exactly once.
          *
@@ -4960,6 +5564,18 @@ export interface components {
             received_at: string;
         };
         /**
+         * MarkedReadOut
+         * @description How many rows `read-all` actually changed.
+         *
+         *     The count the screen shows, and it counts what CHANGED rather than what exists —
+         *     reporting "12 marked read" to a parent who had two unread would be a number they can see
+         *     is wrong.
+         */
+        MarkedReadOut: {
+            /** Marked */
+            marked: number;
+        };
+        /**
          * MatchSuggestionOut
          * @description One unmatched payment and the payer a fingerprint suggests.
          *
@@ -5014,12 +5630,104 @@ export interface components {
             studios: components["schemas"]["StudioMembershipOut"][];
         };
         /**
+         * MissedRecipientOut
+         * @description A family the message did not reach, and the number to phone.
+         *
+         *     The phone number is the point. §5.11 chose this over a WhatsApp Business integration —
+         *     "same outcome as automation, half a day of work, zero risk" — and it only works if the
+         *     manager can copy the numbers.
+         */
+        MissedRecipientOut: {
+            /** Name */
+            name: string;
+            /**
+             * Person Id
+             * Format: uuid
+             */
+            person_id: string;
+            /** Phone */
+            phone?: string | null;
+            /**
+             * Reason
+             * @enum {string}
+             */
+            reason: "no_token" | "denied" | "failed";
+        };
+        /**
          * MyStandingOrderOut
          * @description Whether §5.10's second double-payment guard applies to the person asking.
          */
         MyStandingOrderOut: {
             /** Active */
             active: boolean;
+        };
+        /**
+         * NotificationOut
+         * @description One inbox row. §5.11: "the inbox is where the message lives" — no permission needed
+         *     and it never expires.
+         *
+         *     There is no sender. Every one of §5.11's fifteen triggers is the system telling a
+         *     person something, and a `sender_person_id` here is the field a reply box would be
+         *     built on.
+         */
+        NotificationOut: {
+            /** Body */
+            body: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Payload */
+            payload?: {
+                [key: string]: unknown;
+            };
+            /** Read At */
+            read_at?: string | null;
+            /** Title */
+            title: string;
+        };
+        /**
+         * NotificationPreferenceOut
+         * @description One switch, as `preferences.kind.*` renders it.
+         *
+         *     `always_on` travels as data rather than as a list hardcoded in a component. §5.11's
+         *     exemption is a product rule, and a component that carried its own copy would be a second
+         *     place to change it -- and the likelier of the two to be missed.
+         */
+        NotificationPreferenceOut: {
+            /** Always On */
+            always_on: boolean;
+            /** Enabled */
+            enabled: boolean;
+            /** Kind Group */
+            kind_group: string;
+        };
+        /** NotificationPreferencePatch */
+        NotificationPreferencePatch: {
+            /** Enabled */
+            enabled: boolean;
+            /** Kind Group */
+            kind_group: string;
+        };
+        /**
+         * NotificationPreferencesOut
+         * @description All eight, always, in `PREFERENCE_GROUPS` order.
+         *
+         *     Wrapped in an object rather than returned as a bare list: this is not a paginated
+         *     collection (G16 is about lists that grow), and a top-level array leaves nowhere to add a
+         *     field later without breaking every generated client.
+         */
+        NotificationPreferencesOut: {
+            /** Groups */
+            groups: components["schemas"]["NotificationPreferenceOut"][];
         };
         /**
          * ParentEventOut
@@ -5438,6 +6146,49 @@ export interface components {
             studio_name: string;
         };
         /**
+         * PushTokenIn
+         * @description What the client posts after the OS grants permission.
+         *
+         *     `app` and `platform` are both required because the delivery report is only honest with
+         *     them: §6.5 makes an iOS parent's registration depend on the app being on the home
+         *     screen, so `ios` + `parent` registrations that never arrive are the install funnel
+         *     failing rather than the push service.
+         */
+        PushTokenIn: {
+            /**
+             * App
+             * @enum {string}
+             */
+            app: "staff" | "parent";
+            /**
+             * Platform
+             * @enum {string}
+             */
+            platform: "ios" | "android" | "web";
+            /** Token */
+            token: string;
+        };
+        /** PushTokenOut */
+        PushTokenOut: {
+            /**
+             * App
+             * @enum {string}
+             */
+            app: "staff" | "parent";
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Last Seen At */
+            last_seen_at?: string | null;
+            /**
+             * Platform
+             * @enum {string}
+             */
+            platform: "ios" | "android" | "web";
+        };
+        /**
          * RecurringSubscriptionOut
          * @description G8 — a record of a mandate that exists at the provider, not one we can create.
          *     Nothing in the API creates or varies these; they are entered when a parent sets one up
@@ -5602,6 +6353,19 @@ export interface components {
             class_id: string;
             /** Ordered Ids */
             ordered_ids: string[];
+        };
+        /**
+         * ResendOut
+         * @description How many sends `[ שלח שוב ]` could actually retry.
+         *
+         *     A count and not a boolean, because it is frequently zero and the screen has to say so.
+         *     Only `failed` rows are retryable — see `DeliveryReporter.retry_failed` — so a report
+         *     showing five misses that are all `denied` retries nothing, and a button that claimed
+         *     otherwise would be lying to a manager in a hurry.
+         */
+        ResendOut: {
+            /** Retried Count */
+            retried_count: number;
         };
         /**
          * RosterEntry
@@ -7070,6 +7834,307 @@ export interface operations {
             };
         };
     };
+    list_announcements_api_v1_announcements_get: {
+        parameters: {
+            query?: {
+                after?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CursorPage_AnnouncementOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_announcement_api_v1_announcements_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AnnouncementIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnnouncementOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_audience_api_v1_announcements_audience_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AudienceQuery"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AudienceSizeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_announcement_api_v1_announcements__announcement_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                announcement_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnnouncementOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_announcement_api_v1_announcements__announcement_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                announcement_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_announcement_api_v1_announcements__announcement_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                announcement_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AnnouncementPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnnouncementOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    announcement_delivery_report_api_v1_announcements__announcement_id__delivery_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                announcement_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeliveryReportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    publish_announcement_api_v1_announcements__announcement_id__publish_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                announcement_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnnouncementOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resend_announcement_api_v1_announcements__announcement_id__resend_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                announcement_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResendOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     apply_batch_api_v1_attendance_batch_post: {
         parameters: {
             query?: never;
@@ -7700,6 +8765,86 @@ export interface operations {
             };
         };
     };
+    my_calendar_feeds_api_v1_calendar_feeds_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarFeedsOut"];
+                };
+            };
+        };
+    };
+    rotate_calendar_feed_api_v1_calendar_feeds__feed_id__rotate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                feed_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarFeedOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    calendar_feed_api_v1_calendar__token__ics_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_charges_api_v1_charges_get: {
         parameters: {
             query?: {
@@ -8045,6 +9190,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    install_state_api_v1_comms_install_state_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstallStateOut"];
                 };
             };
         };
@@ -9340,6 +10505,162 @@ export interface operations {
             };
         };
     };
+    get_notification_preferences_api_v1_notification_preferences_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationPreferencesOut"];
+                };
+            };
+        };
+    };
+    patch_notification_preferences_api_v1_notification_preferences_patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NotificationPreferencePatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationPreferencesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_notifications_api_v1_notifications_get: {
+        parameters: {
+            query?: {
+                after?: string | null;
+                limit?: number;
+                unread?: boolean;
+                kind?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CursorPage_NotificationOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mark_all_notifications_read_api_v1_notifications_read_all_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarkedReadOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mark_notification_read_api_v1_notifications__notification_id__read_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                notification_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     payer_balance_api_v1_payers__payer_person_id__balance_get: {
         parameters: {
             query?: never;
@@ -10136,6 +11457,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    register_push_token_api_v1_push_tokens_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PushTokenIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushTokenOut"];
                 };
             };
             /** @description Validation Error */
