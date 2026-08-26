@@ -40,6 +40,8 @@ import {
   EventForm,
   EventPage,
   EventsScreen,
+  ExamEligibilityScreen,
+  ExamsScreen,
   makeDashboardEventsClient,
 } from './features/events'
 import {
@@ -65,6 +67,7 @@ const NAV = [
   { key: 'alerts', labelKey: 'people.alerts.title', href: '#/alerts' },
   { key: 'events', labelKey: 'events.title', href: '#/events' },
   { key: 'belts', labelKey: 'events.belt.title', href: '#/belts' },
+  { key: 'exams', labelKey: 'events.exam.plural', href: '#/exams' },
   { key: 'staff', labelKey: 'common.dash.nav.staff', href: '#/staff' },
   { key: 'settings', labelKey: 'common.dash.nav.settings', href: '#/settings' },
   { key: 'setup', labelKey: 'common.dash.nav.setup', href: '#/setup' },
@@ -74,6 +77,7 @@ export type DashboardRoute =
   | 'home'
   | 'events'
   | 'belts'
+  | 'exams'
   | 'staff'
   | 'settings'
   | 'setup'
@@ -98,6 +102,8 @@ export function routeFromHash(hash: string): DashboardRoute {
   if (name.startsWith('events')) return 'events'
   // §5.9's ladder. `#/belts` today; `#/belts/<classId>` once a studio has two classes.
   if (name.startsWith('belts')) return 'belts'
+  // §5.9's exams: `#/exams` is 6b's roundup, `#/exams/<id>` is 4d's eligibility table.
+  if (name.startsWith('exams')) return 'exams'
   return name === 'staff' || name === 'settings' || name === 'setup' ? name : 'home'
 }
 
@@ -130,6 +136,7 @@ export default function App() {
   const studentRoute = studentRouteFrom(hash)
   const eventRoute = eventRouteFrom(hash)
   const beltsClassId = hash.replace(/^#\/?belts\/?/, '')
+  const examRoute = hash.replace(/^#\/?exams\/?/, '')
   const [locale, setLocale] = useState<Locale>('he')
   // §3.2's hard rule, on the screen's side — and ONLY on the screen's side. The API has
   // already redacted `fee_agorot` to null for a coach, so this cannot leak a price even if
@@ -225,6 +232,19 @@ export default function App() {
           ) : null}
           {route === 'alerts' ? (
             <AlertCentre locale={locale} client={peopleClient} />
+          ) : null}
+          {route === 'exams' && !examRoute ? (
+            <ExamsScreen
+              client={eventsClient}
+              locale={locale}
+              now={today}
+              onOpen={(id) => {
+                globalThis.location.hash = `#/exams/${id}`
+              }}
+            />
+          ) : null}
+          {route === 'exams' && examRoute ? (
+            <ExamEligibilityScreen client={eventsClient} eventId={examRoute} locale={locale} />
           ) : null}
           {route === 'belts' && beltsClassId ? (
             <BeltSystemScreen classId={beltsClassId} client={beltsClient} locale={locale} />
