@@ -182,6 +182,8 @@ export const events: Bundle = {
   'exam.promoted': 'Степени присвоены',
 
   // -- 5b / 5d — the belt system ------------------------------------------------------
+  'form.cancel': 'Отмена',
+  'belt.delete': 'Удалить степень',
   'belt.edit': 'Редактировать степень',
   'belt.save': 'Сохранить степень',
   'belt.preview': 'Предпросмотр',

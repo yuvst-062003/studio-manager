@@ -178,6 +178,8 @@ export const events: Bundle = {
   'exam.promoted': 'Ranks awarded',
 
   // -- 5b / 5d — the belt system ------------------------------------------------------
+  'form.cancel': 'Cancel',
+  'belt.delete': 'Delete rank',
   'belt.edit': 'Edit rank',
   'belt.save': 'Save rank',
   'belt.preview': 'Preview',

@@ -212,6 +212,8 @@ export const events: Bundle = {
   'exam.promoted': 'הדרגות הוענקו',
 
   // -- 5b / 5d — the belt system ------------------------------------------------------
+  'form.cancel': 'ביטול',
+  'belt.delete': 'מחיקת דרגה',
   'belt.edit': 'עריכת דרגה',
   'belt.save': 'שמירת דרגה',
   'belt.preview': 'תצוגה מקדימה',

@@ -42,6 +42,7 @@ import {
   EventsScreen,
   makeDashboardEventsClient,
 } from './features/events'
+import { BeltSystemScreen, makeDashboardBeltsClient } from './features/belts'
 
 registerM1WizardSteps(apiFetch)
 // Seam 4 — `6c` composes sections from four milestones. This lane registers the three it
@@ -55,6 +56,7 @@ const NAV = [
   { key: 'students', labelKey: 'people.student.plural', href: '#/students' },
   { key: 'alerts', labelKey: 'people.alerts.title', href: '#/alerts' },
   { key: 'events', labelKey: 'events.title', href: '#/events' },
+  { key: 'belts', labelKey: 'events.belt.title', href: '#/belts' },
   { key: 'staff', labelKey: 'common.dash.nav.staff', href: '#/staff' },
   { key: 'settings', labelKey: 'common.dash.nav.settings', href: '#/settings' },
   { key: 'setup', labelKey: 'common.dash.nav.setup', href: '#/setup' },
@@ -63,6 +65,7 @@ const NAV = [
 export type DashboardRoute =
   | 'home'
   | 'events'
+  | 'belts'
   | 'staff'
   | 'settings'
   | 'setup'
@@ -85,6 +88,8 @@ export function routeFromHash(hash: string): DashboardRoute {
   // Lane EVENTS' family: `#/events`, `#/events/<id>` and `#/events/new`, decided in
   // features/events/. Same shape as lane SCHEDULE's three hashes above.
   if (name.startsWith('events')) return 'events'
+  // §5.9's ladder. `#/belts` today; `#/belts/<classId>` once a studio has two classes.
+  if (name.startsWith('belts')) return 'belts'
   return name === 'staff' || name === 'settings' || name === 'setup' ? name : 'home'
 }
 
@@ -116,6 +121,7 @@ export default function App() {
   const { route, hash } = useHashRoute()
   const studentRoute = studentRouteFrom(hash)
   const eventRoute = eventRouteFrom(hash)
+  const beltsClassId = hash.replace(/^#\/?belts\/?/, '')
   const [locale, setLocale] = useState<Locale>('he')
   // §3.2's hard rule, on the screen's side — and ONLY on the screen's side. The API has
   // already redacted `fee_agorot` to null for a coach, so this cannot leak a price even if
@@ -136,6 +142,7 @@ export default function App() {
   const scheduleClient = useMemo(() => makeScheduleClient(apiFetch), [])
   const peopleClient = useMemo(() => makeDashboardPeopleClient(apiFetch), [])
   const eventsClient = useMemo(() => makeDashboardEventsClient(apiFetch), [])
+  const beltsClient = useMemo(() => makeDashboardBeltsClient(apiFetch), [])
   // Stable for as long as the studio's day is. `new Date().toISOString()` in this
   // render body was a new value every render, and downstream that is an effect
   // dependency worth `1 + 3N` requests.
@@ -210,6 +217,9 @@ export default function App() {
           ) : null}
           {route === 'alerts' ? (
             <AlertCentre locale={locale} client={peopleClient} />
+          ) : null}
+          {route === 'belts' && beltsClassId ? (
+            <BeltSystemScreen classId={beltsClassId} client={beltsClient} locale={locale} />
           ) : null}
           {route === 'events' && eventRoute && eventRoute !== 'new' ? (
             <EventPage
