@@ -67,7 +67,7 @@ def mis_named_money_columns(metadata: sa.MetaData) -> list[str]:
                 continue
             if f"{table.name}.{name}" in NOT_MONEY_QUALIFIED:
                 continue
-            # A reference, not an amount. W2's `enrollment.price_plan_id` is a UUID
+            # A reference, not an amount. W2's `student.price_plan_id` is a UUID
             # pointing at a `price_plan` row, and `price` is a token in it. No money
             # column in this schema ends in `_id`.
             if name.endswith("_id"):
@@ -142,7 +142,9 @@ def test_the_naming_detector_still_catches_a_real_misname(name):
 
 
 # -- and proven NOT to fire on a reference column -----------------------------
-# W2 brought `enrollment.price_plan_id`: a UUID pointing at W4's `price_plan` row. It is
+# W2 brought `student.price_plan_id`: a UUID pointing at W4's `price_plan` row -- on the
+# STUDENT and not the enrollment, which is C11: the club prices by how often a child
+# trains, so a child in two groups has one price and one tuition charge. It is
 # a reference, not an amount, and the token rule flags it because `price` is a token. The
 # fix is structural rather than another NOT_MONEY entry -- `*_plan_id`, `*_price_id` and
 # `*_fee_id` would each have to be enumerated, leaving the next one to be rediscovered.

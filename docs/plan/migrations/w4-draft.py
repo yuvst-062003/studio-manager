@@ -34,9 +34,16 @@ TABLES = {
 #: touching the models gives a database the models do not describe, and
 #: `test_the_migrations_match_the_models` then fails forever on a schema that is actually
 #: correct — which is the worst kind of red, because the obvious fix is to weaken the test.
+#: **Both are on `student`.** An earlier version of this file said
+#: `enrollment.price_plan_id`, which is pre-C11: the club prices by how often a child
+#: trains, not by which groups they attend, so the price moved to the student and
+#: `enrollment` carries no price at all (app/models/people.py, `Enrollment` docstring --
+#: "a `price_plan_id` here is what made a child in two groups pay twice").
+#: `tests/contracts/test_w4_models.py::test_the_price_is_chosen_on_the_student` asserts
+#: both halves: present on `student`, absent from `enrollment`.
 DEFERRED_FROM_W2 = (
     ("student.current_belt_id", "belt_rank.id", "SET NULL"),
-    ("enrollment.price_plan_id", "price_plan.id", "RESTRICT"),
+    ("student.price_plan_id", "price_plan.id", "RESTRICT"),
 )
 
 HAND_CHECK = (
@@ -50,9 +57,12 @@ HAND_CHECK = (
     "(c23e3e8) -- it is not a new problem to solve here, only one not to undo.",
     # ---------------------------------------------------------------------------------
     "charge's idempotency index is PARTIAL: unique on "
-    "(enrollment_id, period_year, period_month, kind) `postgresql_where=enrollment_id IS NOT "
+    "(student_id, period_year, period_month, kind) `postgresql_where=student_id IS NOT "
     "NULL AND period_year IS NOT NULL`. It is invariant 5's structural half -- §5.10 step 5, "
-    "'re-running for the same period creates no duplicates'. It is partial because only "
+    "'re-running for the same period creates no duplicates'. **On student_id, not "
+    "enrollment_id** (C11): the club prices per student, so a child in two groups is one "
+    "charge, and keying on the enrollment is precisely what would let the second enrollment "
+    "raise a second charge -- the defect C11 was raised to remove. It is partial because only "
     "periodic charges have a period and a manual charge may legitimately repeat. Lose the "
     "predicate and a manager can raise exactly one manual charge per family, ever.",
     # ---------------------------------------------------------------------------------

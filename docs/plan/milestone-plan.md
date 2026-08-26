@@ -759,8 +759,16 @@ app/routers/events.py             app/routers/belts.py
 tests/events/**                   tests/belts/**
 web/apps/{staff,parent,dashboard}/src/features/events/**
 web/apps/{staff,parent,dashboard}/src/features/belts/**
-web/packages/i18n/{he,en,ru}/{events,belts}.ts
+web/packages/i18n/{he,en,ru}/events.ts
 ```
+
+> **Belt strings live in `events.ts`. There is no `belts` namespace**, and W4's contract
+> commit decided there will not be one. Seam 3 exists so that two *lanes* never touch one
+> file; `events` and `belts` are the same lane, so a second namespace buys no isolation
+> and costs an edit to `web/packages/i18n/types.ts` **and** `index.ts` — two files §1.3
+> says are authored once and never touched by a lane. `scripts/lane-check.sh` and
+> CLAUDE.md's nine-namespace list both already assumed this; the line above is what
+> disagreed.
 
 **Builds** — event types · targeting · RSVP · event fees · event consent · event attendance ·
 belt ranks including **bi-colour** grades · grading history · belt exams.

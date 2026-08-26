@@ -44,12 +44,14 @@ HAND_CHECK = (
     "submitted -- before anyone has approved anything. Writing the underlying type instead "
     "produces a working schema and a permanently dirty `alembic check`.",
     # ---------------------------------------------------------------------------------
-    "student.current_belt_id and enrollment.price_plan_id are plain UUID columns with NO "
+    "student.current_belt_id and student.price_plan_id are plain UUID columns with NO "
     "foreign key, deliberately: belt_rank and price_plan are W4's tables and do not exist "
     "yet. Both model docstrings say so. **W4's contract commit adds the ForeignKey to the "
     "two model columns**, and autogenerate then emits the ALTERs -- see w4-draft.py. Do not "
     "hand-write the constraints into 0008 without also adding them to the models, or "
-    "`alembic check` reports a difference forever.",
+    "`alembic check` reports a difference forever. **Both are on `student`** -- an earlier "
+    "version of this line said `enrollment.price_plan_id`, which is pre-C11: the price "
+    "moved to the student, and `enrollment` carries none at all.",
     # ---------------------------------------------------------------------------------
     "student.person_id is UNIQUE. §4.3 gives a person at most one student record per studio, "
     "and losing the constraint lets an import create a second one silently -- after which "

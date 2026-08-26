@@ -94,7 +94,14 @@ agree, because right now they do not.
 `w4-draft.py`'s `DEFERRED_FROM_W2` is correct and is easy to half-do:
 
 - `student.current_belt_id` → `belt_rank.id`, `ON DELETE SET NULL`
-- `enrollment.price_plan_id` → `price_plan.id`, `ON DELETE RESTRICT`
+- `student.price_plan_id` → `price_plan.id`, `ON DELETE RESTRICT`
+
+> **Corrected in the contract commit.** The draft, this prompt and invariant 1's own
+> comment all said `enrollment.price_plan_id`. That column does not exist: C11 moved the
+> price to the student, and `Enrollment`'s docstring says why — *"a `price_plan_id` here is
+> what made a child in two groups pay twice."* Same drift as finding 2, same root cause —
+> three documents written before C11 and not re-read after it. **Both deferred keys are on
+> `student`.**
 
 Add the `ForeignKey(...)` **to the two model columns** and let autogenerate emit the ALTERs.
 Hand-writing `op.create_foreign_key` without touching the models gives a database the models do
@@ -210,10 +217,12 @@ Deliver, in this order:
    - charge's partial unique index is on student_id, NOT enrollment_id. The model
      is right and w4-draft.py's HAND_CHECK is wrong — C11 prices per student, so
      a child in two groups is one charge. Correct the draft; do not touch the model.
-   - Add ForeignKey to TWO MODEL COLUMNS W2 deferred: student.current_belt_id ->
-     belt_rank.id (SET NULL) and enrollment.price_plan_id -> price_plan.id
-     (RESTRICT). Let autogenerate emit the ALTERs. Hand-writing them leaves
-     test_the_migrations_match_the_models red forever on a correct schema.
+   - Add ForeignKey to TWO MODEL COLUMNS W2 deferred, BOTH ON student:
+     student.current_belt_id -> belt_rank.id (SET NULL) and student.price_plan_id
+     -> price_plan.id (RESTRICT). NOT enrollment.price_plan_id — that column does
+     not exist; C11 moved the price to the student. Let autogenerate emit the
+     ALTERs. Hand-writing them leaves test_the_migrations_match_the_models red
+     forever on a correct schema.
    - The payment <-> upay_ipn_record cycle is ALREADY resolved in the models with
      use_alter=True and an explicit constraint name. Do not undo it. It only
      bites on a FRESH database.
