@@ -8,11 +8,13 @@ import { API_ORIGIN, ORIGINS } from './origins'
  * SPEC §13's E2E layer: "Playwright — the five flows below", all of which must pass before
  * release.
  *
- * ── These specs do not pass yet, and that is the point ────────────────────────────────
- * They are written in the contract commit, ahead of every implementation, so each wave's
- * exit gate is a file that already exists rather than one written under deadline at the end
- * of the wave. A gate authored after the code it judges tends to describe what the code
- * does. The wave that fills each flow in is named at the top of its spec.
+ * ── These specs pass, as of W5's gates lane ───────────────────────────────────────────
+ * They were written in the contract commit ahead of every implementation, so each wave's
+ * exit gate was a file that already existed rather than one written under deadline at the
+ * end of the wave. A gate authored after the code it judges tends to describe what the code
+ * does — and this one did not: filling the five bodies in found nine defects that every
+ * unit suite was green through, from a payments screen no parent could load to an offline
+ * queue that never sent anything. Each is named in the spec that found it.
  *
  * ── The prerequisite, landed in W5's contract commit ──────────────────────────────────
  * `@playwright/test` used to be absent — `web/package.json` carried `playwright`, the
@@ -24,9 +26,10 @@ import { API_ORIGIN, ORIGINS } from './origins'
  * pinned to `1.62.1`, matching the driver exactly — a runner and driver that disagree fail
  * in ways that read as browser bugs.
  *
- * What is still owed is HB-w3-e2e-harness: a seed-and-authenticate fixture over the §19.4
- * dev routes, and a rewrite of the spec bodies against the testid vocabulary the apps
- * actually expose. All fifteen tests are `test.fixme`-gated until then.
+ * HB-w3-e2e-harness owed a seed-and-authenticate fixture over the §19.4 dev routes and a
+ * rewrite of the spec bodies against the vocabulary the apps actually expose. Both are
+ * done: `fixtures/` holds the first, the five specs are the second, and no `test.fixme`
+ * remains.
  *
  * ── `NODE_PATH`, and why the install alone was not enough ─────────────────────────────
  * Installing the runner did not make the suite loadable, and the reason is structural

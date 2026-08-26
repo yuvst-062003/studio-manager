@@ -53,6 +53,9 @@ import {
 // screen, the reconciliation queue and `DebtAlert` were built, unit-tested and unreachable,
 // which is what made W4's exit gate untestable through a browser.
 import { BillingSection } from './features/billing/BillingSection'
+// `4c` נוכחות — what was not marked. Nothing imported AttendanceReport, so §5.14's
+// "unmarked is a real state and is not absence" had no screen in a running app.
+import { AttendanceSection } from './features/attendance/AttendanceSection'
 
 import { registerBillingAlertSection } from './features/billing/BillingAlertSection'
 
@@ -75,6 +78,7 @@ const NAV = [
   { key: 'students', labelKey: 'people.student.plural', href: '#/students' },
   { key: 'alerts', labelKey: 'people.alerts.title', href: '#/alerts' },
   { key: 'billing', labelKey: 'billing.debt.title', href: '#/billing' },
+  { key: 'attendance', labelKey: 'common.nav.attendance', href: '#/attendance' },
   { key: 'events', labelKey: 'events.title', href: '#/events' },
   { key: 'belts', labelKey: 'events.belt.title', href: '#/belts' },
   { key: 'exams', labelKey: 'events.exam.plural', href: '#/exams' },
@@ -95,6 +99,7 @@ export type DashboardRoute =
   | 'students'
   | 'alerts'
   | 'billing'
+  | 'attendance'
 
 /** Unknown hashes resolve to home rather than to a blank page. */
 export function routeFromHash(hash: string): DashboardRoute {
@@ -111,6 +116,9 @@ export function routeFromHash(hash: string): DashboardRoute {
   // M6's family: `#/billing` is `3e`'s collections board and
   // `#/billing/reconciliation` is §5.10's unmatched-payment queue.
   if (name.startsWith('billing')) return 'billing'
+  // M5's `4c`. `#/attendance` is the chase list; the register itself is the staff
+  // app's screen, on its own origin.
+  if (name === 'attendance') return 'attendance'
   // Lane EVENTS' family: `#/events`, `#/events/<id>` and `#/events/new`, decided in
   // features/events/. Same shape as lane SCHEDULE's three hashes above.
   if (name.startsWith('events')) return 'events'
@@ -247,6 +255,7 @@ export default function App() {
           {route === 'alerts' ? (
             <AlertCentre locale={locale} client={peopleClient} />
           ) : null}
+          {route === 'attendance' ? <AttendanceSection locale={locale} /> : null}
           {route === 'billing' ? (
             <BillingSection
               locale={locale}

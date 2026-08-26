@@ -96,7 +96,18 @@ export type Scenario = {
   /** The same sessions with their times, for a spec that needs to pick one by date. */
   sessions: { id: string; starts_at: string }[]
   pricePlanId: string
+  /**
+   * The suffix every row this scenario created carries in its name.
+   *
+   * There is one reset per run and only four guardian personas, so a payer is shared
+   * between tests and `/me/charges` answers per PAYER — a screen assertion counting
+   * "the" debt rows would be counting another test's months too. Filtering on this
+   * keeps each test looking at its own family.
+   */
+  tag: string
   studentId: string
+  /** Every child the scenario enrolled, in creation order. */
+  studentIds: string[]
   /** The persona acting as guardian and payer. */
   parentPersona: PersonaKey
   parentPersonId: string
@@ -126,6 +137,14 @@ export type ScenarioOptions = {
    * — one charge would make the chip group render a single option and prove nothing.
    */
   months?: number
+  /**
+   * How many children to enrol, all in the one group and all guarded by `parent`.
+   *
+   * E2E-2 needs more than one: §5.14's whole point is that `unmarked` is a state of its
+   * own, and a roster of one is either fully marked or fully unmarked, so it cannot tell
+   * "the coach marked everyone" from "the coach marked the only child there".
+   */
+  students?: number
 }
 
 /** §5.6's three, populated only when `withProtections` is asked for. */
@@ -272,6 +291,18 @@ export async function buildScenario(
 
   const sessions = { items: await listAllSessions(manager, group.id) }
 
+  // §3.2 — a coach sees the sessions of the groups they are assigned to, and nothing else.
+  // Without this the lead coach's roster is a 404 for a group that plainly exists, which
+  // reads as a broken screen rather than as the scoping rule working.
+  const coaches = await request.get(`${API_ORIGIN}/api/v1/dev/personas`)
+  const lead = (
+    (await coaches.json()) as { items: { key: string; person_id: string }[] }
+  ).items.find((p) => p.key === 'lead')!
+  await manager.send('post', `/groups/${group.id}/staff`, {
+    person_id: lead.person_id,
+    role: 'lead_coach',
+  })
+
   const pricePlan = await manager.send<{ id: string }>('post', '/price-plans', {
     name: `חודשי ${tag}`,
     group_id: group.id,
@@ -288,34 +319,49 @@ export async function buildScenario(
   // this link the persona instead of creating a second parent beside them, and what stops
   // an invitation being issued to a person who already has a login. See the module
   // docstring.
-  const created = await manager.send<{ student: { id: string } }>('post', '/students', {
-    first_name: 'דנה',
-    last_name: `כהן ${tag}`,
-    birthdate: '2016-04-12',
-    guardian: {
-      first_name: 'שירה',
-      last_name: 'הורה',
-      relation: 'parent',
-      email: personaEmail(parent),
-      is_primary: true,
-    },
-  })
+  const FIRST_NAMES = ['דנה', 'יונתן', 'מאיה', 'איתי', 'נועה']
+  const studentIds: string[] = []
+  for (let index = 0; index < (options.students ?? 1); index += 1) {
+    const created = await manager.send<{ student: { id: string } }>('post', '/students', {
+      first_name: FIRST_NAMES[index % FIRST_NAMES.length],
+      last_name: `כהן ${tag}`,
+      birthdate: '2016-04-12',
+      // Only the first child creates the guardian; the rest MATCH her on the same verified
+      // address, which is §5.4a's "a matched parent is never duplicated" doing its job and
+      // is why a three-child family here is one payer rather than three.
+      guardian: {
+        first_name: 'שירה',
+        last_name: 'הורה',
+        relation: 'parent',
+        email: personaEmail(parent),
+        is_primary: index === 0,
+      },
+    })
 
-  // §5.4a step 5 — 'Manager converts → picks group, sets price, status=active, enrollment
-  // created.' Three decisions in one request because they are one decision.
+    // §5.4a step 5 — 'Manager converts → picks group, sets price, status=active, enrollment
+    // created.' Three decisions in one request because they are one decision.
+    //
+    // **The price plan can only be set here.** `POST /students` takes no `price_plan_id`,
+    // and the billing run reads `student.price_plan_id` — a student with none is reported
+    // as `unpriced` and charged nothing, which is a completed run with
+    // `charges_created: 0` and no error anywhere. That is what an earlier draft produced.
+    await manager.send('post', `/students/${created.student.id}/convert`, {
+      group_id: group.id,
+      started_on: YEAR_STARTS,
+      price_plan_id: pricePlan.id,
+      reason: 'e2e fixture',
+    })
+    studentIds.push(created.student.id)
+  }
+  const created = { student: { id: studentIds[0]! } }
+
+  // §5.10 step 1 — the run charges 'every active enrollment' IN THE STUDIO, not just this
+  // scenario's child. So a run here also bills every other scenario's students for the
+  // same month, and a payer legitimately ends up owing months a different test created.
+  // That is the product working; a spec that assumed otherwise would be asserting a rule
+  // §5.10 does not have. `chargeIds` below is filtered to this scenario's own student.
   //
-  // **The price plan can only be set here.** `POST /students` takes no `price_plan_id`, and
-  // the billing run reads `student.price_plan_id` — a student with none is reported as
-  // `unpriced` and charged nothing, which is a completed run with `charges_created: 0` and
-  // no error anywhere. That is what an earlier draft of this fixture produced.
-  await manager.send('post', `/students/${created.student.id}/convert`, {
-    group_id: group.id,
-    started_on: YEAR_STARTS,
-    price_plan_id: pricePlan.id,
-    reason: 'e2e fixture',
-  })
-
-  // §5.10 step 1 — the run charges 'every active enrollment'. One run per month, counting
+  // One run per month, counting
   // back from PERIOD, because `charge`'s idempotency key is
   // `(student_id, period_year, period_month, kind)` — a single run produces a single month
   // however many times it is repeated, which is the property that makes it safe to re-run
@@ -350,7 +396,9 @@ export async function buildScenario(
     sessionIds: sessions.items.map((s) => s.id),
     sessions: sessions.items,
     pricePlanId: pricePlan.id,
+    tag,
     studentId: created.student.id,
+    studentIds,
     parentPersona: parent,
     parentPersonId,
     payerPersonId: parentPersonId,
@@ -494,6 +542,56 @@ export async function openOrderFor(
   return payer.send<OrderRow>(`post`, `/payment-orders?max_payments=${maxPayments}`, {
     charge_ids: scenario.chargeIds,
   })
+}
+
+/**
+ * §5.7's "הודיעו מראש", filed by the FAMILY rather than by a coach.
+ *
+ * §10.2 makes this the one write that requires a connection on purpose, and the parent app
+ * says so rather than queuing into the void: an offline pre-report that syncs after the
+ * class started is not a pre-report, which is why `AbsenceReportIn` deliberately carries no
+ * `client_mark_id`.
+ */
+export async function reportAbsence(
+  request: APIRequestContext,
+  scenario: Scenario,
+  sessionId: string,
+  studentId: string,
+  reason = 'חולה',
+): Promise<void> {
+  const parent = await asPersona(request, scenario.parentPersona)
+  await parent.send('post', '/absence-reports', {
+    student_id: studentId,
+    session_id: sessionId,
+    reason,
+  })
+}
+
+/**
+ * §5.7's `סמן הכל נוכח`, called as the coach.
+ *
+ * It 'never overwrites a parent's advance notice, whatever the request body says' — the
+ * rule is `AttendanceService._bulk_touches`, and `respect_absence_reports` defaults to
+ * protecting so a caller that omits it gets the safe branch.
+ */
+export async function bulkPresentAsCoach(
+  request: APIRequestContext,
+  sessionId: string,
+): Promise<void> {
+  const coach = await asPersona(request, 'lead')
+  await coach.send('post', `/sessions/${sessionId}/attendance/bulk-present`, {
+    client_mark_id_prefix: crypto.randomUUID(),
+    device_marked_at: new Date().toISOString(),
+  })
+}
+
+/** One charge, read as a manager — `allocated_agorot` is what §4.3 settles on. */
+export async function readCharge(
+  request: APIRequestContext,
+  chargeId: string,
+): Promise<{ id: string; status: string; amount_agorot: number; allocated_agorot: number }> {
+  const manager = await asPersona(request, 'manager')
+  return manager.send('get', `/charges/${chargeId}`)
 }
 
 /** `GET /sessions/{id}/attendance` — artboards `1c` and `9f`, and §3.2 gives it to every staff role. */

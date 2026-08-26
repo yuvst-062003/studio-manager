@@ -180,7 +180,7 @@ test.describe('E2E-1 · registration to active student', () => {
     // any guardian whose Person row carried no address, which in the demo studio is all of
     // them; and the queue's approve button had no handler at all, so a manager could see
     // pending requests and act on none of them.
-    const scenario = await buildScenario(request, { parent: 'parent1' })
+    const scenario = await buildScenario(request, { parent: 'parent1', months: 0 })
 
     const familyContext = await browser.newContext()
     const managerContext = await browser.newContext()

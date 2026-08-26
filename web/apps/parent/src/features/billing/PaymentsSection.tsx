@@ -103,7 +103,7 @@ export function PaymentsSection({ locale }: { locale: Locale }) {
   useEffect(() => {
     let alive = true
     void (async () => {
-      const [charges, mandate] = await Promise.all([
+      const [charges, mandate, children] = await Promise.all([
         client.openCharges(''),
         // §5.10's second guard, asked of the person it is a guard for. One request beside
         // the charges rather than after them: the warning has to be on screen the first
@@ -111,16 +111,26 @@ export function PaymentsSection({ locale }: { locale: Locale }) {
         apiFetch('/api/v1/me/standing-order')
           .then((r) => (r.ok ? (r.json() as Promise<{ active: boolean }>) : { active: false }))
           .catch(() => ({ active: false })),
+        // §5.10 renders the period and the CHILD beside each other, and `/me/students` is
+        // the payer-facing read that makes the second half possible. Without it every row
+        // said only "08/2026", so a two-child family could not tell whose month was whose.
+        apiFetch('/api/v1/me/students')
+          .then((r) =>
+            r.ok
+              ? (r.json() as Promise<{ items: { id: string; first_name: string; last_name: string }[] }>)
+              : { items: [] },
+          )
+          .catch(() => ({ items: [] as { id: string; first_name: string; last_name: string }[] })),
       ])
+      const nameOf = new Map(
+        children.items.map((child) => [child.id, `${child.first_name} ${child.last_name}`]),
+      )
       if (!alive) return
       setStandingOrder(mandate.active)
       setDebts(
         charges.map((charge) => ({
           charge,
-          // The child's own name needs `GET /students/{id}`, which is manager-only. §5.10
-          // renders the period and the child beside each other, so until a payer-facing
-          // read exists this is the period alone rather than a name this app cannot fetch.
-          studentName: '',
+          studentName: charge.student_id ? (nameOf.get(charge.student_id) ?? '') : '',
           beltColorHex: null,
           // §5.10's primary double-payment guard is enforced by the server, which refuses
           // a second order over a covered charge with a 409. It cannot be drawn here:

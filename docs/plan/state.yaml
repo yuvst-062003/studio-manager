@@ -345,10 +345,18 @@ waves:
         on: 2026-08-26
       - id: W5.G5
         title: >-
-          Lane GATES — E2E-1, E2E-2 and E2E-4. E2E-1 blocked on
-          HB-e2e-registration-approval; E2E-4 partly blocked on HB-e2e-manager-alert-counts;
-          E2E-2 not started.
-        status: pending
+          Lane GATES — E2E-1, E2E-2 and E2E-4 green with no fixme. All five of SPEC §13's
+          flows now pass end to end through a real browser.
+        status: shipped
+        on: 2026-08-26
+      - id: W5.G6
+        title: >-
+          Lane GATES — the defects the five flows found, fixed: the registration approval
+          500, attendance_taken, the unpaged session list, the payer-facing billing reads,
+          the orders list behind §5.10's alert, the two inert manager decision buttons, the
+          offline queue that never flushed, and client_mark_id not being a UUID.
+        status: shipped
+        on: 2026-08-26
   - id: W6
     milestone: M10
     title: Rollover and polish
@@ -453,6 +461,34 @@ holdbacks:
     source: >-
       app/routers/billing.py list_charges/payer_balance/list_products ·
       web/apps/parent/src/features/billing/billingClient.ts · SPEC §5.10 · §19.6
+  - id: HB-e2e-offline-bulk-op
+    kind: carried
+    title: A queued bulk mark can never flush — `flush` has no route for it
+    why: >-
+      `RosterScreen.bulkPresent` queues one `attendance.bulk` op carrying a
+      `client_mark_id_prefix` and no `student_id`, which is right: §5.7's bulk is one
+      instruction about a whole roster, and §10.5 protects a parent's pre-report
+      "regardless of timestamp" — including one filed AFTER the coach tapped, which only
+      the server can apply at replay time.
+
+      But `sync.ts`'s `flush` groups every pending op by session and posts it to
+      `/attendance/batch` whatever its `kind`, and `AttendanceIn` requires both
+      `student_id` and `status`. So a queued bulk is refused 422 for ever. It should go to
+      `POST /sessions/{id}/attendance/bulk-present`, which exists and does the right thing.
+
+      Found by E2E-2, which asserts §10.5's rule through that endpoint instead and says so.
+      Expanding the bulk into one mark per student on the client would dodge it and would
+      be wrong for the reason above.
+
+      The fix is a branch inside `flush`, in `web/packages/core/**`, which this lane is
+      told not to edit and where lane COMMS is live. Everything else in the offline chain
+      is fixed: nothing called `flush` at all, and `client_mark_id` was not a UUID.
+    blocks: §5.7's bulk mark, offline
+    status: open
+    opened: 2026-08-26
+    source: >-
+      web/packages/core/src/offline/sync.ts · app/schemas/attendance.py AttendanceIn ·
+      web/apps/staff/src/features/attendance/RosterScreen.tsx
   - id: HB-e2e-manager-alert-counts
     kind: carried
     title: §5.10's high-priority manager alert has no endpoint behind its numbers

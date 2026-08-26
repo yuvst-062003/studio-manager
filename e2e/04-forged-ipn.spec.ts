@@ -52,7 +52,7 @@ test.describe('E2E-4 · forged and tampered IPN', () => {
     page,
     request,
   }) => {
-    const scenario = await buildScenario(request, { parent: 'parent3' })
+    const scenario = await buildScenario(request, { parent: 'both' })
     const order = await openOrderFor(request, scenario)
 
     // §19.5's `amount_mismatch` shape: off by one agora, the smallest difference the
@@ -72,8 +72,11 @@ test.describe('E2E-4 · forged and tampered IPN', () => {
     await signInAs(context, scenario.parentPersona, 'parent')
     await page.goto(`${ORIGINS.parent}/#/payments`)
     // Still owed, and still offered. A family whose payment was rejected must be able to
-    // try again; a screen that hid the month would strand them.
-    await expect(page.getByTestId('debt-row')).toHaveCount(scenario.chargeIds.length)
+    // try again; a screen that hid the month would strand them. Filtered to this family's
+    // rows — the payer personas are shared between tests and `/me/charges` is per payer.
+    await expect(page.getByTestId('debt-row').filter({ hasText: scenario.tag })).toHaveCount(
+      scenario.chargeIds.length,
+    )
 
     // -- the money is recorded anyway -----------------------------------------------
     // Half the requirement, and the half a "reject the callback" implementation loses. The
@@ -83,7 +86,14 @@ test.describe('E2E-4 · forged and tampered IPN', () => {
       { headers: { Authorization: `Bearer ${await managerToken(request)}` } },
     )
     expect(payments.ok()).toBe(true)
-    const recorded = ((await payments.json()) as { items: { allocations: unknown[] }[] }).items
+    // Scoped to THIS order. The payer personas are shared between tests, so the payer's
+    // full history is not this test's subject — `payment_order_id` is what ties the money
+    // to the callback that carried it.
+    const recorded = (
+      (await payments.json()) as {
+        items: { payment_order_id: string | null; allocations: unknown[] }[]
+      }
+    ).items.filter((row) => row.payment_order_id === order.id)
     expect(recorded).toHaveLength(1)
     // Allocated to NOTHING. §5.10: the payment is recorded, the charges stay open, and the
     // reconciliation queue is where a human decides what happened.
@@ -98,7 +108,7 @@ test.describe('E2E-4 · forged and tampered IPN', () => {
     // §19.5's `forged_ref` shape is a **well-formed** UUID that matches no order, so what
     // is being tested is "does an order carry this reference", not "is this parseable".
     // §5.10: a sequential id in this endpoint would let anyone mark any tuition paid.
-    const scenario = await buildScenario(request, { parent: 'parent1' })
+    const scenario = await buildScenario(request, { parent: 'none' })
     const order = await openOrderFor(request, scenario)
 
     await simulateIpn(request, {
@@ -137,7 +147,7 @@ test.describe('E2E-4 · forged and tampered IPN', () => {
     // §5.10: "Idempotent on `transactionid`. A second delivery is logged and ignored."
     // Retry behaviour is [NOT COVERED] — uPay never confirmed what it does on a non-200 —
     // so idempotence is what makes the answer not matter.
-    const scenario = await buildScenario(request, { parent: 'trial' })
+    const scenario = await buildScenario(request, { parent: 'owner' })
     const order = await openOrderFor(request, scenario)
 
     const transactionId = `E2E-DUP-${order.public_ref.slice(0, 8)}`
@@ -160,7 +170,9 @@ test.describe('E2E-4 · forged and tampered IPN', () => {
       `${ORIGINS.parent}/api/v1/payments?payer_person_id=${scenario.payerPersonId}`,
       { headers: { Authorization: `Bearer ${await managerToken(request)}` } },
     )
-    const recorded = ((await payments.json()) as { items: unknown[] }).items
+    const recorded = (
+      (await payments.json()) as { items: { payment_order_id: string | null }[] }
+    ).items.filter((row) => row.payment_order_id === order.id)
     // One payment for one card charge, however many times uPay says so.
     expect(recorded).toHaveLength(1)
   })
@@ -172,7 +184,7 @@ test.describe('E2E-4 · forged and tampered IPN', () => {
   }) => {
     // §5.10 — 'a high-priority manager alert is raised'. Asserted on `6c`, because an alert
     // that exists in the database and never reaches the alert centre is not an alert.
-    const scenario = await buildScenario(request, { parent: 'both' })
+    const scenario = await buildScenario(request, { parent: 'assistant' })
     const order = await openOrderFor(request, scenario)
     await simulateIpn(request, {
       shape: 'amount_mismatch',
