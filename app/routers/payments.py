@@ -24,22 +24,48 @@ from __future__ import annotations
 import uuid
 
 from fastapi import APIRouter, HTTPException, Query, Request, status
+from pydantic import BaseModel
 
 from app.core.auth_context import ManagerOrOwner
 from app.core.clock import now
+from app.core.config import settings
 from app.core.tenancy import TenantSessionDep, require_current_studio_id
-from app.models.billing import Payment
+from app.integrations.upay.form import (
+    MAX_INSTALLMENTS,
+    UPAY_ENDPOINT,
+    DemoStudioHasNoLiveFormError,
+)
+from app.models.billing import Payment, PaymentOrder
 from app.schemas._pagination import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, IdempotencyKey
 from app.schemas.billing import (
     ManualPaymentIn,
     PaymentAllocationOut,
+    PaymentOrderCreateIn,
+    PaymentOrderOut,
     PaymentOut,
     PaymentPage,
     PaymentReversalIn,
 )
 from app.services.audit import AuditService
 from app.services.billing.errors import ConflictError, NotFoundError, RefusedError
+from app.services.billing.orders import MerchantEmailMissingError, OrderService
 from app.services.billing.payments import PaymentService
+
+
+class UpayFormOut(BaseModel):
+    """§5.10 step 2's form, as data. The client builds the POST and auto-submits it."""
+
+    action: str
+    fields: dict[str, str]
+
+
+class PaymentCompleteOut(BaseModel):
+    """What the return page renders. `status` is the ORDER's, read from our own row --
+    never anything uPay put in the redirect's query string."""
+
+    status: str
+    public_ref: uuid.UUID | None
+
 
 router = APIRouter(tags=["billing"])
 
@@ -206,3 +232,176 @@ def reverse_payment(
     )
     session.commit()
     return _out(service, payment)
+
+
+# -- §5.10's uPay one-time flow ------------------------------------------------
+def _caller(request: Request) -> uuid.UUID:
+    """The signed-in person, or a 401.
+
+    Used by the order routes, which are **parent-facing and carry no role dependency**.
+    §3.1: "guardian is not a role", and §6.1 makes parent access
+    `EXISTS(guardian WHERE person_id = :me)` -- so `require_roles` here would refuse every
+    parent in the product and admit every coach with no children.
+    """
+    person_id = getattr(request.state, "person_id", None)
+    if not isinstance(person_id, uuid.UUID):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={"code": "unauthenticated", "message": "sign in first"},
+        )
+    return person_id
+
+
+def _is_staff(request: Request) -> bool:
+    roles = getattr(request.state, "roles", None) or []
+    return bool({"owner", "manager"} & set(roles))
+
+
+def _order_out(service: OrderService, order: PaymentOrder) -> PaymentOrderOut:
+    return PaymentOrderOut(
+        id=order.id,
+        payer_person_id=order.payer_person_id,
+        public_ref=order.public_ref,
+        expected_amount_agorot=order.expected_amount_agorot,
+        max_payments=order.max_payments,
+        status=order.status,
+        expires_at=order.expires_at,
+        paid_at=order.paid_at,
+        charge_ids=service.charge_ids_of(order.id),
+    )
+
+
+@router.post("/payment-orders", response_model=PaymentOrderOut, status_code=status.HTTP_201_CREATED)
+def create_payment_order(
+    body: PaymentOrderCreateIn,
+    request: Request,
+    session: TenantSessionDep,
+    max_payments: int = Query(default=1, ge=1, le=MAX_INSTALLMENTS),
+    idempotency_key: IdempotencyKey = None,
+) -> PaymentOrderOut:
+    """§5.10 step 1. **The payer is always the caller** and never a field in the body.
+
+    `PaymentOrderCreateIn` carries only `charge_ids`, and that is the contract shape making
+    the decision: an order is created by the person who is about to stand in front of uPay's
+    hosted page with their own card. A manager settling a family's debt uses
+    `POST /payments`, which is the flow for money that arrives by every other route.
+
+    Taking the payer from the request rather than the body also closes the obvious hole --
+    a body-supplied payer would let anyone open an order over anyone's charges.
+
+    **`max_payments` is a query parameter, not a body field**, because
+    `PaymentOrderCreateIn` is W4's contract shape and carries only `charge_ids`. `1b` draws
+    an instalments chip group, so the count has to reach the server somehow; widening a
+    shape another wave authored is the one way it must not. Capped at `MAX_INSTALLMENTS`
+    here and again in `OrderService.create`, because the dashboard's dropdown stops at 12
+    and behaviour above it was never tested against this account.
+    """
+    studio_id = require_current_studio_id()
+    service = OrderService(session)
+    try:
+        order = service.create(
+            studio_id,
+            payer_person_id=_caller(request),
+            charge_ids=list(body.charge_ids),
+            max_payments=max_payments,
+            at=now(),
+        )
+    except NotFoundError as exc:
+        raise _not_found("charge") from exc
+    except ConflictError as exc:
+        raise _conflict(exc) from exc
+    except RefusedError as exc:
+        raise _refused(exc) from exc
+    session.commit()
+    return _order_out(service, order)
+
+
+@router.get("/payment-orders/{public_ref}", response_model=PaymentOrderOut)
+def read_payment_order(
+    public_ref: uuid.UUID, request: Request, session: TenantSessionDep
+) -> PaymentOrderOut:
+    """The status the return page polls, and §5.10 step 5's whole point.
+
+    'The redirect is **never** the source of truth -- the IPN arrives ~5 minutes later.'
+    So this is a read the parent's browser repeats while `billing.order.verifying` is on
+    screen; it reports `pending` honestly rather than guessing from the redirect.
+
+    Readable by the payer, or by a manager. `public_ref` is unguessable, but "unguessable"
+    is not "authorised" -- a reference that leaked through a shared browser history would
+    otherwise expose what a family owes.
+    """
+    service = OrderService(session)
+    try:
+        order = service.get_by_public_ref(public_ref)
+    except NotFoundError as exc:
+        raise _not_found("order") from exc
+    if order.payer_person_id != _caller(request) and not _is_staff(request):
+        raise _not_found("order")
+    return _order_out(service, order)
+
+
+@router.get("/payment-orders/{public_ref}/form", response_model=UpayFormOut)
+def read_payment_order_form(
+    public_ref: uuid.UUID, request: Request, session: TenantSessionDep
+) -> UpayFormOut:
+    """§5.10 step 2's hidden fields. **Fields, not HTML.**
+
+    The client builds and auto-submits the POST. Returning rendered HTML from an API the
+    TypeScript client is generated against would hand that client a `string` where every
+    other route has a model, and the form's own fields would stop being type-checked.
+
+    A demo studio gets a 409 rather than a form (§19.6 restriction 5): its payment step
+    renders §19.5's IPN simulator, which never leaves our origin.
+    """
+    service = OrderService(session)
+    try:
+        order = service.get_by_public_ref(public_ref)
+    except NotFoundError as exc:
+        raise _not_found("order") from exc
+    if order.payer_person_id != _caller(request) and not _is_staff(request):
+        raise _not_found("order")
+    try:
+        fields = service.form_fields(public_ref, base_url=settings.OAUTH_REDIRECT_BASE_URL)
+    except DemoStudioHasNoLiveFormError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "demo_studio_has_no_live_form",
+                "message": "the demo studio has no live payment form; use the IPN simulator",
+            },
+        ) from exc
+    except MerchantEmailMissingError as exc:
+        # Refusing to build a form beats building one that charges nobody. 503 rather than
+        # 500: the deployment is misconfigured, not the request.
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "code": "merchant_account_unconfigured",
+                "message": "card payment is not configured for this deployment",
+            },
+        ) from exc
+    return UpayFormOut(action=UPAY_ENDPOINT, fields=fields)
+
+
+@router.get("/payment-complete", response_model=PaymentCompleteOut)
+def payment_complete(
+    request: Request, session: TenantSessionDep, ref: uuid.UUID | None = None
+) -> PaymentCompleteOut:
+    """§5.10 step 5's `returnurl`. **It marks nothing paid.**
+
+    'The redirect is never the source of truth -- a closed tab still produces an IPN.' So
+    this reports the order's current status and says, in `billing.order.verifyingHint`, that
+    the window can be closed. uPay appends its own payload to this URL and every field of it
+    is ignored here: it is client-submitted, unsigned, and the IPN is what settles anything.
+    """
+    if ref is None:
+        return PaymentCompleteOut(status="pending", public_ref=None)
+    service = OrderService(session)
+    try:
+        order = service.get_by_public_ref(ref)
+    except NotFoundError:
+        # Not a 404: the parent has just come back from paying and a page reading "not
+        # found" would be alarming for what may be a mistyped bookmark. Pending is honest --
+        # we do not know that anything happened.
+        return PaymentCompleteOut(status="pending", public_ref=ref)
+    return PaymentCompleteOut(status=order.status, public_ref=order.public_ref)

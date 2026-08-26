@@ -250,6 +250,10 @@ waves:
         title: Payments, oldest-first allocation and reversal
         status: shipped
         on: 2026-08-26
+      - id: M6.5
+        title: uPay payment orders, the double-payment guard and the form
+        status: shipped
+        on: 2026-08-26
   - id: W5
     milestone: M8 ∥ M9
     title: Communication ∥ Reports and privacy completion

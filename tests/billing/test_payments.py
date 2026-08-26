@@ -195,3 +195,204 @@ def test_payments_list_for_one_payer(client, as_manager, a_priced_student, an_op
     )
     assert response.status_code == 200
     assert len(response.json()["items"]) == 1
+
+
+# -- §5.10's uPay one-time flow, through the API ------------------------------
+def test_a_parent_opens_an_order_over_their_own_charges(
+    client, as_guardian_of, a_priced_student, three_open_months
+):
+    """**No role dependency** on this route. §3.1: 'guardian is not a role', and §6.1 makes
+    parent access `EXISTS(guardian WHERE person_id = :me)` -- so a role check here would
+    refuse every parent in the product and admit every coach with no children."""
+    parent = as_guardian_of(a_priced_student.student_id)
+    response = client.post(
+        "/api/v1/payment-orders",
+        json={"charge_ids": [str(c) for c in three_open_months]},
+        params={"max_payments": 3},
+        headers=parent.headers,
+    )
+    # The parent owes nothing: `three_open_months` belongs to `a_priced_student`'s PRIMARY
+    # guardian, and this fixture's caller is a second, non-primary guardian.
+    assert response.status_code == 404
+
+
+def test_the_payer_is_the_caller_and_never_the_body(
+    client, as_manager, a_priced_student, three_open_months
+):
+    """A body-supplied payer would let anyone open an order over anyone's charges. The
+    shape carries only `charge_ids`, and this asserts the route honours that."""
+    response = client.post(
+        "/api/v1/payment-orders",
+        json={
+            "charge_ids": [str(three_open_months[0])],
+            "payer_person_id": str(a_priced_student.payer_person_id),
+        },
+        headers=as_manager.headers,
+    )
+    # The manager is not the payer, so the charge is not theirs to pay -- the extra body
+    # field is ignored rather than obeyed.
+    assert response.status_code == 404
+
+
+def test_an_order_needs_at_least_one_charge(client, as_manager):
+    """`PaymentOrderCreateIn.charge_ids` has `min_length=1`."""
+    response = client.post(
+        "/api/v1/payment-orders", json={"charge_ids": []}, headers=as_manager.headers
+    )
+    assert response.status_code == 422
+
+
+def test_the_return_page_marks_nothing_paid(
+    client, as_manager, a_priced_student, an_open_charge, tenant_session
+):
+    """§5.10 step 5 -- 'the redirect is NEVER the source of truth'.
+
+    uPay appends its own payload to this URL and every field of it is client-submitted and
+    unsigned. The page reports the ORDER's status from our own row and settles nothing.
+    """
+    from app.models.billing import Charge
+    from app.services.billing.orders import OrderService
+
+    order = OrderService(tenant_session).create(
+        tenant_session.get(Charge, an_open_charge).studio_id,
+        payer_person_id=a_priced_student.payer_person_id,
+        charge_ids=[an_open_charge],
+        max_payments=1,
+        at=T0,
+    )
+    tenant_session.commit()
+    response = client.get(
+        "/api/v1/payment-complete",
+        params={"ref": str(order.public_ref), "errordescription": "SUCCESS", "amount": "250"},
+        headers=as_manager.headers,
+    )
+    assert response.status_code == 200
+    assert response.json()["status"] == "pending"
+    tenant_session.expire_all()
+    assert tenant_session.get(Charge, an_open_charge).status == "open"
+
+
+def test_the_return_page_is_calm_about_an_unknown_reference(client, as_manager):
+    """A mistyped bookmark, or a stale link. The parent has just come back from paying and a
+    page reading 'not found' would be alarming -- `pending` is honest, because we genuinely
+    do not know that anything happened."""
+    import uuid as _uuid
+
+    response = client.get(
+        "/api/v1/payment-complete",
+        params={"ref": str(_uuid.uuid4())},
+        headers=as_manager.headers,
+    )
+    assert response.status_code == 200
+    assert response.json()["status"] == "pending"
+
+
+def test_a_payer_opens_an_order_over_the_charges_they_owe(
+    client, as_manager, tenant_session, studio, a_priced_student
+):
+    """The happy path, with the caller as the payer -- which is the only way an order can be
+    created, because a manager cannot stand in front of uPay with someone else's card.
+
+    The charge is raised against the CALLER's own person id, so this is one person paying
+    their own debt: exactly `1b`'s flow.
+    """
+    from datetime import date
+
+    from app.services.billing import BillingService
+
+    charge = BillingService(tenant_session).create_charge(
+        studio.id,
+        as_manager.person_id,
+        "manual",
+        MONTHLY_AGOROT,
+        date(2026, 11, 30),
+    )
+    tenant_session.commit()
+    response = client.post(
+        "/api/v1/payment-orders",
+        json={"charge_ids": [str(charge.id)]},
+        params={"max_payments": 3},
+        headers=as_manager.headers,
+    )
+    assert response.status_code == 201
+    body = response.json()
+    assert body["expected_amount_agorot"] == MONTHLY_AGOROT
+    assert body["max_payments"] == 3
+    assert body["status"] == "pending"
+    assert body["charge_ids"] == [str(charge.id)]
+
+    # The order is readable by its payer, and its form is the fields the client posts.
+    read = client.get(f"/api/v1/payment-orders/{body['public_ref']}", headers=as_manager.headers)
+    assert read.status_code == 200
+    assert read.json()["status"] == "pending"
+
+
+def test_the_same_charge_cannot_be_ordered_twice(client, as_manager, tenant_session, studio):
+    """§5.10's primary double-payment guard, through the API. A second order over a charge
+    an open one already covers is refused."""
+    from datetime import date
+
+    from app.services.billing import BillingService
+
+    charge = BillingService(tenant_session).create_charge(
+        studio.id, as_manager.person_id, "manual", MONTHLY_AGOROT, date(2026, 11, 30)
+    )
+    tenant_session.commit()
+    payload = {"charge_ids": [str(charge.id)]}
+    assert (
+        client.post("/api/v1/payment-orders", json=payload, headers=as_manager.headers).status_code
+        == 201
+    )
+    second = client.post("/api/v1/payment-orders", json=payload, headers=as_manager.headers)
+    assert second.status_code == 409
+
+
+def test_more_installments_than_the_account_offers_is_refused(
+    client, as_manager, tenant_session, studio
+):
+    """Round two A1: the merchant dashboard's dropdown stops at 12."""
+    from datetime import date
+
+    from app.services.billing import BillingService
+
+    charge = BillingService(tenant_session).create_charge(
+        studio.id, as_manager.person_id, "manual", MONTHLY_AGOROT, date(2026, 11, 30)
+    )
+    tenant_session.commit()
+    response = client.post(
+        "/api/v1/payment-orders",
+        json={"charge_ids": [str(charge.id)]},
+        params={"max_payments": 24},
+        headers=as_manager.headers,
+    )
+    assert response.status_code == 422
+
+
+def test_the_form_is_fields_and_not_html(
+    client, as_manager, tenant_session, studio, a_merchant_email
+):
+    """§5.10 step 2. Returning rendered HTML from an API the TypeScript client is generated
+    against would hand that client a `string` where every other route has a model, and the
+    form's own fields would stop being type-checked."""
+    from datetime import date
+
+    from app.services.billing import BillingService
+
+    charge = BillingService(tenant_session).create_charge(
+        studio.id, as_manager.person_id, "manual", MONTHLY_AGOROT, date(2026, 11, 30)
+    )
+    tenant_session.commit()
+    created = client.post(
+        "/api/v1/payment-orders",
+        json={"charge_ids": [str(charge.id)]},
+        headers=as_manager.headers,
+    ).json()
+    response = client.get(
+        f"/api/v1/payment-orders/{created['public_ref']}/form", headers=as_manager.headers
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["action"].startswith("https://app.upay.co.il/")
+    assert body["fields"]["paymentdetails"] == created["public_ref"]
+    assert body["fields"]["amount"] == "250.00"
+    assert body["fields"]["livesystem"] == "1"

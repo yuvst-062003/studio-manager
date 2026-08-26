@@ -830,3 +830,66 @@ def a_two_child_family(
         student_ids=(students[0], students[1]),
         charge_ids=(charges[0], charges[1]),
     )
+
+
+@pytest.fixture
+def a_merchant_email(monkeypatch):
+    """A merchant account to charge, for tests that build a real form.
+
+    Patched rather than read from the environment: `UPAY_MERCHANT_EMAIL` lives in Railway
+    variables and never in this repo (.gitleaks.toml carries a rule for it), so a test that
+    depended on the real one would pass on one machine and fail on every other.
+    """
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "UPAY_MERCHANT_EMAIL", "merchant@example.invalid")
+    return "merchant@example.invalid"
+
+
+@pytest.fixture
+def a_demo_studio(app_session: Session) -> Studio:
+    """§19.6 restriction 5's subject. `is_demo` is the flag `upay_form_fields` refuses on,
+    and it is checked on the STUDIO rather than on a keyword, because a keyword the caller
+    controls is a keyword a caller gets wrong."""
+    row = Studio(name="מועדון הדגמה", slug=f"demo-{uuid.uuid4().hex[:8]}", is_demo=True)
+    app_session.add(row)
+    app_session.commit()
+    return row
+
+
+@pytest.fixture
+def a_demo_order(app_session: Session, a_demo_studio: Studio):
+    """An order inside the demo studio. Built directly rather than through `OrderService`,
+    because what is under test is the FORM's refusal and a demo studio has no charges."""
+    from app.models.billing import PaymentOrder
+
+    payer = Person(studio_id=a_demo_studio.id, first_name="הורה", last_name="הדגמה")
+    app_session.add(payer)
+    app_session.flush()
+    order = PaymentOrder(
+        studio_id=a_demo_studio.id,
+        payer_person_id=payer.id,
+        public_ref=uuid.uuid4(),
+        expected_amount_agorot=MONTHLY_AGOROT,
+        max_payments=1,
+        status="pending",
+    )
+    app_session.add(order)
+    app_session.commit()
+    return order
+
+
+@pytest.fixture
+def a_demo_tenant_session(a_demo_studio: Studio) -> Iterator[TenantSession]:
+    """A session scoped to the DEMO studio.
+
+    `tenant_session` is scoped to `studio`, and `TenantSession` fails closed -- so a demo
+    row is invisible through it, correctly. §19.6 restriction 5 is about what happens when
+    a demo studio reaches the payment step, which means the test has to be inside that
+    studio for the refusal to be the thing under test rather than the tenancy filter.
+    """
+    with (
+        use_studio(a_demo_studio.id),
+        TenantSession(bind=get_engine(), expire_on_commit=False) as scoped,
+    ):
+        yield scoped
