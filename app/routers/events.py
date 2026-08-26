@@ -25,6 +25,7 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from pydantic import BaseModel
 
 from app.core.auth_context import AnyStaff, require_roles
 from app.core.clock import now
@@ -39,6 +40,7 @@ from app.schemas.events import (
 )
 from app.services.events.errors import EventNotEditableError, EventNotFoundError
 from app.services.events.events import EventService, redacts_fee
+from app.services.events.publish import EventPublishService
 
 router = APIRouter(tags=["events"])
 
@@ -142,5 +144,66 @@ def update_event(
             "event_is_not_a_draft", "a published event is changed by cancelling it"
         ) from exc
     out = EventService.to_out(session, [row], redact_fee=redacts_fee(_roles(request)))[0]
+    session.commit()
+    return out
+
+
+class EventPublishedOut(BaseModel):
+    """A publish reports the roster it just created.
+
+    Same reasoning as `HealthTemplatePublishedOut`: a publish that said nothing about what
+    it materialised would look identical to one that materialised nothing -- which is
+    exactly what an event with no targets does, and exactly the state a manager needs to
+    see before wondering why no parent replied.
+    """
+
+    event: EventOut
+    registrations_created: int
+
+
+@router.post(
+    "/events/{event_id}/publish",
+    response_model=EventPublishedOut,
+    status_code=status.HTTP_201_CREATED,
+)
+def publish_event(
+    _: EventsWriter,
+    event_id: uuid.UUID,
+    request: Request,
+    session: TenantSessionDep,
+    idempotency_key: IdempotencyKey = None,
+) -> EventPublishedOut:
+    """§5.8 -- every targeted student gets a registration at `rsvp='pending'`.
+
+    **Nothing is sent.** Publishing makes the event visible to guardians; an invitation is
+    a notification, and `NotificationService` is M8's (W5). Four artboards draw
+    "published, invitations not sent" as its own state and no column holds it.
+    """
+    try:
+        event, created = EventPublishService.publish(session, event_id, at=now())
+    except EventNotFoundError as exc:
+        raise _not_found() from exc
+    except EventNotEditableError as exc:
+        raise _conflict("event_is_not_a_draft", "only a draft can be published") from exc
+    out = EventService.to_out(session, [event], redact_fee=redacts_fee(_roles(request)))[0]
+    session.commit()
+    return EventPublishedOut(event=out, registrations_created=created)
+
+
+@router.post("/events/{event_id}/cancel", response_model=EventOut)
+def cancel_event(
+    _: EventsWriter, event_id: uuid.UUID, request: Request, session: TenantSessionDep
+) -> EventOut:
+    """The roster survives. §5.8 notifies on a cancellation and the office phones whoever
+    answered -- deleting the registrations would delete the list the call is made from."""
+    try:
+        event = EventPublishService.cancel(session, event_id, at=now())
+    except EventNotFoundError as exc:
+        raise _not_found() from exc
+    except EventNotEditableError as exc:
+        raise _conflict(
+            "event_is_not_published", "only a published event can be cancelled"
+        ) from exc
+    out = EventService.to_out(session, [event], redact_fee=redacts_fee(_roles(request)))[0]
     session.commit()
     return out
