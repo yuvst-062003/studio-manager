@@ -47,6 +47,15 @@ test_candidates=()
 # case branch below. A directory this lane owns but does not name here is a directory the
 # gate silently skips -- which is worse than a red gate, because it reads as covered.
 feature_dirs=("$V")
+# Subdirectories of web/packages/core/src this lane owns. Defaults to one named for the
+# vertical -- which is what the frontend and lint gates already looked for, and which no
+# vertical actually has, so the default is a no-op preserved rather than a rule.
+#
+# `attendance` is the only lane in the plan that owns anything under web/packages/core --
+# §10's offline queue, pending_ops and the network state machine -- and it does not follow
+# the naming convention. Same rule as feature_dirs above: a directory this lane owns but
+# does not name here is a directory the gate silently skips.
+core_dirs=("$V")
 
 case "$V" in
   core)
@@ -104,6 +113,48 @@ case "$V" in
     # meant to catch it.
     feature_dirs=(people landing)
     ;;
+  attendance)
+    # SPEC §7 puts the offline flush at /sync, so app/routers/sync.py does not follow the
+    # per-vertical convention and the default branch would type-check the roster router
+    # while silently skipping the endpoint the entire offline queue drains into. Listed
+    # explicitly for the same reason `people` lists its four endpoint-named routers.
+    py_candidates=("app/services/$V" "app/routers/$V.py" "app/routers/sync.py" \
+                   "app/models/$V.py")
+    test_candidates=("tests/$V")
+    # §5.7's parent pre-report is this lane's, and it lives under features/absence/ -- the
+    # parent app's own screen for it (artboard 12a), not a section of the coach roster.
+    # Same shape as `people`'s features/landing/. Without this line the frontend, lint and
+    # CSS gates skip every one of its files and the check still prints green.
+    feature_dirs=(attendance absence)
+    # §10.1-§10.6 -- pending_ops, the four-state network machine and the sync queue. This
+    # is the only lane in the plan that owns anything under web/packages/core, and it is
+    # the highest-risk code in it: the default core_dirs=($V) looks for
+    # web/packages/core/src/attendance, which will never exist.
+    core_dirs=(offline)
+    ;;
+  health)
+    # app/routers/health.py is NOT here, deliberately. That file is core's liveness probe
+    # -- `GET /api/v1/health`, asserted by tests/test_health.py -- and the default branch
+    # resolves `app/routers/$V.py` straight onto it, which would hand this lane a gate
+    # over a file it does not own. A gate reads as ownership. SPEC §7 puts M4's routes at
+    # /health-templates and /students/{id}/health-declaration; those two files are the
+    # lane's, and `GET /health-templates` stays in app/routers/structure.py where M1's
+    # conflict-C3 read side already lives.
+    #
+    # app/workers/health_reminders.py is the reason this branch exists at all. §5.5's
+    # one-tap `שלח תזכורת להורה` and its ladder are a job, and the default branch reaches
+    # no worker -- so this lane's own gate would have gone green having never type-checked
+    # the reminder worker. Same reasoning as `people`'s app/workers/followups.py.
+    py_candidates=("app/services/$V" "app/routers/health_templates.py" \
+                   "app/routers/health_declarations.py" \
+                   "app/workers/health_reminders.py" "app/models/$V.py")
+    test_candidates=("tests/$V")
+    # This lane owns nothing under web/packages/core -- `attendance` owns the only piece
+    # of it in the plan. Said out loud rather than left to the default, because the
+    # default would have this lane's CSS gate glob packages/core/src/health/, which reads
+    # as a claim on a directory M5's offline work sits next to.
+    core_dirs=()
+    ;;
   *)
     py_candidates=("app/services/$V" "app/routers/$V.py" "app/models/$V.py")
     test_candidates=("tests/$V")
@@ -134,8 +185,10 @@ else
         find web/apps -path "*/src/features/$fdir/*" \
           \( -name '*.test.ts' -o -name '*.test.tsx' \) 2>/dev/null || true
       done
-      find "web/packages/core/src/$V" \
-        \( -name '*.test.ts' -o -name '*.test.tsx' \) 2>/dev/null || true
+      for cdir in ${core_dirs[@]+"${core_dirs[@]}"}; do
+        find "web/packages/core/src/$cdir" \
+          \( -name '*.test.ts' -o -name '*.test.tsx' \) 2>/dev/null || true
+      done
     } | sed 's|^web/||' | sort
   )
 fi
@@ -150,6 +203,11 @@ else
         for path in web/apps/*/src/features/"$fdir"; do
           if [ -d "$path" ]; then echo "${path#web/}"; fi
         done
+      done
+      # The offline queue is source this lane owns, so D10's logical-property rule and
+      # every other eslint rule must reach it. Without this it is linted by nothing.
+      for cdir in ${core_dirs[@]+"${core_dirs[@]}"}; do
+        if [ -d "web/packages/core/src/$cdir" ]; then echo "packages/core/src/$cdir"; fi
       done
       for locale in he en ru; do
         if [ -f "web/packages/i18n/$locale/$V.ts" ]; then echo "packages/i18n/$locale/$V.ts"; fi
@@ -240,6 +298,9 @@ elif [ -n "$eslint_targets" ]; then
   css_globs=()
   for fdir in ${feature_dirs[@]+"${feature_dirs[@]}"}; do
     css_globs[${#css_globs[@]}]="apps/*/src/features/$fdir/**/*.css"
+  done
+  for cdir in ${core_dirs[@]+"${core_dirs[@]}"}; do
+    css_globs[${#css_globs[@]}]="packages/core/src/$cdir/**/*.css"
   done
   if [ "$DRY_RUN" = 1 ]; then
     printf '   would run: (cd web && stylelint %s)\n' "$(printf '"%s" ' ${css_globs[@]+"${css_globs[@]}"})"

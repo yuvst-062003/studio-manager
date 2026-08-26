@@ -157,3 +157,58 @@ def test_identity_and_structure_fail_closed_before_their_source_exists():
         result = _run(vertical, "--dry-run")
         if result.returncode != 0:
             assert "nothing was checked" in (result.stdout + result.stderr)
+
+
+def test_health_resolves_the_worker_and_the_routers_it_actually_owns():
+    """A green gate over an unchecked worker is worse than a red one, because it reads as
+    covered. 5.5's `שלח תזכורת להורה` and its ladder are a job in
+    app/workers/health_reminders.py, and the default branch reaches no worker at all --
+    same shape as `people`'s app/workers/followups.py.
+
+    SPEC 7 puts M4's routes at /health-templates and /students/{id}/health-declaration, so
+    neither router is named health.py and the default branch would have skipped both."""
+    text = SCRIPT.read_text(encoding="utf-8")
+    for path in (
+        "app/workers/health_reminders.py",
+        "app/routers/health_templates.py",
+        "app/routers/health_declarations.py",
+    ):
+        assert path in text, f"{path} is invisible to lane-check.sh health"
+
+
+def test_the_health_lane_does_not_gate_cores_liveness_router():
+    """app/routers/health.py is `GET /api/v1/health` -- core's liveness probe, asserted by
+    tests/test_health.py. The default branch resolves `app/routers/$V.py` straight onto it
+    and hands the health lane a gate over a file it does not own, which reads as
+    ownership. The case branch names the lane's own two routers instead."""
+    stdout = _run("health", "--dry-run").stdout
+    assert "app/routers/health.py" not in stdout
+
+
+def test_attendance_resolves_the_sync_router_and_the_offline_queue():
+    """M5 owns app/routers/sync.py and web/packages/core/src/offline/** -- the only lane in
+    the plan that owns anything under web/packages/core, and the highest-risk code in it.
+    The default branch names neither: it looks for web/packages/core/src/attendance, which
+    will never exist."""
+    text = SCRIPT.read_text(encoding="utf-8")
+    for path in ("app/routers/sync.py", "core_dirs=(offline)"):
+        assert path in text, f"{path} is invisible to lane-check.sh attendance"
+
+
+def test_attendance_reaches_the_parent_absence_screens():
+    """5.7's parent pre-report lives at web/apps/parent/src/features/absence/, not
+    features/attendance/ -- it is the parent app's own screen (artboard 12a), not a section
+    of the coach roster. Same shape as `people`'s features/landing/. Without the override
+    the frontend, lint and CSS gates skip every one of its files and the check still prints
+    green."""
+    assert "feature_dirs=(attendance absence)" in SCRIPT.read_text(encoding="utf-8")
+
+
+def test_the_w3_verticals_fail_closed_before_their_source_exists():
+    """Adding a case must not hand a vertical a free green -- the same guard `identity` and
+    `structure` got. Until the lanes land files, every scoped gate that can skip does, and a
+    vertical that resolved nothing at all must exit non-zero."""
+    for vertical in ("attendance", "health"):
+        result = _run(vertical, "--dry-run")
+        if result.returncode != 0:
+            assert "nothing was checked" in (result.stdout + result.stderr)
