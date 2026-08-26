@@ -36,7 +36,7 @@ import {
   makeDashboardPeopleClient,
   registerPeopleAlerts,
 } from './features/people'
-import { EventsScreen, makeDashboardEventsClient } from './features/events'
+import { EventForm, EventsScreen, makeDashboardEventsClient } from './features/events'
 
 registerM1WizardSteps(apiFetch)
 // Seam 4 — `6c` composes sections from four milestones. This lane registers the three it
@@ -206,11 +206,24 @@ export default function App() {
           {route === 'alerts' ? (
             <AlertCentre locale={locale} client={peopleClient} />
           ) : null}
+          {route === 'events' && eventRoute === 'new' ? (
+            <EventForm
+              client={eventsClient}
+              locale={locale}
+              onSaved={(id) => {
+                globalThis.location.hash = `#/events/${id}`
+              }}
+              targets={[]}
+            />
+          ) : null}
           {route === 'events' && !eventRoute ? (
             <EventsScreen
               client={eventsClient}
               locale={locale}
               now={today}
+              onCreate={() => {
+                globalThis.location.hash = '#/events/new'
+              }}
               onOpen={(id) => {
                 globalThis.location.hash = `#/events/${id}`
               }}
