@@ -1,0 +1,1094 @@
+# W4 Contract Commit Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Land W4's contract on `main` — revision `0008`, seventeen tables promoted out of `app/models/_pending/`, the two foreign keys W2 deferred, a `billing` lane-check branch that reaches the IPN endpoint, three lane conftests, `test_w4_schemas.py`, and a regenerated API client — so that `lane/money` and `lane/events` can be cut from a `main` neither lane can change unilaterally.
+
+**Architecture:** Everything W4 needs is already authored and type-checked; this commit *moves* it rather than writing it. `app/models/__init__.py` discovers modules by `pkgutil` and skips `_`-prefixed ones, so promotion is a `git mv` plus a rewrite of the two importers that name the pending path. The revision body comes from `alembic revision --autogenerate` and is never hand-tidied — the two deferred FKs are added to the *model columns* so autogenerate emits the ALTERs itself.
+
+**Tech Stack:** Python 3.14 (`.venv/bin/` prefix always), FastAPI, SQLAlchemy 2.0 declarative `Mapped[]`, Alembic, PostgreSQL 16 via `./scripts/dev-db.sh`, pytest, npm workspaces + `openapi-typescript`.
+
+**Spec:** [docs/plan/prompts/w4-contract.md](../../plan/prompts/w4-contract.md) · [docs/plan/milestone-plan.md](../../plan/milestone-plan.md) §2.2 and §W4 · [docs/plan/migrations/w4-draft.py](../../plan/migrations/w4-draft.py)
+
+## Global Constraints
+
+- **G2 — every money column is `*_agorot INTEGER`.** Not `NUMERIC(10,2)`. This is the wave where invariant 1 stops being vacuous.
+- **G8 — no automated recurring billing.** הוראת קבע cannot be created programmatically by uPay. No mandate creator, no automatic matching.
+- **Charges are never mutated to record payment.** `charge.status` is a derived cache with exactly one writer, `recompute_charge_status`.
+- **§11.7 — no card owner names or last-4 digits in application logs.**
+- **One Alembic head.** The chain is linear `0001`→`0007`; `0008` continues it. `main` owns `alembic/versions/**`.
+- **`alembic/versions/**` is denied to Edit/Write by `.claude/hooks/block-protected.sh` (exit 2).** The user approved `0008` for this wave only, on 2026-08-26. The hook's Bash arm also refuses any command containing a redirect (`>`, `2>&1`) *and* a token matching a protected path — keep them in separate commands.
+- **Python tooling is `.venv/bin/`.** A bare `python3` is a pyenv 3.8 earlier on PATH.
+- **Never run `./scripts/dev-db.sh reset`** once a lane worktree exists. It drops the shared Docker volume.
+- **`app/main.py` and `app/models/__init__.py` are never edited to register anything.** Discovery does it.
+- Hebrew strings live in `web/packages/i18n/he/<namespace>.ts`. Never inline a string in a component.
+- Tick `docs/plan/state.yaml` in the same commit as the work it describes. Never write anything measurable there.
+
+---
+
+## Decisions taken before this plan
+
+| # | Decision | Rationale |
+|---|---|---|
+| D-A | **Revision `0008` is approved** to be written under `alembic/versions/`, this wave only. | User, 2026-08-26. Autogenerate is allowed by the hook; the *file rename* and the `revision` string rewrite are the parts that need the bypass. |
+| D-B | **Belt strings fold into `events.ts`.** No tenth namespace. | CLAUDE.md enumerates exactly nine namespaces with no `belts`; `lane-check.sh`'s comment already says `belts` has none; and seam 3 exists to stop two *lanes* colliding on one file — `belts` and `events` are the same lane (EVENTS), so there is no collision to prevent. `milestone-plan.md`'s ownership line is corrected instead. |
+| D-C | **Both deferred foreign keys are on `student`,** not one on `enrollment`. | Finding 7, below. `Enrollment`'s columns are `student_id, group_id, status, started_on, ended_on, attends_weekdays` — there is no `price_plan_id` on it, by C11. |
+
+### Finding 7 — recorded here because the contract prompt does not carry it
+
+`w4-draft.py`'s `DEFERRED_FROM_W2`, the contract prompt's finding 4, and `tests/invariants/test_01_money_is_never_a_float.py`'s comment all say **`enrollment.price_plan_id`**. That column does not exist. C11 moved the price to the student — [app/models/people.py:264](../../../app/models/people.py#L264): *"a `price_plan_id` here is what made a child in two groups pay twice."* [tests/contracts/_pending/test_w4_models.py:142-146](../../../tests/contracts/_pending/test_w4_models.py#L142-L146) already asserts it: `"price_plan_id" in student.c` and `"price_plan_id" not in enrollment.c`.
+
+This is the same drift as finding 2 and the same root cause — three documents written before C11 and not re-read after it. Task 1 corrects all three.
+
+---
+
+## File Structure
+
+**Created**
+| Path | Responsibility |
+|---|---|
+| `alembic/versions/0008_w4_billing_events_belts.py` | The one revision for the wave. Seventeen `create_table`s + two `create_foreign_key` ALTERs, all autogenerated. |
+| `app/models/billing.py` | Promoted verbatim from `_pending/`. Eleven ledger tables. |
+| `app/models/events.py` | Promoted verbatim. Four event tables. |
+| `app/models/belts.py` | Promoted verbatim. Two belt tables. |
+| `tests/contracts/test_w4_models.py` | Promoted verbatim from `_pending/`, plus two new deferred-FK tests. |
+| `tests/contracts/test_w4_schemas.py` | The schema half W2/W3/W5 each have and W4 does not. |
+| `tests/billing/{__init__.py,conftest.py}` | Lane MONEY's fixtures: callers, a payer, a priced student, a charge. |
+| `tests/events/{__init__.py,conftest.py}` | Lane EVENTS' fixtures: callers, an event, a registered student. |
+| `tests/belts/{__init__.py,conftest.py}` | Lane EVENTS' belt fixtures: a class-scoped rank ladder. |
+
+**Modified**
+| Path | Change |
+|---|---|
+| `app/models/people.py:144,149` | Add `ForeignKey` to `current_belt_id` and `price_plan_id`. |
+| `app/models/_pending/__init__.py` | Mark W4 done in the promotion table; drop `billing` from the "seams that name the pending path" paragraph. |
+| `app/services/billing/__init__.py:27,33` | `app.models._pending.billing` → `app.models.billing`. |
+| `tests/contracts/test_seams.py:36,58,76` | Stop resolving `Charge` out of `_pending`; W5's `Notification` still needs the subprocess. |
+| `scripts/lane-check.sh` | New `billing)` case branch; `events)` and `belts)` branches; comment corrected for D-B. |
+| `docs/plan/migrations/w4-draft.py` | Findings 2 and 7 corrected. |
+| `docs/plan/milestone-plan.md` | Lane EVENTS' i18n ownership line: `{events,belts}.ts` → `events.ts`. |
+| `tests/invariants/test_01_money_is_never_a_float.py` | Two comments naming `enrollment.price_plan_id` → `student.price_plan_id`. |
+| `web/packages/api-client/src/schema.d.ts` | Regenerated. |
+| `openapi.json` | Regenerated. |
+| `docs/plan/state.yaml` | Tick W4's contract piece. |
+
+**Deleted**
+- `app/models/_pending/{billing,events,belts}.py` (moved)
+- `tests/contracts/_pending/test_w4_models.py` (moved)
+
+---
+
+## Task 1: Correct the three documents that predate C11
+
+Doc-only, and first so that nothing downstream is written from a source that is wrong. No test — these are prose, and the assertions that would test them already exist in `test_w4_models.py`.
+
+**Files:**
+- Modify: `docs/plan/migrations/w4-draft.py` — `DEFERRED_FROM_W2`, `HAND_CHECK[1]`
+- Modify: `tests/invariants/test_01_money_is_never_a_float.py` — two comments
+- Modify: `docs/plan/milestone-plan.md` — Lane EVENTS i18n ownership line (D-B)
+
+**Interfaces:**
+- Consumes: nothing.
+- Produces: nothing importable. Task 2 reads the corrected `DEFERRED_FROM_W2` as its statement of intent.
+
+- [ ] **Step 1: Fix `DEFERRED_FROM_W2` (finding 7)**
+
+In `docs/plan/migrations/w4-draft.py`, replace the tuple:
+
+```python
+DEFERRED_FROM_W2 = (
+    ("student.current_belt_id", "belt_rank.id", "SET NULL"),
+    ("student.price_plan_id", "price_plan.id", "RESTRICT"),
+)
+```
+
+And append to its docstring comment, after the existing paragraph:
+
+```python
+#: **Both are on `student`.** An earlier draft of this file said
+#: `enrollment.price_plan_id`, which is pre-C11: the club prices by how often a child
+#: trains, not by which groups they attend, so the price moved to the student and
+#: `enrollment` carries no price at all (app/models/people.py, Enrollment docstring).
+#: `tests/contracts/test_w4_models.py::test_the_price_is_chosen_on_the_student` asserts
+#: both halves -- present on `student`, absent from `enrollment`.
+```
+
+- [ ] **Step 2: Fix `HAND_CHECK`'s idempotency-key entry (finding 2)**
+
+Replace the second `HAND_CHECK` string with:
+
+```python
+    "charge's idempotency index is PARTIAL: unique on "
+    "(student_id, period_year, period_month, kind) `postgresql_where=student_id IS NOT "
+    "NULL AND period_year IS NOT NULL`. It is invariant 5's structural half -- §5.10 step "
+    "5, 're-running for the same period creates no duplicates'. **On student_id, not "
+    "enrollment_id** (C11): the club prices per student, so a child in two groups is one "
+    "charge, and keying on the enrollment is precisely what would let the second "
+    "enrollment raise a second charge. It is partial because only periodic charges have a "
+    "period and a manual charge may legitimately repeat. Lose the predicate and a manager "
+    "can raise exactly one manual charge per family, ever.",
+```
+
+- [ ] **Step 3: Fix invariant 1's two comments**
+
+In `tests/invariants/test_01_money_is_never_a_float.py`, the `mis_named_money_columns` inline comment and the `test_the_naming_detector_leaves_a_reference_column_alone` docstring-comment both say *"W2's `enrollment.price_plan_id`"*. Change both occurrences of `enrollment.price_plan_id` to `student.price_plan_id`. The behaviour under test does not change — `price_plan_id` is still the parametrised name — only the sentence naming which table carries it.
+
+- [ ] **Step 4: Apply D-B to the milestone plan**
+
+In `docs/plan/milestone-plan.md`, Lane EVENTS' **Owns** block, change:
+
+```
+web/packages/i18n/{he,en,ru}/{events,belts}.ts
+```
+
+to:
+
+```
+web/packages/i18n/{he,en,ru}/events.ts
+```
+
+and add immediately below the Owns block:
+
+```markdown
+> **Belt strings live in `events.ts`.** There is no `belts` namespace and this commit
+> decided there will not be one (W4 contract, D-B). Seam 3 exists so two *lanes* never
+> touch one file; `events` and `belts` are the same lane, so a second namespace buys no
+> isolation and costs an edit to `web/packages/i18n/types.ts` and `index.ts` — two files
+> the plan says are authored once and never touched by a lane. `lane-check.sh` and
+> CLAUDE.md's nine-namespace list both already assume this.
+```
+
+- [ ] **Step 5: Verify nothing else in the repo still says `enrollment.price_plan_id`**
+
+Run: `grep -rn "enrollment.price_plan_id" --include='*.py' --include='*.md' . | grep -v node_modules`
+Expected: no output. If `docs/plan/prompts/w4-contract.md` still matches, correct its finding 4 the same way.
+
+- [ ] **Step 6: Confirm invariant 1 still passes**
+
+Run: `.venv/bin/pytest tests/invariants/test_01_money_is_never_a_float.py -q`
+Expected: PASS (comment-only change).
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add docs/plan/migrations/w4-draft.py docs/plan/milestone-plan.md \
+        docs/plan/prompts/w4-contract.md tests/invariants/test_01_money_is_never_a_float.py
+git commit -m "docs(w4): correct three documents that predate C11
+
+The draft's DEFERRED_FROM_W2, the contract prompt's finding 4 and invariant 1's
+own comment all name enrollment.price_plan_id. That column does not exist: C11
+moved the price to the student, because pricing per enrollment billed a child in
+two groups twice. The draft's HAND_CHECK made the same mistake about charge's
+idempotency key, on enrollment_id where the model says student_id.
+
+Also records W4's belts-namespace decision: belt strings live in events.ts, so
+lane EVENTS' ownership line no longer claims a belts.ts that never existed."
+```
+
+---
+
+## Task 2: The two foreign keys W2 deferred
+
+**Files:**
+- Modify: `app/models/people.py:143-150`
+- Test: `tests/contracts/_pending/test_w4_models.py` (still in `_pending/` at this point — it is promoted in Task 3)
+
+**Interfaces:**
+- Consumes: `BeltRank.__tablename__ == "belt_rank"`, `PricePlan.__tablename__ == "price_plan"` — both still under `app/models/_pending/` until Task 3.
+- Produces: `student.current_belt_id → belt_rank.id ON DELETE SET NULL` and `student.price_plan_id → price_plan.id ON DELETE RESTRICT` in `Base.metadata`, which Task 4's autogenerate turns into two `op.create_foreign_key` ALTERs.
+
+> **Why the FK strings resolve now and did not in W2.** A `ForeignKey("belt_rank.id")` is resolved lazily, at mapper-configuration time, against whatever is in `Base.metadata`. In W2 nothing put `belt_rank` there, so the string would have failed *every* test in the suite. From Task 3 onward `app/models/belts.py` is discovered by `pkgutil` and the target exists. **These two edits therefore only work once Task 3 has promoted the models** — write the test now, watch it fail, and expect it to stay failing until Task 3's promotion. That is the intended sequence, not a mistake.
+
+- [ ] **Step 1: Write the failing test**
+
+Append to `tests/contracts/_pending/test_w4_models.py`:
+
+```python
+# -- the two constraints W2 deferred to this wave ------------------------------
+def test_the_student_belt_cache_points_at_a_real_rank():
+    """W2 left `student.current_belt_id` with no foreign key because `belt_rank` is
+    created here. A UUID column with no constraint behind it is a dangling pointer the
+    database is happy to accept, and §5.9's progression screen reads it on every render.
+
+    `SET NULL` rather than `RESTRICT`: deleting a rank a student holds should demote them
+    to "no belt recorded", not make the rank undeletable. A studio reorganising its ladder
+    is a normal thing; a rank that cannot be removed because one child holds it is not.
+    """
+    column = Base.metadata.tables["student"].c.current_belt_id
+    fk = next(iter(column.foreign_keys), None)
+    assert fk is not None, "student.current_belt_id still has no foreign key"
+    assert fk.column.table.name == "belt_rank"
+    assert fk.ondelete == "SET NULL"
+
+
+def test_the_student_price_points_at_a_real_plan_and_the_plan_cannot_vanish():
+    """The other half of W2's deferral -- and it is on `student`, not `enrollment` (C11).
+
+    `RESTRICT` rather than `SET NULL`, and the asymmetry with the belt above is the point:
+    a student silently losing their price is a student the billing run skips, which
+    surfaces as a month where a family was simply not billed and nobody noticed. Deleting
+    a price plan that is in use should be refused outright.
+    """
+    column = Base.metadata.tables["student"].c.price_plan_id
+    fk = next(iter(column.foreign_keys), None)
+    assert fk is not None, "student.price_plan_id still has no foreign key"
+    assert fk.column.table.name == "price_plan"
+    assert fk.ondelete == "RESTRICT"
+```
+
+- [ ] **Step 2: Run it and confirm it fails**
+
+Run: `.venv/bin/pytest tests/contracts/_pending/test_w4_models.py -q -k "deferred or points_at" 2>&1 | tail -20`
+
+Expected: both new tests FAIL. Most likely with `KeyError: 'price_plan'` from the surrounding module-level collection (the whole file asserts on tables that are not in the metadata yet), or with `AssertionError: student.current_belt_id still has no foreign key`. **Either failure is the correct starting state.** Note which one you got; Task 3 Step 5 expects the other tests in this file to go green at the same time.
+
+- [ ] **Step 3: Add the two ForeignKeys**
+
+In `app/models/people.py`, replace lines 143-150 (the `current_belt_id` … `price_plan_id` block inside `class Student`) with:
+
+```python
+    #: W4's `belt_rank`. Constrained since W4's contract commit -- see the class
+    #: docstring. `SET NULL`: a studio may reorganise its ladder, and a rank that cannot
+    #: be deleted because one child holds it is a schema fighting the club.
+    current_belt_id: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("belt_rank.id", ondelete="SET NULL")
+    )
+    health_status: Mapped[str] = mapped_column(String(15), nullable=False, default="missing")
+    #: §5.10, C11 -- the tuition price, **per student**. Constrained since W4's contract
+    #: commit. Nullable: a `lead` or `trial` has no price yet, and §5.4 makes setting one
+    #: part of the manager's conversion decision.
+    #:
+    #: `RESTRICT`, unlike the belt above. A student silently losing their price is a
+    #: student the billing run skips -- a family simply not billed for a month, which
+    #: nobody notices until they do. Deleting a plan that is in use is refused.
+    price_plan_id: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("price_plan.id", ondelete="RESTRICT")
+    )
+```
+
+- [ ] **Step 4: Update the `Student` class docstring**
+
+In the same class, replace the paragraph beginning *"`current_belt_id` and `price_plan_id` carry no foreign key"* with:
+
+```
+    `current_belt_id` and `price_plan_id` point at `belt_rank` and `price_plan`, which are
+    W4's tables. **The constraints were added in W4's contract commit, not in W2** — a
+    forward reference in a `ForeignKey` string is resolved at mapper-configuration time,
+    so writing it before W4 promoted those models would have failed every test in the
+    suite rather than one. `guardian.student_id` was deferred the same way in W1.
+```
+
+- [ ] **Step 5: Confirm the failure has MOVED, not gone**
+
+Run: `.venv/bin/pytest tests/contracts/_pending/test_w4_models.py -q 2>&1 | tail -20`
+
+Expected: still red. The `ForeignKey("belt_rank.id")` now cannot resolve, because `belt_rank` is not in `Base.metadata` until Task 3. You should see `NoReferencedTableError: Foreign key ... could not find table 'belt_rank'`. **This is correct.** Do not "fix" it by removing the constraint.
+
+- [ ] **Step 6: Do NOT commit yet**
+
+This working tree is deliberately red between here and Task 4. `app/models/people.py` alone is a broken import for the whole suite. Task 4 commits Tasks 2, 3 and 4 together as one atomic change, because a promoted model with no revision behind it is `alembic check` red and a demo reset that fails on a missing relation.
+
+---
+
+## Task 3: Promote the three models and their contract test
+
+**Files:**
+- Move: `app/models/_pending/billing.py` → `app/models/billing.py`
+- Move: `app/models/_pending/events.py` → `app/models/events.py`
+- Move: `app/models/_pending/belts.py` → `app/models/belts.py`
+- Move: `tests/contracts/_pending/test_w4_models.py` → `tests/contracts/test_w4_models.py`
+- Modify: `app/services/billing/__init__.py:25-33`
+- Modify: `tests/contracts/test_seams.py:35-37, 56-60, 74-78`
+- Modify: `app/models/_pending/__init__.py`
+
+**Interfaces:**
+- Consumes: Task 2's two `ForeignKey`s, currently unresolvable.
+- Produces: `app.models.billing.{PricePlan, Product, Charge, BillingRun, Payment, PaymentAllocation, PaymentOrder, PaymentOrderCharge, UpayIpnRecord, PayerFingerprint, RecurringSubscription}`, `app.models.events.{Event, EventTarget, EventRegistration, EventExamResult}`, `app.models.belts.{BeltRank, StudentBelt}` — all in `Base.metadata`. Tasks 7 and 8 import from these paths.
+
+> All three are **clean promotions**. W3's `health.py` had to be appended because `health_form_template` shipped in `0005` as C3's resolution; `app/models/` has no `billing.py`, `events.py` or `belts.py` today, so `git mv` is the whole operation. Verify that before moving: `ls app/models/billing.py` must fail.
+
+- [ ] **Step 1: Confirm all three are clean promotions**
+
+Run: `ls app/models/billing.py app/models/events.py app/models/belts.py`
+Expected: three "No such file or directory" errors. If any exists, STOP — it is a W3-shaped append, not a move, and this plan does not cover it.
+
+- [ ] **Step 2: Move the four files with `git mv`**
+
+```bash
+git mv app/models/_pending/billing.py app/models/billing.py
+git mv app/models/_pending/events.py  app/models/events.py
+git mv app/models/_pending/belts.py   app/models/belts.py
+git mv tests/contracts/_pending/test_w4_models.py tests/contracts/test_w4_models.py
+```
+
+`git mv` rather than `mv` so the rename is recorded and the diff stays reviewable as a move plus the small edits below.
+
+- [ ] **Step 3: Point the billing seam at the real module**
+
+In `app/services/billing/__init__.py`, replace the comment block and guarded import (lines ~25-33) with:
+
+```python
+# `Charge` is imported under TYPE_CHECKING only. The runtime import is unnecessary --
+# `from __future__ import annotations` makes every annotation a string, so mypy and the
+# IDE resolve `Charge` and the interpreter never does -- and importing a model into a
+# service module for the sake of one annotation is how an import cycle starts.
+if TYPE_CHECKING:
+    from app.models.billing import Charge
+```
+
+The `_pending` path is gone; the reason for the guard is not, so the comment states the surviving reason rather than being deleted with it.
+
+- [ ] **Step 4: Take `Charge` out of the subprocess in the seam tests**
+
+`tests/contracts/test_seams.py` resolves two seam signatures in a **fresh interpreter**, because importing a `_pending` model anywhere in the process registers a table with nothing behind it. That reason is now gone for `Charge` and still stands for `Notification` (W5).
+
+In `_pending_signature`'s generated script, change:
+
+```python
+        from app.models._pending.billing import Charge      # noqa: F401 -- resolves the annotation
+        from app.models._pending.comms import Notification  # noqa: F401
+```
+
+to:
+
+```python
+        from app.models.billing import Charge               # noqa: F401 -- resolves the annotation
+        from app.models._pending.comms import Notification  # noqa: F401
+```
+
+Then update the two comments that explain why the subprocess exists — at line ~36 and in the `_pending_signature` docstring — so they name only W5:
+
+```python
+#: The two W4/W5 seams. `create_charge -> Charge` resolves in-process since W4's contract
+#: commit promoted the model; `enqueue -> Notification` still names `app/models/_pending/`,
+#: which is why the subprocess below survives. Named once so the day W5 moves `comms.py`
+#: up, the greps land here and this helper can be deleted.
+```
+
+and in the docstring, replace *"Two seams name models that live in `app/models/_pending/` until W4 and W5 migrate them"* with:
+
+```
+    One seam still names a model in `app/models/_pending/`: `NotificationService.enqueue ->
+    Notification`, until W5's contract commit migrates it. `create_charge -> Charge` was in
+    the same position until W4 promoted `billing.py`, and is resolved here purely because
+    both seams share this helper. Importing `comms` **anywhere in this process** registers
+    `notification` in `Base.metadata` with nothing behind it -- and `DemoStudioService.wipe_plan`
+    derives the reset's wipe from that metadata, so it would then issue `DELETE FROM
+    notification` against a database holding no such relation, in whichever unrelated test
+    happened to run after this module. An order-dependent failure three suites away is the
+    worst possible way to pay for an import.
+```
+
+- [ ] **Step 5: Update the staging package's own ledger**
+
+In `app/models/_pending/__init__.py`:
+
+Mark W4 done in the promotion table:
+
+```
+    W3  _pending/attendance.py  _pending/health.py   -> 0007   DONE 2026-08-26
+    W4  _pending/billing.py  _pending/events.py  _pending/belts.py  -> 0008   DONE 2026-08-26
+    W5  _pending/comms.py  _pending/reports.py  -> 0009
+```
+
+Correct "these nine files" to "these files" (three have left), and replace the closing paragraph so it names only the surviving offender:
+
+```
+Nothing outside this package may import from it. One service seam still does —
+`app/services/comms/__init__.py` — and it names the pending path explicitly, so the day
+W5 moves the file is the day the import stops lying. `app/services/billing/__init__.py`
+was the other, until W4's contract commit promoted `billing.py`.
+```
+
+Also correct the sentence claiming W4 and W5 have no split — W4 is now settled fact:
+
+```
+W3 is the wave that showed what "move it up" actually means, and it was not a move both
+times. `_pending/attendance.py` became `app/models/attendance.py` whole; `_pending/health.py`
+was **appended** into the `app/models/health.py` M1 had already created, because
+`health_form_template` shipped in revision `0005` as conflict C3's resolution. Moving that
+file over the existing one would have deleted the template and broken M3's trial-booking
+flow. W4's three files were all clean promotions, checked before the move; W5's two are
+expected to be, but the rule to check first stands.
+```
+
+- [ ] **Step 6: Confirm the models import and the FKs now resolve**
+
+Run: `.venv/bin/python -c "import app.models; from app.models.base import Base; print(len(Base.metadata.tables), 'tables')"`
+Expected: prints a table count, no `NoReferencedTableError`. If it still cannot find `belt_rank`, the move did not land.
+
+- [ ] **Step 7: Run the promoted contract test**
+
+Run: `.venv/bin/pytest tests/contracts/test_w4_models.py -q 2>&1 | tail -20`
+Expected: **all** tests PASS, including Task 2's two new ones. This is the moment Task 2's red turns green.
+
+- [ ] **Step 8: Run the seam tests**
+
+Run: `.venv/bin/pytest tests/contracts/test_seams.py -q 2>&1 | tail -20`
+Expected: PASS. If `test_create_charge_returns_the_model` fails on `endswith("billing.Charge'>")`, check the assertion — `app.models.billing.Charge` still ends with `billing.Charge'>`, so it should not need changing.
+
+- [ ] **Step 9: Confirm `alembic check` is now the ONLY thing red**
+
+Run: `.venv/bin/pytest tests/core/test_alembic_baseline.py -q 2>&1 | tail -20`
+Expected: `test_the_migrations_match_the_models` FAILS, reporting seventeen tables and two foreign keys as drift. **This is the correct state and it is Task 4's input.** Do not commit here.
+
+---
+
+## Task 4: Revision `0008`
+
+**Files:**
+- Create: `alembic/versions/0008_w4_billing_events_belts.py` (autogenerated, then renamed)
+
+**Interfaces:**
+- Consumes: `Base.metadata` as of Task 3.
+- Produces: `revision = "0008"`, `down_revision = "0007"`. Task 10's fresh-database check runs it.
+
+> **Hook mechanics, which cost W3 time.** `alembic revision --autogenerate` is allowed — the hook's Bash arm only matches shell constructs that *write*. The generated file is named by **hash**, so both the filename and the `revision: str = ...` string need rewriting to `0008`, and *those* are the operations the user approved. Keep any redirect (`>`, `2>&1`, `| tee`) out of any command that also contains an `alembic/versions/` token, or the Bash arm refuses it for the redirect.
+
+- [ ] **Step 1: Autogenerate**
+
+```bash
+.venv/bin/alembic revision --autogenerate -m "w4 billing events belts"
+```
+
+Note the printed path. Do not pipe this command anywhere.
+
+- [ ] **Step 2: Read the generated body in full**
+
+Read the generated file with the Read tool. Check, against `docs/plan/migrations/w4-draft.py`:
+
+1. **Seventeen `op.create_table` calls**, and their names match `TABLES` in the draft exactly.
+2. **Every money column is `sa.Integer()`.** Grep the body for `Numeric` — expected: no match. `upay_ipn_record.amount` is `sa.String(30)` and that is correct (it is uPay's inbound rendering kept verbatim as evidence; invariant 1 exempts it by qualified name).
+3. **Two `op.create_foreign_key` ALTERs** for `student.current_belt_id` and `student.price_plan_id`, *outside* any `create_table` — these are the deferred pair, and they must be ALTERs because `student` already exists from `0005`.
+4. **One more `op.create_foreign_key`** named `fk_upay_ipn_record_matched_payment_id` — the `use_alter=True` side of the cycle. Its matching `op.drop_constraint` must appear in `downgrade()`. If the drop is missing, the explicit name was lost and `downgrade()` is broken.
+5. `charge`'s partial unique index is on **`student_id`**, with `postgresql_where` carrying `student_id IS NOT NULL AND period_year IS NOT NULL`.
+
+**Do not hand-tidy the body.** The only edit permitted in this file is Step 3's two identifier rewrites.
+
+- [ ] **Step 3: Rename the file and the revision id**
+
+```bash
+git mv alembic/versions/<generated_hash>_w4_billing_events_belts.py \
+       alembic/versions/0008_w4_billing_events_belts.py
+```
+
+Then, inside the file, set:
+
+```python
+revision: str = "0008"
+down_revision: str | None = "0007"
+```
+
+Match the exact annotation style `0007` uses — copy it rather than inventing one.
+
+- [ ] **Step 4: Confirm there is still exactly one head**
+
+Run: `.venv/bin/alembic heads`
+Expected: `0008 (head)` and nothing else. Two heads means the `down_revision` rewrite did not land.
+
+- [ ] **Step 5: Upgrade the existing (W3) database**
+
+Run: `.venv/bin/alembic upgrade head`
+Expected: clean. This is the draft's `VERIFY` item 2 — the two deferred ALTERs run against a `student` table that already holds rows.
+
+- [ ] **Step 6: Confirm the drift is gone**
+
+Run: `.venv/bin/pytest tests/core/test_alembic_baseline.py -q`
+Expected: PASS.
+
+- [ ] **Step 7: Commit Tasks 2, 3 and 4 as one change**
+
+```bash
+git add -A app/models app/services/billing tests/contracts alembic/versions
+git commit -m "feat(w4): revision 0008 — the ledger, events and belts
+
+Promotes app/models/_pending/{billing,events,belts}.py into app/models/, where
+pkgutil discovery registers seventeen tables, and autogenerates the one revision
+for the wave. The three files moved whole; unlike W3's health.py there was no
+existing module to append to, checked before the move.
+
+Adds the two foreign keys W2 deferred, both on `student`: current_belt_id ->
+belt_rank.id ON DELETE SET NULL, and price_plan_id -> price_plan.id ON DELETE
+RESTRICT. They are on the model columns, so autogenerate emitted the ALTERs
+itself -- hand-writing them would leave test_the_migrations_match_the_models red
+forever on a schema that is actually correct. The asymmetry is deliberate: a
+studio may reorganise its belt ladder, but a student silently losing their price
+is a family nobody bills.
+
+This is the wave where invariant 1 stops being vacuous."
+```
+
+---
+
+## Task 5: `lane-check.sh` reaches what each W4 lane owns
+
+**Files:**
+- Modify: `scripts/lane-check.sh` — new `billing)`, `events)` and `belts)` case branches, and the header comment
+
+**Interfaces:**
+- Consumes: nothing from earlier tasks.
+- Produces: nothing importable.
+
+> **The gap.** The default branch resolves `app/services/$V`, `app/routers/$V.py`, `app/models/$V.py`. For `billing` there is **no `app/routers/billing.py` at all**, so the router slot resolves nothing and the gate reports a green it never earned — while the IPN endpoint, the parent pay flow, the monthly worker and every line that talks to uPay go unchecked. §12 makes `app/routers/webhooks.py` the highest-stakes surface in the product precisely because the IPN carries no cryptographic signature.
+>
+> **A path that does not exist yet is filtered out** by the `[ -e "$candidate" ]` loop, so today's `--dry-run` will name only what exists. That is the same position W3's health branch was in when it was written, and it is why the branch is authored now: the day lane MONEY creates `app/routers/webhooks.py`, the gate reaches it without anyone remembering to add it.
+
+- [ ] **Step 1: Add the `billing)` branch**
+
+In `scripts/lane-check.sh`, insert before the `*)` default case:
+
+```bash
+  billing)
+    # There is no app/routers/billing.py, so the default branch's `app/routers/$V.py`
+    # resolves NOTHING and every gate below it would report a green it never earned. SPEC
+    # §7 spreads M6 over routers named for their endpoints, and two of the four paths that
+    # matter most here are not routers at all:
+    #
+    #   webhooks.py   the IPN endpoint. §12: the IPN carries no cryptographic signature,
+    #                 which makes this the highest-stakes file in the product. A silently
+    #                 green gate must never cover it.
+    #   payments.py   the parent-facing pay flow.
+    #   workers/      the monthly run -- invariant 5's subject. Same reasoning as `people`'s
+    #                 followups.py and `health`'s health_reminders.py: a job outside every
+    #                 lane's check is a job nothing type-checks.
+    #   integrations/ every line that talks to uPay.
+    #
+    # app/routers/billing.py is listed anyway: the plan gives it to this lane, it does not
+    # exist yet, and the -e filter below drops it until it does.
+    py_candidates=("app/services/$V" "app/routers/billing.py" "app/routers/payments.py" \
+                   "app/routers/webhooks.py" "app/workers/billing.py" \
+                   "app/integrations/upay" "app/models/$V.py")
+    test_candidates=("tests/$V" tests/upay)
+    ;;
+```
+
+`app/integrations/upay` is the directory rather than a glob: `-e` tests it directly, mypy and ruff both recurse into it, and bash 3.2 has no globstar to expand `**` with.
+
+`tests/upay` is here because `tests/upay/test_callback.py` already exists and tests `app/integrations/upay/callback.py`. A test directory covering this lane's code, reached by no lane's check, is the same silent gap in the other direction.
+
+- [ ] **Step 2: Add the `events)` and `belts)` branches**
+
+Insert after the `billing)` branch:
+
+```bash
+  events|belts)
+    # The default branch happens to be correct for both of these -- app/services/events,
+    # app/routers/events.py, app/models/events.py, and the same four for belts. They are
+    # written out anyway, for the reason `health` writes out core_dirs=(): what a lane's
+    # gate covers should be a statement, not an accident of a default that would silently
+    # change if the default changed.
+    #
+    # Lane EVENTS owns BOTH verticals and runs both checks (`lane-check.sh events &&
+    # lane-check.sh belts`), so neither branch claims the other's paths.
+    py_candidates=("app/services/$V" "app/routers/$V.py" "app/models/$V.py")
+    test_candidates=("tests/$V")
+    # `belts` has no i18n namespace and this is deliberate (W4 contract, D-B): belt strings
+    # live in events.ts, because seam 3 exists to stop two LANES colliding on one file and
+    # these two verticals are one lane. The i18n gate below therefore falls to its
+    # "checking all nine" arm for `belts`, which is strictly stronger than checking one.
+    core_dirs=()
+    ;;
+```
+
+- [ ] **Step 3: Confirm the header comment still tells the truth**
+
+The header says *"`belts`, `privacy` and `core` are verticals with no i18n namespace"*. Under D-B that stays correct — no edit needed. Confirm it reads that way and leave it.
+
+- [ ] **Step 4: Dry-run all three and read the output**
+
+```bash
+./scripts/lane-check.sh billing --dry-run
+./scripts/lane-check.sh events --dry-run
+./scripts/lane-check.sh belts --dry-run
+```
+
+Expected for `billing`: the `types` and `lint` gates name `app/services/billing`, `app/integrations/upay` and `app/models/billing.py`; the `backend` gate names `tests/billing` and `tests/upay`. `app/routers/{billing,payments,webhooks}.py` and `app/workers/billing.py` will be **absent** — they do not exist yet and the `-e` filter drops them. That is expected; record it rather than treating it as a failure.
+
+Expected for `events` and `belts`: `app/models/{events,belts}.py` and `tests/{events,belts}` (which Task 7 creates — run this again after Task 7). The i18n gate prints `· belts has no namespace of its own — checking all nine`.
+
+Each of the three must end `✅ lane <v> green (N scoped gates)` with N ≥ 1, never the `❌ every vertical-scoped gate was skipped` line.
+
+- [ ] **Step 5: Confirm the script is still bash 3.2 clean**
+
+Run: `/bin/bash -n scripts/lane-check.sh && echo "parses"`
+Expected: `parses`. macOS `/bin/bash` is 3.2 — no globstar, no `mapfile`, no `${arr[@]}` on an empty array without the `+` idiom.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add scripts/lane-check.sh
+git commit -m "feat(w4): lane-check reaches what MONEY, EVENTS and BELTS own
+
+There is no app/routers/billing.py, so the default branch resolved nothing for
+this lane and every gate below it would have reported a green it never earned --
+over the IPN endpoint, which §12 makes the highest-stakes file in the product
+precisely because the IPN carries no signature. The branch names webhooks.py,
+payments.py, workers/billing.py and integrations/upay explicitly, plus tests/upay,
+which already covers this lane's code and belonged to no lane's check.
+
+events and belts get branches whose contents match the old default, so that what
+they cover is a statement rather than an accident, and belts records why it owns
+no i18n namespace."
+```
+
+---
+
+## Task 6: The three lane conftests
+
+**Files:**
+- Create: `tests/billing/__init__.py`, `tests/billing/conftest.py`
+- Create: `tests/events/__init__.py`, `tests/events/conftest.py`
+- Create: `tests/belts/__init__.py`, `tests/belts/conftest.py`
+
+**Interfaces:**
+- Consumes: `tests/conftest.py`'s `app_session`, `client`, `fake_provider`, `sign_in`; `app.models.billing.{PricePlan, Charge}`, `app.models.events.Event`, `app.models.belts.BeltRank` from Task 3.
+- Produces, for the lanes to build on:
+  - `tests/billing`: `Caller` (`.token`, `.studio_id`, `.person_id`, `.headers`), `studio`, `as_manager`, `as_owner`, `as_assistant_coach`, `as_guardian`, `a_price_plan -> uuid.UUID`, `a_priced_student -> PricedStudent(student_id, person_id, payer_person_id)`, `an_open_charge -> uuid.UUID`, `tenant_session`.
+  - `tests/events`: the same caller set, plus `a_class`, `a_group`, `an_event -> uuid.UUID`, `a_registered_student -> uuid.UUID`.
+  - `tests/belts`: the same caller set, plus `a_class`, `a_belt_ladder -> list[uuid.UUID]` (three ranks in order), `a_student -> uuid.UUID`.
+
+> **Follow `tests/attendance/conftest.py` and `tests/health/conftest.py` exactly** — they were written for this purpose and they encode three things that are not obvious:
+> 1. **Every fixture signs in for real** rather than forging a token. §3.2's matrix is enforced by a dependency reading `request.state.roles`, which `app/core/auth_context.py` fills from a *verified* claim; a hand-made token tests the dependency against an input the product cannot produce.
+> 2. **Two sign-ins per caller.** The first creates the `auth_identity` (nothing else can), the rows are attached to it, and the second picks up a token whose `sid` and `roles` claims reflect them.
+> 3. **`X-Dev-Now` on every caller.** For billing this matters more than it did for attendance: §5.10's run is keyed on `(period_year, period_month)` and proration reads a date, so a test that lets the server use wall-clock time passes in November and fails in December.
+
+- [ ] **Step 1: Read the two existing conftests end to end**
+
+Read `tests/attendance/conftest.py` (322 lines) and `tests/health/conftest.py` (281 lines) in full before writing anything. Copy the `Caller` dataclass, the `studio` fixture, `_make_caller`, and the `tenant_session` fixture rather than reinventing them — the goal is that a lane moving between `tests/attendance/` and `tests/billing/` finds the same names.
+
+- [ ] **Step 2: Write `tests/billing/conftest.py`**
+
+Pin the clock inside a billable month and give it a module docstring stating why:
+
+```python
+#: Mid-November 2026 -- inside the 2026/27 training year that tests/schedule/conftest.py
+#: pins, and deliberately NOT the 1st: §5.10's proration is computed from materialized
+#: sessions remaining in the period, so a run dated to the first of the month prorates
+#: nothing and would let a broken proration pass.
+T0 = datetime(2026, 11, 12, 9, 0, tzinfo=UTC)
+TODAY = date(2026, 11, 12)
+PERIOD = (2026, 11)
+```
+
+Fixtures, each committing through `app_session` the way `tests/health/conftest.py` does:
+
+- `a_price_plan` — `PricePlan(sessions_per_week=2, monthly_amount_agorot=25000, registration_fee_agorot=10000, active_from=date(2026, 9, 1), active_to=None)`. Money in agorot: ₪250.00 is `25000`, and writing `250` here is exactly the bug G2 exists to catch.
+- `a_priced_student` — a `Person` (the child), a `Student` with `price_plan_id` set to `a_price_plan` and `status="active"`, plus a guardian `Person` with `is_primary=True`. Returns a dataclass carrying `student_id`, `person_id` and `payer_person_id`, because §4.3 captures the payer on the charge at creation and a lane needs all three ids to assert that.
+- `an_open_charge` — one `Charge(kind="tuition", period_year=2026, period_month=11, amount_agorot=25000, status="open", created_by="billing_run")` for `a_priced_student`, inserted directly rather than through `BillingService`. The service raises `NotImplementedError` until M6 fills it in; what this lane needs is a charge id it can predict, the same reasoning `tests/attendance/conftest.py` gives for inserting a session row rather than calling `ScheduleService.materialize_sessions`.
+- `as_guardian` — wired to `a_priced_student`'s guardian person, not a detached one. Every parent-facing billing screen (`1b`, `12e`, `12f`) reads a real balance.
+
+- [ ] **Step 3: Write `tests/events/conftest.py`**
+
+Same caller machinery. `T0 = datetime(2026, 11, 12, 9, 0, tzinfo=UTC)` — the same instant as billing's, so an event fee raised in one lane's test and a charge period in the other's mean the same month.
+
+- `a_class`, `a_group` — copied from `tests/attendance/conftest.py`.
+- `an_event` — `Event(type="competition", title="אליפות החורף", starts_at=T0 + timedelta(days=14), ends_at=T0 + timedelta(days=14, hours=6), fee_agorot=8000, requires_consent=True, consent_text="אני מאשר/ת את השתתפות בני/בתי", status="published")`. **`consent_text` must be non-null whenever `requires_consent` is true** — the `event_consent_has_text` CHECK rejects the row otherwise, and a fixture that trips a CHECK is a fixture every test in the lane fails on.
+- `a_registered_student` — an `EventRegistration` with `rsvp="pending"` and `charge_id=None`. Null on purpose: §5.12's fee is created by `BillingService.create_charge(kind='event')`, which this lane never calls directly, so a fixture that pre-filled it would model a flow the lane is forbidden to perform.
+
+- [ ] **Step 4: Write `tests/belts/conftest.py`**
+
+- `a_class` — belt ranks are ordered *within a class* (§5.9), so a rank with no class is not a thing the schema allows.
+- `a_belt_ladder` — three `BeltRank` rows on one class at `order_index` 0, 1, 2: `לבנה` `#FFFFFF`, `צהובה` `#F7E017`, and a bi-colour `צהובה-כתומה` with `secondary_color_hex="#F08A24"`. Returns their ids in order. Include the bi-colour rank in the *default* fixture rather than a separate one: artboard `5b` requires it, and a lane whose default ladder is solid-only will build a `BeltBar` that renders one colour.
+- `a_student` — a student with `current_belt_id=None`, so the "no belt recorded" branch is the default state a test starts from.
+
+- [ ] **Step 5: Prove each conftest actually builds its rows**
+
+Write one throwaway smoke test per directory (delete before commit, or keep — see Step 6):
+
+```python
+def test_the_fixtures_build(a_priced_student, an_open_charge, as_manager):
+    assert an_open_charge is not None
+```
+
+Run: `.venv/bin/pytest tests/billing tests/events tests/belts -q 2>&1 | tail -20`
+Expected: PASS. A conftest that has never been exercised is a conftest that trips a CHECK constraint on the lane's first morning.
+
+- [ ] **Step 6: Keep the smoke tests, named for what they guarantee**
+
+Rather than deleting them, rename each to state the contract — `test_the_lane_fixtures_build_against_the_real_schema` — and keep it. It costs one test per lane and it is the only thing standing between a CHECK-constraint typo and three lanes losing a morning. Add a one-line docstring saying so.
+
+- [ ] **Step 7: Re-run the events/belts dry-runs now that the test dirs exist**
+
+Run: `./scripts/lane-check.sh events --dry-run` and `./scripts/lane-check.sh belts --dry-run`
+Expected: the `backend` gate now names `tests/events` and `tests/belts`, and the scoped-gate count has gone up by one for each.
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add tests/billing tests/events tests/belts
+git commit -m "test(w4): the fixtures each W4 lane starts from (§2.2 item 8)
+
+Callers that sign in for real, because §3.2's matrix is enforced by a dependency
+reading a VERIFIED claim and a forged token tests it against an input the product
+cannot produce. X-Dev-Now on every caller: §5.10 keys the run on (year, month)
+and prorates from a date, so a test on the wall clock passes in November and
+fails in December.
+
+The clock is the 12th, not the 1st, deliberately -- a run dated to the first
+prorates nothing and would let a broken proration pass. The events fixture pairs
+requires_consent with consent_text because the CHECK rejects the row otherwise,
+and the belt ladder is bi-colour by default because artboard 5b needs it and a
+solid-only default produces a BeltBar that renders one colour.
+
+Each directory keeps one test that builds every fixture, which is the only thing
+between a CHECK-constraint typo and three lanes losing a morning."
+```
+
+---
+
+## Task 7: `tests/contracts/test_w4_schemas.py`
+
+**Files:**
+- Create: `tests/contracts/test_w4_schemas.py`
+
+**Interfaces:**
+- Consumes: `app.schemas.billing.{ChargeOut, ChargeKind, ManualChargeIn, PaymentOrderOut, UpayIpnRecordOut, PayerFingerprintOut, RecurringSubscriptionOut, PaymentMethod, PaymentOrderStatus}`, `app.schemas.events.{EventOut, EventRegistrationOut, EventCreateIn}`, `app.schemas.belts.{BeltRankOut, StudentBeltOut}`.
+- Produces: nothing importable.
+
+> W2, W3 and W5 each have a `test_w<n>_schemas.py`; W4 does not. Follow `tests/contracts/test_w3_schemas.py`'s shape — it asserts the *seam* first, then the constraints §4.3 states in prose that Pydantic can actually enforce. Assert behaviour, not field inventories: `assert "status" in ChargeOut.model_fields` restates the source file, while constructing a `ChargeOut` and proving `status` cannot be sent in tests the rule.
+
+- [ ] **Step 1: Write the tests**
+
+Create `tests/contracts/test_w4_schemas.py` with a docstring explaining that this is the schema half of W4's contract, and these tests:
+
+```python
+# -- the seam ------------------------------------------------------------------
+def test_charge_kind_is_the_union_the_seam_takes():
+    """`BillingService.create_charge(kind=...)` is typed `ChargeKind`, and M7 passes
+    `'event'` through it. A `str` here would make M7's typo a check-constraint violation
+    at runtime in the billing worker instead of a red build in the calling lane."""
+    assert set(get_args(ChargeKind)) == {"tuition", "registration", "event", "manual"}
+
+
+def test_a_manual_charge_cannot_be_tuition():
+    """§5.10 -- a hand-made tuition charge is how a month ends up billed twice. The
+    monthly run is the only thing that may create `kind='tuition'`."""
+    with pytest.raises(ValidationError):
+        ManualChargeIn(payer_person_id=uuid.uuid4(), kind="tuition",
+                       amount_agorot=1000, due_date=date(2026, 11, 30))
+
+
+# -- G2 / invariant 1 ----------------------------------------------------------
+@pytest.mark.parametrize("model", [ChargeOut, PricePlanOut, ProductOut, PaymentOut,
+                                   PaymentAllocationOut, PaymentOrderOut, EventOut])
+def test_every_money_field_is_an_int_and_says_agorot(model):
+    """The annotation is the last place G2 is stated before a value reaches a caller who
+    cannot see the column. A `float` round-trips most prices and loses an agora on the
+    ones that matter."""
+    for name, field in model.model_fields.items():
+        if name.endswith("_agorot"):
+            assert _accepts_only_int(field), f"{model.__name__}.{name} is not an int"
+        else:
+            assert not _looks_like_money(name), (
+                f"{model.__name__}.{name} looks like money but does not say _agorot")
+
+
+def test_a_money_field_rejects_a_float():
+    """Pydantic coerces 250.0 to 250 in lax mode and would silently accept 250.5 as 250
+    in some configurations. The assertion is that it does not round money."""
+    with pytest.raises(ValidationError):
+        ProductOut(id=uuid.uuid4(), name="חגורה", description=None,
+                   price_agorot=8000.5, is_active=True)
+
+
+# -- charges are never mutated to record payment (§4.3) ------------------------
+def test_no_input_shape_can_set_a_charge_status():
+    """`charge.status` is a derived cache with exactly one writer,
+    `recompute_charge_status`. A shape that let a caller write it would give the cache a
+    second writer, and a second writer is how a family's balance starts disagreeing with
+    the receipts they were sent."""
+    for name, model in vars(app.schemas.billing).items():
+        if not (isinstance(model, type) and issubclass(model, BaseModel)):
+            continue
+        if not name.endswith("In"):
+            continue
+        assert "status" not in model.model_fields, f"{name} can write a charge status"
+
+
+def test_a_charge_carries_what_is_allocated_to_it():
+    """§4.3 settles a charge by summing its `payment_allocation` rows, so a client that
+    rendered `amount_agorot` alone would show a fully-paid charge as outstanding."""
+    charge = ChargeOut(id=uuid.uuid4(), payer_person_id=uuid.uuid4(), student_id=uuid.uuid4(),
+                       kind="tuition", period_year=2026, period_month=11,
+                       amount_agorot=25000, original_amount_agorot=None, proration_note=None,
+                       due_date=date(2026, 11, 30), status="open", created_by="billing_run")
+    assert charge.allocated_agorot == 0
+
+
+# -- C11 -----------------------------------------------------------------------
+def test_a_charge_names_a_student_and_never_an_enrollment():
+    """C11 -- tuition covers a student for a period, not one of their group memberships.
+    A child in two groups is one charge."""
+    assert "student_id" in ChargeOut.model_fields
+    assert "enrollment_id" not in ChargeOut.model_fields
+
+
+def test_a_price_plan_is_scoped_by_volume_and_never_by_group():
+    assert "sessions_per_week" in PricePlanOut.model_fields
+    assert "group_id" not in PricePlanOut.model_fields
+    assert "class_id" not in PricePlanOut.model_fields
+
+
+# -- §5.10's security requirements ---------------------------------------------
+def test_a_payment_order_is_addressed_by_uuid():
+    """§5.10 -- a sequential id here lets anyone who can count mark any family's tuition
+    paid, because the IPN endpoint has no signature to fall back on."""
+    assert PaymentOrderOut.model_fields["public_ref"].annotation is uuid.UUID
+
+
+def test_amount_mismatch_is_a_status_a_payment_order_can_hold():
+    """Not a failure. The money really arrived in the merchant account; collapsing it
+    into `failed` loses it."""
+    assert "amount_mismatch" in get_args(PaymentOrderStatus)
+
+
+def test_the_ipn_amount_is_kept_as_text():
+    """uPay's inbound rendering, byte-for-byte, as evidence of what actually arrived.
+    Parsing it to an int at the boundary and storing only that loses the evidence -- and
+    the evidence is the whole defence when the endpoint has no signature."""
+    assert UpayIpnRecordOut.model_fields["amount"].annotation is str
+
+
+# -- G8 ------------------------------------------------------------------------
+def test_nothing_here_creates_a_standing_order_mandate():
+    """G8 -- uPay cannot create a הוראת קבע programmatically. A `RecurringSubscriptionIn`
+    would be a mandate creator by another name."""
+    assert not hasattr(app.schemas.billing, "RecurringSubscriptionIn")
+    assert "standing_order" in get_args(PaymentMethod)
+
+
+# -- events / belts ------------------------------------------------------------
+def test_an_event_registration_points_at_a_charge_rather_than_holding_money():
+    """Plan W4 -- the events lane never writes a billing table. An `amount_agorot` here
+    would be a second answer to what the family owes, and the two diverge the first time
+    a manager applies a discount."""
+    assert "charge_id" in EventRegistrationOut.model_fields
+    assert not any(n.endswith("_agorot") for n in EventRegistrationOut.model_fields)
+
+
+def test_an_event_that_requires_consent_must_carry_the_text():
+    """§5.8 -- otherwise the parent is asked to agree to nothing. The model has the same
+    rule as a CHECK; the schema catches it before the round trip."""
+    with pytest.raises(ValidationError):
+        EventCreateIn(type="competition", title="אליפות", starts_at=..., ends_at=...,
+                      requires_consent=True, consent_text=None)
+
+
+def test_no_event_shape_carries_a_weight_category():
+    """D9.2 -- artboard 7c's `משקל / קטגוריה` column is cut. §2.2 defers weight
+    categories to v2 and they imply `student` fields §4.3 does not carry."""
+    for model in (EventOut, EventCreateIn, EventRegistrationOut):
+        assert not any("weight" in n for n in model.model_fields)
+
+
+def test_a_belt_rank_carries_a_second_colour_for_a_bi_colour_grade():
+    """Artboard 5b -- 'מערכת חגורות, כולל חגורות דו-צבעיות'. Without a field for it M7
+    would invent its own storage or its own bar, and a second bar is how the fill-only
+    bug D7 exists to prevent comes back."""
+    assert "secondary_color_hex" in BeltRankOut.model_fields
+    assert BeltRankOut.model_fields["secondary_color_hex"].default is None
+```
+
+- [ ] **Step 2: Run and expect some to fail**
+
+Run: `.venv/bin/pytest tests/contracts/test_w4_schemas.py -q 2>&1 | tail -30`
+
+Several will fail on details of the existing schemas — a missing validator on `EventCreateIn`'s consent pairing, a `PaymentOrderOut.public_ref` typed differently than assumed, a helper (`_accepts_only_int`, `_looks_like_money`) not yet written. **Read each failure before changing anything, and decide per failure which side is wrong.** A test asserting a rule §4.3 states and the schema does not enforce is a real gap: fix the *schema*. A test asserting something the schema deliberately does differently is the test being wrong: fix the test and say why in its docstring.
+
+Write the two helpers at the top of the file:
+
+```python
+def _looks_like_money(name: str) -> bool:
+    """Mirrors invariant 1's token rule -- a money word counts when a `_`-separated token
+    ENDS with it. Duplicated rather than imported so this file does not depend on a test
+    module, and kept in sync deliberately: the rule is short and the coupling would be
+    worse than the duplication."""
+    return name != "public_ref" and any(
+        re.search(r"(amount|price|fee|balance|total|sum|cost)$", token, re.I)
+        for token in name.split("_")
+    ) and not name.endswith("_id")
+```
+
+- [ ] **Step 3: Iterate until green**
+
+Run: `.venv/bin/pytest tests/contracts/test_w4_schemas.py -q`
+Expected: PASS. Record in the commit message any place where the schema was changed rather than the test.
+
+- [ ] **Step 4: Run the whole contracts directory**
+
+Run: `.venv/bin/pytest tests/contracts -q 2>&1 | tail -20`
+Expected: PASS, including `test_w4_models.py` and `test_seams.py`.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add tests/contracts/test_w4_schemas.py app/schemas
+git commit -m "test(w4): the schema half of the contract
+
+W2, W3 and W5 each had one and W4 did not. Asserts the seam's ChargeKind union,
+G2 on every money field of every W4 shape, that no *In shape can write the
+derived charge status, C11's student-not-enrollment key, §5.10's UUID order ref
+and text-preserved IPN amount, G8's absent mandate creator, and D9.2's cut
+weight category."
+```
+
+---
+
+## Task 8: Regenerate the API client
+
+**Files:**
+- Modify: `openapi.json`, `web/packages/api-client/src/schema.d.ts`
+
+**Interfaces:**
+- Consumes: the app's mounted routes as of Task 4. W4 adds **models**, not routes — the lanes add routers — so the diff may well be empty.
+
+- [ ] **Step 1: Regenerate**
+
+```bash
+cd web && npm run generate:api-client
+```
+
+- [ ] **Step 2: Look at the diff**
+
+Run: `git diff --stat openapi.json web/packages/api-client/src/schema.d.ts`
+
+An empty diff is the expected and correct outcome: this commit mounted no new router. If there **is** a diff, read it — it means something in `app/schemas/` changed shape during Task 7, and that is worth a sentence in the commit message.
+
+- [ ] **Step 3: Lint the generated output only if it changed**
+
+If `schema.d.ts` changed, run `cd web && npx eslint packages/api-client/src/schema.d.ts` — eslint now enforces single quotes and no semicolons (W3 learned this the expensive way), and generated output is not exempt. If the generator's style fights the config, add the file to the eslint ignore list rather than hand-editing generated output.
+
+- [ ] **Step 4: Commit, or record that there was nothing to commit**
+
+```bash
+git add openapi.json web/packages/api-client/src/schema.d.ts
+git commit -m "chore(w4): regenerate the API client"
+```
+
+If the diff was empty, skip the commit and note it — the exit gate asks that `generate:api-client` leaves **no uncommitted diff**, which an empty diff satisfies.
+
+---
+
+## Task 9: The exit gate
+
+No new files. This task is the gate the contract states, run in full, with the result written down.
+
+- [ ] **Step 1: Fresh database — where the FK cycle bites**
+
+```bash
+./scripts/dev-db.sh psql -c 'CREATE DATABASE studio_manager_fresh OWNER studio_migrator'
+DATABASE_URL=<the fresh url> .venv/bin/alembic upgrade head
+```
+
+Expected: clean through `0008`. This is the check that catches a regression in the `payment` ↔ `upay_ipn_record` cycle — **a run against the existing database will not**, because both tables already exist there. Without `use_alter=True` SQLAlchemy drops both constraints from its topological sort and emits `CREATE TABLE`s Postgres rejects.
+
+Then confirm `downgrade()` works, which is the half the explicit constraint name exists for:
+
+```bash
+DATABASE_URL=<the fresh url> .venv/bin/alembic downgrade 0007
+DATABASE_URL=<the fresh url> .venv/bin/alembic upgrade head
+```
+
+Drop the scratch database afterwards. **Do not run `./scripts/dev-db.sh reset`** — it drops the shared volume.
+
+- [ ] **Step 2: W3's database**
+
+Run: `.venv/bin/alembic upgrade head` (already done in Task 4 Step 5; re-run to confirm it is a no-op at head).
+Expected: no pending revisions.
+
+- [ ] **Step 3: The full suite**
+
+Run: `.venv/bin/pytest -q 2>&1 | tail -30`
+Expected: green, `tests/invariants` and `tests/restrictions` included.
+
+Check specifically that **invariant 1 is no longer vacuous** — it must now be asserting against seventeen tables of real columns rather than finding nothing:
+
+```bash
+.venv/bin/pytest tests/invariants/test_01_money_is_never_a_float.py -q
+.venv/bin/python -c "
+import app.models
+from app.models.base import Base
+money = [f'{t.name}.{c.name}' for t in Base.metadata.tables.values() for c in t.columns if c.name.endswith('_agorot')]
+print(len(money), 'money columns:', sorted(money))
+"
+```
+
+Expected: a non-empty list. If it is empty, the promotion did not land and invariant 1 is still checking nothing.
+
+Invariant 5 stays **skipped** and that is correct: `test_the_seam_detector_recognises_the_contract_stub` must pass (proving the seam landed), while `test_the_billing_run_is_idempotent` skips because `create_charge` is still `NotImplementedError`. M6 fills it in. A *failure* rather than a skip there means the seam body changed.
+
+- [ ] **Step 4: Typecheck and lint**
+
+```bash
+npm run typecheck && .venv/bin/mypy app
+.venv/bin/ruff check --fix app && .venv/bin/ruff format app && npm run lint
+```
+
+- [ ] **Step 5: The three dry-runs**
+
+```bash
+./scripts/lane-check.sh billing --dry-run
+./scripts/lane-check.sh events --dry-run
+./scripts/lane-check.sh belts --dry-run
+```
+
+Each must end green with N ≥ 1 scoped gates. Record which owned paths are named and which are absent-because-not-yet-created (Task 5 Step 4 lists the expected absences).
+
+- [ ] **Step 6: Tick `docs/plan/state.yaml`**
+
+Find W4's contract-commit piece and tick it. **Write nothing measurable** — no test counts, no branch names, no environment health. Those are computed, and a declaration that contradicts a measurement is how a status board stops being trusted.
+
+- [ ] **Step 7: Commit and push**
+
+```bash
+git add docs/plan/state.yaml
+git commit -m "docs(plan): tick W4's contract commit"
+git push origin main
+```
+
+- [ ] **Step 8: Only now, the two worktrees**
+
+Do not run this until every check above has passed.
+
+```bash
+git worktree add ../studio-manager-money  -b lane/money  main
+git worktree add ../studio-manager-events -b lane/events main
+```
+
+Then, per worktree — all four of these were learned the expensive way in W3:
+
+1. **`git worktree add` copies no untracked file, and there is no `.worktreeinclude` in this repo.** Each worktree starts with no `.env` and therefore falls back to the **shared** database — worse than a stale copy, because both lanes then tread on each other. Write a `.env` in each pointing at its own database.
+2. **One Postgres container, two more databases:**
+   ```bash
+   ./scripts/dev-db.sh psql -c 'CREATE DATABASE studio_manager_money  OWNER studio_migrator'
+   ./scripts/dev-db.sh psql -c 'CREATE DATABASE studio_manager_events OWNER studio_migrator'
+   ```
+   then `alembic upgrade head` into each. Roles are cluster-wide from `0001`.
+3. **Never run `./scripts/dev-db.sh reset` once a lane is working.** It drops the shared Docker volume and destroys both lane databases mid-run. W3's managing session did this and cost both lanes time.
+4. **`python3` is a pyenv 3.8 on this machine**, so the documented `python3 -m venv` produces an unusable venv. Use the explicit 3.14 path.
+
+---
+
+## Open decisions W3 handed forward
+
+The contract asks that these be settled here or that the reason not to be recorded. Recommendation for each, to be confirmed rather than assumed:
+
+| # | Item | Recommendation |
+|---|---|---|
+| 1 | `TextField` has no multiline mode; four artboards want one | **Add it in this commit.** It is a primitive, primitives are not a lane's to add, and both W4 lanes hit it (`consent_text`, `proration_note`, belt `note`). Deferring means two lanes each build a local textarea. |
+| 2 | `AlertTone` has no green that is not `paid` | **Raise D13, do not add it quietly.** It is a token-layer decision in D12's territory and the reconciliation queue (`5e`) is the first screen that needs a non-money success tone. |
+| 3 | `SignaturePad` → `web/packages/ui/src/primitives/` | **Move it here.** Same argument as 1: two artboards draw it, and it currently sits in a parent feature directory only because primitives are not a lane's to add. |
+| 4 | `app/services/attendance/schemas.py` holds `BatchResult`/`AttendanceConflictOut` | **Leave it.** No OpenAPI effect, and moving it is churn in a file W4 has no other reason to touch. |
+| 5 | `4c`'s at-risk sidebar — M5 or W5? | **W5.** Every string already lives in the `reports` namespace, which is the argument the contract itself makes. |
+
+Items 1 and 3 are frontend primitives and touch no file this plan otherwise modifies; if taken, they are a separate commit between Tasks 7 and 8.
+
+---
+
+## Self-review
+
+**Spec coverage** — the contract's eight deliverables map as: revision `0008` → Task 4; `lane-check.sh` branches → Task 5; three conftests → Task 6; `test_w4_schemas.py` + `test_w4_models.py` promotion → Tasks 7 and 3; namespace decision → D-B, applied in Task 1 Step 4 and Task 5 Step 2; `w4-draft.py` correction → Task 1; API client → Task 8; worktrees → Task 9 Step 8. The five findings the contract lists are covered at Task 5 (1), Task 1 (2), D-B (3), Task 2 (4), Task 4 Step 2 item 4 (5), Task 7 (6), plus finding 7 at Task 1.
+
+**Placeholder scan** — no TBDs. Task 7 Step 2 deliberately does not predict which assertions fail, because that depends on schema details that must be read rather than guessed; it gives the decision rule instead, which is the honest form.
+
+**Type consistency** — `Caller`, `.headers`, `studio`, `tenant_session` are spelled as `tests/attendance/conftest.py` spells them. `a_priced_student` returns a dataclass with `student_id`/`person_id`/`payer_person_id` and is referenced by those names in Task 6 Step 2 and in `an_open_charge`. `ChargeKind`, `PaymentOrderStatus` and `PaymentMethod` match `app/schemas/billing.py`.
