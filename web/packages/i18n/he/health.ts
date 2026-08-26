@@ -77,6 +77,7 @@ export const health: Bundle = {
 
   // -- the manager view (dashboard 4e) ------------------------------------------
   'documents.title': 'מסמכים והצהרות',
+  'documents.backToList': 'חזרה לרשימת המסמכים',
   'documents.missing': 'חסרות',
   'documents.signed': 'הוגשו',
   'documents.empty': 'כל ההצהרות הוגשו',

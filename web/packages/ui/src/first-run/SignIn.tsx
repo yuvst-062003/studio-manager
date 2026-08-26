@@ -50,7 +50,7 @@ export function SignIn({
   app: 'staff' | 'parent' | 'dashboard'
   returnPath?: string
 }) {
-  const [providers, setProviders] = useState<SignInProvider[]>([])
+  const [providers, setProviders] = useState<SignInProvider[] | null>(null)
 
   useEffect(() => {
     let alive = true
@@ -71,16 +71,33 @@ export function SignIn({
   }, [])
 
   return (
-    <div style={listStyle}>
-      {providers.map((provider) => (
-        <a
-          key={provider.name}
-          style={buttonStyle}
-          href={`${provider.start_url}?app=${app}&return_path=${encodeURIComponent(returnPath)}`}
-        >
-          {t(locale, LABEL[provider.name] ?? 'common.auth.continueWithGoogle')}
-        </a>
-      ))}
+    // The design pass gave this a face: no artboard draws a sign-in (the canvas starts
+    // past it), so the card composes the system — the ink mark, the app's name, one line
+    // of purpose, and the provider buttons. Nothing else: §6.1 step 2 is two buttons.
+    <div className="studio-signin" data-testid="sign-in">
+      <div className="studio-signin__card">
+        <div className="studio-signin__mark" aria-hidden="true" />
+        <h1 className="studio-signin__title">{t(locale, `common.appName.${app}`)}</h1>
+        <p className="studio-signin__tagline">{t(locale, `common.auth.tagline.${app}`)}</p>
+        <div style={listStyle}>
+          {(providers ?? []).map((provider) => (
+            <a
+              key={provider.name}
+              style={buttonStyle}
+              href={`${provider.start_url}?app=${app}&return_path=${encodeURIComponent(returnPath)}`}
+            >
+              {t(locale, LABEL[provider.name] ?? 'common.auth.continueWithGoogle')}
+            </a>
+          ))}
+        </div>
+        {providers !== null && providers.length === 0 ? (
+          // The state every developer machine is in: no OAuth client configured, so the
+          // list is honestly empty. Saying so beats a card with a hole in it — and in
+          // production this renders only if configuration is genuinely broken, which is
+          // exactly when a person at this screen should be told something is wrong.
+          <p className="studio-signin__note">{t(locale, 'common.auth.noProviders')}</p>
+        ) : null}
+      </div>
     </div>
   )
 }

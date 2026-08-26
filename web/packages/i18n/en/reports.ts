@@ -8,6 +8,7 @@ export const reports: Bundle = {
   'period': 'Period',
   'period.thisMonth': 'This month',
   'period.lastMonth': 'Last month',
+  'period.nextMonth': 'Next month',
   'period.last12Months': 'Last 12 months',
   'period.custom': 'Custom range',
   'export': 'Export',
@@ -27,6 +28,9 @@ export const reports: Bundle = {
   // -- financial (§5.14) ------------------------------------------------------------
   'financial.title': 'Financial report',
   'financial.collectedVsExpected': 'Collected vs expected',
+  'financial.notYetDue': 'Not yet due',
+  'financial.studentsBilled': 'Students billed',
+  'financial.collectionRate': 'Collection rate',
   'financial.collected': 'Collected',
   'financial.expected': 'Expected',
   'financial.trend12m': '12-month trend',

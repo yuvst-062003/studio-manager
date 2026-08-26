@@ -52,6 +52,7 @@ export const health: Bundle = {
   'flag.detailsRestricted': 'Полные сведения доступны только руководителю',
 
   'documents.title': 'Документы и декларации',
+  'documents.backToList': 'Назад к списку документов',
   'documents.missing': 'Отсутствуют',
   'documents.signed': 'Поданы',
   'documents.empty': 'Все декларации поданы',

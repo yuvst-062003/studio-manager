@@ -30,6 +30,9 @@ function stubApi(routes: Record<string, unknown>) {
 const SIGNED_IN = {
   '/auth/refresh': { access_token: 'tok', expires_in: 900, ...SESSION },
   '/auth/me': SESSION,
+  // The bare hash now lands on the weekly board (design pass), so the shell tests need
+  // the board's one read to answer rather than reject.
+  '/api/v1/sessions': { items: [] },
 }
 
 beforeEach(() => {
@@ -48,8 +51,15 @@ describe('routeFromHash', () => {
     // §5.15's rollover is one hash and one screen: the wizard's seven steps are its own
     // state, and `resume_at` is the only correct answer to "where was I".
     ['#/rollover', 'rollover'],
-    ['', 'home'],
-    ['#/nothing-here', 'home'],
+    // The design pass retired `home`: 3a/1e draw the weekly board as the manager's
+    // landing, so the bare hash — and any unknown one — resolves to the board rather
+    // than to the "בחרו מסך מהתפריט" page that used to land nowhere.
+    ['', 'schedule'],
+    ['#/nothing-here', 'schedule'],
+    ['#/comms', 'comms'],
+    ['#/documents', 'documents'],
+    ['#/prices', 'prices'],
+    ['#/reports', 'reports'],
   ])('maps %s to %s', (hash, expected) => {
     expect(routeFromHash(hash)).toBe(expected)
   })
@@ -72,13 +82,17 @@ describe('dashboard shell', () => {
   it('renders the studio name in the shell once signed in', async () => {
     stubApi(SIGNED_IN)
     render(<App />)
-    await waitFor(() => expect(screen.getByText('מכבי ג׳ודו רעננה')).toBeInTheDocument())
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'מכבי ג׳ודו רעננה' })).toBeInTheDocument(),
+    )
   })
 
   it('renders no dev bar without a developer identity', async () => {
     stubApi(SIGNED_IN)
     render(<App />)
-    await waitFor(() => expect(screen.getByText('מכבי ג׳ודו רעננה')).toBeInTheDocument())
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'מכבי ג׳ודו רעננה' })).toBeInTheDocument(),
+    )
     expect(screen.queryByTestId('studio-dev-bar')).toBeNull()
   })
 

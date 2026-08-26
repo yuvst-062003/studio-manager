@@ -11,10 +11,12 @@ import { apiFetch, useDisplayMode, useSession } from '@studio/core'
 import {
   AccountDrawerFooter,
   AppShell,
+  Icon,
   InstallWalkthrough,
   LanguagePicker,
   SetupWizard,
   SignIn,
+  TabBar,
   ThemeProvider,
   makeSetupClient,
   registerM1WizardSteps,
@@ -22,6 +24,7 @@ import {
 } from '@studio/ui'
 import { DevBar } from '@studio/ui/dev-bar'
 import type { InstallPromptEvent } from '@studio/ui'
+import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { Resolve } from './features/identity/Resolve'
 import { ScheduleSection } from './features/schedule/ScheduleSection'
@@ -204,6 +207,46 @@ export default function App() {
             studioIsDemo: s.studio_is_demo,
           }))}
           activeStudioId={session.activeStudioId}
+          tabBar={
+            // 9a/1c/1d draw the four-tab bar on every staff screen; עוד opens the same
+            // drawer 9e describes ("אותה מגירה"), through the shell's own control.
+            session.access.staff
+              ? ({ openDrawer }) => (
+                  <TabBar
+                    label={t(locale, 'common.nav.today')}
+                    items={[
+                      {
+                        key: 'schedule',
+                        label: t(locale, 'common.nav.schedule'),
+                        href: '#/schedule',
+                        icon: <Icon name="calendar" size={20} />,
+                        active: hash === '' || hash.startsWith('#/schedule'),
+                      },
+                      {
+                        key: 'students',
+                        label: t(locale, 'common.nav.students'),
+                        href: '#/students',
+                        icon: <Icon name="search" size={20} />,
+                        active: onStudents,
+                      },
+                      {
+                        key: 'events',
+                        label: t(locale, 'events.title'),
+                        href: '#/events',
+                        icon: <Icon name="events" size={20} />,
+                        active: onEvents || examEventId !== null,
+                      },
+                      {
+                        key: 'more',
+                        label: t(locale, 'common.nav.more'),
+                        icon: <Icon name="menu" size={20} />,
+                        onSelect: openDrawer,
+                      },
+                    ]}
+                  />
+                )
+              : undefined
+          }
           devBar={
             // §19.4 — the identity is real now. `devTools` comes from /auth/me, which
             // reads the verified is_developer claim; before M1 every app passed null.

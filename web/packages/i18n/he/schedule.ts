@@ -16,6 +16,7 @@ import type { Bundle } from '../types'
 export const schedule: Bundle = {
   // -- the day / week views (staff 9a, 1d; dashboard 3a) ------------------------
   'today.title': 'היום',
+  'today.openRoster': 'פתיחת נוכחות',
   'today.empty': 'אין שיעורים היום',
   'today.emptyHint': 'ימי פעילות נקבעים בלו״ז השבועי של הקבוצה',
   'today.allCoaches': 'כל המאמנים',

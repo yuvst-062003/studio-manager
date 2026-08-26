@@ -38,9 +38,18 @@ export function Resolve({ session, locale }: { session: Session; locale: Locale 
   // an empty state; a failed read renders the empty state, because a home that dies on a
   // schedule hiccup is worse than one missing a list.
   const [upcoming, setUpcoming] = useState<readonly HomeLesson[] | null>(null)
+  // 1a's debt alert — the same `/me/balance` read `12f` renders in full. Zero on failure:
+  // a home that cannot ask about money shows no alert rather than a broken one.
+  const [debtAgorot, setDebtAgorot] = useState(0)
   useEffect(() => {
     if (!session.access.parent) return
     let live = true
+    void apiFetch('/api/v1/me/balance')
+      .then((response) => (response.ok ? (response.json() as Promise<{ balance_agorot: number }>) : { balance_agorot: 0 }))
+      .then((body) => {
+        if (live) setDebtAgorot(Math.max(0, body.balance_agorot))
+      })
+      .catch(() => {})
     const now = new Date()
     const weekOut = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
     const day = (d: Date) => d.toISOString().slice(0, 10)
@@ -154,6 +163,7 @@ export function Resolve({ session, locale }: { session: Session; locale: Locale 
             : null
       }
       upcoming={upcoming}
+      debtAgorot={debtAgorot}
     />
   )
 }

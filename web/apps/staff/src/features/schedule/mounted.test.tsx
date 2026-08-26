@@ -106,8 +106,11 @@ describe('the staff app mounts lane SCHEDULE', () => {
     render(<App />)
 
     await userEvent.click(await screen.findByRole('button', { name: t('he', 'common.nav.menu') }))
-    const link = await screen.findByRole('link', { name: t('he', 'common.nav.schedule') })
-    expect(link).toHaveAttribute('href', '#/schedule')
+    // Two ways in exist since the design pass — the drawer entry and the tab bar —
+    // and both must point at the same place. The assertion keeps covering both.
+    const links = await screen.findAllByRole('link', { name: t('he', 'common.nav.schedule') })
+    for (const link of links) expect(link).toHaveAttribute('href', '#/schedule')
+    expect(links.length).toBeGreaterThan(0)
   })
 
   it('leaves §6.1 first-run routing alone on every other hash', async () => {

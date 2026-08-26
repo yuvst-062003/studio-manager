@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 
@@ -77,5 +77,23 @@ describe('the §6.1 health gate, mounted in the shell', () => {
     stubChildren('signed')
     render(<App />)
     await waitFor(() => expect(screen.queryByTestId('health-gate')).toBeNull())
+  })
+})
+
+describe('the tab bar, in the shell where 1a draws it', () => {
+  it('renders the four tabs on a signed family and none while the gate holds', async () => {
+    stubChildren('signed')
+    render(<App />)
+    await waitFor(() => expect(screen.getByTestId('tab-bar')).toBeInTheDocument())
+    for (const key of ['home', 'payments', 'messages', 'profile']) {
+      expect(screen.getByTestId(`tab-${key}`)).toBeInTheDocument()
+    }
+    cleanup()
+
+    // "No other screen is reachable" (§6.1) includes the bar that reaches them.
+    stubChildren('missing')
+    render(<App />)
+    await waitFor(() => expect(screen.getByTestId('health-gate')).toBeInTheDocument())
+    expect(screen.queryByTestId('tab-bar')).toBeNull()
   })
 })

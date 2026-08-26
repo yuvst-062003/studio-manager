@@ -13,13 +13,16 @@ import { useEffect, useMemo, useState } from 'react'
 import { apiFetch, useSession } from '@studio/core'
 import {
   AppShell,
+  Icon,
   LanguagePicker,
   SetupWizard,
+  SideNav,
   SignIn,
   ThemeProvider,
   makeSetupClient,
   registerM1WizardSteps,
 } from '@studio/ui'
+import type { SideNavGroup } from '@studio/ui'
 import { DevBar } from '@studio/ui/dev-bar'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
@@ -60,6 +63,15 @@ import { BillingSection } from './features/billing/BillingSection'
 // `4c` נוכחות — what was not marked. Nothing imported AttendanceReport, so §5.14's
 // "unmarked is a real state and is not absence" had no screen in a running app.
 import { AttendanceSection } from './features/attendance/AttendanceSection'
+// The design pass (2026-08-27) mounted the four orphans the canvas draws and the app
+// never routed: 4f announcements, 4e documents, 5a prices — each built and unit-tested
+// in its wave and imported by nothing — plus 4g reports, which never had a screen at
+// all, and 5b's missing index for a bare `#/belts`.
+import { CommsSection } from './features/comms/CommsSection'
+import { DocumentsSection } from './features/health/DocumentsSection'
+import { PricesSection } from './features/billing/PricesSection'
+import { ReportsSection } from './features/reports/ReportsSection'
+import { BeltsIndex } from './features/belts/BeltsIndex'
 
 import { registerBillingAlertSection } from './features/billing/BillingAlertSection'
 
@@ -83,7 +95,11 @@ const NAV = [
   { key: 'students', labelKey: 'people.student.plural', href: '#/students' },
   { key: 'alerts', labelKey: 'people.alerts.title', href: '#/alerts' },
   { key: 'billing', labelKey: 'billing.debt.title', href: '#/billing' },
+  { key: 'prices', labelKey: 'common.dash.nav.prices', href: '#/prices' },
   { key: 'attendance', labelKey: 'common.nav.attendance', href: '#/attendance' },
+  { key: 'comms', labelKey: 'common.nav.announcements', href: '#/comms' },
+  { key: 'documents', labelKey: 'common.dash.nav.documents', href: '#/documents' },
+  { key: 'reports', labelKey: 'common.dash.nav.reports', href: '#/reports' },
   { key: 'events', labelKey: 'events.title', href: '#/events' },
   { key: 'belts', labelKey: 'events.belt.title', href: '#/belts' },
   { key: 'exams', labelKey: 'events.exam.plural', href: '#/exams' },
@@ -93,7 +109,6 @@ const NAV = [
 ]
 
 export type DashboardRoute =
-  | 'home'
   | 'events'
   | 'belts'
   | 'exams'
@@ -106,8 +121,14 @@ export type DashboardRoute =
   | 'billing'
   | 'attendance'
   | 'rollover'
+  | 'comms'
+  | 'documents'
+  | 'prices'
+  | 'reports'
 
-/** Unknown hashes resolve to home rather than to a blank page. */
+/** Unknown hashes — and the empty one — resolve to the weekly board: 3a/1e make the
+ *  board the manager's home, and "בחרו מסך מהתפריט" was a landing page that landed
+ *  nowhere (design pass 2026-08-27). */
 export function routeFromHash(hash: string): DashboardRoute {
   const name = hash.replace(/^#\/?/, '')
   // Each vertical collapses its own family of hashes to ONE route here and decides
@@ -137,7 +158,13 @@ export function routeFromHash(hash: string): DashboardRoute {
   if (name.startsWith('belts')) return 'belts'
   // §5.9's exams: `#/exams` is 6b's roundup, `#/exams/<id>` is 4d's eligibility table.
   if (name.startsWith('exams')) return 'exams'
-  return name === 'staff' || name === 'settings' || name === 'setup' ? name : 'home'
+  // The design pass's four mounts: 4f, 4e, 5a, 4g.
+  if (name === 'comms') return 'comms'
+  if (name === 'documents') return 'documents'
+  if (name === 'prices') return 'prices'
+  if (name === 'reports') return 'reports'
+  if (name === 'staff' || name === 'settings' || name === 'setup') return name
+  return 'schedule'
 }
 
 /** `#/events/<id>` → 7c; `#/events/new` → 7b; bare `#/events` → 7a's roundup. */
@@ -148,6 +175,169 @@ export function eventRouteFrom(hash: string): string {
 /** `#/students/<id>` → the card; `#/students/new` → 3c; bare `#/students` → the table. */
 export function studentRouteFrom(hash: string): string {
   return hash.replace(/^#\/?students\/?/, '')
+}
+
+/** The two numbers DashNav badges: households in debt (red) and unsigned declarations
+ *  (amber). Both are manager reads; a coach's sidebar carries neither group. */
+function useSideNavBadges(enabled: boolean): { debtHouseholds: number; missingDocuments: number } {
+  const [counts, setCounts] = useState({ debtHouseholds: 0, missingDocuments: 0 })
+  useEffect(() => {
+    if (!enabled) return
+    let alive = true
+    void (async () => {
+      const [charges, documents] = await Promise.all([
+        apiFetch('/api/v1/charges?status=open&limit=200')
+          .then((r) => (r.ok ? (r.json() as Promise<{ items: { payer_person_id: string }[] }>) : { items: [] }))
+          .catch(() => ({ items: [] as { payer_person_id: string }[] })),
+        apiFetch('/api/v1/health-declarations/summary')
+          .then((r) => (r.ok ? (r.json() as Promise<{ health_status: string }[]>) : []))
+          .catch(() => [] as { health_status: string }[]),
+      ])
+      if (!alive) return
+      setCounts({
+        debtHouseholds: new Set(charges.items.map((c) => c.payer_person_id)).size,
+        missingDocuments: documents.filter((row) => row.health_status !== 'signed').length,
+      })
+    })()
+    return () => {
+      alive = false
+    }
+  }, [enabled])
+  return counts
+}
+
+/** DashNav's three groups, from the canvas's own order. `hash` breaks the one tie the
+ *  route enum cannot: `#/groups` collapses into the schedule vertical. */
+function sideNavGroups(
+  route: DashboardRoute,
+  hash: string,
+  locale: Locale,
+  canSeeMoney: boolean,
+  badges: { debtHouseholds: number; missingDocuments: number },
+): SideNavGroup[] {
+  const onGroups = hash.startsWith('#/groups')
+  const groups: SideNavGroup[] = [
+    {
+      key: 'daily',
+      label: t(locale, 'common.dash.nav.daily'),
+      items: [
+        {
+          key: 'schedule',
+          label: t(locale, 'common.dash.nav.weekly'),
+          href: '#/schedule',
+          icon: <Icon name="calendar" />,
+          active: route === 'schedule' && !onGroups,
+        },
+        {
+          key: 'attendance',
+          label: t(locale, 'common.nav.attendance'),
+          href: '#/attendance',
+          icon: <Icon name="attendance" />,
+          active: route === 'attendance',
+        },
+        {
+          key: 'comms',
+          label: t(locale, 'common.nav.announcements'),
+          href: '#/comms',
+          icon: <Icon name="messages" />,
+          active: route === 'comms',
+        },
+      ],
+    },
+    {
+      key: 'club',
+      label: t(locale, 'common.dash.nav.club'),
+      items: [
+        {
+          key: 'students',
+          label: t(locale, 'people.student.plural'),
+          href: '#/students',
+          icon: <Icon name="students" />,
+          active: route === 'students',
+        },
+        {
+          key: 'groups',
+          label: t(locale, 'common.dash.nav.groups'),
+          href: '#/groups',
+          icon: <Icon name="groups" />,
+          active: onGroups,
+        },
+        {
+          key: 'events',
+          label: t(locale, 'events.title'),
+          href: '#/events',
+          icon: <Icon name="events" />,
+          active: route === 'events',
+        },
+        {
+          key: 'belts',
+          label: t(locale, 'common.dash.nav.beltsExams'),
+          href: '#/belts',
+          icon: <Icon name="belts" />,
+          active: route === 'belts' || route === 'exams',
+        },
+        {
+          key: 'staff',
+          label: t(locale, 'common.dash.nav.staff'),
+          href: '#/staff',
+          icon: <Icon name="profile" />,
+          active: route === 'staff',
+        },
+        {
+          key: 'rollover',
+          label: t(locale, 'common.dash.nav.rollover'),
+          href: '#/rollover',
+          icon: <Icon name="sync" />,
+          active: route === 'rollover',
+        },
+      ],
+    },
+  ]
+  if (canSeeMoney) {
+    groups.push({
+      key: 'money',
+      label: t(locale, 'common.dash.nav.money'),
+      items: [
+        {
+          key: 'billing',
+          label: t(locale, 'billing.debt.title'),
+          href: '#/billing',
+          icon: <Icon name="payments" />,
+          active: route === 'billing',
+          badge:
+            badges.debtHouseholds > 0
+              ? { text: String(badges.debtHouseholds), tone: 'red' }
+              : undefined,
+        },
+        {
+          key: 'prices',
+          label: t(locale, 'common.dash.nav.prices'),
+          href: '#/prices',
+          icon: <Icon name="belts" />,
+          active: route === 'prices',
+        },
+        {
+          key: 'documents',
+          label: t(locale, 'common.dash.nav.documents'),
+          href: '#/documents',
+          icon: <Icon name="documents" />,
+          active: route === 'documents',
+          badge:
+            badges.missingDocuments > 0
+              ? { text: String(badges.missingDocuments), tone: 'amber' }
+              : undefined,
+        },
+        {
+          key: 'reports',
+          label: t(locale, 'common.dash.nav.reports'),
+          href: '#/reports',
+          icon: <Icon name="reports" />,
+          active: route === 'reports',
+        },
+      ],
+    })
+  }
+  return groups
 }
 
 function useHashRoute(): { route: DashboardRoute; hash: string } {
@@ -198,6 +388,7 @@ export default function App() {
   // render body was a new value every render, and downstream that is an effect
   // dependency worth `1 + 3N` requests.
   const today = useToday()
+  const badges = useSideNavBadges(session.status === 'signed-in' && canSeeMoney)
 
   // §6.5 deliberately does NOT gate the dashboard on standalone mode the way the two
   // phone apps are gated. It is the desktop surface: a manager opens it in a browser tab
@@ -209,7 +400,10 @@ export default function App() {
       {session.status === 'anonymous' ? (
         <>
           <LanguagePicker locale={locale} onChoose={setLocale} />
-          <SignIn locale={locale} app="staff" />
+          {/* app="dashboard", not "staff": the OAuth callback routes the browser back to
+              the app named here, and this screen's app is this one (design pass — the
+              wrong name sent a signed-in manager to the staff origin). */}
+          <SignIn locale={locale} app="dashboard" />
         </>
       ) : null}
 
@@ -218,6 +412,24 @@ export default function App() {
           title={session.activeStudioName ?? ''}
           items={NAV}
           locale={locale}
+          sideNav={
+            <SideNav
+              label={t(locale, 'common.nav.menu')}
+              studioName={session.activeStudioName ?? ''}
+              studioNote={t(locale, 'common.appName.dashboard')}
+              groups={sideNavGroups(route, hash, locale, canSeeMoney, badges)}
+              settingsItem={{
+                key: 'settings',
+                label: t(locale, 'common.dash.nav.settings'),
+                href: '#/settings',
+                icon: <Icon name="settings" />,
+                active: route === 'settings',
+              }}
+              // No footer yet, deliberately: the canvas draws the signed-in person's
+              // name there and the session carries no display name — the dev bar already
+              // shows the acting persona, and a raw UUID in a footer is worse than none.
+            />
+          }
           studios={session.studios.map((s) => ({
             studioId: s.studio_id,
             studioName: s.studio_name,
@@ -294,6 +506,10 @@ export default function App() {
           ) : null}
           {route === 'belts' && beltsClassId ? (
             <BeltSystemScreen classId={beltsClassId} client={beltsClient} locale={locale} />
+          ) : route === 'belts' ? (
+            // 5b's missing first step: the ladder lives on a class, so the bare hash is
+            // the class chooser rather than the blank page it used to be.
+            <BeltsIndex locale={locale} />
           ) : null}
           {route === 'events' && eventRoute && eventRoute !== 'new' ? (
             <EventPage
@@ -330,11 +546,16 @@ export default function App() {
           {route === 'staff' ? <StaffScreen locale={locale} /> : null}
           {route === 'settings' ? <SettingsScreen locale={locale} /> : null}
           {route === 'setup' ? <SetupWizard client={setupClient} locale={locale} /> : null}
-          {route === 'home' ? (
-            <section aria-labelledby="dash-home-title">
-              <h2 id="dash-home-title">{t(locale, 'common.dash.home.title')}</h2>
-              <p>{t(locale, 'common.dash.home.body')}</p>
-            </section>
+          {/* The design pass's four mounts — 4f, 4e, 5a, 4g. There is no `home` branch
+              any more: the empty "בחרו מסך מהתפריט" page is gone, and the weekly board
+              answers the bare hash the way 3a/1e always drew it. */}
+          {route === 'comms' ? (
+            <CommsSection locale={locale} canPublishStudioWide={canSeeMoney} />
+          ) : null}
+          {route === 'documents' ? <DocumentsSection locale={locale} /> : null}
+          {route === 'prices' ? <PricesSection locale={locale} /> : null}
+          {route === 'reports' && session.activeStudioId ? (
+            <ReportsSection locale={locale} studioId={session.activeStudioId} />
           ) : null}
         </AppShell>
       ) : null}

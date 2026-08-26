@@ -59,6 +59,12 @@ export { Toast } from './primitives/Toast'
 // The shell both apps mount (§6.2, §6.3). The drawer is the one component here whose
 // layout is direction-dependent, which is why G12 matters most in it.
 export { AppShell } from './shell/AppShell'
+export { TabBar } from './shell/TabBar'
+export type { TabBarItem } from './shell/TabBar'
+export { SideNav } from './shell/SideNav'
+export type { SideNavBadge, SideNavGroup, SideNavItem } from './shell/SideNav'
+export { Icon } from './primitives/Icon'
+export type { IconName } from './primitives/Icon'
 // Artboard 2e / 9e — language and theme, in the drawer they are drawn in.
 export { AccountDrawerFooter } from './shell/AccountDrawerFooter'
 export { NavDrawer } from './shell/NavDrawer'

@@ -111,6 +111,8 @@ export const events: Bundle = {
 
   // -- the belt system (dashboard 5b, wizard 5d) ----------------------------------
   'belt.title': 'Система поясов',
+  'belt.noClasses': 'Пока нет секций — лестница поясов открывается на секции.',
+  'belt.openLadder': 'Открыть лестницу поясов',
   'belt.rank': 'Степень',
   'belt.rankPlural': 'Степени',
   'belt.add': 'Новая степень',

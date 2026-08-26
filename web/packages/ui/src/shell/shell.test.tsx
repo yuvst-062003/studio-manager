@@ -157,10 +157,15 @@ describe('AppShell', () => {
         <p>תוכן</p>
       </AppShell>,
     )
-    const children = [...container.children]
-    expect(children.indexOf(screen.getByTestId('bar'))).toBeLessThan(
-      children.indexOf(screen.getByRole('banner')),
-    )
+    // Document order, not sibling index: the design pass nested the header inside the
+    // shell's flex frame, and where the bar sits relative to it is the property — not
+    // how flat the DOM is.
+    const bar = screen.getByTestId('bar')
+    const header = screen.getByRole('banner')
+    expect(container).toContainElement(bar)
+    expect(
+      bar.compareDocumentPosition(header) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
   })
 
   it('hides the studio switcher when there is nothing to switch between', () => {

@@ -27,6 +27,7 @@ export const reports: Bundle = {
   'period': 'תקופה',
   'period.thisMonth': 'החודש',
   'period.lastMonth': 'החודש שעבר',
+  'period.nextMonth': 'החודש הבא',
   'period.last12Months': '12 החודשים האחרונים',
   'period.custom': 'טווח מותאם',
   'export': 'ייצוא',
@@ -46,6 +47,9 @@ export const reports: Bundle = {
   // -- financial (§5.14) ------------------------------------------------------------
   'financial.title': 'דוח כספי',
   'financial.collectedVsExpected': 'נגבה מול צפוי',
+  'financial.notYetDue': 'טרם הגיע מועד החיוב',
+  'financial.studentsBilled': 'חניכים שחויבו',
+  'financial.collectionRate': 'אחוז גבייה',
   'financial.collected': 'נגבה',
   'financial.expected': 'צפוי',
   'financial.trend12m': 'מגמה — 12 חודשים',

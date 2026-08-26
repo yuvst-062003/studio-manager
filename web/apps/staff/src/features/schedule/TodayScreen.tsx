@@ -13,7 +13,7 @@
 // exist yet, and the last test in the file keeps it out.
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { EmptyState, StatusChip } from '@studio/ui'
+import { Card, EmptyState, StatusChip } from '@studio/ui'
 import { formatTimeInStudioZone, studioDayKey } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
@@ -76,8 +76,6 @@ const rowStyle: CSSProperties = {
   alignItems: 'center',
   gap: 'var(--space-3)',
   minBlockSize: '44px',
-  paddingBlock: 'var(--space-2)',
-  borderBlockEnd: 'var(--border-width-hairline) solid var(--border)',
 }
 
 const filterStyle: CSSProperties = {
@@ -196,10 +194,27 @@ export function TodayScreen({
           description={t(locale, 'schedule.today.emptyHint')}
         />
       ) : (
-        <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+        <ul
+          style={{
+            listStyle: 'none',
+            margin: 0,
+            padding: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 'var(--space-3)',
+          }}
+        >
           {onThisDay.map((session) => (
-            <li key={session.id} data-testid="session-row" style={rowStyle}>
-              <span>
+            <li key={session.id} data-testid="session-row" style={{ minBlockSize: '44px' }}>
+              <Card>
+              <div style={rowStyle}>
+              <span
+                style={{
+                  fontVariantNumeric: 'tabular-nums',
+                  fontWeight: 600,
+                  fontSize: 'var(--text-title)',
+                }}
+              >
                 {formatTimeInStudioZone(session.starts_at, locale)}
                 {'–'}
                 {formatTimeInStudioZone(session.ends_at, locale)}
@@ -229,6 +244,26 @@ export function TodayScreen({
               {session.cancel_reason ? (
                 <span style={noteStyle}>{cancelReasonLabel(locale, session.cancel_reason)}</span>
               ) : null}
+              </div>
+              {session.status !== 'cancelled' ? (
+                // 1d — "לחיצה פותחת את 1c". Until the design pass NOTHING in the app
+                // linked to the roster: the product's core daily flow was reachable only
+                // by typing `#/attendance/<id>` into the URL bar.
+                <a
+                  href={`#/attendance/${session.id}`}
+                  data-testid="open-roster"
+                  className="studio-btn"
+                  data-variant="primary"
+                  style={{
+                    marginBlockStart: 'var(--space-3)',
+                    display: 'flex',
+                    textDecoration: 'none',
+                  }}
+                >
+                  {t(locale, 'schedule.today.openRoster')}
+                </a>
+              ) : null}
+              </Card>
             </li>
           ))}
         </ul>

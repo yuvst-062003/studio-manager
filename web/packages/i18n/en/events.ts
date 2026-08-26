@@ -107,6 +107,8 @@ export const events: Bundle = {
 
   // -- the belt system (dashboard 5b, wizard 5d) ----------------------------------
   'belt.title': 'Belt system',
+  'belt.noClasses': 'No classes yet — a belt ladder lives on a class.',
+  'belt.openLadder': 'Open the belt ladder',
   'belt.rank': 'Rank',
   'belt.rankPlural': 'Ranks',
   'belt.add': 'New rank',

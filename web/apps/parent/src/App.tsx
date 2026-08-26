@@ -12,14 +12,17 @@ import { apiFetch, useDisplayMode, useSession } from '@studio/core'
 import {
   AccountDrawerFooter,
   AppShell,
+  Icon,
   InstallWalkthrough,
   LanguagePicker,
   SignIn,
+  TabBar,
   ThemeProvider,
   useDocumentLocale,
 } from '@studio/ui'
 import { DevBar } from '@studio/ui/dev-bar'
 import type { InstallPromptEvent } from '@studio/ui'
+import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { Resolve } from './features/identity/Resolve'
 import { ScheduleSection, isCalendarRoute } from './features/schedule/ScheduleSection'
@@ -40,7 +43,7 @@ import { PaymentsSection } from './features/billing/PaymentsSection'
 // §6.1 step 6 — the BLOCKING declaration. Mounted here because nothing imported it
 // (HB-w6-health-gate-unmounted): the gate, the form and the pad were built and tested in
 // W3 and a guardian with an unsigned declaration still reached home.
-import { HealthGate, makeHealthClient } from './features/health'
+import { HealthGate, firstStudentNeedingDeclaration, makeHealthClient } from './features/health'
 import type { GatedStudent } from './features/health'
 
 const NAV = [
@@ -234,6 +237,45 @@ export default function App() {
           title={session.activeStudioName ?? ''}
           items={NAV}
           locale={locale}
+          tabBar={
+            // 1a draws the four-tab bar on EVERY screen, and it hides while §6.1's gate
+            // holds — "no other screen is reachable" includes the bar that reaches them.
+            gatedChildren !== null && firstStudentNeedingDeclaration(gatedChildren) === null ? (
+              <TabBar
+                label={t(locale, 'common.home.title')}
+                items={[
+                  {
+                    key: 'home',
+                    label: t(locale, 'common.home.tab.home'),
+                    href: '#/',
+                    icon: <Icon name="home" size={20} />,
+                    active: hash === '' || hash === '#/' || hash === '#',
+                  },
+                  {
+                    key: 'payments',
+                    label: t(locale, 'common.home.tab.payments'),
+                    href: '#/payments',
+                    icon: <Icon name="payments" size={20} />,
+                    active: onPayments,
+                  },
+                  {
+                    key: 'messages',
+                    label: t(locale, 'common.home.tab.messages'),
+                    href: '#/announcements',
+                    icon: <Icon name="messages" size={20} />,
+                    active: onAnnouncements,
+                  },
+                  {
+                    key: 'profile',
+                    label: t(locale, 'common.home.tab.profile'),
+                    href: '#/profile',
+                    icon: <Icon name="profile" size={20} />,
+                    active: onProfile,
+                  },
+                ]}
+              />
+            ) : undefined
+          }
           drawerFooter={<AccountDrawerFooter locale={locale} onChooseLocale={setLocale} />}
           studios={session.studios.map((s) => ({
             studioId: s.studio_id,

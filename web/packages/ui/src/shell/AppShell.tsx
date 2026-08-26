@@ -1,13 +1,20 @@
-// The shell both apps mount. §6.2 (staff) and §6.3 (parent) differ in what they put in
-// the drawer, not in the frame around it.
+// The shell all three apps mount. §6.2 (staff) and §6.3 (parent) differ in what they put
+// in the drawer, not in the frame around it — and since the design pass the frame also
+// carries the navigation every artboard draws: a bottom `tabBar` on the phone apps
+// (1a/9a) and a persistent `sideNav` on the dashboard (DashNav), each rendered only when
+// the app passes one in, so nothing changes for a caller that doesn't.
 //
 // One <main>, one <header>, one drawer trigger with an accessible name and aria-expanded.
-// The dev bar renders ABOVE the header, because §19.4's artboard puts it there and because
-// a bar that pushes the app down is a bar you cannot mistake for part of the product.
+// The drawer stays even beside a sidebar — it is the narrow-viewport navigation; CSS
+// hides its trigger at sidebar widths so there is one door per viewport, not two.
+// The dev bar renders ABOVE the header, because §19.4's artboard puts it there and
+// because a bar that pushes the app down is a bar you cannot mistake for part of the
+// product.
 import { useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
+import { Icon } from '../primitives/Icon'
 import { NavDrawer } from './NavDrawer'
 import type { NavItem } from './NavDrawer'
 import { StudioSwitcher } from './StudioSwitcher'
@@ -31,6 +38,7 @@ const titleStyle: CSSProperties = {
 
 const mainStyle: CSSProperties = {
   padding: 'var(--space-4)',
+  flex: 1,
 }
 
 const spacerStyle: CSSProperties = { marginInlineStart: 'auto' }
@@ -44,6 +52,8 @@ export function AppShell({
   locale,
   devBar,
   drawerFooter,
+  sideNav,
+  tabBar,
   children,
 }: {
   title: string
@@ -54,44 +64,73 @@ export function AppShell({
   locale: Locale
   devBar?: ReactNode
   drawerFooter?: ReactNode
+  /** Desktop sidebar (dashboard). Hidden by its own CSS under 1024px. */
+  sideNav?: ReactNode
+  /** Bottom tab bar (phone apps). The main area pads itself so content clears it. A
+   *  function form receives the drawer control, so a bar can carry the staff app's עוד
+   *  item (9e — "אותה מגירה") without the drawer state leaving this shell. */
+  tabBar?: ReactNode | ((controls: { openDrawer: () => void }) => ReactNode)
   children: ReactNode
 }) {
   const [open, setOpen] = useState(false)
+  const tabBarNode = typeof tabBar === 'function' ? tabBar({ openDrawer: () => setOpen(true) }) : tabBar
+
+  const shellClass = [
+    'studio-shell',
+    sideNav ? 'studio-shell--sidenav' : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
+
+  const contentClass = [
+    'studio-shell__content',
+    tabBarNode ? 'studio-shell--tabbed' : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
 
   return (
     <>
       {devBar}
-      <header style={headerStyle}>
-        <button
-          type="button"
-          aria-expanded={open}
-          aria-controls="app-nav-drawer"
-          onClick={() => setOpen(true)}
-        >
-          {t(locale, 'common.nav.menu')}
-        </button>
-        <h1 style={titleStyle}>{title}</h1>
-        <span style={spacerStyle}>
-          {onSwitchStudio ? (
-            <StudioSwitcher
-              studios={studios}
-              activeStudioId={activeStudioId}
-              onSwitch={onSwitchStudio}
+      <div className={shellClass}>
+        {sideNav}
+        <div className={contentClass}>
+          <header style={headerStyle}>
+            <button
+              type="button"
+              className="studio-shell__drawer-button"
+              aria-expanded={open}
+              aria-controls="app-nav-drawer"
+              onClick={() => setOpen(true)}
+            >
+              <Icon name="menu" size={20} />
+              {t(locale, 'common.nav.menu')}
+            </button>
+            <h1 style={titleStyle}>{title}</h1>
+            <span style={spacerStyle}>
+              {onSwitchStudio ? (
+                <StudioSwitcher
+                  studios={studios}
+                  activeStudioId={activeStudioId}
+                  onSwitch={onSwitchStudio}
+                  locale={locale}
+                />
+              ) : null}
+            </span>
+          </header>
+          <div id="app-nav-drawer">
+            <NavDrawer
+              open={open}
+              items={items}
+              onClose={() => setOpen(false)}
               locale={locale}
+              footer={drawerFooter}
             />
-          ) : null}
-        </span>
-      </header>
-      <div id="app-nav-drawer">
-        <NavDrawer
-          open={open}
-          items={items}
-          onClose={() => setOpen(false)}
-          locale={locale}
-          footer={drawerFooter}
-        />
+          </div>
+          <main style={mainStyle}>{children}</main>
+        </div>
       </div>
-      <main style={mainStyle}>{children}</main>
+      {tabBarNode}
     </>
   )
 }

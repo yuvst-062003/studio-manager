@@ -3,6 +3,7 @@ import type { Bundle } from '../types'
 /** Mirrors `he/schedule.ts`. `en` is `strict` in the parity check — a missing key fails. */
 export const schedule: Bundle = {
   'today.title': 'Today',
+  'today.openRoster': 'Open the register',
   'today.empty': 'No classes today',
   'today.emptyHint': 'Activity days are set in the group’s weekly schedule',
   'today.allCoaches': 'All coaches',

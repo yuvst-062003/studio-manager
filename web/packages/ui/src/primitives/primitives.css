@@ -729,3 +729,321 @@ button.studio-row:focus-visible {
 a {
   color: var(--accent);
 }
+
+/* ── Shell chrome from the canvas (design pass 2026-08-27) ─────────────────────────────
+ * The bottom tab bar (parent 1a/1b, staff 9a/1c/1d) and the dashboard sidebar (DashNav)
+ * — the two pieces of navigation every artboard draws and no shipped app had. Values are
+ * tokens, never the canvas's raw hex (D10); the active treatment is the canvas's ink
+ * pill: foreground as ground, on-foreground as text. */
+
+.studio-tabbar {
+  position: fixed;
+  inset-inline: 0;
+  inset-block-end: 0;
+  background: var(--surface);
+  border-block-start: var(--border-width-hairline) solid var(--border);
+  padding-block-end: env(safe-area-inset-bottom, 0);
+  z-index: 30;
+}
+
+.studio-tabbar__list {
+  display: flex;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-inline-size: 34rem;
+  margin-inline: auto;
+}
+
+.studio-tabbar__slot {
+  flex: 1;
+  display: flex;
+}
+
+.studio-tabbar__item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-block-size: 54px;
+  font-family: inherit;
+  font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
+  color: var(--text-muted);
+  text-decoration: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  border-radius: var(--radius-md);
+}
+
+.studio-tabbar__item--active { color: var(--fg); }
+
+/* Content padding so the fixed bar never covers the last row of a screen. */
+.studio-shell--tabbed { padding-block-end: calc(64px + env(safe-area-inset-bottom, 0px)); }
+
+/* ── SideNav ─────────────────────────────────────────────────────────────────────── */
+
+.studio-sidenav {
+  display: none;
+  inline-size: 236px;
+  flex: none;
+  background: var(--surface);
+  border-inline-end: var(--border-width-hairline) solid var(--border);
+  flex-direction: column;
+  min-block-size: 0;
+}
+
+@media (width >= 1024px) {
+  .studio-sidenav { display: flex; }
+
+  /* The drawer trigger is the narrow-viewport door; beside a persistent sidebar it is
+   * a second answer to the same question. */
+  .studio-shell--sidenav .studio-shell__drawer-button { display: none; }
+}
+
+/* The drawer trigger. Styled here, never inline: the sidebar media query hides it with
+ * `display: none`, and an inline `display` would win that fight and keep two doors open. */
+.studio-shell__drawer-button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  background: none;
+  border: none;
+  font: inherit;
+  color: var(--fg);
+  cursor: pointer;
+  min-block-size: 44px;
+  padding-inline: var(--space-2);
+  border-radius: var(--radius-md);
+}
+
+.studio-shell {
+  display: flex;
+  align-items: stretch;
+  min-block-size: 100dvh;
+}
+
+.studio-shell__content {
+  flex: 1;
+  min-inline-size: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.studio-sidenav__studio {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 16px 16px 14px;
+  border-block-end: var(--border-width-hairline) solid var(--border);
+}
+
+.studio-sidenav__mark {
+  inline-size: 34px;
+  block-size: 34px;
+  border-radius: 9px;
+  background: var(--fg);
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.studio-sidenav__mark::after {
+  content: '';
+  inline-size: 16px;
+  block-size: 4px;
+  background: var(--ground);
+  border-radius: 1px;
+}
+
+.studio-sidenav__studio-name {
+  font-size: var(--text-body);
+  font-weight: var(--weight-semibold);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.studio-sidenav__studio-note {
+  font-size: var(--text-caption);
+  color: var(--text-muted);
+  margin-block-start: 2px;
+}
+
+.studio-sidenav__scroll {
+  flex: 1;
+  padding: 10px 10px 0;
+  overflow-y: auto;
+  min-block-size: 0;
+}
+
+.studio-sidenav__group-label {
+  font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
+  color: var(--text-muted);
+  padding: 12px 8px 8px;
+}
+
+.studio-sidenav__item {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 8px;
+  border-radius: var(--radius-lg);
+  margin-block-end: 2px;
+  font-size: var(--text-body);
+  color: var(--fg);
+  text-decoration: none;
+}
+
+.studio-sidenav__item:hover {
+  background: var(--ground);
+  color: var(--fg);
+}
+
+.studio-sidenav__item--active,
+.studio-sidenav__item--active:hover {
+  background: var(--fg);
+  color: var(--on-fg);
+  font-weight: var(--weight-medium);
+}
+
+.studio-sidenav__label {
+  flex: 1;
+  min-inline-size: 0;
+}
+
+.studio-sidenav__badge {
+  font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
+  border-radius: 20px;
+  padding: 3px 7px;
+}
+
+.studio-sidenav__badge--red {
+  color: var(--debt);
+  border: 1px solid var(--debt);
+}
+
+.studio-sidenav__badge--amber {
+  color: var(--pending);
+  border: 1px dashed var(--pending);
+}
+.studio-sidenav__badge--plain { color: var(--text-muted); }
+
+.studio-sidenav__item--active .studio-sidenav__badge--red,
+.studio-sidenav__item--active .studio-sidenav__badge--amber {
+  color: var(--on-fg);
+  border-color: var(--on-fg);
+}
+
+.studio-sidenav__item--active .studio-sidenav__badge--plain { color: var(--on-fg); }
+
+.studio-sidenav__pinned { padding: 0 10px 10px; }
+
+.studio-sidenav__footer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-block-start: var(--border-width-hairline) solid var(--border);
+}
+
+.studio-sidenav__avatar {
+  inline-size: 32px;
+  block-size: 32px;
+  border-radius: 10px;
+  background: var(--disabled-surface);
+  border: var(--border-width-hairline) solid var(--border);
+  flex: none;
+}
+
+.studio-sidenav__footer-name {
+  font-size: var(--text-body);
+  font-weight: var(--weight-medium);
+}
+
+.studio-sidenav__footer-note {
+  font-size: var(--text-caption);
+  color: var(--text-muted);
+  margin-block-start: 2px;
+}
+
+/* ── Screen header + sign-in card, same pass ────────────────────────────────────── */
+
+.studio-page-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-block-end: var(--space-4);
+}
+
+.studio-page-header h1,
+.studio-page-header h2 {
+  margin: 0;
+  font-size: var(--text-display);
+  font-weight: var(--weight-semibold);
+  margin-inline-end: auto;
+}
+
+.studio-signin {
+  min-block-size: 80dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-5);
+}
+
+.studio-signin__card {
+  inline-size: 100%;
+  max-inline-size: 24rem;
+  background: var(--surface);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-6) var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  text-align: center;
+}
+
+.studio-signin__mark {
+  inline-size: 44px;
+  block-size: 44px;
+  border-radius: 12px;
+  background: var(--fg);
+  margin-inline: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.studio-signin__mark::after {
+  content: '';
+  inline-size: 20px;
+  block-size: 5px;
+  background: var(--ground);
+  border-radius: 1px;
+}
+
+.studio-signin__title {
+  margin: 0;
+  font-size: var(--text-title);
+  font-weight: var(--weight-semibold);
+}
+
+.studio-signin__tagline {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-body);
+}
+
+.studio-signin__note {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+}

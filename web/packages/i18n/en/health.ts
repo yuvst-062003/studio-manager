@@ -52,6 +52,7 @@ export const health: Bundle = {
   'flag.detailsRestricted': 'Full details are available to the manager only',
 
   'documents.title': 'Documents and declarations',
+  'documents.backToList': 'Back to the documents list',
   'documents.missing': 'Missing',
   'documents.signed': 'Submitted',
   'documents.empty': 'Every declaration has been submitted',

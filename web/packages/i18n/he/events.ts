@@ -133,6 +133,8 @@ export const events: Bundle = {
 
   // -- the belt system (dashboard 5b, wizard 5d) ----------------------------------
   'belt.title': 'מערכת חגורות',
+  'belt.noClasses': 'עדיין אין חוגים — מסלול חגורות נפתח על חוג.',
+  'belt.openLadder': 'פתיחת סולם החגורות',
   'belt.rank': 'דרגה',
   'belt.rankPlural': 'דרגות',
   'belt.add': 'דרגה חדשה',

@@ -6,6 +6,7 @@ import type { Bundle } from '../types'
  */
 export const schedule: Bundle = {
   'today.title': 'Сегодня',
+  'today.openRoster': 'Открыть перекличку',
   'today.empty': 'Сегодня занятий нет',
   'today.emptyHint': 'Дни занятий задаются в недельном расписании группы',
   'today.allCoaches': 'Все тренеры',

@@ -12,6 +12,7 @@ export const reports: Bundle = {
   'period': 'Период',
   'period.thisMonth': 'Текущий месяц',
   'period.lastMonth': 'Прошлый месяц',
+  'period.nextMonth': 'Следующий месяц',
   'period.last12Months': 'Последние 12 месяцев',
   'period.custom': 'Свой диапазон',
   'export': 'Экспорт',
@@ -31,6 +32,9 @@ export const reports: Bundle = {
   // -- financial (§5.14) ------------------------------------------------------------
   'financial.title': 'Финансовый отчёт',
   'financial.collectedVsExpected': 'Собрано и ожидалось',
+  'financial.notYetDue': 'Срок оплаты не наступил',
+  'financial.studentsBilled': 'Выставлено ученикам',
+  'financial.collectionRate': 'Процент сбора',
   'financial.collected': 'Собрано',
   'financial.expected': 'Ожидалось',
   'financial.trend12m': 'Динамика за 12 месяцев',
