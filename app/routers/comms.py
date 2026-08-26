@@ -16,6 +16,7 @@ the generated client keeps one definition of each.
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -27,6 +28,10 @@ from app.core.tenancy import TenantSessionDep
 from app.models.comms import PREFERENCE_GROUPS
 from app.schemas._pagination import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, IdempotencyKey
 from app.schemas.comms import (
+    AnnouncementIn,
+    AnnouncementOut,
+    AnnouncementPage,
+    AnnouncementScope,
     NotificationOut,
     NotificationPage,
     PushApp,
@@ -34,7 +39,15 @@ from app.schemas.comms import (
     PushTokenIn,
     PushTokenOut,
 )
-from app.services.comms.errors import TransactionalKindError, UnknownPreferenceGroupError
+from app.services.comms.announcements import AnnouncementService
+from app.services.comms.errors import (
+    AnnouncementAlreadyPublishedError,
+    AnnouncementNotFoundError,
+    AudienceOutOfScopeError,
+    NotYourAnnouncementError,
+    TransactionalKindError,
+    UnknownPreferenceGroupError,
+)
 from app.services.comms.notifications import NotificationReader
 from app.services.comms.preferences import NotificationPreferenceService
 from app.services.comms.push import PushTokenService
@@ -115,6 +128,239 @@ def register_push_token(
         platform=body.platform,
         last_seen_at=row.last_seen_at,
     )
+
+
+# -- §5.11's announcements (dashboard 4f) -------------------------------------
+class AudienceQuery(BaseModel):
+    """A scope, before an announcement exists to carry it.
+
+    `4f` shows `יגיע ל-{{count}} משפחות` while the manager is still choosing who to write to,
+    so the count cannot hang off an announcement id -- there is no row yet, and creating a
+    draft per keystroke to ask "how many" would litter the list.
+    """
+
+    scope_type: AnnouncementScope
+    scope_id: uuid.UUID | None = None
+
+
+class AudienceSizeOut(BaseModel):
+    recipient_count: int
+
+
+class AnnouncementPatch(BaseModel):
+    """A partial edit to a draft. Every field optional, in the shape `app/routers/billing.py`
+    already uses for `ProductPatch`.
+
+    `AnnouncementIn` is the CREATE shape and requires a title, a body and a scope. Reusing it
+    here would make `PATCH` mean `PUT` -- a manager fixing a typo would have to resend the
+    audience, and forgetting to would silently re-scope the announcement.
+
+    `scope_id` and `scheduled_for` are both nullable AND meaningful when null (a studio-wide
+    scope names no row; an unscheduled announcement has no time), so "was it sent" is read
+    from `model_fields_set` rather than from the value. That is what lets
+    `{"scheduled_for": null}` mean `announcement.cancelSchedule` instead of "leave it alone".
+    """
+
+    title: str | None = Field(default=None, min_length=1, max_length=200)
+    body: str | None = Field(default=None, min_length=1)
+    scope_type: AnnouncementScope | None = None
+    scope_id: uuid.UUID | None = None
+    scheduled_for: datetime | None = None
+
+
+def _roles(request: Request) -> frozenset[str]:
+    """The verified JWT's claim, not a database read. Same helper as
+    `app/routers/events.py::_roles`, and `require_roles`' docstring carries the argument for
+    why a fifteen-minute snapshot is the right latency."""
+    return frozenset(getattr(request.state, "roles", ()) or ())
+
+
+def _scoped(service: AnnouncementService, request: Request, body: AnnouncementIn) -> None:
+    """The two refusals every write to an announcement's audience has to make.
+
+    Order matters: §3.2 first, then whether the scope names anything. A coach probing for
+    which groups exist would otherwise learn it from the difference between a 403 and a 422.
+    """
+    try:
+        service.assert_may_publish_to(
+            _person_id(request), _roles(request), body.scope_type, body.scope_id
+        )
+    except NotYourAnnouncementError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "code": "forbidden",
+                "message": "a lead coach publishes to their own groups",
+            },
+        ) from exc
+    try:
+        service.assert_scope_exists(body.scope_type, body.scope_id)
+    except AudienceOutOfScopeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={
+                "code": "bad_audience",
+                "message": str(exc.args[0]) if exc.args else "no such audience",
+            },
+        ) from exc
+
+
+def _not_found(exc: AnnouncementNotFoundError) -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail={"code": "not_found", "message": "no such announcement"},
+    )
+
+
+@router.post("/announcements", response_model=AnnouncementOut, status_code=status.HTTP_201_CREATED)
+def create_announcement(
+    request: Request,
+    body: AnnouncementIn,
+    session: TenantSessionDep,
+    _: AnnouncementPublisher,
+    idempotency_key: IdempotencyKey = None,
+) -> AnnouncementOut:
+    """§5.11's publish form. Creating is not sending -- `published_at` stays null until
+    `/publish`, so a draft can be written now and checked before it reaches anybody."""
+    service = AnnouncementService(session)
+    _scoped(service, request, body)
+    row = service.create(_person_id(request), body, at=now())
+    return AnnouncementOut.model_validate(row, from_attributes=True)
+
+
+@router.post("/announcements/audience-preview", response_model=AudienceSizeOut)
+def preview_audience(
+    request: Request,
+    body: AudienceQuery,
+    session: TenantSessionDep,
+    _: AnnouncementPublisher,
+) -> AudienceSizeOut:
+    """`audience.recipients` -- `יגיע ל-{{count}} משפחות`.
+
+    A POST rather than a GET with query parameters, because it is scoped by the same
+    (scope_type, scope_id) pair the body of an announcement carries and splitting that across
+    two shapes is how the two drift. It reads nothing and changes nothing.
+    """
+    service = AnnouncementService(session)
+    try:
+        service.assert_may_publish_to(
+            _person_id(request), _roles(request), body.scope_type, body.scope_id
+        )
+    except NotYourAnnouncementError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"code": "forbidden", "message": "a lead coach publishes to their own groups"},
+        ) from exc
+    return AudienceSizeOut(recipient_count=service.audience_size(body.scope_type, body.scope_id))
+
+
+@router.get("/announcements", response_model=AnnouncementPage)
+def list_announcements(
+    session: TenantSessionDep,
+    _: AnnouncementPublisher,
+    after: uuid.UUID | None = None,
+    limit: int = Query(default=DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
+) -> AnnouncementPage:
+    rows, has_more = AnnouncementService(session).list(after=after, limit=limit)
+    return AnnouncementPage(
+        items=[AnnouncementOut.model_validate(row, from_attributes=True) for row in rows],
+        next_cursor=rows[-1].id if has_more and rows else None,
+        has_more=has_more,
+    )
+
+
+@router.get("/announcements/{announcement_id}", response_model=AnnouncementOut)
+def get_announcement(
+    announcement_id: uuid.UUID, session: TenantSessionDep, _: AnnouncementPublisher
+) -> AnnouncementOut:
+    try:
+        row = AnnouncementService(session).get(announcement_id)
+    except AnnouncementNotFoundError as exc:
+        raise _not_found(exc) from exc
+    return AnnouncementOut.model_validate(row, from_attributes=True)
+
+
+@router.patch("/announcements/{announcement_id}", response_model=AnnouncementOut)
+def update_announcement(
+    request: Request,
+    announcement_id: uuid.UUID,
+    body: AnnouncementPatch,
+    session: TenantSessionDep,
+    _: AnnouncementPublisher,
+    idempotency_key: IdempotencyKey = None,
+) -> AnnouncementOut:
+    """409 once it has been published: parents already hold it.
+
+    The patch is merged over the stored row here rather than in the service, so the service
+    keeps one `update(id, AnnouncementIn)` that always receives a complete, validated
+    announcement -- and so the §3.2 and audience checks below run against the scope this edit
+    would RESULT in, not the one it happened to mention.
+    """
+    service = AnnouncementService(session)
+    try:
+        row = service.get(announcement_id)
+    except AnnouncementNotFoundError as exc:
+        raise _not_found(exc) from exc
+
+    sent = body.model_fields_set
+    merged = AnnouncementIn(
+        title=body.title if body.title is not None else row.title,
+        body=body.body if body.body is not None else row.body,
+        scope_type=body.scope_type if body.scope_type is not None else row.scope_type,
+        scope_id=body.scope_id if "scope_id" in sent else row.scope_id,
+        scheduled_for=body.scheduled_for if "scheduled_for" in sent else row.scheduled_for,
+    )
+    _scoped(service, request, merged)
+    try:
+        row = service.update(announcement_id, merged)
+    except AnnouncementNotFoundError as exc:
+        raise _not_found(exc) from exc
+    except AnnouncementAlreadyPublishedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "already_published",
+                "message": "this announcement has already been sent",
+            },
+        ) from exc
+    return AnnouncementOut.model_validate(row, from_attributes=True)
+
+
+@router.delete("/announcements/{announcement_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_announcement(
+    announcement_id: uuid.UUID,
+    session: TenantSessionDep,
+    _: AnnouncementPublisher,
+    idempotency_key: IdempotencyKey = None,
+) -> None:
+    """Soft, per G15. Every recipient's inbox row names this announcement in its payload."""
+    try:
+        AnnouncementService(session).soft_delete(announcement_id, at=now())
+    except AnnouncementNotFoundError as exc:
+        raise _not_found(exc) from exc
+
+
+@router.post("/announcements/{announcement_id}/publish", response_model=AnnouncementOut)
+def publish_announcement(
+    announcement_id: uuid.UUID,
+    session: TenantSessionDep,
+    _: AnnouncementPublisher,
+    idempotency_key: IdempotencyKey = None,
+) -> AnnouncementOut:
+    """The send. 409 on a second attempt -- see `AnnouncementService.publish`."""
+    try:
+        row, _reached = AnnouncementService(session).publish(announcement_id, at=now())
+    except AnnouncementNotFoundError as exc:
+        raise _not_found(exc) from exc
+    except AnnouncementAlreadyPublishedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "already_published",
+                "message": "this announcement has already been sent",
+            },
+        ) from exc
+    return AnnouncementOut.model_validate(row, from_attributes=True)
 
 
 # -- §5.11's inbox ------------------------------------------------------------
