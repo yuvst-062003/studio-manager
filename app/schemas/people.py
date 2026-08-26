@@ -20,6 +20,7 @@ from typing import Annotated, Any
 from pydantic import BaseModel, Field, model_validator
 
 from app.schemas._pagination import CursorPage
+from app.schemas.schedule import TrialSlotOut
 
 #: §4.3, mirrored as patterns so the generated client gets unions rather than `string`.
 STUDENT_STATUS_PATTERN = r"^(lead|trial|pending_approval|active|frozen|left|lost)$"
@@ -82,14 +83,53 @@ class StudentOut(BaseModel):
     guardians: list[GuardianOut] = Field(default_factory=list)
 
 
+class GuardianCreate(BaseModel):
+    """§5.3 — guardians are invited by email or phone, and the invitation carries a token
+    binding the accepting identity to the pre-created Person.
+
+    Declared above `StudentCreate` because that shape references it: `from __future__
+    import annotations` makes the annotation a string, but Pydantic resolves it when the
+    model class is built, so the name has to exist by then.
+    """
+
+    first_name: str = Field(min_length=1, max_length=80)
+    last_name: str = Field(min_length=1, max_length=80)
+    relation: str = Field(default="parent", max_length=40)
+    phone: str | None = Field(default=None, max_length=40)
+    email: str | None = Field(default=None, max_length=255)
+    #: §5.3 — this decides bill addressing and הוראת קבע matching, and nothing else.
+    is_primary: bool = False
+
+    @model_validator(mode="after")
+    def _a_guardian_is_reachable(self) -> GuardianCreate:
+        if not self.email and not self.phone:
+            raise ValueError("a guardian needs an email or a phone to be invited on")
+        return self
+
+
 class StudentCreate(BaseModel):
     first_name: str = Field(min_length=1, max_length=100)
     last_name: str = Field(min_length=1, max_length=100)
     birthdate: date | None = None
     phone: str | None = Field(default=None, max_length=40)
     email: str | None = Field(default=None, max_length=255)
-    #: §5.4 — a manager adding a student directly. The public link cannot reach this.
+    #: The group this child joins. §5.4(a) for a manager adding a student directly —
+    #: 'child details and group ... creates everything immediately' — and §5.4a step 2 for
+    #: a trial booking, where it is asked **per child** because the group list is filtered
+    #: by each child's age. Absent on a trial booking means 'use the one at the root'.
     group_id: uuid.UUID | None = None
+    #: C12 — which of that group's weekly sessions the child is actually expected at.
+    #: NULL means all of them, which is the default and the common case. Ignored when
+    #: `group_id` is absent, and by §5.4a's trial booking, which creates no enrollment.
+    attends_weekdays: list[int] | None = None
+    #: §5.4(a) — 'parent details → child details and group'. One request, because a
+    #: student with no guardian is a child nobody can be contacted about, and §5.3 makes
+    #: at least one guardian structural rather than optional.
+    #:
+    #: Optional on the shape rather than required, because §5.4a's trial booking reuses
+    #: `StudentCreate` for its `children[]` and supplies the parent once for the whole
+    #: submission. `POST /students` rejects an absent guardian at the router.
+    guardian: GuardianCreate | None = None
 
 
 class StudentUpdate(BaseModel):
@@ -179,6 +219,20 @@ class TrialBookingOut(BaseModel):
     is_override: bool
 
 
+class TrialChildIn(StudentCreate):
+    """One child in §5.4a's booking, with the two choices the spec makes **per child**.
+
+    Step 2 is "class ▸ group (groups filtered by the child's age)" and step 4 is "the next
+    N upcoming sessions of each chosen group, **one pick per child**". Siblings of
+    different ages are the whole reason the group list is age-filtered, so a booking that
+    can only carry one group cannot express the case the picker exists for.
+    """
+
+    #: §5.4a step 4. Absent means 'use the root one', which is only honoured when this
+    #: child is in the root group — see `TrialBookingSelfIn._resolve_per_child_choices`.
+    session_id: uuid.UUID | None = None
+
+
 class TrialBookingSelfIn(BaseModel):
     """§7 — `POST /trial-bookings/self`, **authenticated**: the parent has just signed in.
 
@@ -189,12 +243,39 @@ class TrialBookingSelfIn(BaseModel):
     being written straight to a table (§11.1).
     """
 
-    group_id: uuid.UUID
-    session_id: uuid.UUID
-    children: list[StudentCreate] = Field(min_length=1, max_length=10)
+    #: §5.4a ① — 'A per-group QR pre-selects that group.' A default for children who name
+    #: no group of their own; a child's own `group_id` always wins. Optional because a
+    #: booking where every child chose for themselves has no single group to put here.
+    group_id: uuid.UUID | None = None
+    session_id: uuid.UUID | None = None
+    children: list[TrialChildIn] = Field(min_length=1, max_length=10)
     #: One per child, same order. Booleans and short answers only — never free text about
     #: a condition, which is what the full declaration (W3) is for.
     trial_health_declarations: list[dict[str, Any]] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _resolve_per_child_choices(self) -> TrialBookingSelfIn:
+        """Fold the root defaults into each child, so every layer below reads one place.
+
+        The session default is deliberately narrower than the group default: a root
+        `session_id` belongs to the root group, so handing it to a child who chose a
+        DIFFERENT group would book them into a lesson their group never holds. That is the
+        same class of mistake as applying one group to every child, one level down.
+        """
+        for child in self.children:
+            if child.group_id is None:
+                child.group_id = self.group_id
+                if child.session_id is None:
+                    child.session_id = self.session_id
+        without_a_group = [
+            index for index, child in enumerate(self.children) if child.group_id is None
+        ]
+        if without_a_group:
+            raise ValueError(
+                f"children at {without_a_group} have no group: give each child a group_id, "
+                "or one at the root for all of them"
+            )
+        return self
 
     @model_validator(mode="after")
     def _one_declaration_per_child(self) -> TrialBookingSelfIn:
@@ -242,3 +323,326 @@ StudentPage = CursorPage[StudentOut]
 EnrollmentPage = CursorPage[EnrollmentOut]
 RegistrationRequestPage = CursorPage[RegistrationRequestOut]
 TrialBookingPage = CursorPage[TrialBookingOut]
+
+
+# -- M3's own shapes, appended by lane PEOPLE. The contract shapes above are unchanged
+# apart from `StudentCreate.guardian`, which §5.4(a) needs in the same request.
+#
+# **Where `price_plan_id` may and may not appear.** Invariant 3 forbids a financial field
+# on any coach-scoped response, and `tests/invariants/test_03`'s detector matches the
+# property name against `^price` — so `price_plan_id` IS a financial field as far as the
+# gate is concerned, whatever the contract's own docstring intended. `StudentOut` carries
+# it and is therefore returned only from manager-scoped routes; every shape a coach can
+# reach is built without it. `StudentPricePlanOut` is the manager's way to read it, and it
+# carries the C11 volume suggestion beside it because that is the number §5.10 shows when
+# the plan is chosen.
+
+
+class StudentSummaryOut(BaseModel):
+    """The row dashboard `3b` and staff `9h` render, and the only student shape a coach
+    receives from a list.
+
+    `group_names` and not `group_ids`: C11 makes several live enrollments normal, and
+    `3b`'s column shows what a manager reads rather than what a client would have to join.
+    """
+
+    id: uuid.UUID
+    person_id: uuid.UUID
+    first_name: str
+    last_name: str
+    birthdate: date | None
+    status: str = Field(pattern=STUDENT_STATUS_PATTERN)
+    health_status: str = Field(pattern=HEALTH_STATUS_PATTERN)
+    joined_on: date | None
+    left_on: date | None
+    current_belt_id: uuid.UUID | None = None
+    current_belt_name: str | None = None
+    current_belt_color_hex: str | None = None
+    group_names: list[str] = Field(default_factory=list)
+    #: §5.4's freeze shows guardians "מוקפא" with the return date. `None` on an
+    #: open-ended freeze, which is a real state a manager sets deliberately.
+    frozen_until: date | None = None
+    guardian_display_names: list[str] = Field(default_factory=list)
+
+
+class StudentDetailOut(BaseModel):
+    """One student in full, for staff `9c` and dashboard `4a` — and **coach-reachable**.
+
+    `StudentOut` minus `price_plan_id`. §3.2 gives every staff role "View students in own
+    groups", so `GET /students/{id}` is a coach route, and invariant 3's detector reads
+    `price_plan_id` as financial. The price is not omitted to be coy: a coach has no use
+    for it, and a shape that cannot carry it is cheaper to guarantee than a filter that
+    has to remember to.
+    """
+
+    id: uuid.UUID
+    person_id: uuid.UUID
+    first_name: str
+    last_name: str
+    birthdate: date | None
+    phone: str | None = None
+    email: str | None = None
+    status: str = Field(pattern=STUDENT_STATUS_PATTERN)
+    health_status: str = Field(pattern=HEALTH_STATUS_PATTERN)
+    joined_on: date | None
+    left_on: date | None
+    current_belt_id: uuid.UUID | None = None
+    current_belt_name: str | None = None
+    current_belt_color_hex: str | None = None
+    frozen_until: date | None = None
+    guardians: list[GuardianOut] = Field(default_factory=list)
+
+
+class StudentPricePlanOut(BaseModel):
+    """C11's two numbers, manager-scoped. **Never** returned from a `coach`-tagged route.
+
+    `weekly_volume` is what §5.10 shows beside the plan picker so a mismatch between what
+    a child attends and what they are billed for is visible at the moment the price is
+    set. It is a suggestion, not a computation — the manager picks the plan.
+
+    No amount, because `price_plan` is W4's table and does not exist yet (L2).
+    """
+
+    student_id: uuid.UUID
+    price_plan_id: uuid.UUID | None
+    weekly_volume: int
+
+
+class GuardianListResponse(BaseModel):
+    items: list[GuardianOut]
+
+
+class StudentConvertIn(BaseModel):
+    """§5.4a step 5 — 'Manager converts → picks group, sets price, status=active,
+    enrollment created.' Three decisions in one request, because they are one decision."""
+
+    group_id: uuid.UUID
+    started_on: date
+    #: C11, L2 — an opaque id. `price_plan` is W4's table, so this is stored and never
+    #: resolved, and no endpoint in this lane returns an amount.
+    price_plan_id: uuid.UUID | None = None
+    #: C12 — offered as checkboxes over the group's training weekdays, all ticked by
+    #: default. `None` means all of them.
+    attends_weekdays: list[Weekday] | None = Field(default=None, min_length=1)
+    reason: str | None = Field(default=None, max_length=200)
+
+
+class StudentMarkLostIn(BaseModel):
+    """§5.4a — 'No conversion after N days → status=lost, with a reason.' Required here
+    and optional in the job, because a manager pressing the button knows why and the job
+    only knows that time passed."""
+
+    reason: str = Field(min_length=1, max_length=200)
+
+
+class StudentCreateResult(BaseModel):
+    """§5.4(a) — 'Creates everything immediately with health_status = missing, and sends
+    the parent an invitation.'
+
+    `invitation_token` is returned **once**, to the manager who just created the student,
+    so the dashboard can render a copyable link for a parent standing at the desk. Only
+    its SHA-256 hash reaches `invitation.token_hash`, and it is never logged.
+
+    Manager-scoped, so `StudentOut` (with `price_plan_id`) is safe here.
+    """
+
+    student: StudentOut
+    invitation_token: str | None = None
+
+
+class StudentStatusHistoryListResponse(BaseModel):
+    items: list[StudentStatusHistoryOut]
+
+
+class PublicGroupOut(BaseModel):
+    """§7 — `GET /public/studios/{slug}/groups`, unauthenticated.
+
+    A deliberately narrow projection, for the same reason `TrialSlotOut` is one: this is a
+    shop window on the open internet. No class id, no staff, no enrollment count.
+    `training_weekdays` is here because parent `13a` shows "מתאמנים בימים" beside each
+    group, and because §5.4a filters groups by the child's age where a range is set.
+    """
+
+    id: uuid.UUID
+    name: str
+    description: str | None
+    age_min: int | None
+    age_max: int | None
+    training_weekdays: list[Weekday] = Field(default_factory=list)
+
+
+class PublicGroupListResponse(BaseModel):
+    """Not a `CursorPage`: a club has a dozen groups, not a growing list somebody pages
+    through, and the landing page renders all of them at once."""
+
+    items: list[PublicGroupOut]
+
+
+class PublicLandingOut(BaseModel):
+    """§5.4a ① — 'a public LANDING PAGE at /t/{studio-slug} — the club's shop window, not
+    a form.'"""
+
+    studio_name: str
+    slug: str
+    logo_url: str | None
+    default_locale: str
+    #: §5.4a: "Logo, photos, what the club does, where and when". Read from
+    #: `studio.settings`, the JSONB M1's setup wizard already writes.
+    headline: str | None
+    about: str | None
+    address: str | None
+    photo_urls: list[str] = Field(default_factory=list)
+    groups: list[PublicGroupOut] = Field(default_factory=list)
+
+
+class TrialSlotListResponse(BaseModel):
+    """Not a `CursorPage`: §7 asks for "the next N bookable sessions", which is a bounded
+    peek rather than a list somebody pages through. G16's rule is about lists that grow."""
+
+    items: list[TrialSlotOut]
+
+
+class EnrollmentWeekdayOptionsOut(BaseModel):
+    """C12's checkboxes. The enrolment form asks this before it can draw the day list.
+
+    `training_weekdays` comes through `ScheduleService.materialize_sessions()` (L5), so an
+    empty list means "this group has no schedule yet" and the form says exactly that.
+    """
+
+    group_id: uuid.UUID
+    group_name: str
+    training_weekdays: list[Weekday] = Field(default_factory=list)
+
+
+#: G16 -- an alias, never a subclass. `class X(CursorPage[T])` carries no generic origin,
+#: so tests/contracts/test_w2_schemas.py reads it as a hand-rolled envelope.
+StudentSummaryPage = CursorPage[StudentSummaryOut]
+
+
+class TrialBookingConfirmationOut(BaseModel):
+    """§5.4a step 5's "נתראה ביום א׳ 17:00", once per child.
+
+    Two siblings in different groups have two different answers to 'which group' and
+    'when', so `13b` renders one of these per child rather than one for the booking.
+    """
+
+    student_id: uuid.UUID
+    student_display_name: str
+    group_name: str
+    session_starts_at: datetime | None
+
+
+class TrialBookingSelfResult(BaseModel):
+    """§5.4a step 5 — 'אישור: "נתראה ביום א׳ 17:00" · [ הוסף ליומן ] · .ics'.
+
+    Everything artboard `13b` renders, in one response, because the parent has no studio in
+    their token yet and a second round trip would need one.
+    """
+
+    studio_slug: str
+    studio_name: str
+    students: list[StudentSummaryOut] = Field(default_factory=list)
+    #: One per child, in the order they were submitted. There is deliberately no
+    #: `group_name` on this model: with siblings in two groups, any single name here would
+    #: be wrong for one of them, and quietly wrong is how the per-child pick got lost in
+    #: the first place.
+    bookings: list[TrialBookingConfirmationOut] = Field(default_factory=list)
+
+
+class TrialBookingCreate(BaseModel):
+    """§5.4a — 'A manager can also log a phone enquiry, producing the same rows.'"""
+
+    group_id: uuid.UUID
+    session_id: uuid.UUID | None = None
+    child: StudentCreate
+    guardian: GuardianCreate
+
+
+class TrialBookingUpdate(BaseModel):
+    """§5.4a ③ — the coach marks attendance and may leave a note.
+
+    `attended` is `bool | None` **and** the field is optional, so three states survive the
+    wire: absent means "do not change", `null` means "not yet", `false` means "did not turn
+    up". The follow-up ladder treats the last two completely differently.
+    """
+
+    attended: bool | None = None
+    coach_note: str | None = Field(default=None, max_length=2000)
+    outcome: str | None = Field(default=None, pattern=TRIAL_OUTCOME_PATTERN)
+
+
+class TrialBookingRow(BaseModel):
+    """One row of the dashboard's שיעורי ניסיון queue (§5.4a ②).
+
+    Carries the child's name because a queue of timestamps is not a queue anyone can act
+    on — but nothing else about them, and nothing at all about health.
+    """
+
+    id: uuid.UUID
+    student_id: uuid.UUID
+    student_display_name: str
+    group_id: uuid.UUID
+    group_name: str
+    session_id: uuid.UUID | None
+    booked_at: datetime
+    attended: bool | None
+    outcome: str | None = Field(default=None, pattern=TRIAL_OUTCOME_PATTERN)
+    is_override: bool
+
+
+TrialBookingRowPage = CursorPage[TrialBookingRow]
+
+
+class ChildMatchOut(BaseModel):
+    """§5.4a's duplicate-child warning. A candidate the manager judges, never a merge."""
+
+    student_id: uuid.UUID
+    display_name: str
+    birthdate: date | None
+
+
+class RegistrationRequestDetailOut(BaseModel):
+    """One submission, opened. Reading this is audit-logged as sensitive (§11.2) — the
+    summary in the queue is free, the full read is recorded."""
+
+    id: uuid.UUID
+    source: str = Field(pattern=REGISTRATION_SOURCE_PATTERN)
+    status: str = Field(pattern=REGISTRATION_STATUS_PATTERN)
+    submitted_at: datetime
+    reviewed_at: datetime | None
+    matched_person_id: uuid.UUID | None
+    child_display_name: str
+    guardian_display_name: str
+    children: list[dict[str, Any]] = Field(default_factory=list)
+    #: A preference the queue renders. §5.4 puts the group on the DECISION.
+    preferred_group_id: uuid.UUID | None = None
+    possible_duplicate_students: list[ChildMatchOut] = Field(default_factory=list)
+
+
+class SiblingRequestIn(BaseModel):
+    """§5.4(c) — parent `12g`. `POST /me/students`.
+
+    The group is a **preference**, not a choice: L6 makes enrolment a manager decision, and
+    the copy on `12g` promises review rather than a place.
+    """
+
+    first_name: str = Field(min_length=1, max_length=100)
+    last_name: str = Field(min_length=1, max_length=100)
+    birthdate: date | None = None
+    preferred_group_id: uuid.UUID | None = None
+
+
+RegistrationRequestPageOut = CursorPage[RegistrationRequestOut]
+
+
+class RegistrationDecisionOut(BaseModel):
+    """The result of approving or rejecting one submission.
+
+    One shape for both verbs: a rejection creates no students and returns an empty list,
+    which is a truer answer than a second shape that cannot express the difference.
+    """
+
+    request_id: uuid.UUID
+    status: str = Field(pattern=REGISTRATION_STATUS_PATTERN)
+    #: §5.4a's worked example approves two children at once, so this is a list.
+    student_ids: list[uuid.UUID] = Field(default_factory=list)

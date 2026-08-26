@@ -126,6 +126,34 @@ SESSION_DEP_ALLOWLIST: dict[str, str] = {
         "app/core/auth_context.py puts it on request.state, and every OTHER router "
         "takes TenantSessionDep and fails closed on it."
     ),
+    "trial_bookings.py": (
+        "One route in this file -- POST /trial-bookings/self -- is SPEC 6.1's single "
+        "self-service entry point: 'booking a trial creates the guardian row itself'. The "
+        "caller has just signed in and belongs to no studio, so their token carries no "
+        "`sid` and TenantSessionDep would 401 the one path a stranger is meant to take. "
+        "The unscoped session is used for exactly two reads -- the identity, and the "
+        "studio the chosen group belongs to -- and every WRITE then happens inside a "
+        "TenantSession opened with use_studio(that studio), so the rows are stamped and "
+        "guarded exactly as on any other route. Every other route in this file takes "
+        "TenantSessionDep."
+    ),
+    "public.py": (
+        "SPEC 6.1 -- 'Parent-app access needs no provisioning at all, because booking a "
+        "trial creates the guardian row itself. That is the only self-service entry point "
+        "in the system.' These routes run for a stranger holding a flyer: no token, no "
+        "`sid` claim, and therefore no studio for TenantSessionDep to resolve, so a "
+        "tenant-scoped session would 401 the shop window rather than protect it. "
+        "Restriction 1 is not bypassed, it is replaced by something narrower: every query "
+        "in app/services/people/landing.py names its studio EXPLICITLY, resolved from the "
+        "slug or the group the caller supplied, and the module never calls "
+        "with_all_tenants -- so nothing here can reach past the one studio the URL names. "
+        "The unscoped session's reach is bounded by that property, so it extends only as "
+        "far as code that has it: W2 added ScheduleService, which does NOT name its studio "
+        "-- it inherits the filter from its session -- so public.py resolves the studio "
+        "first and hands the schedule a real TenantSession under use_studio(). See "
+        "_scoped_schedule in that module. The rule for anything added here later is the "
+        "same: name your studio, or open a scope."
+    ),
     "platform.py": (
         "SPEC 18.1 puts the platform console above every studio: 5.1 makes it the only "
         "thing that can create one, so it cannot itself be scoped to one. Its own "

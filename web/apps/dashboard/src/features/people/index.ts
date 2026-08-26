@@ -1,0 +1,8 @@
+export { StudentsScreen, chipToneFor, documentLabelKey } from './StudentsScreen'
+export { AddStudentScreen } from './AddStudentScreen'
+export { StudentDetailScreen } from './StudentDetailScreen'
+export { AlertCentre } from './AlertCentre'
+export type { AlertSectionProps } from './AlertCentre'
+export { registerPeopleAlerts } from './register'
+export { makeDashboardPeopleClient } from './peopleClient'
+export type { DashboardPeopleClient } from './peopleClient'

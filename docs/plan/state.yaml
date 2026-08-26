@@ -119,6 +119,10 @@ waves:
         title: Artboards — dashboard 3a/6a/4b, staff 9a/1d/9b, parent 12b
         status: shipped
         on: 2026-08-26
+      - id: M3
+        title: Students, guardians, the lead funnel and the public trial page
+        status: shipped
+        on: 2026-08-26
   - id: W3
     milestone: M4 ∥ M5
     title: Health ∥ Attendance

@@ -17,12 +17,15 @@ import { Resolve } from './features/identity/Resolve'
 import { ScheduleSection, isCalendarRoute } from './features/schedule/ScheduleSection'
 import { makeParentScheduleClient } from './features/schedule/client'
 import { useToday } from './features/schedule/useToday'
+import { PublicLanding, makeLandingClient, matchLandingPath } from './features/landing'
+import { AddSibling, makePeopleClient } from './features/people'
 
 const NAV = [
   { key: 'myChildren', labelKey: 'common.nav.myChildren', href: '/' },
   { key: 'calendar', labelKey: 'schedule.calendar.title', href: '#/calendar' },
   { key: 'payments', labelKey: 'common.nav.payments', href: '/payments' },
   { key: 'announcements', labelKey: 'common.nav.announcements', href: '/announcements' },
+  { key: 'addChild', labelKey: 'people.sibling.title', href: '#/add-child' },
   { key: 'settings', labelKey: 'common.nav.settings', href: '/settings' },
 ]
 
@@ -50,11 +53,22 @@ export default function App() {
   const installed = displayMode !== 'browser'
   const [locale, setLocale] = useState<Locale>('he')
   const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null)
-  // Memoised: ChildCalendar reads through this in an effect keyed on the client, so a
-  // fresh object every render would re-fetch the month forever.
+  // Both memoised for the same reason: each screen reads through its client in an effect
+  // keyed on the client, so a fresh object every render would re-fetch forever — the
+  // month for 12b, the club for 13a.
   const scheduleClient = useMemo(() => makeParentScheduleClient(apiFetch), [])
+  const landingClient = useMemo(() => makeLandingClient(apiFetch), [])
+  const peopleClient = useMemo(() => makePeopleClient(apiFetch), [])
   const hash = useHash()
   const today = useToday()
+  // §5.4(c)'s add-a-sibling is one hash away from home. Hash and not a path: it is an
+  // in-app screen, unlike the landing page, which has to be shareable.
+  //
+  // Read off `useHash()` rather than `globalThis.location.hash` directly: both W2 lanes
+  // put a screen behind a hash in this shell, and a plain read is not reactive — the
+  // screen would change only when something else happened to re-render App. One
+  // subscription serves both lanes' routes.
+  const addingChild = hash === '#/add-child'
 
   useEffect(() => {
     const onPrompt = (event: Event): void => {
@@ -64,6 +78,30 @@ export default function App() {
     globalThis.addEventListener('beforeinstallprompt', onPrompt)
     return () => globalThis.removeEventListener('beforeinstallprompt', onPrompt)
   }, [])
+
+  // §5.4a ① — the shop window is a marketing asset on the open internet, so it renders
+  // AHEAD of every gate. A stranger tapping an Instagram link must see the club, not an
+  // install walkthrough for an app they have no reason to want yet; §6.5's install prompt
+  // belongs on `13b`, after they have booked, which is the moment they are most willing.
+  //
+  // A real path and not a hash: the URL goes in a bio and on a printed QR, and Vite's PWA
+  // config already sets `navigateFallback: 'index.html'` so the deep link resolves.
+  const landingRoute = matchLandingPath(globalThis.location?.pathname ?? '/')
+  if (landingRoute) {
+    return (
+      <ThemeProvider>
+        {/* Language before login (§6.1): a Russian-speaking parent cannot read a Hebrew
+            offer any more than a Hebrew consent screen. */}
+        <LanguagePicker locale={locale} onChoose={setLocale} />
+        <PublicLanding
+          slug={landingRoute.slug}
+          locale={locale}
+          client={landingClient}
+          signedIn={session.status === 'signed-in'}
+        />
+      </ThemeProvider>
+    )
+  }
 
   if (!installed) {
     return (
@@ -108,10 +146,15 @@ export default function App() {
             />
           }
         >
-          {/* §6.1's first-run routing still owns the default screen — `Resolve` decides
-              between the studio picker, the blocking consents and home. A guardian who has
-              navigated to #/calendar is past that, and `access.parent` is re-checked here
-              so the hash cannot route around §6.1's refusal arm. */}
+          {/* §6.1's first-run routing still owns the DEFAULT screen — `Resolve` decides
+              between the studio picker, the blocking consents and home. Both W2 lanes
+              hang one screen off a hash in front of it, and neither claims the fallback:
+              an unknown hash still falls through to `Resolve`.
+
+              `access.parent` guards lane SCHEDULE's branch because a hash is typed by
+              whoever is holding the phone, so the check cannot live in the link. Lane
+              PEOPLE's branch needs no such guard — `AddSibling` is behind §6.1's refusal
+              already, since a person with no guardian row never reaches this shell. */}
           {session.access.parent && isCalendarRoute(hash) ? (
             <ScheduleSection
               locale={locale}
@@ -119,6 +162,8 @@ export default function App() {
               hash={hash}
               today={today}
             />
+          ) : addingChild ? (
+            <AddSibling locale={locale} client={peopleClient} />
           ) : (
             <Resolve session={session} locale={locale} />
           )}

@@ -255,6 +255,69 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/enrollments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Enrollments
+         * @description Always scoped to one student. C11 makes several live rows normal, so this is a
+         *     small bounded list rather than a page -- G16's rule is about lists that grow.
+         */
+        get: operations["list_enrollments_api_v1_enrollments_get"];
+        put?: never;
+        /**
+         * Create Enrollment
+         * @description L6 -- enrolment is always a manager decision. `EnrollmentCreate` carries no price,
+         *     because C11 put that on the student and there is no column here to receive one.
+         */
+        post: operations["create_enrollment_api_v1_enrollments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/enrollments/weekday-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Weekday Options
+         * @description C12's checkboxes. Every enrolment form asks this before it draws the day list.
+         */
+        get: operations["weekday_options_api_v1_enrollments_weekday_options_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/enrollments/{enrollment_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Enrollment */
+        patch: operations["update_enrollment_api_v1_enrollments__enrollment_id__patch"];
+        trace?: never;
+    };
     "/api/v1/groups": {
         parameters: {
             query?: never;
@@ -411,6 +474,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/students": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Students
+         * @description §6.3's home, and L9 verbatim.
+         *
+         *     **No role dependency**, deliberately. §3.1: "guardian is not a role"; §6.1 makes parent
+         *     access `EXISTS(guardian WHERE person_id = :me)`. `require_roles` here would refuse
+         *     every guardian in the product and admit every coach with no children.
+         *
+         *     L8 -- no `is_primary` branch. Every guardian on a student sees the same list.
+         *
+         *     Not paginated: this is one person's children. G16 is about lists that grow, and a
+         *     family that outgrows one page is not a case the product has.
+         */
+        get: operations["my_students_api_v1_me_students_get"];
+        put?: never;
+        /**
+         * Request A Sibling
+         * @description §5.4(c) -- parent `12g`, `+ הוסף ילד`.
+         *
+         *     **A request, not an enrollment** (L6). §5.4: "This creates a registration_request with
+         *     source = 'parent_app' and matched_person_id set -- a request, not an enrollment. The
+         *     manager approves it, consistent with (b): conversion is always a human decision."
+         *
+         *     No role dependency, for the same reason `/me/students` has none: §3.1 -- 'guardian is
+         *     not a role'. Being a guardian is what `person_id` on a `guardian` row means, and this
+         *     route needs nothing more than an identity with a Person in this studio.
+         */
+        post: operations["request_a_sibling_api_v1_me_students_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/platform/studios": {
         parameters: {
             query?: never;
@@ -474,6 +578,191 @@ export interface paths {
          *     `studios_for_identity` skips a non-active one.
          */
         post: operations["suspend_api_v1_platform_studios__studio_id__suspend_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/groups/{group_id}/trial-slots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Trial Slots
+         * @description §5.4a step 4 -- 'the next N upcoming sessions of each chosen group, one pick per
+         *     child.'
+         */
+        get: operations["trial_slots_api_v1_public_groups__group_id__trial_slots_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/studios/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Public Studio
+         * @description §7 lists this separately from `/landing`. Same payload: splitting the club's name
+         *     from the club's page would give a caller two shapes to keep in step for no benefit, and
+         *     the narrow one is already as narrow as it goes.
+         */
+        get: operations["public_studio_api_v1_public_studios__slug__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/studios/{slug}/groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Public Groups */
+        get: operations["public_groups_api_v1_public_studios__slug__groups_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/studios/{slug}/landing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Landing */
+        get: operations["landing_api_v1_public_studios__slug__landing_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/studios/{slug}/logo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Public Logo
+         * @description §5.4a ① -- the logo, on the club's own marketing page.
+         *
+         *     Unauthenticated by necessity: `/api/v1/studio/logo` is tenant-scoped and needs a token,
+         *     and a stranger tapping an Instagram link has neither. A club's own logo on its own shop
+         *     window is public by definition -- it is the thing they print on flyers.
+         */
+        get: operations["public_logo_api_v1_public_studios__slug__logo_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/registration-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Registration Requests
+         * @description Dashboard `6c`. §3.2 -- 'Approve registration requests' is owner and manager only.
+         *
+         *     L10 -- `RegistrationRequestOut` carries two display names and no payload. A list
+         *     endpoint that decrypted every row would defeat the encryption for one page load.
+         */
+        get: operations["list_registration_requests_api_v1_registration_requests_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/registration-requests/{request_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Registration Request
+         * @description Opening one submission. **Audit-logged as sensitive** (§11.2): this is a stranger's
+         *     personal data about a minor, so the summary is free and the full read is recorded.
+         */
+        get: operations["read_registration_request_api_v1_registration_requests__request_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/registration-requests/{request_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve Registration Request
+         * @description §5.4a's approval transaction.
+         *
+         *     **The group comes from the body, not the payload** (§5.4): "Approving is where the group
+         *     is chosen, which is why group_id lives on the decision and not on the submission."
+         */
+        post: operations["approve_registration_request_api_v1_registration_requests__request_id__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/registration-requests/{request_id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reject Registration Request */
+        post: operations["reject_registration_request_api_v1_registration_requests__request_id__reject_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -622,6 +911,253 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/students": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Students
+         * @description Dashboard `3b` and staff `9h`.
+         */
+        get: operations["list_students_api_v1_students_get"];
+        put?: never;
+        /**
+         * Create Student
+         * @description §5.4(a) -- `+ תלמיד חדש`. Dashboard `3c`.
+         *
+         *     L6: manager-or-owner, and there is no self-service equivalent. The public link's only
+         *     job is a first lesson.
+         *
+         *     Naming a group enrols the child here, in the same transaction -- §5.4(a) is 'child
+         *     details AND GROUP -> save. Creates everything immediately.' Omitting one is the
+         *     phone-enquiry case and leaves a lead with no enrollment, which is what §5.4a says a
+         *     lead is.
+         */
+        post: operations["create_student_api_v1_students_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/students/{student_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Student
+         * @description Staff `9c` and dashboard `4a`. No price here -- see the module docstring.
+         */
+        get: operations["get_student_api_v1_students__student_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Student */
+        patch: operations["update_student_api_v1_students__student_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/students/{student_id}/convert": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Convert Student
+         * @description §5.4a step 5. L6 -- manager-or-owner, because enrolment is always a manager decision
+         *     and this is the moment it is made.
+         */
+        post: operations["convert_student_api_v1_students__student_id__convert_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/students/{student_id}/freeze": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Freeze Student
+         * @description §5.4's freeze. Parent `12i` and dashboard `4a`. The enrollment and the spot are
+         *     retained -- see `StudentService.freeze`.
+         */
+        post: operations["freeze_student_api_v1_students__student_id__freeze_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/students/{student_id}/guardians": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Guardians
+         * @description Staff `9c`'s card shows how to reach the parent. Coach-reachable, and safe to tag:
+         *     §5.3 gives `GuardianOut` no permission field and no financial one.
+         */
+        get: operations["list_guardians_api_v1_students__student_id__guardians_get"];
+        put?: never;
+        /** Add Guardian */
+        post: operations["add_guardian_api_v1_students__student_id__guardians_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/students/{student_id}/guardians/{person_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove Guardian
+         * @description Returns the remaining guardians rather than 204, because removing the primary
+         *     promotes another and the client needs to know which.
+         */
+        delete: operations["remove_guardian_api_v1_students__student_id__guardians__person_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/students/{student_id}/guardians/{person_id}/set-primary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Set Primary Guardian
+         * @description L8 -- this changes whose name the bill carries and which person a הוראת קבע matches.
+         *     It changes no permission, because there is none attached to it.
+         */
+        post: operations["set_primary_guardian_api_v1_students__student_id__guardians__person_id__set_primary_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/students/{student_id}/leave": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Leave Studio
+         * @description §5.4's leaving. `StudentLeaveIn` carries no money field and no write-off flag --
+         *     parent `12i`: the monthly charge stays the parent's responsibility.
+         */
+        post: operations["leave_studio_api_v1_students__student_id__leave_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/students/{student_id}/mark-lost": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark Student Lost
+         * @description §5.4a ⑤. The reason is required here and optional in the job: a manager pressing the
+         *     button knows why, and the job only knows that time passed.
+         */
+        post: operations["mark_student_lost_api_v1_students__student_id__mark_lost_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/students/{student_id}/price-plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Student Price Plan
+         * @description C11's two numbers, for dashboard `4a`'s plan field.
+         *
+         *     Manager-only and deliberately **untagged**: `price_plan_id` is what invariant 3's
+         *     detector reads as a financial field, so this shape must never be reachable from a
+         *     coach route. `weekly_volume` is §5.10's suggestion beside the plan picker -- a count of
+         *     sessions, never an amount. `price_plan` is W4's table and this lane never resolves it.
+         */
+        get: operations["student_price_plan_api_v1_students__student_id__price_plan_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/students/{student_id}/status-history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Student Status History
+         * @description §5.4a's funnel is computed from these rows; dashboard `4a` renders them as a
+         *     timeline. Task 6 fills in the service method.
+         */
+        get: operations["student_status_history_api_v1_students__student_id__status_history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/studio": {
         parameters: {
             query?: never;
@@ -737,6 +1273,105 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/trial-bookings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Trial Bookings
+         * @description §5.4a ② -- the dashboard's שיעורי ניסיון queue.
+         */
+        get: operations["list_trial_bookings_api_v1_trial_bookings_get"];
+        put?: never;
+        /**
+         * Log Trial Booking
+         * @description §5.4a -- 'A manager can also log a phone enquiry, producing the same rows.'
+         *
+         *     `AnyStaff` and not `ManagerOrOwner`: staff `11b` is a coach adding a trial student
+         *     mid-lesson, which §5.4a ③ describes and §3.2 permits -- it records an enquiry, it does
+         *     not enrol anybody. L6 is untouched: no enrollment is created here either.
+         */
+        post: operations["log_trial_booking_api_v1_trial_bookings_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/trial-bookings/self": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Book Trial For Self
+         * @description §5.4a steps 1-5. **Authenticated, but with no studio in the token.**
+         *
+         *     `SessionDep` and not `TenantSessionDep`, deliberately -- see the module docstring. The
+         *     writes below all happen inside a `TenantSession` scoped to the studio the group belongs
+         *     to, so nothing here escapes the tenant guard; it simply arrives by a different route.
+         *
+         *     §11.7's two controls: rate-limited per IP and per identity (see
+         *     `app/services/people/rate_limit.py` for what that limiter is and is not), and
+         *     sign-in-first standing in for the captcha that has no provider configured.
+         */
+        post: operations["book_trial_for_self_api_v1_trial_bookings_self_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/trial-bookings/{booking_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Trial Booking
+         * @description §5.4a ③ -- 'Coach marks attendance exactly as normal. Coach can leave a note.'
+         */
+        patch: operations["update_trial_booking_api_v1_trial_bookings__booking_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/trial-bookings/{booking_id}/grant-override": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Grant Override
+         * @description §5.4a -- a manager granting a **second** free trial, in one tap.
+         *
+         *     Manager-only, because §5.4a makes one free trial the rule and a second one "a
+         *     deliberate, visible, countable act rather than someone quietly adding a row".
+         */
+        post: operations["grant_override_api_v1_trial_bookings__booking_id__grant_override_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -784,6 +1419,21 @@ export interface components {
             invitation_token?: string | null;
             /** State */
             state: string;
+        };
+        /**
+         * ChildMatchOut
+         * @description §5.4a's duplicate-child warning. A candidate the manager judges, never a merge.
+         */
+        ChildMatchOut: {
+            /** Birthdate */
+            birthdate: string | null;
+            /** Display Name */
+            display_name: string;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
         };
         /** ClassCreate */
         ClassCreate: {
@@ -924,6 +1574,18 @@ export interface components {
             /** Next Cursor */
             next_cursor?: string | null;
         };
+        /** CursorPage[RegistrationRequestOut] */
+        CursorPage_RegistrationRequestOut_: {
+            /**
+             * Has More
+             * @default false
+             */
+            has_more: boolean;
+            /** Items */
+            items: components["schemas"]["RegistrationRequestOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
         /** CursorPage[SessionNoteOut] */
         CursorPage_SessionNoteOut_: {
             /**
@@ -948,6 +1610,18 @@ export interface components {
             /** Next Cursor */
             next_cursor?: string | null;
         };
+        /** CursorPage[StudentSummaryOut] */
+        CursorPage_StudentSummaryOut_: {
+            /**
+             * Has More
+             * @default false
+             */
+            has_more: boolean;
+            /** Items */
+            items: components["schemas"]["StudentSummaryOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
         /** CursorPage[TrainingYearOut] */
         CursorPage_TrainingYearOut_: {
             /**
@@ -959,6 +1633,100 @@ export interface components {
             items: components["schemas"]["TrainingYearOut"][];
             /** Next Cursor */
             next_cursor?: string | null;
+        };
+        /** CursorPage[TrialBookingRow] */
+        CursorPage_TrialBookingRow_: {
+            /**
+             * Has More
+             * @default false
+             */
+            has_more: boolean;
+            /** Items */
+            items: components["schemas"]["TrialBookingRow"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** EnrollmentCreate */
+        EnrollmentCreate: {
+            /** Attends Weekdays */
+            attends_weekdays?: number[] | null;
+            /**
+             * Group Id
+             * Format: uuid
+             */
+            group_id: string;
+            /**
+             * Started On
+             * Format: date
+             */
+            started_on: string;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+        };
+        /**
+         * EnrollmentOut
+         * @description One group membership. **Carries no price** — C11 put that on the student, so a
+         *     child in two groups has two of these and one tuition charge.
+         */
+        EnrollmentOut: {
+            /** Attends Weekdays */
+            attends_weekdays?: number[] | null;
+            /** Ended On */
+            ended_on: string | null;
+            /**
+             * Group Id
+             * Format: uuid
+             */
+            group_id: string;
+            /** Group Name */
+            group_name: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Started On
+             * Format: date
+             */
+            started_on: string;
+            /** Status */
+            status: string;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+        };
+        /** EnrollmentUpdate */
+        EnrollmentUpdate: {
+            /** Attends Weekdays */
+            attends_weekdays?: number[] | null;
+            /** Ended On */
+            ended_on?: string | null;
+            /** Status */
+            status?: string | null;
+        };
+        /**
+         * EnrollmentWeekdayOptionsOut
+         * @description C12's checkboxes. The enrolment form asks this before it can draw the day list.
+         *
+         *     `training_weekdays` comes through `ScheduleService.materialize_sessions()` (L5), so an
+         *     empty list means "this group has no schedule yet" and the form says exactly that.
+         */
+        EnrollmentWeekdayOptionsOut: {
+            /**
+             * Group Id
+             * Format: uuid
+             */
+            group_id: string;
+            /** Group Name */
+            group_name: string;
+            /** Training Weekdays */
+            training_weekdays?: number[];
         };
         /**
          * GenerateSessionsOut
@@ -1065,6 +1833,69 @@ export interface components {
             role: string;
             /** To Date */
             to_date: string | null;
+        };
+        /**
+         * GuardianCreate
+         * @description §5.3 — guardians are invited by email or phone, and the invitation carries a token
+         *     binding the accepting identity to the pre-created Person.
+         *
+         *     Declared above `StudentCreate` because that shape references it: `from __future__
+         *     import annotations` makes the annotation a string, but Pydantic resolves it when the
+         *     model class is built, so the name has to exist by then.
+         */
+        GuardianCreate: {
+            /** Email */
+            email?: string | null;
+            /** First Name */
+            first_name: string;
+            /**
+             * Is Primary
+             * @default false
+             */
+            is_primary: boolean;
+            /** Last Name */
+            last_name: string;
+            /** Phone */
+            phone?: string | null;
+            /**
+             * Relation
+             * @default parent
+             */
+            relation: string;
+        };
+        /** GuardianListResponse */
+        GuardianListResponse: {
+            /** Items */
+            items: components["schemas"]["GuardianOut"][];
+        };
+        /**
+         * GuardianOut
+         * @description §4.3's `guardian` link, projected.
+         *
+         *     `is_primary` is reported because the parent app shows whose name the bill carries
+         *     (§5.10) — not because anything is gated on it. See the module docstring.
+         */
+        GuardianOut: {
+            /** Display Name */
+            display_name: string;
+            /** Email */
+            email?: string | null;
+            /** Is Primary */
+            is_primary: boolean;
+            /**
+             * Person Id
+             * Format: uuid
+             */
+            person_id: string;
+            /** Phone */
+            phone?: string | null;
+            /** Relation */
+            relation: string;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -1273,6 +2104,168 @@ export interface components {
              * @default Asia/Jerusalem
              */
             timezone: string;
+        };
+        /**
+         * PublicGroupListResponse
+         * @description Not a `CursorPage`: a club has a dozen groups, not a growing list somebody pages
+         *     through, and the landing page renders all of them at once.
+         */
+        PublicGroupListResponse: {
+            /** Items */
+            items: components["schemas"]["PublicGroupOut"][];
+        };
+        /**
+         * PublicGroupOut
+         * @description §7 — `GET /public/studios/{slug}/groups`, unauthenticated.
+         *
+         *     A deliberately narrow projection, for the same reason `TrialSlotOut` is one: this is a
+         *     shop window on the open internet. No class id, no staff, no enrollment count.
+         *     `training_weekdays` is here because parent `13a` shows "מתאמנים בימים" beside each
+         *     group, and because §5.4a filters groups by the child's age where a range is set.
+         */
+        PublicGroupOut: {
+            /** Age Max */
+            age_max: number | null;
+            /** Age Min */
+            age_min: number | null;
+            /** Description */
+            description: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Training Weekdays */
+            training_weekdays?: number[];
+        };
+        /**
+         * PublicLandingOut
+         * @description §5.4a ① — 'a public LANDING PAGE at /t/{studio-slug} — the club's shop window, not
+         *     a form.'
+         */
+        PublicLandingOut: {
+            /** About */
+            about: string | null;
+            /** Address */
+            address: string | null;
+            /** Default Locale */
+            default_locale: string;
+            /** Groups */
+            groups?: components["schemas"]["PublicGroupOut"][];
+            /** Headline */
+            headline: string | null;
+            /** Logo Url */
+            logo_url: string | null;
+            /** Photo Urls */
+            photo_urls?: string[];
+            /** Slug */
+            slug: string;
+            /** Studio Name */
+            studio_name: string;
+        };
+        /**
+         * RegistrationDecisionIn
+         * @description `POST /registration-requests/{id}/{approve|reject}`.
+         *
+         *     §5.4: **enrollment is always a manager decision.** Approving is where the group is
+         *     chosen, which is why `group_id` lives on the decision and not on the submission — the
+         *     public link's only job is a first lesson.
+         */
+        RegistrationDecisionIn: {
+            /** Group Id */
+            group_id?: string | null;
+            /** Reason */
+            reason?: string | null;
+        };
+        /**
+         * RegistrationDecisionOut
+         * @description The result of approving or rejecting one submission.
+         *
+         *     One shape for both verbs: a rejection creates no students and returns an empty list,
+         *     which is a truer answer than a second shape that cannot express the difference.
+         */
+        RegistrationDecisionOut: {
+            /**
+             * Request Id
+             * Format: uuid
+             */
+            request_id: string;
+            /** Status */
+            status: string;
+            /** Student Ids */
+            student_ids?: string[];
+        };
+        /**
+         * RegistrationRequestDetailOut
+         * @description One submission, opened. Reading this is audit-logged as sensitive (§11.2) — the
+         *     summary in the queue is free, the full read is recorded.
+         */
+        RegistrationRequestDetailOut: {
+            /** Child Display Name */
+            child_display_name: string;
+            /** Children */
+            children?: {
+                [key: string]: unknown;
+            }[];
+            /** Guardian Display Name */
+            guardian_display_name: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Matched Person Id */
+            matched_person_id: string | null;
+            /** Possible Duplicate Students */
+            possible_duplicate_students?: components["schemas"]["ChildMatchOut"][];
+            /** Preferred Group Id */
+            preferred_group_id?: string | null;
+            /** Reviewed At */
+            reviewed_at: string | null;
+            /** Source */
+            source: string;
+            /** Status */
+            status: string;
+            /**
+             * Submitted At
+             * Format: date-time
+             */
+            submitted_at: string;
+        };
+        /**
+         * RegistrationRequestOut
+         * @description The approval queue's row (dashboard `6c`).
+         *
+         *     **`payload` is not here.** The encrypted payload is a stranger's personal data about a
+         *     minor (§11.1); the queue renders a summary, and reading the full submission is a
+         *     separate, audit-logged fetch. A list endpoint that decrypted every row would defeat
+         *     the encryption for the cost of one page load.
+         */
+        RegistrationRequestOut: {
+            /** Child Display Name */
+            child_display_name: string;
+            /** Guardian Display Name */
+            guardian_display_name: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Matched Person Id */
+            matched_person_id: string | null;
+            /** Reviewed At */
+            reviewed_at: string | null;
+            /** Source */
+            source: string;
+            /** Status */
+            status: string;
+            /**
+             * Submitted At
+             * Format: date-time
+             */
+            submitted_at: string;
         };
         /**
          * ScheduleImpactPreview
@@ -1648,6 +2641,23 @@ export interface components {
              */
             status: "pending" | "done" | "skipped";
         };
+        /**
+         * SiblingRequestIn
+         * @description §5.4(c) — parent `12g`. `POST /me/students`.
+         *
+         *     The group is a **preference**, not a choice: L6 makes enrolment a manager decision, and
+         *     the copy on `12g` promises review rather than a place.
+         */
+        SiblingRequestIn: {
+            /** Birthdate */
+            birthdate?: string | null;
+            /** First Name */
+            first_name: string;
+            /** Last Name */
+            last_name: string;
+            /** Preferred Group Id */
+            preferred_group_id?: string | null;
+        };
         /** StaffGroupOut */
         StaffGroupOut: {
             /** Id */
@@ -1688,6 +2698,312 @@ export interface components {
              * @description Always null in M1. Weekly load is group_schedule_rule × session, both W2 contract models. Zero would report an idle coach rather than a missing measurement.
              */
             weekly_hours?: number | null;
+        };
+        /**
+         * StudentConvertIn
+         * @description §5.4a step 5 — 'Manager converts → picks group, sets price, status=active,
+         *     enrollment created.' Three decisions in one request, because they are one decision.
+         */
+        StudentConvertIn: {
+            /** Attends Weekdays */
+            attends_weekdays?: number[] | null;
+            /**
+             * Group Id
+             * Format: uuid
+             */
+            group_id: string;
+            /** Price Plan Id */
+            price_plan_id?: string | null;
+            /** Reason */
+            reason?: string | null;
+            /**
+             * Started On
+             * Format: date
+             */
+            started_on: string;
+        };
+        /** StudentCreate */
+        StudentCreate: {
+            /** Attends Weekdays */
+            attends_weekdays?: number[] | null;
+            /** Birthdate */
+            birthdate?: string | null;
+            /** Email */
+            email?: string | null;
+            /** First Name */
+            first_name: string;
+            /** Group Id */
+            group_id?: string | null;
+            guardian?: components["schemas"]["GuardianCreate"] | null;
+            /** Last Name */
+            last_name: string;
+            /** Phone */
+            phone?: string | null;
+        };
+        /**
+         * StudentCreateResult
+         * @description §5.4(a) — 'Creates everything immediately with health_status = missing, and sends
+         *     the parent an invitation.'
+         *
+         *     `invitation_token` is returned **once**, to the manager who just created the student,
+         *     so the dashboard can render a copyable link for a parent standing at the desk. Only
+         *     its SHA-256 hash reaches `invitation.token_hash`, and it is never logged.
+         *
+         *     Manager-scoped, so `StudentOut` (with `price_plan_id`) is safe here.
+         */
+        StudentCreateResult: {
+            /** Invitation Token */
+            invitation_token?: string | null;
+            student: components["schemas"]["StudentOut"];
+        };
+        /**
+         * StudentDetailOut
+         * @description One student in full, for staff `9c` and dashboard `4a` — and **coach-reachable**.
+         *
+         *     `StudentOut` minus `price_plan_id`. §3.2 gives every staff role "View students in own
+         *     groups", so `GET /students/{id}` is a coach route, and invariant 3's detector reads
+         *     `price_plan_id` as financial. The price is not omitted to be coy: a coach has no use
+         *     for it, and a shape that cannot carry it is cheaper to guarantee than a filter that
+         *     has to remember to.
+         */
+        StudentDetailOut: {
+            /** Birthdate */
+            birthdate: string | null;
+            /** Current Belt Color Hex */
+            current_belt_color_hex?: string | null;
+            /** Current Belt Id */
+            current_belt_id?: string | null;
+            /** Current Belt Name */
+            current_belt_name?: string | null;
+            /** Email */
+            email?: string | null;
+            /** First Name */
+            first_name: string;
+            /** Frozen Until */
+            frozen_until?: string | null;
+            /** Guardians */
+            guardians?: components["schemas"]["GuardianOut"][];
+            /** Health Status */
+            health_status: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Joined On */
+            joined_on: string | null;
+            /** Last Name */
+            last_name: string;
+            /** Left On */
+            left_on: string | null;
+            /**
+             * Person Id
+             * Format: uuid
+             */
+            person_id: string;
+            /** Phone */
+            phone?: string | null;
+            /** Status */
+            status: string;
+        };
+        /**
+         * StudentFreezeIn
+         * @description §7 — `POST /students/{id}/freeze`. §5.10 step 4: a frozen student generates no
+         *     charge for the frozen period, which is why this is a date range and not a boolean.
+         */
+        StudentFreezeIn: {
+            /**
+             * From Date
+             * Format: date
+             */
+            from_date: string;
+            /** Reason */
+            reason?: string | null;
+            /** To Date */
+            to_date?: string | null;
+        };
+        /**
+         * StudentLeaveIn
+         * @description §7 — `POST /students/{id}/leave`.
+         *
+         *     Parent artboard `12i` states it plainly: **the monthly charge stays the parent's
+         *     responsibility**. Leaving is not a refund, so this shape carries no money field and no
+         *     "cancel outstanding charges" flag. A manager who wants to write one off does it in the
+         *     billing screen, deliberately, where it is audit-logged as a write-off.
+         */
+        StudentLeaveIn: {
+            /**
+             * Left On
+             * Format: date
+             */
+            left_on: string;
+            /** Reason */
+            reason?: string | null;
+        };
+        /**
+         * StudentMarkLostIn
+         * @description §5.4a — 'No conversion after N days → status=lost, with a reason.' Required here
+         *     and optional in the job, because a manager pressing the button knows why and the job
+         *     only knows that time passed.
+         */
+        StudentMarkLostIn: {
+            /** Reason */
+            reason: string;
+        };
+        /**
+         * StudentOut
+         * @description One student, as every surface reads them.
+         *
+         *     `health_status` is here and `derived_flags` is **not**. That split is §5.5's whole
+         *     privacy model: the status is a three-valued fact a coach may see, the flags are health
+         *     data and travel only on the roster payload a coach is already authorised for
+         *     (`BootstrapPayload.roster[]`, W3). A general-purpose student shape that carried flags
+         *     would leak them into every screen that happens to list students.
+         */
+        StudentOut: {
+            /** Birthdate */
+            birthdate: string | null;
+            /** Current Belt Color Hex */
+            current_belt_color_hex?: string | null;
+            /** Current Belt Id */
+            current_belt_id: string | null;
+            /** Current Belt Name */
+            current_belt_name?: string | null;
+            /** First Name */
+            first_name: string;
+            /** Guardians */
+            guardians?: components["schemas"]["GuardianOut"][];
+            /** Health Status */
+            health_status: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Joined On */
+            joined_on: string | null;
+            /** Last Name */
+            last_name: string;
+            /** Left On */
+            left_on: string | null;
+            /**
+             * Person Id
+             * Format: uuid
+             */
+            person_id: string;
+            /** Price Plan Id */
+            price_plan_id?: string | null;
+            /** Status */
+            status: string;
+        };
+        /**
+         * StudentPricePlanOut
+         * @description C11's two numbers, manager-scoped. **Never** returned from a `coach`-tagged route.
+         *
+         *     `weekly_volume` is what §5.10 shows beside the plan picker so a mismatch between what
+         *     a child attends and what they are billed for is visible at the moment the price is
+         *     set. It is a suggestion, not a computation — the manager picks the plan.
+         *
+         *     No amount, because `price_plan` is W4's table and does not exist yet (L2).
+         */
+        StudentPricePlanOut: {
+            /** Price Plan Id */
+            price_plan_id: string | null;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+            /** Weekly Volume */
+            weekly_volume: number;
+        };
+        /** StudentStatusHistoryListResponse */
+        StudentStatusHistoryListResponse: {
+            /** Items */
+            items: components["schemas"]["StudentStatusHistoryOut"][];
+        };
+        /** StudentStatusHistoryOut */
+        StudentStatusHistoryOut: {
+            /**
+             * Changed At
+             * Format: date-time
+             */
+            changed_at: string;
+            /** From Status */
+            from_status: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Reason */
+            reason: string | null;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+            /** To Status */
+            to_status: string;
+        };
+        /**
+         * StudentSummaryOut
+         * @description The row dashboard `3b` and staff `9h` render, and the only student shape a coach
+         *     receives from a list.
+         *
+         *     `group_names` and not `group_ids`: C11 makes several live enrollments normal, and
+         *     `3b`'s column shows what a manager reads rather than what a client would have to join.
+         */
+        StudentSummaryOut: {
+            /** Birthdate */
+            birthdate: string | null;
+            /** Current Belt Color Hex */
+            current_belt_color_hex?: string | null;
+            /** Current Belt Id */
+            current_belt_id?: string | null;
+            /** Current Belt Name */
+            current_belt_name?: string | null;
+            /** First Name */
+            first_name: string;
+            /** Frozen Until */
+            frozen_until?: string | null;
+            /** Group Names */
+            group_names?: string[];
+            /** Guardian Display Names */
+            guardian_display_names?: string[];
+            /** Health Status */
+            health_status: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Joined On */
+            joined_on: string | null;
+            /** Last Name */
+            last_name: string;
+            /** Left On */
+            left_on: string | null;
+            /**
+             * Person Id
+             * Format: uuid
+             */
+            person_id: string;
+            /** Status */
+            status: string;
+        };
+        /** StudentUpdate */
+        StudentUpdate: {
+            /** Birthdate */
+            birthdate?: string | null;
+            /** Email */
+            email?: string | null;
+            /** First Name */
+            first_name?: string | null;
+            /** Last Name */
+            last_name?: string | null;
+            /** Phone */
+            phone?: string | null;
         };
         /** StudioListResponse */
         StudioListResponse: {
@@ -1792,6 +3108,245 @@ export interface components {
             starts_on: string;
             /** Status */
             status: string;
+        };
+        /**
+         * TrialBookingConfirmationOut
+         * @description §5.4a step 5's "נתראה ביום א׳ 17:00", once per child.
+         *
+         *     Two siblings in different groups have two different answers to 'which group' and
+         *     'when', so `13b` renders one of these per child rather than one for the booking.
+         */
+        TrialBookingConfirmationOut: {
+            /** Group Name */
+            group_name: string;
+            /** Session Starts At */
+            session_starts_at: string | null;
+            /** Student Display Name */
+            student_display_name: string;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+        };
+        /**
+         * TrialBookingCreate
+         * @description §5.4a — 'A manager can also log a phone enquiry, producing the same rows.'
+         */
+        TrialBookingCreate: {
+            child: components["schemas"]["StudentCreate"];
+            /**
+             * Group Id
+             * Format: uuid
+             */
+            group_id: string;
+            guardian: components["schemas"]["GuardianCreate"];
+            /** Session Id */
+            session_id?: string | null;
+        };
+        /** TrialBookingOut */
+        TrialBookingOut: {
+            /** Attended */
+            attended: boolean | null;
+            /**
+             * Booked At
+             * Format: date-time
+             */
+            booked_at: string;
+            /**
+             * Group Id
+             * Format: uuid
+             */
+            group_id: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Override */
+            is_override: boolean;
+            /** Outcome */
+            outcome?: string | null;
+            /** Session Id */
+            session_id: string | null;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+        };
+        /**
+         * TrialBookingRow
+         * @description One row of the dashboard's שיעורי ניסיון queue (§5.4a ②).
+         *
+         *     Carries the child's name because a queue of timestamps is not a queue anyone can act
+         *     on — but nothing else about them, and nothing at all about health.
+         */
+        TrialBookingRow: {
+            /** Attended */
+            attended: boolean | null;
+            /**
+             * Booked At
+             * Format: date-time
+             */
+            booked_at: string;
+            /**
+             * Group Id
+             * Format: uuid
+             */
+            group_id: string;
+            /** Group Name */
+            group_name: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Override */
+            is_override: boolean;
+            /** Outcome */
+            outcome?: string | null;
+            /** Session Id */
+            session_id: string | null;
+            /** Student Display Name */
+            student_display_name: string;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+        };
+        /**
+         * TrialBookingSelfIn
+         * @description §7 — `POST /trial-bookings/self`, **authenticated**: the parent has just signed in.
+         *
+         *     §5.4's sign-in-first booking. The children are described here rather than matched by
+         *     the client, because §5.4 matches people on **verified email or phone** and a client
+         *     cannot verify anything. `trial_health_declarations` carries §5.4a's trial answers,
+         *     which is why the request lands in `registration_request.payload_encrypted` rather than
+         *     being written straight to a table (§11.1).
+         */
+        TrialBookingSelfIn: {
+            /** Children */
+            children: components["schemas"]["TrialChildIn"][];
+            /** Group Id */
+            group_id?: string | null;
+            /** Session Id */
+            session_id?: string | null;
+            /** Trial Health Declarations */
+            trial_health_declarations?: {
+                [key: string]: unknown;
+            }[];
+        };
+        /**
+         * TrialBookingSelfResult
+         * @description §5.4a step 5 — 'אישור: "נתראה ביום א׳ 17:00" · [ הוסף ליומן ] · .ics'.
+         *
+         *     Everything artboard `13b` renders, in one response, because the parent has no studio in
+         *     their token yet and a second round trip would need one.
+         */
+        TrialBookingSelfResult: {
+            /** Bookings */
+            bookings?: components["schemas"]["TrialBookingConfirmationOut"][];
+            /** Students */
+            students?: components["schemas"]["StudentSummaryOut"][];
+            /** Studio Name */
+            studio_name: string;
+            /** Studio Slug */
+            studio_slug: string;
+        };
+        /**
+         * TrialBookingUpdate
+         * @description §5.4a ③ — the coach marks attendance and may leave a note.
+         *
+         *     `attended` is `bool | None` **and** the field is optional, so three states survive the
+         *     wire: absent means "do not change", `null` means "not yet", `false` means "did not turn
+         *     up". The follow-up ladder treats the last two completely differently.
+         */
+        TrialBookingUpdate: {
+            /** Attended */
+            attended?: boolean | null;
+            /** Coach Note */
+            coach_note?: string | null;
+            /** Outcome */
+            outcome?: string | null;
+        };
+        /**
+         * TrialChildIn
+         * @description One child in §5.4a's booking, with the two choices the spec makes **per child**.
+         *
+         *     Step 2 is "class ▸ group (groups filtered by the child's age)" and step 4 is "the next
+         *     N upcoming sessions of each chosen group, **one pick per child**". Siblings of
+         *     different ages are the whole reason the group list is age-filtered, so a booking that
+         *     can only carry one group cannot express the case the picker exists for.
+         */
+        TrialChildIn: {
+            /** Attends Weekdays */
+            attends_weekdays?: number[] | null;
+            /** Birthdate */
+            birthdate?: string | null;
+            /** Email */
+            email?: string | null;
+            /** First Name */
+            first_name: string;
+            /** Group Id */
+            group_id?: string | null;
+            guardian?: components["schemas"]["GuardianCreate"] | null;
+            /** Last Name */
+            last_name: string;
+            /** Phone */
+            phone?: string | null;
+            /** Session Id */
+            session_id?: string | null;
+        };
+        /**
+         * TrialSlotListResponse
+         * @description Not a `CursorPage`: §7 asks for "the next N bookable sessions", which is a bounded
+         *     peek rather than a list somebody pages through. G16's rule is about lists that grow.
+         */
+        TrialSlotListResponse: {
+            /** Items */
+            items: components["schemas"]["TrialSlotOut"][];
+        };
+        /**
+         * TrialSlotOut
+         * @description §7 — `GET /public/groups/{id}/trial-slots`, the next N bookable sessions.
+         *
+         *     **Unauthenticated, so it is a deliberately narrower projection of `SessionOut`.** No
+         *     staff list, no ids beyond the session and group, no note of whether attendance was
+         *     taken. A public landing page (§5.4, parent `13a`) has no business knowing which coach
+         *     is on the mat, and the cheapest way to guarantee that is a shape that cannot carry it.
+         */
+        TrialSlotOut: {
+            /**
+             * Ends At
+             * Format: date-time
+             */
+            ends_at: string;
+            /**
+             * Group Id
+             * Format: uuid
+             */
+            group_id: string;
+            /** Group Name */
+            group_name: string;
+            /**
+             * Is Bookable
+             * @default true
+             */
+            is_bookable: boolean;
+            /** Location Name */
+            location_name: string | null;
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
+            /**
+             * Starts At
+             * Format: date-time
+             */
+            starts_at: string;
         };
         /** ValidationError */
         ValidationError: {
@@ -2254,6 +3809,143 @@ export interface operations {
             };
         };
     };
+    list_enrollments_api_v1_enrollments_get: {
+        parameters: {
+            query: {
+                student_id: string;
+                include_ended?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnrollmentOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_enrollment_api_v1_enrollments_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EnrollmentCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnrollmentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    weekday_options_api_v1_enrollments_weekday_options_get: {
+        parameters: {
+            query: {
+                group_id: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnrollmentWeekdayOptionsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_enrollment_api_v1_enrollments__enrollment_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                enrollment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EnrollmentUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnrollmentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_groups_api_v1_groups_get: {
         parameters: {
             query?: {
@@ -2602,6 +4294,62 @@ export interface operations {
             };
         };
     };
+    my_students_api_v1_me_students_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CursorPage_StudentSummaryOut_"];
+                };
+            };
+        };
+    };
+    request_a_sibling_api_v1_me_students_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SiblingRequestIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistrationRequestOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_studios_api_v1_platform_studios_get: {
         parameters: {
             query?: never;
@@ -2708,6 +4456,301 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["app__schemas__platform__StudioOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    trial_slots_api_v1_public_groups__group_id__trial_slots_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                group_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrialSlotListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    public_studio_api_v1_public_studios__slug__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicLandingOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    public_groups_api_v1_public_studios__slug__groups_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicGroupListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    landing_api_v1_public_studios__slug__landing_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicLandingOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    public_logo_api_v1_public_studios__slug__logo_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_registration_requests_api_v1_registration_requests_get: {
+        parameters: {
+            query?: {
+                status?: string | null;
+                after?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CursorPage_RegistrationRequestOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_registration_request_api_v1_registration_requests__request_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistrationRequestDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_registration_request_api_v1_registration_requests__request_id__approve_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegistrationDecisionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistrationDecisionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reject_registration_request_api_v1_registration_requests__request_id__reject_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegistrationDecisionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistrationDecisionOut"];
                 };
             };
             /** @description Validation Error */
@@ -3067,6 +5110,497 @@ export interface operations {
             };
         };
     };
+    list_students_api_v1_students_get: {
+        parameters: {
+            query?: {
+                status?: string | null;
+                group_id?: string | null;
+                health_status?: string | null;
+                q?: string | null;
+                after?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CursorPage_StudentSummaryOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_student_api_v1_students_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StudentCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudentCreateResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_student_api_v1_students__student_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudentDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_student_api_v1_students__student_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StudentUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    convert_student_api_v1_students__student_id__convert_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StudentConvertIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    freeze_student_api_v1_students__student_id__freeze_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StudentFreezeIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_guardians_api_v1_students__student_id__guardians_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GuardianListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_guardian_api_v1_students__student_id__guardians_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GuardianCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GuardianListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_guardian_api_v1_students__student_id__guardians__person_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+                person_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GuardianListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_primary_guardian_api_v1_students__student_id__guardians__person_id__set_primary_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                student_id: string;
+                person_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GuardianListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    leave_studio_api_v1_students__student_id__leave_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StudentLeaveIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mark_student_lost_api_v1_students__student_id__mark_lost_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StudentMarkLostIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    student_price_plan_api_v1_students__student_id__price_plan_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudentPricePlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    student_status_history_api_v1_students__student_id__status_history_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudentStatusHistoryListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     read_studio_api_v1_studio_get: {
         parameters: {
             query?: never;
@@ -3314,6 +5848,180 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GenerateSessionsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_trial_bookings_api_v1_trial_bookings_get: {
+        parameters: {
+            query?: {
+                outcome?: string | null;
+                after?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CursorPage_TrialBookingRow_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    log_trial_booking_api_v1_trial_bookings_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TrialBookingCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrialBookingOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    book_trial_for_self_api_v1_trial_bookings_self_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TrialBookingSelfIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrialBookingSelfResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_trial_booking_api_v1_trial_bookings__booking_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                booking_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TrialBookingUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrialBookingOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    grant_override_api_v1_trial_bookings__booking_id__grant_override_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                booking_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrialBookingOut"];
                 };
             };
             /** @description Validation Error */

@@ -100,14 +100,19 @@ def test_no_coach_scoped_endpoint_returns_a_financial_field():
 
 def test_the_gate_is_no_longer_vacuous():
     """This file used to end with `test_the_gate_is_currently_empty_and_says_so`, which
-    asserted that **no** coach-tagged route existed and whose docstring said: "When M1 lands
-    the first coach router this goes red, and the correct fix is to delete this test."
+    asserted that **no** coach-tagged route existed and whose docstring said: "When M1
+    lands the first coach router this goes red, and the correct fix is to delete this
+    test."
 
-    W2's lane SCHEDULE landed it — `app/routers/sessions.py`, §7's coach-facing block. So
-    the tripwire is spent, and this replaces it with the opposite assertion. The point of
-    both is the same and worth keeping: a gate with nothing to check is a gate that passes
-    while verifying nothing, and the day the last coach route is deleted is a day somebody
-    should notice rather than inherit a green tick.
+    Both W2 lanes landed one, independently and in the same wave — lane SCHEDULE's
+    `app/routers/sessions.py`, §7's coach-facing block, and lane PEOPLE's
+    `app/routers/students.py`, whose reads staff `9c` and `9h` make coach-reachable. Which
+    of the two arrived first is not a fact this test should depend on, so it names both.
+    The tripwire is spent either way, and this replaces it with the opposite assertion
+    rather than deleting it outright. The point of both is the same and worth keeping: a
+    gate with nothing to check is a gate that passes while verifying nothing, and the day
+    the last coach route disappears is a day somebody should notice rather than inherit a
+    green tick.
     """
     tagged = [
         path
