@@ -475,6 +475,27 @@ export type RosterEntry = {
   has_absence_report: boolean
 }
 
+/**
+ * An open payment order over every charge in the scenario, created as the PAYER.
+ *
+ * The order routes take their payer from the session rather than the body — deliberately,
+ * because a body-supplied payer would let anyone open an order over anyone's charges — so
+ * this signs in as the family rather than the manager.
+ *
+ * Used by E2E-4, where the thing under test is the callback's verdict rather than the
+ * parent's click. E2E-3 walks the click.
+ */
+export async function openOrderFor(
+  request: APIRequestContext,
+  scenario: Scenario,
+  maxPayments = 1,
+): Promise<OrderRow> {
+  const payer = await asPersona(request, scenario.parentPersona)
+  return payer.send<OrderRow>(`post`, `/payment-orders?max_payments=${maxPayments}`, {
+    charge_ids: scenario.chargeIds,
+  })
+}
+
 /** `GET /sessions/{id}/attendance` — artboards `1c` and `9f`, and §3.2 gives it to every staff role. */
 export async function readRoster(
   request: APIRequestContext,
