@@ -23,7 +23,10 @@ from app.core.tenancy import with_all_tenants
 from app.models.person import Invitation, Person, RoleAssignment
 from app.models.studio import Studio
 from app.services.audit import AuditService
-from app.services.structure.health_templates import ensure_trial_template
+from app.services.structure.health_templates import (
+    ensure_full_template,
+    ensure_trial_template,
+)
 
 _PLATFORM_SCOPE = (
     "SPEC 18.1 -- the platform console operates above every studio; 5.1 makes it the "
@@ -76,6 +79,10 @@ def provision_studio(
         session.add(studio)
         session.flush()
         ensure_trial_template(session, studio.id, at=at)
+        # D11 -- every studio ships with the default `full` question set, editable in the
+        # app. Revision 0007 seeded the studios that existed when it ran; this is the same
+        # guarantee for every studio provisioned after it, which is all of them from here.
+        ensure_full_template(session, studio.id, at=at)
         AuditService.record(
             session,
             action="platform.studio.provisioned",

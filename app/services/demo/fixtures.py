@@ -34,7 +34,10 @@ from sqlalchemy.orm import Session
 from app.models.studio import Studio
 from app.services.demo import DEMO_STUDIO_NAME, DEMO_STUDIO_SETTINGS, DEMO_STUDIO_SLUG
 from app.services.demo.personas import SEEDED_AT, seed_personas
-from app.services.structure.health_templates import ensure_trial_template
+from app.services.structure.health_templates import (
+    ensure_full_template,
+    ensure_trial_template,
+)
 
 
 @dataclass(frozen=True)
@@ -112,11 +115,20 @@ def _seed_studio(session: Session, studio_id: uuid.UUID) -> None:
     )
 
 
-def _seed_trial_template(session: Session, studio_id: uuid.UUID) -> None:
-    """Conflict C3. Seeded into the demo studio for the same reason
+def _seed_health_templates(session: Session, studio_id: uuid.UUID) -> None:
+    """Both question sets, for the two different reasons they exist.
+
+    The trial one is conflict C3, seeded into the demo studio for the same reason
     `provision_studio` seeds it into every new one: §5.4a's funnel puts a trial
-    declaration at step 3 of five, and `dev+trial` exists to walk that funnel."""
+    declaration at step 3 of five, and `dev+trial` exists to walk that funnel.
+
+    The full one is D11. Revision `0007` seeded it, but a reset **wipes**
+    `health_form_template` -- it is in this layer's `tables` -- so re-seeding the trial form
+    alone would leave the demo studio the one studio in the product without a default
+    question set, and it would happen the first time a developer pressed reset.
+    """
     ensure_trial_template(session, studio_id, at=SEEDED_AT)
+    ensure_full_template(session, studio_id, at=SEEDED_AT)
 
 
 _V1 = FixtureSet(
@@ -153,7 +165,7 @@ _V1 = FixtureSet(
             name="health_templates",
             milestone="M1",
             tables=("health_form_template",),
-            seed=_seed_trial_template,
+            seed=_seed_health_templates,
         ),
     ),
 )

@@ -61,6 +61,7 @@ Revises: 0006
 Create Date: 2026-08-26
 
 """
+import json
 from typing import Sequence, Union
 
 from alembic import op
@@ -73,6 +74,124 @@ revision: str = '0007'
 down_revision: Union[str, Sequence[str], None] = '0006'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
+
+#: D11's default `full` health question set, **frozen at revision 0007**.
+#:
+#: A copy of app/services/structure/health_templates.py::FULL_TEMPLATE_SCHEMA as it stood on
+#: 2026-08-26, deliberately not an import. D11 makes rewording the questions a manager's
+#: right and lane HEALTH builds the editor for it, so the live constant is expected to move;
+#: a migration that followed it would silently rewrite what it did to databases that ran it
+#: months ago. `template_version` on health_declaration is what records which questions a
+#: given signature actually answered (§4.3), and that column is meaningless if version 1
+#: does not stay version 1.
+#:
+#: `is_bundled_default` carries D11's caveat: this is a STARTING POINT, the app says so
+#: where a manager edits it (`template.disclaimer` in the i18n bundle), and it is not a
+#: compliance artefact.
+_FULL_TEMPLATE_SCHEMA_V1 = {'version': 1,
+ 'kind': 'full',
+ 'is_bundled_default': True,
+ 'title': 'הצהרת בריאות',
+ 'sections': [{'id': 'medical_history',
+               'title': 'רקע רפואי',
+               'questions': [{'id': 'chronic_illness',
+                              'type': 'boolean',
+                              'label': 'האם קיימת מחלה כרונית?'},
+                             {'id': 'chronic_illness_details',
+                              'type': 'text',
+                              'label': 'פירוט המחלה הכרונית',
+                              'required': False,
+                              'visible_if': {'chronic_illness': True}},
+                             {'id': 'asthma',
+                              'type': 'boolean',
+                              'label': 'האם יש אסתמה?',
+                              'flag': True},
+                             {'id': 'allergy',
+                              'type': 'boolean',
+                              'label': 'האם יש אלרגיה?',
+                              'flag': True},
+                             {'id': 'allergy_details',
+                              'type': 'text',
+                              'label': 'פירוט האלרגיה',
+                              'required': False,
+                              'visible_if': {'allergy': True}},
+                             {'id': 'medication',
+                              'type': 'boolean',
+                              'label': 'האם התלמיד/ה נוטל/ת תרופות באופן קבוע?',
+                              'flag': True},
+                             {'id': 'medication_details',
+                              'type': 'text',
+                              'label': 'אילו תרופות',
+                              'required': False,
+                              'visible_if': {'medication': True}},
+                             {'id': 'epilepsy',
+                              'type': 'boolean',
+                              'label': 'האם יש אפילפסיה או פרכוסים?',
+                              'flag': True},
+                             {'id': 'diabetes',
+                              'type': 'boolean',
+                              'label': 'האם יש סוכרת?',
+                              'flag': True}]},
+              {'id': 'cardiac',
+               'title': 'לב ומאמץ',
+               'questions': [{'id': 'heart',
+                              'type': 'boolean',
+                              'label': 'האם ידוע על מחלת לב, מום לבבי או ניתוח לב?',
+                              'flag': True},
+                             {'id': 'chest_pain',
+                              'type': 'boolean',
+                              'label': 'האם הופיעו כאבים בחזה במהלך מאמץ גופני?'},
+                             {'id': 'fainting',
+                              'type': 'boolean',
+                              'label': 'האם הייתה התעלפות או סחרחורת במהלך מאמץ גופני?'},
+                             {'id': 'family_sudden_death',
+                              'type': 'boolean',
+                              'label': 'האם היה במשפחה מקרה של מוות פתאומי לפני גיל 50?'}]},
+              {'id': 'orthopaedic',
+               'title': 'אורתופדיה ופציעות',
+               'questions': [{'id': 'injury',
+                              'type': 'boolean',
+                              'label': 'האם קיימת פציעה פעילה או בעיה אורתופדית?',
+                              'flag': True},
+                             {'id': 'surgery_last_year',
+                              'type': 'boolean',
+                              'label': 'האם עבר/ה ניתוח בשנה האחרונה?'},
+                             {'id': 'restrictions',
+                              'type': 'text',
+                              'label': 'מגבלות פעילות גופנית',
+                              'required': False}]},
+              {'id': 'other',
+               'title': 'נוסף',
+               'questions': [{'id': 'other',
+                              'type': 'boolean',
+                              'label': 'האם יש מצב רפואי נוסף שחשוב שנדע עליו?',
+                              'flag': True},
+                             {'id': 'other_details',
+                              'type': 'text',
+                              'label': 'פירוט',
+                              'required': False,
+                              'visible_if': {'other': True}},
+                             {'id': 'health_fund',
+                              'type': 'text',
+                              'label': 'קופת חולים',
+                              'required': False},
+                             {'id': 'emergency_contact',
+                              'type': 'phone',
+                              'label': 'טלפון לשעת חירום',
+                              'required': True}]},
+              {'id': 'declaration',
+               'title': 'הצהרה',
+               'questions': [{'id': 'fit_to_train',
+                              'type': 'boolean',
+                              'label': 'אני מצהיר/ה שהתלמיד/ה כשיר/ה לפעילות גופנית ולאימוני '
+                                       "ג'ודו",
+                              'required': True},
+                             {'id': 'notify_changes',
+                              'type': 'boolean',
+                              'label': 'אני מתחייב/ת לעדכן את המועדון בכל שינוי במצב '
+                                       'הבריאותי',
+                              'required': True}]}]}
+
 
 
 def upgrade() -> None:
@@ -168,11 +287,39 @@ def upgrade() -> None:
     op.create_index('ix_attendance_studio_id_student_id', 'attendance', ['studio_id', 'student_id'], unique=False)
     op.create_index('uq_attendance_client_mark_id', 'attendance', ['client_mark_id'], unique=True)
     op.create_index('uq_attendance_session_id_student_id', 'attendance', ['session_id', 'student_id'], unique=True)
+    # -- D11's default `full` question set -------------------------------------------
+    # "Ship a standard Israeli sports health declaration as the default
+    # health_form_template question set, seeded by migration." §15 item 1 had made the
+    # studio's own PDF a hard blocker on the whole M4 lane; this is what unblocks it.
+    #
+    # One row per studio, skipping any that already has a v1 `full` template. The guard is
+    # not defensive dressing: app/services/structure/health_templates.py::ensure_full_template
+    # seeds the same row for studios provisioned after this revision, and the demo fixture
+    # layer re-seeds it after a reset -- so a database can genuinely arrive here with the
+    # row already present, and the unique index on (studio_id, kind, version) would make
+    # that an integrity error rather than a no-op.
+    op.execute(
+        sa.text(
+            "INSERT INTO health_form_template "
+            "(id, studio_id, kind, version, schema, published_at, created_at, updated_at) "
+            "SELECT gen_random_uuid(), s.id, 'full', 1, CAST(:schema AS jsonb), "
+            "       now(), now(), now() "
+            "FROM studio s "
+            "WHERE NOT EXISTS ("
+            "  SELECT 1 FROM health_form_template t "
+            "  WHERE t.studio_id = s.id AND t.kind = 'full' AND t.version = 1"
+            ")"
+        ).bindparams(schema=json.dumps(_FULL_TEMPLATE_SCHEMA_V1, ensure_ascii=False))
+    )
     # ### end Alembic commands ###
 
 
 def downgrade() -> None:
     """Downgrade schema."""
+    # D11's seed, removed before the tables it sits beside. Scoped to the bundled v1: a
+    # studio that has since published its own v2 keeps it, because this revision did not
+    # create that one and a downgrade must not destroy work it never did.
+    op.execute("DELETE FROM health_form_template WHERE kind = 'full' AND version = 1")
     # ### commands auto generated by Alembic - please adjust! ###
     op.drop_index('uq_attendance_session_id_student_id', table_name='attendance')
     op.drop_index('uq_attendance_client_mark_id', table_name='attendance')
