@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-import { buildScenario } from './scenario'
+import { buildScenario, readRoster, readSession } from './scenario'
 
 /**
  * The scenario builder's own gate, for the same reason `fixtures.spec.ts` exists: every
@@ -26,6 +26,38 @@ test.describe('the scenario builder', () => {
     // fixture exists for — a charge owned by a person with no login is a charge no parent
     // app can ever show.
     expect(scenario.payerPersonId).toBe(scenario.parentPersonId)
+  })
+
+  test('sets up §5.6’s three protections when asked', async ({ request }) => {
+    const scenario = await buildScenario(request, { withProtections: true })
+    const protections = scenario.protections!
+
+    expect(protections.pastSessionId).toBeTruthy()
+    expect(protections.manuallyEditedSessionId).toBeTruthy()
+    expect(protections.adHocSessionId).toBeTruthy()
+
+    // Asserted through the API before any screen reads them, because
+    // `tests/contracts/test_w2_schemas.py` puts both flags on `SessionOut` precisely so
+    // the client can draw the lock — if they are not true here, E2E-5 is unassertable and
+    // the reason is the fixture rather than the UI.
+    const moved = await readSession(request, protections.manuallyEditedSessionId)
+    expect(moved.is_manually_edited).toBe(true)
+
+    const adHoc = await readSession(request, protections.adHocSessionId)
+    expect(adHoc.is_ad_hoc).toBe(true)
+
+    // The held session is asserted by its REGISTER and not by `attendance_taken`, which is
+    // hardcoded `False` in `ScheduleService.project_sessions` — its docstring still says
+    // "`attendance_taken` is False for every row in W2 ... M5 fills the field", and M5 has
+    // landed (`app/models/_pending/` is empty, `app/models/attendance.py` is real) without
+    // filling it. So the flag is false for every session in the product, and asserting it
+    // would be asserting a bug.
+    //
+    // The register is the better assertion anyway: §5.14's sessions-held-vs-planned report
+    // reads these rows, so a regenerated past session does not merely lose a time, it
+    // changes a number the club may already have acted on. That is the thing to protect.
+    const roster = await readRoster(request, protections.pastSessionId)
+    expect(roster.roster.filter((entry) => entry.status !== 'unmarked').length).toBeGreaterThan(0)
   })
 
   test('builds an isolated scenario each time it is called', async ({ request }) => {

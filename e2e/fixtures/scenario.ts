@@ -44,12 +44,22 @@ import type { APIRequestContext } from '@playwright/test'
 import { API_ORIGIN } from '../origins'
 import type { PersonaKey } from './api'
 
-/** The training year every scenario materializes into. §16: 1 September – 31 August. */
-const YEAR_STARTS = '2026-09-01'
-const YEAR_ENDS = '2027-08-31'
+/**
+ * The training year every scenario materializes into. §16: 1 September – 31 August.
+ *
+ * The CURRENT year, not the next one, and that is load-bearing for E2E-5: a year starting
+ * in the future materializes nothing in the past, and §5.6's whole subject is what a rule
+ * change must not touch. Sessions run from last September to next August, so today sits in
+ * the middle of them and "past" and "future" both exist without any clock travel.
+ */
+const YEAR_STARTS = '2025-09-01'
+const YEAR_ENDS = '2026-08-31'
 
-/** The period the billing run charges, and the month the flows talk about. */
-export const PERIOD = { year: 2026, month: 9 } as const
+/**
+ * The period the billing run charges, and the month the flows talk about. The current
+ * month, so the charge it produces is one a parent would really be looking at.
+ */
+export const PERIOD = { year: 2026, month: 8 } as const
 
 /** §5.10's tuition price for the fixture group. Whole shekels — G2, integers throughout. */
 const MONTHLY_AGOROT = 32_000
@@ -79,6 +89,8 @@ export type Scenario = {
   /** Open tuition charges for the payer, oldest first — the order §5.10 selects in. */
   chargeIds: string[]
   monthlyAmountAgorot: number
+  /** Present only when `withProtections` was asked for. */
+  protections: Protections | null
 }
 
 export type ScenarioOptions = {
@@ -86,6 +98,23 @@ export type ScenarioOptions = {
   parent?: PersonaKey
   /** Distinguishes one scenario's rows from another's in a shared studio. */
   label?: string
+  /**
+   * Set up §5.6's three protections: one session already held with attendance against it,
+   * one moved by hand, one one-off. Off by default because only E2E-5 needs them and they
+   * cost four extra round trips — and because a flow that does not need them should not
+   * quietly depend on them.
+   */
+  withProtections?: boolean
+}
+
+/** §5.6's three, populated only when `withProtections` is asked for. */
+export type Protections = {
+  /** Held before today, with attendance marked — so regenerating it would rewrite a register. */
+  pastSessionId: string
+  /** Moved by hand to 19:30, in the future. A rule change must not undo it. */
+  manuallyEditedSessionId: string
+  /** A one-off no rule created, so no rule may remove it. */
+  adHocSessionId: string
 }
 
 /**
@@ -106,9 +135,22 @@ class Api {
     private readonly token: string,
   ) {}
 
-  async send<T>(method: 'get' | 'post' | 'put' | 'patch', path: string, data?: unknown): Promise<T> {
+  /**
+   * `at` sets §19.5's `X-Dev-Now`, which shifts `app.core.clock.now()` for that request
+   * and only that request. The scenario needs it for exactly one call — see the schedule
+   * PUT below — and nothing else here should carry it.
+   */
+  async send<T>(
+    method: 'get' | 'post' | 'put' | 'patch',
+    path: string,
+    data?: unknown,
+    at?: string,
+  ): Promise<T> {
     const response = await this.request[method](`${API_ORIGIN}/api/v1${path}`, {
-      headers: { Authorization: `Bearer ${this.token}` },
+      headers: {
+        Authorization: `Bearer ${this.token}`,
+        ...(at ? { 'X-Dev-Now': at } : {}),
+      },
       ...(data === undefined ? {} : { data }),
     })
     if (!response.ok()) {
@@ -183,22 +225,31 @@ export async function buildScenario(
   //
   // Sunday and Tuesday, 17:00–18:00. `weekday` is 0–6 with 0 = Sunday, matching Israel's
   // working week and Postgres's EXTRACT(DOW).
-  await manager.send('put', `/groups/${group.id}/schedule`, {
-    effective_from: YEAR_STARTS,
-    apply: true,
-    rules: [0, 2].map((weekday) => ({
-      weekday,
-      start_time: '17:00',
-      end_time: '18:00',
-      location_id: location.id,
+  //
+  // **`X-Dev-Now` is what makes a past session possible at all.** §5.6 rewrites only
+  // sessions with `starts_at > now()`, and `change_window_start` is `max(effective_from,
+  // today)` — so a schedule change never materializes into the past, correctly and by
+  // design. Applying the rules as of the first day of the training year is therefore the
+  // only honest way to end up with a year of sessions with today in the middle of them.
+  // §19.5 exists for exactly this: "run the billing run in March" has the same shape.
+  await manager.send(
+    'put',
+    `/groups/${group.id}/schedule`,
+    {
       effective_from: YEAR_STARTS,
-    })),
-  })
-
-  const sessions = await manager.send<{ items: { id: string }[] }>(
-    'get',
-    `/sessions?group_id=${group.id}&from=${YEAR_STARTS}&to=${YEAR_ENDS}`,
+      apply: true,
+      rules: [0, 2].map((weekday) => ({
+        weekday,
+        start_time: '17:00',
+        end_time: '18:00',
+        location_id: location.id,
+        effective_from: YEAR_STARTS,
+      })),
+    },
+    `${YEAR_STARTS}T06:00:00Z`,
   )
+
+  const sessions = { items: await listAllSessions(manager, group.id) }
 
   const pricePlan = await manager.send<{ id: string }>('post', '/price-plans', {
     name: `חודשי ${tag}`,
@@ -249,6 +300,10 @@ export async function buildScenario(
     period_month: PERIOD.month,
   })
 
+  const protections = options.withProtections
+    ? await buildProtections(manager, group.id, trainingYear.id, sessions.items)
+    : null
+
   const personaRow = await request.get(`${API_ORIGIN}/api/v1/dev/personas`)
   const cast = (await personaRow.json()) as { items: { key: PersonaKey; person_id: string }[] }
   const parentPersonId = cast.items.find((p) => p.key === parent)!.person_id
@@ -273,5 +328,136 @@ export async function buildScenario(
       .filter((charge) => charge.student_id === created.student.id)
       .map((charge) => charge.id),
     monthlyAmountAgorot: MONTHLY_AGOROT,
+    protections,
+  }
+}
+
+/**
+ * Every session in the training year, following the cursor to the end.
+ *
+ * Paged rather than asked for in one go, and the difference is not academic: `GET
+ * /sessions` defaults to 50 rows, and two rules a week across a training year is about a
+ * hundred. An unpaged read returns the first fifty — which, for a year that started last
+ * September, is fifty sessions all in the past and none in the future. That reads exactly
+ * like "materialization only went forwards", and it is not.
+ */
+async function listAllSessions(
+  manager: Api,
+  groupId: string,
+): Promise<{ id: string; starts_at: string }[]> {
+  const all: { id: string; starts_at: string }[] = []
+  let cursor: string | null = null
+  do {
+    const page: { items: { id: string; starts_at: string }[]; next_cursor: string | null } =
+      await manager.send(
+        'get',
+        `/sessions?group_id=${groupId}&from=${YEAR_STARTS}&to=${YEAR_ENDS}&limit=200` +
+          (cursor ? `&cursor=${cursor}` : ''),
+      )
+    all.push(...page.items)
+    cursor = page.next_cursor
+  } while (cursor)
+  return all
+}
+
+export type SessionRow = {
+  id: string
+  starts_at: string
+  ends_at: string
+  status: string
+  is_manually_edited: boolean
+  is_ad_hoc: boolean
+  attendance_taken: boolean
+}
+
+/**
+ * One session, read as a manager.
+ *
+ * Exported because a spec sometimes has to check a flag the screen renders as an icon:
+ * asserting `is_manually_edited` through the API says "the lock is true", while asserting
+ * the lock in the DOM says "the lock is drawn". Both are worth having, and when they
+ * disagree the pair is what tells you which half is broken.
+ */
+export async function readSession(
+  request: APIRequestContext,
+  sessionId: string,
+): Promise<SessionRow> {
+  const manager = await asPersona(request, 'manager')
+  return manager.send<SessionRow>('get', `/sessions/${sessionId}`)
+}
+
+export type RosterEntry = {
+  student_id: string
+  display_name: string
+  status: 'unmarked' | 'present' | 'absent' | 'late' | 'excused'
+  source: string | null
+  has_absence_report: boolean
+}
+
+/** `GET /sessions/{id}/attendance` — artboards `1c` and `9f`, and §3.2 gives it to every staff role. */
+export async function readRoster(
+  request: APIRequestContext,
+  sessionId: string,
+): Promise<{ session: SessionRow; roster: RosterEntry[] }> {
+  const manager = await asPersona(request, 'manager')
+  return manager.send('get', `/sessions/${sessionId}/attendance`)
+}
+
+/**
+ * §5.6's three protections, each a different way to destroy history.
+ *
+ * They are built AFTER the schedule is applied rather than before, because two of the
+ * three are edits to sessions the rules created and the third has to survive a later
+ * regenerate — which is the property E2E-5 exists to check.
+ */
+async function buildProtections(
+  manager: Api,
+  groupId: string,
+  trainingYearId: string,
+  sessions: readonly { id: string; starts_at: string }[],
+): Promise<Protections> {
+  const now = Date.now()
+  const past = sessions.filter((s) => Date.parse(s.starts_at) < now)
+  const future = sessions.filter((s) => Date.parse(s.starts_at) > now)
+  if (past.length === 0 || future.length === 0) {
+    throw new Error(
+      `the scenario needs sessions on both sides of today; got ${past.length} past ` +
+        `and ${future.length} future. Check YEAR_STARTS and the X-Dev-Now on the schedule PUT.`,
+    )
+  }
+
+  // **Past, and held.** A session that happened has attendance rows against it, and
+  // regenerating it rewrites a register a coach already signed. Marking it is what makes
+  // the protection mean something — an empty past session loses nothing.
+  const held = past[past.length - 1]!
+  await manager.send('post', `/sessions/${held.id}/attendance/bulk-present`, {
+    client_mark_id_prefix: crypto.randomUUID(),
+    device_marked_at: held.starts_at,
+  })
+
+  // **Manually edited.** Someone moved this one class deliberately, usually a room clash.
+  // Times move as a pair — `SessionPatch` refuses a start without an end, because "the
+  // class is an hour shorter now" is not something anyone typed.
+  const moved = future[0]!
+  const movedDay = moved.starts_at.slice(0, 10)
+  await manager.send('patch', `/sessions/${moved.id}`, {
+    starts_at: `${movedDay}T16:30:00Z`,
+    ends_at: `${movedDay}T17:30:00Z`,
+  })
+
+  // **Ad hoc.** A one-off no rule created, so no rule may remove it. `is_ad_hoc` is not a
+  // field a caller may set: every session created here is ad-hoc by construction.
+  const extraDay = future[future.length - 1]!.starts_at.slice(0, 10)
+  const adHoc = await manager.send<{ id: string }>('post', '/sessions', {
+    group_id: groupId,
+    training_year_id: trainingYearId,
+    starts_at: `${extraDay}T11:00:00Z`,
+    ends_at: `${extraDay}T12:00:00Z`,
+  })
+
+  return {
+    pastSessionId: held.id,
+    manuallyEditedSessionId: moved.id,
+    adHocSessionId: adHoc.id,
   }
 }
