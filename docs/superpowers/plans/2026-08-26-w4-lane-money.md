@@ -116,6 +116,25 @@ The moment `create_charge` has a body, `test_the_billing_run_is_idempotent` rais
 `AssertionError` by design. Task 1 replaces that raise with `assert_idempotent(run, snapshot)`
 over a seeded period. The tripwire is working; wiring it is the whole point.
 
+**D-M6-12 — `form_fields` refuses an empty merchant email, not just a missing one.**
+Found while running the full suite after Task 1. The committed environment template ships
+**eight** optional keys with empty values, and every one is declared `X | None = None` in the
+settings module — so following the template produces `''`, never `None`. The same bug has now
+bitten three times: `dev_tools_allowed` (fixed in `728b665`), `DevClockMiddleware` (fixed in
+`b5cf3e1`), and `tests/identity/test_settings.py::test_no_provider_credential_has_a_default`,
+which is still red.
+
+`UPAY_MERCHANT_EMAIL` is on that list, and it is **this lane's blast radius**: an empty
+merchant email builds a uPay form whose `email` field is blank — a real payer sent to a real
+hosted page to pay an account that does not exist. `upay_form_fields` checks `studio.is_demo`
+and nothing else, so nothing today would stop it.
+
+The systemic fix belongs in the settings module (coerce empty to `None` once, the way
+`configured_dev_token()` now does for one key) and that file is the **core lane's**. Whether
+or not it lands, **Task 5's `OrderService.form_fields` raises when the merchant email is
+missing or blank** — refusing to build a form is always better than building one that charges
+nobody, and that check lives in a file this lane owns.
+
 ---
 
 ## File structure
