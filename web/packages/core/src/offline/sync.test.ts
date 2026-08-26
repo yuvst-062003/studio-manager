@@ -219,6 +219,77 @@ describe('§10.5 — cross-actor conflicts on flush', () => {
   })
 })
 
+describe('§5.7 — a queued bulk mark', () => {
+  const bulk = (overrides: Partial<PendingOp> = {}): PendingOp =>
+    op({
+      client_mark_id: 'bulk-1',
+      kind: 'attendance.bulk',
+      // One instruction about a whole roster, so it names no student and no status.
+      student_id: null,
+      payload: { client_mark_id_prefix: 'bulk-1' },
+      ...overrides,
+    })
+
+  it('goes to the bulk endpoint, not to the batch one', async () => {
+    // `סימון כולם כנוכחים` queues ONE op for the whole roster, which is right: §10.5
+    // protects a parent's pre-report "regardless of timestamp", including one filed after
+    // the coach tapped, and only the server can apply that at replay time.
+    //
+    // The flusher used to post every op to `/attendance/batch` whatever its kind. A bulk
+    // carries no `student_id` and no `status`, and `AttendanceIn` requires both — so the
+    // server refused it 422 for ever and the button never persisted anything, online or
+    // offline. The roster is optimistic by design, so it looked like it had worked.
+    const store = memoryStore()
+    await queued(store, bulk())
+    const post = vi.fn().mockResolvedValue(accepted())
+
+    const result = await flush({ store, post, refresh: async () => true, currentPersonId: () => ME })
+
+    expect(post).toHaveBeenCalledWith(
+      '/api/v1/sessions/session-1/attendance/bulk-present',
+      expect.objectContaining({
+        client_mark_id_prefix: 'bulk-1',
+        device_marked_at: '2026-11-03T17:00:00.000Z',
+      }),
+    )
+    expect(result.flushed).toBe(1)
+    expect(await pendingCount(store)).toBe(0)
+  })
+
+  it('never asks the server to overwrite a pre-report', async () => {
+    // §10.5's one rule that is not last-write-wins. `respect_absence_reports` defaults to
+    // true on the server, so omitting it would also be safe — sending it is the client
+    // saying the same thing out loud, and `BulkPresentIn`'s docstring is explicit that the
+    // bulk "never overwrites a parent's advance notice, whatever the request body says".
+    const store = memoryStore()
+    await queued(store, bulk())
+    const post = vi.fn().mockResolvedValue(accepted())
+
+    await flush({ store, post, refresh: async () => true, currentPersonId: () => ME })
+
+    expect(post.mock.calls[0]?.[1]).toMatchObject({ respect_absence_reports: true })
+  })
+
+  it('sends a bulk and a single mark to their own endpoints in one flush', async () => {
+    // A coach who taps "everyone" and then corrects one row leaves both kinds queued for
+    // the same session. Grouping by session alone put them in one request.
+    const store = memoryStore()
+    await queued(store, bulk(), op({ client_mark_id: 'mark-2' }))
+    // `mockImplementation`, not `mockResolvedValue`: this is the first test here to make
+    // TWO requests, and a `Response` body can only be read once — a single shared instance
+    // fails the second read with "Body is unusable", which looks like a product fault and
+    // is not one.
+    const post = vi.fn().mockImplementation(() => accepted())
+
+    const result = await flush({ store, post, refresh: async () => true, currentPersonId: () => ME })
+
+    const paths = post.mock.calls.map((call) => call[0])
+    expect(paths).toContain('/api/v1/sessions/session-1/attendance/bulk-present')
+    expect(paths).toContain('/api/v1/attendance/batch')
+    expect(result.flushed).toBe(2)
+  })
+})
+
 describe('the flusher', () => {
   it('leaves every op in place when the network fails mid-flush', async () => {
     const store = memoryStore()

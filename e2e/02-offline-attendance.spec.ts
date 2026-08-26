@@ -2,12 +2,7 @@ import { expect, test } from '@playwright/test'
 
 import { ORIGINS } from './origins'
 import { signInAs } from './fixtures/auth'
-import {
-  buildScenario,
-  bulkPresentAsCoach,
-  readRoster,
-  reportAbsence,
-} from './fixtures/scenario'
+import { buildScenario, readRoster, reportAbsence } from './fixtures/scenario'
 
 /**
  * SPEC §13, flow 2 — "Coach takes attendance **offline** → reconnects → marks sync →
@@ -159,31 +154,29 @@ test.describe('E2E-2 · offline attendance and sync', () => {
       await expect(preReported).toHaveAttribute('data-pre-reported', 'true')
       await expect(preReported).not.toHaveAttribute('data-status', 'present')
 
-      // The queued bulk never reaches the server, and that is a REPORTED DEFECT rather
-      // than something asserted around. `flush` groups every pending op by session and
-      // posts it to `/attendance/batch`, whatever its `kind` — but a bulk op carries no
-      // `student_id` and no `status`, because it is one instruction about a whole roster,
-      // and `AttendanceIn` requires both. So a queued `attendance.bulk` is refused 422 for
-      // ever. Routing it to `/sessions/{id}/attendance/bulk-present` is a change inside
-      // `flush`, in `packages/core`, which this lane must not edit.
+      // §10.3 queues EVERY mark, a bulk one included, so the server hears about it on the
+      // next flush rather than on the tap. This coach is ONLINE, so the queue drains in
+      // milliseconds — polling the register is the honest wait, where watching
+      // `roster-pending` is not: the badge can appear and vanish between two assertions,
+      // and `toBeHidden` then passes before the op has even been written.
       //
-      // Expanding the bulk into one mark per student on the client would dodge it and
-      // would be wrong: §10.5 protects a pre-report "regardless of timestamp", including
-      // one filed AFTER the coach tapped, and only the server can apply that at replay
-      // time. The instruction has to stay one op.
-      //
-      // So the rule below is asserted through the endpoint the queue should be reaching,
-      // which is where the rule actually lives.
-      await bulkPresentAsCoach(request, session.id)
+      // Asserted on the SERVER, not on the screen, because the screen could be protecting
+      // the row while the replay quietly overwrote it — which is exactly the shape of the
+      // bug §10.5 is written against.
+      await expect
+        .poll(
+          async () => {
+            const live = await readRoster(request, session.id)
+            return live.roster.filter((row) => row.status === 'present').length
+          },
+          { timeout: 20_000 },
+        )
+        .toBe(2)
 
-      // Asserted on the server too, because the screen could be protecting the row while
-      // the replay quietly overwrote it — which is exactly the shape of the bug §10.5 is
-      // written against.
       const register = await readRoster(request, session.id)
       const child = register.roster.find((row) => row.student_id === scenario.studentIds[0]!)!
       expect(child.has_absence_report).toBe(true)
       expect(child.status).not.toBe('present')
-      expect(register.roster.filter((row) => row.status === 'present')).toHaveLength(2)
     } finally {
       await coachContext.close()
     }

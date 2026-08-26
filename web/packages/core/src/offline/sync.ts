@@ -20,6 +20,26 @@ import type { ConflictCard, ConflictKind, OfflineStore, PendingOp } from './type
 const CONFLICTS = 'conflicts' as const
 const BATCH_PATH = '/api/v1/attendance/batch'
 
+/**
+ * §5.7's `סמן הכל נוכח`, which is a different request from a list of marks.
+ *
+ * A bulk is ONE instruction about a whole roster: it names no student and no status,
+ * because who it touches is decided by the server at replay time. That is not a detail —
+ * §10.5 protects a parent's pre-report "regardless of timestamp", INCLUDING one filed
+ * after the coach tapped, and only the server can know about that one. Expanding a bulk
+ * into a list of marks on the device would resolve the roster at tap time and overwrite
+ * exactly the notice the rule exists to protect.
+ *
+ * So it cannot travel as `AttendanceIn`, which requires both fields, and posting it to
+ * `BATCH_PATH` earned a 422 every time — silently, because the roster is optimistic and
+ * the screen had already moved on.
+ */
+const bulkPath = (sessionId: string): string =>
+  `/api/v1/sessions/${sessionId}/attendance/bulk-present`
+
+/** §5.7's two request shapes. `attendance.bulk` is the only kind that is not a mark. */
+const isBulk = (op: PendingOp): boolean => op.kind === 'attendance.bulk'
+
 /** What the server's `BatchResult` looks like on the wire. Mirrors
  *  `app/services/attendance/schemas.py`. */
 type BatchResponse = {
@@ -89,16 +109,38 @@ export async function flush(deps: FlushDeps): Promise<FlushResult> {
   let flushed = 0
   let refreshed = false
 
+  // Grouped by session AND by shape. A coach who taps "everyone" and then corrects one
+  // row leaves both kinds queued for the same session, and they are two different requests
+  // to two different endpoints — grouping on the session alone put them in one.
   for (const [sessionId, ops] of groupBySession(mine)) {
+    for (const batch of [ops.filter(isBulk), ops.filter((op) => !isBulk(op))]) {
+      if (batch.length === 0) continue
+      await sendBatch(sessionId, batch)
+    }
+  }
+
+  return { flushed, deferred: (await listPending(deps.store)).length, conflicts: cards }
+
+  async function sendBatch(sessionId: string, ops: PendingOp[]): Promise<void> {
     const send = (): Promise<Response> =>
-      deps.post(BATCH_PATH, {
-        session_id: sessionId,
-        marks: ops.map(toMark),
-        // §10.5 — what the device believed when the coach marked. A manager cancelling the
-        // session meanwhile is the cross-actor conflict this lets the server detect rather
-        // than silently apply.
-        session_status_seen: 'scheduled',
-      })
+      isBulk(ops[0]!)
+        ? // One op per request: a bulk is one instruction, and two of them for the same
+          // session would be two answers to the same question.
+          deps.post(bulkPath(sessionId), {
+            ...ops[0]!.payload,
+            device_marked_at: ops[0]!.device_marked_at,
+            // §10.5's rule, said out loud. The server defaults to protecting, so this is
+            // the client agreeing rather than the client deciding.
+            respect_absence_reports: true,
+          })
+        : deps.post(BATCH_PATH, {
+            session_id: sessionId,
+            marks: ops.map(toMark),
+            // §10.5 — what the device believed when the coach marked. A manager cancelling
+            // the session meanwhile is the cross-actor conflict this lets the server detect
+            // rather than silently apply.
+            session_status_seen: 'scheduled',
+          })
 
     let response: Response
     try {
@@ -112,19 +154,19 @@ export async function flush(deps: FlushDeps): Promise<FlushResult> {
           // §10.3 item 3 — the refresh token has expired too. The queue is PRESERVED. The
           // user signs in again and it flushes afterwards.
           await noteAttempts(deps.store, ops)
-          continue
+          return
         }
         response = await send()
       }
     } catch {
       // A `TypeError: Failed to fetch` is the network, not an answer. Nothing leaves.
       await noteAttempts(deps.store, ops)
-      continue
+      return
     }
 
     if (!response.ok) {
       await noteAttempts(deps.store, ops)
-      continue
+      return
     }
 
     const body = (await response.json()) as BatchResponse
@@ -146,9 +188,6 @@ export async function flush(deps: FlushDeps): Promise<FlushResult> {
       )
     }
   }
-
-  const deferred = (await listPending(deps.store)).length
-  return { flushed, deferred, conflicts: cards }
 }
 
 export async function listConflicts(store: OfflineStore): Promise<ConflictCard[]> {

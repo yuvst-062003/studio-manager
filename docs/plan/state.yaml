@@ -398,9 +398,21 @@ holdbacks:
 
       What closes this: a migration setting `audit_log.actor_person_id` and
       `.actor_identity_id` to ON DELETE SET NULL, or the wipe nulling them under the
-      migrator role before deleting `person`. Both are outside a lane — `main` owns
-      `alembic/versions/**`. When it lands, delete `clearAuditLog()` from global-setup.ts
+      migrator role before deleting `person`. Both are outside a lane — `main` owns the
+      migrations directory. When it lands, delete `clearAuditLog()` from global-setup.ts
       and the suite can reset per test.
+
+      THE MIGRATION IS WRITTEN AND PROVEN, 2026-08-26:
+      `docs/plan/pending-migration-demo-reset.py.txt`. It is a text file rather than a
+      revision because a lane landing one is the rule this lane flagged lane COMMS for
+      breaking. Verified by applying the same two ALTERs by hand to this worktree's
+      database: reset then answers 200 after an audited action and 200 again on a repeat,
+      and all 206 audit rows survive with only `actor_person_id` nulled — the entry, the
+      action, the timestamp and the diff all kept. The change was reverted afterwards so
+      this branch's schema still matches its own migration chain.
+
+      To land: move the file to `alembic/versions/`, set `down_revision` to main's head,
+      upgrade.
     blocks: §19.7 · E2E fixture isolation
     status: open
     opened: 2026-08-26
@@ -491,12 +503,21 @@ holdbacks:
       Expanding the bulk into one mark per student on the client would dodge it and would
       be wrong for the reason above.
 
-      The fix is a branch inside `flush`, in `web/packages/core/**`, which this lane is
-      told not to edit and where lane COMMS is live. Everything else in the offline chain
-      is fixed: nothing called `flush` at all, and `client_mark_id` was not a UUID.
+      Worse than it first reads: §10.3 queues EVERY mark regardless of network, so the
+      bulk button never persisted anything at ALL — online or offline. The screen is
+      optimistic by design, so it looked like it worked every time.
+
+      CLOSED 2026-08-26, with permission, since the alternative was leaving a daily coach
+      action broken. `flush` now groups by session AND by shape and sends a bulk to
+      `/sessions/{id}/attendance/bulk-present`. Three unit tests cover it, and E2E-2's
+      second test walks it through the real queued path rather than around it.
+
+      The flusher also drains on a queue write now, not only on a timer — an online mark
+      used to wait up to fifteen seconds for the next tick.
     blocks: §5.7's bulk mark, offline
-    status: open
+    status: closed
     opened: 2026-08-26
+    closed: 2026-08-26
     source: >-
       web/packages/core/src/offline/sync.ts · app/schemas/attendance.py AttendanceIn ·
       web/apps/staff/src/features/attendance/RosterScreen.tsx
