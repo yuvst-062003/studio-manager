@@ -170,6 +170,7 @@ class NotificationReader:
         after: uuid.UUID | None = None,
         limit: int = 50,
         unread_only: bool = False,
+        kind: str | None = None,
     ) -> tuple[list[Notification], bool]:
         """One page, newest first. Returns the rows and whether more remain.
 
@@ -182,6 +183,12 @@ class NotificationReader:
         stmt = select(Notification).where(Notification.person_id == person_id)
         if unread_only:
             stmt = stmt.where(Notification.read_at.is_(None))
+        if kind is not None:
+            # An exact match, not a prefix. §5.14's at-risk card asks for
+            # `attendance.at_risk` specifically, and a prefix filter would quietly widen to
+            # every future `attendance.*` kind somebody adds — a card that started rendering
+            # notifications it was never designed for.
+            stmt = stmt.where(Notification.kind == kind)
         if after is not None:
             anchor = self._session.get(Notification, after)
             if anchor is not None:

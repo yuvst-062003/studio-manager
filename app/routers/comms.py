@@ -474,15 +474,20 @@ def list_notifications(
     after: uuid.UUID | None = None,
     limit: int = Query(default=DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
     unread: bool = False,
+    kind: str | None = None,
 ) -> NotificationPage:
     """§7's `GET /notifications`. §5.11's "permanent הודעות list", newest first.
 
     There is no `person_id` parameter and there will not be one: a notification is addressed
     to a person, and a route that let a caller name someone else would make another family's
     messages one query string away.
+
+    `kind` exists for §5.14's at-risk card, which asks this person's inbox for one kind rather
+    than reading a report. It is still scoped to the caller, so it widens nothing: the worst a
+    caller can do with it is see fewer of their own messages.
     """
     rows, has_more = NotificationReader(session).inbox(
-        _person_id(request), after=after, limit=limit, unread_only=unread
+        _person_id(request), after=after, limit=limit, unread_only=unread, kind=kind
     )
     return NotificationPage(
         items=[NotificationOut.model_validate(row, from_attributes=True) for row in rows],

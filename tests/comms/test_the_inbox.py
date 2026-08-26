@@ -182,3 +182,30 @@ def test_there_is_no_way_to_send_a_message_from_the_inbox(
 
 def test_the_inbox_requires_a_signed_in_person(client) -> None:
     assert client.get("/api/v1/notifications").status_code == 401
+
+
+def test_the_kind_filter_returns_exactly_that_kind(client, studio, as_lead_coach) -> None:
+    """§5.14's at-risk card asks this coach's own inbox for one kind rather than reading a
+    report — "it is not left sitting in a report nobody opens"."""
+    _seed(studio, as_lead_coach.person_id, kind="attendance.at_risk")
+    _seed(studio, as_lead_coach.person_id, kind="belt.awarded", count=2)
+
+    rows = _inbox(client, as_lead_coach, kind="attendance.at_risk").json()["items"]
+    assert [row["kind"] for row in rows] == ["attendance.at_risk"]
+
+
+def test_the_kind_filter_is_exact_and_not_a_prefix(client, studio, as_lead_coach) -> None:
+    """A prefix match would quietly widen to every future `attendance.*` kind somebody adds,
+    and the card would start rendering notifications it was never designed for — with a
+    payload it cannot read and a phone number it does not have."""
+    _seed(studio, as_lead_coach.person_id, kind="attendance.at_risk")
+    assert _inbox(client, as_lead_coach, kind="attendance").json()["items"] == []
+
+
+def test_the_kind_filter_is_still_scoped_to_the_caller(
+    client, studio, as_lead_coach, as_manager
+) -> None:
+    """It narrows and never widens: the worst a caller can do with it is see fewer of their
+    own messages."""
+    _seed(studio, as_manager.person_id, kind="attendance.at_risk")
+    assert _inbox(client, as_lead_coach, kind="attendance.at_risk").json()["items"] == []
