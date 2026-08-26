@@ -262,6 +262,10 @@ waves:
         title: הוראת קבע reconciliation, fingerprints and suggestions
         status: shipped
         on: 2026-08-26
+      - id: M6.8
+        title: The monthly run job, the debt ladder and the stale-order sweep
+        status: shipped
+        on: 2026-08-26
   - id: W5
     milestone: M8 ∥ M9
     title: Communication ∥ Reports and privacy completion

@@ -992,3 +992,30 @@ def a_confirming_manager(app_session: Session, studio: Studio) -> uuid.UUID:
     app_session.add(row)
     app_session.commit()
     return row.id
+
+
+@pytest.fixture
+def a_second_guardian(
+    app_session: Session, studio: Studio, a_priced_student: PricedStudent
+) -> uuid.UUID:
+    """A second, non-primary guardian on the same child.
+
+    §3.3 allows several guardians per child and L8 says `is_primary` decides bill addressing
+    and הוראת קבע matching -- and a REMINDER is neither, so both parents get told. A fixture
+    with one guardian could not tell a correct implementation from one that only ever
+    messages the payer.
+    """
+    person = Person(studio_id=studio.id, first_name="הורה", last_name="שני")
+    app_session.add(person)
+    app_session.flush()
+    app_session.add(
+        Guardian(
+            studio_id=studio.id,
+            student_id=a_priced_student.student_id,
+            person_id=person.id,
+            is_primary=False,
+            relation="parent",
+        )
+    )
+    app_session.commit()
+    return person.id
