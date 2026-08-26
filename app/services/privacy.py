@@ -4,6 +4,7 @@ import uuid
 
 from sqlalchemy.orm import Session
 
+from app.models.person import Person
 from app.models.reports import DataExportRequest, DeletionRequest
 
 
@@ -24,6 +25,11 @@ class PrivacyService:
         Returns the created request with initial status 'pending'.
         The export is enqueued as a background job and can be polled via get_export_status.
         """
+        # Validate that subject_person_id belongs to the current studio (tenant scope)
+        subject = self.session.query(Person).filter(Person.id == subject_person_id).first()
+        if not subject:
+            raise ValueError(f"Person {subject_person_id} not found")
+
         export = DataExportRequest(
             subject_person_id=subject_person_id,
             requested_by_person_id=requested_by_person_id,
@@ -49,6 +55,11 @@ class PrivacyService:
         Returns the created request with initial status 'pending'.
         The deletion is enqueued as a background job respecting retention windows.
         """
+        # Validate that subject_person_id belongs to the current studio (tenant scope)
+        subject = self.session.query(Person).filter(Person.id == subject_person_id).first()
+        if not subject:
+            raise ValueError(f"Person {subject_person_id} not found")
+
         deletion = DeletionRequest(
             subject_person_id=subject_person_id,
             requested_by_person_id=requested_by_person_id,

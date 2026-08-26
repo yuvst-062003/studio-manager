@@ -87,16 +87,12 @@ def get_export_status(
     session: TenantSessionDep,
 ) -> DataExportResponse:
     """Poll status of a data export job."""
+    from fastapi import HTTPException
+
     service = PrivacyService(session)
     export = service.get_export_status(job_id)
     if not export:
-        # Return minimal response for not-found (in production, would be 404)
-        return DataExportResponse(
-            job_id=job_id,
-            status="pending",
-            percent_complete=0,
-            expires_at=None,
-        )
+        raise HTTPException(status_code=404, detail="Export job not found")
     return DataExportResponse(
         job_id=export.id,
         status=export.status,
@@ -144,15 +140,12 @@ def get_deletion_status(
     session: TenantSessionDep,
 ) -> DeletionResponse:
     """Poll status of a deletion request."""
+    from fastapi import HTTPException
+
     service = PrivacyService(session)
     deletion = service.get_deletion_status(deletion_id)
     if not deletion:
-        # Return minimal response for not-found (in production, would be 404)
-        return DeletionResponse(
-            deletion_id=deletion_id,
-            status="pending",
-            person_id=uuid.uuid4(),
-        )
+        raise HTTPException(status_code=404, detail="Deletion request not found")
     return DeletionResponse(
         deletion_id=deletion.id,
         status=deletion.status,
