@@ -120,4 +120,40 @@ export const comms: Bundle = {
   // keeps a parent from relying on it for the urgent case.
   'calendar.refreshDelay': 'יומן Google מתעדכן באיחור של עד יממה. ביטולים נשלחים תמיד בהתראה',
   'calendar.addSingleEvent': 'הוספת האירוע ליומן',
+
+  // -- §6.5's value pre-prompt, and the iOS path with no prompt at all ---------------
+  // §5.11: ask behind a value pre-prompt FIRST, then the OS dialog. Never the raw OS
+  // dialog on launch — on iOS a denial is permanent and cannot be re-requested in-app.
+  'push.prePrompt.title': 'שנודיע לכם?',
+  'push.prePrompt.body': 'נודיע לך אם שיעור מתבטל',
+  'push.prePrompt.accept': 'כן, הודיעו לי',
+  'push.prePrompt.decline': 'לא עכשיו',
+  // §6.5 — in a Safari tab the Push API is ABSENT, not denied. There is nothing to ask
+  // for, so the app teaches the install instead of showing a button that cannot work.
+  'push.iosTabHasNoApi': 'כדי לקבל התראות באייפון, יש להוסיף את האפליקציה למסך הבית',
+  'push.registered': 'המכשיר רשום לקבלת התראות',
+
+  // -- §6.5's install-state list, beside the delivery report -------------------------
+  'install.title': 'מי יכול לקבל התראות',
+  'install.installed': '{{count}} התקינו את האפליקציה',
+  'install.notInstalled': '{{count}} לא התקינו',
+  // §5.11 permits no email and no SMS fallback, so this list is reachable only by phone.
+  'install.callThem': 'אפשר להתקשר אליהם',
+  'install.emptyGood': 'כל המשפחות התקינו את האפליקציה',
+  'install.platform.ios': 'אייפון',
+  'install.platform.android': 'אנדרואיד',
+  'install.platform.web': 'דפדפן',
+
+  // -- §5.14's at-risk alert ---------------------------------------------------------
+  // 'It is not left sitting in a report nobody opens' — hence the one-tap contact.
+  'atRisk.title': 'תלמידים בסיכון',
+  'atRisk.body': '{{name}} נעדר {{count}} שיעורים ברצף',
+  'atRisk.contactParent': 'צור קשר עם ההורה',
+  'atRisk.noPhone': 'אין מספר טלפון בכרטיס',
+  'atRisk.empty': 'אין תלמידים בסיכון',
+
+  // A resend can only retry a send that ERRORED. 'App not installed' and 'notifications
+  // off' are not retryable, and the screen says so rather than offering a dead button.
+  'delivery.nothingToResend': 'אין שליחות לנסות שוב — יש להתקשר למשפחות ברשימה',
+  'calendar.coachSubtitle': 'השיעורים שאתם מעבירים יופיעו ביומן שלכם',
 }

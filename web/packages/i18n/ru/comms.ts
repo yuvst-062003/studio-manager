@@ -62,7 +62,8 @@ export const comms: Bundle = {
   'pushDisabled.title': 'Уведомления отключены',
   'pushDisabled.body': 'Вы не узнаете об отменённых занятиях',
   'pushDisabled.openSettings': 'Открыть настройки',
-  'pushDisabled.iosNeedsInstall': 'На iPhone добавьте приложение на домашний экран, чтобы получать уведомления',
+  'pushDisabled.iosNeedsInstall':
+    'На iPhone добавьте приложение на домашний экран, чтобы получать уведомления',
   'pushEnabled.confirmation': 'Уведомления включены',
   'push.enable': 'Включить уведомления',
 
@@ -92,6 +93,36 @@ export const comms: Bundle = {
   'calendar.rotated': 'Ссылка заменена — прежняя больше не работает',
   'calendar.rotateWarning': 'Замена ссылки отключает все уже синхронизированные календари',
   'calendar.lastRotated': 'Заменена',
-  'calendar.refreshDelay': 'Google Календарь может отставать до суток. Отмены всегда приходят уведомлением',
+  'calendar.refreshDelay':
+    'Google Календарь может отставать до суток. Отмены всегда приходят уведомлением',
   'calendar.addSingleEvent': 'Добавить мероприятие в календарь',
+
+  // -- §6.5's value pre-prompt, and the iOS path with no prompt at all ---------------
+  'push.prePrompt.title': 'Сообщать вам?',
+  'push.prePrompt.body': 'Мы сообщим, если занятие отменят',
+  'push.prePrompt.accept': 'Да, сообщайте',
+  'push.prePrompt.decline': 'Не сейчас',
+  'push.iosTabHasNoApi':
+    'Чтобы получать уведомления на iPhone, добавьте приложение на главный экран',
+  'push.registered': 'Устройство будет получать уведомления',
+
+  // -- §6.5's install-state list, beside the delivery report -------------------------
+  'install.title': 'Кто может получать уведомления',
+  'install.installed': '{{count}} установили приложение',
+  'install.notInstalled': '{{count}} не установили',
+  'install.callThem': 'С этими семьями можно связаться только по телефону',
+  'install.emptyGood': 'Все семьи установили приложение',
+  'install.platform.ios': 'iPhone',
+  'install.platform.android': 'Android',
+  'install.platform.web': 'Браузер',
+
+  // -- §5.14's at-risk alert ---------------------------------------------------------
+  'atRisk.title': 'Ученики в зоне риска',
+  'atRisk.body': '{{name}} пропустил(а) {{count}} занятия подряд',
+  'atRisk.contactParent': 'Позвонить родителю',
+  'atRisk.noPhone': 'Нет номера телефона',
+  'atRisk.empty': 'Нет учеников в зоне риска',
+
+  'delivery.nothingToResend': 'Нечего повторять — позвоните семьям из списка выше',
+  'calendar.coachSubtitle': 'Занятия, которые вы ведёте, появятся в вашем календаре',
 }
