@@ -34,7 +34,7 @@ def with_slots(monkeypatch, studio, a_group, a_training_year):
         )
         for moment in (SUNDAY, WEDNESDAY)
     ]
-    monkeypatch.setattr(public_router, "schedule_reader", lambda: fake)
+    monkeypatch.setattr(public_router, "schedule_reader", lambda _session: fake)
     return fake
 
 
@@ -154,7 +154,7 @@ def test_a_cancelled_session_is_offered_but_not_bookable(
             status="cancelled",
         )
     ]
-    monkeypatch.setattr(public_router, "schedule_reader", lambda: fake)
+    monkeypatch.setattr(public_router, "schedule_reader", lambda _session: fake)
 
     slot = client.get(f"/api/v1/public/groups/{a_group}/trial-slots").json()["items"][0]
     assert slot["is_bookable"] is False
@@ -188,14 +188,6 @@ def test_an_unknown_group_is_404(client, with_slots):
     assert client.get(f"/api/v1/public/groups/{uuid.uuid4()}/trial-slots").status_code == 404
 
 
-def test_trial_slots_503_until_the_schedule_lane_lands(client, a_group):
-    """L5's seam surfaced honestly, with no reader patched in.
-    `.claude/rules/api.md` -- 'Never leak stack traces.' Delete when M2 merges."""
-    response = client.get(f"/api/v1/public/groups/{a_group}/trial-slots")
-    assert response.status_code == 503
-    assert response.json()["detail"]["code"] == "schedule_unavailable"
-
-
 # -- what the tag must not say -------------------------------------------------
 
 
@@ -221,3 +213,51 @@ def test_every_public_route_is_reachable_without_a_token(client, studio, a_group
         f"/api/v1/public/groups/{a_group}/trial-slots",
     ):
         assert client.get(path).status_code == 200, path
+
+
+# -- the unscoped session does not reach the schedule --------------------------
+def test_the_schedule_reader_is_handed_a_tenant_scoped_session(
+    client, monkeypatch, studio, a_group, a_training_year
+):
+    """W2's merge made this load-bearing, and nothing else in this file would catch it.
+
+    `ScheduleService` inherits its tenancy entirely from the session it is given: the
+    filter and the `studio_id` stamp in `app/core/tenancy.py` are registered on
+    `TenantSession` and nothing else, and `require_group` is a bare primary-key `get`.
+    This router deliberately holds the UNSCOPED `SessionDep` (see
+    `tests/restrictions/test_01_no_action_in_a_real_studio.py`'s allowlist), so wiring the
+    seam the obvious way -- `ScheduleService(session)` on the router's own session -- reads
+    every studio's training years and closures into the weekday calculation and inserts
+    `session` rows with no `studio_id` at all.
+
+    Both failures are silent-ish from the outside: the first returns wrong weekdays, the
+    second is a 500 only once a group has a rule that produces a missing session. So the
+    assertion is on the type and the ambient studio, which is where the guarantee actually
+    lives, rather than on a symptom.
+    """
+    import app.routers.public as public_router
+    from app.core.tenancy import TenantSession, get_current_studio_id
+
+    seen: list[tuple[type, uuid.UUID | None]] = []
+
+    def spy(session):
+        seen.append((type(session), get_current_studio_id()))
+        return FakeSchedule()
+
+    monkeypatch.setattr(public_router, "schedule_reader", spy)
+
+    assert client.get(f"/api/v1/public/studios/{studio.slug}/landing").status_code == 200
+    assert client.get(f"/api/v1/public/studios/{studio.slug}/groups").status_code == 200
+    assert client.get(f"/api/v1/public/groups/{a_group}/trial-slots").status_code == 200
+
+    assert len(seen) == 3, "every schedule read should resolve through the scoped factory"
+    for session_type, active_studio in seen:
+        assert issubclass(session_type, TenantSession), (
+            "the schedule was handed the router's unscoped session -- ScheduleService has "
+            "no studio filter of its own, so this is a cross-tenant read and an unstamped "
+            "write"
+        )
+        assert active_studio == studio.id, (
+            "a TenantSession with no studio in context fails closed rather than scoping, "
+            "so the studio resolved from the URL has to be in context too"
+        )

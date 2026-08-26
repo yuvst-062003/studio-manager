@@ -146,7 +146,13 @@ SESSION_DEP_ALLOWLIST: dict[str, str] = {
         "Restriction 1 is not bypassed, it is replaced by something narrower: every query "
         "in app/services/people/landing.py names its studio EXPLICITLY, resolved from the "
         "slug or the group the caller supplied, and the module never calls "
-        "with_all_tenants -- so nothing here can reach past the one studio the URL names."
+        "with_all_tenants -- so nothing here can reach past the one studio the URL names. "
+        "The unscoped session's reach is bounded by that property, so it extends only as "
+        "far as code that has it: W2 added ScheduleService, which does NOT name its studio "
+        "-- it inherits the filter from its session -- so public.py resolves the studio "
+        "first and hands the schedule a real TenantSession under use_studio(). See "
+        "_scoped_schedule in that module. The rule for anything added here later is the "
+        "same: name your studio, or open a scope."
     ),
     "platform.py": (
         "SPEC 18.1 puts the platform console above every studio: 5.1 makes it the only "

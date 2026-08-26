@@ -257,6 +257,170 @@
         "title": "ClassOut",
         "type": "object"
       },
+      "ClosureCreate": {
+        "properties": {
+          "date_from": {
+            "format": "date",
+            "title": "Date From",
+            "type": "string"
+          },
+          "date_to": {
+            "format": "date",
+            "title": "Date To",
+            "type": "string"
+          },
+          "reason": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          },
+          "source": {
+            "default": "manual",
+            "pattern": "^(holiday_preset|manual)$",
+            "title": "Source",
+            "type": "string"
+          },
+          "training_year_id": {
+            "format": "uuid",
+            "title": "Training Year Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "training_year_id",
+          "date_from",
+          "date_to",
+          "reason"
+        ],
+        "title": "ClosureCreate",
+        "type": "object"
+      },
+      "ClosureCreatedOut": {
+        "description": "§5.6 — 'adding one cancels the affected sessions and notifies the affected\nguardians'. The count is returned rather than left for the client to discover on the\nnext fetch, because a manager who has just closed a fortnight needs to see how many\nlessons that cost before they navigate away. The notification is §5.11's and lands\nin W5.",
+        "properties": {
+          "date_from": {
+            "format": "date",
+            "title": "Date From",
+            "type": "string"
+          },
+          "date_to": {
+            "format": "date",
+            "title": "Date To",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "sessions_cancelled": {
+            "default": 0,
+            "title": "Sessions Cancelled",
+            "type": "integer"
+          },
+          "source": {
+            "pattern": "^(holiday_preset|manual)$",
+            "title": "Source",
+            "type": "string"
+          },
+          "training_year_id": {
+            "format": "uuid",
+            "title": "Training Year Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "training_year_id",
+          "date_from",
+          "date_to",
+          "reason",
+          "source"
+        ],
+        "title": "ClosureCreatedOut",
+        "type": "object"
+      },
+      "ClosureOut": {
+        "properties": {
+          "date_from": {
+            "format": "date",
+            "title": "Date From",
+            "type": "string"
+          },
+          "date_to": {
+            "format": "date",
+            "title": "Date To",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "source": {
+            "pattern": "^(holiday_preset|manual)$",
+            "title": "Source",
+            "type": "string"
+          },
+          "training_year_id": {
+            "format": "uuid",
+            "title": "Training Year Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "training_year_id",
+          "date_from",
+          "date_to",
+          "reason",
+          "source"
+        ],
+        "title": "ClosureOut",
+        "type": "object"
+      },
+      "CursorPage_ClosureOut_": {
+        "properties": {
+          "has_more": {
+            "default": false,
+            "title": "Has More",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ClosureOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "CursorPage[ClosureOut]",
+        "type": "object"
+      },
       "CursorPage_RegistrationRequestOut_": {
         "properties": {
           "has_more": {
@@ -290,6 +454,72 @@
         "title": "CursorPage[RegistrationRequestOut]",
         "type": "object"
       },
+      "CursorPage_SessionNoteOut_": {
+        "properties": {
+          "has_more": {
+            "default": false,
+            "title": "Has More",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SessionNoteOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "CursorPage[SessionNoteOut]",
+        "type": "object"
+      },
+      "CursorPage_SessionOut_": {
+        "properties": {
+          "has_more": {
+            "default": false,
+            "title": "Has More",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SessionOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "CursorPage[SessionOut]",
+        "type": "object"
+      },
       "CursorPage_StudentSummaryOut_": {
         "properties": {
           "has_more": {
@@ -321,6 +551,39 @@
           "items"
         ],
         "title": "CursorPage[StudentSummaryOut]",
+        "type": "object"
+      },
+      "CursorPage_TrainingYearOut_": {
+        "properties": {
+          "has_more": {
+            "default": false,
+            "title": "Has More",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TrainingYearOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "CursorPage[TrainingYearOut]",
         "type": "object"
       },
       "CursorPage_TrialBookingRow_": {
@@ -546,6 +809,31 @@
           "group_name"
         ],
         "title": "EnrollmentWeekdayOptionsOut",
+        "type": "object"
+      },
+      "GenerateSessionsOut": {
+        "description": "§5.15 step 6 — 'materialize every session for the year … and show a summary of what\nwas created'.",
+        "properties": {
+          "groups": {
+            "title": "Groups",
+            "type": "integer"
+          },
+          "sessions_created": {
+            "title": "Sessions Created",
+            "type": "integer"
+          },
+          "training_year_id": {
+            "format": "uuid",
+            "title": "Training Year Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "training_year_id",
+          "groups",
+          "sessions_created"
+        ],
+        "title": "GenerateSessionsOut",
         "type": "object"
       },
       "GroupCreate": {
@@ -1027,6 +1315,37 @@
         "title": "HealthTemplateOut",
         "type": "object"
       },
+      "HolidayPresetOut": {
+        "description": "§7 — `GET /holiday-presets?year=2026`.\n\n§5.6 is emphatic that these are **proposals the manager ticks, never automatic\nclosures**. The shape carries no `applied` flag for that reason: a preset is not a\nthing that can be in a state, it is a suggestion. Ticking one creates a `Closure`.",
+        "properties": {
+          "date_from": {
+            "format": "date",
+            "title": "Date From",
+            "type": "string"
+          },
+          "date_to": {
+            "format": "date",
+            "title": "Date To",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "name",
+          "date_from",
+          "date_to"
+        ],
+        "title": "HolidayPresetOut",
+        "type": "object"
+      },
       "InvitationOut": {
         "description": "§5.3's token, returned exactly once.\n\nOnly its SHA-256 is stored, so nothing can reproduce this value later -- which is why\nthe list endpoint has no field for it and why a re-send has to issue a new one.",
         "properties": {
@@ -1252,6 +1571,33 @@
           "acting_as_person_id"
         ],
         "title": "MeResponse",
+        "type": "object"
+      },
+      "ProtectedSessionOut": {
+        "description": "One session the change will not touch, named rather than merely counted.\n\n§5.6's dialog prints the manually-edited ones as bullets — `· 15.11 אימון ים 90 דק'` —\nbecause \"2 sessions were manually edited\" tells a manager nothing about which two. The\nshape carries no title: `session` has no name column, and inventing one here would be a\nfield with nothing behind it. The client renders the date and the time range.",
+        "properties": {
+          "ends_at": {
+            "format": "date-time",
+            "title": "Ends At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "starts_at": {
+            "format": "date-time",
+            "title": "Starts At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "starts_at",
+          "ends_at"
+        ],
+        "title": "ProtectedSessionOut",
         "type": "object"
       },
       "ProviderListResponse": {
@@ -1717,6 +2063,519 @@
         "title": "RegistrationRequestOut",
         "type": "object"
       },
+      "ScheduleImpactPreview": {
+        "description": "§5.6's impact dialog: \"showing exactly what will change before it changes.\"\n\nThe three protected counts are listed separately rather than summed, because the\nmanager's question is not \"how many are safe\" but \"what am I about to lose\". E2E-5\nasserts `sessions_protected_manually_edited` is non-zero for a group with an edited\nsession and that those sessions are unchanged afterwards.",
+        "properties": {
+          "first_affected_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Affected Date"
+          },
+          "protected_manually_edited_sessions": {
+            "items": {
+              "$ref": "#/components/schemas/ProtectedSessionOut"
+            },
+            "title": "Protected Manually Edited Sessions",
+            "type": "array"
+          },
+          "sessions_protected_ad_hoc": {
+            "title": "Sessions Protected Ad Hoc",
+            "type": "integer"
+          },
+          "sessions_protected_manually_edited": {
+            "title": "Sessions Protected Manually Edited",
+            "type": "integer"
+          },
+          "sessions_protected_past": {
+            "title": "Sessions Protected Past",
+            "type": "integer"
+          },
+          "sessions_to_cancel": {
+            "title": "Sessions To Cancel",
+            "type": "integer"
+          },
+          "sessions_to_create": {
+            "title": "Sessions To Create",
+            "type": "integer"
+          },
+          "sessions_to_update": {
+            "title": "Sessions To Update",
+            "type": "integer"
+          },
+          "students_left_unscheduled": {
+            "default": 0,
+            "title": "Students Left Unscheduled",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "sessions_to_create",
+          "sessions_to_update",
+          "sessions_to_cancel",
+          "sessions_protected_past",
+          "sessions_protected_manually_edited",
+          "sessions_protected_ad_hoc"
+        ],
+        "title": "ScheduleImpactPreview",
+        "type": "object"
+      },
+      "SchedulePutIn": {
+        "description": "`PUT /groups/{id}/schedule`. §7: \"PUT returns an impact preview before applying.\"\n\n`apply` is what makes one endpoint serve both halves. `false` (the default) computes\nthe preview and writes nothing; `true` performs the change. Defaulting to the harmless\nbranch means a caller that forgets the field gets a preview rather than an unreviewed\nrewrite of a whole training year's sessions.",
+        "properties": {
+          "apply": {
+            "default": false,
+            "title": "Apply",
+            "type": "boolean"
+          },
+          "effective_from": {
+            "format": "date",
+            "title": "Effective From",
+            "type": "string"
+          },
+          "rules": {
+            "items": {
+              "$ref": "#/components/schemas/ScheduleRuleIn"
+            },
+            "title": "Rules",
+            "type": "array"
+          }
+        },
+        "required": [
+          "rules",
+          "effective_from"
+        ],
+        "title": "SchedulePutIn",
+        "type": "object"
+      },
+      "ScheduleRuleIn": {
+        "description": "One weekly rule. `weekday` is 0–6 with **0 = Sunday**, matching Israel's working\nweek and Postgres's `EXTRACT(DOW)`.",
+        "properties": {
+          "effective_from": {
+            "format": "date",
+            "title": "Effective From",
+            "type": "string"
+          },
+          "end_time": {
+            "format": "time",
+            "title": "End Time",
+            "type": "string"
+          },
+          "location_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location Id"
+          },
+          "start_time": {
+            "format": "time",
+            "title": "Start Time",
+            "type": "string"
+          },
+          "weekday": {
+            "maximum": 6.0,
+            "minimum": 0.0,
+            "title": "Weekday",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "weekday",
+          "start_time",
+          "end_time",
+          "effective_from"
+        ],
+        "title": "ScheduleRuleIn",
+        "type": "object"
+      },
+      "ScheduleRuleOut": {
+        "properties": {
+          "effective_from": {
+            "format": "date",
+            "title": "Effective From",
+            "type": "string"
+          },
+          "effective_to": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective To"
+          },
+          "end_time": {
+            "format": "time",
+            "title": "End Time",
+            "type": "string"
+          },
+          "group_id": {
+            "format": "uuid",
+            "title": "Group Id",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "location_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location Id"
+          },
+          "start_time": {
+            "format": "time",
+            "title": "Start Time",
+            "type": "string"
+          },
+          "weekday": {
+            "maximum": 6.0,
+            "minimum": 0.0,
+            "title": "Weekday",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "weekday",
+          "start_time",
+          "end_time",
+          "effective_from",
+          "id",
+          "group_id"
+        ],
+        "title": "ScheduleRuleOut",
+        "type": "object"
+      },
+      "ScheduleRulesOut": {
+        "description": "`GET /groups/{id}/schedule`. Only rules still in force: a superseded rule is history\nthe editor must not offer back for editing.",
+        "properties": {
+          "group_id": {
+            "format": "uuid",
+            "title": "Group Id",
+            "type": "string"
+          },
+          "rules": {
+            "items": {
+              "$ref": "#/components/schemas/ScheduleRuleOut"
+            },
+            "title": "Rules",
+            "type": "array"
+          }
+        },
+        "required": [
+          "group_id"
+        ],
+        "title": "ScheduleRulesOut",
+        "type": "object"
+      },
+      "SessionCancelIn": {
+        "description": "§5.6 — 'or cancel it with a reason'. The reason is required by the column's own\ncheck constraint, so a blank one is refused here rather than at the database.",
+        "properties": {
+          "reason": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "SessionCancelIn",
+        "type": "object"
+      },
+      "SessionCreate": {
+        "description": "§5.6 — 'They can also add an ad-hoc session that belongs to no rule.'\n\n`is_ad_hoc` is not a field a caller may set: every session created here is ad-hoc by\nconstruction, and a flag the client controlled would let a caller mint a session that a\nregenerate then silently destroys.",
+        "properties": {
+          "ends_at": {
+            "format": "date-time",
+            "title": "Ends At",
+            "type": "string"
+          },
+          "group_id": {
+            "format": "uuid",
+            "title": "Group Id",
+            "type": "string"
+          },
+          "location_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location Id"
+          },
+          "staff": {
+            "items": {
+              "$ref": "#/components/schemas/SessionStaffIn"
+            },
+            "title": "Staff",
+            "type": "array"
+          },
+          "starts_at": {
+            "format": "date-time",
+            "title": "Starts At",
+            "type": "string"
+          },
+          "training_year_id": {
+            "format": "uuid",
+            "title": "Training Year Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "group_id",
+          "training_year_id",
+          "starts_at",
+          "ends_at"
+        ],
+        "title": "SessionCreate",
+        "type": "object"
+      },
+      "SessionNoteCreate": {
+        "properties": {
+          "body": {
+            "minLength": 1,
+            "title": "Body",
+            "type": "string"
+          }
+        },
+        "required": [
+          "body"
+        ],
+        "title": "SessionNoteCreate",
+        "type": "object"
+      },
+      "SessionNoteOut": {
+        "properties": {
+          "author_person_id": {
+            "format": "uuid",
+            "title": "Author Person Id",
+            "type": "string"
+          },
+          "body": {
+            "title": "Body",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "session_id": {
+            "format": "uuid",
+            "title": "Session Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "session_id",
+          "author_person_id",
+          "body",
+          "created_at"
+        ],
+        "title": "SessionNoteOut",
+        "type": "object"
+      },
+      "SessionOut": {
+        "description": "One materialized session. G3 — `starts_at`/`ends_at` are UTC instants; the client\nrenders them in Asia/Jerusalem regardless of locale (`@studio/core`'s `datetime`).",
+        "properties": {
+          "attendance_taken": {
+            "default": false,
+            "title": "Attendance Taken",
+            "type": "boolean"
+          },
+          "cancel_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancel Reason"
+          },
+          "ends_at": {
+            "format": "date-time",
+            "title": "Ends At",
+            "type": "string"
+          },
+          "group_id": {
+            "format": "uuid",
+            "title": "Group Id",
+            "type": "string"
+          },
+          "group_name": {
+            "title": "Group Name",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_ad_hoc": {
+            "title": "Is Ad Hoc",
+            "type": "boolean"
+          },
+          "is_manually_edited": {
+            "title": "Is Manually Edited",
+            "type": "boolean"
+          },
+          "location_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location Id"
+          },
+          "location_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location Name"
+          },
+          "staff": {
+            "items": {
+              "$ref": "#/components/schemas/SessionStaffOut"
+            },
+            "title": "Staff",
+            "type": "array"
+          },
+          "starts_at": {
+            "format": "date-time",
+            "title": "Starts At",
+            "type": "string"
+          },
+          "status": {
+            "pattern": "^(scheduled|cancelled|completed)$",
+            "title": "Status",
+            "type": "string"
+          },
+          "training_year_id": {
+            "format": "uuid",
+            "title": "Training Year Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "group_id",
+          "group_name",
+          "training_year_id",
+          "starts_at",
+          "ends_at",
+          "location_id",
+          "location_name",
+          "status",
+          "is_manually_edited",
+          "is_ad_hoc",
+          "cancel_reason"
+        ],
+        "title": "SessionOut",
+        "type": "object"
+      },
+      "SessionPatch": {
+        "description": "§5.6's per-session override.\n\n**Every field is optional and absence is not `null`.** `location_id: null` clears the\nlocation; omitting `location_id` leaves it alone. The service distinguishes them with\n`model_fields_set`, which is the only way to express \"remove the room\" and \"do not\ntouch the room\" in one shape.\n\nTimes move as a pair. A start without an end would silently redefine the duration, and\n\"the class is an hour shorter now\" is not something anyone typed.",
+        "properties": {
+          "ends_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ends At"
+          },
+          "location_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location Id"
+          },
+          "staff": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SessionStaffIn"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Staff"
+          },
+          "starts_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Starts At"
+          }
+        },
+        "title": "SessionPatch",
+        "type": "object"
+      },
       "SessionResponse": {
         "description": "The access token lives in the body, never in a cookie (§10.3).\n\nThe client holds it in memory and replays it, which is what keeps it out of\nautomatic-credential territory -- a cookie-borne access token is sent by the browser\non every request, which is what makes CSRF possible at all. The refresh token is in\nthe Set-Cookie header and never here.",
         "properties": {
@@ -1759,6 +2618,62 @@
           "active_studio_id"
         ],
         "title": "SessionResponse",
+        "type": "object"
+      },
+      "SessionStaffIn": {
+        "description": "Who is actually on the mat for this one session. Distinct from `group_staff`, which\nis who normally coaches the group — §5.14's 'sessions without a coach' report is the\ndifference between the two.",
+        "properties": {
+          "is_substitute": {
+            "default": false,
+            "title": "Is Substitute",
+            "type": "boolean"
+          },
+          "person_id": {
+            "format": "uuid",
+            "title": "Person Id",
+            "type": "string"
+          },
+          "role": {
+            "pattern": "^(lead_coach|assistant_coach)$",
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "person_id",
+          "role"
+        ],
+        "title": "SessionStaffIn",
+        "type": "object"
+      },
+      "SessionStaffOut": {
+        "properties": {
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "is_substitute": {
+            "title": "Is Substitute",
+            "type": "boolean"
+          },
+          "person_id": {
+            "format": "uuid",
+            "title": "Person Id",
+            "type": "string"
+          },
+          "role": {
+            "pattern": "^(lead_coach|assistant_coach)$",
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "person_id",
+          "display_name",
+          "role",
+          "is_substitute"
+        ],
+        "title": "SessionStaffOut",
         "type": "object"
       },
       "SetupProgressOut": {
@@ -3062,6 +3977,70 @@
         "title": "SwitchStudioRequest",
         "type": "object"
       },
+      "TrainingYearCreate": {
+        "properties": {
+          "ends_on": {
+            "format": "date",
+            "title": "Ends On",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "starts_on": {
+            "format": "date",
+            "title": "Starts On",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "starts_on",
+          "ends_on"
+        ],
+        "title": "TrainingYearCreate",
+        "type": "object"
+      },
+      "TrainingYearOut": {
+        "properties": {
+          "ends_on": {
+            "format": "date",
+            "title": "Ends On",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "starts_on": {
+            "format": "date",
+            "title": "Starts On",
+            "type": "string"
+          },
+          "status": {
+            "pattern": "^(draft|active|closed)$",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "starts_on",
+          "ends_on",
+          "status"
+        ],
+        "title": "TrainingYearOut",
+        "type": "object"
+      },
       "TrialBookingConfirmationOut": {
         "description": "§5.4a step 5's \"נתראה ביום א׳ 17:00\", once per child.\n\nTwo siblings in different groups have two different answers to 'which group' and\n'when', so `13b` renders one of these per child rather than one for the booking.",
         "properties": {
@@ -4250,6 +5229,145 @@
         ]
       }
     },
+    "/api/v1/closures": {
+      "get": {
+        "operationId": "list_closures_api_v1_closures_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "training_year_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Training Year Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CursorPage_ClosureOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Closures",
+        "tags": [
+          "schedule"
+        ]
+      },
+      "post": {
+        "operationId": "create_closure_api_v1_closures_post",
+        "parameters": [
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClosureCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClosureCreatedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Closure",
+        "tags": [
+          "schedule"
+        ]
+      }
+    },
     "/api/v1/enrollments": {
       "get": {
         "description": "Always scoped to one student. C11 makes several live rows normal, so this is a\nsmall bounded list rather than a page -- G16's rule is about lists that grow.",
@@ -4607,6 +5725,120 @@
         ]
       }
     },
+    "/api/v1/groups/{group_id}/schedule": {
+      "get": {
+        "operationId": "get_group_schedule_api_v1_groups__group_id__schedule_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "group_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Group Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduleRulesOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Group Schedule",
+        "tags": [
+          "schedule"
+        ]
+      },
+      "put": {
+        "description": "§7 — 'PUT returns an impact preview before applying.'\n\nOne endpoint serves both halves because `apply` is the only difference, and defaulting\nit to `false` means a caller that forgets the field gets a preview rather than an\nunreviewed rewrite of a whole training year.",
+        "operationId": "put_group_schedule_api_v1_groups__group_id__schedule_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "group_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Group Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SchedulePutIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduleImpactPreview"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Group Schedule",
+        "tags": [
+          "schedule"
+        ]
+      }
+    },
     "/api/v1/groups/{group_id}/staff": {
       "get": {
         "operationId": "list_group_staff_api_v1_groups__group_id__staff_get",
@@ -4771,6 +6003,55 @@
         "summary": "List Health Templates",
         "tags": [
           "structure"
+        ]
+      }
+    },
+    "/api/v1/holiday-presets": {
+      "get": {
+        "description": "§5.6 — **proposals the manager ticks, never automatic closures.**\n\nNo session dependency, deliberately: this route reads nothing and writes nothing, and\na database handle it did not need would be a database handle a later edit could use.\nA Gregorian year always straddles two Hebrew ones, which is why 2026 answers with both\nPesach of 5786 and Rosh Hashanah of 5787.",
+        "operationId": "list_holiday_presets_api_v1_holiday_presets_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "year",
+            "required": true,
+            "schema": {
+              "maximum": 2100,
+              "minimum": 2000,
+              "title": "Year",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/HolidayPresetOut"
+                  },
+                  "title": "Response List Holiday Presets Api V1 Holiday Presets Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Holiday Presets",
+        "tags": [
+          "schedule"
         ]
       }
     },
@@ -5596,6 +6877,516 @@
         "summary": "Reject Registration Request",
         "tags": [
           "people"
+        ]
+      }
+    },
+    "/api/v1/sessions": {
+      "get": {
+        "operationId": "list_sessions_api_v1_sessions_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "from",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "title": "From",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "title": "To",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "group_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Group Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "coach_person_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Coach Person Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CursorPage_SessionOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Sessions",
+        "tags": [
+          "coach",
+          "schedule"
+        ]
+      },
+      "post": {
+        "operationId": "create_ad_hoc_session_api_v1_sessions_post",
+        "parameters": [
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Ad Hoc Session",
+        "tags": [
+          "coach",
+          "schedule"
+        ]
+      }
+    },
+    "/api/v1/sessions/{session_id}": {
+      "get": {
+        "operationId": "get_session_api_v1_sessions__session_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Session",
+        "tags": [
+          "coach",
+          "schedule"
+        ]
+      },
+      "patch": {
+        "operationId": "patch_session_api_v1_sessions__session_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Patch Session",
+        "tags": [
+          "coach",
+          "schedule"
+        ]
+      }
+    },
+    "/api/v1/sessions/{session_id}/cancel": {
+      "post": {
+        "operationId": "cancel_session_api_v1_sessions__session_id__cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionCancelIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cancel Session",
+        "tags": [
+          "coach",
+          "schedule"
+        ]
+      }
+    },
+    "/api/v1/sessions/{session_id}/notes": {
+      "get": {
+        "operationId": "list_notes_api_v1_sessions__session_id__notes_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CursorPage_SessionNoteOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Notes",
+        "tags": [
+          "coach",
+          "schedule"
+        ]
+      },
+      "post": {
+        "operationId": "add_note_api_v1_sessions__session_id__notes_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionNoteCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionNoteOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Note",
+        "tags": [
+          "coach",
+          "schedule"
         ]
       }
     },
@@ -6779,6 +8570,253 @@
         "summary": "Upload Logo",
         "tags": [
           "studio"
+        ]
+      }
+    },
+    "/api/v1/training-years": {
+      "get": {
+        "operationId": "list_training_years_api_v1_training_years_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CursorPage_TrainingYearOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Training Years",
+        "tags": [
+          "schedule"
+        ]
+      },
+      "post": {
+        "operationId": "create_training_year_api_v1_training_years_post",
+        "parameters": [
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TrainingYearCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrainingYearOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Training Year",
+        "tags": [
+          "schedule"
+        ]
+      }
+    },
+    "/api/v1/training-years/{training_year_id}/activate": {
+      "post": {
+        "operationId": "activate_training_year_api_v1_training_years__training_year_id__activate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "training_year_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Training Year Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrainingYearOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Activate Training Year",
+        "tags": [
+          "schedule"
+        ]
+      }
+    },
+    "/api/v1/training-years/{training_year_id}/generate-sessions": {
+      "post": {
+        "description": "§5.15 step 6. Safe to press twice — `materialize_sessions` keeps a session already\nsitting at the wanted instant rather than adding a second one.",
+        "operationId": "generate_sessions_api_v1_training_years__training_year_id__generate_sessions_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "training_year_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Training Year Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenerateSessionsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Generate Sessions",
+        "tags": [
+          "schedule"
         ]
       }
     },

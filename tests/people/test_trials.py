@@ -38,7 +38,7 @@ def bookable(monkeypatch, studio, a_group, a_training_year, app_session):
     app_session.add(row)
     app_session.commit()
     fake.sessions[a_group] = [row]
-    monkeypatch.setattr(public_router, "schedule_reader", lambda: fake)
+    monkeypatch.setattr(public_router, "schedule_reader", lambda _session: fake)
     return fake
 
 

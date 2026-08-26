@@ -15,20 +15,41 @@ Three deliberate departures from every other router in this lane, each with a re
 * **Not tagged `coach`.** The tag is a promise about invariant 3's guard, and an
   unauthenticated router is not a coach router.
 
-`schedule_reader` is a module-level factory rather than a direct `ScheduleService()` call
-so a test can substitute a reader without monkeypatching the shared service class.
+`schedule_reader` is a module-level factory rather than a direct `ScheduleService(...)`
+call so a test can substitute a reader without monkeypatching the shared service class.
+
+**The unscoped session does NOT reach the schedule.** W2's merge made this load-bearing.
+`ScheduleService` inherits its tenancy entirely from the session it is handed: the filter
+(`do_orm_execute`) and the `studio_id` stamp (`before_flush`) in `app/core/tenancy.py` are
+registered on `TenantSession` and on nothing else, and `ScheduleService.require_group` is a
+bare primary-key `get` with no studio predicate of its own. Handing it the unscoped session
+above would therefore read any studio's group by UUID, feed EVERY studio's training years
+and closures into `expand_rules` -- so the weekdays would be wrong, not merely unguarded --
+and, because `materialize_sessions` writes, insert `session` rows with no `studio_id` at
+all, which is a NOT NULL violation and a 500 on the shop window.
+
+So the schedule read runs in its own scope: resolve the studio from the slug or the group
+with the unscoped session, then open a `TenantSession` under `use_studio(studio_id)` and
+give the service THAT. `_scoped_schedule` below is the one place it happens.
+`app/routers/trial_bookings.py::book_trial_for_self` does the same thing for the same
+reason. The scope is deliberately never committed: a stranger loading a marketing page
+should not leave rows behind, and `materialize_sessions` flushes, so the weekdays it
+computes are correct inside the transaction that is about to be rolled back.
 """
 
 from __future__ import annotations
 
 import uuid
+from collections.abc import Iterator
+from contextlib import contextmanager
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 
 from app.core.clock import now
-from app.core.db import SessionDep
+from app.core.db import SessionDep, get_engine
 from app.core.storage import ObjectNotFoundError, ObjectStore, build_object_store
+from app.core.tenancy import TenantSession, use_studio
 from app.schemas.people import (
     PublicGroupListResponse,
     PublicGroupOut,
@@ -53,9 +74,27 @@ def object_store() -> ObjectStore:
 ObjectStoreDep = Annotated[ObjectStore, Depends(object_store)]
 
 
-def schedule_reader() -> ScheduleReader:
-    """L5's seam, behind one indirection so tests can supply a reader."""
-    return ScheduleService()
+def schedule_reader(session: TenantSession) -> ScheduleReader:
+    """L5's seam, behind one indirection so tests can supply a reader.
+
+    Takes the session the reader must run on. It is typed `TenantSession` rather than
+    `Session` on purpose: an unscoped session here is the whole failure the module
+    docstring describes, and the annotation is the cheapest place to say so.
+    """
+    return ScheduleService(session)
+
+
+@contextmanager
+def _scoped_schedule(studio_id: uuid.UUID) -> Iterator[tuple[TenantSession, ScheduleReader]]:
+    """A tenant-scoped session and a reader bound to it, for one studio.
+
+    Never committed -- see the module docstring. Exiting the `with` rolls back whatever
+    `materialize_sessions` flushed, which is the intended behaviour for an unauthenticated
+    GET: the weekdays are computed from real rows inside the transaction, and the open
+    internet leaves nothing behind.
+    """
+    with use_studio(studio_id), TenantSession(bind=get_engine(), expire_on_commit=False) as scoped:
+        yield scoped, schedule_reader(scoped)
 
 
 def _not_found() -> HTTPException:
@@ -93,10 +132,19 @@ def _landing(slug: str, session: SessionDep) -> PublicLandingOut:
     club that has filled none of it in gets nulls, and the page renders its name and its
     groups -- which is still a shop window.
     """
+    # `LandingService.landing()` is the composite of these two, and it takes ONE session.
+    # Split here rather than widened there: the studio lookup is the half that legitimately
+    # runs unscoped -- it is how the studio is discovered at all -- and the group half is
+    # the half that must not. G6 is intact; this is still parse, call, return.
     try:
-        studio, groups = LandingService.landing(
-            session, slug=slug, since=now().date(), schedule=schedule_reader()
-        )
+        studio = LandingService.studio_by_slug(session, slug=slug)
+    except NotFoundError as exc:
+        raise _not_found() from exc
+    try:
+        with _scoped_schedule(studio.id) as (scoped, schedule):
+            groups = LandingService.public_groups(
+                scoped, studio_id=studio.id, since=now().date(), schedule=schedule
+            )
     except NotFoundError as exc:
         raise _not_found() from exc
     except NotImplementedError as exc:
@@ -142,9 +190,10 @@ def public_studio(slug: str, session: SessionDep) -> PublicLandingOut:
 def public_groups(slug: str, session: SessionDep) -> PublicGroupListResponse:
     try:
         studio = LandingService.studio_by_slug(session, slug=slug)
-        groups = LandingService.public_groups(
-            session, studio_id=studio.id, since=now().date(), schedule=schedule_reader()
-        )
+        with _scoped_schedule(studio.id) as (scoped, schedule):
+            groups = LandingService.public_groups(
+                scoped, studio_id=studio.id, since=now().date(), schedule=schedule
+            )
     except NotFoundError as exc:
         raise _not_found() from exc
     except NotImplementedError as exc:
@@ -185,13 +234,14 @@ def trial_slots(group_id: uuid.UUID, session: SessionDep) -> TrialSlotListRespon
     child.'"""
     try:
         studio_id = LandingService.studio_id_for_group(session, group_id=group_id)
-        rows = LandingService.trial_slots(
-            session,
-            group_id=group_id,
-            studio_id=studio_id,
-            since=now().date(),
-            schedule=schedule_reader(),
-        )
+        with _scoped_schedule(studio_id) as (scoped, schedule):
+            rows = LandingService.trial_slots(
+                scoped,
+                group_id=group_id,
+                studio_id=studio_id,
+                since=now().date(),
+                schedule=schedule,
+            )
     except NotFoundError as exc:
         raise _not_found() from exc
     except NotImplementedError as exc:

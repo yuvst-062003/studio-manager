@@ -67,15 +67,22 @@ from app.services.schedule import ScheduleService
 router = APIRouter(tags=["people"])
 
 
-def schedule_reader() -> ScheduleReader:
+def schedule_reader(session: TenantSession) -> ScheduleReader:
     """L5's seam, behind one indirection -- the same shape `app/routers/public.py` uses.
 
-    A module-level factory rather than a `ScheduleService()` call inside each route, so a
-    test substitutes a reader by patching one name instead of reaching into the shared
+    A module-level factory rather than a `ScheduleService(session)` call inside each route,
+    so a test substitutes a reader by patching one name instead of reaching into the shared
     service class. A function-local import cannot be patched at all, which is how the first
     version of this silently kept calling the real seam.
+
+    **The session is threaded through from the request.** W2's contract fixed the seam as
+    `materialize_sessions(group_id, from_date, to_date)` -- three arguments and no session
+    -- so lane SCHEDULE put the session on the constructor. A no-argument call here is a
+    TypeError at request time, and the reader must be the REQUEST's `TenantSession` rather
+    than one of its own: that is what carries the tenant filter and the studio stamp into
+    every query the seam runs.
     """
-    return ScheduleService()
+    return ScheduleService(session)
 
 
 #: SPEC §7 lists `/me/students` beside `/students`, and both live here. The tag that
@@ -311,7 +318,7 @@ def create_student(
             actor_person_id=getattr(request.state, "person_id", None),
             group_id=body.group_id,
             attends_weekdays=body.attends_weekdays,
-            schedule=schedule_reader(),
+            schedule=schedule_reader(session),
         )
     except NotFoundError as exc:
         raise _not_found() from exc
@@ -439,7 +446,7 @@ def convert_student(
             reason=body.reason,
             at=now(),
             actor_person_id=getattr(request.state, "person_id", None),
-            schedule=schedule_reader(),
+            schedule=schedule_reader(session),
         )
     except NotFoundError as exc:
         raise _not_found() from exc
@@ -501,7 +508,7 @@ def student_price_plan(
         raise _not_found() from exc
     try:
         volume = EnrollmentService.weekly_volume_for_student(
-            session, student_id=student_id, since=now().date(), schedule=schedule_reader()
+            session, student_id=student_id, since=now().date(), schedule=schedule_reader(session)
         )
     except NotImplementedError:
         # L5's seam. Until lane SCHEDULE merges there is no calendar to observe, so the

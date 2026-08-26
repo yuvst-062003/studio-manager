@@ -139,12 +139,3 @@ def test_a_group_with_no_sessions_trains_on_no_days(fake_schedule):
     empty checkbox list."""
     assert training_weekdays(GROUP, since=SINCE, schedule=fake_schedule) == frozenset()
 
-
-def test_the_real_seam_still_refuses(fake_schedule):
-    """The contract, restated where this lane can see it: `materialize_sessions` raises
-    until lane SCHEDULE merges, and this lane never papers over that with an empty list.
-    Delete this test when M2 lands and the seam returns rows."""
-    from app.services.schedule import ScheduleService
-
-    with pytest.raises(NotImplementedError):
-        training_weekdays(GROUP, since=SINCE, schedule=ScheduleService())

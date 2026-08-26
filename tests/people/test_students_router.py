@@ -39,7 +39,7 @@ def twice_weekly(monkeypatch, studio, a_group, a_training_year):
         )
         for moment in (SUNDAY, WEDNESDAY)
     ]
-    monkeypatch.setattr(students_router, "schedule_reader", lambda: fake)
+    monkeypatch.setattr(students_router, "schedule_reader", lambda _session: fake)
     return fake
 
 #: Coach-reachable, and therefore inside invariant 3's guard.

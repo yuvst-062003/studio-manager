@@ -86,7 +86,7 @@ def weekday_options(
     """C12's checkboxes. Every enrolment form asks this before it draws the day list."""
     try:
         options = EnrollmentService.weekday_options(
-            session, group_id=group_id, since=now().date(), schedule=ScheduleService()
+            session, group_id=group_id, since=now().date(), schedule=ScheduleService(session)
         )
     except NotFoundError as exc:
         raise _not_found("group") from exc
@@ -135,7 +135,7 @@ def create_enrollment(
             attends_weekdays=body.attends_weekdays,
             at=now(),
             actor_person_id=getattr(request.state, "person_id", None),
-            schedule=ScheduleService(),
+            schedule=ScheduleService(session),
         )
     except NotFoundError as exc:
         raise _not_found("student or group") from exc
@@ -175,7 +175,7 @@ def update_enrollment(
             attends_weekdays=body.attends_weekdays,
             at=now(),
             actor_person_id=getattr(request.state, "person_id", None),
-            schedule=ScheduleService(),
+            schedule=ScheduleService(session),
         )
     except NotFoundError as exc:
         raise _not_found("enrollment") from exc

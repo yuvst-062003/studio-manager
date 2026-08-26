@@ -56,15 +56,22 @@ from app.services.schedule import ScheduleService
 router = APIRouter(tags=["people"])
 
 
-def schedule_reader() -> ScheduleReader:
+def schedule_reader(session: TenantSession) -> ScheduleReader:
     """L5's seam, behind one indirection -- the same shape `app/routers/public.py` uses.
 
-    A module-level factory rather than a `ScheduleService()` call inside each route, so a
-    test substitutes a reader by patching one name instead of reaching into the shared
+    A module-level factory rather than a `ScheduleService(session)` call inside each route,
+    so a test substitutes a reader by patching one name instead of reaching into the shared
     service class. A function-local import cannot be patched at all, which is how the first
     version of this silently kept calling the real seam.
+
+    **The session is threaded through from the request.** W2's contract fixed the seam as
+    `materialize_sessions(group_id, from_date, to_date)` -- three arguments and no session
+    -- so lane SCHEDULE put the session on the constructor. A no-argument call here is a
+    TypeError at request time, and the reader must be the REQUEST's `TenantSession` rather
+    than one of its own: that is what carries the tenant filter and the studio stamp into
+    every query the seam runs.
     """
-    return ScheduleService()
+    return ScheduleService(session)
 
 
 #: Module-level so a test can substitute a tighter budget without reaching into the service.
@@ -428,7 +435,7 @@ def approve_registration_request(
             group_id=body.group_id,
             actor_person_id=getattr(request.state, "person_id", None),
             at=now(),
-            schedule=schedule_reader(),
+            schedule=schedule_reader(session),
         )
     except NotFoundError as exc:
         raise _not_found("registration request or group") from exc

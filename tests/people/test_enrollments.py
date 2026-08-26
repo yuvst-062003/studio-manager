@@ -377,18 +377,6 @@ def test_the_contract_module_is_untouched_by_this_lane():
 # -- the router ----------------------------------------------------------------
 
 
-def test_the_weekday_options_endpoint_503s_until_the_schedule_lane_lands(
-    client, as_manager, a_group
-):
-    """L5's seam surfaced honestly. `.claude/rules/api.md` -- 'Never leak stack traces.'
-    Delete this test when M2 merges and the seam returns rows."""
-    response = client.get(
-        f"/api/v1/enrollments/weekday-options?group_id={a_group}", headers=as_manager.headers
-    )
-    assert response.status_code == 503
-    assert response.json()["detail"]["code"] == "schedule_unavailable"
-
-
 def test_a_coach_may_not_create_an_enrollment(client, as_lead_coach, a_group):
     """§3.2 -- enrolment is a manager decision (L6)."""
     response = client.post(

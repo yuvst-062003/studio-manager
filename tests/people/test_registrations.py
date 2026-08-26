@@ -39,7 +39,7 @@ def trains_sundays(monkeypatch, studio, a_group, a_second_group, a_training_year
             )
         ]
 
-    monkeypatch.setattr(trial_router, "schedule_reader", lambda: fake)
+    monkeypatch.setattr(trial_router, "schedule_reader", lambda _session: fake)
     return fake
 
 
