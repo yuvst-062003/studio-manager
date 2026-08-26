@@ -57,6 +57,23 @@ class HealthService:
             )
         return self._session
 
+    def current_template(self, kind: str) -> HealthFormTemplate | None:
+        """The studio's highest **published** template of one kind — what a parent signs today.
+
+        A draft (`published_at IS NULL`) is deliberately excluded: a manager half-way through
+        rewording the questionnaire must not change what a coach's roster warns about, and must
+        not change what the next parent is asked.
+        """
+        return self.session.execute(
+            select(HealthFormTemplate)
+            .where(
+                HealthFormTemplate.kind == kind,
+                HealthFormTemplate.published_at.is_not(None),
+            )
+            .order_by(HealthFormTemplate.version.desc())
+            .limit(1)
+        ).scalar_one_or_none()
+
     def recompute_derived_flags(self, student_id: uuid.UUID) -> dict[str, bool]:
         """Re-derive `health_declaration.derived_flags` for one student, and return them.
 
@@ -68,10 +85,25 @@ class HealthService:
         `student.health_status` is `missing`, the roster renders
         `⚠ הצהרת בריאות חסרה`, and §5.5 is explicit that nothing on the mat is blocked.
 
-        **Derives against the template the declaration was signed against**, found by
-        `template_id` rather than by "the studio's current full template". D11 makes the question
-        set editable, so those are different rows the moment a manager publishes — and a
-        declaration's flags must mean what the questions it was signed against asked.
+        **Derives against the studio's CURRENT published template**, not the one the declaration
+        was signed against, and that choice is the whole reason this method exists. This module's
+        own docstring states it: "the moment a manager rewords a question the derivation changes
+        and every declaration's flags are stale. A single named entry point means M4 can re-derive
+        the studio's whole roster after a template edit." Deriving against the signed-against row
+        would make a template edit a no-op for every declaration already collected, and this
+        method would have nothing to do.
+
+        The counter-argument is real and is answered by the split §4.3 already drew. An answer
+        only means something in the context of the question asked, so the *record* — the encrypted
+        answers, the `template_version`, the rendered PDF — is frozen against the version signed,
+        and that is what an audit or a dispute reads. `derived_flags` is not the record. It is a
+        cache of "what should this coach be warned about, under the questions this studio asks
+        today", and a studio that has just started asking about epilepsy wants the warning on the
+        children already enrolled.
+
+        `strict=False`, because a manager may mark an existing free-text question as a flag
+        question. One declaration holding text there would otherwise raise and take down the
+        publish trying to fix the whole roster. See `derive_flags`.
 
         **Writes the result back before returning.** "Recompute" is the entry point a template
         publish uses to fix a whole studio's roster, so a caller that had to remember to persist
@@ -87,13 +119,14 @@ class HealthService:
         if row is None:
             return {}
 
-        template = self.session.get(HealthFormTemplate, row.template_id)
-        if template is None:
+        signed_against = self.session.get(HealthFormTemplate, row.template_id)
+        if signed_against is None:
             # Impossible through the ORM -- `template_id` is `ondelete="RESTRICT"` -- and cheap
             # to state. An empty mapping is the safe direction: no flags rather than wrong ones.
             return {}
 
-        flags = derive_flags(row.answers_encrypted or {}, template.schema)
+        current = self.current_template(signed_against.kind) or signed_against
+        flags = derive_flags(row.answers_encrypted or {}, current.schema, strict=False)
         row.derived_flags = flags
         self.session.flush()
         return flags

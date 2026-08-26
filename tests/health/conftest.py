@@ -189,16 +189,29 @@ def a_full_template(app_session: Session, studio: Studio) -> uuid.UUID:
     Idempotent, so it returns revision 0007's row where one exists and creates it where the
     studio postdates the migration -- which is exactly the guarantee
     `ensure_full_template` exists to make, exercised rather than assumed.
+
+    **The commit is load-bearing**, and it is why this reads differently from the handed-over
+    draft. `ensure_full_template` flushes and does not commit, so without it the row exists only
+    inside `app_session`'s open transaction -- invisible to the request-scoped session a route
+    opens on its own connection, and every route test in this lane 404s on a template that is
+    plainly there. `a_student` above already commits for the same reason.
     """
-    return ensure_full_template(app_session, studio.id, at=T0).id
+    template_id = ensure_full_template(app_session, studio.id, at=T0).id
+    app_session.commit()
+    return template_id
 
 
 @pytest.fixture
 def a_trial_template(app_session: Session, studio: Studio) -> uuid.UUID:
     """Conflict C3's row. **This lane does not own it** -- M1 seeded it so M3's trial
     bookings had something to write against, and M3 writes declarations against it. It is
-    here so this lane can assert it left the trial form alone."""
-    return ensure_trial_template(app_session, studio.id, at=T0).id
+    here so this lane can assert it left the trial form alone.
+
+    Committed for the same reason `a_full_template` is: a flushed-only row is invisible to the
+    session a route opens."""
+    template_id = ensure_trial_template(app_session, studio.id, at=T0).id
+    app_session.commit()
+    return template_id
 
 
 @pytest.fixture

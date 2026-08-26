@@ -53,15 +53,26 @@ def flag_question_ids(schema: Mapping[str, Any]) -> tuple[str, ...]:
     )
 
 
-def derive_flags(answers: Mapping[str, Any], schema: Mapping[str, Any]) -> dict[str, bool]:
+def derive_flags(
+    answers: Mapping[str, Any], schema: Mapping[str, Any], *, strict: bool = True
+) -> dict[str, bool]:
     """`{"asthma": True, "allergy": False}` — booleans, one per flag question in `schema`.
 
     An unanswered flag question is `False` rather than absent. A roster renders chips for the
     `True` ones, and a key that sometimes vanishes would make "no asthma" and "never asked"
     indistinguishable at the one moment the difference matters.
 
-    Raises `ValueError` when a flag question's answer is present and is not a `bool`. That is a bug
-    in whoever derived it, and the loud failure is the cheap way to find it.
+    **`strict=True` (the default) raises on a non-boolean answer to a flag question.** That is a
+    bug in whoever derived it, and the loud failure is the cheap way to find it. This is the mode
+    a submit runs in: the caller is a live parent and the answers are being written for the first
+    time.
+
+    **`strict=False` omits that question instead**, and is the mode a re-derivation runs in. D11
+    lets a manager mark an existing free-text question as a flag question, at which point every
+    declaration already holding text there would raise — and one such row would take down the
+    publish that is trying to fix the whole studio's roster. Omitted rather than `False`, because
+    `False` asserts "this child does not have that condition" on the strength of a question that
+    was never asked as a yes/no. No chip is honest; a wrong chip is not.
     """
     flags: dict[str, bool] = {}
     for question_id in flag_question_ids(schema):
@@ -70,6 +81,8 @@ def derive_flags(answers: Mapping[str, Any], schema: Mapping[str, Any]) -> dict[
             continue
         answer = answers[question_id]
         if not isinstance(answer, bool):
+            if not strict:
+                continue
             raise ValueError(
                 f"answer to flag question {question_id!r} is {type(answer).__name__}, not a bool: "
                 "§4.3 allows booleans only, never free text"
