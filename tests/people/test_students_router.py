@@ -42,6 +42,7 @@ def twice_weekly(monkeypatch, studio, a_group, a_training_year):
     monkeypatch.setattr(students_router, "schedule_reader", lambda _session: fake)
     return fake
 
+
 #: Coach-reachable, and therefore inside invariant 3's guard.
 COACH_ROUTES = [
     ("/api/v1/students", "get"),
@@ -137,9 +138,7 @@ def test_a_student_created_with_no_group_is_still_a_lead(client, as_manager, app
     assert body["student"]["status"] == "lead"
     assert (
         app_session.execute(
-            select(Enrollment).where(
-                Enrollment.student_id == uuid.UUID(body["student"]["id"])
-            )
+            select(Enrollment).where(Enrollment.student_id == uuid.UUID(body["student"]["id"]))
         ).first()
         is None
     )

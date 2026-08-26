@@ -138,4 +138,3 @@ def test_a_group_with_no_sessions_trains_on_no_days(fake_schedule):
     and the enrolment form renders 'this group has no schedule' rather than a silent
     empty checkbox list."""
     assert training_weekdays(GROUP, since=SINCE, schedule=fake_schedule) == frozenset()
-

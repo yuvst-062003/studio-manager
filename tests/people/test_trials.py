@@ -245,8 +245,9 @@ def test_two_siblings_book_into_their_own_groups_and_their_own_slots(
     by_name = {row["student_display_name"]: row for row in body["bookings"]}
     assert by_name[f"דנה{tag} כהן{tag}"]["group_name"] == "מתחילים"
     assert by_name[f"יוסי{tag} כהן{tag}"]["group_name"] == "נבחרת"
-    assert by_name[f"דנה{tag} כהן{tag}"]["session_starts_at"] != (
-        by_name[f"יוסי{tag} כהן{tag}"]["session_starts_at"]
+    assert (
+        by_name[f"דנה{tag} כהן{tag}"]["session_starts_at"]
+        != (by_name[f"יוסי{tag} כהן{tag}"]["session_starts_at"])
     )
 
     # And the rows themselves, not just what the response says about them.
