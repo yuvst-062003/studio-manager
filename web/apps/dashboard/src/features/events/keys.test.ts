@@ -119,6 +119,9 @@ describe('the events namespace', () => {
     // the criterion arrives without a column to store it in.
     const values = Object.values(he).join(' ')
     expect(values).not.toMatch(/%/)
-    expect(values).not.toMatch(/חוב/)
+    // `חוב` (debt) as a whole word, not as a substring: `שדה חובה` (required field) starts
+    // with the same three letters and means something else entirely. JS `\b` is
+    // ASCII-word-based, so the boundary has to be spelled out against the Hebrew block.
+    expect(values).not.toMatch(/(^|[^֐-׿])חוב([^֐-׿]|$)/)
   })
 })
