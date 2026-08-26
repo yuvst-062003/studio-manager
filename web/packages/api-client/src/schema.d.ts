@@ -298,6 +298,149 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/billing-runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Billing Runs */
+        get: operations["list_billing_runs_api_v1_billing_runs_get"];
+        put?: never;
+        /**
+         * Create Billing Run
+         * @description Run the month now. **Safe to press twice** -- §5.10 step 5, and
+         *     `billing.run.idempotentHint` is that promise written on the button.
+         *
+         *     `now()` rather than a wall clock, so §19.5's `X-Dev-Now` reaches the run and a manager
+         *     can test December's billing in November.
+         */
+        post: operations["create_billing_run_api_v1_billing_runs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/billing/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Billing Settings
+         * @description What `1b` renders for the standing-order and cash routes.
+         */
+        get: operations["read_billing_settings_api_v1_billing_settings_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Billing Settings
+         * @description A partial write. `exclude_unset` is what stops the הגדרות panel's one-field autosave
+         *     blanking the other two.
+         */
+        patch: operations["update_billing_settings_api_v1_billing_settings_patch"];
+        trace?: never;
+    };
+    "/api/v1/charges": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Charges
+         * @description §7's `GET /charges?payer_person_id&status`. `allocated_agorot` travels with each row
+         *     because §4.3 settles a charge by summing allocations -- a client rendering
+         *     `amount_agorot` alone would show a fully-paid charge as outstanding.
+         */
+        get: operations["list_charges_api_v1_charges_get"];
+        put?: never;
+        /**
+         * Create Charge
+         * @description §5.10's manual charge. Goes through `BillingService.create_charge` and **not** an
+         *     insert: one writer, so a manual charge and the monthly run cannot disagree about what a
+         *     charge is.
+         *
+         *     `ManualChargeIn.kind` excludes `tuition` on purpose -- a hand-made tuition charge is how
+         *     a month ends up billed twice, beside a run that believes it did its job.
+         */
+        post: operations["create_charge_api_v1_charges_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/charges/{charge_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Charge */
+        get: operations["get_charge_api_v1_charges__charge_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/charges/{charge_id}/adjust": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Adjust Charge
+         * @description A correction recorded as a **new** charge, never an edit to the original.
+         *
+         *     §5.10 makes a credit a negative amount rather than an edit, so the ledger stays
+         *     append-only and last month's statement does not change after a parent has read it. The
+         *     201 and the new id are that rule visible from the outside.
+         */
+        post: operations["adjust_charge_api_v1_charges__charge_id__adjust_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/charges/{charge_id}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Close Charge
+         * @description Void or write off. §11.4 forbids deleting a financial row, so this is how a charge
+         *     stops counting without ceasing to exist.
+         */
+        post: operations["close_charge_api_v1_charges__charge_id__close_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/classes": {
         parameters: {
             query?: never;
@@ -704,6 +847,196 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/payers/{payer_person_id}/balance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Payer Balance
+         * @description `12f`'s summary card and `3e`'s household row.
+         *
+         *     Negative is a family in credit. `MoneyDisplay` wraps the amount in `<bdi>` precisely so
+         *     a negative reads as a credit in a right-to-left sentence rather than as a debt.
+         */
+        get: operations["payer_balance_api_v1_payers__payer_person_id__balance_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payment-complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Payment Complete
+         * @description §5.10 step 5's `returnurl`. **It marks nothing paid.**
+         *
+         *     'The redirect is never the source of truth -- a closed tab still produces an IPN.' So
+         *     this reports the order's current status and says, in `billing.order.verifyingHint`, that
+         *     the window can be closed. uPay appends its own payload to this URL and every field of it
+         *     is ignored here: it is client-submitted, unsigned, and the IPN is what settles anything.
+         */
+        get: operations["payment_complete_api_v1_payment_complete_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payment-orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Payment Order
+         * @description §5.10 step 1. **The payer is always the caller** and never a field in the body.
+         *
+         *     `PaymentOrderCreateIn` carries only `charge_ids`, and that is the contract shape making
+         *     the decision: an order is created by the person who is about to stand in front of uPay's
+         *     hosted page with their own card. A manager settling a family's debt uses
+         *     `POST /payments`, which is the flow for money that arrives by every other route.
+         *
+         *     Taking the payer from the request rather than the body also closes the obvious hole --
+         *     a body-supplied payer would let anyone open an order over anyone's charges.
+         *
+         *     **`max_payments` is a query parameter, not a body field**, because
+         *     `PaymentOrderCreateIn` is W4's contract shape and carries only `charge_ids`. `1b` draws
+         *     an instalments chip group, so the count has to reach the server somehow; widening a
+         *     shape another wave authored is the one way it must not. Capped at `MAX_INSTALLMENTS`
+         *     here and again in `OrderService.create`, because the dashboard's dropdown stops at 12
+         *     and behaviour above it was never tested against this account.
+         */
+        post: operations["create_payment_order_api_v1_payment_orders_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payment-orders/{public_ref}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Payment Order
+         * @description The status the return page polls, and §5.10 step 5's whole point.
+         *
+         *     'The redirect is **never** the source of truth -- the IPN arrives ~5 minutes later.'
+         *     So this is a read the parent's browser repeats while `billing.order.verifying` is on
+         *     screen; it reports `pending` honestly rather than guessing from the redirect.
+         *
+         *     Readable by the payer, or by a manager. `public_ref` is unguessable, but "unguessable"
+         *     is not "authorised" -- a reference that leaked through a shared browser history would
+         *     otherwise expose what a family owes.
+         */
+        get: operations["read_payment_order_api_v1_payment_orders__public_ref__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payment-orders/{public_ref}/form": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Payment Order Form
+         * @description §5.10 step 2's hidden fields. **Fields, not HTML.**
+         *
+         *     The client builds and auto-submits the POST. Returning rendered HTML from an API the
+         *     TypeScript client is generated against would hand that client a `string` where every
+         *     other route has a model, and the form's own fields would stop being type-checked.
+         *
+         *     A demo studio gets a 409 rather than a form (§19.6 restriction 5): its payment step
+         *     renders §19.5's IPN simulator, which never leaves our origin.
+         */
+        get: operations["read_payment_order_form_api_v1_payment_orders__public_ref__form_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Payments
+         * @description `12f`'s history and `3e`'s per-household drill-down.
+         */
+        get: operations["list_payments_api_v1_payments_get"];
+        put?: never;
+        /**
+         * Record Payment
+         * @description §5.10's manual payment -- cash, transfer, הוראת קבע or a credit adjustment.
+         *
+         *     Naming `charge_ids` allocates to exactly those; leaving it empty records the money and
+         *     allocates nothing, which is what the reconciliation queue then resolves. Either way the
+         *     charge is settled by its allocations and never by a field written here.
+         */
+        post: operations["record_payment_api_v1_payments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payments/{payment_id}/reverse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reverse Payment
+         * @description A returned cheque, a chargeback, a payment recorded against the wrong family.
+         *
+         *     §11.4 -- never a DELETE. The row stays with `reversed_at` and a reason, the allocations
+         *     go, and every charge they touched is recomputed. Without that last step the club would
+         *     show a month as paid that it was never paid for, invisible in every debt report.
+         */
+        post: operations["reverse_payment_api_v1_payments__payment_id__reverse_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/platform/studios": {
         parameters: {
             query?: never;
@@ -771,6 +1104,109 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/price-plans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Price Plans
+         * @description Dashboard `5a` and the wizard's step 4. Current plan first, closed ones below.
+         */
+        get: operations["list_price_plans_api_v1_price_plans_get"];
+        put?: never;
+        /** Create Price Plan */
+        post: operations["create_price_plan_api_v1_price_plans_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/price-plans/{plan_id}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Close Price Plan
+         * @description §5.10 -- 'Plans are versioned so a price change never rewrites history.' Returns the
+         *     SUCCESSOR, which is the row `5a` then renders as current.
+         */
+        post: operations["close_price_plan_api_v1_price_plans__plan_id__close_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/products": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Products */
+        get: operations["list_products_api_v1_products_get"];
+        put?: never;
+        /** Create Product */
+        post: operations["create_product_api_v1_products_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/products/handout-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Handout Options
+         * @description What staff `11a`'s picker renders. **Names only, never prices** (invariant 3).
+         *
+         *     Active products only: a coach handing out an item the club stopped selling would create
+         *     a charge for a price nobody currently offers.
+         */
+        get: operations["list_handout_options_api_v1_products_handout_options_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/products/{product_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Product
+         * @description `exclude_unset` is what makes this a partial write rather than a blanking one.
+         */
+        patch: operations["update_product_api_v1_products__product_id__patch"];
         trace?: never;
     };
     "/api/v1/public/groups/{group_id}/trial-slots": {
@@ -868,6 +1304,126 @@ export interface paths {
         get: operations["public_logo_api_v1_public_studios__slug__logo_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reconciliation/match": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm Match
+         * @description §5.10 step 3 and step 5.
+         *
+         *     `IpnMatchIn.match_status` is `Literal["manual", "ignored"]` -- **there is no `auto` a
+         *     client can send**, and that is the schema saying step 5 out loud: a match is a human's
+         *     decision or it is nothing.
+         *
+         *     **`ipn_id` and `payer_person_id` are query parameters, and `IpnMatchIn.payment_id` is
+         *     left for what it says.** The contract shape carries `payment_id` -- an existing
+         *     *payment* to link this callback to, for the case where a manager already recorded the
+         *     money by hand and now wants the evidence attached. §5.10 step 3's flow is the other one:
+         *     the system *creates* the payment, so what it needs is a payer, not a payment. Reusing
+         *     `payment_id` to carry a person id would have been a field lying about its own name in
+         *     the one place a wrong id sends the wrong parent a debt reminder.
+         *
+         *     `confirmed_by_person_id` comes from the request context, never the body. A client that
+         *     could name the confirmer could attribute someone else's decision, and the row that is
+         *     supposed to prove a human decided would prove the wrong human.
+         */
+        post: operations["confirm_match_api_v1_reconciliation_match_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reconciliation/suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Suggestions
+         * @description §5.10 step 4. **A read with no side effect** -- computing a suggestion twice must
+         *     leave the ledger exactly where it was, because the manager's tap is the only thing that
+         *     moves money.
+         */
+        get: operations["list_suggestions_api_v1_reconciliation_suggestions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reconciliation/unmatched": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Unmatched
+         * @description `3e`'s reconciliation queue, left column: payments waiting for a human.
+         */
+        get: operations["list_unmatched_api_v1_reconciliation_unmatched_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/recurring-subscriptions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Subscriptions */
+        get: operations["list_subscriptions_api_v1_recurring_subscriptions_get"];
+        put?: never;
+        /**
+         * Record Subscription
+         * @description G8 -- a record of a mandate that exists at the provider, not one we can create.
+         */
+        post: operations["record_subscription_api_v1_recurring_subscriptions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/recurring-subscriptions/{subscription_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel Subscription
+         * @description The family stopped. The row stays as history -- it is what explains why last March's
+         *     reconciliation expected them.
+         */
+        post: operations["cancel_subscription_api_v1_recurring_subscriptions__subscription_id__cancel_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1769,6 +2325,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/webhooks/upay/{public_ref}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Upay Ipn
+         * @description §5.10's IPN. **Always 200**, including for a forgery and including on a bug.
+         *
+         *     A non-200 invites retries whose behaviour nobody has observed, and by the time anything
+         *     here can fail the bytes are already safe -- which is what makes answering 200 to a
+         *     forged callback the right answer rather than a lax one.
+         *
+         *     `SessionDep`, not `TenantSessionDep`: there is no authenticated caller, so there is no
+         *     studio in context and the tenant-scoped dependency would 401 every real payment. The
+         *     scope is opened from the order's own `studio_id` once the order is found.
+         */
+        get: operations["upay_ipn_api_v1_webhooks_upay__public_ref__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2014,6 +2598,73 @@ export interface components {
              */
             superseded: number;
         };
+        /**
+         * BillingRunIn
+         * @description §7's `POST /billing-runs`, and the endpoint the dev bar's runJob tool triggers.
+         *
+         *     A period, not a date range: §5.10 bills calendar months and `charge`'s idempotency key
+         *     is `(student_id, period_year, period_month, kind)`.
+         */
+        BillingRunIn: {
+            /** Period Month */
+            period_month: number;
+            /** Period Year */
+            period_year: number;
+        };
+        /** BillingRunOut */
+        BillingRunOut: {
+            /** Charges Created */
+            charges_created: number;
+            /** Finished At */
+            finished_at: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Period Month */
+            period_month: number;
+            /** Period Year */
+            period_year: number;
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "running" | "completed" | "failed";
+        };
+        /**
+         * BillingSettingsOut
+         * @description §5.10's three studio-level settings.
+         *
+         *     `standing_order_link` is the shared recurring link the manager created once in the uPay
+         *     dashboard and pasted here -- G8: we cannot create one, cannot vary its amount per payer,
+         *     and cannot tell from its callbacks who paid.
+         */
+        BillingSettingsOut: {
+            /** Cash Instructions */
+            cash_instructions?: string | null;
+            /**
+             * Run Day
+             * @default 1
+             */
+            run_day: number;
+            /** Standing Order Link */
+            standing_order_link?: string | null;
+        };
+        /** BillingSettingsPatch */
+        BillingSettingsPatch: {
+            /** Cash Instructions */
+            cash_instructions?: string | null;
+            /** Run Day */
+            run_day?: number | null;
+            /** Standing Order Link */
+            standing_order_link?: string | null;
+        };
         /** Body_upload_logo_api_v1_studio_logo_post */
         Body_upload_logo_api_v1_studio_logo_post: {
             /**
@@ -2098,6 +2749,90 @@ export interface components {
             invitation_token?: string | null;
             /** State */
             state: string;
+        };
+        /**
+         * ChargeAdjustmentIn
+         * @description A correction, recorded as a new fact. §5.10 makes a credit a negative amount
+         *     rather than an edit to the original charge, so the ledger stays append-only and last
+         *     month's statement does not change after a parent has read it.
+         */
+        ChargeAdjustmentIn: {
+            /**
+             * Amount Agorot
+             * @description Negative for a credit. Never zero.
+             */
+            amount_agorot: number;
+            /** Reason */
+            reason: string;
+        };
+        /**
+         * ChargeCloseIn
+         * @description §11.4 -- a financial row is never deleted, so a charge raised in error is closed and
+         *     explained. `reason` is mandatory because 'why' is the only thing that makes it auditable
+         *     a year later, when the family asks where their September went.
+         */
+        ChargeCloseIn: {
+            /** Reason */
+            reason: string;
+            /** Status */
+            status: string;
+        };
+        /**
+         * ChargeOut
+         * @description One line of what a family owes.
+         *
+         *     `original_amount_agorot` and `proration_note` travel together and are how a
+         *     mid-month join is explained on the parent's screen rather than looking like an
+         *     arbitrary discount (§5.10).
+         */
+        ChargeOut: {
+            /**
+             * Allocated Agorot
+             * @default 0
+             */
+            allocated_agorot: number;
+            /** Amount Agorot */
+            amount_agorot: number;
+            /**
+             * Created By
+             * @enum {string}
+             */
+            created_by: "billing_run" | "manual" | "event";
+            /**
+             * Due Date
+             * Format: date
+             */
+            due_date: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "tuition" | "registration" | "event" | "manual";
+            /** Original Amount Agorot */
+            original_amount_agorot: number | null;
+            /**
+             * Payer Person Id
+             * Format: uuid
+             */
+            payer_person_id: string;
+            /** Period Month */
+            period_month?: number | null;
+            /** Period Year */
+            period_year: number | null;
+            /** Proration Note */
+            proration_note: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "open" | "settled" | "void" | "written_off";
+            /** Student Id */
+            student_id: string | null;
         };
         /**
          * ChildMatchOut
@@ -2253,6 +2988,30 @@ export interface components {
             /** Next Cursor */
             next_cursor?: string | null;
         };
+        /** CursorPage[BillingRunOut] */
+        CursorPage_BillingRunOut_: {
+            /**
+             * Has More
+             * @default false
+             */
+            has_more: boolean;
+            /** Items */
+            items: components["schemas"]["BillingRunOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** CursorPage[ChargeOut] */
+        CursorPage_ChargeOut_: {
+            /**
+             * Has More
+             * @default false
+             */
+            has_more: boolean;
+            /** Items */
+            items: components["schemas"]["ChargeOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
         /** CursorPage[ClosureOut] */
         CursorPage_ClosureOut_: {
             /**
@@ -2262,6 +3021,54 @@ export interface components {
             has_more: boolean;
             /** Items */
             items: components["schemas"]["ClosureOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** CursorPage[PaymentOut] */
+        CursorPage_PaymentOut_: {
+            /**
+             * Has More
+             * @default false
+             */
+            has_more: boolean;
+            /** Items */
+            items: components["schemas"]["PaymentOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** CursorPage[PricePlanOut] */
+        CursorPage_PricePlanOut_: {
+            /**
+             * Has More
+             * @default false
+             */
+            has_more: boolean;
+            /** Items */
+            items: components["schemas"]["PricePlanOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** CursorPage[ProductOut] */
+        CursorPage_ProductOut_: {
+            /**
+             * Has More
+             * @default false
+             */
+            has_more: boolean;
+            /** Items */
+            items: components["schemas"]["ProductOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** CursorPage[RecurringSubscriptionOut] */
+        CursorPage_RecurringSubscriptionOut_: {
+            /**
+             * Has More
+             * @default false
+             */
+            has_more: boolean;
+            /** Items */
+            items: components["schemas"]["RecurringSubscriptionOut"][];
             /** Next Cursor */
             next_cursor?: string | null;
         };
@@ -2334,6 +3141,18 @@ export interface components {
             has_more: boolean;
             /** Items */
             items: components["schemas"]["TrialBookingRow"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** CursorPage[UpayIpnRecordOut] */
+        CursorPage_UpayIpnRecordOut_: {
+            /**
+             * Has More
+             * @default false
+             */
+            has_more: boolean;
+            /** Items */
+            items: components["schemas"]["UpayIpnRecordOut"][];
             /** Next Cursor */
             next_cursor?: string | null;
         };
@@ -2592,6 +3411,28 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /**
+         * HandoutOptionOut
+         * @description §5.10's `11a`, and **invariant 3 as a shape rather than as a rule someone remembers**.
+         *
+         *     A coach picks the item; the server prices it from `product.price_agorot`. There is no
+         *     money field here, and that absence is the whole reason this shape exists instead of
+         *     reusing `ProductOut`.
+         */
+        HandoutOptionOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+        };
+        /** HandoutOptionsOut */
+        HandoutOptionsOut: {
+            /** Items */
+            items: components["schemas"]["HandoutOptionOut"][];
         };
         /**
          * HealthDeclarationFullOut
@@ -2870,6 +3711,21 @@ export interface components {
             /** Last Name */
             last_name: string;
         };
+        /**
+         * IpnMatchIn
+         * @description §5.10: "A wrong automatic match marks the wrong payer paid and sends the wrong
+         *     parent a debt reminder. A human always confirms." So this exists and there is no
+         *     endpoint that applies a suggestion without one.
+         */
+        IpnMatchIn: {
+            /**
+             * Match Status
+             * @enum {string}
+             */
+            match_status: "manual" | "ignored";
+            /** Payment Id */
+            payment_id?: string | null;
+        };
         /** LocationCreate */
         LocationCreate: {
             /** Address */
@@ -2900,6 +3756,103 @@ export interface components {
             /** Notes */
             notes: string | null;
         };
+        /**
+         * ManualChargeIn
+         * @description §5.10's manual charge. `kind` excludes `tuition` and `billing_run` provenance on
+         *     purpose -- a hand-made tuition charge is how a month ends up billed twice.
+         */
+        ManualChargeIn: {
+            /** Amount Agorot */
+            amount_agorot: number;
+            /**
+             * Due Date
+             * Format: date
+             */
+            due_date: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "registration" | "event" | "manual";
+            /** Note */
+            note?: string | null;
+            /**
+             * Payer Person Id
+             * Format: uuid
+             */
+            payer_person_id: string;
+            /** Student Id */
+            student_id?: string | null;
+        };
+        /**
+         * ManualPaymentIn
+         * @description G8's consequence. הוראת קבע and bank transfers are marked paid by a human in the
+         *     same flow as cash, because our provider cannot create a per-payer recurring mandate
+         *     programmatically -- so this shape is the *normal* route for recurring money, not an
+         *     exception path.
+         */
+        ManualPaymentIn: {
+            /** Amount Agorot */
+            amount_agorot: number;
+            /** Charge Ids */
+            charge_ids?: string[];
+            /** External Receipt Number */
+            external_receipt_number?: string | null;
+            /**
+             * Method
+             * @enum {string}
+             */
+            method: "standing_order" | "bank_transfer" | "cash" | "credit_adjustment";
+            /** Note */
+            note?: string | null;
+            /**
+             * Payer Person Id
+             * Format: uuid
+             */
+            payer_person_id: string;
+            /**
+             * Received At
+             * Format: date-time
+             */
+            received_at: string;
+        };
+        /**
+         * MatchSuggestionOut
+         * @description One unmatched payment and the payer a fingerprint suggests.
+         *
+         *     `confidence` is **advisory** (§5.10 step 5). Nothing acts on a threshold: it is a number
+         *     a manager reads before tapping, never a gate anything passes.
+         */
+        MatchSuggestionOut: {
+            /** Amount Agorot */
+            amount_agorot: number | null;
+            /** Card Owner Name */
+            card_owner_name: string | null;
+            /** Confidence */
+            confidence: number;
+            /** Four Digits */
+            four_digits: string | null;
+            /**
+             * Ipn Id
+             * Format: uuid
+             */
+            ipn_id: string;
+            /**
+             * Payer Person Id
+             * Format: uuid
+             */
+            payer_person_id: string;
+        };
+        /** MatchSuggestionsOut */
+        MatchSuggestionsOut: {
+            /** Items */
+            items: components["schemas"]["MatchSuggestionOut"][];
+            /**
+             * Never Auto
+             * @default true
+             */
+            never_auto: boolean;
+        };
         /** MeResponse */
         MeResponse: {
             access: components["schemas"]["AppAccessOut"];
@@ -2916,6 +3869,271 @@ export interface components {
             identity_id: string;
             /** Studios */
             studios: components["schemas"]["StudioMembershipOut"][];
+        };
+        /**
+         * PayerBalanceOut
+         * @description What a parent sees on `12f` תשלומים (D9.3 — titled תשלומים, not קבלות ותשלומים).
+         *
+         *     `balance_agorot` is negative when the family is in credit. §5.10 makes that real via
+         *     credit adjustments, and `MoneyDisplay` wraps the amount in `<bdi>` precisely so a
+         *     negative reads as a credit in a right-to-left sentence rather than as a debt.
+         */
+        PayerBalanceOut: {
+            /** Balance Agorot */
+            balance_agorot: number;
+            /** Charged Agorot */
+            charged_agorot: number;
+            /** Open Charge Count */
+            open_charge_count: number;
+            /** Paid Agorot */
+            paid_agorot: number;
+            /**
+             * Payer Person Id
+             * Format: uuid
+             */
+            payer_person_id: string;
+        };
+        /**
+         * PaymentAllocationOut
+         * @description The join that settles a charge. Its own amount, because one payment covers several
+         *     months and the split is the fact that has to survive (§5.10's "N months").
+         */
+        PaymentAllocationOut: {
+            /** Amount Agorot */
+            amount_agorot: number;
+            /**
+             * Charge Id
+             * Format: uuid
+             */
+            charge_id: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Payment Id
+             * Format: uuid
+             */
+            payment_id: string;
+        };
+        /**
+         * PaymentCompleteOut
+         * @description What the return page renders. `status` is the ORDER's, read from our own row --
+         *     never anything uPay put in the redirect's query string.
+         */
+        PaymentCompleteOut: {
+            /** Public Ref */
+            public_ref: string | null;
+            /** Status */
+            status: string;
+        };
+        /**
+         * PaymentOrderCreateIn
+         * @description The parent picks charges; the server prices them. `expected_amount_agorot` is
+         *     absent on purpose -- §5.10 compares the IPN against a server-side sum, and a
+         *     client-supplied expected amount would be the thing it is compared to.
+         */
+        PaymentOrderCreateIn: {
+            /** Charge Ids */
+            charge_ids: string[];
+        };
+        /**
+         * PaymentOrderOut
+         * @description §5.10. `public_ref` is a UUIDv4 and is the only identifier that reaches uPay -- a
+         *     sequential id here would let anyone mark any family's tuition paid by guessing.
+         */
+        PaymentOrderOut: {
+            /** Charge Ids */
+            charge_ids?: string[];
+            /** Expected Amount Agorot */
+            expected_amount_agorot: number;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Max Payments */
+            max_payments: number;
+            /** Paid At */
+            paid_at: string | null;
+            /**
+             * Payer Person Id
+             * Format: uuid
+             */
+            payer_person_id: string;
+            /**
+             * Public Ref
+             * Format: uuid
+             */
+            public_ref: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "paid" | "failed" | "amount_mismatch" | "expired";
+        };
+        /**
+         * PaymentOut
+         * @description §11.4 — never deleted. Israeli tax law requires roughly seven years of financial
+         *     records, so a reversal is `reversed_at` plus a reason on the row, not a DELETE.
+         */
+        PaymentOut: {
+            /** Allocations */
+            allocations?: components["schemas"]["PaymentAllocationOut"][];
+            /** Amount Agorot */
+            amount_agorot: number;
+            /** External Receipt Number */
+            external_receipt_number: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Method
+             * @enum {string}
+             */
+            method: "upay_card" | "standing_order" | "bank_transfer" | "cash" | "credit_adjustment";
+            /** Note */
+            note: string | null;
+            /**
+             * Payer Person Id
+             * Format: uuid
+             */
+            payer_person_id: string;
+            /** Payment Order Id */
+            payment_order_id: string | null;
+            /**
+             * Received At
+             * Format: date-time
+             */
+            received_at: string;
+            /** Recorded By Person Id */
+            recorded_by_person_id: string | null;
+            /** Reversal Reason */
+            reversal_reason: string | null;
+            /** Reversed At */
+            reversed_at: string | null;
+        };
+        /** PaymentReversalIn */
+        PaymentReversalIn: {
+            /** Reason */
+            reason: string;
+        };
+        /**
+         * PricePlanCloseIn
+         * @description A price change: close the current plan, open its successor the next day. There is
+         *     deliberately no shape that edits an amount in place.
+         */
+        PricePlanCloseIn: {
+            /**
+             * Closes On
+             * Format: date
+             */
+            closes_on: string;
+            /** Replacement Amount Agorot */
+            replacement_amount_agorot: number;
+            /** Replacement Registration Fee Agorot */
+            replacement_registration_fee_agorot?: number | null;
+        };
+        /**
+         * PricePlanIn
+         * @description §5.10's plan, and C11 in a shape: `sessions_per_week` and **no group**.
+         *
+         *     Defined here rather than in `app/schemas/billing.py` because that file is W4's contract
+         *     commit and this lane does not widen it -- the contract authored the read shapes both
+         *     lanes share and left the write shapes to whoever built the routes.
+         */
+        PricePlanIn: {
+            /**
+             * Active From
+             * Format: date
+             */
+            active_from: string;
+            /** Monthly Amount Agorot */
+            monthly_amount_agorot: number;
+            /** Name */
+            name: string;
+            /** Registration Fee Agorot */
+            registration_fee_agorot?: number | null;
+            /** Sessions Per Week */
+            sessions_per_week: number;
+        };
+        /**
+         * PricePlanOut
+         * @description §5.10 step 1 prices from here. `active_to` is null for the current plan, which is
+         *     what lets a mid-year price change leave last month's charges explainable.
+         *
+         *     **No `group_id` and no `class_id`** — C11. A plan is scoped by training volume and
+         *     chosen per student (`StudentOut.price_plan_id`); a group has no price.
+         */
+        PricePlanOut: {
+            /**
+             * Active From
+             * Format: date
+             */
+            active_from: string;
+            /** Active To */
+            active_to: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Monthly Amount Agorot */
+            monthly_amount_agorot: number;
+            /** Name */
+            name: string;
+            /** Registration Fee Agorot */
+            registration_fee_agorot: number;
+            /** Sessions Per Week */
+            sessions_per_week: number;
+        };
+        /** ProductIn */
+        ProductIn: {
+            /** Description */
+            description?: string | null;
+            /** Name */
+            name: string;
+            /** Price Agorot */
+            price_agorot: number;
+        };
+        /** ProductOut */
+        ProductOut: {
+            /** Description */
+            description: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Active */
+            is_active: boolean;
+            /** Name */
+            name: string;
+            /** Price Agorot */
+            price_agorot: number;
+        };
+        /**
+         * ProductPatch
+         * @description Every field optional. There is no `quantity` and there will not be one -- §4.3 and
+         *     §5.10 both say inventory is a different product.
+         */
+        ProductPatch: {
+            /** Description */
+            description?: string | null;
+            /** Is Active */
+            is_active?: boolean | null;
+            /** Name */
+            name?: string | null;
+            /** Price Agorot */
+            price_agorot?: number | null;
         };
         /**
          * ProtectedSessionOut
@@ -3038,6 +4256,38 @@ export interface components {
             slug: string;
             /** Studio Name */
             studio_name: string;
+        };
+        /**
+         * RecurringSubscriptionOut
+         * @description G8 — a record of a mandate that exists at the provider, not one we can create.
+         *     Nothing in the API creates or varies these; they are entered when a parent sets one up
+         *     at the bank and cancelled when they stop.
+         */
+        RecurringSubscriptionOut: {
+            /** Amount Agorot */
+            amount_agorot: number;
+            /** Cancelled At */
+            cancelled_at: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Payer Person Id
+             * Format: uuid
+             */
+            payer_person_id: string;
+            /**
+             * Start Date
+             * Format: date
+             */
+            start_date: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "active" | "cancelled";
         };
         /**
          * RegistrationDecisionIn
@@ -3999,6 +5249,33 @@ export interface components {
             /** Sport */
             sport?: string | null;
         };
+        /**
+         * SubscriptionIn
+         * @description **The manager's record of who is on the link. Not a mandate.**
+         *
+         *     G8: uPay cannot create a per-payer mandate, cannot vary its amount per payer, and its
+         *     recurring callbacks carry no customer identifier -- so there is no external reference,
+         *     no token and no provider id here, because there is nothing to store. `app/schemas/
+         *     billing.py` deliberately has no `RecurringSubscriptionIn` and
+         *     `tests/contracts/test_w4_schemas.py` asserts that; this is the *route's* input shape and
+         *     lives here, in this lane's own file.
+         *
+         *     **The parent never sets this.** It is manager-or-owner like everything else here.
+         */
+        SubscriptionIn: {
+            /** Amount Agorot */
+            amount_agorot: number;
+            /**
+             * Payer Person Id
+             * Format: uuid
+             */
+            payer_person_id: string;
+            /**
+             * Start Date
+             * Format: date
+             */
+            start_date: string;
+        };
         /** SwitchStudioRequest */
         SwitchStudioRequest: {
             /**
@@ -4282,6 +5559,66 @@ export interface components {
              * Format: date-time
              */
             starts_at: string;
+        };
+        /**
+         * UpayFormOut
+         * @description §5.10 step 2's form, as data. The client builds the POST and auto-submits it.
+         */
+        UpayFormOut: {
+            /** Action */
+            action: string;
+            /** Fields */
+            fields: {
+                [key: string]: string;
+            };
+        };
+        /**
+         * UpayIpnRecordOut
+         * @description The reconciliation screen's row.
+         *
+         *     `amount` is a **string**, and that is the point: it is uPay's inbound rendering kept
+         *     exactly as sent, because the integer alone would lose the evidence of what arrived.
+         *     `amount_agorot` beside it is our parse of the same value, so a manager sees both when
+         *     they disagree -- which is the only way an amount mismatch is legible.
+         *
+         *     §11.7 forbids the card owner name and last four digits in application *logs*. They are
+         *     data here, on a manager-only screen, which is where reconciling an unmatched הוראת קבע
+         *     payment actually happens.
+         */
+        UpayIpnRecordOut: {
+            /** Amount */
+            amount: string;
+            /** Amount Agorot */
+            amount_agorot: number | null;
+            /** Card Owner Name */
+            card_owner_name: string | null;
+            /** Four Digits */
+            four_digits: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Match Status
+             * @enum {string}
+             */
+            match_status: "auto" | "manual" | "unmatched" | "ignored";
+            /** Matched Payment Id */
+            matched_payment_id: string | null;
+            /** Order Public Ref */
+            order_public_ref: string | null;
+            /** Payment Date */
+            payment_date: string | null;
+            /**
+             * Received At
+             * Format: date-time
+             */
+            received_at: string;
+            /** Source Ip */
+            source_ip: string | null;
+            /** Transactionid */
+            transactionid: string;
         };
         /** ValidationError */
         ValidationError: {
@@ -4699,6 +6036,309 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_billing_runs_api_v1_billing_runs_get: {
+        parameters: {
+            query?: {
+                after?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CursorPage_BillingRunOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_billing_run_api_v1_billing_runs_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BillingRunIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BillingRunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_billing_settings_api_v1_billing_settings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BillingSettingsOut"];
+                };
+            };
+        };
+    };
+    update_billing_settings_api_v1_billing_settings_patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BillingSettingsPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BillingSettingsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_charges_api_v1_charges_get: {
+        parameters: {
+            query?: {
+                payer_person_id?: string | null;
+                student_id?: string | null;
+                status?: string | null;
+                kind?: string | null;
+                after?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CursorPage_ChargeOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_charge_api_v1_charges_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ManualChargeIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChargeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_charge_api_v1_charges__charge_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                charge_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChargeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    adjust_charge_api_v1_charges__charge_id__adjust_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                charge_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChargeAdjustmentIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChargeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    close_charge_api_v1_charges__charge_id__close_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                charge_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChargeCloseIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChargeOut"];
                 };
             };
             /** @description Validation Error */
@@ -5551,6 +7191,275 @@ export interface operations {
             };
         };
     };
+    payer_balance_api_v1_payers__payer_person_id__balance_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                payer_person_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PayerBalanceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    payment_complete_api_v1_payment_complete_get: {
+        parameters: {
+            query?: {
+                ref?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentCompleteOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_payment_order_api_v1_payment_orders_post: {
+        parameters: {
+            query?: {
+                max_payments?: number;
+            };
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PaymentOrderCreateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentOrderOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_payment_order_api_v1_payment_orders__public_ref__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                public_ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentOrderOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_payment_order_form_api_v1_payment_orders__public_ref__form_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                public_ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpayFormOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_payments_api_v1_payments_get: {
+        parameters: {
+            query?: {
+                payer_person_id?: string | null;
+                after?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CursorPage_PaymentOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    record_payment_api_v1_payments_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ManualPaymentIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reverse_payment_api_v1_payments__payment_id__reverse_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                payment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PaymentReversalIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_studios_api_v1_platform_studios_get: {
         parameters: {
             query?: never;
@@ -5657,6 +7566,239 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["app__schemas__platform__StudioOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_price_plans_api_v1_price_plans_get: {
+        parameters: {
+            query?: {
+                after?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CursorPage_PricePlanOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_price_plan_api_v1_price_plans_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PricePlanIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PricePlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    close_price_plan_api_v1_price_plans__plan_id__close_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                plan_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PricePlanCloseIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PricePlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_products_api_v1_products_get: {
+        parameters: {
+            query?: {
+                include_inactive?: boolean;
+                after?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CursorPage_ProductOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_product_api_v1_products_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProductIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_handout_options_api_v1_products_handout_options_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HandoutOptionsOut"];
+                };
+            };
+        };
+    };
+    update_product_api_v1_products__product_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                product_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProductPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductOut"];
                 };
             };
             /** @description Validation Error */
@@ -5812,6 +7954,199 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_match_api_v1_reconciliation_match_post: {
+        parameters: {
+            query: {
+                ipn_id: string;
+                payer_person_id?: string | null;
+            };
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IpnMatchIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpayIpnRecordOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_suggestions_api_v1_reconciliation_suggestions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MatchSuggestionsOut"];
+                };
+            };
+        };
+    };
+    list_unmatched_api_v1_reconciliation_unmatched_get: {
+        parameters: {
+            query?: {
+                after?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CursorPage_UpayIpnRecordOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_subscriptions_api_v1_recurring_subscriptions_get: {
+        parameters: {
+            query?: {
+                after?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CursorPage_RecurringSubscriptionOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    record_subscription_api_v1_recurring_subscriptions_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubscriptionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecurringSubscriptionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_subscription_api_v1_recurring_subscriptions__subscription_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                subscription_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecurringSubscriptionOut"];
                 };
             };
             /** @description Validation Error */
@@ -7519,6 +9854,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TrialBookingOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upay_ipn_api_v1_webhooks_upay__public_ref__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                public_ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

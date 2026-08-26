@@ -183,4 +183,26 @@ export const billing: Bundle = {
   'product.order': 'הזמנת פריטים',
   // §5.10 — 'no stock counts, no inventory. That is a different product.'
   'product.noStockHint': 'אין ניהול מלאי — בחירת פריט יוצרת חיוב בלבד',
+
+  // -- added by M6's screens (1b, 12e, 12f, 11a, 3e, 5a) ------------------------
+  'card.splitSingle': 'תשלום אחד',
+  'card.splitEqual': '{{count}} תשלומים שווים',
+  'charge.overdueDays': '{{count}} ימי פיגור',
+  'filter.all': 'הכל',
+  'debt.balance': 'יתרה',
+  'debt.monthsInDebt': 'חודשים בחוב',
+  'debt.sortBy': 'מיון',
+  'debt.collectedThisMonth': 'נגבה החודש',
+  'debt.collectedShare': '{{percent}}% מהצפוי',
+  'debt.sendReminderToCount': 'שליחת תזכורת ל־{{count}} משקי בית',
+  'debt.household': 'משק בית',
+  'run.confirm': 'אישור הפקת חיובים',
+  'export.forAccountant': 'ייצוא לרו״ח',
+  'payment.recordCash': 'רישום תשלום מזומן',
+  'history.paidThisYear': 'שולם השנה',
+  'history.openBalance': 'יתרה פתוחה',
+  'product.forWhom': 'למי',
+  'product.size': 'מידה',
+  'product.colour': 'צבע',
+  'product.handOutPolicy': 'מחיר הפריט אינו מוצג למאמן',
 }

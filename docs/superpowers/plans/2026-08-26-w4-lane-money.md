@@ -162,6 +162,32 @@ this lane already stepped outside its boundary once for the clock middleware, so
 recorded rather than done. The lane's own coverage does not depend on it:
 `tests/upay/test_webhook.py` drives all four shapes straight at the endpoint.
 
+**D-M6-14 — `11a` ships with no inventory. The spec wins over the artboard.**
+`12e`'s own spec names the conflict: *"The two artboards disagree about whether this product
+has inventory, and only one of them can be right."* `12e` holds the rule; `11a` breaks it
+three ways — an out-of-stock row (`חסר במלאי — המנהל הזמין`), an automatic-inventory switch
+on by default, and a live decrement helper (`7 → 6`).
+
+§5.10 and §4.3 both say it outright — *"No stock counts, no inventory — that is a different
+product and it is not this one"* — and there is no column to hold a count: `product` has
+`name`, `description`, `price_agorot`, `is_active` and nothing else. Building `11a` as drawn
+would need a migration this lane may not write, for a feature two spec sections refuse.
+
+So the hand-over screen ships **without** the switch, the decrement and the out-of-stock
+state, and its footer disclaimer keeps only its true half — *"מחיר הפריט אינו מוצג למאמן"* —
+because the first half (*"מעדכן מלאי אצל המנהל"*) describes something the product does not do.
+
+**D-M6-15 — `11a`'s list is scoped by attendance, which is a cross-lane READ.**
+Its scope banner says the items are waiting for students *present in this lesson*, so the
+filter is "pending hand-over AND marked present in today's attendance for this session".
+`11a`'s spec flags this as a cross-lane dependency that should have been in the W4 contract
+and was not.
+
+Reading M5's `attendance_mark` is legitimate — the ownership rule is about which lane may
+**write** a table, and M5 is merged. What this lane must not do is write one. The screen
+therefore takes the present-student list as a prop from the roster it is opened from, so the
+dependency is visible at the call site rather than buried in a query.
+
 ---
 
 ## File structure
