@@ -163,4 +163,73 @@ export const events: Bundle = {
   'belt.awardOutsideExam': 'הענקה ללא מבחן',
   'belt.groupPromote': 'קידום קבוצתי',
   'belt.groupPromoteHint': 'קידום כל המועמדים שעברו, בפעולה אחת',
+
+  // -- 7a / 9i / 12h — list chrome the audits found missing ------------------------
+  'list.subtitle': 'אירועים חד-פעמיים — לא חלק מהלו״ז השבועי',
+  'list.filterAll': 'הכל',
+  'list.needsAttention': 'דורשים תשומת לב',
+  // 7a finding 1 — `status.draftHint` says a draft is hidden from parents; this says why
+  // the manager is still looking at it. 6b's draft copy is better than 7a's and this is it.
+  'status.draftWhy': 'טיוטה — טרם הושלמה',
+
+  // -- 7c / 9i — aggregates. The rsvp.* keys above are per-student and singular -------
+  'counts.confirmed': 'אישרו',
+  'counts.awaitingConsent': 'ללא אישור הורה',
+  'counts.attended': 'הגיעו',
+
+  // -- 7c — the participants table (D9.2 — six columns, none of them משקל) -----------
+  'roster.title': 'רשימת משתתפים',
+  'roster.columnConsent': 'אישור הורה חתום',
+  'roster.columnPayment': 'תשלום',
+  // The em dash on a cell that does not apply — a consent or a payment is meaningless
+  // until someone has said yes. It needs a label, not a bare glyph.
+  'roster.notApplicable': 'לא רלוונטי',
+  'roster.sendConsentForm': 'שליחת טופס',
+
+  // -- 7b findings 2 and 8 — a required field with no input, on a form that never errors
+  'form.required': 'שדה חובה',
+  'form.blank': 'אירוע חדש',
+  'form.errorTitle': 'לא ניתן לשמור',
+  'form.saved': 'האירוע נשמר',
+  'form.edit': 'עריכת האירוע',
+
+  // -- 7d / 12h finding 7 — the parent's screen speaks in the second person -----------
+  'rsvp.awaitingYourAnswer': 'ממתין לתשובתכם',
+  'rsvp.youConfirmed': 'אישרתם השתתפות',
+  'rsvp.youDeclined': 'סימנתם שלא תגיעו',
+
+  // -- 9d / 4d / 6b — the exam --------------------------------------------------------
+  'exam.new': 'מבחן חגורה חדש',
+  'exam.save': 'שמירת התוצאות',
+  'exam.tenureAtRank': 'ותק בדרגה',
+  'exam.readiness': 'מוכנות',
+  // Deliberately impersonal. 4d finding 7: `מוכן`/`מוכנה` inflects per student and is the
+  // first gendered STATUS value in the product. A neutral phrasing is the one thing this
+  // lane can ship that is correct for every child.
+  'exam.ready': 'עומד/ת בתנאים',
+  'exam.confirmPromotion': 'אישור קידום',
+  'exam.promoted': 'הדרגות הוענקו',
+
+  // -- 5b / 5d — the belt system ------------------------------------------------------
+  'belt.edit': 'עריכת דרגה',
+  'belt.save': 'שמירת דרגה',
+  'belt.preview': 'תצוגה מקדימה',
+  // 5b reorders by drag and there is no drag primitive and no shared drag utility, so the
+  // rows move with buttons over `order_index` — the column that exists.
+  'belt.moveUp': 'העלאה בסדר',
+  'belt.moveDown': 'הורדה בסדר',
+  // 5b finding 7 — the row already shows how many students hold the rank, so the refusal
+  // has its reason on screen. `student_belt.belt_rank_id` is ON DELETE RESTRICT.
+  'belt.deleteHeld': 'לא ניתן למחוק דרגה שהוענקה לחניכים',
+  'belt.holders': 'חניכים בדרגה',
+  'belt.presetTitle': 'איזו מערכת חגורות נהוגה אצלכם?',
+  'belt.presetScratch': 'הגדרה ידנית',
+  'belt.presetRankCount': 'דרגות בערכה',
+
+  // -- 12d ------------------------------------------------------------------------------
+  // 12d finding 7 — the artboard spells both ordinals as Hebrew words, which no
+  // interpolation produces. Digits instead, rather than adding a Hebrew ordinal formatter
+  // to `core`, which is not this lane's package.
+  'belt.ordinalOfTotal': 'דרגה מתוך',
+  'belt.progressCaption': 'הדרגות שהוענקו עד היום',
 }

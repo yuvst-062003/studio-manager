@@ -136,4 +136,59 @@ export const events: Bundle = {
   'belt.awardOutsideExam': 'Award without an exam',
   'belt.groupPromote': 'Promote as a group',
   'belt.groupPromoteHint': 'Promote everyone who passed, in one action',
+
+  // -- 7a / 9i / 12h — list chrome the audits found missing ------------------------
+  'list.subtitle': 'One-off events — not part of the weekly schedule',
+  'list.filterAll': 'All',
+  'list.needsAttention': 'Need attention',
+  'status.draftWhy': 'Draft — not finished',
+
+  // -- 7c / 9i — aggregates. The rsvp.* keys above are per-student and singular -------
+  'counts.confirmed': 'Confirmed',
+  'counts.awaitingConsent': 'Without a parent consent',
+  'counts.attended': 'Attended',
+
+  // -- 7c — the participants table (D9.2 — six columns, none of them weight) ---------
+  'roster.title': 'Participants',
+  'roster.columnConsent': 'Signed parent consent',
+  'roster.columnPayment': 'Payment',
+  'roster.notApplicable': 'Not applicable',
+  'roster.sendConsentForm': 'Send the form',
+
+  // -- 7b findings 2 and 8 — a required field with no input, on a form that never errors
+  'form.required': 'Required',
+  'form.blank': 'New event',
+  'form.errorTitle': 'Cannot save',
+  'form.saved': 'Event saved',
+  'form.edit': 'Edit the event',
+
+  // -- 7d / 12h finding 7 — the parent's screen speaks in the second person -----------
+  'rsvp.awaitingYourAnswer': 'Awaiting your answer',
+  'rsvp.youConfirmed': 'You confirmed',
+  'rsvp.youDeclined': 'You said you will not come',
+
+  // -- 9d / 4d / 6b — the exam --------------------------------------------------------
+  'exam.new': 'New belt exam',
+  'exam.save': 'Save the results',
+  'exam.tenureAtRank': 'Tenure at rank',
+  'exam.readiness': 'Readiness',
+  'exam.ready': 'Meets the conditions',
+  'exam.confirmPromotion': 'Confirm promotion',
+  'exam.promoted': 'Ranks awarded',
+
+  // -- 5b / 5d — the belt system ------------------------------------------------------
+  'belt.edit': 'Edit rank',
+  'belt.save': 'Save rank',
+  'belt.preview': 'Preview',
+  'belt.moveUp': 'Move up',
+  'belt.moveDown': 'Move down',
+  'belt.deleteHeld': 'A rank awarded to students cannot be deleted',
+  'belt.holders': 'Students at this rank',
+  'belt.presetTitle': 'Which belt system does your club use?',
+  'belt.presetScratch': 'Set it up by hand',
+  'belt.presetRankCount': 'ranks in this set',
+
+  // -- 12d ------------------------------------------------------------------------------
+  'belt.ordinalOfTotal': 'Rank of',
+  'belt.progressCaption': 'The ranks awarded so far',
 }

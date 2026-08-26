@@ -140,4 +140,59 @@ export const events: Bundle = {
   'belt.awardOutsideExam': 'Присвоить без экзамена',
   'belt.groupPromote': 'Групповое присвоение',
   'belt.groupPromoteHint': 'Присвоить всем сдавшим, одним действием',
+
+  // -- 7a / 9i / 12h — list chrome the audits found missing ------------------------
+  'list.subtitle': 'Разовые события — вне недельного расписания',
+  'list.filterAll': 'Все',
+  'list.needsAttention': 'Требуют внимания',
+  'status.draftWhy': 'Черновик — ещё не завершён',
+
+  // -- 7c / 9i — aggregates. The rsvp.* keys above are per-student and singular -------
+  'counts.confirmed': 'Подтвердили',
+  'counts.awaitingConsent': 'Без согласия родителя',
+  'counts.attended': 'Пришли',
+
+  // -- 7c — the participants table (D9.2 — six columns, none of them weight) ---------
+  'roster.title': 'Список участников',
+  'roster.columnConsent': 'Подписанное согласие родителя',
+  'roster.columnPayment': 'Оплата',
+  'roster.notApplicable': 'Не применимо',
+  'roster.sendConsentForm': 'Отправить бланк',
+
+  // -- 7b findings 2 and 8 — a required field with no input, on a form that never errors
+  'form.required': 'Обязательное поле',
+  'form.blank': 'Новое событие',
+  'form.errorTitle': 'Не удалось сохранить',
+  'form.saved': 'Событие сохранено',
+  'form.edit': 'Редактировать событие',
+
+  // -- 7d / 12h finding 7 — the parent's screen speaks in the second person -----------
+  'rsvp.awaitingYourAnswer': 'Ждём вашего ответа',
+  'rsvp.youConfirmed': 'Вы подтвердили участие',
+  'rsvp.youDeclined': 'Вы отметили, что не придёте',
+
+  // -- 9d / 4d / 6b — the exam --------------------------------------------------------
+  'exam.new': 'Новый экзамен на пояс',
+  'exam.save': 'Сохранить результаты',
+  'exam.tenureAtRank': 'Стаж в степени',
+  'exam.readiness': 'Готовность',
+  'exam.ready': 'Соответствует условиям',
+  'exam.confirmPromotion': 'Подтвердить присвоение',
+  'exam.promoted': 'Степени присвоены',
+
+  // -- 5b / 5d — the belt system ------------------------------------------------------
+  'belt.edit': 'Редактировать степень',
+  'belt.save': 'Сохранить степень',
+  'belt.preview': 'Предпросмотр',
+  'belt.moveUp': 'Выше в порядке',
+  'belt.moveDown': 'Ниже в порядке',
+  'belt.deleteHeld': 'Нельзя удалить степень, присвоенную ученикам',
+  'belt.holders': 'Учеников в степени',
+  'belt.presetTitle': 'Какая система поясов принята у вас?',
+  'belt.presetScratch': 'Задать вручную',
+  'belt.presetRankCount': 'степеней в наборе',
+
+  // -- 12d ------------------------------------------------------------------------------
+  'belt.ordinalOfTotal': 'Степень из',
+  'belt.progressCaption': 'Присвоенные степени на сегодня',
 }
