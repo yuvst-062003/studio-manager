@@ -18,6 +18,11 @@ import { ScheduleSection, isCalendarRoute } from './features/schedule/ScheduleSe
 import { makeParentScheduleClient } from './features/schedule/client'
 import { useToday } from './features/schedule/useToday'
 import { PublicLanding, makeLandingClient, matchLandingPath } from './features/landing'
+import {
+  EventInviteScreen,
+  ParentEventsScreen,
+  makeParentEventsClient,
+} from './features/events'
 import { AddSibling, makePeopleClient } from './features/people'
 
 const NAV = [
@@ -73,6 +78,7 @@ export default function App() {
   const scheduleClient = useMemo(() => makeParentScheduleClient(apiFetch), [])
   const landingClient = useMemo(() => makeLandingClient(apiFetch), [])
   const peopleClient = useMemo(() => makePeopleClient(apiFetch), [])
+  const eventsClient = useMemo(() => makeParentEventsClient(apiFetch), [])
   const hash = useHash()
   const today = useToday()
   // §5.4(c)'s add-a-sibling is one hash away from home. Hash and not a path: it is an
@@ -83,6 +89,11 @@ export default function App() {
   // screen would change only when something else happened to re-render App. One
   // subscription serves both lanes' routes.
   const addingChild = hash === '#/add-child'
+  // 12h's list, and 7d's invite behind `#/events/<eventId>/<studentId>`. Both ids are in
+  // the hash because 12h is per CHILD per event: a family with two children on one
+  // competition has two answers to give, and an event id alone cannot say which.
+  const onEvents = hash === '#/events'
+  const invite = hash.startsWith('#/events/') ? hash.slice('#/events/'.length).split('/') : []
 
   useEffect(() => {
     const onPrompt = (event: Event): void => {
@@ -178,6 +189,23 @@ export default function App() {
             />
           ) : addingChild ? (
             <AddSibling locale={locale} client={peopleClient} />
+          ) : invite.length === 2 ? (
+            <EventInviteScreen
+              client={eventsClient}
+              eventId={invite[0]!}
+              locale={locale}
+              now={today}
+              studentId={invite[1]!}
+            />
+          ) : onEvents ? (
+            <ParentEventsScreen
+              client={eventsClient}
+              locale={locale}
+              now={today}
+              onOpen={(eventId, studentId) => {
+                globalThis.location.hash = `#/events/${eventId}/${studentId}`
+              }}
+            />
           ) : (
             <Resolve session={session} locale={locale} />
           )}
