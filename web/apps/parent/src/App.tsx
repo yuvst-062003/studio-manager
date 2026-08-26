@@ -50,7 +50,21 @@ export default function App() {
   // M0 already drew this line: core's isInstalled() is display-mode !== 'browser', so a
   // fullscreen or minimal-ui home-screen launch counts too. Its own docstring names
   // M1's onboarding gate as the caller.
-  const installed = displayMode !== 'browser'
+  //
+  // The `MODE` disjunct opens the gate on the VITE DEV SERVER only, so this app can be
+  // worked on in an ordinary tab — the dev server serves no service worker
+  // (`devOptions: { enabled: false }`), so there is nothing to install from and the gate
+  // would otherwise be unreachable rather than merely inconvenient.
+  //
+  // It is not a weakening of §6.5. `import.meta.env.MODE` is replaced by a string literal
+  // at build time, so in a real build this folds to `'production' === 'development'` and
+  // the branch is eliminated from the bundle: there is no flag to flip and nothing to
+  // forget. Under vitest MODE is 'test', which is why this app's own
+  // install-walkthrough tests still exercise the real gate.
+  //
+  // `useDisplayMode()` is deliberately left alone: M8 reports install rates from it, and
+  // a measurement that lies to make a dev tab convenient is worse than the gate.
+  const installed = displayMode !== 'browser' || import.meta.env.MODE === 'development'
   const [locale, setLocale] = useState<Locale>('he')
   const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null)
   // Both memoised for the same reason: each screen reads through its client in an effect

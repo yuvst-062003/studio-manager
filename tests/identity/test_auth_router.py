@@ -13,6 +13,7 @@ from __future__ import annotations
 import uuid
 from http.cookies import SimpleCookie
 
+from app.core.config import settings
 from app.routers.identity import REFRESH_COOKIE_NAME, REFRESH_COOKIE_PATH
 from tests.conftest import sign_in, start_flow
 
@@ -24,10 +25,25 @@ def _set_cookie(response) -> str:
 
 
 # -- 11.7's cookie ------------------------------------------------------------
-def test_the_refresh_cookie_is_httponly_secure_and_samesite(signed_in):
+def test_the_refresh_cookie_is_httponly_secure_and_samesite(client, fake_provider, monkeypatch):
     """All three asserted individually: dropping any one is a different vulnerability,
-    and a single combined assertion would hide which."""
-    header = _set_cookie(signed_in).lower()
+    and a single combined assertion would hide which.
+
+    Signed in under a DEPLOYED environment rather than through the `signed_in` fixture,
+    because `Secure` is now the one attribute that varies: it is dropped in development,
+    where Safari would otherwise refuse the cookie over plain http and leave a developer
+    with no session at all. Asserting it against the suite's own `development` default
+    would assert the exception and call it the rule. Both halves are pinned in
+    tests/identity/test_refresh_cookie.py; this one keeps the check end to end, on a
+    cookie that came back from a real sign-in.
+    """
+    monkeypatch.setattr(settings, "ENV", "staging")
+    fake_provider.register(
+        code="c-cookie",
+        subject=f"s-{uuid.uuid4()}",
+        email=f"{uuid.uuid4().hex[:8]}@example.invalid",
+    )
+    header = _set_cookie(sign_in(client, code="c-cookie")).lower()
     assert "httponly" in header
     assert "secure" in header
     assert "samesite=lax" in header
@@ -365,10 +381,13 @@ def test_the_browser_callback_lands_back_in_the_app_that_started_the_flow(client
     assert response.headers["location"].endswith("/")
 
 
-def test_the_browser_callback_sets_the_refresh_cookie(client, fake_provider):
+def test_the_browser_callback_sets_the_refresh_cookie(client, fake_provider, monkeypatch):
     """The redirect carries the session or it carries nothing. §11.7's cookie is how the
     app that receives the user gets an access token, through POST /auth/refresh -- there
     is no body on a 307 for it to read one from."""
+    # Staging, for the same reason as the cookie test above: `Secure` is deliberately
+    # absent in development, so asserting it there would assert the exception.
+    monkeypatch.setattr(settings, "ENV", "staging")
     fake_provider.register(code="c-get3", subject=f"s-{uuid.uuid4()}", email="g3@example.invalid")
     state = start_flow(client)
     response = client.get(

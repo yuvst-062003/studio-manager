@@ -57,6 +57,7 @@ from app.services.identity.refresh import (
     issue_refresh_token,
     revoke_family,
     rotate_refresh_token,
+    set_refresh_cookie,
 )
 from app.services.identity.resolution import (
     InvitationRejectedError,
@@ -86,27 +87,6 @@ def get_providers() -> dict[str, OAuthProvider]:
 
 
 ProvidersDep = Annotated[dict[str, OAuthProvider], Depends(get_providers)]
-
-
-def _set_refresh_cookie(response: Response, secret: str) -> None:
-    """§11.7 -- 'secure/httpOnly/SameSite cookies for the refresh token', plus
-    infra/railway/README.md's fourth requirement: host-only.
-
-    **There is no `domain=` here and there must never be one.** That is not an omission.
-    A Domain attribute would make a staging session valid against production, and it is
-    also the first thing someone reaches for when the cookie stops flowing on Railway's
-    generated subdomains -- where it would not help anyway, because Domain cannot cross a
-    public suffix. The fix for that is the domain (HB-domain), not this line.
-    """
-    response.set_cookie(
-        key=REFRESH_COOKIE_NAME,
-        value=secret,
-        max_age=settings.REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60,
-        path=REFRESH_COOKIE_PATH,
-        httponly=True,
-        secure=True,
-        samesite="lax",
-    )
 
 
 def _membership_out(membership: StudioMembership) -> StudioMembershipOut:
@@ -155,7 +135,7 @@ def _build_session(
     access = app_access(session, [m.person_id for m in memberships])
 
     if refresh_secret is not None:
-        _set_refresh_cookie(response, refresh_secret)
+        set_refresh_cookie(response, refresh_secret)
 
     claims = AccessClaims(
         identity_id=identity_id,

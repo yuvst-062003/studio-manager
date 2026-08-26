@@ -53,6 +53,13 @@ class ResolvedPersona:
     label: str
     roles: tuple[str, ...]
     is_guardian: bool
+    #: The `auth_identity` row behind this Person, or None for someone who has never
+    #: signed in. §19.4's sign-in route issues its refresh token against THIS identity
+    #: rather than against the developer's, so `/auth/me` re-derives §6.1's access
+    #: queries for the persona exactly as it would after a real login. Carried here, on
+    #: the object that already applies restriction 1, so no caller has to reach across
+    #: studios for it themselves -- tests/restrictions/test_19_7 catches it when they do.
+    auth_identity_id: uuid.UUID | None
     #: §19.3's right-hand column -- what this persona exists to test. Carried to the dev
     #: bar so the reason is visible where the switch happens.
     tests: str = ""
@@ -104,6 +111,7 @@ def _describe(session: Session, person: Person, studio: Studio) -> ResolvedPerso
         label=f"{person.first_name} {person.last_name}",
         roles=roles,
         is_guardian=is_guardian,
+        auth_identity_id=person.auth_identity_id,
         tests=_PERSONA_PURPOSE.get(key or "", ""),
     )
 

@@ -32,6 +32,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
+from fastapi import Response
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
@@ -43,12 +44,53 @@ _SECRET_BYTES = 32
 
 #: §11.7's cookie. Named here rather than in the router because §19.4's role switcher
 #: needs them too, and a router importing another router is a dependency neither wants.
-#: The attributes themselves are set in one place -- app/routers/identity.py's
-#: `_set_refresh_cookie` -- so no route can weaken them.
+#: The attributes are set by `set_refresh_cookie` below -- one place, beside the names it
+#: has to stay consistent with -- so no route can weaken them.
 REFRESH_COOKIE_NAME = "studio_refresh"
 #: Scoped to the one endpoint that reads it. Sending it on every API call would widen the
 #: CSRF surface for no benefit.
 REFRESH_COOKIE_PATH = "/api/v1/auth"
+
+
+def set_refresh_cookie(response: Response, secret: str) -> None:
+    """§11.7 -- 'secure/httpOnly/SameSite cookies for the refresh token', plus
+    infra/railway/README.md's fourth requirement: host-only.
+
+    **There is no `domain=` here and there must never be one.** That is not an omission.
+    A Domain attribute would make a staging session valid against production, and it is
+    also the first thing someone reaches for when the cookie stops flowing on Railway's
+    generated subdomains -- where it would not help anyway, because Domain cannot cross a
+    public suffix. The fix for that is the domain (HB-domain), not this line.
+
+    Lives here rather than in app/routers/identity.py, where it began, because §19.4's
+    sign-in-as route establishes a session too. Two routes setting this cookie means two
+    places these attributes could drift apart, and `secure`/`httponly` are exactly the
+    pair that gets quietly dropped by whoever is debugging why a cookie will not stick.
+
+    **`Secure` is dropped in development, and only there.** Safari refuses a `Secure`
+    cookie over plain `http://` and grants no localhost exemption -- Chrome and Firefox
+    do, which is why this survived until someone opened the local dashboard in Safari and
+    got the language picker back: the cookie was set, silently discarded, and
+    `/auth/refresh` answered 401. Local development is served over http, so there `Secure`
+    does not protect a session, it prevents there being one -- in the browser that matters
+    most for a product whose §6.5 install story is iPhone-first.
+
+    The condition is the ENVIRONMENT and not the request's scheme, deliberately. Behind
+    Railway's proxy the scheme a request appears to arrive on depends on
+    `X-Forwarded-Proto` being trusted, so keying on it would let one proxy
+    misconfiguration silently unset `Secure` in production -- the failure mode you cannot
+    see. An explicit environment check fails loudly instead, in
+    tests/identity/test_refresh_cookie.py, which pins both halves.
+    """
+    response.set_cookie(
+        key=REFRESH_COOKIE_NAME,
+        value=secret,
+        max_age=settings.REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60,
+        path=REFRESH_COOKIE_PATH,
+        httponly=True,
+        secure=settings.ENV != "development",
+        samesite="lax",
+    )
 
 
 class RefreshRejectedError(Exception):

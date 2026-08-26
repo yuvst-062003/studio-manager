@@ -55,6 +55,13 @@ RELOADABLE = (
     # now reads .ENV off a module-scope `settings` binding like the entries above it.
     # Freezing that binding would send a staging sign-in home to a development host.
     "app.routers.identity",
+    # §19.4's sign-in route made the refresh cookie's `Secure` attribute environment
+    # dependent -- Safari refuses a Secure cookie over the plain http:// that local
+    # development is served on, so it is set everywhere EXCEPT development. That check
+    # reads settings.ENV off a module-scope binding, which puts this module under the same
+    # rule as the routers above it: leave the binding frozen and a staging test would
+    # assert the development cookie.
+    "app.services.identity.refresh",
     "app.routers.dev",
     "app.main",
     # Not part of app.main's import graph -- this harness never reaches it, and

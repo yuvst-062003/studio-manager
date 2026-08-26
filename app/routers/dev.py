@@ -20,10 +20,12 @@ import uuid
 from datetime import timedelta
 
 from fastapi import APIRouter, HTTPException, Request, status
+from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 
 from app.core.clock import is_shifted, now
 from app.core.config import settings
+from app.core.cors import app_origin
 from app.core.db import SessionDep
 from app.core.dev_account import RequireDeveloper
 from app.integrations.upay.ipn import build_ipn_query
@@ -48,7 +50,12 @@ from app.services.identity.act_as import (
     resolve_persona,
     switchable_personas,
 )
-from app.services.identity.refresh import REFRESH_COOKIE_NAME, hash_refresh_secret
+from app.services.identity.refresh import (
+    REFRESH_COOKIE_NAME,
+    hash_refresh_secret,
+    issue_refresh_token,
+    set_refresh_cookie,
+)
 from app.services.identity.tokens import AccessClaims, mint_access_token
 
 router = APIRouter(prefix="/dev", tags=["dev"])
@@ -258,3 +265,115 @@ def act_as(
         studio_id=persona.studio_id,
         roles=list(persona.roles),
     )
+
+
+@router.get("/sign-in-as/{persona_key}")
+def sign_in_as(
+    _: RequireDeveloper,
+    persona_key: str,
+    request: Request,
+    session: SessionDep,
+    app: str = "dashboard",
+    return_path: str = "/",
+) -> RedirectResponse:
+    """§19.4's switcher, entered from a URL bar rather than from the dev bar.
+
+    **Why this exists at all.** `POST /dev/act-as/{person_id}` already mints a persona
+    session, but it returns a bearer token in a JSON body and a browser has nowhere to put
+    one: `setAccessToken` is a module-scoped variable in
+    `packages/core/src/identity/session.ts`, deliberately unreachable from a console, and
+    `useSession` bootstraps from the §11.7 cookie alone. So the switcher could only ever
+    be used *after* a real OAuth sign-in had already happened -- and on a machine where no
+    client id is configured, `configured_providers()` is empty, the sign-in screen renders
+    no buttons, and there is no first session to switch from. This route is the only way
+    into the apps in that state.
+
+    It therefore ends exactly where the OAuth callback's GET arm ends -- a refresh cookie
+    and a redirect -- rather than inventing a second way to establish a session. The
+    cookie is set by `set_refresh_cookie`, the same function the real callback uses, so
+    `secure`/`httpOnly`/`SameSite` cannot drift between the two doors.
+
+    **The refresh token is issued against the PERSONA's own identity**, not against a
+    developer identity acting as them. Every §19.3 persona has a real `auth_identity` row
+    (`demo-persona-*`), so `/auth/me` re-derives §6.1's access queries from the database
+    for that person exactly as it would after a real login -- which is what makes the
+    assistant-coach persona's "no financial data leaks" worth asserting.
+
+    Hit it through the **app's own origin**, not the API's, so the cookie lands where the
+    app will look for it:
+
+        http://localhost:5175/api/v1/dev/sign-in-as/manager
+    """
+    # An open redirect out of a route that has just minted a session is a
+    # credential-phishing primitive -- the user has authenticated and will trust wherever
+    # they land. Same check, and the same reason, as `/auth/{provider}/start`.
+    if not return_path.startswith("/") or return_path[1:2] in {"/", "\\"}:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={"code": "invalid_return_path", "message": "return_path must be app-relative"},
+        )
+
+    # Resolved from domains.json before anything is minted. An unknown app name is the
+    # other half of the open-redirect defence: the destination is chosen from a table this
+    # repository owns, never built from the query string.
+    origin = app_origin(app, settings.ENV)
+    if origin is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={"code": "unknown_app", "message": f"no host for {app!r}"},
+        )
+
+    at = now()
+    # `switchable_personas` and not a direct query: it applies §19.6 restriction 1 itself,
+    # so a persona this caller could not switch INTO is not offered here either. A second
+    # lookup would be a second place that rule could be forgotten.
+    persona = next(
+        (p for p in switchable_personas(session, env=settings.ENV) if p.key == persona_key), None
+    )
+    if persona is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "unknown_persona", "message": f"no persona {persona_key!r}"},
+        )
+
+    identity_id = persona.auth_identity_id
+    if identity_id is None:
+        # A §19.3 persona with no identity row cannot be signed in as, and silently
+        # redirecting to a signed-out app would look like the sign-in failed for some
+        # reason to do with the app. Say which half is missing.
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "persona_has_no_identity",
+                "message": f"persona {persona_key!r} has no auth identity to sign in as",
+            },
+        )
+
+    issued = issue_refresh_token(
+        session,
+        identity_id=identity_id,
+        active_studio_id=persona.studio_id,
+        acting_as_person_id=persona.person_id,
+        at=at,
+    )
+
+    # §19.4 -- 'Every switch is audit-logged in the demo studio's own log.' A route that
+    # hands out a session in a single GET leaves a trail or it is not a developer tool.
+    # The diff names the persona and its roles and nothing else: G7 forbids health
+    # contents here, and there are none to put.
+    AuditService.record(
+        session,
+        action="dev.sign_in_as",
+        entity_type="person",
+        entity_id=persona.person_id,
+        studio_id=persona.studio_id,
+        actor_identity_id=identity_id,
+        diff={"persona": persona.key, "label": persona.label, "roles": list(persona.roles)},
+    )
+    session.commit()
+
+    redirect = RedirectResponse(
+        f"{origin}{return_path}", status_code=status.HTTP_307_TEMPORARY_REDIRECT
+    )
+    set_refresh_cookie(redirect, issued.secret)
+    return redirect
