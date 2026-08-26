@@ -139,7 +139,10 @@ def send_monthly_report(
 
     # Validate that recipient person belongs to the current studio
     person = session.execute(
-        select(Person).where(Person.id == body.to_person_id)
+        select(Person).where(
+            Person.id == body.to_person_id,
+            Person.studio_id == studio_id,
+        )
     ).scalar_one_or_none()
     if not person:
         raise HTTPException(status_code=404, detail="Recipient not found in studio")
