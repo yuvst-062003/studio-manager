@@ -24,3 +24,12 @@ dist/
 
 # OS
 .DS_Store
+
+# Playwright run artifacts (§13's E2E layer). The reporters write these next to whatever
+# directory the runner was invoked from -- `web/`, since `test:e2e` is an npm script there.
+# `trace`/`video`/`screenshot` are all retain-on-failure, so these hold failure evidence:
+# useful locally, never source.
+test-results/
+playwright-report/
+blob-report/
+.playwright/

@@ -13,12 +13,14 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint . && stylelint \"**/*.css\" --allow-empty-input",
     "test": "vitest run --reporter=dot",
+    "test:e2e": "NODE_PATH=node_modules playwright test -c ../e2e/playwright.config.ts",
     "build": "npm run build --workspaces --if-present",
     "installability": "node scripts/check-installability.mjs",
     "generate:api-client": "cd .. && .venv/bin/python scripts/export_openapi.py && cd web && npx openapi-typescript ../openapi.json -o packages/api-client/src/schema.d.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.62.1",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.6",

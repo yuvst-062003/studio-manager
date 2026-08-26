@@ -329,23 +329,35 @@ waves:
 holdbacks:
   - id: HB-w3-e2e-harness
     kind: carried
-    title: W3's E2E gate cannot be met by filling in the specs — there is no harness and the specs assume an app that was never built
+    title: W3's E2E gate cannot be met by filling in the specs — the harness now runs, but the specs still address an app that was never built
     why: >-
       W3's stated exit gate is E2E-2 (offline attendance → sync → dashboard) and E2E-1
       complete with health. Both lanes correctly left these to the merge plan. Attempting
-      them on 2026-08-26 found the specs cannot be un-fixme'd, because three of their
-      assumptions are false about the product that exists.
+      them on 2026-08-26 found the specs cannot be un-fixme'd. Four of their assumptions
+      were false; W5's contract commit closed two, and this entry carries what is left.
 
-      One — every spec deep-links. Seventeen `page.goto()` calls across the five files
-      address `/staff/today`, `/dashboard/attendance`, `/parent/absence` and so on. There
-      is no router: `web/package.json` carries no react-router or wouter, and each app is a
-      single-page state machine driven from its entry state. No deep link in any spec can
-      resolve.
+      One — every spec deep-links, and THE REASONING FIRST RECORDED HERE WAS WRONG. It said
+      "there is no router... no deep link in any spec can resolve." That was already out of
+      date when it was written: W2's lanes shipped hash routing in all three apps —
+      `useHash()` in staff and parent, `useHashRoute()` in dashboard — with real
+      `<a href="#/...">` links behind it. A deep link can resolve. It has to be `#/`-shaped.
 
-      Two — the specs assume one origin. `playwright.config.ts` sets a single
-      `baseURL` of localhost:5173, but staff, parent and dashboard are three separate Vite
-      apps. A single baseURL cannot reach all three; this needs three Playwright projects,
-      which is a config decision nobody has made.
+      The conclusion survives the correction, for a different reason than the one given. The
+      specs address 17 distinct path-shaped targets across 35 `page.goto()` calls —
+      `/staff/today`, `/dashboard/attendance`, `/parent/absence` — and a path is not a hash,
+      so none of them lands. "Seventeen `page.goto()` calls" was itself a miscount:
+      seventeen is the number of distinct targets, not of calls. One target is wrong twice
+      over: flow 1 opens `/register/demo-studio`, but the parent app's only real path is
+      `/t/{slug}` (`features/landing/route.ts`), so it would miss even if paths worked.
+
+      Two — CLOSED by W5's contract commit, 2026-08-26. The specs assumed one origin.
+      `e2e/playwright.config.ts` now carries three projects, one per app, each with its own
+      baseURL, and a `webServer` block that starts uvicorn and all three dev servers. Two
+      limits found while doing it are documented in that file rather than here: a project's
+      baseURL still cannot serve the four flows that visit two apps inside a SINGLE test —
+      `e2e/origins.ts` exists so the rewrite has one place to read absolute origins from —
+      and all five specs currently collect in all three projects, which is 45 runs the
+      moment they are un-gated and wants per-project narrowing the rewrite should decide.
 
       Three — the testid vocabulary is fiction. The specs name `session-card`, `roster`,
       `offline-banner`, `student-row`, `mark-present`, `pending-ops-count`, `force-flush`,
@@ -355,23 +367,32 @@ holdbacks:
       `session-row`, `unmarked-list`, `unmarked-not-absence`, `summary-sync`. The specs
       were authored in M0 against an imagined UI and never reconciled.
 
-      There is also no `webServer` block, so nothing starts the backend or the three dev
-      servers, and no fixture seeds or authenticates. `/dev/demo/reset` and `/dev/act-as`
-      (§19.4) are the right tools for both and already exist — that part is tractable.
+      Four — the suite could not resolve its own test runner, which no one had noticed
+      because no one had run it. `e2e/` sits at the repository root while `node_modules`
+      lives under `web/`, and Node resolves a bare specifier by walking up from the
+      importing file — so the config and all five specs failed on
+      `import ... from '@playwright/test'` before a single assertion ran. Installing the
+      package was necessary and not sufficient. CLOSED by W5's contract commit with
+      `NODE_PATH=node_modules` in `web/package.json`'s `test:e2e` script.
+
+      No fixture seeds or authenticates. `/dev/demo/reset` and `/dev/act-as` (§19.4) are the
+      right tools for that and already exist — that part is tractable.
 
       What this is NOT: a lane defect. Both lanes are feature-complete and their own gates
       are green (1656 backend, 1400 frontend, `lane-check.sh` green for both verticals).
       What is unproven is that the two features work TOGETHER through a real browser, which
       is exactly what an E2E gate is for and exactly what no unit suite can substitute for.
 
-      What closes this: one focused session to build the harness — three Playwright
-      projects, a `webServer` block, a seed-and-authenticate fixture over the §19.4 dev
-      routes — and then rewrite the three W3-relevant spec bodies against the vocabulary
-      the apps actually expose. HB-w2-e2e-gate's owed W2 subsets fall out of the same work,
+      What closes this, now that the harness runs: a seed-and-authenticate fixture over the
+      §19.4 dev routes, and a rewrite of the spec bodies against what the apps actually
+      expose — hash routes in place of paths, the real testid vocabulary, and a decision on
+      per-project narrowing. HB-w2-e2e-gate's owed W2 subsets fall out of the same work,
       since 05-schedule-change is one of the files being rewritten either way.
 
-      Estimated wrongly once already: this was scoped as "half a session, run the
-      journeys" before the three mismatches were found. It is its own session.
+      Estimated wrongly once already: scoped as "half a session, run the journeys" before
+      the mismatches were found. The harness half is done and the remaining half is smaller
+      than the original estimate, but it is still its own session — rewriting five spec
+      files against a 239-testid vocabulary is not a search and replace.
     blocks: W3 exit gate
     status: open
     opened: 2026-08-26
