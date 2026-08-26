@@ -93,6 +93,7 @@ export const comms: Bundle = {
   'calendar.rotated': 'Ссылка заменена — прежняя больше не работает',
   'calendar.rotateWarning': 'Замена ссылки отключает все уже синхронизированные календари',
   'calendar.lastRotated': 'Заменена',
+  'calendar.rotateKeep': 'Оставить текущую ссылку',
   'calendar.refreshDelay':
     'Google Календарь может отставать до суток. Отмены всегда приходят уведомлением',
   'calendar.addSingleEvent': 'Добавить мероприятие в календарь',

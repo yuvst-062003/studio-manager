@@ -115,6 +115,7 @@ export const comms: Bundle = {
   'calendar.rotated': 'הקישור הוחלף — הקישור הקודם כבר אינו פעיל',
   'calendar.rotateWarning': 'החלפת הקישור מנתקת כל יומן שכבר סונכרן',
   'calendar.lastRotated': 'הוחלף לאחרונה',
+  'calendar.rotateKeep': 'להשאיר את הקישור הנוכחי',
   // §5.12 — Google refreshes a subscribed calendar slowly. The feed answers "where do I
   // need to be next Tuesday", never "tonight is cancelled", and saying so here is what
   // keeps a parent from relying on it for the urgent case.

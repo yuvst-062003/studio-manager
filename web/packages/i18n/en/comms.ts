@@ -89,6 +89,7 @@ export const comms: Bundle = {
   'calendar.rotated': 'Link replaced — the old one no longer works',
   'calendar.rotateWarning': 'Replacing the link disconnects every calendar already synced',
   'calendar.lastRotated': 'Last replaced',
+  'calendar.rotateKeep': 'Keep the current link',
   'calendar.refreshDelay':
     'Google Calendar can lag by up to a day. Cancellations are always sent as a notification',
   'calendar.addSingleEvent': 'Add this event to your calendar',
