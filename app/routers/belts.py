@@ -37,10 +37,13 @@ from app.schemas.belts import BeltRankIn, BeltRankOut
 from app.services.belts.errors import (
     BeltRankIsHeldError,
     BeltRankNotFoundError,
+    LadderAlreadySeededError,
     LadderClassRequiredError,
     LadderOrderCollisionError,
+    NoSuchPresetError,
     NotThisClassesLadderError,
 )
+from app.services.belts.presets import BELT_PRESETS, BeltPresetService
 from app.services.belts.ranks import BeltRankService
 
 router = APIRouter(tags=["belts"])
@@ -200,6 +203,88 @@ def reorder_belt_ranks(
         rows = BeltRankService.reorder(session, body.class_id, body.ordered_ids)
     except NotThisClassesLadderError as exc:
         raise _unprocessable("reorder_must_name_the_whole_ladder", str(exc)) from exc
+    items = _ladder_out(session, rows)
+    session.commit()
+    return LadderPage(items=items, next_cursor=None, has_more=False)
+
+
+# -- §5.9's seeded sets (artboards 5d and 5b) -----------------------------------------
+class BeltRankPresetOut(BaseModel):
+    """One rung of a preset, before any of it exists as a row."""
+
+    name: str
+    kyu: int | None
+    order_index: int
+    color_hex: str
+    secondary_color_hex: str | None
+
+
+class BeltPresetOut(BaseModel):
+    """A whole seeded set. `5d` renders the ranks each preset WOULD create, as a live
+    preview beside the cards, so the ladder has to be readable before it exists."""
+
+    key: str
+    discipline: str
+    name: str
+    ranks: list[BeltRankPresetOut]
+
+
+class SeedLadderIn(BaseModel):
+    class_id: uuid.UUID
+    preset_key: str
+
+
+@router.get("/belt-presets", response_model=CursorPage[BeltPresetOut])
+def list_belt_presets(_: AnyStaff) -> CursorPage[BeltPresetOut]:
+    """§5.9's seeded sets, as data.
+
+    No session and no tenancy: a preset is versioned application data, the same shape as
+    `app/services/demo/fixtures.py`, and identical for every studio. That is what makes a
+    club seeded in September and one seeded in March comparable.
+    """
+    return CursorPage[BeltPresetOut](
+        items=[
+            BeltPresetOut(
+                key=preset.key,
+                discipline=preset.discipline,
+                name=preset.name,
+                ranks=[
+                    BeltRankPresetOut(
+                        name=rank.name,
+                        kyu=rank.kyu,
+                        order_index=rank.order_index,
+                        color_hex=rank.color_hex,
+                        secondary_color_hex=rank.secondary_color_hex,
+                    )
+                    for rank in preset.ranks
+                ],
+            )
+            for preset in BELT_PRESETS
+        ],
+        next_cursor=None,
+        has_more=False,
+    )
+
+
+@router.post("/belt-ranks/seed", response_model=LadderPage, status_code=status.HTTP_201_CREATED)
+def seed_belt_ranks(
+    _: ManagerOrOwner,
+    body: SeedLadderIn,
+    session: TenantSessionDep,
+    idempotency_key: IdempotencyKey = None,
+) -> LadderPage:
+    """`5d`'s wizard step and `5b`'s `events.belt.seedDefault` button, one route.
+
+    409 on a class that already has a ladder, rather than a merge: a second seed renumbers
+    ranks that `student_belt` rows point at, rewriting a child's history without touching
+    their row.
+    """
+    try:
+        rows = BeltPresetService.seed(session, body.class_id, body.preset_key)
+    except NoSuchPresetError as exc:
+        raise _unprocessable("no_such_preset", "there is no such belt system") from exc
+    except LadderAlreadySeededError as exc:
+        raise _conflict("ladder_already_seeded", "this class already has a belt system") from exc
     items = _ladder_out(session, rows)
     session.commit()
     return LadderPage(items=items, next_cursor=None, has_more=False)
