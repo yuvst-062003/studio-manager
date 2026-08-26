@@ -92,27 +92,53 @@ def upay_ipn(public_ref: uuid.UUID, request: Request, session: SessionDep) -> Re
         )
         return Response(status_code=status.HTTP_200_OK)
 
+    studio_id = order.studio_id
+
+    # -- 1. write the bytes down, and COMMIT them on their own ------------------------
+    # §5.10: "Every IPN is persisted verbatim in `upay_ipn_record` whether matched or not."
+    # This commit is what makes that true. `record()`'s SAVEPOINT protects the insert from
+    # the duplicate-delivery unique violation; it does NOT survive the rollback below,
+    # because an outer rollback unwinds the whole transaction, savepoint included. Since
+    # this endpoint answers 200 to everything, uPay never re-delivers -- so a rolled-back
+    # row is a callback that no longer exists anywhere, for money that is in the account.
     try:
-        with use_studio(order.studio_id):
-            intake = IpnIntake(session)
-            record, is_new = intake.record(
-                order.studio_id,
+        with use_studio(studio_id):
+            record, is_new = IpnIntake(session).record(
+                studio_id,
                 raw_query=raw_query,
                 raw=raw,
                 source_ip=source_ip,
                 at=at,
             )
-            if is_new:
-                intake.settle(record.id, at=at)
+            record_id = record.id  # read before the commit expires it
             session.commit()
     except Exception:  # noqa: BLE001 -- deliberate: see the docstring
-        # A bug in settlement must not become a retry storm, and the raw bytes are already
-        # committed by the nested savepoint in `record()`. Logged loudly, answered 200.
+        # Nothing was persisted and there is nothing to settle. Still 200: a retry would
+        # re-run the same failing insert. The traceback is the only record, and §11.7 is
+        # why it is the only one -- `raw_query` carries the card owner name and last four,
+        # and the scrubber redacts that key by name, so logging it here would say nothing.
         session.rollback()
         logger.exception(
-            "upay ipn processing failed after the callback was persisted",
+            "upay ipn could not be persisted",
             extra={"public_ref": str(public_ref)},
         )
+        return Response(status_code=status.HTTP_200_OK)
+
+    # -- 2. only then work out what they mean -----------------------------------------
+    if is_new:
+        try:
+            with use_studio(studio_id):
+                IpnIntake(session).settle(record_id, at=at)
+                session.commit()
+        except Exception:  # noqa: BLE001 -- deliberate: see the docstring
+            # A bug in settlement must not become a retry storm, and it must not take the
+            # evidence with it either -- the row above is committed and stays `unmatched`,
+            # which is the reconciliation queue. Logged loudly, answered 200.
+            session.rollback()
+            logger.exception(
+                "upay ipn processing failed after the callback was persisted",
+                extra={"public_ref": str(public_ref), "ipn_record_id": str(record_id)},
+            )
 
     if source_ip is not None and not source_ip_is_known(source_ip):
         # Recorded on the row and noted here. Never a decision -- see `_source_ip`.

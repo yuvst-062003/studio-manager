@@ -19,6 +19,7 @@ import uuid
 import pytest
 from app.integrations.upay.ipn import IPN_SOURCE_IP, IpnShape, build_ipn_query
 from app.models.billing import Charge, Payment, PaymentAllocation, PaymentOrder, UpayIpnRecord
+from app.services.billing.reconciliation import IpnIntake
 from sqlalchemy import func, select
 from tests.billing.conftest import T0
 
@@ -299,3 +300,36 @@ def test_every_shape_answers_200(client, an_order, shape):
     answer is 200 -- because by the time a verdict exists the bytes are already safe, and a
     non-200 invites a retry nobody has observed."""
     assert _deliver(client, an_order.order, shape, suffix=str(shape)).status_code == 200
+
+
+def test_a_failure_in_settlement_never_discards_the_raw_callback(
+    client, an_order, tenant_session, monkeypatch
+):
+    """§5.10: 'Every IPN is persisted verbatim in `upay_ipn_record` whether matched or not.'
+
+    The endpoint answers 200 to everything, so uPay never re-delivers -- which makes the
+    persisted row the *only* copy of a callback that ever existed. If settlement raises and
+    the handler rolls back, that row goes with it: the money is in the merchant account, we
+    have no record it ever arrived, and no retry is coming to tell us again.
+
+    A SAVEPOINT does not save it. `record()` opens one, but an outer `session.rollback()`
+    unwinds the whole transaction, savepoint included. The bytes have to be **committed** on
+    their own before any settlement work begins.
+    """
+    order = an_order.order
+
+    def boom(self, record_id, *, at):
+        raise RuntimeError("a bug in settlement")
+
+    monkeypatch.setattr(IpnIntake, "settle", boom)
+    response = _deliver(client, order, IpnShape.SUCCESS, suffix="BOOM")
+
+    assert response.status_code == 200
+    tenant_session.expire_all()
+    record = tenant_session.execute(
+        select(UpayIpnRecord).where(UpayIpnRecord.transactionid == _txn(order, "BOOM"))
+    ).scalars().one()
+    assert record.raw_query, "the verbatim bytes are the whole point of the row"
+    assert record.match_status == "unmatched", "nothing was settled, so nothing is matched"
+    # Untouched: settlement never ran.
+    assert tenant_session.get(PaymentOrder, order.id).status == "pending"
