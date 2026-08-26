@@ -732,3 +732,101 @@ def a_frozen_student(
     )
     app_session.commit()
     return PricedStudent(student_id=student.id, person_id=child.id, payer_person_id=payer.id)
+
+
+@pytest.fixture
+def three_open_months(
+    app_session: Session, studio: Studio, a_priced_student: PricedStudent
+) -> tuple[uuid.UUID, uuid.UUID, uuid.UUID]:
+    """September, October and November's tuition, unpaid. **Returned oldest first.**
+
+    Oldest-first is the ordering §5.10's reconciliation allocates in, so a test that could
+    not name the three positionally would have to re-derive it -- and half of them would
+    get it wrong in the same direction as the bug.
+    """
+    ids = []
+    for month in (9, 10, 11):
+        row = Charge(
+            studio_id=studio.id,
+            payer_person_id=a_priced_student.payer_person_id,
+            student_id=a_priced_student.student_id,
+            kind="tuition",
+            period_year=2026,
+            period_month=month,
+            amount_agorot=MONTHLY_AGOROT,
+            due_date=date(2026, month, 28),
+            status="open",
+            created_by="billing_run",
+        )
+        app_session.add(row)
+        app_session.flush()
+        ids.append(row.id)
+    app_session.commit()
+    return (ids[0], ids[1], ids[2])
+
+
+@dataclass
+class TwoChildFamily:
+    """One payer, two children. §5.10's card route selects charges 'across every student
+    this person is the payer for', so a family with two children pays once, not twice."""
+
+    payer_person_id: uuid.UUID
+    student_ids: tuple[uuid.UUID, uuid.UUID]
+    charge_ids: tuple[uuid.UUID, uuid.UUID]
+
+
+@pytest.fixture
+def a_two_child_family(
+    app_session: Session, studio: Studio, a_price_plan: uuid.UUID
+) -> TwoChildFamily:
+    payer = Person(studio_id=studio.id, first_name="הורה", last_name="שניים")
+    app_session.add(payer)
+    app_session.flush()
+    students: list[uuid.UUID] = []
+    charges: list[uuid.UUID] = []
+    for index, name in enumerate(("דנה", "יוסי")):
+        child = Person(studio_id=studio.id, first_name=name, last_name="שניים")
+        app_session.add(child)
+        app_session.flush()
+        student = Student(
+            studio_id=studio.id,
+            person_id=child.id,
+            status="active",
+            joined_on=YEAR_STARTS,
+            price_plan_id=a_price_plan,
+        )
+        app_session.add(student)
+        app_session.flush()
+        charge = Charge(
+            studio_id=studio.id,
+            payer_person_id=payer.id,
+            student_id=student.id,
+            kind="tuition",
+            period_year=2026,
+            period_month=10 + index,
+            amount_agorot=MONTHLY_AGOROT,
+            due_date=date(2026, 10 + index, 28),
+            status="open",
+            created_by="billing_run",
+        )
+        app_session.add_all(
+            [
+                Guardian(
+                    studio_id=studio.id,
+                    student_id=student.id,
+                    person_id=payer.id,
+                    is_primary=True,
+                    relation="parent",
+                ),
+                charge,
+            ]
+        )
+        app_session.flush()
+        students.append(student.id)
+        charges.append(charge.id)
+    app_session.commit()
+    return TwoChildFamily(
+        payer_person_id=payer.id,
+        student_ids=(students[0], students[1]),
+        charge_ids=(charges[0], charges[1]),
+    )

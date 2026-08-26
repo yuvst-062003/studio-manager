@@ -246,6 +246,10 @@ waves:
         title: Price plans, products, the charges API and the run endpoint
         status: shipped
         on: 2026-08-26
+      - id: M6.4
+        title: Payments, oldest-first allocation and reversal
+        status: shipped
+        on: 2026-08-26
   - id: W5
     milestone: M8 ∥ M9
     title: Communication ∥ Reports and privacy completion
