@@ -55,17 +55,15 @@ import type { PersonaKey } from './api'
  * §5.6's whole subject is what a rule change must NOT touch, so a scenario with no past
  * has nothing to protect.
  *
- * **It is short.** §16's default year is 1 September – 31 August, and two rules a week
- * across one is about 104 sessions. `makeScheduleClient().listSessions` sets no `limit`
- * and ignores `next_cursor`, so `GET /sessions` returns its default 50 and the group's
- * schedule page renders the first fifty and nothing after — silently, with no "load more"
- * and no count. For a year that started last September that is fifty past sessions and no
- * future ones, so the manually-edited and ad-hoc sessions this fixture creates would not
- * be on the screen at all.
+ * **It is not §16's default year, and it cannot be.** §16 runs 1 September – 31 August,
+ * and today sits five days from the end of the current one: that year has a hundred past
+ * sessions and one future, which is not enough to hold a hand-moved lesson AND leave a
+ * rule-driven one for the change to move. Next year's has the opposite problem — all
+ * future, nothing to protect. So the fixture takes a window with room on both sides.
  *
- * That is a real defect for a real club and it is reported as one. Sizing the fixture's
- * year to fit inside one page is how E2E-5 tests §5.6 instead of testing the page size —
- * when the client pages, this can go back to §16's dates and nothing else here changes.
+ * It used to be short for a second reason, now gone: `listSessions` ignored `next_cursor`,
+ * so a year's worth of sessions arrived truncated at fifty. That was a real defect for a
+ * real club and it is fixed rather than dodged.
  */
 const YEAR_STARTS = '2026-06-01'
 const YEAR_ENDS = '2026-10-31'

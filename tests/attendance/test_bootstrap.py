@@ -180,3 +180,41 @@ def test_attendance_taken_reflects_the_roster_the_payload_already_holds(
     app_session.commit()
     after = client.get(BOOTSTRAP, headers=as_lead_coach.headers).json()
     assert after["sessions"][0]["attendance_taken"] is True
+
+
+def test_a_session_read_the_ordinary_way_also_says_its_register_was_signed(
+    client, app_session, studio, a_session, an_enrolled_student, as_lead_coach
+):
+    """The same fact, through `GET /sessions/{id}` rather than through the offline payload.
+
+    `ScheduleService.project_sessions` hardcoded `attendance_taken=False` with a docstring
+    saying "M5 fills the field". M5 landed — `app/models/_pending/` is empty and
+    `app/models/attendance.py` is real — without filling it, so every session in every
+    ordinary read claimed its register was unsigned. Only the bootstrap payload, which
+    overwrites the field after projecting, was ever right.
+
+    That is what §5.14's sessions-held-versus-planned report counts, and what the dashboard
+    would draw a lock from, so a permanent `False` is a number the club could act on.
+    """
+    import uuid
+
+    from app.models.attendance import Attendance
+
+    url = f"/api/v1/sessions/{a_session}"
+    assert client.get(url, headers=as_lead_coach.headers).json()["attendance_taken"] is False
+
+    app_session.add(
+        Attendance(
+            studio_id=studio.id,
+            session_id=a_session,
+            student_id=an_enrolled_student,
+            status="present",
+            source="coach",
+            marked_at=T0,
+            device_marked_at=T0,
+            client_mark_id=uuid.uuid4(),
+        )
+    )
+    app_session.commit()
+
+    assert client.get(url, headers=as_lead_coach.headers).json()["attendance_taken"] is True
