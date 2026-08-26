@@ -26,15 +26,17 @@ import uuid
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
 from sqlalchemy import select
 
 from app.core.auth_context import AnyStaff, require_roles
 from app.core.clock import now
-from app.core.tenancy import TenantSessionDep
+from app.core.tenancy import TenantSessionDep, require_current_studio_id
 from app.models.events import Event, EventRegistration
 from app.models.people import Student
 from app.models.person import Person
+from app.models.studio import Studio
 from app.schemas._pagination import (
     DEFAULT_PAGE_SIZE,
     MAX_PAGE_SIZE,
@@ -69,6 +71,7 @@ from app.services.events.errors import (
 )
 from app.services.events.events import EventService, redacts_fee
 from app.services.events.exams import ExamService
+from app.services.events.ics import render_event_ics
 from app.services.events.publish import EventPublishService
 from app.services.events.rsvp import RsvpService
 
@@ -141,6 +144,37 @@ def create_event(
     out = EventService.to_out(session, [row], redact_fee=redacts_fee(_roles(request)))[0]
     session.commit()
     return out
+
+
+# Declared BEFORE `GET /events/{event_id}`, and that order is load-bearing. FastAPI matches
+# `.ics` as a literal suffix on the path parameter, so with the plain route first every
+# `<uuid>.ics` request would be swallowed by it and fail to parse as a UUID -- surfacing as
+# a 422 on a route that looks unrelated to the one that was called.
+@router.get(
+    "/events/{event_id}.ics",
+    response_class=PlainTextResponse,
+    responses={200: {"content": {"text/calendar": {}}}},
+)
+def event_calendar_file(
+    _: AnyStaff, event_id: uuid.UUID, session: TenantSessionDep
+) -> PlainTextResponse:
+    """§5.8's הוסף ליומן.
+
+    A draft 404s -- §4.3 keeps it invisible to guardians, and a resolvable link would be
+    that invisibility leaking through a file extension.
+    """
+    try:
+        event = EventService.read(session, event_id)
+    except EventNotFoundError as exc:
+        raise _not_found() from exc
+    if event.status == "draft":
+        raise _not_found()
+    studio = session.get(Studio, require_current_studio_id())
+    return PlainTextResponse(
+        render_event_ics(event, studio_name=studio.name if studio else "", at=now()),
+        media_type="text/calendar; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="event-{event_id}.ics"'},
+    )
 
 
 @router.get("/events/{event_id}", response_model=EventOut)
