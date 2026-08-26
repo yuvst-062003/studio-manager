@@ -45,15 +45,30 @@ import { API_ORIGIN } from '../origins'
 import type { PersonaKey } from './api'
 
 /**
- * The training year every scenario materializes into. §16: 1 September – 31 August.
+ * The training year every scenario materializes into.
  *
- * The CURRENT year, not the next one, and that is load-bearing for E2E-5: a year starting
- * in the future materializes nothing in the past, and §5.6's whole subject is what a rule
- * change must not touch. Sessions run from last September to next August, so today sits in
- * the middle of them and "past" and "future" both exist without any clock travel.
+ * Two properties, and the second one is a workaround rather than a design.
+ *
+ * **It straddles today**, which is load-bearing for E2E-5: a year starting in the future
+ * materializes nothing in the past, because §5.6 rewrites only sessions with `starts_at >
+ * now()` and `change_window_start` is `max(effective_from, today)`. Both correct. But
+ * §5.6's whole subject is what a rule change must NOT touch, so a scenario with no past
+ * has nothing to protect.
+ *
+ * **It is short.** §16's default year is 1 September – 31 August, and two rules a week
+ * across one is about 104 sessions. `makeScheduleClient().listSessions` sets no `limit`
+ * and ignores `next_cursor`, so `GET /sessions` returns its default 50 and the group's
+ * schedule page renders the first fifty and nothing after — silently, with no "load more"
+ * and no count. For a year that started last September that is fifty past sessions and no
+ * future ones, so the manually-edited and ad-hoc sessions this fixture creates would not
+ * be on the screen at all.
+ *
+ * That is a real defect for a real club and it is reported as one. Sizing the fixture's
+ * year to fit inside one page is how E2E-5 tests §5.6 instead of testing the page size —
+ * when the client pages, this can go back to §16's dates and nothing else here changes.
  */
-const YEAR_STARTS = '2025-09-01'
-const YEAR_ENDS = '2026-08-31'
+const YEAR_STARTS = '2026-06-01'
+const YEAR_ENDS = '2026-10-31'
 
 /**
  * The period the billing run charges, and the month the flows talk about. The current
@@ -80,6 +95,8 @@ export type Scenario = {
   groupId: string
   /** Every session the two weekly rules materialized, ascending by start. */
   sessionIds: string[]
+  /** The same sessions with their times, for a spec that needs to pick one by date. */
+  sessions: { id: string; starts_at: string }[]
   pricePlanId: string
   studentId: string
   /** The persona acting as guardian and payer. */
@@ -319,6 +336,7 @@ export async function buildScenario(
     classId: klass.id,
     groupId: group.id,
     sessionIds: sessions.items.map((s) => s.id),
+    sessions: sessions.items,
     pricePlanId: pricePlan.id,
     studentId: created.student.id,
     parentPersona: parent,
