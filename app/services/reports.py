@@ -81,7 +81,16 @@ class ReportService:
 
         Used for invoice generation and charge history display.
         Returns list of charge details sorted by period (newest first).
+        Validates that student belongs to current studio (tenant-scoped).
         """
+        from app.models.people import Student
+
+        # Verify student exists and belongs to current studio (TenantSession scope)
+        stmt_student = select(Student).where(Student.id == student_id)
+        student = self.session.execute(stmt_student).scalar_one_or_none()
+        if not student:
+            return []
+
         stmt = (
             select(Charge)
             .where(Charge.student_id == student_id)

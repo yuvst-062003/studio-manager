@@ -102,3 +102,55 @@ def get_student_charges(
         student_id=student_id,
         charges=[ChargeDetail(**charge) for charge in charges],
     )
+
+
+class ReportDeliveryRequest(BaseModel):
+    """Request to send a monthly report via email."""
+
+    year: int
+    month: int
+    to_person_id: uuid.UUID
+
+
+class ReportDeliveryResponse(BaseModel):
+    """Response confirming report delivery request."""
+
+    notification_id: uuid.UUID | None
+    status: str  # queued, failed
+
+
+@router.post("/{studio_id}/send-monthly")
+def send_monthly_report(
+    studio_id: uuid.UUID,
+    body: ReportDeliveryRequest,
+    _: ManagerOrOwner,
+    session: TenantSessionDep,
+) -> ReportDeliveryResponse:
+    """Queue a monthly billing report for email delivery.
+
+    Enqueues a notification through the COMMS lane's notification system.
+    The report PDF is generated and attached by the notification worker.
+    """
+    from app.services.comms import NotificationService
+
+    try:
+        notification = NotificationService(session).enqueue(
+            person_id=body.to_person_id,
+            kind="report.monthly",
+            title="Monthly Billing Report",
+            body=f"Your billing report for {body.month}/{body.year} is ready",
+            payload={
+                "year": body.year,
+                "month": body.month,
+            },
+        )
+        return ReportDeliveryResponse(
+            notification_id=notification.id,
+            status="queued",
+        )
+    except NotImplementedError:
+        # COMMS lane not yet implemented
+        return ReportDeliveryResponse(
+            notification_id=None,
+            status="failed",
+        )

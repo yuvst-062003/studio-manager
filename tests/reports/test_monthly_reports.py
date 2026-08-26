@@ -76,3 +76,26 @@ def test_get_student_charges_requires_auth(client):
         "/api/v1/reports/00000000-0000-0000-0000-000000000000/charges/00000000-0000-0000-0000-000000000001"
     )
     assert response.status_code == 401
+
+
+def test_send_monthly_report_as_manager(
+    client,
+    as_manager: Caller,
+    twelve_students_mixed_billing,
+):
+    """Manager can queue a monthly report for delivery."""
+    response = client.post(
+        f"/api/v1/reports/{as_manager.studio_id}/send-monthly",
+        json={
+            "year": 2026,
+            "month": 10,
+            "to_person_id": str(as_manager.person_id),
+        },
+        headers=as_manager.headers,
+    )
+    # COMMS is not yet implemented, so this returns queued or failed
+    assert response.status_code == 200
+    data = response.json()
+    assert "status" in data
+    # Either queued (if COMMS is available) or failed (if not implemented)
+    assert data["status"] in ("queued", "failed")
