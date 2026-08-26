@@ -270,6 +270,10 @@ waves:
         title: The parent's money — 1b, 12f, 12e and the uPay return page
         status: shipped
         on: 2026-08-26
+      - id: M6.10
+        title: Staff 11a — a coach hands an item over and never sees a price
+        status: shipped
+        on: 2026-08-26
   - id: W5
     milestone: M8 ∥ M9
     title: Communication ∥ Reports and privacy completion

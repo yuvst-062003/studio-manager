@@ -43,6 +43,7 @@ from app.models.billing import (
     RecurringSubscription,
     UpayIpnRecord,
 )
+from app.models.person import Guardian
 from app.models.studio import Studio
 from app.schemas._pagination import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, IdempotencyKey
 from app.schemas.billing import (
@@ -959,3 +960,88 @@ def _subscription_out(row: RecurringSubscription) -> RecurringSubscriptionOut:
         status=row.status,
         cancelled_at=row.cancelled_at,
     )
+
+
+# -- staff `11a`: handing an item over -----------------------------------------
+class HandOverIn(BaseModel):
+    """§5.10's `11a`. **A coach names the item and the child, and nothing else.**
+
+    There is deliberately no amount here. §3.2 gives a coach no financial read, so the price
+    comes from `product.price_agorot` server-side and the payer from the student's primary
+    guardian -- a coach who could send either could set a family's bill from the mat.
+    """
+
+    product_id: uuid.UUID
+    student_id: uuid.UUID
+
+
+class HandOverOut(BaseModel):
+    """What `11a` renders after a hand-over: **that** a charge was created, never for how
+    much. Invariant 3 inspects this shape because the route is `coach`-tagged, and a money
+    field here would make it name the exact field."""
+
+    charge_id: uuid.UUID
+    product_name: str
+
+
+@router.post(
+    "/charges/from-product",
+    response_model=HandOverOut,
+    status_code=status.HTTP_201_CREATED,
+    tags=COACH,
+)
+def hand_over_product(
+    _: AnyStaff,
+    body: HandOverIn,
+    request: Request,
+    session: TenantSessionDep,
+    idempotency_key: IdempotencyKey = None,
+) -> HandOverOut:
+    """A coach hands a child a גי and the club bills the family for it.
+
+    Everything financial happens on this side of the boundary: the amount is read from the
+    product, the payer from the primary guardian (§4.3 -- captured at creation, so changing
+    the guardian later leaves the charge with whoever owed it), and neither is echoed back.
+
+    An inactive product is refused: handing out an item the club stopped selling would raise
+    a charge at a price nobody currently offers.
+    """
+    studio_id = require_current_studio_id()
+    catalogue = CatalogueService(session)
+    try:
+        product = catalogue.get_product(body.product_id)
+    except NotFoundError as exc:
+        raise _not_found("product") from exc
+    if not product.is_active:
+        raise _refused(RefusedError("that item is no longer sold"))
+
+    payer_person_id = session.execute(
+        select(Guardian.person_id).where(
+            Guardian.student_id == body.student_id, Guardian.is_primary.is_(True)
+        )
+    ).scalar_one_or_none()
+    if payer_person_id is None:
+        raise _refused(
+            RefusedError("that student has no primary guardian, so nobody owes the charge")
+        )
+
+    charge = BillingService(session).create_charge(
+        studio_id,
+        payer_person_id,
+        "manual",
+        product.price_agorot,
+        now().date(),
+        student_id=body.student_id,
+    )
+    charge.proration_note = product.name
+    AuditService.record(
+        session,
+        action="charge.hand_over",
+        entity_type="charge",
+        entity_id=charge.id,
+        studio_id=studio_id,
+        actor_person_id=_actor(request),
+        diff={"product_id": str(product.id)},
+    )
+    session.commit()
+    return HandOverOut(charge_id=charge.id, product_name=product.name)

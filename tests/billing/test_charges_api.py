@@ -262,3 +262,98 @@ def test_the_run_day_is_a_day_of_the_month(client, as_manager):
         "/api/v1/billing/settings", json={"run_day": 32}, headers=as_manager.headers
     )
     assert response.status_code == 422
+
+
+# -- staff `11a`: a coach hands an item over ----------------------------------
+@pytest.mark.parametrize("caller", ["as_lead_coach", "as_assistant_coach"])
+def test_a_coach_hands_an_item_over_and_never_sees_a_price(
+    client, request, caller, as_manager, a_priced_student
+):
+    """§5.10's `11a`, and invariant 3 as a DESIGN constraint rather than a router tag.
+
+    The coach names the item and the child. The price comes from `product.price_agorot`
+    server-side, the payer from the primary guardian, and neither is echoed back -- the
+    response says THAT a charge was created, never for how much.
+    """
+    signed_in = request.getfixturevalue(caller)
+    product = client.post(
+        "/api/v1/products",
+        json={"name": "גי מידה 140", "price_agorot": 18_000},
+        headers=as_manager.headers,
+    ).json()
+
+    options = client.get("/api/v1/products/handout-options", headers=signed_in.headers)
+    assert options.status_code == 200
+    assert options.json()["items"] == [{"id": product["id"], "name": "גי מידה 140"}]
+
+    handed = client.post(
+        "/api/v1/charges/from-product",
+        json={"product_id": product["id"], "student_id": str(a_priced_student.student_id)},
+        headers=signed_in.headers,
+    )
+    assert handed.status_code == 201
+    body = handed.json()
+    assert body["product_name"] == "גי מידה 140"
+    # The whole point: no money field anywhere in the response.
+    assert "price_agorot" not in body
+    assert "amount_agorot" not in body
+
+
+def test_the_hand_over_charge_is_owed_by_the_primary_guardian(
+    client, as_lead_coach, as_manager, a_priced_student
+):
+    """§4.3 -- captured at creation. The coach never names a payer and could not."""
+    product = client.post(
+        "/api/v1/products",
+        json={"name": "חגורה", "price_agorot": 6_000},
+        headers=as_manager.headers,
+    ).json()
+    handed = client.post(
+        "/api/v1/charges/from-product",
+        json={"product_id": product["id"], "student_id": str(a_priced_student.student_id)},
+        headers=as_lead_coach.headers,
+    ).json()
+    charge = client.get(
+        f"/api/v1/charges/{handed['charge_id']}", headers=as_manager.headers
+    ).json()
+    assert charge["payer_person_id"] == str(a_priced_student.payer_person_id)
+    assert charge["amount_agorot"] == 6_000
+    assert charge["kind"] == "manual"
+
+
+def test_handing_out_a_discontinued_item_is_refused(
+    client, as_lead_coach, as_manager, a_priced_student
+):
+    """A charge at a price nobody currently offers is a dispute waiting to happen."""
+    product = client.post(
+        "/api/v1/products",
+        json={"name": "ישן", "price_agorot": 1_000},
+        headers=as_manager.headers,
+    ).json()
+    client.patch(
+        f"/api/v1/products/{product['id']}",
+        json={"is_active": False},
+        headers=as_manager.headers,
+    )
+    response = client.post(
+        "/api/v1/charges/from-product",
+        json={"product_id": product["id"], "student_id": str(a_priced_student.student_id)},
+        headers=as_lead_coach.headers,
+    )
+    assert response.status_code == 422
+
+
+def test_the_handout_options_carry_no_money_field(client, as_lead_coach, as_manager):
+    """The shape's absence is the guarantee. Invariant 3 inspects it because the route is
+    coach-tagged; this asserts the same rule from the client's side."""
+    client.post(
+        "/api/v1/products",
+        json={"name": "כפפות", "price_agorot": 4_000},
+        headers=as_manager.headers,
+    )
+    items = client.get(
+        "/api/v1/products/handout-options", headers=as_lead_coach.headers
+    ).json()["items"]
+    assert items
+    for item in items:
+        assert set(item) == {"id", "name"}

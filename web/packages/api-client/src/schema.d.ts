@@ -379,6 +379,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/charges/from-product": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Hand Over Product
+         * @description A coach hands a child a גי and the club bills the family for it.
+         *
+         *     Everything financial happens on this side of the boundary: the amount is read from the
+         *     product, the payer from the primary guardian (§4.3 -- captured at creation, so changing
+         *     the guardian later leaves the charge with whoever owed it), and neither is echoed back.
+         *
+         *     An inactive product is refused: handing out an item the club stopped selling would raise
+         *     a charge at a price nobody currently offers.
+         */
+        post: operations["hand_over_product_api_v1_charges_from_product_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/charges/{charge_id}": {
         parameters: {
             query?: never;
@@ -3413,6 +3440,41 @@ export interface components {
             detail?: components["schemas"]["ValidationError"][];
         };
         /**
+         * HandOverIn
+         * @description §5.10's `11a`. **A coach names the item and the child, and nothing else.**
+         *
+         *     There is deliberately no amount here. §3.2 gives a coach no financial read, so the price
+         *     comes from `product.price_agorot` server-side and the payer from the student's primary
+         *     guardian -- a coach who could send either could set a family's bill from the mat.
+         */
+        HandOverIn: {
+            /**
+             * Product Id
+             * Format: uuid
+             */
+            product_id: string;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+        };
+        /**
+         * HandOverOut
+         * @description What `11a` renders after a hand-over: **that** a charge was created, never for how
+         *     much. Invariant 3 inspects this shape because the route is `coach`-tagged, and a money
+         *     field here would make it name the exact field.
+         */
+        HandOverOut: {
+            /**
+             * Charge Id
+             * Format: uuid
+             */
+            charge_id: string;
+            /** Product Name */
+            product_name: string;
+        };
+        /**
          * HandoutOptionOut
          * @description §5.10's `11a`, and **invariant 3 as a shape rather than as a rule someone remembers**.
          *
@@ -6232,6 +6294,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ChargeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    hand_over_product_api_v1_charges_from_product_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HandOverIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HandOverOut"];
                 };
             };
             /** @description Validation Error */

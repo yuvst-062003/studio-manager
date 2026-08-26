@@ -2246,6 +2246,47 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
+      "HandOverIn": {
+        "description": "§5.10's `11a`. **A coach names the item and the child, and nothing else.**\n\nThere is deliberately no amount here. §3.2 gives a coach no financial read, so the price\ncomes from `product.price_agorot` server-side and the payer from the student's primary\nguardian -- a coach who could send either could set a family's bill from the mat.",
+        "properties": {
+          "product_id": {
+            "format": "uuid",
+            "title": "Product Id",
+            "type": "string"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "product_id",
+          "student_id"
+        ],
+        "title": "HandOverIn",
+        "type": "object"
+      },
+      "HandOverOut": {
+        "description": "What `11a` renders after a hand-over: **that** a charge was created, never for how\nmuch. Invariant 3 inspects this shape because the route is `coach`-tagged, and a money\nfield here would make it name the exact field.",
+        "properties": {
+          "charge_id": {
+            "format": "uuid",
+            "title": "Charge Id",
+            "type": "string"
+          },
+          "product_name": {
+            "title": "Product Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "charge_id",
+          "product_name"
+        ],
+        "title": "HandOverOut",
+        "type": "object"
+      },
       "HandoutOptionOut": {
         "description": "§5.10's `11a`, and **invariant 3 as a shape rather than as a rule someone remembers**.\n\nA coach picks the item; the server prices it from `product.price_agorot`. There is no\nmoney field here, and that absence is the whole reason this shape exists instead of\nreusing `ProductOut`.",
         "properties": {
@@ -8268,6 +8309,71 @@
         "summary": "Create Charge",
         "tags": [
           "billing"
+        ]
+      }
+    },
+    "/api/v1/charges/from-product": {
+      "post": {
+        "description": "A coach hands a child a גי and the club bills the family for it.\n\nEverything financial happens on this side of the boundary: the amount is read from the\nproduct, the payer from the primary guardian (§4.3 -- captured at creation, so changing\nthe guardian later leaves the charge with whoever owed it), and neither is echoed back.\n\nAn inactive product is refused: handing out an item the club stopped selling would raise\na charge at a price nobody currently offers.",
+        "operationId": "hand_over_product_api_v1_charges_from_product_post",
+        "parameters": [
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HandOverIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandOverOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Hand Over Product",
+        "tags": [
+          "billing",
+          "billing",
+          "coach"
         ]
       }
     },
