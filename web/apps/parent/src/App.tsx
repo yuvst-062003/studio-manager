@@ -7,20 +7,39 @@
 // home-screen web app, "so an iPhone parent who never installs receives no push at all —
 // and §5.11 permits no email or SMS fallback, so that parent is reachable only by
 // telephone."
-import { useEffect, useState } from 'react'
-import { useDisplayMode, useSession } from '@studio/core'
+import { useEffect, useMemo, useState } from 'react'
+import { apiFetch, useDisplayMode, useSession } from '@studio/core'
 import { AppShell, InstallWalkthrough, LanguagePicker, SignIn, ThemeProvider } from '@studio/ui'
 import { DevBar } from '@studio/ui/dev-bar'
 import type { InstallPromptEvent } from '@studio/ui'
 import type { Locale } from '@studio/i18n'
 import { Resolve } from './features/identity/Resolve'
+import { ScheduleSection, isCalendarRoute } from './features/schedule/ScheduleSection'
+import { makeParentScheduleClient } from './features/schedule/client'
+import { useToday } from './features/schedule/useToday'
 
 const NAV = [
   { key: 'myChildren', labelKey: 'common.nav.myChildren', href: '/' },
+  { key: 'calendar', labelKey: 'schedule.calendar.title', href: '#/calendar' },
   { key: 'payments', labelKey: 'common.nav.payments', href: '/payments' },
   { key: 'announcements', labelKey: 'common.nav.announcements', href: '/announcements' },
   { key: 'settings', labelKey: 'common.nav.settings', href: '/settings' },
 ]
+
+/**
+ * Lane SCHEDULE's screens route on `location.hash`, matching the dashboard: real `<a href>`
+ * links that survive the back button and open-in-new-tab, with no router dependency
+ * (`.claude/rules/ui-rtl-a11y.md` forbids adding one without asking).
+ */
+function useHash(): string {
+  const [hash, setHash] = useState<string>(() => globalThis.location?.hash ?? '')
+  useEffect(() => {
+    const onChange = () => setHash(globalThis.location?.hash ?? '')
+    globalThis.addEventListener('hashchange', onChange)
+    return () => globalThis.removeEventListener('hashchange', onChange)
+  }, [])
+  return hash
+}
 
 export default function App() {
   const session = useSession()
@@ -31,6 +50,11 @@ export default function App() {
   const installed = displayMode !== 'browser'
   const [locale, setLocale] = useState<Locale>('he')
   const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null)
+  // Memoised: ChildCalendar reads through this in an effect keyed on the client, so a
+  // fresh object every render would re-fetch the month forever.
+  const scheduleClient = useMemo(() => makeParentScheduleClient(apiFetch), [])
+  const hash = useHash()
+  const today = useToday()
 
   useEffect(() => {
     const onPrompt = (event: Event): void => {
@@ -84,7 +108,20 @@ export default function App() {
             />
           }
         >
-          <Resolve session={session} locale={locale} />
+          {/* §6.1's first-run routing still owns the default screen — `Resolve` decides
+              between the studio picker, the blocking consents and home. A guardian who has
+              navigated to #/calendar is past that, and `access.parent` is re-checked here
+              so the hash cannot route around §6.1's refusal arm. */}
+          {session.access.parent && isCalendarRoute(hash) ? (
+            <ScheduleSection
+              locale={locale}
+              client={scheduleClient}
+              hash={hash}
+              today={today}
+            />
+          ) : (
+            <Resolve session={session} locale={locale} />
+          )}
         </AppShell>
       ) : null}
     </ThemeProvider>
