@@ -36,7 +36,7 @@ from typing import Any
 
 from sqlalchemy import func, select
 
-from app.core.storage import sniff_image_type
+from app.core.storage import ObjectStore, sniff_image_type, validate_key
 from app.core.tenancy import TenantSession
 from app.models.audit import AuditLog
 from app.models.health import HealthDeclaration, HealthFormTemplate
@@ -46,6 +46,7 @@ from app.schemas.health import HealthStatusSummaryOut
 from app.services.audit import AuditService
 from app.services.health import HealthService
 from app.services.health.flags import derive_flags
+from app.services.health.pdf import RenderedSection, render_declaration_pdf
 
 logger = logging.getLogger(__name__)
 
@@ -428,3 +429,140 @@ class HealthDeclarationService:
     def recompute(session: TenantSession, student_id: uuid.UUID) -> dict[str, bool]:
         """The seam, from this module. One import site rather than five."""
         return HealthService(session).recompute_derived_flags(student_id)
+
+
+# ==========================================================================================
+# §5.5's rendered PDF
+# ==========================================================================================
+#: The three locales §9 ships, for the two words a boolean answer becomes.
+#:
+#: **12c finding 4, answered.** "Are the questions translated or are they data?" They are
+#: manager-editable rows in `health_form_template.schema`, so they are **data** and are rendered in
+#: whatever language the manager typed them in — a studio that reworded them into Russian has a
+#: Russian questionnaire, and a translation layer would silently overwrite that. The *answers* are
+#: not data: `True` is not a string anybody typed, so it is rendered in the studio's own locale.
+#: This is the whole of i18n in the Python process, and it stays this small on purpose.
+_ANSWER_WORDS: dict[str, tuple[str, str]] = {
+    "he": ("כן", "לא"),
+    "en": ("Yes", "No"),
+    "ru": ("Да", "Нет"),
+}
+_UNANSWERED = {"he": "—", "en": "—", "ru": "—"}
+
+#: D11's caveat, on the artefact a club is most likely to hand to an insurer. Mirrors
+#: `template.disclaimer` in web/packages/i18n/{he,en,ru}/health.ts; the two are kept in step by
+#: `tests/health/test_pdf_contents.py`, because a caveat that exists only in the app is a caveat
+#: absent from the document it is about.
+_DISCLAIMER: dict[str, str] = {
+    "he": (
+        "השאלון המצורף הוא נקודת פתיחה בלבד ואינו מסמך עמידה ברגולציה. "
+        "באחריות המועדון להתאים אותו לדרישות הביטוח והחוק"
+    ),
+    "en": (
+        "The bundled questionnaire is a starting point only and is not a compliance document. "
+        "Adapting it to insurance and legal requirements is the club's responsibility"
+    ),
+    "ru": (
+        "Прилагаемая анкета — только отправная точка и не является документом соответствия. "
+        "Приведение её в соответствие с требованиями страхования и закона — обязанность клуба"
+    ),
+}
+
+
+def _display_answer(value: Any, locale: str) -> str:
+    """One answer, as it appears on the page.
+
+    A boolean becomes the locale's word. Anything else is the parent's own text and is rendered
+    verbatim: it is *their* answer, and paraphrasing a free-text medical note on the document they
+    signed would make the document say something they did not.
+    """
+    yes, no = _ANSWER_WORDS.get(locale, _ANSWER_WORDS["he"])
+    if value is None or value == "":
+        return _UNANSWERED.get(locale, "—")
+    if isinstance(value, bool):
+        return yes if value else no
+    return str(value)
+
+
+def build_pdf_sections(
+    schema: Mapping[str, Any], answers: Mapping[str, Any], locale: str
+) -> list[RenderedSection]:
+    """The template's own sections, paired with what was answered.
+
+    **A question that was not on screen is not on the page.** A `visible_if` question whose
+    condition did not hold was never asked, and printing it with a dash reads as a refusal to
+    answer. §5.5's document is a record of what happened.
+    """
+    sections: list[RenderedSection] = []
+    for section in schema.get("sections") or ():
+        if not isinstance(section, Mapping):
+            continue
+        rows: list[tuple[str, str]] = []
+        for question in section.get("questions") or ():
+            if not isinstance(question, Mapping) or not question.get("id"):
+                continue
+            question_id = str(question["id"])
+            condition = question.get("visible_if")
+            if isinstance(condition, Mapping) and not all(
+                answers.get(key) == value for key, value in condition.items()
+            ):
+                continue
+            label = str(question.get("label") or question_id)
+            rows.append((label, _display_answer(answers.get(question_id), locale)))
+        if rows:
+            sections.append(
+                RenderedSection(
+                    title=str(section.get("title") or section.get("id") or ""), rows=rows
+                )
+            )
+    return sections
+
+
+def declaration_pdf_key(studio_id: uuid.UUID, declaration_id: uuid.UUID) -> str:
+    return validate_key(f"studios/{studio_id}/health-declarations/{declaration_id}.pdf")
+
+
+def render_and_store_pdf(
+    session: TenantSession,
+    declaration: HealthDeclaration,
+    *,
+    store: ObjectStore,
+    studio_name: str,
+    student_name: str,
+    locale: str,
+) -> str:
+    """§5.5 — 'renders a filled, signed PDF which is saved to object storage'.
+
+    The bytes are §11.1 personal data and object storage is not an encrypted column, which is why
+    §11.7 puts access behind short-lived signed URLs and never a public bucket. This lane serves
+    them through the API, authorised per request, rather than handing out a key.
+
+    Rendered from the template the declaration was **signed against** — unlike `derived_flags`,
+    which follow the live questions. The document is the record; the flags are a cache. See
+    `HealthService.recompute_derived_flags`.
+    """
+    template = session.get(HealthFormTemplate, declaration.template_id)
+    if template is None:
+        raise DeclarationNotFoundError(str(declaration.template_id))
+
+    signer = session.get(Person, declaration.signed_by_person_id)
+    signed_by = f"{signer.first_name} {signer.last_name}".strip() if signer else ""
+
+    data = render_declaration_pdf(
+        title=str(template.schema.get("title") or "הצהרת בריאות"),
+        student_name=student_name,
+        studio_name=studio_name,
+        signed_at=declaration.signed_at,
+        signed_by=signed_by,
+        template_version=declaration.template_version,
+        sections=build_pdf_sections(template.schema, declaration.answers_encrypted or {}, locale),
+        disclaimer=_DISCLAIMER.get(locale, _DISCLAIMER["he"]),
+        signature_png=declaration.signature_image_encrypted,
+    )
+    key = declaration_pdf_key(declaration.studio_id, declaration.id)
+    store.put(key, data, content_type="application/pdf")
+    declaration.pdf_object_key = key
+    session.flush()
+    # `extra=`, never an f-string, and no answer in either (G7).
+    logger.info("health declaration pdf rendered", extra={"bytes": len(data)})
+    return key

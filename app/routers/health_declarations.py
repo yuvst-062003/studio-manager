@@ -28,13 +28,17 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, HTTPException, Query, Request, status
+from fastapi import APIRouter, HTTPException, Query, Request, Response, status
 
 from app.core.auth_context import AnyStaff, ManagerOrOwner, require_roles
 from app.core.clock import now
-from app.core.tenancy import TenantSessionDep
+from app.core.storage import ObjectNotFoundError
+from app.core.tenancy import TenantSessionDep, require_current_studio_id
 from app.models.health import HealthDeclaration
-from app.routers.health_templates import client_ip
+from app.models.people import Student
+from app.models.person import Person
+from app.models.studio import Studio
+from app.routers.health_templates import ObjectStoreDep, client_ip
 from app.schemas.health import (
     HealthDeclarationFullOut,
     HealthDeclarationIn,
@@ -42,11 +46,13 @@ from app.schemas.health import (
     HealthStatusSummaryOut,
 )
 from app.services.health.declarations import (
+    ACTION_READ_FULL,
     AnswersIncompleteError,
     DeclarationNotFoundError,
     HealthDeclarationService,
     SignatureNotAPngError,
     SignatureRequiredError,
+    render_and_store_pdf,
 )
 
 router = APIRouter(tags=["health"])
@@ -165,6 +171,7 @@ def submit_declaration(
     student_id: uuid.UUID,
     body: HealthDeclarationIn,
     session: TenantSessionDep,
+    store: ObjectStoreDep,
 ) -> HealthDeclarationOut:
     """A guardian of this student, or a manager/owner filing it on their behalf (§5.1).
 
@@ -212,9 +219,34 @@ def submit_declaration(
         # `derive_flags` refusing a non-boolean answer to a flag question (§4.3). The message
         # names the question id and no answer.
         raise _unprocessable("flag_answer_not_a_boolean", str(exc)) from exc
+
+    # §5.5 renders the PDF as part of the submit, not afterwards on a job: "on submit the backend
+    # stores ... and renders a filled, signed PDF". A parent who signs and is then told to come
+    # back later for their copy has not finished the flow the artboard draws.
+    _render_pdf(session, row, store)
     session.commit()
     session.refresh(row)
     return _out(row)
+
+
+def _render_pdf(session: TenantSessionDep, row: HealthDeclaration, store: ObjectStoreDep) -> None:
+    """Render and file the signed PDF, naming the studio and the child on it.
+
+    The two names are read here rather than inside the service because they are display strings
+    from two other verticals' tables, and a health service reaching into `studio` and `person` for
+    formatting is a health service with two more reasons to change.
+    """
+    studio = session.get(Studio, require_current_studio_id())
+    student = session.get(Student, row.student_id)
+    person = session.get(Person, student.person_id) if student is not None else None
+    render_and_store_pdf(
+        session,
+        row,
+        store=store,
+        studio_name=studio.name if studio is not None else "",
+        student_name=f"{person.first_name} {person.last_name}".strip() if person else "",
+        locale=(studio.default_locale if studio is not None else None) or "he",
+    )
 
 
 @router.get(
@@ -248,6 +280,69 @@ def read_declaration_full(
     )
     session.commit()
     return out
+
+
+@router.get("/students/{student_id}/health-declaration/pdf")
+def download_declaration_pdf(
+    request: Request, student_id: uuid.UUID, session: TenantSessionDep, store: ObjectStoreDep
+) -> Response:
+    """§5.5 — 'downloadable by the guardian and by managers.'
+
+    **Exactly those two, and a coach is refused.** The file is the full record: every answer, laid
+    out and legible. §11.7 forbids a public bucket and §11.1 does not reach object storage, so the
+    bytes are served through the API and authorised per request rather than behind a URL that is a
+    capability once it leaks.
+
+    A manager's download is logged as a `read_full`, because it is one — the same answers by a
+    different route, and an audit trail that missed it would answer "who has seen my child's
+    medical information" wrongly. A guardian reading their own child's record is not logged: §11.2
+    lists the reads it wants and a parent reading about their own child is not among them.
+    """
+    _require_signed_in(request)
+    person_id, identity_id, ip = _actor(request)
+    roles = set(getattr(request.state, "roles", ()) or ())
+    is_manager = bool(roles & {"owner", "manager"})
+    is_guardian = HealthDeclarationService.is_guardian_of(
+        session, person_id=person_id, student_id=student_id
+    )
+    if not is_manager and not is_guardian:
+        raise _forbidden()
+
+    try:
+        if is_manager:
+            row = HealthDeclarationService.read_full(
+                session,
+                student_id,
+                actor_person_id=person_id,
+                actor_identity_id=identity_id,
+                actor_ip=ip,
+                action=ACTION_READ_FULL,
+            )
+        else:
+            row = HealthDeclarationService.require(session, student_id)
+    except DeclarationNotFoundError as exc:
+        raise _not_found() from exc
+
+    if row.pdf_object_key is None:
+        # A declaration written before this route existed, or one whose render was cleared by a
+        # re-submit. Rendering on demand is cheaper than a migration and leaves no state that can
+        # be wrong.
+        _render_pdf(session, row, store)
+    try:
+        data, content_type = store.get(row.pdf_object_key or "")
+    except ObjectNotFoundError:
+        _render_pdf(session, row, store)
+        data, content_type = store.get(row.pdf_object_key or "")
+    session.commit()
+    return Response(
+        content=data,
+        media_type=content_type,
+        headers={
+            "Content-Disposition": f'attachment; filename="health-declaration-{student_id}.pdf"',
+            # §11.7 — the bytes are personal data about a minor. No shared cache holds them.
+            "Cache-Control": "private, no-store",
+        },
+    )
 
 
 @router.post(
