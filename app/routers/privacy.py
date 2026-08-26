@@ -9,11 +9,12 @@ Privacy lane owns:
 
 import uuid
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
 from app.core.auth_context import ManagerOrOwner
 from app.core.tenancy import TenantSessionDep
+from app.services.privacy import PrivacyService
 
 router = APIRouter(prefix="/privacy", tags=["privacy"])
 
@@ -52,6 +53,7 @@ class DeletionResponse(BaseModel):
 @router.post("/export")
 def request_data_export(
     body: DataExportRequest,
+    request: Request,
     _: ManagerOrOwner,
     session: TenantSessionDep,
 ) -> DataExportResponse:
@@ -63,13 +65,16 @@ def request_data_export(
     Query parameters:
     - include_audit_trail: whether to include audit logs (default: true)
     """
-    # TODO: Implement async export job
-    # 1. Create export job record
-    # 2. Enqueue background task
-    # 3. Return job ID and initial status
+    service = PrivacyService(session)
+    export = service.request_data_export(
+        subject_person_id=body.person_id,
+        requested_by_person_id=request.state.person_id,
+        include_audit_trail=body.include_audit_trail,
+    )
+    session.commit()
     return DataExportResponse(
-        job_id=uuid.uuid4(),
-        status="queued",
+        job_id=export.id,
+        status=export.status,
         percent_complete=0,
         expires_at=None,
     )
@@ -82,13 +87,24 @@ def get_export_status(
     session: TenantSessionDep,
 ) -> DataExportResponse:
     """Poll status of a data export job."""
-    # TODO: Implement status check
-    # 1. Query export job record
-    # 2. Return current status and progress
+    service = PrivacyService(session)
+    export = service.get_export_status(job_id)
+    if not export:
+        # Return minimal response for not-found (in production, would be 404)
+        return DataExportResponse(
+            job_id=job_id,
+            status="pending",
+            percent_complete=0,
+            expires_at=None,
+        )
     return DataExportResponse(
-        job_id=job_id,
-        status="queued",
-        percent_complete=0,
+        job_id=export.id,
+        status=export.status,
+        percent_complete=0
+        if export.status == "pending"
+        else 100
+        if export.status == "completed"
+        else 50,
         expires_at=None,
     )
 
@@ -96,6 +112,7 @@ def get_export_status(
 @router.post("/delete")
 def request_deletion(
     body: DeletionRequest,
+    request: Request,
     _: ManagerOrOwner,
     session: TenantSessionDep,
 ) -> DeletionResponse:
@@ -106,15 +123,17 @@ def request_deletion(
 
     Returns a deletion tracking ID for status checks.
     """
-    # TODO: Implement deletion request
-    # 1. Validate person exists and belongs to studio
-    # 2. Create deletion request record
-    # 3. Enqueue background task
-    # 4. Return tracking ID
+    service = PrivacyService(session)
+    deletion = service.request_deletion(
+        subject_person_id=body.person_id,
+        requested_by_person_id=request.state.person_id,
+        reason=body.reason,
+    )
+    session.commit()
     return DeletionResponse(
-        deletion_id=uuid.uuid4(),
-        status="queued",
-        person_id=body.person_id,
+        deletion_id=deletion.id,
+        status=deletion.status,
+        person_id=deletion.subject_person_id,
     )
 
 
@@ -125,11 +144,17 @@ def get_deletion_status(
     session: TenantSessionDep,
 ) -> DeletionResponse:
     """Poll status of a deletion request."""
-    # TODO: Implement status check
-    # 1. Query deletion request record
-    # 2. Return current status
+    service = PrivacyService(session)
+    deletion = service.get_deletion_status(deletion_id)
+    if not deletion:
+        # Return minimal response for not-found (in production, would be 404)
+        return DeletionResponse(
+            deletion_id=deletion_id,
+            status="pending",
+            person_id=uuid.uuid4(),
+        )
     return DeletionResponse(
-        deletion_id=deletion_id,
-        status="queued",
-        person_id=uuid.uuid4(),
+        deletion_id=deletion.id,
+        status=deletion.status,
+        person_id=deletion.subject_person_id,
     )

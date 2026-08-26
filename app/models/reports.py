@@ -45,6 +45,7 @@ from app.models.base import Base, TimestampColumns, UUIDPrimaryKey
 #:   "time-limited" and this is that limit having arrived. **Not the same as `failed`**: the
 #:   export worked, and a re-request is the remedy rather than an investigation.
 EXPORT_STATUSES = ("pending", "running", "completed", "failed", "expired")
+DELETION_STATUSES = ("pending", "running", "completed", "failed")
 
 
 class DataExportRequest(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
@@ -107,4 +108,47 @@ class DataExportRequest(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
     object_key: Mapped[str | None] = mapped_column(String(500))
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     #: Why it failed, for the person who has to answer the guardian. Never the contents.
+    error: Mapped[str | None] = mapped_column(Text)
+
+
+class DeletionRequest(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
+    """§11.4 -- Data deletion request. Unlike data exports which are time-limited
+    downloads, deletion requests are asynchronous tasks that purge data from the system.
+
+    Deletion respects retention windows (e.g., financial records kept per Israeli law).
+    See the deletion service for constraints on what can be deleted and the timeline.
+    """
+
+    __tablename__ = "deletion_request"
+    __tenant_table_args__ = (
+        CheckConstraint(
+            "status IN ('pending', 'running', 'completed', 'failed')",
+            name="deletion_request_status",
+        ),
+        # Failed deletions must record why (exception detail or constraint violation)
+        CheckConstraint(
+            "(status = 'failed') = (error IS NOT NULL)",
+            name="deletion_request_error_when_failed",
+        ),
+        # Worker's queue scan and deletion history per person
+        Index("ix_deletion_request_studio_id_status", "studio_id", "status"),
+        Index(
+            "ix_deletion_request_studio_id_subject_person_id",
+            "studio_id",
+            "subject_person_id",
+        ),
+    )
+
+    #: Whose data to delete.
+    subject_person_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("person.id", ondelete="RESTRICT"), nullable=False
+    )
+    #: Who requested the deletion. Same as subject in guardian requests, a manager for admin requests.
+    requested_by_person_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("person.id", ondelete="RESTRICT"), nullable=False
+    )
+    status: Mapped[str] = mapped_column(String(9), nullable=False, default="pending")
+    #: The reason for deletion (e.g., "account_closure", "gdpr_request", "parent_request")
+    reason: Mapped[str] = mapped_column(String(100), nullable=False)
+    #: Why it failed, if status is 'failed'. Never sensitive data.
     error: Mapped[str | None] = mapped_column(Text)

@@ -23,7 +23,7 @@ def test_request_data_export_as_manager(
     )
     assert response.status_code == 200
     data = response.json()
-    assert data["status"] == "queued"
+    assert data["status"] == "pending"
     assert data["percent_complete"] == 0
     assert "job_id" in data
 
@@ -63,7 +63,7 @@ def test_request_deletion_as_manager(
     )
     assert response.status_code == 200
     data = response.json()
-    assert data["status"] == "queued"
+    assert data["status"] == "pending"
     assert data["person_id"] == str(person_id)
     assert "deletion_id" in data
 
