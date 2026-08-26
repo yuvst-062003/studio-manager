@@ -214,6 +214,12 @@ export function RosterScreen({
       >
         {t(locale, 'attendance.roster.markAllPresent')}
       </Button>
+      {/* `9f` finding 1 — "if the action skips pre-reported marks, **the button's own copy
+          should say so**." Unconditional, and not only when a parent has reported: a coach
+          decides whether to tap this before knowing whether anybody reported, and a
+          reassurance that appears only sometimes is one nobody learns to rely on. The
+          dashboard's `1e` copy says the same thing beside the same button. */}
+      <p data-testid="roster-bulk-hint">{t(locale, 'attendance.roster.markAllPresentHint')}</p>
 
       {roster.length === 0 ? (
         <p data-testid="roster-empty">{t(locale, 'attendance.roster.empty')}</p>

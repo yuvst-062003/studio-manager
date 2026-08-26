@@ -248,6 +248,16 @@ describe('§5.7 — the bulk rule, and the artboard that gets it wrong', () => {
     })
   })
 
+  it('says on the button itself that it will not overwrite a parent report', async () => {
+    // `9f` finding 1 — "the button's own copy should say so", unconditionally. A coach
+    // decides whether to tap before knowing whether anybody reported, and a reassurance
+    // that appears only sometimes is one nobody learns to rely on.
+    renderScreen()
+    expect(await screen.findByTestId('roster-bulk-hint')).toHaveTextContent(
+      'לא ידרוס דיווחי הורים או סימונים קיימים',
+    )
+  })
+
   it('shows the advance-notice hint when a parent has reported', async () => {
     // `9f` adds this row and its claim — that pre-reported students are handled — is only
     // true because the button below skips them.
