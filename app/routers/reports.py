@@ -9,6 +9,7 @@ The reporting service materializes charges by period and renders them; notificat
 integrate via the slot pattern wired in M8's COMMS lane.
 """
 
+import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Query
@@ -16,6 +17,7 @@ from pydantic import BaseModel
 
 from app.core.auth_context import ManagerOrOwner
 from app.core.tenancy import TenantSessionDep
+from app.services.reports import ReportService
 
 router = APIRouter(prefix="/reports", tags=["reports"])
 
@@ -57,16 +59,5 @@ def get_monthly_report(
     - year: billing year (2000–2100)
     - month: billing month (1–12)
     """
-    # TODO: Implement report generation
-    # 1. Query charges for (studio_id, year, month)
-    # 2. Group by status and calculate totals
-    # 3. Return summary
-    return MonthlyReportSummary(
-        period_year=year,
-        period_month=month,
-        total_students=0,
-        total_agorot=0,
-        settled_agorot=0,
-        overdue_agorot=0,
-        pending_agorot=0,
-    )
+    summary = ReportService(session).monthly_summary(year, month)
+    return MonthlyReportSummary(**summary)

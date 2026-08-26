@@ -1,6 +1,6 @@
 """Monthly billing report endpoint tests."""
 
-from tests.reports.conftest import Caller
+from tests.reports.conftest import NOVEMBER_PERIOD, OCTOBER_PERIOD, Caller
 
 
 def test_get_monthly_report_as_manager(
@@ -8,13 +8,44 @@ def test_get_monthly_report_as_manager(
     as_manager: Caller,
     twelve_students_mixed_billing,
 ):
-    """Manager can fetch monthly report summary for a studio."""
+    """Manager can fetch monthly report summary for October."""
+    year, month = OCTOBER_PERIOD
     response = client.get(
-        f"/api/v1/reports/{as_manager.studio_id}/monthly?year=2026&month=10",
+        f"/api/v1/reports/{as_manager.studio_id}/monthly?year={year}&month={month}",
         headers=as_manager.headers,
     )
     assert response.status_code == 200
     data = response.json()
-    assert data["period_year"] == 2026
-    assert data["period_month"] == 10
-    # TODO: Verify counts once implementation fills them in
+    assert data["period_year"] == year
+    assert data["period_month"] == month
+    # 8 students have October charges
+    assert data["total_students"] == 8
+    assert data["total_agorot"] == 8 * 25_000
+
+
+def test_get_monthly_report_november_pending(
+    client,
+    as_manager: Caller,
+    twelve_students_mixed_billing,
+):
+    """Manager can fetch monthly report for November."""
+    year, month = NOVEMBER_PERIOD
+    response = client.get(
+        f"/api/v1/reports/{as_manager.studio_id}/monthly?year={year}&month={month}",
+        headers=as_manager.headers,
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["period_year"] == year
+    assert data["period_month"] == month
+    # 4 students have November charges
+    assert data["total_students"] == 4
+    assert data["total_agorot"] == 4 * 25_000
+
+
+def test_get_monthly_report_requires_auth(client):
+    """Unauthenticated requests are rejected."""
+    response = client.get(
+        "/api/v1/reports/00000000-0000-0000-0000-000000000000/monthly?year=2026&month=10"
+    )
+    assert response.status_code == 401
