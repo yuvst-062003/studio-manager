@@ -455,12 +455,23 @@ holdbacks:
       all and W4's exit gate stays theatre — the same reasoning that gave this lane the
       App.tsx exception. The parent app's own `billingClient.ts` is untouched; the container
       implements the same interface, so lane MONEY's file changes when lane MONEY changes it.
-    blocks: E2E-3 · W4 exit gate
+      AMENDED AGAIN 2026-08-26. The standing-order half is closed too:
+      `GET /me/standing-order` answers the one question `hasActiveSubscription` asks, and
+      E2E-3's third test asserts the warning appears and the pay button stays ENABLED —
+      §5.10's "a warning, not a block".
+
+      WHAT IS LEFT, and it is one thing: `ChargeOut` carries no field saying a charge
+      already sits inside an open order, so `covered-elsewhere` cannot render for a parent
+      and §5.10's double-payment refusal reaches them as a generic error rather than
+      naming the month. The guard itself holds — E2E-3's second test proves the server
+      refuses with a 409. Adding the field means editing the app schemas package, which
+      this lane is told not to touch.
+    blocks: §5.10's covered-elsewhere copy
     status: open
     opened: 2026-08-26
     source: >-
-      app/routers/billing.py list_charges/payer_balance/list_products ·
-      web/apps/parent/src/features/billing/billingClient.ts · SPEC §5.10 · §19.6
+      app/schemas/billing.py ChargeOut ·
+      web/apps/parent/src/features/billing/PaymentsScreen.tsx · SPEC §5.10
   - id: HB-e2e-offline-bulk-op
     kind: carried
     title: A queued bulk mark can never flush — `flush` has no route for it
@@ -512,12 +523,16 @@ holdbacks:
       and a duplicate delivery creates no second payment.
 
       What closes this: a manager-facing read over payment orders, filterable by status —
-      or a counts endpoint for the alert centre, which is the narrower answer. Either is a
-      W4 decision rather than a gate lane's, which is why E2E-4 is not written around a
-      guess.
+      or a counts endpoint for the alert centre, which is the narrower answer.
+
+      CLOSED 2026-08-26. `GET /payment-orders?status=` — a filtered list rather than a
+      counts endpoint, because every other list in that router is one and a manager told
+      "three" wants to know which three. `6c`'s money section is mounted and reads it, and
+      E2E-4's fourth test asserts the alert reaches the alert centre at high priority.
     blocks: E2E-4 · W4 exit gate
-    status: open
+    status: closed
     opened: 2026-08-26
+    closed: 2026-08-26
     source: >-
       web/apps/dashboard/src/features/billing/DebtAlert.tsx · app/routers/payments.py ·
       SPEC §5.10
@@ -545,9 +560,15 @@ holdbacks:
       address. §5.4a's trial booking already does exactly that — `TrialService` attaches
       `Guardian(person_id=parent.id)` directly — which is why the E2E fixture reaches a
       guardian link at all.
+
+      CLOSED 2026-08-26. `StudentService.create` takes an optional `guardian_person_id`
+      that short-circuits the match, and `approve()` passes the id it already resolved.
+      Covered by a backend test that clears the Person's address — the shape the fixtures
+      never produced and §19.3 always does — and by E2E-1's second test end to end.
     blocks: E2E-1 · §5.4(c)
-    status: open
+    status: closed
     opened: 2026-08-26
+    closed: 2026-08-26
     source: app/services/people/registrations.py approve() · app/services/people/matching.py
   - id: HB-e2e-stale-seams
     kind: carried
@@ -572,9 +593,15 @@ holdbacks:
       September that is fifty past sessions and no future ones. The E2E fixture works around
       it by using a five-month training year that fits inside one page, which is recorded in
       `e2e/fixtures/scenario.ts` as a workaround rather than a design.
+
+      CLOSED 2026-08-26. `project_sessions` computes `attendance_taken` from the attendance
+      table in one batch query beside the other three, and `listSessions` follows
+      `next_cursor`. The fixture's short year stays, for the unrelated reason that today
+      sits five days from the end of §16's current one.
     blocks: nothing outright
-    status: open
+    status: closed
     opened: 2026-08-26
+    closed: 2026-08-26
     source: >-
       app/services/schedule/service.py project_sessions ·
       web/apps/dashboard/src/features/schedule/client.ts listSessions
@@ -597,10 +624,17 @@ holdbacks:
       run `alembic revision`; one revision per wave lands in the wave's contract commit."
 
       What closes this: 0010 landing on main so both lanes carry it, and — separately — a
-      database per concern, so an E2E run and a pytest run stop sharing state. The E2E
-      backend already has its own start script; pointing it at its own database is a small
-      change with a large effect.
-    blocks: lane-check.sh on feat/e2e-harness
+      database per concern, so an E2E run and a pytest run stop sharing state.
+
+      AMENDED 2026-08-26. The database half is done: `scripts/e2e-backend.sh` creates and
+      migrates a database named from the deployment's own settings, so a worktree owns its
+      schema and its rows. 2176 backend tests pass on this branch again.
+
+      WHAT IS LEFT is the process leak rather than the code: revision 0010 was authored in
+      a lane worktree, against CLAUDE.md's rule that main owns the migrations directory and
+      that one revision per wave lands in the wave's contract commit. It costs this branch
+      nothing now and will conflict at merge.
+    blocks: W5 merge
     status: open
     opened: 2026-08-26
     source: tests/conftest.py · alembic_version · CLAUDE.md §Layout
@@ -710,11 +744,18 @@ holdbacks:
       HB-e2e-parent-billing-api, HB-e2e-registration-approval and HB-e2e-stale-seams. Both
       lanes were feature-complete with green unit suites throughout. That is precisely the
       thing this holdback said an E2E gate is for — "what is unproven is that the two
-      features work TOGETHER through a real browser" — and it turns out they do not, in
-      four places.
+      features work TOGETHER through a real browser" — and it turns out they did not, in
+      nine places.
+
+      CLOSED 2026-08-26. All five flows are green with no `test.fixme`: nineteen tests
+      across three projects, one project per spec. Six of the nine defects are fixed in
+      this branch; the other three carry their own entries — HB-e2e-demo-reset,
+      HB-e2e-offline-bulk-op, and the residue of HB-e2e-parent-billing-api — because each
+      needs a file this lane was told not to edit.
     blocks: W3 exit gate
-    status: open
+    status: closed
     opened: 2026-08-26
+    closed: 2026-08-26
   - id: HB-w3-manual-offline
     kind: carried
     title: The 90-minute real-device airplane-mode run has not happened
@@ -779,10 +820,18 @@ holdbacks:
       HB-e2e-registration-approval. Writing the spec around it would be writing a test that
       cannot pass, and un-fixme'ing it would be the permanently red gate this entry already
       declined once.
+
+      CLOSED 2026-08-26. Both halves are met, and as the COMPLETE flows rather than as W2
+      subsets — the split turned out to be unnecessary, because M3, M4 and M5 have all
+      landed since. E2E-1's first test walks the public landing, sign-in-first booking,
+      §5.4a's trial declaration and a manager's conversion; its second walks §5.4(c)'s
+      sibling request through the approval queue. The 500 that made the approval half
+      impossible when this entry was last amended is fixed — see
+      HB-e2e-registration-approval.
     blocks: W3
-    status: open
+    status: closed
     opened: 2026-08-26
-    closed: null
+    closed: 2026-08-26
     source: >-
       SPEC §13 flows 1 and 5 · docs/plan/milestone-plan.md §2.1 ·
       e2e/01-registration-to-active.spec.ts:7 · e2e/05-schedule-change.spec.ts
