@@ -57,6 +57,22 @@ export default tseslint.config(
       ...reactHooks.configs.recommended.rules,
       'no-undef': 'off', // TypeScript already checks this, and knows the DOM lib.
       'no-restricted-syntax': ['error', ...physicalPropertySyntax],
+      // This repo is NOT prettier-formatted -- there is no formatter for TS at all, and
+      // running `npx prettier` over it reflows a third of the tree at any width. But
+      // nothing stopped someone reaching for it, and twice now someone has: prettier's
+      // defaults are double quotes and semicolons, and both land silently because eslint
+      // enforced no style at all.
+      //
+      // It is not hypothetical. W2's people lane shipped `packages/i18n/{he,en,ru}/people.ts`
+      // prettier-default-formatted and nobody noticed for a wave; W3's health lane hit the
+      // same thing and caught it only because `tests/structure/test_full_template.py` greps
+      // the i18n files for single-quoted keys -- an unrelated test, catching it by accident.
+      //
+      // These two rules turn that into a red gate in the one command every lane runs.
+      // `avoidEscape` keeps double quotes legal exactly where they earn it: a string that
+      // contains an apostrophe, which Hebrew copy does (ג'ודו).
+      quotes: ['error', 'single', { avoidEscape: true, allowTemplateLiterals: false }],
+      semi: ['error', 'never'],
     },
   },
   {
@@ -65,6 +81,14 @@ export default tseslint.config(
     // D10 does not apply — these emit assets, they do not author styles.
     files: ['scripts/**/*.mjs'],
     languageOptions: { globals: { ...globals.node, ...globals.browser } },
+    // The quote and semicolon rules above are scoped to **/*.{ts,tsx}, so without this
+    // the node scripts sit outside them -- and a build script is exactly as reachable by
+    // an accidental `npx prettier --write .` as a component is. A rule that covers most
+    // of the tree reads as covering the tree.
+    rules: {
+      quotes: ['error', 'single', { avoidEscape: true, allowTemplateLiterals: false }],
+      semi: ['error', 'never'],
+    },
   },
   {
     files: ['apps/*/src/**/*.tsx'],

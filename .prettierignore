@@ -1,0 +1,20 @@
+# Prettier is NOT this repo's formatter, and this file plus .prettierrc exist to make an
+# accidental run harmless rather than to invite one.
+#
+# Measured 2026-08-26: `prettier --write` over web/ reflows 113 of 301 files at printWidth
+# 100 and more at every other width, because the tree was hand-written and never
+# prettier-formatted. .prettierrc pins the two settings whose defaults actually caused
+# damage — prettier's double quotes and semicolons landed silently in
+# packages/i18n/{he,en,ru}/people.ts during W2 and went unnoticed for a wave. eslint's
+# `quotes` and `semi` rules are the enforcement; this is the guard rail.
+#
+# Generated output is never formatted by hand or by tool.
+openapi.json
+web/packages/api-client/src/schema.d.ts
+**/*.gen.ts
+**/dist/**
+**/dev-dist/**
+**/node_modules/**
+
+# The canvas exports are a visual reference, not source (D10's corollary).
+docs/design/canvas/**

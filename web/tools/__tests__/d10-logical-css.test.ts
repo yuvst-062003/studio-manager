@@ -10,18 +10,18 @@ const lintText = async (code: string) => {
 
 describe('D10 — physical CSS properties are banned before the first component', () => {
   it('rejects marginLeft in a style object', async () => {
-    const out = await lintText(`export const A = () => <div style={{ marginLeft: 8 }} />`)
+    const out = await lintText('export const A = () => <div style={{ marginLeft: 8 }} />')
     expect(out).toMatch(/marginInlineStart/)
   })
 
   it('rejects a bare left offset', async () => {
-    const out = await lintText(`export const A = () => <div style={{ left: 0 }} />`)
+    const out = await lintText('export const A = () => <div style={{ left: 0 }} />')
     expect(out).toMatch(/insetInlineStart/)
   })
 
   it('accepts the logical equivalent', async () => {
     const out = await lintText(
-      `export const A = () => <div style={{ marginInlineStart: 8 }} />`,
+      'export const A = () => <div style={{ marginInlineStart: 8 }} />',
     )
     expect(out).not.toMatch(/marginInlineStart is banned/)
   })

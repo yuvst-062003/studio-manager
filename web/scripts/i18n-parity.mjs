@@ -95,7 +95,7 @@ export async function checkParity({ root = DEFAULT_ROOT, namespace } = {}) {
         if (!(key in reference)) {
           errors.push(
             `${locale}/${ns}.ts: \`${key}\` has no ${REFERENCE_LOCALE} source — ` +
-              `Hebrew is the reference locale (SPEC §9)`,
+              'Hebrew is the reference locale (SPEC §9)',
           )
         }
       }

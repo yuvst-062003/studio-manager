@@ -20,7 +20,7 @@ const lint = async (code: string, filePath: string) => {
   return results.flatMap((r) => r.messages.map((m) => m.message)).join('\n')
 }
 
-const INLINE_HEBREW = `export const A = () => <div>שלום עולם</div>`
+const INLINE_HEBREW = 'export const A = () => <div>שלום עולם</div>'
 const VIA_T = `import { t } from '@studio/i18n'
 export const A = () => <div>{t('he', 'common.dev.title')}</div>`
 

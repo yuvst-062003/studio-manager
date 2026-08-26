@@ -10,16 +10,16 @@ let root: string
 function fixture(bundles: Record<string, Record<string, Record<string, string>>>) {
   writeFileSync(
     join(root, 'types.ts'),
-    `export const LOCALES = ['he', 'en', 'ru'] as const\n` +
-      `export const NAMESPACES = ['common'] as const\n` +
-      `export const REFERENCE_LOCALE = 'he'\n`,
+    'export const LOCALES = [\'he\', \'en\', \'ru\'] as const\n' +
+      'export const NAMESPACES = [\'common\'] as const\n' +
+      'export const REFERENCE_LOCALE = \'he\'\n',
   )
   for (const [locale, namespaces] of Object.entries(bundles)) {
     mkdirSync(join(root, locale), { recursive: true })
     for (const [ns, entries] of Object.entries(namespaces)) {
       writeFileSync(
         join(root, locale, `${ns}.ts`),
-        `import type { Bundle } from '../types'\n` +
+        'import type { Bundle } from \'../types\'\n' +
           `export const ${ns}: Bundle = ${JSON.stringify(entries)}\n`,
       )
     }
