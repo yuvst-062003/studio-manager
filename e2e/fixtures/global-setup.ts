@@ -45,6 +45,26 @@ import { resetDemoStudio } from './api'
 
 const REPO_ROOT = path.join(__dirname, '..', '..')
 
+/**
+ * Which database the API is configured for, asked of the settings object rather than
+ * hardcoded — the same resolution `scripts/e2e-backend.sh` uses, and for the same reason.
+ * A name written down twice is a name that goes stale once: an earlier version of this file
+ * truncated `studio_manager` while the stack had moved to `studio_manager_e2e`, so the
+ * clearing silently did nothing and the reset went on failing for its original reason.
+ */
+function databaseName(): string {
+  return execFileSync(
+    '.venv/bin/python',
+    [
+      '-c',
+      'from urllib.parse import urlparse\n' +
+        'from app.core.config import settings\n' +
+        'print(urlparse(settings.MIGRATION_DATABASE_URL.replace("+psycopg", "")).path.lstrip("/"))',
+    ],
+    { cwd: REPO_ROOT, encoding: 'utf8' },
+  ).trim()
+}
+
 /** The `audit_log` truncation, and the reason it is a named function rather than a line. */
 function clearAuditLog(): void {
   console.log(
@@ -69,7 +89,7 @@ function clearAuditLog(): void {
       '-U',
       'studio_migrator',
       '-d',
-      'studio_manager',
+      databaseName(),
       '-c',
       'truncate audit_log',
     ],

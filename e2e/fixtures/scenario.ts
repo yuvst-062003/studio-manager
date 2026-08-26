@@ -122,6 +122,12 @@ export type ScenarioOptions = {
    * quietly depend on them.
    */
   withProtections?: boolean
+  /**
+   * How many months to bill, counting back from `PERIOD`. §5.10's card route offers
+   * `[1] [2] [3] [6]`, and a flow about "choosing three months" needs three to choose from
+   * — one charge would make the chip group render a single option and prove nothing.
+   */
+  months?: number
 }
 
 /** §5.6's three, populated only when `withProtections` is asked for. */
@@ -311,11 +317,19 @@ export async function buildScenario(
     reason: 'e2e fixture',
   })
 
-  // §5.10 step 1 — the run charges 'every active enrollment'.
-  await manager.send('post', '/billing-runs', {
-    period_year: PERIOD.year,
-    period_month: PERIOD.month,
-  })
+  // §5.10 step 1 — the run charges 'every active enrollment'. One run per month, counting
+  // back from PERIOD, because `charge`'s idempotency key is
+  // `(student_id, period_year, period_month, kind)` — a single run produces a single month
+  // however many times it is repeated, which is the property that makes it safe to re-run
+  // and the reason three months need three runs.
+  const months = options.months ?? 1
+  for (let back = months - 1; back >= 0; back -= 1) {
+    const month = PERIOD.month - back
+    await manager.send('post', '/billing-runs', {
+      period_year: month > 0 ? PERIOD.year : PERIOD.year - 1,
+      period_month: month > 0 ? month : month + 12,
+    })
+  }
 
   const protections = options.withProtections
     ? await buildProtections(manager, group.id, trainingYear.id, sessions.items)
@@ -402,6 +416,34 @@ export async function readSession(
 ): Promise<SessionRow> {
   const manager = await asPersona(request, 'manager')
   return manager.send<SessionRow>('get', `/sessions/${sessionId}`)
+}
+
+export type OrderRow = {
+  id: string
+  payer_person_id: string
+  public_ref: string
+  expected_amount_agorot: number
+  max_payments: number
+  status: string
+  expires_at: string
+  paid_at: string | null
+  charge_ids: string[]
+}
+
+/**
+ * One payment order, read as a MANAGER.
+ *
+ * `GET /payment-orders/{public_ref}` admits the payer or any staff member, and staff is
+ * what a spec has: the order was created by a click in the browser, so the test never held
+ * the parent's bearer token. There is deliberately no list-orders endpoint — the specs get
+ * a `public_ref` by watching the POST that creates one.
+ */
+export async function readOrder(
+  request: APIRequestContext,
+  publicRef: string,
+): Promise<OrderRow> {
+  const manager = await asPersona(request, 'manager')
+  return manager.send<OrderRow>('get', `/payment-orders/${publicRef}`)
 }
 
 export type RosterEntry = {
