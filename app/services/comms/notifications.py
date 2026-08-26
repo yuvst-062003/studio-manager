@@ -34,6 +34,7 @@ from sqlalchemy import select, tuple_
 from app.core.clock import now
 from app.core.db import get_engine
 from app.core.tenancy import TenantSession
+from app.schemas.comms import DeliveryReportOut, MissedRecipientOut
 from app.services.comms.preferences import NotificationPreferenceService
 from app.services.comms.push import PushTokenService
 
@@ -248,6 +249,119 @@ class NotificationReader:
         at = now()
         for note in rows:
             note.read_at = at
+        if rows:
+            self._session.commit()
+        return len(rows)
+
+
+class DeliveryReporter:
+    """§5.11's post-send screen, for a cancellation or an announcement.
+
+        נשלח ל-24 משפחות · ✓ 19 קיבלו · ⚠ 5 לא קיבלו — התראות כבויות
+
+    **Three counts, and `queued` is in none of them.** A send still in flight is neither
+    received nor missed: reporting one as a miss sends a manager chasing a family whose phone
+    is about to buzz. `delivery.inFlight` is rendered from the difference, which is why there
+    is no fourth count -- it would be derivable from the other three and free to disagree
+    with them.
+
+    **The names and numbers are the feature.** §5.11 permits no email, no SMS and no WhatsApp
+    channel, so a family whose push did not land and who is not reading the inbox is reachable
+    only by telephone. "5 didn't receive it" tells a manager that five children may turn up to
+    a cancelled class without telling them which five.
+    """
+
+    #: A push that landed, as far as anything on our side can know. `sent` is "the provider
+    #: accepted it" and `delivered` is "the device acknowledged"; §5.11's report counts both
+    #: as received, because the action a manager would take is the same for either.
+    RECEIVED = ("sent", "delivered")
+    #: `MissedReason`, and the order §5.11's ⚠ list reads in.
+    MISSED = ("no_token", "denied", "failed")
+
+    def __init__(self, session: TenantSession) -> None:
+        self._session = session
+
+    def for_announcement(self, announcement_id: uuid.UUID) -> DeliveryReportOut:
+        from app.models.comms import Notification, NotificationDelivery
+        from app.models.person import Person
+
+        rows = list(
+            self._session.execute(
+                select(Notification, NotificationDelivery, Person)
+                .join(
+                    NotificationDelivery,
+                    NotificationDelivery.notification_id == Notification.id,
+                )
+                .join(Person, Person.id == Notification.person_id)
+                .where(
+                    # The stamp `AnnouncementService.publish` writes. A JSONB `->>` rather
+                    # than a foreign key: `notification` serves fifteen triggers and most of
+                    # them have nothing to do with an announcement, so a nullable column for
+                    # this one would be null on almost every row.
+                    Notification.payload["announcement_id"].astext == str(announcement_id),
+                    NotificationDelivery.channel == "push",
+                )
+                .order_by(Person.last_name, Person.first_name)
+            )
+        )
+
+        missed = [
+            MissedRecipientOut(
+                person_id=person.id,
+                name=f"{person.first_name} {person.last_name}".strip(),
+                phone=person.phone,
+                # `error='preference'` deliberately does NOT reach the manager. A parent who
+                # switched this type off and one whose OS refused are the same conversation
+                # -- `התראות כבויות` -- and a distinction they cannot act on is noise on a
+                # screen they are reading in a hurry.
+                reason=delivery.status,
+            )
+            for _note, delivery, person in rows
+            if delivery.status in self.MISSED
+        ]
+        return DeliveryReportOut(
+            notification_ids=[note.id for note, _d, _p in rows],
+            sent_count=len(rows),
+            received_count=sum(1 for _n, d, _p in rows if d.status in self.RECEIVED),
+            missed_count=len(missed),
+            missed=missed,
+        )
+
+    def retry_failed(self, announcement_id: uuid.UUID) -> int:
+        """§5.11's `[ שלח שוב ]`. Returns how many sends were actually re-queued.
+
+        **Only `failed`.** It is the one of the three reasons a retry can fix. `no_token`
+        means there is no device to send to and `denied` means the person said no -- pressing
+        the button again for either would do nothing at all while looking like it did
+        something, which is worse than a button that reports "0". §5.11 puts
+        `[ העתק מספרים ]` beside it precisely because the telephone is the remedy for those
+        two.
+
+        Re-queues the EXISTING delivery row rather than enqueuing a second notification. A
+        family with two identical rows in their inbox is how a manager learns not to press
+        the button.
+        """
+        from app.models.comms import Notification, NotificationDelivery
+
+        rows = list(
+            self._session.execute(
+                select(NotificationDelivery)
+                .join(Notification, Notification.id == NotificationDelivery.notification_id)
+                .where(
+                    Notification.payload["announcement_id"].astext == str(announcement_id),
+                    NotificationDelivery.channel == "push",
+                    NotificationDelivery.status == "failed",
+                )
+            ).scalars()
+        )
+        for row in rows:
+            row.status = "queued"
+            # Both cleared: a stale `error` beside a `queued` status describes an attempt that
+            # is no longer the current one, and `provider_message_id` would point support at a
+            # send that already failed.
+            row.error = None
+            row.provider_message_id = None
+            row.sent_at = None
         if rows:
             self._session.commit()
         return len(rows)

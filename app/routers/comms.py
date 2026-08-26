@@ -32,6 +32,7 @@ from app.schemas.comms import (
     AnnouncementOut,
     AnnouncementPage,
     AnnouncementScope,
+    DeliveryReportOut,
     NotificationOut,
     NotificationPage,
     PushApp,
@@ -48,7 +49,7 @@ from app.services.comms.errors import (
     TransactionalKindError,
     UnknownPreferenceGroupError,
 )
-from app.services.comms.notifications import NotificationReader
+from app.services.comms.notifications import DeliveryReporter, NotificationReader
 from app.services.comms.preferences import NotificationPreferenceService
 from app.services.comms.push import PushTokenService
 
@@ -361,6 +362,55 @@ def publish_announcement(
             },
         ) from exc
     return AnnouncementOut.model_validate(row, from_attributes=True)
+
+
+# -- §5.11's delivery report --------------------------------------------------
+class ResendOut(BaseModel):
+    """How many sends `[ שלח שוב ]` could actually retry.
+
+    A count and not a boolean, because it is frequently zero and the screen has to say so.
+    Only `failed` rows are retryable — see `DeliveryReporter.retry_failed` — so a report
+    showing five misses that are all `denied` retries nothing, and a button that claimed
+    otherwise would be lying to a manager in a hurry.
+    """
+
+    retried_count: int
+
+
+@router.get("/announcements/{announcement_id}/delivery", response_model=DeliveryReportOut)
+def announcement_delivery_report(
+    announcement_id: uuid.UUID, session: TenantSessionDep, _: ManagerOnly
+) -> DeliveryReportOut:
+    """§5.11's post-send screen.
+
+    `ManagerOnly` rather than `AnnouncementPublisher`: this is a list of families' names and
+    telephone numbers, and §3.2 gives a coach the roster rather than the household directory.
+    A lead coach can publish to their own group and cannot read the club's phone book, which
+    is the same line §3.2 draws everywhere else.
+
+    A draft returns zeroes rather than a 404. It has reached nobody, and that is the honest
+    answer to "how did it go" for something that has not gone.
+    """
+    try:
+        AnnouncementService(session).get(announcement_id)
+    except AnnouncementNotFoundError as exc:
+        raise _not_found(exc) from exc
+    return DeliveryReporter(session).for_announcement(announcement_id)
+
+
+@router.post("/announcements/{announcement_id}/resend", response_model=ResendOut)
+def resend_announcement(
+    announcement_id: uuid.UUID,
+    session: TenantSessionDep,
+    _: ManagerOnly,
+    idempotency_key: IdempotencyKey = None,
+) -> ResendOut:
+    """`delivery.resend`. Re-queues the errored sends and nothing else."""
+    try:
+        AnnouncementService(session).get(announcement_id)
+    except AnnouncementNotFoundError as exc:
+        raise _not_found(exc) from exc
+    return ResendOut(retried_count=DeliveryReporter(session).retry_failed(announcement_id))
 
 
 # -- §5.11's inbox ------------------------------------------------------------
