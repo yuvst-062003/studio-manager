@@ -113,6 +113,11 @@ const devServer = (workspace: string, url: string) => ({
 
 export default defineConfig({
   testDir: '.',
+  //: One reset for the whole run, not one per test. `fixtures/global-setup.ts` carries the
+  //: measurement behind that: /dev/demo/reset works once and then 500s, because `audit_log`
+  //: is never wiped, `person` is, and the actor foreign key between them is RESTRICT. Each
+  //: test isolates itself by building its own entities instead.
+  globalSetup: './fixtures/global-setup.ts',
   //: Generous, because flow 3 waits on a simulated IPN and §5.10 builds the UI for a delay
   //: rather than for instant confirmation.
   timeout: 60_000,
