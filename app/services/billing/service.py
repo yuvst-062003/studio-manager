@@ -37,7 +37,7 @@ from sqlalchemy.orm import Session
 from app.core.tenancy import get_current_studio_id
 from app.models.billing import Charge, PaymentAllocation
 from app.schemas.billing import ChargeKind
-from app.services.billing.errors import ConflictError, NotFoundError
+from app.services.billing.errors import ConflictError, NotFoundError, RefusedError
 
 if TYPE_CHECKING:  # pragma: no cover -- `Charge` is imported eagerly above for the ORM
     pass
@@ -176,6 +176,112 @@ class BillingService:
             )
         ).scalar_one()
         return int(total)
+
+    def list_charges(
+        self,
+        *,
+        payer_person_id: uuid.UUID | None = None,
+        student_id: uuid.UUID | None = None,
+        status: str | None = None,
+        kind: str | None = None,
+        after: uuid.UUID | None = None,
+        limit: int = 50,
+    ) -> tuple[list[tuple[Charge, int]], uuid.UUID | None]:
+        """Charges and how much of each is allocated, cursor-paginated on `charge.id`.
+
+        The allocated sum travels WITH the row because `ChargeOut` carries it: §4.3 settles
+        a charge by summing allocations, so a client rendering `amount_agorot` alone would
+        show a fully-paid charge as outstanding. One grouped subquery rather than a query
+        per row -- the parent payments screen renders a year of them.
+        """
+        allocated = (
+            select(
+                PaymentAllocation.charge_id.label("charge_id"),
+                func.coalesce(func.sum(PaymentAllocation.amount_agorot), 0).label("total"),
+            )
+            .group_by(PaymentAllocation.charge_id)
+            .subquery()
+        )
+        stmt = select(Charge, func.coalesce(allocated.c.total, 0)).outerjoin(
+            allocated, allocated.c.charge_id == Charge.id
+        )
+        if payer_person_id is not None:
+            stmt = stmt.where(Charge.payer_person_id == payer_person_id)
+        if student_id is not None:
+            stmt = stmt.where(Charge.student_id == student_id)
+        if status is not None:
+            stmt = stmt.where(Charge.status == status)
+        if kind is not None:
+            stmt = stmt.where(Charge.kind == kind)
+        if after is not None:
+            stmt = stmt.where(Charge.id > after)
+        rows = self._session.execute(stmt.order_by(Charge.id).limit(limit + 1)).all()
+        has_more = len(rows) > limit
+        rows = rows[:limit]
+        pairs = [(row[0], int(row[1])) for row in rows]
+        return pairs, (pairs[-1][0].id if has_more and pairs else None)
+
+    def get_charge(self, charge_id: uuid.UUID) -> Charge:
+        charge = self._session.get(Charge, charge_id)
+        if charge is None:
+            raise NotFoundError(f"no charge {charge_id}")
+        return charge
+
+    def payer_balance(self, payer_person_id: uuid.UUID) -> tuple[int, int, int]:
+        """(charged, paid, open_charge_count) for one payer.
+
+        `12f`'s summary card and `3e`'s household row read this. **Voided and written-off
+        charges are excluded from `charged`**: a debt a manager decided not to pursue is
+        not money the family owes, and leaving it in makes every collection figure in the
+        club permanently overstated.
+
+        `paid` is the sum of ALLOCATIONS, not of payments -- an unallocated surplus is money
+        received that settles nothing yet, and counting it here would make the balance
+        disagree with the charges it is supposedly the balance of. The surplus surfaces in
+        the reconciliation queue instead (§5.10).
+        """
+        charged = self._session.execute(
+            select(func.coalesce(func.sum(Charge.amount_agorot), 0)).where(
+                Charge.payer_person_id == payer_person_id,
+                Charge.status.notin_(("void", "written_off")),
+            )
+        ).scalar_one()
+        paid = self._session.execute(
+            select(func.coalesce(func.sum(PaymentAllocation.amount_agorot), 0))
+            .join(Charge, Charge.id == PaymentAllocation.charge_id)
+            .where(
+                Charge.payer_person_id == payer_person_id,
+                Charge.status.notin_(("void", "written_off")),
+            )
+        ).scalar_one()
+        open_count = self._session.execute(
+            select(func.count())
+            .select_from(Charge)
+            .where(Charge.payer_person_id == payer_person_id, Charge.status == "open")
+        ).scalar_one()
+        return (int(charged), int(paid), int(open_count))
+
+    def close_charge(self, charge_id: uuid.UUID, *, status: str, reason: str) -> Charge:
+        """Void or write off a charge. **The one place outside `recompute_charge_status`
+        that assigns `charge.status`, and it lives here rather than in a router for exactly
+        that reason** -- the exception is written down in the class that owns the field
+        instead of scattered across the routes that need it.
+
+        Legitimate because neither value is derivable from the allocations: they record a
+        decision a human made, which is why `recompute_charge_status` then refuses to
+        overwrite them. §11.4 forbids deleting a financial row at all, so a charge raised in
+        error is closed and explained, never removed.
+        """
+        if status not in ("void", "written_off"):
+            raise RefusedError(f"{status!r} is not a closing status; use void or written_off")
+        if not reason.strip():
+            raise RefusedError("closing a charge needs a reason -- it is a decision, not a sum")
+        charge = self.get_charge(charge_id)
+        if charge.status in ("void", "written_off"):
+            raise ConflictError(f"charge {charge_id} is already {charge.status}")
+        charge.status = status
+        self._session.flush()
+        return charge
 
     # -- internals ------------------------------------------------------------
     def _require_scope(self, studio_id: uuid.UUID) -> None:

@@ -242,6 +242,10 @@ waves:
         title: Proration from materialized sessions, registration fees and freezes
         status: shipped
         on: 2026-08-26
+      - id: M6.3
+        title: Price plans, products, the charges API and the run endpoint
+        status: shipped
+        on: 2026-08-26
   - id: W5
     milestone: M8 ∥ M9
     title: Communication ∥ Reports and privacy completion
