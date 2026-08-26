@@ -291,6 +291,30 @@ def _order_out(service: OrderService, order: PaymentOrder) -> PaymentOrderOut:
 # every coach with no children.
 
 
+class MyStandingOrderOut(BaseModel):
+    """Whether §5.10's second double-payment guard applies to the person asking."""
+
+    active: bool
+
+
+@router.get("/me/standing-order", response_model=MyStandingOrderOut)
+def my_standing_order(request: Request, session: TenantSessionDep) -> MyStandingOrderOut:
+    """§5.10's second guard, from the side of the person it is a guard for.
+
+    'If the payer has an active recurring_subscription, the credit-card option shows a
+    warning before opening uPay. **A warning, not a block — the parent decides.**' The
+    parent could not be told: `GET /recurring-subscriptions` is manager-only, so
+    `PaymentsScreen`'s `hasActiveSubscription` had no payer-facing source and the warning
+    §5.10 requires was unreachable by the only person it addresses.
+
+    A boolean and not the subscription. The screen asks one question, the answer is not
+    money, and a family's mandate details are the reconciliation queue's business.
+    """
+    return MyStandingOrderOut(
+        active=OrderService(session).has_active_subscription(_caller(request))
+    )
+
+
 @router.get("/me/payments", response_model=PaymentPage)
 def my_payments(
     request: Request,
@@ -305,6 +329,42 @@ def my_payments(
     )
     return PaymentPage(
         items=[_out(service, row) for row in rows],
+        next_cursor=next_cursor,
+        has_more=next_cursor is not None,
+    )
+
+
+class PaymentOrderPage(BaseModel):
+    """§7's cursor page, over orders. Same shape as `ChargePage` and `PaymentPage`."""
+
+    items: list[PaymentOrderOut]
+    next_cursor: uuid.UUID | None = None
+    has_more: bool = False
+
+
+@router.get("/payment-orders", response_model=PaymentOrderPage)
+def list_payment_orders(
+    _: ManagerOrOwner,
+    session: TenantSessionDep,
+    order_status: str | None = Query(default=None, alias="status"),
+    after: uuid.UUID | None = None,
+    limit: int = Query(default=DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
+) -> PaymentOrderPage:
+    """§5.10's alert centre asks two questions about orders and had no way to ask either.
+
+    'On a mismatch a high-priority manager alert is raised', and the last threat row is
+    'nightly job flags orders `pending` for more than 24h'. Both are counts over
+    `payment_order`, and §7 exposed only `POST /payment-orders` and
+    `GET /payment-orders/{public_ref}` — so `DebtAlert` shipped with `amountMismatches` and
+    `staleOrders` props that nothing in the product could fill.
+
+    Manager-or-owner, and deliberately not `coach`-tagged: §3.2 gives a coach no financial
+    read, and invariant 3 enforces that against the tag.
+    """
+    service = OrderService(session)
+    rows, next_cursor = service.list_orders(status=order_status, after=after, limit=limit)
+    return PaymentOrderPage(
+        items=[_order_out(service, row) for row in rows],
         next_cursor=next_cursor,
         has_more=next_cursor is not None,
     )

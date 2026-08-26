@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test'
 import { ORIGINS } from './origins'
 import { simulateIpn } from './fixtures/api'
 import { signInAs } from './fixtures/auth'
-import { buildScenario, readOrder } from './fixtures/scenario'
+import { buildScenario, readOrder, recordStandingOrder } from './fixtures/scenario'
 
 /**
  * SPEC §13, flow 3 — "Parent selects 3 months → uPay order → simulated IPN → charges
@@ -42,18 +42,12 @@ import { buildScenario, readOrder } from './fixtures/scenario'
  * agora from ₪320 rather than from the order under test. It is the honest shape anyway: an
  * IPN is uPay's server-to-server callback, not something a person clicks.
  *
- * ── The M0 draft's third test is missing, and that is a report rather than an omission ─
- * "An active standing order warns before the card route, and does not block it" cannot be
- * written yet. `PaymentsScreen` renders that warning from `hasActiveSubscription`, and the
- * only endpoint that knows — `GET /recurring-subscriptions` — is `ManagerOrOwner`. So a
- * parent can never be told, and a test asserting the warning would be asserting an
- * implementation that does not exist rather than a rule that is broken.
- *
- * The same gap costs the second test its screen-level assertion: §5.10's "covered
- * elsewhere" state is real and enforced by the server, but `ChargeOut` carries no field
- * saying a charge is already inside an open order, so `covered-elsewhere` cannot render for
- * a parent and the refusal arrives as a generic error. Both are recorded on
- * HB-e2e-parent-billing-api.
+ * ── One assertion the screen still cannot make ────────────────────────────────────────
+ * §5.10's "covered elsewhere" state is real and the server enforces it, but `ChargeOut`
+ * carries no field saying a charge already sits inside an open order — so
+ * `covered-elsewhere` cannot render for a parent, and the second test asserts the refusal
+ * as the generic error the screen actually shows. The guard holds; the explanation does
+ * not. Recorded on HB-e2e-parent-billing-api.
  */
 test.describe('E2E-3 · uPay happy path', () => {
   test('three months are selected, one order is created, and the IPN settles them all', async ({
@@ -172,5 +166,28 @@ test.describe('E2E-3 · uPay happy path', () => {
     // `common.error.generic` here — see the file docstring: it cannot yet say WHICH month
     // is already covered, because the fact is not on `ChargeOut`.
     await expect(page.getByRole('alert')).toBeVisible()
+  })
+
+  test('an active standing order warns before the card route, and does not block it', async ({
+    context,
+    page,
+    request,
+  }) => {
+    // §5.10's second guard: 'A **warning, not a block** — the parent decides.' Asserting
+    // that the pay button stays enabled is the point of the test. A blocked route would be
+    // a reasonable-looking change that quietly stops a family paying at all when the
+    // manager's הוראת קבע record is stale.
+    const scenario = await buildScenario(request, { parent: 'trial', months: 1 })
+    await recordStandingOrder(request, scenario.payerPersonId, scenario.monthlyAmountAgorot)
+
+    await signInAs(context, scenario.parentPersona, 'parent')
+    await page.goto(`${ORIGINS.parent}/#/payments`)
+
+    await expect(page.getByTestId('payments-screen')).toBeVisible()
+    await expect(page.getByText('רשומה הוראת קבע פעילה — ודא שאינך משלם פעמיים')).toBeVisible()
+
+    // The whole assertion. G8 makes a mandate something a human records rather than
+    // something we can verify, so a stale record must never cost a family the card route.
+    await expect(page.getByTestId('pay-button')).toBeEnabled()
   })
 })

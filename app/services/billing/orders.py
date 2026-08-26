@@ -213,6 +213,35 @@ class OrderService:
             ).scalars()
         )
 
+    def list_orders(
+        self,
+        *,
+        status: str | None = None,
+        after: uuid.UUID | None = None,
+        limit: int = 50,
+    ) -> tuple[list[PaymentOrder], uuid.UUID | None]:
+        """The orders a manager may look at, newest first, optionally by status.
+
+        §5.10's high-priority alert counts `amount_mismatch` orders, and its last threat row
+        counts `pending` ones older than a day. Neither could be asked for: the only reads
+        were `POST` and one-by-`public_ref`, so `DebtAlert` shipped with props nothing could
+        fill. This is the smallest thing that answers both, and it is a filtered list rather
+        than a counts endpoint because every other list in this router is one — a manager
+        who sees a count of three wants to know which three.
+
+        Cursor pagination on `id`, matching `list_charges` and `list_payments`.
+        """
+        query = select(PaymentOrder)
+        if status is not None:
+            query = query.where(PaymentOrder.status == status)
+        if after is not None:
+            query = query.where(PaymentOrder.id > after)
+        rows = list(
+            self._session.execute(query.order_by(PaymentOrder.id).limit(limit + 1)).scalars()
+        )
+        next_cursor = rows[limit - 1].id if len(rows) > limit else None
+        return rows[:limit], next_cursor
+
     def expire_stale(self, studio_id: uuid.UUID, *, at: datetime) -> list[PaymentOrder]:
         """§5.10's "IPN never arrives" row, and the release valve for guard 1.
 

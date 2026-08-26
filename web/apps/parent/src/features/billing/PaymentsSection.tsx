@@ -92,6 +92,7 @@ export function makeParentBillingClient(fetcher: Fetcher): BillingClient {
 export function PaymentsSection({ locale }: { locale: Locale }) {
   const client = useMemo(() => makeParentBillingClient(apiFetch), [])
   const [debts, setDebts] = useState<readonly DebtRow[]>([])
+  const [standingOrder, setStandingOrder] = useState(false)
   const [loaded, setLoaded] = useState(false)
   // Bumped to re-read after an order opens. A counter rather than calling the loader
   // directly, so there is exactly one place that writes `debts` — `react-hooks`'
@@ -102,8 +103,17 @@ export function PaymentsSection({ locale }: { locale: Locale }) {
   useEffect(() => {
     let alive = true
     void (async () => {
-      const charges = await client.openCharges('')
+      const [charges, mandate] = await Promise.all([
+        client.openCharges(''),
+        // §5.10's second guard, asked of the person it is a guard for. One request beside
+        // the charges rather than after them: the warning has to be on screen the first
+        // time the card route is, or it is a warning nobody sees before deciding.
+        apiFetch('/api/v1/me/standing-order')
+          .then((r) => (r.ok ? (r.json() as Promise<{ active: boolean }>) : { active: false }))
+          .catch(() => ({ active: false })),
+      ])
       if (!alive) return
+      setStandingOrder(mandate.active)
       setDebts(
         charges.map((charge) => ({
           charge,
@@ -135,10 +145,11 @@ export function PaymentsSection({ locale }: { locale: Locale }) {
       locale={locale}
       client={client}
       debts={debts}
-      // Manager-only reads (`GET /recurring-subscriptions`, `GET /billing/settings`), so
-      // the screen degrades to "no warning, no link, default instructions" rather than
-      // showing a parent a 403. §5.10's warning is a nicety; its absence blocks nothing.
-      hasActiveSubscription={false}
+      hasActiveSubscription={standingOrder}
+      // `GET /billing/settings` is manager-only, so the shared uPay mandate link and the
+      // studio's own cash instructions have no payer-facing source yet. The screen falls
+      // back to the default copy rather than showing a parent a 403; neither blocks a
+      // payment, unlike the three reads that used to.
       standingOrderLink={null}
       cashInstructions={null}
       onOrderOpened={(form) => {

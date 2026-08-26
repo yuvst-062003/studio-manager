@@ -444,6 +444,29 @@ export async function readOrder(
   return manager.send<OrderRow>('get', `/payment-orders/${publicRef}`)
 }
 
+/**
+ * G8's הוראת קבע, recorded by a manager rather than created by us.
+ *
+ * uPay cannot create a per-payer mandate, cannot vary its amount per payer, and its
+ * recurring callbacks carry no customer identifier — so this row is a manager's note that
+ * a family is on the shared link, and nothing more. That is exactly why §5.10 makes the
+ * resulting warning a warning: the record can be stale, and a stale record must not cost a
+ * family the card route.
+ */
+export async function recordStandingOrder(
+  request: APIRequestContext,
+  payerPersonId: string,
+  amountAgorot: number,
+  startDate = '2026-06-01',
+): Promise<void> {
+  const manager = await asPersona(request, 'manager')
+  await manager.send('post', '/recurring-subscriptions', {
+    payer_person_id: payerPersonId,
+    amount_agorot: amountAgorot,
+    start_date: startDate,
+  })
+}
+
 export type RosterEntry = {
   student_id: string
   display_name: string

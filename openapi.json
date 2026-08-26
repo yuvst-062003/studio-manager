@@ -4659,6 +4659,20 @@
         "title": "MeResponse",
         "type": "object"
       },
+      "MyStandingOrderOut": {
+        "description": "Whether §5.10's second double-payment guard applies to the person asking.",
+        "properties": {
+          "active": {
+            "title": "Active",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "active"
+        ],
+        "title": "MyStandingOrderOut",
+        "type": "object"
+      },
       "ParentEventOut": {
         "description": "`12h`'s row: the event, plus this family's own answer for one child.\n\nTwo objects rather than one flattened shape, because the answer is per-child and the\nevent is not -- a family with two children on one competition sees one event and two\nanswers, and flattening would duplicate the event on the screen.",
         "properties": {
@@ -4868,6 +4882,40 @@
           "paid_at"
         ],
         "title": "PaymentOrderOut",
+        "type": "object"
+      },
+      "PaymentOrderPage": {
+        "description": "§7's cursor page, over orders. Same shape as `ChargePage` and `PaymentPage`.",
+        "properties": {
+          "has_more": {
+            "default": false,
+            "title": "Has More",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PaymentOrderOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "PaymentOrderPage",
         "type": "object"
       },
       "PaymentOut": {
@@ -12903,6 +12951,28 @@
         ]
       }
     },
+    "/api/v1/me/standing-order": {
+      "get": {
+        "description": "§5.10's second guard, from the side of the person it is a guard for.\n\n'If the payer has an active recurring_subscription, the credit-card option shows a\nwarning before opening uPay. **A warning, not a block — the parent decides.**' The\nparent could not be told: `GET /recurring-subscriptions` is manager-only, so\n`PaymentsScreen`'s `hasActiveSubscription` had no payer-facing source and the warning\n§5.10 requires was unreachable by the only person it addresses.\n\nA boolean and not the subscription. The screen asks one question, the answer is not\nmoney, and a family's mandate details are the reconciliation queue's business.",
+        "operationId": "my_standing_order_api_v1_me_standing_order_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyStandingOrderOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "My Standing Order",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
     "/api/v1/me/students": {
       "get": {
         "description": "§6.3's home, and L9 verbatim.\n\n**No role dependency**, deliberately. §3.1: \"guardian is not a role\"; §6.1 makes parent\naccess `EXISTS(guardian WHERE person_id = :me)`. `require_roles` here would refuse\nevery guardian in the product and admit every coach with no children.\n\nL8 -- no `is_primary` branch. Every guardian on a student sees the same list.\n\nNot paginated: this is one person's children. G16 is about lists that grow, and a\nfamily that outgrows one page is not a case the product has.",
@@ -13082,6 +13152,83 @@
       }
     },
     "/api/v1/payment-orders": {
+      "get": {
+        "description": "§5.10's alert centre asks two questions about orders and had no way to ask either.\n\n'On a mismatch a high-priority manager alert is raised', and the last threat row is\n'nightly job flags orders `pending` for more than 24h'. Both are counts over\n`payment_order`, and §7 exposed only `POST /payment-orders` and\n`GET /payment-orders/{public_ref}` — so `DebtAlert` shipped with `amountMismatches` and\n`staleOrders` props that nothing in the product could fill.\n\nManager-or-owner, and deliberately not `coach`-tagged: §3.2 gives a coach no financial\nread, and invariant 3 enforces that against the tag.",
+        "operationId": "list_payment_orders_api_v1_payment_orders_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "After"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentOrderPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Payment Orders",
+        "tags": [
+          "billing"
+        ]
+      },
       "post": {
         "description": "§5.10 step 1. **The payer is always the caller** and never a field in the body.\n\n`PaymentOrderCreateIn` carries only `charge_ids`, and that is the contract shape making\nthe decision: an order is created by the person who is about to stand in front of uPay's\nhosted page with their own card. A manager settling a family's debt uses\n`POST /payments`, which is the flow for money that arrives by every other route.\n\nTaking the payer from the request rather than the body also closes the obvious hole --\na body-supplied payer would let anyone open an order over anyone's charges.\n\n**`max_payments` is a query parameter, not a body field**, because\n`PaymentOrderCreateIn` is W4's contract shape and carries only `charge_ids`. `1b` draws\nan instalments chip group, so the count has to reach the server somehow; widening a\nshape another wave authored is the one way it must not. Capped at `MAX_INSTALLMENTS`\nhere and again in `OrderService.create`, because the dashboard's dropdown stops at 12\nand behaviour above it was never tested against this account.",
         "operationId": "create_payment_order_api_v1_payment_orders_post",

@@ -1303,6 +1303,35 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/standing-order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Standing Order
+         * @description §5.10's second guard, from the side of the person it is a guard for.
+         *
+         *     'If the payer has an active recurring_subscription, the credit-card option shows a
+         *     warning before opening uPay. **A warning, not a block — the parent decides.**' The
+         *     parent could not be told: `GET /recurring-subscriptions` is manager-only, so
+         *     `PaymentsScreen`'s `hasActiveSubscription` had no payer-facing source and the warning
+         *     §5.10 requires was unreachable by the only person it addresses.
+         *
+         *     A boolean and not the subscription. The screen asks one question, the answer is not
+         *     money, and a family's mandate details are the reconciliation queue's business.
+         */
+        get: operations["my_standing_order_api_v1_me_standing_order_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/students": {
         parameters: {
             query?: never;
@@ -1399,7 +1428,20 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * List Payment Orders
+         * @description §5.10's alert centre asks two questions about orders and had no way to ask either.
+         *
+         *     'On a mismatch a high-priority manager alert is raised', and the last threat row is
+         *     'nightly job flags orders `pending` for more than 24h'. Both are counts over
+         *     `payment_order`, and §7 exposed only `POST /payment-orders` and
+         *     `GET /payment-orders/{public_ref}` — so `DebtAlert` shipped with `amountMismatches` and
+         *     `staleOrders` props that nothing in the product could fill.
+         *
+         *     Manager-or-owner, and deliberately not `coach`-tagged: §3.2 gives a coach no financial
+         *     read, and invariant 3 enforces that against the tag.
+         */
+        get: operations["list_payment_orders_api_v1_payment_orders_get"];
         put?: never;
         /**
          * Create Payment Order
@@ -4972,6 +5014,14 @@ export interface components {
             studios: components["schemas"]["StudioMembershipOut"][];
         };
         /**
+         * MyStandingOrderOut
+         * @description Whether §5.10's second double-payment guard applies to the person asking.
+         */
+        MyStandingOrderOut: {
+            /** Active */
+            active: boolean;
+        };
+        /**
          * ParentEventOut
          * @description `12h`'s row: the event, plus this family's own answer for one child.
          *
@@ -5092,6 +5142,21 @@ export interface components {
              * @enum {string}
              */
             status: "pending" | "paid" | "failed" | "amount_mismatch" | "expired";
+        };
+        /**
+         * PaymentOrderPage
+         * @description §7's cursor page, over orders. Same shape as `ChargePage` and `PaymentPage`.
+         */
+        PaymentOrderPage: {
+            /**
+             * Has More
+             * @default false
+             */
+            has_more: boolean;
+            /** Items */
+            items: components["schemas"]["PaymentOrderOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
         };
         /**
          * PaymentOut
@@ -9199,6 +9264,26 @@ export interface operations {
             };
         };
     };
+    my_standing_order_api_v1_me_standing_order_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyStandingOrderOut"];
+                };
+            };
+        };
+    };
     my_students_api_v1_me_students_get: {
         parameters: {
             query?: never;
@@ -9304,6 +9389,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PaymentCompleteOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_payment_orders_api_v1_payment_orders_get: {
+        parameters: {
+            query?: {
+                status?: string | null;
+                after?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentOrderPage"];
                 };
             };
             /** @description Validation Error */
