@@ -49,6 +49,7 @@ from app.services.comms.errors import (
     TransactionalKindError,
     UnknownPreferenceGroupError,
 )
+from app.services.comms.install import InstallStateService
 from app.services.comms.notifications import DeliveryReporter, NotificationReader
 from app.services.comms.preferences import NotificationPreferenceService
 from app.services.comms.push import PushTokenService
@@ -411,6 +412,47 @@ def resend_announcement(
     except AnnouncementNotFoundError as exc:
         raise _not_found(exc) from exc
     return ResendOut(retried_count=DeliveryReporter(session).retry_failed(announcement_id))
+
+
+# -- §6.5's install-state report ----------------------------------------------
+class InstallStateRowOut(BaseModel):
+    person_id: uuid.UUID
+    name: str
+    phone: str | None = None
+
+
+class InstallStateOut(BaseModel):
+    """Who can receive a push at all, and the list to phone.
+
+    Sits beside §5.11's delivery report on the dashboard because they answer two halves of
+    one question, and this is the fixable half: a family here will be on every delivery
+    report until somebody calls them.
+    """
+
+    installed_count: int
+    not_installed_count: int
+    by_platform: dict[str, int]
+    not_installed: list[InstallStateRowOut]
+
+
+@router.get("/comms/install-state", response_model=InstallStateOut)
+def install_state(session: TenantSessionDep, _: ManagerOnly) -> InstallStateOut:
+    """§6.5 -- "The dashboard lists guardians who have not installed, alongside the
+    push-delivery report, so the office can see exactly who it needs to call."
+
+    `ManagerOnly` for the same reason the delivery report is: it is a list of families' names
+    and telephone numbers.
+    """
+    state = InstallStateService(session).report()
+    return InstallStateOut(
+        installed_count=state.installed_count,
+        not_installed_count=state.not_installed_count,
+        by_platform=state.by_platform,
+        not_installed=[
+            InstallStateRowOut(person_id=row.person_id, name=row.name, phone=row.phone)
+            for row in state.not_installed
+        ],
+    )
 
 
 # -- §5.11's inbox ------------------------------------------------------------
