@@ -155,6 +155,63 @@ case "$V" in
     # as a claim on a directory M5's offline work sits next to.
     core_dirs=()
     ;;
+  billing)
+    # There is no app/routers/billing.py, so the default branch's `app/routers/$V.py`
+    # resolves NOTHING -- and the gates below would then report a green this lane never
+    # earned, over the four paths that matter most in it. SPEC §7 spreads M6 across
+    # routers named for their endpoints, and two of those four paths are not routers:
+    #
+    #   webhooks.py       the IPN endpoint. §12: the IPN carries NO cryptographic
+    #                     signature, which makes this the highest-stakes file in the
+    #                     product. It is the one file a silently-green gate must never
+    #                     cover.
+    #   payments.py       the parent-facing pay flow.
+    #   workers/billing.py  the monthly run -- invariant 5's subject. Same reasoning as
+    #                     `people`'s followups.py and `health`'s health_reminders.py: a
+    #                     job outside every lane's check is a job nothing type-checks.
+    #   integrations/upay the provider boundary. Named as a DIRECTORY, not a `**` glob:
+    #                     `-e` tests it directly, mypy and ruff both recurse into it, and
+    #                     bash 3.2 has no globstar to expand a glob with.
+    #
+    # app/routers/billing.py is listed even though it does not exist yet -- the plan gives
+    # it to this lane, and the `-e` filter below drops it until lane MONEY creates it.
+    # Same for payments.py, webhooks.py and workers/billing.py. Listing them now is the
+    # point: the day they appear, the gate reaches them without anyone remembering to.
+    py_candidates=("app/services/$V" "app/routers/billing.py" "app/routers/payments.py" \
+                   "app/routers/webhooks.py" "app/workers/billing.py" \
+                   "app/integrations/upay" "app/models/$V.py")
+    # tests/upay already exists and already covers app/integrations/upay/callback.py. A
+    # test directory over this lane's code that no lane's check runs is the same silent
+    # gap as an unreached source file, in the other direction.
+    test_candidates=("tests/$V" tests/upay)
+    # This lane owns nothing under web/packages/core -- `attendance` owns the only piece
+    # of it in the plan. Said out loud rather than left to the default, which would have
+    # the CSS gate glob packages/core/src/billing/ and read as a claim on a directory M6
+    # has no business in.
+    core_dirs=()
+    ;;
+  events|belts)
+    # These two happen to match the default branch exactly. They are written out anyway,
+    # for the same reason `health` writes out `core_dirs=()`: what a lane's gate covers
+    # should be a statement someone made, not an accident of a default that would change
+    # silently if the default changed.
+    #
+    # Lane EVENTS owns BOTH verticals and runs both checks (§W4: `lane-check.sh events &&
+    # lane-check.sh belts`), so neither branch claims the other's paths.
+    py_candidates=("app/services/$V" "app/routers/$V.py" "app/models/$V.py")
+    test_candidates=("tests/$V")
+    # Neither owns anything under web/packages/core -- `attendance` owns the only piece of
+    # it in the plan. Said out loud rather than left to the default, which would have the
+    # CSS gate glob packages/core/src/{events,belts}/ and read as a claim on a directory
+    # that will never exist.
+    core_dirs=()
+    # `belts` has no i18n namespace of its own, deliberately: belt strings live in
+    # events.ts. Seam 3 exists so two LANES never touch one file, and these two verticals
+    # are one lane, so a second namespace buys no isolation while costing an edit to
+    # web/packages/i18n/types.ts AND index.ts -- both authored once, never by a lane. The
+    # i18n gate below therefore takes its "checking all nine" arm for `belts`, which is
+    # strictly stronger than checking one.
+    ;;
   *)
     py_candidates=("app/services/$V" "app/routers/$V.py" "app/models/$V.py")
     test_candidates=("tests/$V")
