@@ -51,6 +51,21 @@
         "title": "Body_upload_logo_api_v1_studio_logo_post",
         "type": "object"
       },
+      "Body_upload_source_pdf_api_v1_health_templates__template_id__source_pdf_post": {
+        "properties": {
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "description": "The studio's own declaration, as a PDF.",
+            "title": "File",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_upload_source_pdf_api_v1_health_templates__template_id__source_pdf_post",
+        "type": "object"
+      },
       "CallbackRequest": {
         "properties": {
           "code": {
@@ -1232,6 +1247,261 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
+      "HealthDeclarationFullOut": {
+        "description": "**Manager and owner only, and every read is audit-logged** (§4.3, §11.2).\n\nSeparate from `HealthDeclarationOut` by inheritance so it cannot drift: adding a field\nto the coach-safe shape adds it here too, and adding one here never leaks downward.",
+        "properties": {
+          "answers": {
+            "additionalProperties": true,
+            "title": "Answers",
+            "type": "object"
+          },
+          "derived_flags": {
+            "additionalProperties": {
+              "type": "boolean"
+            },
+            "title": "Derived Flags",
+            "type": "object"
+          },
+          "has_signature": {
+            "default": false,
+            "title": "Has Signature",
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "pdf_object_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pdf Object Key"
+          },
+          "signed_at": {
+            "format": "date-time",
+            "title": "Signed At",
+            "type": "string"
+          },
+          "signed_by_person_id": {
+            "format": "uuid",
+            "title": "Signed By Person Id",
+            "type": "string"
+          },
+          "signed_ip": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signed Ip"
+          },
+          "signed_user_agent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signed User Agent"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          },
+          "template_version": {
+            "title": "Template Version",
+            "type": "integer"
+          },
+          "valid_until": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid Until"
+          }
+        },
+        "required": [
+          "id",
+          "student_id",
+          "template_version",
+          "signed_at",
+          "answers",
+          "signed_by_person_id"
+        ],
+        "title": "HealthDeclarationFullOut",
+        "type": "object"
+      },
+      "HealthDeclarationIn": {
+        "description": "What a parent submits (parent `12c` הצהרת בריאות — מילוי וחתימה).\n\nThe answers arrive in the clear over TLS and are encrypted before they hit the\ndatabase (§11.1). They are never logged on the way through (G7) — the M0 scrubber\ncovers serialization, and a reviewer checks the call sites.",
+        "properties": {
+          "answers": {
+            "additionalProperties": true,
+            "title": "Answers",
+            "type": "object"
+          },
+          "signature_image_base64": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signature Image Base64"
+          },
+          "template_id": {
+            "format": "uuid",
+            "title": "Template Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "template_id",
+          "answers"
+        ],
+        "title": "HealthDeclarationIn",
+        "type": "object"
+      },
+      "HealthDeclarationOut": {
+        "description": "**The coach-safe projection.** Flags, no answers. See the module docstring.",
+        "properties": {
+          "derived_flags": {
+            "additionalProperties": {
+              "type": "boolean"
+            },
+            "title": "Derived Flags",
+            "type": "object"
+          },
+          "has_signature": {
+            "default": false,
+            "title": "Has Signature",
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "pdf_object_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pdf Object Key"
+          },
+          "signed_at": {
+            "format": "date-time",
+            "title": "Signed At",
+            "type": "string"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          },
+          "template_version": {
+            "title": "Template Version",
+            "type": "integer"
+          },
+          "valid_until": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid Until"
+          }
+        },
+        "required": [
+          "id",
+          "student_id",
+          "template_version",
+          "signed_at"
+        ],
+        "title": "HealthDeclarationOut",
+        "type": "object"
+      },
+      "HealthFormTemplateOut": {
+        "description": "The questions, never the answers. Nothing in this shape is personal data.",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "pattern": "^(full|trial)$",
+            "title": "Kind",
+            "type": "string"
+          },
+          "published_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published At"
+          },
+          "schema": {
+            "additionalProperties": true,
+            "title": "Schema",
+            "type": "object"
+          },
+          "source_pdf_object_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Pdf Object Key"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "version",
+          "schema"
+        ],
+        "title": "HealthFormTemplateOut",
+        "type": "object"
+      },
       "HealthResponse": {
         "properties": {
           "env": {
@@ -1274,6 +1544,48 @@
         "title": "HealthResponse",
         "type": "object"
       },
+      "HealthStatusSummaryOut": {
+        "description": "Dashboard `4e` מסמכים והצהרות — 'what is missing, from whom'.\n\nCounts and names, no contents. A manager chasing missing declarations needs to know\n*who*, and nothing about what any of the completed ones say.",
+        "properties": {
+          "health_status": {
+            "enum": [
+              "missing",
+              "trial_signed",
+              "signed"
+            ],
+            "title": "Health Status",
+            "type": "string"
+          },
+          "last_reminder_sent_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Reminder Sent At"
+          },
+          "student_display_name": {
+            "title": "Student Display Name",
+            "type": "string"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "student_id",
+          "student_display_name",
+          "health_status"
+        ],
+        "title": "HealthStatusSummaryOut",
+        "type": "object"
+      },
       "HealthTemplateListResponse": {
         "properties": {
           "items": {
@@ -1313,6 +1625,39 @@
           "version"
         ],
         "title": "HealthTemplateOut",
+        "type": "object"
+      },
+      "HealthTemplatePublishedOut": {
+        "description": "A publish reports the roster it just re-derived.\n\nFlags are a function of (answers, template version), so publishing invalidates every\ndeclaration's flags and `recompute_derived_flags` fixes them. Reporting the count is the same\nreasoning `app/workers/followups.py` applies to its undeliverable tally: a publish that said\nnothing about the roster it touched would look identical to one that fixed nothing.",
+        "properties": {
+          "declarations_recomputed": {
+            "title": "Declarations Recomputed",
+            "type": "integer"
+          },
+          "template": {
+            "$ref": "#/components/schemas/HealthFormTemplateOut"
+          }
+        },
+        "required": [
+          "template",
+          "declarations_recomputed"
+        ],
+        "title": "HealthTemplatePublishedOut",
+        "type": "object"
+      },
+      "HealthTemplateSchemaIn": {
+        "description": "The questions, and only the questions.\n\n`version` and `kind` are deliberately absent: a client that could set its own version could\ncollide with a published one, and the partial unique index would turn a manager's edit into\nan integrity error they cannot act on. The service takes both from the row.",
+        "properties": {
+          "schema": {
+            "additionalProperties": true,
+            "title": "Schema",
+            "type": "object"
+          }
+        },
+        "required": [
+          "schema"
+        ],
+        "title": "HealthTemplateSchemaIn",
         "type": "object"
       },
       "HolidayPresetOut": {
@@ -5956,6 +6301,72 @@
         ]
       }
     },
+    "/api/v1/health-declarations/summary": {
+      "get": {
+        "description": "Dashboard `4e` — §5.5's 'the manager dashboard lists every student missing one'.\n\n**No medical content on this response.** Names, statuses and when the parent was last chased;\nnot one flag and not one answer. That is why it needs no audit row: nothing medical is\ndisclosed by it.",
+        "operationId": "status_summary_api_v1_health_declarations_summary_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 200,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/HealthStatusSummaryOut"
+                  },
+                  "title": "Response Status Summary Api V1 Health Declarations Summary Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Status Summary",
+        "tags": [
+          "health"
+        ]
+      }
+    },
     "/api/v1/health-templates": {
       "get": {
         "description": "Conflict C3's read side, so M3 can find the trial template it must present.\n\nManager and owner only: §3.2 gives 'Read full health declaration' to those two, and\n§6.4 puts the template editor on the manager dashboard. A coach has no business here\n-- they see `derived_flags` and nothing else (§5.5).",
@@ -6003,6 +6414,200 @@
         "summary": "List Health Templates",
         "tags": [
           "structure"
+        ]
+      }
+    },
+    "/api/v1/health-templates/{template_id}": {
+      "get": {
+        "description": "One template **including its questions**, which the editor cannot work without.\n\nAdditive rather than a change to the list route. `GET /health-templates` lives in\napp/routers/structure.py (M1, conflict C3) and its `HealthTemplateOut` carries `id`, `kind`\nand `version` and nothing else -- deliberately, because M1 owned a file that must never be\nable to hold an answer. Widening it would be an OpenAPI-visible change to a generated,\ncommitted client for the benefit of one screen; a new route beside it is neither.\n\nManager and owner only, matching the list route. A coach sees `derived_flags` (§5.5).",
+        "operationId": "read_health_template_api_v1_health_templates__template_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "template_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Template Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthFormTemplateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Health Template",
+        "tags": [
+          "health"
+        ]
+      },
+      "put": {
+        "description": "D11 — 'a manager can add, remove and reword questions.'\n\n**The row that changes is the studio's draft, which may not be the row named in the path.**\n`template_id` names the version being revised; a published version is never edited in place,\nbecause a declaration signed against it records that version number and would silently come\nto mean something else. The response carries the id that actually moved.\n\nNothing a parent signs and nothing a coach sees moves until `POST …/publish`.",
+        "operationId": "edit_health_template_api_v1_health_templates__template_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "template_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Template Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HealthTemplateSchemaIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthFormTemplateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Edit Health Template",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/api/v1/health-templates/{template_id}/publish": {
+      "post": {
+        "description": "201 Created: a publish turns the draft into a new live version — `version + 1`.\n\nPublishing with no draft is a 409, not a silent success. Re-stamping the live version would\ntell a manager their unsaved edits went out.",
+        "operationId": "publish_health_template_api_v1_health_templates__template_id__publish_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "template_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Template Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthTemplatePublishedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Publish Health Template",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/api/v1/health-templates/{template_id}/source-pdf": {
+      "post": {
+        "description": "D11 — the studio's own PDF, kept 'for reference'.\n\n**Nothing parses it back into a question set.** D11 rejected \"sign the PDF\" outright: a\nsignature over an image yields no `derived_flags`, so a coach gets no ⚠ and reading anything\nat all would mean opening the full medical record — the exact opposite of §11.1 and §11.2.",
+        "operationId": "upload_source_pdf_api_v1_health_templates__template_id__source_pdf_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "template_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Template Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_source_pdf_api_v1_health_templates__template_id__source_pdf_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthFormTemplateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Upload Source Pdf",
+        "tags": [
+          "health"
         ]
       }
     },
@@ -8200,6 +8805,236 @@
         "summary": "Set Primary Guardian",
         "tags": [
           "people"
+        ]
+      }
+    },
+    "/api/v1/students/{student_id}/health-declaration": {
+      "get": {
+        "description": "**Flags, never answers** (§5.5). Any staff role, or a guardian of this student.\n\nEvery staff role reaches it because §5.5's whole point is that a coach is *warned*: a roster\nthat could not render the ⚠ would be enforcing a rule about the full record by breaking the\nwarning. No audit row: a chip on a roster is not a read of the declaration, and logging it\nwould put one row per render per coach into an append-only table, drowning the reads §11.2\nexists to surface.",
+        "operationId": "read_declaration_api_v1_students__student_id__health_declaration_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthDeclarationOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Declaration",
+        "tags": [
+          "health"
+        ]
+      },
+      "post": {
+        "description": "A guardian of this student, or a manager/owner filing it on their behalf (§5.1).\n\nA coach is refused: §3.2 gives them no write on a health declaration at all, and a coach who\ncould file one could file one that raises no flags.\n\nThe response is the **coach-safe** shape even for the parent who just typed the answers. There\nis no caller who needs them echoed back, and a shape that returned them would be a shape one\nreuse away from a roster.",
+        "operationId": "submit_declaration_api_v1_students__student_id__health_declaration_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HealthDeclarationIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthDeclarationOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Submit Declaration",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/api/v1/students/{student_id}/health-declaration/full": {
+      "get": {
+        "description": "**Manager and owner only, and every read is audit-logged** (§4.3, §11.2).\n\nThe audit row is written by the service, not here — see its docstring. The commit is here\nbecause the router owns the transaction, and it is the reason a read endpoint commits at all.",
+        "operationId": "read_declaration_full_api_v1_students__student_id__health_declaration_full_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthDeclarationFullOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Declaration Full",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/api/v1/students/{student_id}/health-declaration/pdf": {
+      "get": {
+        "description": "§5.5 — 'downloadable by the guardian and by managers.'\n\n**Exactly those two, and a coach is refused.** The file is the full record: every answer, laid\nout and legible. §11.7 forbids a public bucket and §11.1 does not reach object storage, so the\nbytes are served through the API and authorised per request rather than behind a URL that is a\ncapability once it leaks.\n\nA manager's download is logged as a `read_full`, because it is one — the same answers by a\ndifferent route, and an audit trail that missed it would answer \"who has seen my child's\nmedical information\" wrongly. A guardian reading their own child's record is not logged: §11.2\nlists the reads it wants and a parent reading about their own child is not among them.",
+        "operationId": "download_declaration_pdf_api_v1_students__student_id__health_declaration_pdf_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Download Declaration Pdf",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/api/v1/students/{student_id}/health-declaration/reminder": {
+      "post": {
+        "description": "§5.5's one-tap `שלח תזכורת להורה`, which lives on a coach's roster.\n\nEvery staff role, because the roster is where it is pressed. 202 rather than 200: the message\ngoes through W5's notification seam, which does not exist yet — the ledger entry is written\neither way, and a 200 would claim a delivery nobody can make.",
+        "operationId": "send_reminder_api_v1_students__student_id__health_declaration_reminder_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Send Reminder Api V1 Students  Student Id  Health Declaration Reminder Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Send Reminder",
+        "tags": [
+          "health"
         ]
       }
     },

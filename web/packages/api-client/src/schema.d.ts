@@ -407,6 +407,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/health-declarations/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Status Summary
+         * @description Dashboard `4e` — §5.5's 'the manager dashboard lists every student missing one'.
+         *
+         *     **No medical content on this response.** Names, statuses and when the parent was last chased;
+         *     not one flag and not one answer. That is why it needs no audit row: nothing medical is
+         *     disclosed by it.
+         */
+        get: operations["status_summary_api_v1_health_declarations_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/health-templates": {
         parameters: {
             query?: never;
@@ -425,6 +449,92 @@ export interface paths {
         get: operations["list_health_templates_api_v1_health_templates_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/health-templates/{template_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Health Template
+         * @description One template **including its questions**, which the editor cannot work without.
+         *
+         *     Additive rather than a change to the list route. `GET /health-templates` lives in
+         *     app/routers/structure.py (M1, conflict C3) and its `HealthTemplateOut` carries `id`, `kind`
+         *     and `version` and nothing else -- deliberately, because M1 owned a file that must never be
+         *     able to hold an answer. Widening it would be an OpenAPI-visible change to a generated,
+         *     committed client for the benefit of one screen; a new route beside it is neither.
+         *
+         *     Manager and owner only, matching the list route. A coach sees `derived_flags` (§5.5).
+         */
+        get: operations["read_health_template_api_v1_health_templates__template_id__get"];
+        /**
+         * Edit Health Template
+         * @description D11 — 'a manager can add, remove and reword questions.'
+         *
+         *     **The row that changes is the studio's draft, which may not be the row named in the path.**
+         *     `template_id` names the version being revised; a published version is never edited in place,
+         *     because a declaration signed against it records that version number and would silently come
+         *     to mean something else. The response carries the id that actually moved.
+         *
+         *     Nothing a parent signs and nothing a coach sees moves until `POST …/publish`.
+         */
+        put: operations["edit_health_template_api_v1_health_templates__template_id__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/health-templates/{template_id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Publish Health Template
+         * @description 201 Created: a publish turns the draft into a new live version — `version + 1`.
+         *
+         *     Publishing with no draft is a 409, not a silent success. Re-stamping the live version would
+         *     tell a manager their unsaved edits went out.
+         */
+        post: operations["publish_health_template_api_v1_health_templates__template_id__publish_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/health-templates/{template_id}/source-pdf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload Source Pdf
+         * @description D11 — the studio's own PDF, kept 'for reference'.
+         *
+         *     **Nothing parses it back into a question set.** D11 rejected "sign the PDF" outright: a
+         *     signature over an image yields no `derived_flags`, so a coach gets no ⚠ and reading anything
+         *     at all would mean opening the full medical record — the exact opposite of §11.1 and §11.2.
+         */
+        post: operations["upload_source_pdf_api_v1_health_templates__template_id__source_pdf_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1070,6 +1180,120 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/students/{student_id}/health-declaration": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Declaration
+         * @description **Flags, never answers** (§5.5). Any staff role, or a guardian of this student.
+         *
+         *     Every staff role reaches it because §5.5's whole point is that a coach is *warned*: a roster
+         *     that could not render the ⚠ would be enforcing a rule about the full record by breaking the
+         *     warning. No audit row: a chip on a roster is not a read of the declaration, and logging it
+         *     would put one row per render per coach into an append-only table, drowning the reads §11.2
+         *     exists to surface.
+         */
+        get: operations["read_declaration_api_v1_students__student_id__health_declaration_get"];
+        put?: never;
+        /**
+         * Submit Declaration
+         * @description A guardian of this student, or a manager/owner filing it on their behalf (§5.1).
+         *
+         *     A coach is refused: §3.2 gives them no write on a health declaration at all, and a coach who
+         *     could file one could file one that raises no flags.
+         *
+         *     The response is the **coach-safe** shape even for the parent who just typed the answers. There
+         *     is no caller who needs them echoed back, and a shape that returned them would be a shape one
+         *     reuse away from a roster.
+         */
+        post: operations["submit_declaration_api_v1_students__student_id__health_declaration_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/students/{student_id}/health-declaration/full": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Declaration Full
+         * @description **Manager and owner only, and every read is audit-logged** (§4.3, §11.2).
+         *
+         *     The audit row is written by the service, not here — see its docstring. The commit is here
+         *     because the router owns the transaction, and it is the reason a read endpoint commits at all.
+         */
+        get: operations["read_declaration_full_api_v1_students__student_id__health_declaration_full_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/students/{student_id}/health-declaration/pdf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download Declaration Pdf
+         * @description §5.5 — 'downloadable by the guardian and by managers.'
+         *
+         *     **Exactly those two, and a coach is refused.** The file is the full record: every answer, laid
+         *     out and legible. §11.7 forbids a public bucket and §11.1 does not reach object storage, so the
+         *     bytes are served through the API and authorised per request rather than behind a URL that is a
+         *     capability once it leaks.
+         *
+         *     A manager's download is logged as a `read_full`, because it is one — the same answers by a
+         *     different route, and an audit trail that missed it would answer "who has seen my child's
+         *     medical information" wrongly. A guardian reading their own child's record is not logged: §11.2
+         *     lists the reads it wants and a parent reading about their own child is not among them.
+         */
+        get: operations["download_declaration_pdf_api_v1_students__student_id__health_declaration_pdf_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/students/{student_id}/health-declaration/reminder": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send Reminder
+         * @description §5.5's one-tap `שלח תזכורת להורה`, which lives on a coach's roster.
+         *
+         *     Every staff role, because the roster is where it is pressed. 202 rather than 200: the message
+         *     goes through W5's notification seam, which does not exist yet — the ledger entry is written
+         *     either way, and a 200 would claim a delivery nobody can make.
+         */
+        post: operations["send_reminder_api_v1_students__student_id__health_declaration_reminder_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/students/{student_id}/leave": {
         parameters: {
             query?: never;
@@ -1408,6 +1632,14 @@ export interface components {
             /**
              * File
              * @description PNG, JPEG or WebP. Never SVG.
+             */
+            file: string;
+        };
+        /** Body_upload_source_pdf_api_v1_health_templates__template_id__source_pdf_post */
+        Body_upload_source_pdf_api_v1_health_templates__template_id__source_pdf_post: {
+            /**
+             * File
+             * @description The studio's own declaration, as a PDF.
              */
             file: string;
         };
@@ -1902,6 +2134,138 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
+        /**
+         * HealthDeclarationFullOut
+         * @description **Manager and owner only, and every read is audit-logged** (§4.3, §11.2).
+         *
+         *     Separate from `HealthDeclarationOut` by inheritance so it cannot drift: adding a field
+         *     to the coach-safe shape adds it here too, and adding one here never leaks downward.
+         */
+        HealthDeclarationFullOut: {
+            /** Answers */
+            answers: {
+                [key: string]: unknown;
+            };
+            /** Derived Flags */
+            derived_flags?: {
+                [key: string]: boolean;
+            };
+            /**
+             * Has Signature
+             * @default false
+             */
+            has_signature: boolean;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Pdf Object Key */
+            pdf_object_key?: string | null;
+            /**
+             * Signed At
+             * Format: date-time
+             */
+            signed_at: string;
+            /**
+             * Signed By Person Id
+             * Format: uuid
+             */
+            signed_by_person_id: string;
+            /** Signed Ip */
+            signed_ip?: string | null;
+            /** Signed User Agent */
+            signed_user_agent?: string | null;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+            /** Template Version */
+            template_version: number;
+            /** Valid Until */
+            valid_until?: string | null;
+        };
+        /**
+         * HealthDeclarationIn
+         * @description What a parent submits (parent `12c` הצהרת בריאות — מילוי וחתימה).
+         *
+         *     The answers arrive in the clear over TLS and are encrypted before they hit the
+         *     database (§11.1). They are never logged on the way through (G7) — the M0 scrubber
+         *     covers serialization, and a reviewer checks the call sites.
+         */
+        HealthDeclarationIn: {
+            /** Answers */
+            answers: {
+                [key: string]: unknown;
+            };
+            /** Signature Image Base64 */
+            signature_image_base64?: string | null;
+            /**
+             * Template Id
+             * Format: uuid
+             */
+            template_id: string;
+        };
+        /**
+         * HealthDeclarationOut
+         * @description **The coach-safe projection.** Flags, no answers. See the module docstring.
+         */
+        HealthDeclarationOut: {
+            /** Derived Flags */
+            derived_flags?: {
+                [key: string]: boolean;
+            };
+            /**
+             * Has Signature
+             * @default false
+             */
+            has_signature: boolean;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Pdf Object Key */
+            pdf_object_key?: string | null;
+            /**
+             * Signed At
+             * Format: date-time
+             */
+            signed_at: string;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+            /** Template Version */
+            template_version: number;
+            /** Valid Until */
+            valid_until?: string | null;
+        };
+        /**
+         * HealthFormTemplateOut
+         * @description The questions, never the answers. Nothing in this shape is personal data.
+         */
+        HealthFormTemplateOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Published At */
+            published_at?: string | null;
+            /** Schema */
+            schema: {
+                [key: string]: unknown;
+            };
+            /** Source Pdf Object Key */
+            source_pdf_object_key?: string | null;
+            /** Version */
+            version: number;
+        };
         /** HealthResponse */
         HealthResponse: {
             /**
@@ -1918,6 +2282,29 @@ export interface components {
             started_at: string;
             /** Status */
             status: string;
+        };
+        /**
+         * HealthStatusSummaryOut
+         * @description Dashboard `4e` מסמכים והצהרות — 'what is missing, from whom'.
+         *
+         *     Counts and names, no contents. A manager chasing missing declarations needs to know
+         *     *who*, and nothing about what any of the completed ones say.
+         */
+        HealthStatusSummaryOut: {
+            /**
+             * Health Status
+             * @enum {string}
+             */
+            health_status: "missing" | "trial_signed" | "signed";
+            /** Last Reminder Sent At */
+            last_reminder_sent_at?: string | null;
+            /** Student Display Name */
+            student_display_name: string;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
         };
         /** HealthTemplateListResponse */
         HealthTemplateListResponse: {
@@ -1939,6 +2326,34 @@ export interface components {
             kind: string;
             /** Version */
             version: number;
+        };
+        /**
+         * HealthTemplatePublishedOut
+         * @description A publish reports the roster it just re-derived.
+         *
+         *     Flags are a function of (answers, template version), so publishing invalidates every
+         *     declaration's flags and `recompute_derived_flags` fixes them. Reporting the count is the same
+         *     reasoning `app/workers/followups.py` applies to its undeliverable tally: a publish that said
+         *     nothing about the roster it touched would look identical to one that fixed nothing.
+         */
+        HealthTemplatePublishedOut: {
+            /** Declarations Recomputed */
+            declarations_recomputed: number;
+            template: components["schemas"]["HealthFormTemplateOut"];
+        };
+        /**
+         * HealthTemplateSchemaIn
+         * @description The questions, and only the questions.
+         *
+         *     `version` and `kind` are deliberately absent: a client that could set its own version could
+         *     collide with a published one, and the partial unique index would turn a manager's edit into
+         *     an integrity error they cannot act on. The service takes both from the row.
+         */
+        HealthTemplateSchemaIn: {
+            /** Schema */
+            schema: {
+                [key: string]: unknown;
+            };
         };
         /**
          * HolidayPresetOut
@@ -4167,6 +4582,38 @@ export interface operations {
             };
         };
     };
+    status_summary_api_v1_health_declarations_summary_get: {
+        parameters: {
+            query?: {
+                status?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HealthStatusSummaryOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_health_templates_api_v1_health_templates_get: {
         parameters: {
             query?: {
@@ -4185,6 +4632,138 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthTemplateListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_health_template_api_v1_health_templates__template_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HealthFormTemplateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    edit_health_template_api_v1_health_templates__template_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HealthTemplateSchemaIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HealthFormTemplateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    publish_health_template_api_v1_health_templates__template_id__publish_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HealthTemplatePublishedOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_source_pdf_api_v1_health_templates__template_id__source_pdf_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_source_pdf_api_v1_health_templates__template_id__source_pdf_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HealthFormTemplateOut"];
                 };
             };
             /** @description Validation Error */
@@ -5450,6 +6029,167 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GuardianListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_declaration_api_v1_students__student_id__health_declaration_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HealthDeclarationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    submit_declaration_api_v1_students__student_id__health_declaration_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HealthDeclarationIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HealthDeclarationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_declaration_full_api_v1_students__student_id__health_declaration_full_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HealthDeclarationFullOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    download_declaration_pdf_api_v1_students__student_id__health_declaration_pdf_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    send_reminder_api_v1_students__student_id__health_declaration_reminder_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
                 };
             };
             /** @description Validation Error */
