@@ -162,8 +162,13 @@ waves:
     mode: parallel
     lanes: [HEALTH, ATTENDANCE]
     exit_gate: E2E-2 offline attendance → sync · E2E-1 complete, with health
-    status: pending
-    pieces: []
+    status: active
+    opened: 2026-08-26
+    pieces:
+      - id: W3.0
+        title: Contract commit — revision 0007, the lane gates and the lane fixtures
+        status: shipped
+        on: 2026-08-26
   - id: W4
     milestone: M6 ∥ M7
     title: Money ∥ Events and belts

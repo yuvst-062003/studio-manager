@@ -611,17 +611,26 @@ queuing into the void (§10.2).
 
 ```
 app/models/health.py              app/services/health/**
-app/routers/health.py             app/workers/health_reminders.py
-tests/health/**
+app/routers/health_templates.py   app/routers/health_declarations.py
+app/workers/health_reminders.py   tests/health/**
 web/apps/parent/src/features/health/**
 web/apps/dashboard/src/features/health/**
 web/apps/staff/src/features/health/HealthBadge.tsx    ← registers into 'roster-row'
 web/packages/i18n/{he,en,ru}/health.ts
 ```
 
-**Builds** — `kind='full'` template mapped from the studio's PDF into versioned
-`health_form_template.schema` · declaration flow with a finger-drawn signature · encryption of
-answers and signature image · `derived_flags` · signed-PDF rendering · the parent app gate.
+> **`app/routers/health.py` is not this lane's file**, and the earlier draft of this block
+> said it was. That file is core's liveness probe — `GET /api/v1/health`, asserted by
+> `tests/test_health.py`. §7 puts M4's routes at `/health-templates` and
+> `/students/{id}/health-declaration`, hence the two filenames above; `GET /health-templates`
+> already exists in `app/routers/structure.py` (M1, conflict C3) and this lane adds the write
+> side. W3's contract commit corrected `lane-check.sh` to match: the default branch resolved
+> `app/routers/$V.py` straight onto the liveness probe, and a gate reads as ownership.
+
+**Builds** — the `kind='full'` template **editor** on top of D11's seeded default question
+set, in versioned `health_form_template.schema` · declaration flow with a finger-drawn
+signature · encryption of answers and signature image · `derived_flags` · signed-PDF
+rendering · the parent app gate.
 
 **Invariants:**
 - The gate is a **hard block in the parent app only**. Nothing on the mat is ever blocked —
@@ -646,9 +655,20 @@ answers and signature image · `derived_flags` · signed-PDF rendering · the pa
 
 **Check** — `./scripts/lane-check.sh health`
 
-**Blocked on you** — §15 item 1: the studio's הצהרת בריאות PDF at
-`docs/forms/health-declaration.pdf`. **This is a hard blocker on the whole lane** — the
-template is derived from it. Get it before W3 opens, not during.
+**Not blocked.** §15 item 1 made the studio's own הצהרת בריאות PDF a hard blocker on this
+whole lane, because §5.5 said the template was *"derived from the studio's existing PDF"* and
+there was nothing to derive from. [D11](../design/decisions.md) closed that on 2026-08-24 and
+W3's contract commit acted on it: revision `0007` seeds a standard Israeli sports health
+declaration as the default `full` `health_form_template` question set, for every studio. What
+this lane owns is making it **editable** — a manager adds, removes and rewords questions — and
+accepting the studio's own PDF at `source_pdf_object_key` for reference if they upload one.
+There is no `docs/forms/` directory and there does not need to be.
+
+**Carry D11's caveat into the UI.** A health declaration for minors in an Israeli sports club
+touches insurance and regulatory ground. The bundled set is a **starting point and the app
+must say so** where the manager edits it. `template.disclaimer` is already authored in all
+three locales and the seeded row carries `is_bundled_default`, so the editor can tell whose
+questions it is showing. It is not a compliance artefact and must not be presented as one.
 
 ### Merge & integration
 
