@@ -119,6 +119,5 @@ export const comms: Bundle = {
   'atRisk.noPhone': 'No phone number on file',
   'atRisk.empty': 'No students at risk',
 
-  'delivery.nothingToResend': 'Nothing to retry — call the families listed above',
   'calendar.coachSubtitle': 'The sessions you teach appear in your calendar',
 }

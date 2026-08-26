@@ -155,6 +155,28 @@ describe('the composer (4f)', () => {
     expect(truncateForLockScreen('א'.repeat(80)).endsWith('…')).toBe(true)
   })
 
+  it('confirms a send rather than opening a delivery audit', async () => {
+    // A manager who has just sent a note about a summer BBQ wants confirmation that it went.
+    // A delivery report after every send is a screen people learn to dismiss without reading,
+    // which costs exactly the one case it exists for — a cancellation a couple of hours out.
+    render(
+      <AnnouncementsScreen
+        canPublishStudioWide
+        client={makeClient()}
+        locale="he"
+        scopes={SCOPES}
+      />,
+    )
+    await userEvent.type(screen.getByLabelText(t('he', 'comms.announcement.subject')), 'ביטול')
+    await userEvent.type(screen.getByLabelText(t('he', 'comms.announcement.body')), 'מבוטל')
+    await userEvent.click(
+      screen.getByRole('button', { name: t('he', 'comms.announcement.publish') }),
+    )
+
+    expect(await screen.findByTestId('announcement-sent')).toBeInTheDocument()
+    expect(screen.queryByTestId('delivery-report')).toBeNull()
+  })
+
   it('creates and publishes in one press', async () => {
     const create = vi.fn().mockResolvedValue(ANNOUNCEMENT)
     const publish = vi.fn().mockResolvedValue(ANNOUNCEMENT)
@@ -258,14 +280,28 @@ describe('the delivery report', () => {
     expect(inFlightCount(report({ received_count: 0, missed_count: 0 }))).toBe(24)
   })
 
-  it('says so when a resend has nothing it can retry', async () => {
-    // Only `failed` is retryable. A report of five denials retries nothing, and a button that
-    // claimed otherwise would be lying to a manager in a hurry.
-    const client = makeClient({ resend: vi.fn().mockResolvedValue({ retried_count: 0 }) })
-    render(<DeliveryReport announcement={ANNOUNCEMENT} client={client} locale="he" />)
+  it('offers no resend button, and points at the group instead', async () => {
+    // A decision rather than an omission. Only a `failed` push is retryable at all, and
+    // §5.11's own remedy for a missed one is "the WhatsApp group the club already has" — a
+    // group post reaches all twenty-four families rather than the five this report names, so
+    // a per-family retry solves a problem the group solves better.
+    //
+    // Asserted rather than left true, so the button does not come back as "a small thing".
+    const resend = vi.fn()
+    render(
+      <DeliveryReport announcement={ANNOUNCEMENT} client={makeClient({ resend })} locale="he" />,
+    )
     await screen.findByTestId('delivery-report')
-    await userEvent.click(screen.getByRole('button', { name: t('he', 'comms.delivery.resend') }))
-    expect(await screen.findByTestId('nothing-to-resend')).toBeInTheDocument()
+
+    expect(screen.queryByRole('button', { name: t('he', 'comms.delivery.resend') })).toBeNull()
+    expect(resend).not.toHaveBeenCalled()
+    // What the screen DOES offer: the numbers, and the group.
+    expect(
+      screen.getByRole('button', { name: t('he', 'comms.delivery.copyNumbers') }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('link', { name: t('he', 'comms.delivery.shareToWhatsapp') }),
+    ).toBeInTheDocument()
   })
 
   it('celebrates a clean send rather than showing an empty list', async () => {

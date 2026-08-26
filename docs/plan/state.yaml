@@ -358,6 +358,39 @@ waves:
     status: pending
     pieces: []
 holdbacks:
+  - id: HB-cancel-false-confidence
+    kind: carried
+    title: Cancelling a session in the app may stop a manager doing the thing that actually works
+    why: >-
+      Found while reviewing §5.11's delivery reporting with the product owner, and it is the
+      one failure mode that survived that review.
+
+      A manager cancels a session two hours before it starts. The app reports the message
+      sent. It WAS sent — every family has it in their in-app mailbox, which never fails and
+      never expires. But push is opt-in (§12), so some phones did not ring, and those families
+      will not open the app in the next two hours. They will put their child in the car.
+
+      The risk is not the missed push. It is that the app's confirmation reads as "handled",
+      so the manager does not post in the club's WhatsApp group — which reaches all
+      twenty-four families at once and is what the club did before the app existed. The app
+      would have made the outcome WORSE than no app at all, for that one message type.
+
+      §5.11's answer is a delivery report listing who missed it, with their phone numbers. On
+      review that is the wrong shape for this: a group post reaches everyone, so a list of
+      five numbers solves a problem the group already solves better, and a report that appears
+      after every send is one people learn to dismiss. The report is kept, one click away, for
+      the case where somebody genuinely wants the detail.
+
+      What would close this is one line at the moment of cancelling, on the cancel screen
+      itself, naming how many families the app cannot reach by push. Not a report, not a list
+      — a sentence, at the moment the decision is being made.
+
+      Filed rather than built because `POST /sessions/{id}/cancel` and the screen in front of
+      it belong to the schedule vertical. Lane COMMS owns the number it would display
+      (`GET /comms/install-state` already returns it) and none of the screen.
+    blocks: nothing; it is a product risk rather than a dependency
+    status: open
+    opened: 2026-08-26
   - id: HB-push-transport
     kind: external
     title: There is no FCM transport behind the push port, and no setting to hold a credential

@@ -153,8 +153,7 @@ export const comms: Bundle = {
   'atRisk.noPhone': 'אין מספר טלפון בכרטיס',
   'atRisk.empty': 'אין תלמידים בסיכון',
 
-  // A resend can only retry a send that ERRORED. 'App not installed' and 'notifications
-  // off' are not retryable, and the screen says so rather than offering a dead button.
-  'delivery.nothingToResend': 'אין שליחות לנסות שוב — יש להתקשר למשפחות ברשימה',
+  // §5.12's two feeds carry different things — a parent's children's lessons, a coach's own
+  // sessions — so the panel says which one you are looking at.
   'calendar.coachSubtitle': 'השיעורים שאתם מעבירים יופיעו ביומן שלכם',
 }

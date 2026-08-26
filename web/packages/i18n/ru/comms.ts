@@ -124,6 +124,5 @@ export const comms: Bundle = {
   'atRisk.noPhone': 'Нет номера телефона',
   'atRisk.empty': 'Нет учеников в зоне риска',
 
-  'delivery.nothingToResend': 'Нечего повторять — позвоните семьям из списка выше',
   'calendar.coachSubtitle': 'Занятия, которые вы ведёте, появятся в вашем календаре',
 }

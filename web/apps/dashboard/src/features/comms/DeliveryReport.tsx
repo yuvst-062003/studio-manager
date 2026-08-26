@@ -16,11 +16,18 @@
 // reachable only by telephone. "5 didn't receive it" tells a manager that five children may
 // turn up to a cancelled class without telling them which five.
 //
-// **`[ שלח שוב ]` reports what it actually did.** Only `failed` sends are retryable —
-// `no_token` means there is no device and `denied` means the person said no — so the button
-// returns a count and the screen says `delivery.nothingToResend` when that count is zero. A
-// button that appeared to try would be lying to a manager in a hurry, which is worse than one
-// that says it cannot help.
+// **There is no resend button, and that is a decision rather than an omission.** Only a
+// `failed` push is retryable at all — `no_token` means there is no device and `denied` means
+// the person said no — so the button would frequently do nothing. More to the point, §5.11's
+// own remedy for a missed push is "the WhatsApp group the club already has", and a group post
+// reaches all twenty-four families rather than the five this report names. A per-family retry
+// solves a problem the group solves better. `POST /announcements/{id}/resend` still exists on
+// the API for a `failed` state; nothing on this screen calls it.
+//
+// **This screen is behind a link, not on the page.** The report matters for one case — a
+// cancellation a couple of hours out, where a family who does not know will put their child in
+// the car. For a new event or a belt exam the mailbox is enough on its own, and a delivery
+// report on every send is a screen nobody reads.
 import { useCallback, useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { Alert, Button, Card } from '@studio/ui'
@@ -104,7 +111,6 @@ export function DeliveryReport({
 }) {
   const [report, setReport] = useState<DeliveryReportOut | null>(null)
   const [copied, setCopied] = useState(false)
-  const [retried, setRetried] = useState<number | null>(null)
 
   useEffect(() => {
     let live = true
@@ -124,14 +130,6 @@ export function DeliveryReport({
     else void globalThis.navigator?.clipboard?.writeText(text)
     setCopied(true)
   }, [report, onCopy])
-
-  const resend = useCallback(async () => {
-    const result = await client.resend(announcement.id).catch(() => null)
-    if (!result) return
-    setRetried(result.retried_count)
-    const next = await client.deliveryReport(announcement.id).catch(() => null)
-    if (next) setReport(next)
-  }, [client, announcement.id])
 
   if (!report) return null
 
@@ -181,9 +179,6 @@ export function DeliveryReport({
             <Button variant="secondary" onClick={copy}>
               {t(locale, 'comms.delivery.copyNumbers')}
             </Button>
-            <Button variant="secondary" onClick={() => void resend()}>
-              {t(locale, 'comms.delivery.resend')}
-            </Button>
             {/* §12 — the Groups API caps a group at 8 participants and exposes no endpoint to
                 add one; the unofficial libraries get the number banned. A share-sheet URL is
                 the only viable handoff, and it is deliberately not an integration. */}
@@ -200,11 +195,6 @@ export function DeliveryReport({
           {copied ? (
             <p style={hintStyle} data-testid="numbers-copied">
               {t(locale, 'comms.delivery.numbersCopied')}
-            </p>
-          ) : null}
-          {retried === 0 ? (
-            <p style={hintStyle} data-testid="nothing-to-resend">
-              {t(locale, 'comms.delivery.nothingToResend')}
             </p>
           ) : null}
         </>

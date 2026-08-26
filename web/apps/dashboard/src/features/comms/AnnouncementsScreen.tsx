@@ -103,6 +103,7 @@ export function AnnouncementsScreen({
   // navigated away from can never be read as the current one.
   const [audience, setAudience] = useState<{ scope: string; count: number } | null>(null)
   const [selected, setSelected] = useState<AnnouncementOut | null>(null)
+  const [sent, setSent] = useState(false)
 
   const refresh = useCallback(async () => {
     const page = await client.list().catch(() => null)
@@ -165,8 +166,12 @@ export function AnnouncementsScreen({
     const published = await client.publish(created.id).catch(() => null)
     setTitle('')
     setBody('')
+    setSent(published !== null)
     await refresh()
-    if (published) setSelected(published)
+    // Deliberately does NOT open the delivery report. A manager who has just sent a note
+    // about a summer BBQ wants confirmation that it went, not a delivery audit — and a
+    // report that appears after every send is one people learn to dismiss without reading,
+    // which costs exactly the case it exists for.
   }, [client, title, body, scopeType, scopeId, refresh])
 
   return (
@@ -258,6 +263,11 @@ export function AnnouncementsScreen({
           <Button disabled={!canSend} onClick={() => void send()}>
             {t(locale, 'comms.announcement.publish')}
           </Button>
+          {sent ? (
+            <p style={lineStyle} data-testid="announcement-sent">
+              {t(locale, 'comms.announcement.published')}
+            </p>
+          ) : null}
         </section>
       </Card>
 
@@ -269,6 +279,7 @@ export function AnnouncementsScreen({
       {rows.map((row) => (
         <Card key={row.id}>
           <button
+            disabled={row.published_at === null}
             onClick={() => setSelected(row)}
             style={{
               background: 'none',
@@ -285,9 +296,12 @@ export function AnnouncementsScreen({
           >
             <strong style={lineStyle}>{row.title}</strong>
             <span style={hintStyle}>
+              {/* A draft has nothing to report, so it says so and offers nothing. A published
+                  one names what the click opens rather than leaving the row mysteriously
+                  tappable. */}
               {row.published_at === null
                 ? t(locale, 'comms.announcement.draft')
-                : t(locale, 'comms.announcement.published')}
+                : t(locale, 'comms.delivery.title')}
             </span>
           </button>
         </Card>
