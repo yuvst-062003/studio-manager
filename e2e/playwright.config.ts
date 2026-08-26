@@ -136,6 +136,15 @@ export default defineConfig({
   //: See the module docstring. A flake here is a finding.
   retries: 0,
   fullyParallel: false,
+  //: **One worker, and this is a correctness requirement rather than a preference.**
+  //: `fullyParallel: false` still runs separate FILES concurrently, and every test in this
+  //: suite builds its scenario inside the one demo studio — which holds at most one active
+  //: training year (`uq_training_year_one_active`). Activating a year CLOSES the incumbent,
+  //: and a closed year cannot be reactivated, so two files building scenarios at the same
+  //: time permanently close each other's: the group page then finds the other test's year
+  //: and renders a group with no sessions. Sequential is the only safe arrangement until
+  //: the fixture can have a studio per worker.
+  workers: 1,
   reporter: env.CI ? [['github'], ['html', { open: 'never' }]] : [['list']],
   use: {
     locale: 'he-IL',
