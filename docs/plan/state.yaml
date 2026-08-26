@@ -317,6 +317,25 @@ waves:
           the E2E harness W4 deferred. Lane fixtures are NOT in it; see HB-w5-lane-fixtures.
         status: shipped
         on: 2026-08-26
+      - id: W5.G1
+        title: >-
+          Lane GATES — the E2E fixture: /dev/demo/reset plus /dev/sign-in-as per browser
+          context, and a scenario builder that reaches open tuition charges through the
+          product's own API. Per-project narrowing decided: one project per spec, chosen by
+          whose surface the flow's actor is on, 45 collected runs down to 15.
+        status: shipped
+        on: 2026-08-26
+      - id: W5.G2
+        title: >-
+          Lane GATES — E2E-5 green with no fixme, which is W2's stated exit-gate flow.
+        status: shipped
+        on: 2026-08-26
+      - id: W5.G3
+        title: >-
+          Lane GATES — E2E-1, E2E-2, E2E-3 and E2E-4. Blocked on product defects found by
+          building the harness; see HB-e2e-parent-billing-api, HB-e2e-registration-approval
+          and HB-e2e-demo-reset.
+        status: pending
   - id: W6
     milestone: M10
     title: Rollover and polish
@@ -334,6 +353,157 @@ waves:
     status: pending
     pieces: []
 holdbacks:
+  - id: HB-e2e-demo-reset
+    kind: carried
+    title: POST /dev/demo/reset works once, then 500s for ever
+    why: >-
+      Three decisions meet, each defensible alone. `audit_log` is in `NEVER_WIPED`
+      (app/services/demo/service.py) because it is append-only by grant and §19.4 logs every
+      persona switch to it. `person` IS wiped — the personas layer deletes and recreates the
+      nine rows. And `fk_audit_log_actor_person_id_person` is ON DELETE RESTRICT. So the
+      first audit row carrying an `actor_person_id` pins the person it names, and the next
+      wipe raises RestrictViolation.
+
+      Measured on 2026-08-26 against a running stack, minimally: with an empty `audit_log`
+      the reset answers 200, and answers 200 again with no actions in between; one
+      `POST /locations` (which writes no audit row) leaves it at 200; one `PATCH /studio`
+      (which writes one, with an actor) takes it to 500. Truncating `audit_log` restores it.
+
+      This makes §19.7's "restores the fixture set from a versioned seed" unreachable after
+      a single meaningful use — by a developer pressing the dev bar's reset button as much
+      as by a test. It is also why the E2E suite resets once per run rather than per test,
+      and why `e2e/fixtures/global-setup.ts` clears `audit_log` first and prints a paragraph
+      saying so on every run.
+
+      What closes this: a migration setting `audit_log.actor_person_id` and
+      `.actor_identity_id` to ON DELETE SET NULL, or the wipe nulling them under the
+      migrator role before deleting `person`. Both are outside a lane — `main` owns
+      `alembic/versions/**`. When it lands, delete `clearAuditLog()` from global-setup.ts
+      and the suite can reset per test.
+    blocks: §19.7 · E2E fixture isolation
+    status: open
+    opened: 2026-08-26
+    source: >-
+      app/services/demo/service.py NEVER_WIPED · fk_audit_log_actor_person_id_person ·
+      e2e/fixtures/global-setup.ts
+  - id: HB-e2e-parent-billing-api
+    kind: carried
+    title: The parent app's billing vertical has no parent-reachable API, so `12f` cannot load
+    why: >-
+      Every endpoint `web/apps/parent/src/features/billing/billingClient.ts` calls is
+      declared `ManagerOrOwner` and answers 403 to a parent. Measured as the parent3 persona
+      on 2026-08-26: GET /charges 403, GET /payers/{id}/balance 403, GET /payments 403,
+      GET /products 403. For contrast the parent app's working verticals answer 200 on the
+      `/me/*` shape — /me/students and /me/events — and billing has no /me/charges,
+      /me/balance or /me/payments at all.
+
+      The WRITE side is correct and makes the asymmetry unmistakable: POST /payment-orders
+      answers 201 for a parent and takes the payer from the session rather than the body,
+      exactly as its own docstring intends. So a parent can pay and cannot see what they owe.
+
+      The consequence is that `PaymentsScreen.tsx` — artboard `12f`, the subject of E2E-3
+      and E2E-4 — is not merely unmounted but unmountable: its first fetch 403s, so wiring
+      it into App.tsx would render an error state. E2E-3 is blocked outright.
+
+      Related and smaller, on the same screen: §19.6 says a demo studio "gets no payment
+      form at all, and its payment step renders §19.5's IPN simulator instead". The backend
+      half exists (409 demo_studio_has_no_live_form). `PaymentsScreen.pay()` has no demo
+      branch — it calls client.orderForm(), catches, and renders common.error.generic. The
+      order IS created first, so the ledger half is reachable, but the screen a parent sees
+      after pressing שלם is a generic error.
+
+      What closes this: parent-reachable reads for a payer's own charges, balance and
+      payments. That is W4's design decision, not a gate lane's — the `/me/*` shape the rest
+      of the parent app uses is the obvious candidate.
+    blocks: E2E-3 · W4 exit gate
+    status: open
+    opened: 2026-08-26
+    source: >-
+      app/routers/billing.py list_charges/payer_balance/list_products ·
+      web/apps/parent/src/features/billing/billingClient.ts · SPEC §5.10 · §19.6
+  - id: HB-e2e-registration-approval
+    kind: carried
+    title: Approving a parent-app registration request 500s for any guardian without an email
+    why: >-
+      `RegistrationService.approve` resolves the matched parent and then passes
+      `guardian_email=parent.email` down to `StudentService.create`, commenting "reuse their
+      VERIFIED address so create() links rather than duplicates. §5.4a: No second
+      invitation, no second account, no second login."
+
+      It reuses the wrong column. `match_person` keys on the AuthIdentity's verified address
+      and never on `person.email` — matching.py's own docstring says "person.email alone is
+      therefore never a key". The nine §19.3 personas carry no `person.email` and no phone,
+      so the match returns None, a duplicate parent Person is created, and an invitation is
+      issued with both recipient columns null, violating
+      `ck_invitation_invitation_has_a_recipient`. HTTP 500.
+
+      In the demo studio that is EVERY parent-app registration request, which is every one a
+      developer or an E2E suite can make. It is latent in production too: any matched
+      guardian whose Person row has no address takes the same branch.
+
+      The fix is to pass the matched person's ID rather than re-deriving them from an
+      address. §5.4a's trial booking already does exactly that — `TrialService` attaches
+      `Guardian(person_id=parent.id)` directly — which is why the E2E fixture reaches a
+      guardian link at all.
+    blocks: E2E-1 · §5.4(c)
+    status: open
+    opened: 2026-08-26
+    source: app/services/people/registrations.py approve() · app/services/people/matching.py
+  - id: HB-e2e-stale-seams
+    kind: carried
+    title: Two W2-era seams that M5 and pagination were meant to close, and did not
+    why: >-
+      Found while writing E2E-5. Neither is fatal to a flow, and both are wrong on a real
+      club's screen rather than only on a test's.
+
+      One — `SessionOut.attendance_taken` is hardcoded `False` in
+      `ScheduleService.project_sessions`. Its docstring still reads "attendance_taken is
+      False for every row in W2. The attendance table is W3's and lives in
+      app/models/_pending/ ... M5 fills the field". M5 has landed: `app/models/_pending/` is
+      empty and `app/models/attendance.py` is real, with attendance rows in the database. So
+      the flag is false for every session in the product and no screen can ever show that a
+      register was signed — which §5.14's sessions-held-vs-planned report is about.
+      E2E-5 asserts the register through GET /sessions/{id}/attendance instead.
+
+      Two — `makeScheduleClient().listSessions` sets no `limit` and ignores `next_cursor`.
+      GET /sessions defaults to 50 rows and §16's default training year with two rules a
+      week is about 104, so a group's schedule page renders the first fifty and nothing
+      after: silently, with no count and no "load more". For a year that started last
+      September that is fifty past sessions and no future ones. The E2E fixture works around
+      it by using a five-month training year that fits inside one page, which is recorded in
+      `e2e/fixtures/scenario.ts` as a workaround rather than a design.
+    blocks: nothing outright
+    status: open
+    opened: 2026-08-26
+    source: >-
+      app/services/schedule/service.py project_sessions ·
+      web/apps/dashboard/src/features/schedule/client.ts listSessions
+  - id: HB-e2e-shared-database
+    kind: carried
+    title: The E2E stack, pytest and both lanes share one database, and a lane migrated it
+    why: >-
+      `tests/conftest.py` reads `settings.DATABASE_URL`, so `pytest` runs against the same
+      `studio_manager` database the E2E stack asserts against. A backend test run — this
+      lane's or the other's — writes into the database a live E2E run is reading.
+
+      That became concrete on 2026-08-26. Lane COMMS authored `0010_notification_preference`
+      in its own worktree and applied it to the shared database, which now reports
+      `alembic_version = 0010`. Branch feat/e2e-harness has no such revision, so
+      `alembic upgrade head` from that worktree fails with "Can't locate revision identified
+      by '0010'" and every database-backed pytest errors at the session fixture. The E2E
+      suite is unaffected, because 0010 only adds a table.
+
+      CLAUDE.md already forbids the cause: "`main` owns `alembic/versions/**`. Lanes never
+      run `alembic revision`; one revision per wave lands in the wave's contract commit."
+
+      What closes this: 0010 landing on main so both lanes carry it, and — separately — a
+      database per concern, so an E2E run and a pytest run stop sharing state. The E2E
+      backend already has its own start script; pointing it at its own database is a small
+      change with a large effect.
+    blocks: lane-check.sh on feat/e2e-harness
+    status: open
+    opened: 2026-08-26
+    source: tests/conftest.py · alembic_version · CLAUDE.md §Layout
   - id: HB-w5-lane-fixtures
     kind: carried
     title: W5's lane fixtures (§2.2 item 8) are not written, and both lanes start without them
@@ -428,6 +598,20 @@ holdbacks:
       the mismatches were found. The harness half is done and the remaining half is smaller
       than the original estimate, but it is still its own session — rewriting five spec
       files against a 239-testid vocabulary is not a search and replace.
+
+      AMENDED 2026-08-26 by lane GATES. The fixture and the narrowing are DONE: a scenario
+      builder that reaches open tuition charges through the product's own API,
+      /dev/sign-in-as per browser context, and one project per spec chosen by whose surface
+      the flow's actor is on (45 collected runs down to 15). E2E-5 is green with no fixme.
+
+      The estimate was wrong a second time, and in a more interesting direction. The
+      remaining work is not spec rewriting — it is four product defects that only an E2E
+      gate could have found, each recorded as its own holdback: HB-e2e-demo-reset,
+      HB-e2e-parent-billing-api, HB-e2e-registration-approval and HB-e2e-stale-seams. Both
+      lanes were feature-complete with green unit suites throughout. That is precisely the
+      thing this holdback said an E2E gate is for — "what is unproven is that the two
+      features work TOGETHER through a real browser" — and it turns out they do not, in
+      four places.
     blocks: W3 exit gate
     status: open
     opened: 2026-08-26
@@ -480,6 +664,21 @@ holdbacks:
       sign-in-first booking, the approval queue and the student going active — without the
       health step. W3's own gate already names the complete versions of both flows, so
       these ride in beside them rather than needing a wave of their own.
+
+      AMENDED 2026-08-26 by lane GATES. The E2E-5 half is MET, and as the complete flow
+      rather than a W2 subset: the rule change, the impact preview's three named
+      protections, the parent's calendar and a closure that cancels, all green with no
+      fixme. It did not need the W2/W3 split after all — M5 has landed, so the attendance
+      half is real, and the flow asserts the register through GET /sessions/{id}/attendance
+      rather than through `attendance_taken`, which is still hardcoded false
+      (HB-e2e-stale-seams).
+
+      The E2E-1a half is NOT met and is blocked rather than unwritten:
+      POST /registration-requests/{id}/approve raises a 500 for every guardian without an
+      email on their Person row, which in the demo studio is all of them. See
+      HB-e2e-registration-approval. Writing the spec around it would be writing a test that
+      cannot pass, and un-fixme'ing it would be the permanently red gate this entry already
+      declined once.
     blocks: W3
     status: open
     opened: 2026-08-26
