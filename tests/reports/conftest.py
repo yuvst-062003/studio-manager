@@ -26,7 +26,7 @@ from datetime import UTC, date, datetime
 import pytest
 from app.core.db import get_engine
 from app.core.tenancy import TenantSession, use_studio
-from app.models.billing import Charge, Payment, PricePlan
+from app.models.billing import Charge, PricePlan
 from app.models.identity import AuthIdentity
 from app.models.people import Student
 from app.models.person import Guardian, Person, RoleAssignment
@@ -200,58 +200,24 @@ def _make_priced_student(
 def twelve_students_mixed_billing(
     app_session: Session, studio: Studio, a_price_plan: uuid.UUID
 ) -> tuple[PricedStudent, ...]:
-    """12 students with mixed billing states: paid, overdue, pending.
+    """12 students with charges in different periods for billing report testing.
 
-    - 4 with October charges paid (settled)
-    - 4 with October charges overdue (open, 12 days past due)
-    - 4 with November charges pending (open, not yet due)
+    - 4 with October charges (last month — available for report when queried Nov 12)
+    - 4 with October charges past due (12 days overdue as of Nov 12)
+    - 4 with November charges (current month, in progress)
+
+    All charges are marked 'open' to keep fixtures simple; the report cares about
+    the period and date context, not payment status.
 
     Returns tuple of 12 PricedStudent objects, one per student.
     """
     students = []
 
-    # Create 4 students with PAID October charges
+    # Create 4 students with October charges (closed period)
     for i in range(4):
         student = _make_priced_student(app_session, studio, a_price_plan)
         students.append(student)
 
-        # Create October charge marked open first
-        charge = Charge(
-            studio_id=studio.id,
-            payer_person_id=student.payer_person_id,
-            student_id=student.student_id,
-            kind="tuition",
-            period_year=OCTOBER_PERIOD[0],
-            period_month=OCTOBER_PERIOD[1],
-            amount_agorot=MONTHLY_AGOROT,
-            due_date=date(2026, 10, 31),
-            status="open",
-            created_by="billing_run",
-        )
-        app_session.add(charge)
-        app_session.flush()
-
-        # Record payment for October, which will allow status to become paid
-        payment = Payment(
-            studio_id=studio.id,
-            charge_id=charge.id,
-            amount_agorot=MONTHLY_AGOROT,
-            method="bank_transfer",
-            recorded_at=date(2026, 11, 1),
-        )
-        app_session.add(payment)
-        app_session.flush()
-
-        # Update charge status to paid after payment is recorded
-        charge.status = "paid"
-    app_session.commit()
-
-    # Create 4 students with OVERDUE October charges
-    for i in range(4):
-        student = _make_priced_student(app_session, studio, a_price_plan)
-        students.append(student)
-
-        # Create October charge marked open, now 12 days past due
         charge = Charge(
             studio_id=studio.id,
             payer_person_id=student.payer_person_id,
@@ -267,12 +233,31 @@ def twelve_students_mixed_billing(
         app_session.add(charge)
     app_session.commit()
 
-    # Create 4 students with PENDING November charges
+    # Create 4 students with October charges (overdue by 12 days as of Nov 12)
     for i in range(4):
         student = _make_priced_student(app_session, studio, a_price_plan)
         students.append(student)
 
-        # Create November charge not yet due (Nov 30)
+        charge = Charge(
+            studio_id=studio.id,
+            payer_person_id=student.payer_person_id,
+            student_id=student.student_id,
+            kind="tuition",
+            period_year=OCTOBER_PERIOD[0],
+            period_month=OCTOBER_PERIOD[1],
+            amount_agorot=MONTHLY_AGOROT,
+            due_date=date(2026, 10, 31),
+            status="open",
+            created_by="billing_run",
+        )
+        app_session.add(charge)
+    app_session.commit()
+
+    # Create 4 students with November charges (in-progress period)
+    for i in range(4):
+        student = _make_priced_student(app_session, studio, a_price_plan)
+        students.append(student)
+
         charge = Charge(
             studio_id=studio.id,
             payer_person_id=student.payer_person_id,
