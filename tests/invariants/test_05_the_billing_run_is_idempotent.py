@@ -1,9 +1,10 @@
 """SPEC §13 invariant 5: the billing run is idempotent across repeated executions.
 
-Vacuous until M6 *implements* `BillingService` -- correct and intended. What is *not*
-vacuous is the harness: `assert_idempotent` is unit-tested here against deliberately
-non-idempotent stubs, so when M6 arrives the real assertion is a one-line change to
-something already known to work rather than something written under deadline.
+**Wired to a real run by lane MONEY (M6).** It was vacuous until then -- correct and
+intended -- and what was never vacuous is the harness: `assert_idempotent` was unit-tested
+here against deliberately non-idempotent stubs, so wiring it was a change to something
+already known to work rather than something written under deadline. Those self-tests stay
+below, because the harness is what the real assertion rests on.
 
 **The trigger was corrected in W4's contract commit.** As written, this fired the moment
 `app.services.billing.BillingService` could be imported. Plan §2.2 makes that the wrong
@@ -25,10 +26,21 @@ import ast
 import importlib
 import inspect
 import textwrap
+import uuid
 from collections.abc import Callable
+from datetime import UTC, date, datetime
 from typing import Any
 
 import pytest
+from app.core.tenancy import use_studio
+from app.models.billing import Charge, PricePlan
+from app.models.people import Enrollment, Student
+from app.models.person import Guardian, Person
+from app.models.structure import Class as StudioClass
+from app.models.structure import Group
+from app.models.studio import Studio
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 
 def assert_idempotent(
@@ -87,35 +99,140 @@ def is_still_a_seam(method: Any) -> bool:
     return isinstance(raised, ast.Name) and raised.id == "NotImplementedError"
 
 
-def test_the_billing_run_is_idempotent():
-    service = _billing_service()
-    if service is None:
-        pytest.skip(
-            "app.services.billing.BillingService does not exist yet. This is the one "
-            "invariant that cannot be written before the thing it guards exists; the "
-            "harness is tested below instead."
-        )
-    if is_still_a_seam(service.create_charge):
-        pytest.skip(
-            "BillingService is still W4's empty-bodied seam -- create_charge raises "
-            "NotImplementedError. There is no billing run to assert idempotence over "
-            "until lane MONEY (M6) fills it in."
-        )
-    raise AssertionError(  # pragma: no cover -- reached only once M6 implements the body
-        "BillingService.create_charge has a real body. Wire assert_idempotent() to a real "
-        "run over a seeded period and delete this line."
+#: The period the seeded run bills. Inside the 2026/27 training year the rest of the suite
+#: pins, and deliberately not a month boundary.
+_T0 = datetime(2026, 11, 12, 9, 0, tzinfo=UTC)
+_PERIOD = (2026, 11)
+
+
+def _seed_a_billable_period(session: Session) -> tuple[uuid.UUID, int]:
+    """One studio, one priced student, one active enrollment. Returns (studio_id, charges).
+
+    Seeded here rather than borrowed from `tests/billing/conftest.py`, because this
+    directory runs **unscoped in every lane** -- an invariant that depended on one lane's
+    fixtures would be an invariant only that lane could run.
+
+    Committed rather than flushed: the run opens its own SAVEPOINTs, and a row living only
+    inside an uncommitted transaction is a row the second execution cannot see.
+    """
+    suffix = uuid.uuid4().hex[:8]
+    studio = Studio(name="מועדון חיוב", slug=f"inv5-{suffix}")
+    session.add(studio)
+    session.flush()
+
+    plan = PricePlan(
+        studio_id=studio.id,
+        name="פעמיים בשבוע",
+        sessions_per_week=2,
+        monthly_amount_agorot=25_000,
+        registration_fee_agorot=None,
+        active_from=date(2026, 9, 1),
+    )
+    child = Person(studio_id=studio.id, first_name="ילד", last_name="בודק")
+    payer = Person(studio_id=studio.id, first_name="הורה", last_name="בודק")
+    klass = StudioClass(studio_id=studio.id, name="מתחילים", is_active=True)
+    session.add_all([plan, child, payer, klass])
+    session.flush()
+
+    group = Group(studio_id=studio.id, class_id=klass.id, name="מתחילים א", is_active=True)
+    student = Student(
+        studio_id=studio.id,
+        person_id=child.id,
+        status="active",
+        joined_on=date(2026, 9, 1),
+        price_plan_id=plan.id,
+    )
+    session.add_all([group, student])
+    session.flush()
+    session.add_all(
+        [
+            Guardian(
+                studio_id=studio.id,
+                student_id=student.id,
+                person_id=payer.id,
+                is_primary=True,
+                relation="parent",
+            ),
+            Enrollment(
+                studio_id=studio.id,
+                student_id=student.id,
+                group_id=group.id,
+                status="active",
+                started_on=date(2026, 9, 1),
+            ),
+        ]
+    )
+    session.commit()
+    return studio.id, 1
+
+
+def test_the_billing_run_is_idempotent(app_session):
+    """**Wired by lane MONEY (M6).** Until M6 this skipped, because the seam it guards had
+    no body -- and W4's contract commit corrected the trigger from "the class imports" to
+    "the body is still a stub" so the skip could not silently become permanent.
+
+    Why this one matters more than most: the billing run creates money rows. A run that is
+    not idempotent produces "we charged them twice" in a community where every parent knows
+    every other parent (§8.1a).
+
+    Three executions, snapshotted after **each** -- see the harness's own self-tests below
+    for why after each and not only at the end.
+    """
+    from app.services.billing.run import BillingRunService
+
+    studio_id, expected = _seed_a_billable_period(app_session)
+
+    def run() -> None:
+        with use_studio(studio_id):
+            BillingRunService(app_session).run(
+                studio_id, period_year=_PERIOD[0], period_month=_PERIOD[1], at=_T0
+            )
+        app_session.commit()
+
+    def snapshot() -> list[tuple[Any, ...]]:
+        rows = app_session.execute(
+            select(
+                Charge.kind,
+                Charge.amount_agorot,
+                Charge.period_year,
+                Charge.period_month,
+                Charge.student_id,
+            )
+            .where(Charge.studio_id == studio_id)
+            .order_by(Charge.student_id, Charge.kind)
+        ).all()
+        return [tuple(row) for row in rows]
+
+    assert_idempotent(run, snapshot)
+    assert len(snapshot()) == expected, (
+        "the run produced no charges at all, so idempotence was asserted over nothing"
     )
 
 
 # -- and the seam detector is proven to tell a stub from an implementation ----
-def test_the_seam_detector_recognises_the_contract_stub():
-    """The live case, asserted against the real seam rather than a fixture, so this stops
-    passing the moment M6 writes a body -- which is precisely when the tripwire above must
-    start firing."""
+def test_the_seam_detector_recognises_a_contract_stub():
+    """The live case, asserted against a seam that is **still** a seam.
+
+    This pointed at `BillingService.create_charge` until lane MONEY filled it in -- by
+    design: it was written to stop passing at exactly that moment, which is when the
+    tripwire above had to start firing. A detector proven only against the fixtures below
+    is a detector nobody has pointed at real code, so the live case moved to W5's
+    `NotificationService.enqueue`, which is still empty-bodied. When W5 fills that in, move
+    it again to whichever seam is then pending -- or retire it, and say so here.
+    """
+    from app.services.comms import NotificationService
+
+    assert is_still_a_seam(NotificationService.enqueue)
+
+
+def test_the_billing_seam_is_no_longer_a_stub():
+    """The other half, and the reason the tripwire above is a real assertion rather than a
+    skip. If this ever goes red, M6 was reverted and `test_the_billing_run_is_idempotent`
+    is asserting over a method that raises."""
     service = _billing_service()
     assert service is not None, "W4's contract commit should have landed the seam"
-    assert is_still_a_seam(service.create_charge)
-    assert is_still_a_seam(service.recompute_charge_status)
+    assert not is_still_a_seam(service.create_charge)
+    assert not is_still_a_seam(service.recompute_charge_status)
 
 
 def test_the_seam_detector_rejects_a_real_body():

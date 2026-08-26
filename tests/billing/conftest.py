@@ -330,3 +330,126 @@ def tenant_session(studio: Studio) -> Iterator[TenantSession]:
     """
     with use_studio(studio.id), TenantSession(bind=get_engine(), expire_on_commit=False) as s:
         yield s
+
+
+@pytest.fixture
+def a_group(app_session: Session, studio: Studio) -> uuid.UUID:
+    """A group to enrol into.
+
+    The run never reads a group -- C11 prices per student, and `price_plan` carries no
+    `group_id` at all -- but `enrollment.group_id` is non-null, so eligibility needs one to
+    exist. That asymmetry IS C11: a group is where a child trains, never what they pay.
+    """
+    from app.models.structure import Class as StudioClass
+    from app.models.structure import Group
+
+    klass = StudioClass(studio_id=studio.id, name="מתחילים", is_active=True)
+    app_session.add(klass)
+    app_session.flush()
+    group = Group(studio_id=studio.id, class_id=klass.id, name="מתחילים א", is_active=True)
+    app_session.add(group)
+    app_session.commit()
+    return group.id
+
+
+@pytest.fixture
+def an_enrolled_student(
+    app_session: Session, studio: Studio, a_priced_student: PricedStudent, a_group: uuid.UUID
+) -> uuid.UUID:
+    """§5.10 step 1's eligibility: at least one `active` enrollment.
+
+    Started at the training year's start, so this fixture prorates NOTHING -- Task 2's
+    fixtures are the mid-month ones. Keeping the two apart matters: a proration test whose
+    student also happens to be the flat-rate test's student cannot fail for one reason.
+    """
+    from app.models.people import Enrollment
+
+    row = Enrollment(
+        studio_id=studio.id,
+        student_id=a_priced_student.student_id,
+        group_id=a_group,
+        status="active",
+        started_on=YEAR_STARTS,
+    )
+    app_session.add(row)
+    app_session.commit()
+    return row.id
+
+
+@pytest.fixture
+def a_second_enrollment(
+    app_session: Session,
+    studio: Studio,
+    a_priced_student: PricedStudent,
+    an_enrolled_student: uuid.UUID,
+) -> uuid.UUID:
+    """C11's test case: the same child in a SECOND group.
+
+    One charge, not two. Walking enrollments instead of students is the defect that bills
+    this child twice, at two different prices, silently and forever.
+    """
+    from app.models.people import Enrollment
+    from app.models.structure import Class as StudioClass
+    from app.models.structure import Group
+
+    klass = StudioClass(studio_id=studio.id, name="תחרותית", is_active=True)
+    app_session.add(klass)
+    app_session.flush()
+    group = Group(studio_id=studio.id, class_id=klass.id, name="תחרותית א", is_active=True)
+    app_session.add(group)
+    app_session.flush()
+    row = Enrollment(
+        studio_id=studio.id,
+        student_id=a_priced_student.student_id,
+        group_id=group.id,
+        status="active",
+        started_on=YEAR_STARTS,
+    )
+    app_session.add(row)
+    app_session.commit()
+    return row.id
+
+
+@pytest.fixture
+def an_unpriced_student(app_session: Session, studio: Studio, a_group: uuid.UUID) -> PricedStudent:
+    """A child the manager enrolled but has not priced.
+
+    §5.4 sets `price_plan_id` at conversion and nothing forces it, so this is a real state
+    and the run must survive it without inventing a number. Charging zero would look like a
+    working run; skipping silently would lose the child.
+    """
+    from app.models.people import Enrollment
+
+    child = Person(studio_id=studio.id, first_name="ללא", last_name="מחיר")
+    payer = Person(studio_id=studio.id, first_name="הורה", last_name="ללא מחיר")
+    app_session.add_all([child, payer])
+    app_session.flush()
+    student = Student(
+        studio_id=studio.id,
+        person_id=child.id,
+        status="active",
+        joined_on=YEAR_STARTS,
+        price_plan_id=None,
+    )
+    app_session.add(student)
+    app_session.flush()
+    app_session.add_all(
+        [
+            Guardian(
+                studio_id=studio.id,
+                student_id=student.id,
+                person_id=payer.id,
+                is_primary=True,
+                relation="parent",
+            ),
+            Enrollment(
+                studio_id=studio.id,
+                student_id=student.id,
+                group_id=a_group,
+                status="active",
+                started_on=YEAR_STARTS,
+            ),
+        ]
+    )
+    app_session.commit()
+    return PricedStudent(student_id=student.id, person_id=child.id, payer_person_id=payer.id)
