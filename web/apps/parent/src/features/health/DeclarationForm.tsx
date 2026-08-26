@@ -20,68 +20,61 @@
 // signing something the app privately describes as a starting point.
 //
 // **G7.** No answer is logged, and nothing here is put anywhere but the request body.
-import { useEffect, useMemo, useState } from "react";
-import type { CSSProperties, FormEvent } from "react";
-import { Alert, Button, Card, SegmentedControl } from "@studio/ui";
-import { t } from "@studio/i18n";
-import type { Locale } from "@studio/i18n";
-import { SignaturePad } from "./SignaturePad";
-import { isVisible, unansweredRequired } from "./healthClient";
-import type {
-  AnswerValue,
-  HealthClient,
-  TemplateQuestion,
-  TemplateSchema,
-} from "./healthClient";
+import { useEffect, useMemo, useState } from 'react'
+import type { CSSProperties, FormEvent } from 'react'
+import { Alert, Button, Card, SegmentedControl } from '@studio/ui'
+import { t } from '@studio/i18n'
+import type { Locale } from '@studio/i18n'
+import { SignaturePad } from './SignaturePad'
+import { isVisible, unansweredRequired } from './healthClient'
+import type { AnswerValue, HealthClient, TemplateQuestion, TemplateSchema } from './healthClient'
 
 const formStyle: CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  gap: "var(--space-4)",
-  maxInlineSize: "34rem",
-  marginInline: "auto",
-  inlineSize: "100%",
-};
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 'var(--space-4)',
+  maxInlineSize: '34rem',
+  marginInline: 'auto',
+  inlineSize: '100%',
+}
 
 const rowStyle: CSSProperties = {
-  display: "flex",
-  flexWrap: "wrap",
-  alignItems: "center",
-  justifyContent: "space-between",
-  gap: "var(--space-2)",
-  paddingBlock: "var(--space-3)",
-  borderBlockEnd: "1px solid var(--border)",
-};
+  display: 'flex',
+  flexWrap: 'wrap',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 'var(--space-2)',
+  paddingBlock: 'var(--space-3)',
+  borderBlockEnd: '1px solid var(--border)',
+}
 
 const detailStyle: CSSProperties = {
-  inlineSize: "100%",
-  padding: "var(--space-2)",
-  border: "1px solid var(--border-strong)",
-  borderRadius: "var(--radius-1)",
-  background: "var(--surface)",
-  color: "var(--fg)",
-  font: "inherit",
-};
+  inlineSize: '100%',
+  padding: 'var(--space-2)',
+  border: '1px solid var(--border-strong)',
+  borderRadius: 'var(--radius-1)',
+  background: 'var(--surface)',
+  color: 'var(--fg)',
+  font: 'inherit',
+}
 
 export type DeclarationFormProps = {
-  locale: Locale;
-  client: HealthClient;
-  studentId: string;
-  studentName: string;
+  locale: Locale
+  client: HealthClient
+  studentId: string
+  studentName: string
   /** Signed and dated by whoever is holding the phone (12c's attestation caption). */
-  signerName?: string;
-  today?: string;
-  onSubmitted?: () => void;
-};
+  signerName?: string
+  today?: string
+  onSubmitted?: () => void
+}
 
 /** 12c's `כן` / `לא`, plus the third state the artboard does not draw. */
-function booleanOptions(
-  locale: Locale,
-): readonly { value: string; label: string }[] {
+function booleanOptions(locale: Locale): readonly { value: string; label: string }[] {
   return [
-    { value: "yes", label: t(locale, "health.declaration.yes") },
-    { value: "no", label: t(locale, "health.declaration.no") },
-  ];
+    { value: 'yes', label: t(locale, 'health.declaration.yes') },
+    { value: 'no', label: t(locale, 'health.declaration.no') },
+  ]
 }
 
 export function DeclarationForm({
@@ -93,67 +86,61 @@ export function DeclarationForm({
   today,
   onSubmitted,
 }: DeclarationFormProps) {
-  const [schema, setSchema] = useState<TemplateSchema | null>(null);
-  const [templateId, setTemplateId] = useState<string | null>(null);
-  const [answers, setAnswers] = useState<Record<string, AnswerValue>>({});
-  const [signature, setSignature] = useState<string | null>(null);
-  const [loadFailed, setLoadFailed] = useState(false);
-  const [sending, setSending] = useState(false);
-  const [failed, setFailed] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
-  const [showErrors, setShowErrors] = useState(false);
+  const [schema, setSchema] = useState<TemplateSchema | null>(null)
+  const [templateId, setTemplateId] = useState<string | null>(null)
+  const [answers, setAnswers] = useState<Record<string, AnswerValue>>({})
+  const [signature, setSignature] = useState<string | null>(null)
+  const [loadFailed, setLoadFailed] = useState(false)
+  const [sending, setSending] = useState(false)
+  const [failed, setFailed] = useState(false)
+  const [submitted, setSubmitted] = useState(false)
+  const [showErrors, setShowErrors] = useState(false)
 
   useEffect(() => {
-    let live = true;
+    let live = true
     client
       .template()
       .then((template) => {
-        if (!live) return;
-        setTemplateId(template.id);
-        setSchema(template.schema as unknown as TemplateSchema);
+        if (!live) return
+        setTemplateId(template.id)
+        setSchema(template.schema as unknown as TemplateSchema)
       })
       .catch(() => {
-        if (live) setLoadFailed(true);
-      });
+        if (live) setLoadFailed(true)
+      })
     return () => {
-      live = false;
-    };
-  }, [client]);
+      live = false
+    }
+  }, [client])
 
-  const missing = useMemo(
-    () => (schema ? unansweredRequired(schema, answers) : []),
-    [schema, answers],
-  );
-  const complete = missing.length === 0 && signature !== null;
+  const missing = useMemo(() => (schema ? unansweredRequired(schema, answers) : []), [schema, answers])
+  const complete = missing.length === 0 && signature !== null
 
   const answer = (question: TemplateQuestion, value: AnswerValue) => {
     setAnswers((previous) => {
-      const next = { ...previous, [question.id]: value };
+      const next = { ...previous, [question.id]: value }
       // A `no` hides the detail field AND clears it. Leaving the text behind would submit an
       // answer to a question that is no longer on screen — and for a health record, a stale
       // free-text note about a child is worse than none.
-      if (question.type === "boolean" && value === false) {
+      if (question.type === 'boolean' && value === false) {
         for (const section of schema?.sections ?? []) {
           for (const candidate of section.questions ?? []) {
-            if (
-              candidate.visible_if &&
-              Object.keys(candidate.visible_if).includes(question.id)
-            ) {
-              delete next[candidate.id];
+            if (candidate.visible_if && Object.keys(candidate.visible_if).includes(question.id)) {
+              delete next[candidate.id]
             }
           }
         }
       }
-      return next;
-    });
-  };
+      return next
+    })
+  }
 
   const submit = (event: FormEvent) => {
-    event.preventDefault();
-    setShowErrors(true);
-    if (!complete || !templateId || !signature) return;
-    setSending(true);
-    setFailed(false);
+    event.preventDefault()
+    setShowErrors(true)
+    if (!complete || !templateId || !signature) return
+    setSending(true)
+    setFailed(false)
     client
       .submit(studentId, {
         template_id: templateId,
@@ -161,25 +148,21 @@ export function DeclarationForm({
         signature_image_base64: signature,
       })
       .then(() => {
-        setSubmitted(true);
-        onSubmitted?.();
+        setSubmitted(true)
+        onSubmitted?.()
       })
       .catch(() => setFailed(true))
-      .finally(() => setSending(false));
-  };
+      .finally(() => setSending(false))
+  }
 
   if (loadFailed) {
     return (
-      <Alert
-        iconLabel={t(locale, "health.declaration.error")}
-        live
-        tone="danger"
-      >
-        {t(locale, "health.declaration.error")}
+      <Alert iconLabel={t(locale, 'health.declaration.error')} live tone="danger">
+        {t(locale, 'health.declaration.error')}
       </Alert>
-    );
+    )
   }
-  if (!schema) return <p>{t(locale, "health.declaration.loading")}</p>;
+  if (!schema) return <p>{t(locale, 'health.declaration.loading')}</p>
   if (submitted) {
     return (
       <>
@@ -187,144 +170,110 @@ export function DeclarationForm({
           finding — "--paid renders 'this charge is settled' and 'this declaration is valid'",
           the same green for two concepts — and it needs deciding in the token layer, not by a
           feature inventing a fourth tone here. */}
-        <Alert
-          iconLabel={t(locale, "health.declaration.submitted")}
-          live
-          tone="paid"
-        >
-          {t(locale, "health.declaration.submitted")} ·{" "}
-          {t(locale, "health.declaration.noExpiry")}
+        <Alert iconLabel={t(locale, 'health.declaration.submitted')} live tone="paid">
+          {t(locale, 'health.declaration.submitted')} · {t(locale, 'health.declaration.noExpiry')}
         </Alert>
       </>
-    );
+    )
   }
 
   return (
     <form onSubmit={submit} style={formStyle}>
       <header>
-        <h1>{t(locale, "health.declaration.title")}</h1>
-        <p style={{ color: "var(--text-muted)" }}>
-          {t(locale, "health.declaration.forChild")} <bdi>{studentName}</bdi>
+        <h1>{t(locale, 'health.declaration.title')}</h1>
+        <p style={{ color: 'var(--text-muted)' }}>
+          {t(locale, 'health.declaration.forChild')} <bdi>{studentName}</bdi>
         </p>
         {/* §5.5 — declarations do not expire. The subtitle says so rather than showing a
             validity the model does not have (12c finding 1, the seventh artboard to assume one). */}
-        <p style={{ color: "var(--text-muted)" }}>
-          {t(locale, "health.declaration.noExpiry")}
-        </p>
+        <p style={{ color: 'var(--text-muted)' }}>{t(locale, 'health.declaration.noExpiry')}</p>
       </header>
 
       <Card>
-        <p style={{ color: "var(--text-secondary)" }}>
-          {t(locale, "health.declaration.attestation")}
-        </p>
+        <p style={{ color: 'var(--text-secondary)' }}>{t(locale, 'health.declaration.attestation')}</p>
         {/* D11's caveat, on the screen the parent signs. 12c finding 3. */}
-        <p style={{ color: "var(--text-muted)", fontSize: "var(--text-sm)" }}>
-          {t(locale, "health.template.disclaimer")}
+        <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)' }}>
+          {t(locale, 'health.template.disclaimer')}
         </p>
       </Card>
 
       <Card>
-        <p style={{ color: "var(--text-secondary)" }}>
-          {t(locale, "health.declaration.intro")}
-        </p>
+        <p style={{ color: 'var(--text-secondary)' }}>{t(locale, 'health.declaration.intro')}</p>
         {(schema.sections ?? []).map((section) => (
           <section key={section.id}>
             {section.title ? <h2>{section.title}</h2> : null}
             {(section.questions ?? [])
               .filter((question) => isVisible(question, answers))
               .map((question) => {
-                const value = answers[question.id];
-                const unanswered =
-                  value === undefined || value === null || value === "";
-                if (question.type === "boolean") {
+                const value = answers[question.id]
+                const unanswered = value === undefined || value === null || value === ''
+                if (question.type === 'boolean') {
                   return (
                     <div key={question.id} style={rowStyle}>
                       <SegmentedControl
                         legend={question.label}
-                        onValueChange={(next) =>
-                          answer(question, next === "yes")
-                        }
+                        onValueChange={(next) => answer(question, next === 'yes')}
                         options={booleanOptions(locale)}
                         // '' selects neither: the third state 12c finding 5 says must exist.
-                        value={
-                          value === true ? "yes" : value === false ? "no" : ""
-                        }
+                        value={value === true ? 'yes' : value === false ? 'no' : ''}
                       />
-                      {showErrors &&
-                      unanswered &&
-                      question.required !== false ? (
+                      {showErrors && unanswered && question.required !== false ? (
                         <span
                           data-testid={`unanswered-${question.id}`}
                           style={{
-                            color: "var(--text-muted)",
-                            fontSize: "var(--text-sm)",
+                            color: 'var(--text-muted)',
+                            fontSize: 'var(--text-sm)',
                           }}
                         >
-                          {t(locale, "health.declaration.unanswered")}
+                          {t(locale, 'health.declaration.unanswered')}
                         </span>
                       ) : null}
                     </div>
-                  );
+                  )
                 }
                 return (
                   <div key={question.id} style={rowStyle}>
-                    <label style={{ inlineSize: "100%" }}>
+                    <label style={{ inlineSize: '100%' }}>
                       <span>{question.label}</span>
                       {/* A native textarea: `TextField` has no multiline mode. Four artboards
                           want one (12c, 9g, 7b, 4f) and the primitive is not this lane's file. */}
                       <textarea
-                        onChange={(event) =>
-                          answer(question, event.target.value)
-                        }
-                        rows={question.type === "phone" ? 1 : 2}
+                        onChange={(event) => answer(question, event.target.value)}
+                        rows={question.type === 'phone' ? 1 : 2}
                         style={detailStyle}
-                        value={typeof value === "string" ? value : ""}
+                        value={typeof value === 'string' ? value : ''}
                       />
                     </label>
                   </div>
-                );
+                )
               })}
           </section>
         ))}
       </Card>
 
       <SignaturePad
-        attestation={
-          signerName && today ? `${signerName} · ${today}` : undefined
-        }
+        attestation={signerName && today ? `${signerName} · ${today}` : undefined}
         error={
-          showErrors && signature === null
-            ? t(locale, "health.declaration.signatureRequired")
-            : undefined
+          showErrors && signature === null ? t(locale, 'health.declaration.signatureRequired') : undefined
         }
         locale={locale}
         onChange={setSignature}
       />
 
       {showErrors && missing.length > 0 ? (
-        <Alert
-          iconLabel={t(locale, "health.declaration.answerRequired")}
-          live
-          tone="danger"
-        >
-          {t(locale, "health.declaration.answerRequired")}
+        <Alert iconLabel={t(locale, 'health.declaration.answerRequired')} live tone="danger">
+          {t(locale, 'health.declaration.answerRequired')}
         </Alert>
       ) : null}
       {failed ? (
-        <Alert
-          iconLabel={t(locale, "health.declaration.error")}
-          live
-          tone="danger"
-        >
-          {t(locale, "health.declaration.error")}
+        <Alert iconLabel={t(locale, 'health.declaration.error')} live tone="danger">
+          {t(locale, 'health.declaration.error')}
         </Alert>
       ) : null}
 
       <Button disabled={sending} type="submit" variant="primary">
-        {sending
-          ? t(locale, "health.declaration.submitting")
-          : t(locale, "health.declaration.submit")}
+        {sending ? t(locale, 'health.declaration.submitting') : t(locale, 'health.declaration.submit')}
       </Button>
     </form>
-  );
+  )
 }

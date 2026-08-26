@@ -21,11 +21,11 @@
 // **Booleans only, never free text** (§4.3). The chips are fixed labels looked up by flag id. A
 // flag with no label renders NOTHING rather than a blank chip: a warning that silently is not one
 // is worse than no warning, and §5.5's badge is only useful while it is trusted.
-import type { CSSProperties } from "react";
-import { Button, StatusChip } from "@studio/ui";
-import type { ChipStatus } from "@studio/ui";
-import { t } from "@studio/i18n";
-import type { Locale } from "@studio/i18n";
+import type { CSSProperties } from 'react'
+import { Button, StatusChip } from '@studio/ui'
+import type { ChipStatus } from '@studio/ui'
+import { t } from '@studio/i18n'
+import type { Locale } from '@studio/i18n'
 
 /**
  * The eight flag ids §5.5's badge can label, and the whole set `health.flag.*` ships.
@@ -37,24 +37,24 @@ import type { Locale } from "@studio/i18n";
  * of words that mean something.
  */
 const LABELLED_FLAGS = [
-  "asthma",
-  "allergy",
-  "medication",
-  "epilepsy",
-  "heart",
-  "diabetes",
-  "injury",
-  "other",
-] as const;
+  'asthma',
+  'allergy',
+  'medication',
+  'epilepsy',
+  'heart',
+  'diabetes',
+  'injury',
+  'other',
+] as const
 
-type LabelledFlag = (typeof LABELLED_FLAGS)[number];
+type LabelledFlag = (typeof LABELLED_FLAGS)[number]
 
 const rowStyle: CSSProperties = {
-  display: "flex",
-  flexWrap: "wrap",
-  alignItems: "center",
-  gap: "var(--space-2)",
-};
+  display: 'flex',
+  flexWrap: 'wrap',
+  alignItems: 'center',
+  gap: 'var(--space-2)',
+}
 
 /**
  * The prop shape M5's `roster-row` container passes, from the contract commit's
@@ -65,23 +65,23 @@ const rowStyle: CSSProperties = {
  * into the void applies to a message as much as to a mark.
  */
 export type HealthBadgeProps = {
-  status: "missing" | "trial_signed" | "signed";
-  flags: Record<string, boolean>;
-  studentId: string;
-  locale: Locale;
-  onRemind?: (studentId: string) => void;
-  reminderSent?: boolean;
-};
+  status: 'missing' | 'trial_signed' | 'signed'
+  flags: Record<string, boolean>
+  studentId: string
+  locale: Locale
+  onRemind?: (studentId: string) => void
+  reminderSent?: boolean
+}
 
 /** Booleans only. Never a value, never a key the namespace cannot name. */
 export function labelledFlags(flags: Record<string, boolean>): LabelledFlag[] {
-  return LABELLED_FLAGS.filter((flag) => flags[flag] === true);
+  return LABELLED_FLAGS.filter((flag) => flags[flag] === true)
 }
 
-export function badgeStatusFor(status: HealthBadgeProps["status"]): ChipStatus {
-  if (status === "missing") return "debt";
-  if (status === "trial_signed") return "pending";
-  return "paid";
+export function badgeStatusFor(status: HealthBadgeProps['status']): ChipStatus {
+  if (status === 'missing') return 'debt'
+  if (status === 'trial_signed') return 'pending'
+  return 'paid'
 }
 
 export function HealthBadge({
@@ -92,67 +92,45 @@ export function HealthBadge({
   onRemind,
   reminderSent = false,
 }: HealthBadgeProps) {
-  const raised = labelledFlags(flags);
+  const raised = labelledFlags(flags)
 
-  if (status === "missing") {
+  if (status === 'missing') {
     return (
       <div data-testid={`health-badge-${studentId}`} style={rowStyle}>
-        <StatusChip
-          label={`⚠ ${t(locale, "health.badge.missing")}`}
-          status="debt"
-        />
+        <StatusChip label={`⚠ ${t(locale, 'health.badge.missing')}`} status="debt" />
         {/* §5.5 — the coach can still mark them present, and the hint says so out loud. */}
-        <span
-          style={{ color: "var(--text-muted)", fontSize: "var(--text-sm)" }}
-        >
-          {t(locale, "health.badge.missingHint")}
+        <span style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)' }}>
+          {t(locale, 'health.badge.missingHint')}
         </span>
         {onRemind ? (
-          <Button
-            onClick={() => onRemind(studentId)}
-            type="button"
-            variant="secondary"
-          >
-            {reminderSent
-              ? t(locale, "health.reminder.sent")
-              : t(locale, "health.reminder.send")}
+          <Button onClick={() => onRemind(studentId)} type="button" variant="secondary">
+            {reminderSent ? t(locale, 'health.reminder.sent') : t(locale, 'health.reminder.send')}
           </Button>
         ) : null}
       </div>
-    );
+    )
   }
 
   return (
     <div data-testid={`health-badge-${studentId}`} style={rowStyle}>
-      {status === "trial_signed" ? (
-        <StatusChip
-          label={t(locale, "health.badge.trialSigned")}
-          status={badgeStatusFor(status)}
-        />
+      {status === 'trial_signed' ? (
+        <StatusChip label={t(locale, 'health.badge.trialSigned')} status={badgeStatusFor(status)} />
       ) : null}
       {raised.length > 0 ? (
         <>
-          <span
-            style={{ color: "var(--text-muted)", fontSize: "var(--text-sm)" }}
-          >
-            {t(locale, "health.flag.title")}
+          <span style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)' }}>
+            {t(locale, 'health.flag.title')}
           </span>
           {raised.map((flag) => (
-            <StatusChip
-              key={flag}
-              label={t(locale, `health.flag.${flag}` as const)}
-              status="pending"
-            />
+            <StatusChip key={flag} label={t(locale, `health.flag.${flag}` as const)} status="pending" />
           ))}
           {/* §11.2 — the full record is manager-only and every read of it is audit-logged. A
               coach seeing a chip and no way to open anything is the design, not a gap. */}
-          <span
-            style={{ color: "var(--text-muted)", fontSize: "var(--text-sm)" }}
-          >
-            {t(locale, "health.flag.detailsRestricted")}
+          <span style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)' }}>
+            {t(locale, 'health.flag.detailsRestricted')}
           </span>
         </>
       ) : null}
     </div>
-  );
+  )
 }

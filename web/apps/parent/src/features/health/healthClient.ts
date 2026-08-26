@@ -7,22 +7,19 @@
 //
 // **G7 applies to this file.** Nothing here logs, and `submit` is the only call that carries a
 // child's answers. It posts them once and never keeps a copy: the form owns the draft state.
-import type { components } from "@studio/api-client";
+import type { components } from '@studio/api-client'
 
-export type HealthDeclarationOut =
-  components["schemas"]["HealthDeclarationOut"];
-export type HealthFormTemplateOut =
-  components["schemas"]["HealthFormTemplateOut"];
-export type HealthStatus =
-  components["schemas"]["StudentSummaryOut"]["health_status"];
+export type HealthDeclarationOut = components['schemas']['HealthDeclarationOut']
+export type HealthFormTemplateOut = components['schemas']['HealthFormTemplateOut']
+export type HealthStatus = components['schemas']['StudentSummaryOut']['health_status']
 
-export type Fetcher = (path: string, init?: RequestInit) => Promise<Response>;
+export type Fetcher = (path: string, init?: RequestInit) => Promise<Response>
 
-const JSON_HEADERS = { "Content-Type": "application/json" };
+const JSON_HEADERS = { 'Content-Type': 'application/json' }
 
 async function json<T>(response: Response): Promise<T> {
-  if (!response.ok) throw new Error(`${response.status} ${response.url}`);
-  return (await response.json()) as T;
+  if (!response.ok) throw new Error(`${response.status} ${response.url}`)
+  return (await response.json()) as T
 }
 
 /**
@@ -35,35 +32,35 @@ async function json<T>(response: Response): Promise<T> {
  * Only the answers are copy.
  */
 export type TemplateQuestion = {
-  id: string;
-  type: "boolean" | "text" | "phone";
-  label: string;
-  required?: boolean;
+  id: string
+  type: 'boolean' | 'text' | 'phone'
+  label: string
+  required?: boolean
   /** §5.5 — this question's answer becomes a `derived_flag`, and a coach sees the boolean. */
-  flag?: boolean;
+  flag?: boolean
   /** Progressive disclosure: shown only while every named answer matches. */
-  visible_if?: Record<string, unknown>;
-};
+  visible_if?: Record<string, unknown>
+}
 
 export type TemplateSection = {
-  id: string;
-  title?: string;
-  questions: TemplateQuestion[];
-};
+  id: string
+  title?: string
+  questions: TemplateQuestion[]
+}
 
 export type TemplateSchema = {
-  title?: string;
-  version?: number;
+  title?: string
+  version?: number
   /** D11's marker. `true` while the studio is still showing the questions the app ships with. */
-  is_bundled_default?: boolean;
-  sections: TemplateSection[];
-};
+  is_bundled_default?: boolean
+  sections: TemplateSection[]
+}
 
-export type AnswerValue = boolean | string | null;
+export type AnswerValue = boolean | string | null
 
 /** §5.5's three question types, plus the third answer state 12c finding 5 says must exist. */
 export function isAnswered(value: AnswerValue | undefined): boolean {
-  return value !== undefined && value !== null && value !== "";
+  return value !== undefined && value !== null && value !== ''
 }
 
 /**
@@ -77,10 +74,8 @@ export function isVisible(
   question: TemplateQuestion,
   answers: Readonly<Record<string, AnswerValue>>,
 ): boolean {
-  if (!question.visible_if) return true;
-  return Object.entries(question.visible_if).every(
-    ([key, value]) => answers[key] === value,
-  );
+  if (!question.visible_if) return true
+  return Object.entries(question.visible_if).every(([key, value]) => answers[key] === value)
 }
 
 /**
@@ -95,15 +90,15 @@ export function unansweredRequired(
   schema: TemplateSchema,
   answers: Readonly<Record<string, AnswerValue>>,
 ): string[] {
-  const missing: string[] = [];
+  const missing: string[] = []
   for (const section of schema.sections ?? []) {
     for (const question of section.questions ?? []) {
-      if (!isVisible(question, answers)) continue;
-      if (question.required !== true && question.flag !== true) continue;
-      if (!isAnswered(answers[question.id])) missing.push(question.id);
+      if (!isVisible(question, answers)) continue
+      if (question.required !== true && question.flag !== true) continue
+      if (!isAnswered(answers[question.id])) missing.push(question.id)
     }
   }
-  return missing;
+  return missing
 }
 
 export function makeHealthClient(fetcher: Fetcher) {
@@ -114,20 +109,17 @@ export function makeHealthClient(fetcher: Fetcher) {
      * two-minute trial declaration is not §5.5's gate.
      */
     template: (): Promise<HealthFormTemplateOut> =>
-      fetcher("/api/v1/health-templates?kind=full")
+      fetcher('/api/v1/health-templates?kind=full')
         .then(json<{ items: { id: string }[] }>)
         .then((list) => {
-          const first = list.items[0];
-          if (!first) throw new Error("no full health template in this studio");
-          return fetcher(`/api/v1/health-templates/${first.id}`).then(
-            json<HealthFormTemplateOut>,
-          );
+          const first = list.items[0]
+          if (!first) throw new Error('no full health template in this studio')
+          return fetcher(`/api/v1/health-templates/${first.id}`).then(json<HealthFormTemplateOut>)
         }),
 
     declaration: (studentId: string): Promise<HealthDeclarationOut | null> =>
-      fetcher(`/api/v1/students/${studentId}/health-declaration`).then(
-        (response) =>
-          response.status === 404 ? null : json<HealthDeclarationOut>(response),
+      fetcher(`/api/v1/students/${studentId}/health-declaration`).then((response) =>
+        response.status === 404 ? null : json<HealthDeclarationOut>(response),
       ),
 
     /**
@@ -140,21 +132,20 @@ export function makeHealthClient(fetcher: Fetcher) {
     submit: (
       studentId: string,
       body: {
-        template_id: string;
-        answers: Record<string, unknown>;
-        signature_image_base64: string;
+        template_id: string
+        answers: Record<string, unknown>
+        signature_image_base64: string
       },
     ): Promise<HealthDeclarationOut> =>
       fetcher(`/api/v1/students/${studentId}/health-declaration`, {
-        method: "POST",
+        method: 'POST',
         headers: JSON_HEADERS,
         body: JSON.stringify(body),
       }).then(json<HealthDeclarationOut>),
 
     /** §5.5 — 'downloadable by the guardian'. Served through the API, never a bucket URL. */
-    pdfUrl: (studentId: string): string =>
-      `/api/v1/students/${studentId}/health-declaration/pdf`,
-  };
+    pdfUrl: (studentId: string): string => `/api/v1/students/${studentId}/health-declaration/pdf`,
+  }
 }
 
-export type HealthClient = ReturnType<typeof makeHealthClient>;
+export type HealthClient = ReturnType<typeof makeHealthClient>

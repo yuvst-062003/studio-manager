@@ -14,27 +14,27 @@
 // **`trial_signed` is still gated.** §5.5's gate is about the full declaration: a family who
 // signed §5.4a's short trial form has answered three questions on a phone, and the gate exists
 // because the club needs the whole record before a child trains regularly.
-import { useMemo } from "react";
-import type { ReactNode } from "react";
-import type { CSSProperties } from "react";
-import { Card } from "@studio/ui";
-import { t } from "@studio/i18n";
-import type { Locale } from "@studio/i18n";
-import { DeclarationForm } from "./DeclarationForm";
-import type { HealthClient, HealthStatus } from "./healthClient";
+import { useMemo } from 'react'
+import type { ReactNode } from 'react'
+import type { CSSProperties } from 'react'
+import { Card } from '@studio/ui'
+import { t } from '@studio/i18n'
+import type { Locale } from '@studio/i18n'
+import { DeclarationForm } from './DeclarationForm'
+import type { HealthClient, HealthStatus } from './healthClient'
 
 const gateStyle: CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  gap: "var(--space-4)",
-  padding: "var(--space-4)",
-};
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 'var(--space-4)',
+  padding: 'var(--space-4)',
+}
 
 export type GatedStudent = {
-  id: string;
-  display_name: string;
-  health_status: HealthStatus;
-};
+  id: string
+  display_name: string
+  health_status: HealthStatus
+}
 
 /**
  * The first student still owing a full declaration, or `null` when nobody does.
@@ -43,21 +43,19 @@ export type GatedStudent = {
  * for three children's declarations at once is a screen nobody finishes. The gate reappears for
  * the next child on submit, which is the same routing decision made again.
  */
-export function firstStudentNeedingDeclaration(
-  students: readonly GatedStudent[],
-): GatedStudent | null {
-  return students.find((student) => student.health_status !== "signed") ?? null;
+export function firstStudentNeedingDeclaration(students: readonly GatedStudent[]): GatedStudent | null {
+  return students.find((student) => student.health_status !== 'signed') ?? null
 }
 
 export type HealthGateProps = {
-  locale: Locale;
-  client: HealthClient;
-  students: readonly GatedStudent[];
-  signerName?: string;
-  today?: string;
-  onSigned?: () => void;
-  children: ReactNode;
-};
+  locale: Locale
+  client: HealthClient
+  students: readonly GatedStudent[]
+  signerName?: string
+  today?: string
+  onSigned?: () => void
+  children: ReactNode
+}
 
 export function HealthGate({
   locale,
@@ -68,12 +66,9 @@ export function HealthGate({
   onSigned,
   children,
 }: HealthGateProps) {
-  const blocked = useMemo(
-    () => firstStudentNeedingDeclaration(students),
-    [students],
-  );
+  const blocked = useMemo(() => firstStudentNeedingDeclaration(students), [students])
 
-  if (!blocked) return <>{children}</>;
+  if (!blocked) return <>{children}</>
 
   return (
     // `children` is not rendered at all — not hidden, not disabled, not behind an overlay. §5.5
@@ -81,15 +76,14 @@ export function HealthGate({
     // away from being reachable.
     <div data-testid="health-gate" style={gateStyle}>
       <Card>
-        <h1>{t(locale, "health.gate.title")}</h1>
-        <p>{t(locale, "health.gate.body")}</p>
-        <p style={{ color: "var(--text-muted)" }}>
-          {t(locale, "health.declaration.forChild")}{" "}
-          <bdi>{blocked.display_name}</bdi>
+        <h1>{t(locale, 'health.gate.title')}</h1>
+        <p>{t(locale, 'health.gate.body')}</p>
+        <p style={{ color: 'var(--text-muted)' }}>
+          {t(locale, 'health.declaration.forChild')} <bdi>{blocked.display_name}</bdi>
         </p>
-        {blocked.health_status === "trial_signed" ? (
-          <p style={{ color: "var(--text-muted)", fontSize: "var(--text-sm)" }}>
-            {t(locale, "health.badge.trialSigned")}
+        {blocked.health_status === 'trial_signed' ? (
+          <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)' }}>
+            {t(locale, 'health.badge.trialSigned')}
           </p>
         ) : null}
       </Card>
@@ -103,5 +97,5 @@ export function HealthGate({
         today={today}
       />
     </div>
-  );
+  )
 }

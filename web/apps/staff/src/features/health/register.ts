@@ -9,15 +9,15 @@
 // contract's prop shape — `BootstrapPayload.roster[].health_status` and `.derived_flags` — which
 // is the seam both lanes agreed on before either started. The integration test belongs on the
 // container and is deferred until it lands; the badge's own tests do not need it.
-import { registerSlot } from "@studio/ui";
-import { HealthBadge } from "./HealthBadge";
-import type { HealthBadgeProps } from "./HealthBadge";
+import { registerSlot } from '@studio/ui'
+import { HealthBadge } from './HealthBadge'
+import type { HealthBadgeProps } from './HealthBadge'
 
 export function registerHealthSections(): void {
-  registerSlot<HealthBadgeProps>("roster-row", {
-    key: "health-badge",
+  registerSlot<HealthBadgeProps>('roster-row', {
+    key: 'health-badge',
     // Early: §5.5's ⚠ is the thing a coach must see before they read anything else on the row.
     order: 10,
     render: HealthBadge,
-  });
+  })
 }
