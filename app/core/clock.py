@@ -30,7 +30,6 @@ G3: always timezone-aware UTC. Rendering in Asia/Jerusalem happens at the edge.
 
 from __future__ import annotations
 
-import secrets
 from collections.abc import Awaitable, Callable, Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
@@ -40,7 +39,7 @@ from fastapi import Request, Response
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from app.core.dev_account import DEV_TOKEN_HEADER
+from app.core.dev_account import DEV_TOKEN_HEADER, configured_dev_token, dev_tools_allowed
 
 X_DEV_NOW_HEADER = "X-Dev-Now"
 
@@ -81,13 +80,23 @@ class DevClockMiddleware(BaseHTTPMiddleware):
 
     Staging is a public HTTPS origin (app/core/config.py's own reasoning for
     DEV_TOOLS_TOKEN existing at all), so this header must answer to the same rule
-    app.core.dev_account.dev_tools_allowed already enforces for every /dev/* route:
-    when a token is configured, a caller must present a matching one. Without this,
-    the router-level check and this middleware reached opposite conclusions about the
-    same exposure -- a caller with no token at all could still shift the clock a
-    developer session on staging is gated behind. When no token is configured (local
-    development, where there is no auth layer to authenticate against yet), the shift
-    applies unconditionally, exactly as before.
+    app.core.dev_account.dev_tools_allowed already enforces for every /dev/* route.
+
+    **It now answers to that rule by calling it, rather than by restating it.** This
+    middleware used to carry its own copy, and the copies drifted twice. First on the
+    token: 728b665 taught `dev_tools_allowed` that an empty configured value is no token
+    and did not teach this one, so a machine whose configuration came from the committed
+    template had every request carrying X-Dev-Now refused -- while every /dev/* route on
+    the same machine was allowed. Second on the environment: the copy here allowed the
+    shift on ANY non-production environment when no token was configured, so on staging an
+    unauthenticated caller could move the server's clock, which is the capability
+    DEV_TOOLS_TOKEN exists to gate. One function, one truth table, no third drift.
+
+    Consulting `request.state.is_developer` makes this middleware's position in the stack
+    load-bearing -- app/main.py adds AuthContextMiddleware afterwards so that it runs
+    first, and that comment is no longer merely descriptive. It is read rather than passed
+    as False so a signed-in developer on staging keeps the capability §19.5 gives them;
+    passing False would have been a quiet tightening dressed as a bug fix.
     """
 
     async def dispatch(
@@ -99,20 +108,20 @@ class DevClockMiddleware(BaseHTTPMiddleware):
         if raw is None or settings.ENV == "production":
             return await call_next(request)
 
-        configured = settings.DEV_TOOLS_TOKEN
-        if configured is not None:
-            presented = request.headers.get(DEV_TOKEN_HEADER)
-            if presented is None or not secrets.compare_digest(
-                presented, configured.get_secret_value()
-            ):
-                return JSONResponse(
-                    status_code=403,
-                    content={
-                        "code": "dev_token_required",
-                        "message": f"{X_DEV_NOW_HEADER} requires a matching "
-                        f"{DEV_TOKEN_HEADER} header on this environment",
-                    },
-                )
+        if not dev_tools_allowed(
+            env=settings.ENV,
+            is_developer=bool(getattr(request.state, "is_developer", False)),
+            presented_token=request.headers.get(DEV_TOKEN_HEADER),
+            configured_token=configured_dev_token(),
+        ):
+            return JSONResponse(
+                status_code=403,
+                content={
+                    "code": "dev_token_required",
+                    "message": f"{X_DEV_NOW_HEADER} requires a matching "
+                    f"{DEV_TOKEN_HEADER} header on this environment",
+                },
+            )
 
         try:
             shifted = parse_dev_now(raw)

@@ -18,6 +18,41 @@ from app.core.config import settings
 DEV_TOKEN_HEADER = "X-Dev-Token"
 
 
+def configured_dev_token() -> str | None:
+    """The configured developer token, or `None` when there is not one.
+
+    **An empty value is no token**, and this function exists so that sentence is written
+    down once. The committed environment template ships the key with an empty value and
+    says in its own comment that an unset token means "this machine only"; `SecretStr("")`
+    is not `None`, so every reader that tested the setting for `is not None` got both
+    halves wrong at once.
+
+    Too strict locally: it refused the capability on a machine where nothing was
+    misconfigured. Too permissive on a public origin, which is the half that matters --
+    `secrets.compare_digest("", "")` is True, so an empty configured value authorised
+    anyone who sent an empty `X-Dev-Token` header.
+
+    728b665 fixed that inside `dev_tools_allowed` and missed the second copy of the same
+    rule in `app.core.clock.DevClockMiddleware`, which is how a lane worktree ended up
+    with every HTTP test failing. Both callers read the setting through here now, so there
+    is one place to be wrong rather than two places to keep in step.
+
+    **`settings` is imported inside the body, not off this module's own binding.**
+    `app.core.clock` imports this function at module scope and is deliberately absent from
+    `tests/dev/conftest.py`'s RELOADABLE list -- it reads `settings` late, inside
+    `dispatch`, so its binding can never freeze to whichever environment imported it
+    first. A module-level read here would hand that frozen binding straight back to it:
+    the harness reloads `app.core.dev_account`, but `clock` still points at the *previous*
+    function object, and that object would carry the pre-swap settings with it.
+    """
+    from app.core.config import settings as current
+
+    token = current.DEV_TOOLS_TOKEN
+    if token is None:
+        return None
+    return token.get_secret_value() or None
+
+
 def dev_tools_allowed(
     *,
     env: str,
@@ -66,12 +101,11 @@ def developer_may_act(*, is_developer: bool, studio_is_demo: bool, env: str) -> 
 def require_developer(request: Request) -> None:
     """The dependency every /dev route declares (.claude/rules/api.md: authorization is
     checked in the router via a dependency, never inside a service)."""
-    configured = settings.DEV_TOOLS_TOKEN
     if not dev_tools_allowed(
         env=settings.ENV,
         is_developer=bool(getattr(request.state, "is_developer", False)),
         presented_token=request.headers.get(DEV_TOKEN_HEADER),
-        configured_token=None if configured is None else configured.get_secret_value(),
+        configured_token=configured_dev_token(),
     ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

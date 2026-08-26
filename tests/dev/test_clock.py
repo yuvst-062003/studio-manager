@@ -150,6 +150,49 @@ def test_a_configured_token_refuses_an_unauthenticated_shift(monkeypatch):
     assert now().year != 2027
 
 
+def test_an_empty_configured_token_lets_the_clock_shift_on_a_developers_machine(monkeypatch):
+    """728b665's fix, applied to the copy of the rule that commit missed.
+
+    The committed environment template ships the key with an empty value and its own
+    comment says an unset token means "this machine only". `SecretStr("")` is not None, so
+    this middleware read it as a CONFIGURED token and demanded a matching `X-Dev-Token` --
+    while `app.core.dev_account.dev_tools_allowed`, fixed in 728b665, read the same value
+    as no token at all. Two guards reaching opposite conclusions about one exposure is the
+    exact failure this middleware's docstring says it exists to prevent.
+
+    The cost was not theoretical: it made every request carrying `X-Dev-Now` 403, so both
+    W4 lane worktrees -- whose configuration came from that template -- had every HTTP test
+    in `tests/health`, `tests/events` and `tests/billing` fail for a reason in neither lane.
+    """
+    monkeypatch.setenv("DEV_TOOLS_TOKEN", "")
+    with app_in_env("development") as application:
+        body = (
+            TestClient(application)
+            .get("/api/v1/dev/clock", headers={X_DEV_NOW_HEADER: TRAVELLED})
+            .json()
+        )
+    assert body["now"].startswith("2027-03-01T09:00:00")
+    assert body["shifted"] is True
+
+
+def test_an_empty_configured_token_authorises_nobody_on_a_public_origin(monkeypatch):
+    """The half that matters, and the same one 728b665 named.
+
+    `secrets.compare_digest("", "")` is True, so an empty configured value authorised
+    anyone who sent an empty `X-Dev-Token` header -- on staging, a public HTTPS origin, to
+    shift the server's clock. It must fall through to the environment rule and be refused,
+    exactly as every `/dev/*` route already is.
+    """
+    monkeypatch.setenv("DEV_TOOLS_TOKEN", "")
+    with app_in_env("staging") as application:
+        response = TestClient(application).get(
+            "/api/v1/health",
+            headers={X_DEV_NOW_HEADER: TRAVELLED, DEV_TOKEN_HEADER: ""},
+        )
+    assert response.status_code == 403
+    assert now().year != 2027
+
+
 def test_a_configured_token_refuses_a_wrong_one_too(monkeypatch):
     """The control for the case above: a caller presenting *some* token still must not
     get through with the wrong one."""

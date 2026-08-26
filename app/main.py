@@ -60,8 +60,12 @@ if settings.ENV != "production":
 # DevClockMiddleware are not registrations.
 #
 # Added AFTER DevClockMiddleware, so it runs BEFORE it (Starlette runs the last-added
-# outermost). That order is deliberate but not load-bearing: neither reads what the other
-# writes. It is stated so a later reader does not have to re-derive that it is safe.
+# outermost). **That order is now load-bearing.** It used to be merely deliberate --
+# neither read what the other wrote -- but DevClockMiddleware answers to
+# app.core.dev_account.dev_tools_allowed rather than to its own copy of the rule, and that
+# function takes `is_developer`, which is a claim this middleware puts on request.state.
+# Swap the two lines and a signed-in developer on staging silently loses the X-Dev-Now
+# capability §19.5 gives them, because the claim would not be there yet to read.
 app.add_middleware(AuthContextMiddleware)
 
 # The refresh cookie is cross-ORIGIN in every environment -- the api and the three PWAs
