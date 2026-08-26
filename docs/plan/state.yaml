@@ -317,6 +317,30 @@ waves:
           the E2E harness W4 deferred. Lane fixtures are NOT in it; see HB-w5-lane-fixtures.
         status: shipped
         on: 2026-08-26
+      - id: M8.1
+        title: >-
+          The fan-out behind W5's seam — both levels per §5.11, preferences, and revision
+          0010's notification_preference table
+        status: shipped
+        on: 2026-08-26
+      - id: M8.2
+        title: >-
+          Announcements with audience resolution, §5.11's delivery report, and §6.5's
+          install-state list
+        status: shipped
+        on: 2026-08-26
+      - id: M8.3
+        title: >-
+          §5.12's ICS subscription feeds — guardian and coach — with Asia/Jerusalem VTIMEZONE
+          and RFC 5545 folding
+        status: shipped
+        on: 2026-08-26
+      - id: M8.4
+        title: >-
+          Artboards parent 2b and dashboard 4f, plus the screenless staff surface (C2); not
+          yet routed — see HB-2b-and-4f-not-mounted
+        status: shipped
+        on: 2026-08-26
   - id: W6
     milestone: M10
     title: Rollover and polish
@@ -334,6 +358,49 @@ waves:
     status: pending
     pieces: []
 holdbacks:
+  - id: HB-push-transport
+    kind: external
+    title: There is no FCM transport behind the push port, and no setting to hold a credential
+    why: >-
+      §6.5 names Web Push over FCM as the channel and §12 records what it costs on each
+      platform, but `app/core/config.py` carries no FCM or VAPID setting — and that file
+      belongs to `core` rather than to any W5 lane, so there is nowhere to put a server key
+      without a cross-lane edit. §15's "required from you before or during implementation"
+      list never asked for the credential either, which is the more useful gap: it should
+      have a row there.
+
+      What this does NOT cost is worth stating, because "push is not wired" reads as "none of
+      it works". Everything either side of the wire is built and tested: registration
+      (`POST /push-tokens`), the per-channel `notification_delivery` record, §5.11's delivery
+      report, §6.5's install-state list, the push-disabled banner, and the queue the worker
+      drains. `RecordingPushSender` stands in for the provider and marks a send `sent` rather
+      than `delivered`, because handing a message to a push service is not the same as a
+      phone lighting up and §5.11 keeps those apart.
+
+      A second piece is blocked by the same gap and by a different ownership line: the
+      service worker's `push` event handler, which is what DISPLAYS an arriving notification,
+      lives in each app's own SW entry. Subscription works without it; display does not.
+    blocks: a real push reaching a real phone
+    status: open
+    opened: 2026-08-26
+  - id: HB-2b-and-4f-not-mounted
+    kind: carried
+    title: M8's screens are built and tested but not routed, by design this wave
+    why: >-
+      The E2E harness lane owns `web/apps/{staff,parent,dashboard}/src/App.tsx` for W5,
+      because it is wiring in several waves' worth of screens that were built and never
+      mounted. M8's prompt names this and says to stop rather than edit, so four mount points
+      are outstanding — parent `2b`'s inbox and calendar panel, the staff preferences screen
+      and coach feed, dashboard `4f` and its `alert-centre` registration.
+
+      A fifth is a different case and does not resolve when App.tsx does.
+      `EventCalendarButtons` (§5.12's per-event `.ics`) belongs on `7d`/`12h`, which are
+      `web/apps/parent/src/features/events/` — lane EVENTS' directory, with no slot
+      registered in either container. It is built, tested and exported; mounting it needs
+      either a slot in that container or an owner's edit.
+    blocks: E2E-anything that drives these screens through a shell
+    status: open
+    opened: 2026-08-26
   - id: HB-w5-lane-fixtures
     kind: carried
     title: W5's lane fixtures (§2.2 item 8) are not written, and both lanes start without them
@@ -359,6 +426,13 @@ holdbacks:
 
       What closes this: three conftests plus three fixture-build tests, on `main`, before the
       worktrees are created. It is the same work W4 did and the same size.
+
+      ONE OF THE THREE IS DONE. Lane COMMS wrote `tests/comms/conftest.py` and
+      `tests/comms/test_the_lane_fixtures_build.py` inside the lane rather than on `main`,
+      pinned to the same instant `tests/billing/conftest.py` and `tests/events/conftest.py`
+      pin — which is the specific disagreement this entry warned about, since M8's
+      notification and M9's at-risk job are a caller/callee pair across one seam. `reports`
+      and `privacy` still have none, and lane REPORTS opens next.
     blocks: W5 lane start
     status: open
     opened: 2026-08-26
