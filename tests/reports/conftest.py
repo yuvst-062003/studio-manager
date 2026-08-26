@@ -215,7 +215,7 @@ def twelve_students_mixed_billing(
         student = _make_priced_student(app_session, studio, a_price_plan)
         students.append(student)
 
-        # Create October charge
+        # Create October charge marked open first
         charge = Charge(
             studio_id=studio.id,
             payer_person_id=student.payer_person_id,
@@ -225,13 +225,13 @@ def twelve_students_mixed_billing(
             period_month=OCTOBER_PERIOD[1],
             amount_agorot=MONTHLY_AGOROT,
             due_date=date(2026, 10, 31),
-            status="paid",
+            status="open",
             created_by="billing_run",
         )
         app_session.add(charge)
         app_session.flush()
 
-        # Record payment for October
+        # Record payment for October, which will allow status to become paid
         payment = Payment(
             studio_id=studio.id,
             charge_id=charge.id,
@@ -240,6 +240,10 @@ def twelve_students_mixed_billing(
             recorded_at=date(2026, 11, 1),
         )
         app_session.add(payment)
+        app_session.flush()
+
+        # Update charge status to paid after payment is recorded
+        charge.status = "paid"
     app_session.commit()
 
     # Create 4 students with OVERDUE October charges
