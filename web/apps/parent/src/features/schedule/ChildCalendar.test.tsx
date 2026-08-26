@@ -85,7 +85,7 @@ function calendar(props: Record<string, unknown> = {}) {
 describe('ChildCalendar (12b)', () => {
   it('renders a whole month, Sunday first', async () => {
     render(calendar())
-    await waitFor(() => expect(screen.getAllByRole('gridcell')).toHaveLength(30))
+    await waitFor(() => expect(screen.getAllByRole('cell')).toHaveLength(30))
     expect(screen.getAllByRole('columnheader')[0]).toHaveTextContent(t('he', 'schedule.weekday.0'))
   })
 

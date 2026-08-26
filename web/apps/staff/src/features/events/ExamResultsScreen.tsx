@@ -20,7 +20,7 @@
 // says nothing about notifying — which the audit noticed about the drawn caption too.
 import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { Alert, Button, Card, EmptyState } from '@studio/ui'
+import { Alert, Button, Card, EmptyState, useModalDialog } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { BeltPair } from './BeltPair'
@@ -86,6 +86,9 @@ export function ExamResultsScreen({
   const [loaded, setLoaded] = useState(false)
   const [marks, setMarks] = useState<Record<string, ExamResult>>({})
   const [confirming, setConfirming] = useState(false)
+  // Moves focus in on open, traps Tab, closes on Escape, and restores focus to the button
+  // that opened it. Escape matters most here: it is what a coach presses first.
+  const dialogRef = useModalDialog(confirming, () => setConfirming(false))
   const [saved, setSaved] = useState(false)
   const [failed, setFailed] = useState(false)
 
@@ -206,8 +209,15 @@ export function ExamResultsScreen({
       {confirming ? (
         <div
           aria-label={t(locale, 'events.exam.save')}
+          // `aria-modal` and the trap arrive together, deliberately. The attribute alone told
+          // a screen reader the rest of the screen was unavailable while Tab still walked
+          // straight out of this dialog and back into the roster behind it — and what this
+          // one confirms is an irreversible bulk write that promotes every passing student.
+          aria-modal="true"
+          ref={dialogRef}
           role="alertdialog"
           style={dialogStyle}
+          tabIndex={-1}
         >
           <p style={{ margin: 0 }}>{t(locale, 'events.exam.passPromotesHint')}</p>
           <span style={{ display: 'flex', gap: 'var(--space-2)' }}>

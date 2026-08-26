@@ -111,6 +111,16 @@ class ChargeOut(BaseModel):
     #: read shape because §4.3 settles a charge by summing allocations, so a client that
     #: rendered `amount_agorot` alone would show a fully-paid charge as outstanding.
     allocated_agorot: int = 0
+    #: §5.10 — 'a charge already covered by an open or paid `payment_order` is **not
+    #: selectable** in the credit-card option'. The refusal itself was always enforced by
+    #: `OrderService`; without this field the read shape could not say *why*, so a parent
+    #: whose charge sat in an order opened on another device tapped a visible row and got a
+    #: generic error. Computed from the same `HOLDING_STATUSES` predicate the refusal uses,
+    #: so the screen and the server cannot disagree about which rows are payable.
+    #:
+    #: Defaulted rather than optional on purpose: `None` would have to mean "unknown", and a
+    #: client cannot render an explanation for a state it does not know it is in.
+    is_covered_elsewhere: bool = False
 
 
 class ManualChargeIn(BaseModel):

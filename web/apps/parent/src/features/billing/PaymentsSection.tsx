@@ -132,11 +132,13 @@ export function PaymentsSection({ locale }: { locale: Locale }) {
           charge,
           studentName: charge.student_id ? (nameOf.get(charge.student_id) ?? '') : '',
           beltColorHex: null,
-          // §5.10's primary double-payment guard is enforced by the server, which refuses
-          // a second order over a covered charge with a 409. It cannot be drawn here:
-          // `ChargeOut` carries no field saying a charge already sits inside an open
-          // order, so the screen has nothing to read. See HB-e2e-parent-billing-api.
-          coveredElsewhere: false,
+          // §5.10's primary double-payment guard, now drawn rather than only enforced. The
+          // server has always refused a second order over a covered charge with a 409; what
+          // it could not do was explain, so a parent who opened an order on another device
+          // tapped a live-looking row and got common.error.generic. `is_covered_elsewhere`
+          // is computed from the same predicate as the refusal, so a row this screen greys
+          // out is exactly a row the server would decline. Closes HB-e2e-parent-billing-api.
+          coveredElsewhere: charge.is_covered_elsewhere,
         })),
       )
       setLoaded(true)

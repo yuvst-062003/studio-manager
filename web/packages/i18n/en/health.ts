@@ -14,6 +14,10 @@ export const health: Bundle = {
   'declaration.signatureHint': 'Sign with your finger inside the frame',
   'declaration.signatureClear': 'Clear signature',
   'declaration.signatureRequired': 'A signature is required to submit',
+  // The keyboard route to signing. SPEC 6.1 makes the declaration a hard gate, so a pad
+  // that only answers to a finger locked a parent out of the entire app.
+  'declaration.signatureTyped': 'Or type your full name',
+  'declaration.signatureTypedHint': 'The name you type is signed into the pad above',
   'declaration.submit': 'Submit the declaration',
   'declaration.submitting': 'Sending…',
   'declaration.submitted': 'Declaration submitted',

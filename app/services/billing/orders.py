@@ -25,6 +25,7 @@ parent who opened uPay and closed the tab would otherwise never be able to pay t
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
 from datetime import datetime, timedelta
 
 from sqlalchemy import select
@@ -43,7 +44,12 @@ ORDER_TTL_HOURS = 24
 #: `amount_mismatch` KEEPS its claim: real money arrived against that order, and offering
 #: the same charges for a second card payment before a human has looked would invite the
 #: family to pay twice for one month.
-_HOLDING_STATUSES = ("pending", "paid", "amount_mismatch")
+HOLDING_STATUSES = ("pending", "paid", "amount_mismatch")
+
+#: Kept as a private alias so the existing call sites below read unchanged. The public name
+#: exists because `ChargeOut.is_covered_elsewhere` is the same predicate seen from the read
+#: side, and two hand-copied tuples would drift the moment a sixth order status appears.
+_HOLDING_STATUSES = HOLDING_STATUSES
 
 
 class MerchantEmailMissingError(RuntimeError):
@@ -96,6 +102,35 @@ class OrderService:
                     Charge.id.notin_(claimed),
                 )
                 .order_by(Charge.due_date, Charge.id)
+            ).scalars()
+        )
+
+    def covered_charge_ids(self, charge_ids: Sequence[uuid.UUID]) -> set[uuid.UUID]:
+        """Which of these charges are already claimed by an open or paid order.
+
+        The read-side twin of `selectable_charges`'s `notin_(claimed)`. That method answers
+        "what may this payer pay now" and drops the rest; a LIST of charges has to render
+        the rest too, greyed out and explained, which is what §5.10's covered-elsewhere copy
+        on `12f` is. Both read `HOLDING_STATUSES`, so a row the server would refuse is
+        exactly a row the screen shows as unpayable.
+
+        Takes the ids rather than a payer, because the caller has already paged them: a
+        second query filtered by payer would return claims for charges that are not on the
+        page and miss none that are. Returns a set for O(1) membership while projecting.
+
+        An empty input short-circuits. `IN ()` is legal SQL for SQLAlchemy to emit but the
+        round trip is pure cost on the common case of a family with nothing outstanding.
+        """
+        if not charge_ids:
+            return set()
+        return set(
+            self._session.execute(
+                select(PaymentOrderCharge.charge_id)
+                .join(PaymentOrder, PaymentOrder.id == PaymentOrderCharge.payment_order_id)
+                .where(
+                    PaymentOrder.status.in_(HOLDING_STATUSES),
+                    PaymentOrderCharge.charge_id.in_(charge_ids),
+                )
             ).scalars()
         )
 

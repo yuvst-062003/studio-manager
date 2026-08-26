@@ -6,7 +6,19 @@ Open the `.dc.html` files in a browser to look at the actual designs.
 
 **61 artboards** across three surfaces. Reviewed in [../canvas-review.md](../canvas-review.md).
 
-Artboard IDs are stable and referenced by [../decisions.md](../decisions.md) — e.g. D9 cuts `2b`, `7c` and `12f`.
+The count is asserted, not remembered: `tests/contracts/test_canvas_matches_spec.py` fails if
+the canvas grows a 62nd artboard or loses one. W6's exit gate is phrased as *"all 61"*, and a
+number nobody checks is not a gate. §5.15's rollover wizard is the one major flow with **no**
+artboard, deliberately — see conflict C5 in [../../plan/milestone-plan.md](../../plan/milestone-plan.md).
+
+Artboard IDs are stable and referenced by [../decisions.md](../decisions.md).
+
+**No artboard has ever been fully cut.** D9 is often paraphrased as "cutting `2b`, `7c` and
+`12f`"; read as written it *reduces* all three and removes none — `2b` loses its conversation
+tab and keeps the inbox, `7c` loses one column, `12f` is retitled and has its email affordance
+narrowed. All three reductions are applied to the canvas and to the shipped code. C10
+(2026-08-26) removed one row from `3f`: the health-declaration attendance block SPEC §5.5 says
+must not exist. Each of those four negatives is held by the contract test above.
 
 
 ## Parent app (390×844 unless noted)

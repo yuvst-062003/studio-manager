@@ -209,6 +209,27 @@ export const TOKEN_ROLES: Record<string, TokenRole> = {
     obligation: { kind: 'ground' },
     note: 'The disabled button fill.',
   },
+  '--scrim': {
+    tier: 'structural',
+    group: 'palette',
+    // SC 1.4.11 is about the contrast of a component's own boundary against what is
+    // ADJACENT to it. A scrim has no boundary and identifies nothing; it exists to reduce
+    // the legibility of what is behind it, so a minimum-contrast obligation would be
+    // measuring the opposite of its purpose. Its accessibility burden is carried instead by
+    // the dialog's `aria-modal` and its focus trap, which is where modality is actually
+    // announced.
+    obligation: {
+      kind: 'exempt',
+      why: 'SC 1.4.11 covers boundaries that identify a component; a scrim identifies none.',
+    },
+    note: 'Modal overlay. Was USED and never DEFINED until W6 — `background` does not inherit, so it resolved to transparent and the nav drawer opened with no scrim at all.',
+  },
+  '--surface-raised': {
+    tier: 'structural',
+    group: 'palette',
+    obligation: { kind: 'ground' },
+    note: 'A surface above --surface: popovers, sheets, preview cards. In dark mode it goes LIGHTER than --surface, because elevation in dark mode is light.',
+  },
   '--belt-ring': {
     tier: 'structural',
     group: 'shape',

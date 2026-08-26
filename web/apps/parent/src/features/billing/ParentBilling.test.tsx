@@ -20,7 +20,12 @@ import type { BillingClient, ChargeOut, PaymentOut } from './billingClient'
 
 const LOCALE = 'he' as const
 
-function charge(id: string, month: number, amount = 25_000): ChargeOut {
+function charge(
+  id: string,
+  month: number,
+  amount = 25_000,
+  isCoveredElsewhere = false,
+): ChargeOut {
   return {
     id,
     payer_person_id: 'payer-1',
@@ -35,6 +40,11 @@ function charge(id: string, month: number, amount = 25_000): ChargeOut {
     status: 'open',
     created_by: 'billing_run',
     allocated_agorot: 0,
+    // §5.10's covered-elsewhere flag, served by `/me/charges` since W6. The row-level
+    // `DebtRow.coveredElsewhere` below is what the screen reads; this is the wire field the
+    // section maps from, and the two are kept separate so a screen test can still build a
+    // greyed-out row without a server shape.
+    is_covered_elsewhere: isCoveredElsewhere,
   }
 }
 

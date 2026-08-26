@@ -2,8 +2,10 @@
 //
 // **The load-bearing test is the one about a route that does not exist.** §2.3 puts in-app
 // two-way chat out of scope, §5.11 permits exactly two levels — a push notification and a
-// ONE-WAY inbox — and D9.1 cut `שיחה עם המשרד` from this artboard. The canvas still shows it.
-// A test asserting the absence is what stops it coming back as "a small thing".
+// ONE-WAY inbox — and D9.1 cut `שיחה עם המשרד` from this artboard. W6 verified the canvas
+// no longer draws it either (C9, 2026-08-26); tests/contracts/test_canvas_matches_spec.py
+// now fails if it returns there, and this test fails if it returns here. Two negatives over
+// the same rule, because the mockup and the code are read by different people.
 //
 // **The second is the iOS branch.** The lane brief: "the two platforms take different paths
 // here and you must not share one code path between them." On iOS in a Safari tab the Push

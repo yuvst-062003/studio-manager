@@ -82,7 +82,7 @@ export function HealthGate({
           {t(locale, 'health.declaration.forChild')} <bdi>{blocked.display_name}</bdi>
         </p>
         {blocked.health_status === 'trial_signed' ? (
-          <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)' }}>
+          <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-caption)' }}>
             {t(locale, 'health.badge.trialSigned')}
           </p>
         ) : null}

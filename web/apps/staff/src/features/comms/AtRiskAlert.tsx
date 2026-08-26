@@ -58,7 +58,7 @@ const callStyle: CSSProperties = {
   alignSelf: 'flex-start',
   background: 'var(--surface)',
   border: 'var(--border-width-hairline) solid var(--border)',
-  borderRadius: 'var(--radius-2)',
+  borderRadius: 'var(--radius-md)',
   color: 'var(--fg)',
   display: 'inline-flex',
   // §6.2 — "large tap targets ... no interaction requiring precision". 44px is the smallest

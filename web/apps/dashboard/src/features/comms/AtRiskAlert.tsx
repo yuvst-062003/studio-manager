@@ -58,7 +58,7 @@ const hintStyle: CSSProperties = {
 const callStyle: CSSProperties = {
   alignItems: 'center',
   border: 'var(--border-width-hairline) solid var(--border)',
-  borderRadius: 'var(--radius-2)',
+  borderRadius: 'var(--radius-md)',
   color: 'var(--fg)',
   display: 'inline-flex',
   minBlockSize: '44px',

@@ -4,6 +4,11 @@ import './primitives/primitives.css'
 
 export { HelloProof } from './HelloProof'
 export { ThemeProvider, useTheme } from './ThemeProvider'
+// Every app calls this once, at its root. Without it `<html dir>` stays on the literal its
+// index.html shipped and picking English renders LTR copy inside an RTL document.
+export { useDocumentLocale } from './useDocumentLocale'
+// `aria-modal="true"` is a promise about the rest of the page. This is what keeps it.
+export { useModalDialog } from './useModalDialog'
 export { THEME_COLOR, THEME_STORAGE_KEY, resolveTheme } from './theme'
 export type { ResolvedTheme, ThemePreference } from './theme'
 export type { AppManifest, ManifestIcon } from './manifest'
@@ -54,6 +59,8 @@ export { Toast } from './primitives/Toast'
 // The shell both apps mount (§6.2, §6.3). The drawer is the one component here whose
 // layout is direction-dependent, which is why G12 matters most in it.
 export { AppShell } from './shell/AppShell'
+// Artboard 2e / 9e — language and theme, in the drawer they are drawn in.
+export { AccountDrawerFooter } from './shell/AccountDrawerFooter'
 export { NavDrawer } from './shell/NavDrawer'
 export type { NavItem } from './shell/NavDrawer'
 export { StudioSwitcher } from './shell/StudioSwitcher'

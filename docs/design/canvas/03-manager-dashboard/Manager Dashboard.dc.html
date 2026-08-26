@@ -2187,11 +2187,18 @@
             <div style="font:500 13px/1 Rubik;color:#1f6b3f">מופעל</div>
             <div style="width:46px;height:27px;border-radius:14px;background:#1f6b3f;display:flex;align-items:center;justify-content:flex-end;padding:0 3px;flex:none;cursor:pointer"><div style="width:19px;height:19px;border-radius:50%;background:#fffefb"></div></div>
           </div>
-          <div style="display:flex;align-items:center;gap:14px;padding:15px 0;border-bottom:1px solid rgba(23,21,15,.08)">
-            <div style="flex:1"><div style="font:500 15px/1.2 Rubik">חסימת השתתפות ללא הצהרת בריאות</div><div style="font:400 13px/1.3 Rubik;color:#55524a;margin-top:4px">המאמן יראה התראה, החניך לא ייחסם אוטומטית</div></div>
-            <div style="font:500 13px/1 Rubik;color:#6f6b62">כבוי</div>
-            <div style="width:46px;height:27px;border-radius:14px;border:1.5px solid rgba(23,21,15,.30);display:flex;align-items:center;padding:0 3px;flex:none;cursor:pointer"><div style="width:19px;height:19px;border-radius:50%;background:#17150f"></div></div>
-          </div>
+          <!-- C10 / W6, 2026-08-26 — a fourth toggle was REMOVED from this panel: the one
+               proposing to bar a student from attending while their health declaration was
+               unsigned. SPEC §5.5 states there is no such setting and "nothing to
+               configure". Blocking a row in an app does not stop a child stepping onto a
+               mat — the coach controls that physically — so a hard block would only stop
+               the RECORD from being accurate, without making anyone safer. The removed row
+               also contradicted its own label: its subtitle promised the student would NOT
+               be blocked automatically, under a switch that said otherwise.
+               M1.10 shipped this panel without the row, SettingsScreen.test.tsx fails if it
+               is added back, and tests/contracts/test_canvas_matches_spec.py fails if it
+               reappears here. Do not restore it — this artboard was the only place in the
+               product that offered the setting at all. -->
           <div style="display:flex;align-items:center;gap:14px;padding:15px 0">
             <div style="flex:1"><div style="font:500 15px/1.2 Rubik">הודעת היעדרות מהורה</div><div style="font:400 13px/1.3 Rubik;color:#55524a;margin-top:4px">היעדרות שדווחה מראש תסומן כ״הודיעו מראש״</div></div>
             <div style="font:500 13px/1 Rubik;color:#1f6b3f">מופעל</div>

@@ -10,7 +10,7 @@
 // moved — they drop off the roster and stop being counted absent, which looks exactly like
 // the feature working.
 import type { CSSProperties } from 'react'
-import { Alert, Button, Card } from '@studio/ui'
+import { Alert, Button, Card, useModalDialog } from '@studio/ui'
 import { formatDateInStudioZone, formatTimeInStudioZone } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
@@ -87,14 +87,22 @@ export function ImpactDialog({
   const changes =
     preview.sessions_to_create + preview.sessions_to_update + preview.sessions_to_cancel
   const stranded = preview.students_left_unscheduled
+  // Rendered only while open, so the caller's conditional IS the open state.
+  const dialogRef = useModalDialog(true, onCancel)
 
   return (
+    // `aria-modal="true"` was here from the start and nothing kept the promise it makes:
+    // Tab walked out of the dialog and back into the schedule form behind it, while a
+    // screen-reader user had been told that form was unavailable. `useModalDialog` (W6)
+    // moves focus in, traps Tab, closes on Escape and restores focus to the trigger.
     <div
       role="dialog"
       aria-modal="true"
       aria-labelledby="impact-title"
       data-testid="impact-preview"
+      ref={dialogRef}
       style={dialogStyle}
+      tabIndex={-1}
     >
       <h2 id="impact-title">{t(locale, 'schedule.impact.title')}</h2>
       <p data-testid="impact-subtitle">{t(locale, 'schedule.impact.subtitle')}</p>

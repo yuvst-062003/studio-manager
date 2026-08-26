@@ -16,7 +16,7 @@ const listStyle: CSSProperties = {
 
 /** Each language named IN that language — someone who cannot read the current locale
  *  still has to recognise their own. */
-const ENDONYM: Record<Locale, string> = {
+export const ENDONYM: Record<Locale, string> = {
   he: 'עברית',
   en: 'English',
   ru: 'Русский',

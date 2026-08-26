@@ -186,7 +186,14 @@ export function DocumentsScreen({ locale, client, onEditTemplate }: DocumentsScr
             />
             {row.health_status === 'signed' ? (
               <>
-                <a href={client.pdfUrl(row.student_id)} rel="noopener" target="_blank">
+                {/* `noreferrer` as well as `noopener`: the URL of a health-declaration PDF
+                    names a student, and sending it as a Referer to whatever the browser
+                    opens next leaks that outside §11.2's audited read. */}
+                <a
+                  href={client.pdfUrl(row.student_id)}
+                  rel="noopener noreferrer"
+                  target="_blank"
+                >
                   {t(locale, 'health.documents.viewFull')}
                 </a>
                 {/* 4e finding 1. §11.2 logs the read; the manager is told before it happens. */}
@@ -194,7 +201,7 @@ export function DocumentsScreen({ locale, client, onEditTemplate }: DocumentsScr
                   data-testid={`audit-notice-${row.student_id}`}
                   style={{
                     color: 'var(--text-muted)',
-                    fontSize: 'var(--text-sm)',
+                    fontSize: 'var(--text-caption)',
                   }}
                 >
                   {t(locale, 'health.documents.viewFullNotice')}

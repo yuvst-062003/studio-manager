@@ -52,7 +52,7 @@ const detailStyle: CSSProperties = {
   inlineSize: '100%',
   padding: 'var(--space-2)',
   border: '1px solid var(--border-strong)',
-  borderRadius: 'var(--radius-1)',
+  borderRadius: 'var(--radius-sm)',
   background: 'var(--surface)',
   color: 'var(--fg)',
   font: 'inherit',
@@ -180,7 +180,11 @@ export function DeclarationForm({
   return (
     <form onSubmit={submit} style={formStyle}>
       <header>
-        <h1>{t(locale, 'health.declaration.title')}</h1>
+        {/* h2, not h1. `HealthGate` renders its own <h1> and then renders this form directly
+            beneath it, so an <h1> here produced two top-level headings on one screen and a
+            screen-reader user skipping by heading level heard the page start twice. The
+            section titles below are h3 for the same reason: the outline has to descend. */}
+        <h2>{t(locale, 'health.declaration.title')}</h2>
         <p style={{ color: 'var(--text-muted)' }}>
           {t(locale, 'health.declaration.forChild')} <bdi>{studentName}</bdi>
         </p>
@@ -192,7 +196,7 @@ export function DeclarationForm({
       <Card>
         <p style={{ color: 'var(--text-secondary)' }}>{t(locale, 'health.declaration.attestation')}</p>
         {/* D11's caveat, on the screen the parent signs. 12c finding 3. */}
-        <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)' }}>
+        <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-caption)' }}>
           {t(locale, 'health.template.disclaimer')}
         </p>
       </Card>
@@ -201,7 +205,7 @@ export function DeclarationForm({
         <p style={{ color: 'var(--text-secondary)' }}>{t(locale, 'health.declaration.intro')}</p>
         {(schema.sections ?? []).map((section) => (
           <section key={section.id}>
-            {section.title ? <h2>{section.title}</h2> : null}
+            {section.title ? <h3>{section.title}</h3> : null}
             {(section.questions ?? [])
               .filter((question) => isVisible(question, answers))
               .map((question) => {
@@ -222,7 +226,7 @@ export function DeclarationForm({
                           data-testid={`unanswered-${question.id}`}
                           style={{
                             color: 'var(--text-muted)',
-                            fontSize: 'var(--text-sm)',
+                            fontSize: 'var(--text-caption)',
                           }}
                         >
                           {t(locale, 'health.declaration.unanswered')}

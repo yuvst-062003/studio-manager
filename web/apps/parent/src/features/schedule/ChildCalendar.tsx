@@ -57,6 +57,10 @@ const gridStyle: CSSProperties = {
   gap: 'var(--space-1)',
 }
 
+/** No box of its own: the month is one flat CSS grid, and the row exists only so the ARIA
+ *  structure is valid (a cell may not be a direct child of a table). */
+const weekRowStyle: CSSProperties = { display: 'contents' }
+
 const headerCellStyle: CSSProperties = {
   textAlign: 'center',
   fontSize: 'var(--text-caption)',
@@ -146,6 +150,11 @@ export function ChildCalendar({
   const [loaded, setLoaded] = useState(false)
 
   const cells = useMemo(() => monthGrid(year, month), [year, month])
+  // `monthGrid` already pads to a whole number of sevens, so every chunk is a full week.
+  const weeks = useMemo(
+    () => Array.from({ length: cells.length / 7 }, (_, i) => cells.slice(i * 7, i * 7 + 7)),
+    [cells],
+  )
   const bounds = useMemo(() => {
     const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate()
     return { from: dayKey(year, month, 1), to: dayKey(year, month, daysInMonth) }
@@ -207,21 +216,37 @@ export function ChildCalendar({
         </button>
       </div>
 
-      <div style={gridStyle} role="grid" aria-label={t(locale, 'schedule.view.month')}>
-        {[0, 1, 2, 3, 4, 5, 6].map((weekday) => (
-          <div key={weekday} style={headerCellStyle} role="columnheader">
-            {t(locale, `schedule.weekday.${weekday}`)}
-          </div>
-        ))}
-        {cells.map((cell, index) =>
+      {/* `role="table"`, not `role="grid"`.
+          
+          A grid PROMISES two-dimensional keyboard traversal — arrow keys between cells, a
+          roving tabindex, one tab stop for the whole widget. This calendar has none of that
+          and should not: it is a read-only month view, nothing in it is operable, and every
+          cell is static text. Declaring `grid` told a screen-reader user to press the arrow
+          keys and then did nothing when they did.
+          
+          The `row` layer below is also required and was missing. ARIA does not permit a cell
+          as a direct child of a table, so the old markup was invalid as well as
+          over-promising. `display: contents` gives the rows no box of their own, so the flat
+          CSS grid that lays the month out is completely unaffected. */}
+      <div style={gridStyle} role="table" aria-label={t(locale, 'schedule.view.month')}>
+        <div role="row" style={weekRowStyle}>
+          {[0, 1, 2, 3, 4, 5, 6].map((weekday) => (
+            <div key={weekday} style={headerCellStyle} role="columnheader">
+              {t(locale, `schedule.weekday.${weekday}`)}
+            </div>
+          ))}
+        </div>
+        {weeks.map((week, weekIndex) => (
+          <div key={`week-${weekIndex}`} role="row" style={weekRowStyle}>
+        {week.map((cell, index) =>
           cell === '' ? (
             <div key={`pad-${index}`} style={dayStyle} aria-hidden="true" />
           ) : (
             <div
               key={cell}
-              role="gridcell"
-              // Keyed only; the month's length is `getAllByRole('gridcell')`. The pads are
-              // aria-hidden divs, so the gridcells ARE the days.
+              role="cell"
+              // Keyed only; the month's length is `getAllByRole('cell')`. The pads are
+              // aria-hidden divs, so the cells ARE the days.
               data-testid={`calendar-day-${cell}`}
               data-has-sessions={trainingDays.has(cell) ? 'true' : 'false'}
               aria-current={cell === todayKey ? 'date' : undefined}
@@ -231,6 +256,8 @@ export function ChildCalendar({
             </div>
           ),
         )}
+          </div>
+        ))}
       </div>
 
       {loaded && sessions.length === 0 ? (

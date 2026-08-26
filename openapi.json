@@ -1068,6 +1068,27 @@
         "title": "BootstrapPayload",
         "type": "object"
       },
+      "BulkOutcomeOut": {
+        "description": "What a bulk step did. `applied` counts rows CHANGED, not rows submitted — a group\nalready named what you renamed it to is not a change, and inflating the count would make\nthe summary §5.15 step 6 asks for a fiction.",
+        "properties": {
+          "applied": {
+            "title": "Applied",
+            "type": "integer"
+          },
+          "refused": {
+            "items": {
+              "$ref": "#/components/schemas/BulkRefusal"
+            },
+            "title": "Refused",
+            "type": "array"
+          }
+        },
+        "required": [
+          "applied"
+        ],
+        "title": "BulkOutcomeOut",
+        "type": "object"
+      },
       "BulkPresentIn": {
         "description": "`POST /sessions/{id}/attendance/bulk-present`.\n\n§5.7's \"bulk mark with the pre-report protection rule\", and the rule is in the name of\nthe field below. §10.5: **a parent pre-report never loses to a bulk action regardless\nof timestamp.** The default is therefore to protect, so a caller that omits the field\ngets the safe branch rather than overwriting every parent who reported this morning.",
         "properties": {
@@ -1092,6 +1113,25 @@
           "device_marked_at"
         ],
         "title": "BulkPresentIn",
+        "type": "object"
+      },
+      "BulkRefusal": {
+        "description": "One row a bulk press could not apply, and why.\n\nA machine-readable `reason` rather than a sentence: the screen renders it through the\ni18n layer, and an English string from the server would be the one piece of copy on a\nHebrew screen that nobody could translate.",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "reason"
+        ],
+        "title": "BulkRefusal",
         "type": "object"
       },
       "CalendarFeedOut": {
@@ -1289,6 +1329,68 @@
         "title": "ChargeCloseIn",
         "type": "object"
       },
+      "ChargeDetail": {
+        "description": "Details of a single charge for invoice rendering.",
+        "properties": {
+          "amount_agorot": {
+            "title": "Amount Agorot",
+            "type": "integer"
+          },
+          "charge_id": {
+            "format": "uuid",
+            "title": "Charge Id",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "due_date": {
+            "title": "Due Date",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "payer_person_id": {
+            "format": "uuid",
+            "title": "Payer Person Id",
+            "type": "string"
+          },
+          "period_month": {
+            "title": "Period Month",
+            "type": "integer"
+          },
+          "period_year": {
+            "title": "Period Year",
+            "type": "integer"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "charge_id",
+          "student_id",
+          "payer_person_id",
+          "kind",
+          "period_year",
+          "period_month",
+          "amount_agorot",
+          "due_date",
+          "status",
+          "created_at"
+        ],
+        "title": "ChargeDetail",
+        "type": "object"
+      },
       "ChargeOut": {
         "description": "One line of what a family owes.\n\n`original_amount_agorot` and `proration_note` travel together and are how a\nmid-month join is explained on the parent's screen rather than looking like an\narbitrary discount (§5.10).",
         "properties": {
@@ -1319,6 +1421,11 @@
             "format": "uuid",
             "title": "Id",
             "type": "string"
+          },
+          "is_covered_elsewhere": {
+            "default": false,
+            "title": "Is Covered Elsewhere",
+            "type": "boolean"
           },
           "kind": {
             "enum": [
@@ -2548,6 +2655,109 @@
         "title": "CursorPage[UpayIpnRecordOut]",
         "type": "object"
       },
+      "DataExportRequest": {
+        "description": "Request to export a person's personal data.",
+        "properties": {
+          "include_audit_trail": {
+            "default": true,
+            "title": "Include Audit Trail",
+            "type": "boolean"
+          },
+          "person_id": {
+            "format": "uuid",
+            "title": "Person Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "person_id"
+        ],
+        "title": "DataExportRequest",
+        "type": "object"
+      },
+      "DataExportResponse": {
+        "description": "Response with export job status.",
+        "properties": {
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          },
+          "percent_complete": {
+            "title": "Percent Complete",
+            "type": "integer"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id",
+          "status",
+          "percent_complete",
+          "expires_at"
+        ],
+        "title": "DataExportResponse",
+        "type": "object"
+      },
+      "DeletionRequest": {
+        "description": "Request to delete a person's personal data.",
+        "properties": {
+          "person_id": {
+            "format": "uuid",
+            "title": "Person Id",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "person_id",
+          "reason"
+        ],
+        "title": "DeletionRequest",
+        "type": "object"
+      },
+      "DeletionResponse": {
+        "description": "Response confirming deletion request.",
+        "properties": {
+          "deletion_id": {
+            "format": "uuid",
+            "title": "Deletion Id",
+            "type": "string"
+          },
+          "person_id": {
+            "format": "uuid",
+            "title": "Person Id",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "deletion_id",
+          "status",
+          "person_id"
+        ],
+        "title": "DeletionResponse",
+        "type": "object"
+      },
       "DeliveryReportOut": {
         "description": "§5.11's post-send screen, for a cancellation or an announcement.\n\n`sent_count` is families targeted; `received_count` is those a push actually reached.\nThey are counted separately rather than derived from `len(missed)` because a send that\nis still in flight has neither — `queued` rows are not yet misses, and reporting them\nas such would send a manager chasing families whose phone is about to buzz.",
         "properties": {
@@ -2628,6 +2838,26 @@
           "started_on"
         ],
         "title": "EnrollmentCreate",
+        "type": "object"
+      },
+      "EnrollmentMove": {
+        "properties": {
+          "enrollment_id": {
+            "format": "uuid",
+            "title": "Enrollment Id",
+            "type": "string"
+          },
+          "to_group_id": {
+            "format": "uuid",
+            "title": "To Group Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "enrollment_id",
+          "to_group_id"
+        ],
+        "title": "EnrollmentMove",
         "type": "object"
       },
       "EnrollmentOut": {
@@ -3603,65 +3833,6 @@
         "title": "GenerateSessionsOut",
         "type": "object"
       },
-      "GroupCreate": {
-        "properties": {
-          "age_max": {
-            "anyOf": [
-              {
-                "maximum": 120.0,
-                "minimum": 0.0,
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Age Max"
-          },
-          "age_min": {
-            "anyOf": [
-              {
-                "maximum": 120.0,
-                "minimum": 0.0,
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Age Min"
-          },
-          "class_id": {
-            "format": "uuid",
-            "title": "Class Id",
-            "type": "string"
-          },
-          "description": {
-            "anyOf": [
-              {
-                "maxLength": 2000,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Description"
-          },
-          "name": {
-            "maxLength": 120,
-            "minLength": 1,
-            "title": "Name",
-            "type": "string"
-          }
-        },
-        "required": [
-          "class_id",
-          "name"
-        ],
-        "title": "GroupCreate",
-        "type": "object"
-      },
       "GroupListResponse": {
         "properties": {
           "items": {
@@ -3754,6 +3925,27 @@
           "is_active"
         ],
         "title": "GroupOut",
+        "type": "object"
+      },
+      "GroupRename": {
+        "properties": {
+          "group_id": {
+            "format": "uuid",
+            "title": "Group Id",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "group_id",
+          "name"
+        ],
+        "title": "GroupRename",
         "type": "object"
       },
       "GroupStaffCreate": {
@@ -5197,6 +5389,50 @@
         "title": "MissedRecipientOut",
         "type": "object"
       },
+      "MonthlyReportSummary": {
+        "description": "Summary of charges in a billing period.",
+        "properties": {
+          "overdue_agorot": {
+            "title": "Overdue Agorot",
+            "type": "integer"
+          },
+          "pending_agorot": {
+            "title": "Pending Agorot",
+            "type": "integer"
+          },
+          "period_month": {
+            "title": "Period Month",
+            "type": "integer"
+          },
+          "period_year": {
+            "title": "Period Year",
+            "type": "integer"
+          },
+          "settled_agorot": {
+            "title": "Settled Agorot",
+            "type": "integer"
+          },
+          "total_agorot": {
+            "title": "Total Agorot",
+            "type": "integer"
+          },
+          "total_students": {
+            "title": "Total Students",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "period_year",
+          "period_month",
+          "total_students",
+          "total_agorot",
+          "settled_agorot",
+          "overdue_agorot",
+          "pending_agorot"
+        ],
+        "title": "MonthlyReportSummary",
+        "type": "object"
+      },
       "MyStandingOrderOut": {
         "description": "Whether §5.10's second double-payment guard applies to the person asking.",
         "properties": {
@@ -5709,6 +5945,39 @@
           "reason"
         ],
         "title": "PaymentReversalIn",
+        "type": "object"
+      },
+      "PlanRepricing": {
+        "description": "A new amount for one open plan, effective from the new year's start.\n\n`registration_fee_agorot` omitted means *inherit* the current fee, which is different\nfrom sending `0` — that sets the fee to nothing. The distinction is real money and the\nfield is deliberately nullable rather than defaulted.",
+        "properties": {
+          "monthly_amount_agorot": {
+            "minimum": 0.0,
+            "title": "Monthly Amount Agorot",
+            "type": "integer"
+          },
+          "plan_id": {
+            "format": "uuid",
+            "title": "Plan Id",
+            "type": "string"
+          },
+          "registration_fee_agorot": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Registration Fee Agorot"
+          }
+        },
+        "required": [
+          "plan_id",
+          "monthly_amount_agorot"
+        ],
+        "title": "PlanRepricing",
         "type": "object"
       },
       "PricePlanCloseIn": {
@@ -6640,6 +6909,58 @@
         "title": "ReorderLadderIn",
         "type": "object"
       },
+      "ReportDeliveryRequest": {
+        "description": "Request to send a monthly report via email.",
+        "properties": {
+          "month": {
+            "title": "Month",
+            "type": "integer"
+          },
+          "to_person_id": {
+            "format": "uuid",
+            "title": "To Person Id",
+            "type": "string"
+          },
+          "year": {
+            "title": "Year",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "year",
+          "month",
+          "to_person_id"
+        ],
+        "title": "ReportDeliveryRequest",
+        "type": "object"
+      },
+      "ReportDeliveryResponse": {
+        "description": "Response confirming report delivery request.",
+        "properties": {
+          "notification_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notification Id"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "notification_id",
+          "status"
+        ],
+        "title": "ReportDeliveryResponse",
+        "type": "object"
+      },
       "ResendOut": {
         "description": "How many sends `[ שלח שוב ]` could actually retry.\n\nA count and not a boolean, because it is frequently zero and the screen has to say so.\nOnly `failed` rows are retryable — see `DeliveryReporter.retry_failed` — so a report\nshowing five misses that are all `denied` retries nothing, and a button that claimed\notherwise would be lying to a manager in a hurry.",
         "properties": {
@@ -6652,6 +6973,254 @@
           "retried_count"
         ],
         "title": "ResendOut",
+        "type": "object"
+      },
+      "RolloverAnnounceIn": {
+        "description": "§5.15 step 7 — \"optionally publish the new schedule to all guardians in one action\".\n\nNo `scope_type`: the step's whole definition is *all guardians*, and offering a narrower\naudience here would be a second announcements composer hiding inside a wizard. A manager\nwho wants one group has `4f`.",
+        "properties": {
+          "body": {
+            "minLength": 1,
+            "title": "Body",
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "body"
+        ],
+        "title": "RolloverAnnounceIn",
+        "type": "object"
+      },
+      "RolloverAnnounceOut": {
+        "properties": {
+          "announcement_id": {
+            "format": "uuid",
+            "title": "Announcement Id",
+            "type": "string"
+          },
+          "families": {
+            "title": "Families",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "announcement_id",
+          "families"
+        ],
+        "title": "RolloverAnnounceOut",
+        "type": "object"
+      },
+      "RolloverGroupsIn": {
+        "description": "§5.15 step 3. **There is no `carry_forward` list, and that is the design.** A group is\nnot scoped to a training year — the year reaches it only through the sessions generated\nfor it — so carrying one forward unchanged is the absence of an operation. A field for it\nwould be a field the server ignores, which is worse than no field at all.",
+        "properties": {
+          "creates": {
+            "items": {
+              "$ref": "#/components/schemas/app__schemas__rollover__GroupCreate"
+            },
+            "maxItems": 500,
+            "title": "Creates",
+            "type": "array"
+          },
+          "renames": {
+            "items": {
+              "$ref": "#/components/schemas/GroupRename"
+            },
+            "maxItems": 500,
+            "title": "Renames",
+            "type": "array"
+          },
+          "retire": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 500,
+            "title": "Retire",
+            "type": "array"
+          },
+          "revive": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 500,
+            "title": "Revive",
+            "type": "array"
+          }
+        },
+        "title": "RolloverGroupsIn",
+        "type": "object"
+      },
+      "RolloverPricesIn": {
+        "properties": {
+          "repricings": {
+            "items": {
+              "$ref": "#/components/schemas/PlanRepricing"
+            },
+            "maxItems": 500,
+            "title": "Repricings",
+            "type": "array"
+          }
+        },
+        "title": "RolloverPricesIn",
+        "type": "object"
+      },
+      "RolloverStateOut": {
+        "description": "What `GET /rollover/{id}` returns: the whole wizard, in one read.\n\nOne read rather than seven, because the rail renders every step's status at once and a\nper-step fetch would show the manager a rail that fills in raggedly.",
+        "properties": {
+          "closures": {
+            "title": "Closures",
+            "type": "integer"
+          },
+          "complete": {
+            "title": "Complete",
+            "type": "boolean"
+          },
+          "groups_active": {
+            "title": "Groups Active",
+            "type": "integer"
+          },
+          "price_plans_open": {
+            "title": "Price Plans Open",
+            "type": "integer"
+          },
+          "resume_at": {
+            "enum": [
+              "year",
+              "closures",
+              "groups",
+              "students",
+              "prices",
+              "generate",
+              "announce"
+            ],
+            "title": "Resume At",
+            "type": "string"
+          },
+          "sessions_generated": {
+            "title": "Sessions Generated",
+            "type": "integer"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/RolloverStepOut"
+            },
+            "title": "Steps",
+            "type": "array"
+          },
+          "students_enrolled": {
+            "title": "Students Enrolled",
+            "type": "integer"
+          },
+          "training_year": {
+            "$ref": "#/components/schemas/TrainingYearOut"
+          }
+        },
+        "required": [
+          "training_year",
+          "steps",
+          "resume_at",
+          "complete",
+          "closures",
+          "groups_active",
+          "students_enrolled",
+          "price_plans_open",
+          "sessions_generated"
+        ],
+        "title": "RolloverStateOut",
+        "type": "object"
+      },
+      "RolloverStepOut": {
+        "description": "One row of the wizard rail.",
+        "properties": {
+          "detail": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "id": {
+            "enum": [
+              "year",
+              "closures",
+              "groups",
+              "students",
+              "prices",
+              "generate",
+              "announce"
+            ],
+            "title": "Id",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "done",
+              "skipped"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status"
+        ],
+        "title": "RolloverStepOut",
+        "type": "object"
+      },
+      "RolloverStepPatch": {
+        "description": "Acknowledge one step. `pending` is accepted so a manager can reopen a step they\nticked by mistake — a one-way ratchet would send them back through the whole wizard to\ncorrect a single press.",
+        "properties": {
+          "status": {
+            "enum": [
+              "pending",
+              "done",
+              "skipped"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "RolloverStepPatch",
+        "type": "object"
+      },
+      "RolloverStudentsIn": {
+        "description": "§5.15 step 4. **No `confirm` list either**, for the same reason as `carry_forward`: an\nenrollment left alone continues, so confirming one writes nothing. §5.15 also forbids\nautomatic age-based promotion in v1, so every move here is named by a human.",
+        "properties": {
+          "moves": {
+            "items": {
+              "$ref": "#/components/schemas/EnrollmentMove"
+            },
+            "maxItems": 500,
+            "title": "Moves",
+            "type": "array"
+          },
+          "not_returning": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 500,
+            "title": "Not Returning",
+            "type": "array"
+          }
+        },
+        "title": "RolloverStudentsIn",
         "type": "object"
       },
       "RosterEntry": {
@@ -7844,6 +8413,29 @@
           "note"
         ],
         "title": "StudentBeltOut",
+        "type": "object"
+      },
+      "StudentChargeDetails": {
+        "description": "Charges for a student across all periods.",
+        "properties": {
+          "charges": {
+            "items": {
+              "$ref": "#/components/schemas/ChargeDetail"
+            },
+            "title": "Charges",
+            "type": "array"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "student_id",
+          "charges"
+        ],
+        "title": "StudentChargeDetails",
         "type": "object"
       },
       "StudentConvertIn": {
@@ -9753,6 +10345,124 @@
           "created_at"
         ],
         "title": "StudioOut",
+        "type": "object"
+      },
+      "app__schemas__rollover__GroupCreate": {
+        "description": "A group created during the rollover. Same fields as `POST /groups`, because a group\nmade here must be indistinguishable from one made there — a rollover that produced a\nsecond-class group would show up as a bug six months later, in a different screen.",
+        "properties": {
+          "age_max": {
+            "anyOf": [
+              {
+                "maximum": 120.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age Max"
+          },
+          "age_min": {
+            "anyOf": [
+              {
+                "maximum": 120.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age Min"
+          },
+          "class_id": {
+            "format": "uuid",
+            "title": "Class Id",
+            "type": "string"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "class_id",
+          "name"
+        ],
+        "title": "GroupCreate",
+        "type": "object"
+      },
+      "app__schemas__structure__GroupCreate": {
+        "properties": {
+          "age_max": {
+            "anyOf": [
+              {
+                "maximum": 120.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age Max"
+          },
+          "age_min": {
+            "anyOf": [
+              {
+                "maximum": 120.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age Min"
+          },
+          "class_id": {
+            "format": "uuid",
+            "title": "Class Id",
+            "type": "string"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "class_id",
+          "name"
+        ],
+        "title": "GroupCreate",
         "type": "object"
       },
       "app__schemas__studio__StudioOut": {
@@ -13382,7 +14092,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/GroupCreate"
+                "$ref": "#/components/schemas/app__schemas__structure__GroupCreate"
               }
             }
           },
@@ -15637,6 +16347,178 @@
         ]
       }
     },
+    "/api/v1/privacy/delete": {
+      "post": {
+        "description": "Request deletion of a person's personal data.\n\nEnqueues a task to delete data within retention window constraints\n(e.g., financial records retained per Israeli law).\n\nReturns a deletion tracking ID for status checks.",
+        "operationId": "request_deletion_api_v1_privacy_delete_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeletionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeletionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Request Deletion",
+        "tags": [
+          "privacy"
+        ]
+      }
+    },
+    "/api/v1/privacy/delete/{deletion_id}": {
+      "get": {
+        "description": "Poll status of a deletion request.",
+        "operationId": "get_deletion_status_api_v1_privacy_delete__deletion_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "deletion_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Deletion Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeletionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Deletion Status",
+        "tags": [
+          "privacy"
+        ]
+      }
+    },
+    "/api/v1/privacy/export": {
+      "post": {
+        "description": "Request GDPR data export for a person.\n\nReturns a job ID. Client polls `/export/{job_id}` to check status.\nData is available for download when status is 'ready'.\n\nQuery parameters:\n- include_audit_trail: whether to include audit logs (default: true)",
+        "operationId": "request_data_export_api_v1_privacy_export_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DataExportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataExportResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Request Data Export",
+        "tags": [
+          "privacy"
+        ]
+      }
+    },
+    "/api/v1/privacy/export/{job_id}": {
+      "get": {
+        "description": "Poll status of a data export job.",
+        "operationId": "get_export_status_api_v1_privacy_export__job_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataExportResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Export Status",
+        "tags": [
+          "privacy"
+        ]
+      }
+    },
     "/api/v1/products": {
       "get": {
         "operationId": "list_products_api_v1_products_get",
@@ -16769,6 +17651,598 @@
         "summary": "Reject Registration Request",
         "tags": [
           "people"
+        ]
+      }
+    },
+    "/api/v1/reports/{studio_id}/charges/{student_id}": {
+      "get": {
+        "description": "Fetch all charges for a student for invoice generation.\n\nReturns charge details across all periods, sorted by period (newest first).\nOnly accessible to owner and manager roles.",
+        "operationId": "get_student_charges_api_v1_reports__studio_id__charges__student_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "studio_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Studio Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentChargeDetails"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Student Charges",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/{studio_id}/monthly": {
+      "get": {
+        "description": "Fetch summary of charges for a given month.\n\nOnly accessible to owner and manager roles. Returns totals by charge status:\nsettled (paid charges), overdue (open charges past due date), pending (open\ncharges not yet due).\n\nQuery parameters:\n- year: billing year (2000–2100)\n- month: billing month (1–12)",
+        "operationId": "get_monthly_report_api_v1_reports__studio_id__monthly_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "studio_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Studio Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "year",
+            "required": true,
+            "schema": {
+              "maximum": 2100,
+              "minimum": 2000,
+              "title": "Year",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "month",
+            "required": true,
+            "schema": {
+              "maximum": 12,
+              "minimum": 1,
+              "title": "Month",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MonthlyReportSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Monthly Report",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/{studio_id}/send-monthly": {
+      "post": {
+        "description": "Queue a monthly billing report for email delivery.\n\nEnqueues a notification through the COMMS lane's notification system.\nThe report PDF is generated and attached by the notification worker.",
+        "operationId": "send_monthly_report_api_v1_reports__studio_id__send_monthly_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "studio_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Studio Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportDeliveryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportDeliveryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Send Monthly Report",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/rollover/{training_year_id}": {
+      "get": {
+        "description": "§5.15 — where the manager got to, in one read.\n\nTwo steps are computed from the data and five are acknowledgements; the client is told\nthe answer and not the mechanism, so a future step that becomes observable can stop\nbeing an ack without a client release.",
+        "operationId": "read_rollover_state_api_v1_rollover__training_year_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "training_year_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Training Year Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RolloverStateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Rollover State",
+        "tags": [
+          "rollover"
+        ]
+      }
+    },
+    "/api/v1/rollover/{training_year_id}/announce": {
+      "post": {
+        "description": "§5.15 step 7 — \"optionally publish the new schedule to all guardians in one action\".\n\nCreate and publish in one call, which is the difference between this and `4f`. The\ncomposer exists so a manager can draft, preview an audience and send later; the rollover\nstep exists because they have just finished a forty-minute wizard and the announcement is\nthe last press. A draft left behind here would be a message about a schedule that is now\nlive, sitting unsent in a screen nobody opens until next year.\n\nThe scope is always `studio`, so `scope_id` is `None` — §5.11's audience rules and the\nper-guardian dedupe are `AnnouncementService`'s, unchanged.",
+        "operationId": "announce_rollover_api_v1_rollover__training_year_id__announce_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "training_year_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Training Year Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RolloverAnnounceIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RolloverAnnounceOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Announce Rollover",
+        "tags": [
+          "rollover"
+        ]
+      }
+    },
+    "/api/v1/rollover/{training_year_id}/groups": {
+      "post": {
+        "description": "§5.15 step 3 — groups carried forward, renamed, retired or created.\n\nCarrying forward is not an operation: `group` has no `training_year_id`, so a group left\nalone is already next year's group. Only the three verbs that write anything are here.",
+        "operationId": "apply_rollover_groups_api_v1_rollover__training_year_id__groups_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "training_year_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Training Year Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RolloverGroupsIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkOutcomeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Apply Rollover Groups",
+        "tags": [
+          "rollover"
+        ]
+      }
+    },
+    "/api/v1/rollover/{training_year_id}/prices": {
+      "post": {
+        "description": "§5.15 step 5 — new amounts from the new year's start, **old plans closed not\noverwritten**.\n\nEach repricing closes the incumbent plan on the day before the year starts and opens a\nsuccessor on the day it does, so last year's statements keep saying what last year cost.",
+        "operationId": "apply_rollover_prices_api_v1_rollover__training_year_id__prices_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "training_year_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Training Year Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RolloverPricesIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkOutcomeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Apply Rollover Prices",
+        "tags": [
+          "rollover"
+        ]
+      }
+    },
+    "/api/v1/rollover/{training_year_id}/steps/{step_id}": {
+      "patch": {
+        "description": "Record that a human answered a step, or reopen one they answered by mistake.\n\nAnswering a DERIVED step is a 409 rather than a silent no-op: a client that believed it\nhad marked generation done would let the manager activate a year with an empty calendar.",
+        "operationId": "set_rollover_step_api_v1_rollover__training_year_id__steps__step_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "training_year_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Training Year Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "step_id",
+            "required": true,
+            "schema": {
+              "title": "Step Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RolloverStepPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RolloverStateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Rollover Step",
+        "tags": [
+          "rollover"
+        ]
+      }
+    },
+    "/api/v1/rollover/{training_year_id}/students": {
+      "post": {
+        "description": "§5.15 step 4 — moves and leavers, in bulk, **with no automatic age-based promotion**.\n\nEvery move is named by the caller. There is no rule anywhere behind this route that reads\na date of birth, and there must not be: a child moved up a group without a human saying\nso is a conversation with a parent that nobody in the office knows happened.",
+        "operationId": "apply_rollover_students_api_v1_rollover__training_year_id__students_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "training_year_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Training Year Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RolloverStudentsIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkOutcomeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Apply Rollover Students",
+        "tags": [
+          "rollover"
         ]
       }
     },

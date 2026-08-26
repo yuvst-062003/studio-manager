@@ -2045,6 +2045,97 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/privacy/delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Request Deletion
+         * @description Request deletion of a person's personal data.
+         *
+         *     Enqueues a task to delete data within retention window constraints
+         *     (e.g., financial records retained per Israeli law).
+         *
+         *     Returns a deletion tracking ID for status checks.
+         */
+        post: operations["request_deletion_api_v1_privacy_delete_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/privacy/delete/{deletion_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Deletion Status
+         * @description Poll status of a deletion request.
+         */
+        get: operations["get_deletion_status_api_v1_privacy_delete__deletion_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/privacy/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Request Data Export
+         * @description Request GDPR data export for a person.
+         *
+         *     Returns a job ID. Client polls `/export/{job_id}` to check status.
+         *     Data is available for download when status is 'ready'.
+         *
+         *     Query parameters:
+         *     - include_audit_trail: whether to include audit logs (default: true)
+         */
+        post: operations["request_data_export_api_v1_privacy_export_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/privacy/export/{job_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Export Status
+         * @description Poll status of a data export job.
+         */
+        get: operations["get_export_status_api_v1_privacy_export__job_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/products": {
         parameters: {
             query?: never;
@@ -2433,6 +2524,227 @@ export interface paths {
         put?: never;
         /** Reject Registration Request */
         post: operations["reject_registration_request_api_v1_registration_requests__request_id__reject_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/{studio_id}/charges/{student_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Student Charges
+         * @description Fetch all charges for a student for invoice generation.
+         *
+         *     Returns charge details across all periods, sorted by period (newest first).
+         *     Only accessible to owner and manager roles.
+         */
+        get: operations["get_student_charges_api_v1_reports__studio_id__charges__student_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/{studio_id}/monthly": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Monthly Report
+         * @description Fetch summary of charges for a given month.
+         *
+         *     Only accessible to owner and manager roles. Returns totals by charge status:
+         *     settled (paid charges), overdue (open charges past due date), pending (open
+         *     charges not yet due).
+         *
+         *     Query parameters:
+         *     - year: billing year (2000–2100)
+         *     - month: billing month (1–12)
+         */
+        get: operations["get_monthly_report_api_v1_reports__studio_id__monthly_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/{studio_id}/send-monthly": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send Monthly Report
+         * @description Queue a monthly billing report for email delivery.
+         *
+         *     Enqueues a notification through the COMMS lane's notification system.
+         *     The report PDF is generated and attached by the notification worker.
+         */
+        post: operations["send_monthly_report_api_v1_reports__studio_id__send_monthly_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/rollover/{training_year_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Rollover State
+         * @description §5.15 — where the manager got to, in one read.
+         *
+         *     Two steps are computed from the data and five are acknowledgements; the client is told
+         *     the answer and not the mechanism, so a future step that becomes observable can stop
+         *     being an ack without a client release.
+         */
+        get: operations["read_rollover_state_api_v1_rollover__training_year_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/rollover/{training_year_id}/announce": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Announce Rollover
+         * @description §5.15 step 7 — "optionally publish the new schedule to all guardians in one action".
+         *
+         *     Create and publish in one call, which is the difference between this and `4f`. The
+         *     composer exists so a manager can draft, preview an audience and send later; the rollover
+         *     step exists because they have just finished a forty-minute wizard and the announcement is
+         *     the last press. A draft left behind here would be a message about a schedule that is now
+         *     live, sitting unsent in a screen nobody opens until next year.
+         *
+         *     The scope is always `studio`, so `scope_id` is `None` — §5.11's audience rules and the
+         *     per-guardian dedupe are `AnnouncementService`'s, unchanged.
+         */
+        post: operations["announce_rollover_api_v1_rollover__training_year_id__announce_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/rollover/{training_year_id}/groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Apply Rollover Groups
+         * @description §5.15 step 3 — groups carried forward, renamed, retired or created.
+         *
+         *     Carrying forward is not an operation: `group` has no `training_year_id`, so a group left
+         *     alone is already next year's group. Only the three verbs that write anything are here.
+         */
+        post: operations["apply_rollover_groups_api_v1_rollover__training_year_id__groups_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/rollover/{training_year_id}/prices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Apply Rollover Prices
+         * @description §5.15 step 5 — new amounts from the new year's start, **old plans closed not
+         *     overwritten**.
+         *
+         *     Each repricing closes the incumbent plan on the day before the year starts and opens a
+         *     successor on the day it does, so last year's statements keep saying what last year cost.
+         */
+        post: operations["apply_rollover_prices_api_v1_rollover__training_year_id__prices_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/rollover/{training_year_id}/steps/{step_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Set Rollover Step
+         * @description Record that a human answered a step, or reopen one they answered by mistake.
+         *
+         *     Answering a DERIVED step is a 409 rather than a silent no-op: a client that believed it
+         *     had marked generation done would let the manager activate a year with an empty calendar.
+         */
+        patch: operations["set_rollover_step_api_v1_rollover__training_year_id__steps__step_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/rollover/{training_year_id}/students": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Apply Rollover Students
+         * @description §5.15 step 4 — moves and leavers, in bulk, **with no automatic age-based promotion**.
+         *
+         *     Every move is named by the caller. There is no rule anywhere behind this route that reads
+         *     a date of birth, and there must not be: a child moved up a group without a human saying
+         *     so is a conversation with a parent that nobody in the office knows happened.
+         */
+        post: operations["apply_rollover_students_api_v1_rollover__training_year_id__students_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3854,6 +4166,18 @@ export interface components {
             to_time: string;
         };
         /**
+         * BulkOutcomeOut
+         * @description What a bulk step did. `applied` counts rows CHANGED, not rows submitted — a group
+         *     already named what you renamed it to is not a change, and inflating the count would make
+         *     the summary §5.15 step 6 asks for a fiction.
+         */
+        BulkOutcomeOut: {
+            /** Applied */
+            applied: number;
+            /** Refused */
+            refused?: components["schemas"]["BulkRefusal"][];
+        };
+        /**
          * BulkPresentIn
          * @description `POST /sessions/{id}/attendance/bulk-present`.
          *
@@ -3878,6 +4202,20 @@ export interface components {
              * @default true
              */
             respect_absence_reports: boolean;
+        };
+        /**
+         * BulkRefusal
+         * @description One row a bulk press could not apply, and why.
+         *
+         *     A machine-readable `reason` rather than a sentence: the screen renders it through the
+         *     i18n layer, and an English string from the server would be the one piece of copy on a
+         *     Hebrew screen that nobody could translate.
+         */
+        BulkRefusal: {
+            /** Id */
+            id: string;
+            /** Reason */
+            reason: string;
         };
         /**
          * CalendarFeedOut
@@ -3978,6 +4316,41 @@ export interface components {
             status: string;
         };
         /**
+         * ChargeDetail
+         * @description Details of a single charge for invoice rendering.
+         */
+        ChargeDetail: {
+            /** Amount Agorot */
+            amount_agorot: number;
+            /**
+             * Charge Id
+             * Format: uuid
+             */
+            charge_id: string;
+            /** Created At */
+            created_at: string;
+            /** Due Date */
+            due_date: string;
+            /** Kind */
+            kind: string;
+            /**
+             * Payer Person Id
+             * Format: uuid
+             */
+            payer_person_id: string;
+            /** Period Month */
+            period_month: number;
+            /** Period Year */
+            period_year: number;
+            /** Status */
+            status: string;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+        };
+        /**
          * ChargeOut
          * @description One line of what a family owes.
          *
@@ -4008,6 +4381,11 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /**
+             * Is Covered Elsewhere
+             * @default false
+             */
+            is_covered_elsewhere: boolean;
             /**
              * Kind
              * @enum {string}
@@ -4477,6 +4855,70 @@ export interface components {
             next_cursor?: string | null;
         };
         /**
+         * DataExportRequest
+         * @description Request to export a person's personal data.
+         */
+        DataExportRequest: {
+            /**
+             * Include Audit Trail
+             * @default true
+             */
+            include_audit_trail: boolean;
+            /**
+             * Person Id
+             * Format: uuid
+             */
+            person_id: string;
+        };
+        /**
+         * DataExportResponse
+         * @description Response with export job status.
+         */
+        DataExportResponse: {
+            /** Expires At */
+            expires_at: string | null;
+            /**
+             * Job Id
+             * Format: uuid
+             */
+            job_id: string;
+            /** Percent Complete */
+            percent_complete: number;
+            /** Status */
+            status: string;
+        };
+        /**
+         * DeletionRequest
+         * @description Request to delete a person's personal data.
+         */
+        DeletionRequest: {
+            /**
+             * Person Id
+             * Format: uuid
+             */
+            person_id: string;
+            /** Reason */
+            reason: string;
+        };
+        /**
+         * DeletionResponse
+         * @description Response confirming deletion request.
+         */
+        DeletionResponse: {
+            /**
+             * Deletion Id
+             * Format: uuid
+             */
+            deletion_id: string;
+            /**
+             * Person Id
+             * Format: uuid
+             */
+            person_id: string;
+            /** Status */
+            status: string;
+        };
+        /**
          * DeliveryReportOut
          * @description §5.11's post-send screen, for a cancellation or an announcement.
          *
@@ -4516,6 +4958,19 @@ export interface components {
              * Format: uuid
              */
             student_id: string;
+        };
+        /** EnrollmentMove */
+        EnrollmentMove: {
+            /**
+             * Enrollment Id
+             * Format: uuid
+             */
+            enrollment_id: string;
+            /**
+             * To Group Id
+             * Format: uuid
+             */
+            to_group_id: string;
         };
         /**
          * EnrollmentOut
@@ -4901,22 +5356,6 @@ export interface components {
              */
             training_year_id: string;
         };
-        /** GroupCreate */
-        GroupCreate: {
-            /** Age Max */
-            age_max?: number | null;
-            /** Age Min */
-            age_min?: number | null;
-            /**
-             * Class Id
-             * Format: uuid
-             */
-            class_id: string;
-            /** Description */
-            description?: string | null;
-            /** Name */
-            name: string;
-        };
         /** GroupListResponse */
         GroupListResponse: {
             /** Items */
@@ -4944,6 +5383,16 @@ export interface components {
             id: string;
             /** Is Active */
             is_active: boolean;
+            /** Name */
+            name: string;
+        };
+        /** GroupRename */
+        GroupRename: {
+            /**
+             * Group Id
+             * Format: uuid
+             */
+            group_id: string;
             /** Name */
             name: string;
         };
@@ -5654,6 +6103,26 @@ export interface components {
             reason: "no_token" | "denied" | "failed";
         };
         /**
+         * MonthlyReportSummary
+         * @description Summary of charges in a billing period.
+         */
+        MonthlyReportSummary: {
+            /** Overdue Agorot */
+            overdue_agorot: number;
+            /** Pending Agorot */
+            pending_agorot: number;
+            /** Period Month */
+            period_month: number;
+            /** Period Year */
+            period_year: number;
+            /** Settled Agorot */
+            settled_agorot: number;
+            /** Total Agorot */
+            total_agorot: number;
+            /** Total Students */
+            total_students: number;
+        };
+        /**
          * MyStandingOrderOut
          * @description Whether §5.10's second double-payment guard applies to the person asking.
          */
@@ -5913,6 +6382,25 @@ export interface components {
         PaymentReversalIn: {
             /** Reason */
             reason: string;
+        };
+        /**
+         * PlanRepricing
+         * @description A new amount for one open plan, effective from the new year's start.
+         *
+         *     `registration_fee_agorot` omitted means *inherit* the current fee, which is different
+         *     from sending `0` — that sets the fee to nothing. The distinction is real money and the
+         *     field is deliberately nullable rather than defaulted.
+         */
+        PlanRepricing: {
+            /** Monthly Amount Agorot */
+            monthly_amount_agorot: number;
+            /**
+             * Plan Id
+             * Format: uuid
+             */
+            plan_id: string;
+            /** Registration Fee Agorot */
+            registration_fee_agorot?: number | null;
         };
         /**
          * PricePlanCloseIn
@@ -6355,6 +6843,31 @@ export interface components {
             ordered_ids: string[];
         };
         /**
+         * ReportDeliveryRequest
+         * @description Request to send a monthly report via email.
+         */
+        ReportDeliveryRequest: {
+            /** Month */
+            month: number;
+            /**
+             * To Person Id
+             * Format: uuid
+             */
+            to_person_id: string;
+            /** Year */
+            year: number;
+        };
+        /**
+         * ReportDeliveryResponse
+         * @description Response confirming report delivery request.
+         */
+        ReportDeliveryResponse: {
+            /** Notification Id */
+            notification_id: string | null;
+            /** Status */
+            status: string;
+        };
+        /**
          * ResendOut
          * @description How many sends `[ שלח שוב ]` could actually retry.
          *
@@ -6366,6 +6879,124 @@ export interface components {
         ResendOut: {
             /** Retried Count */
             retried_count: number;
+        };
+        /**
+         * RolloverAnnounceIn
+         * @description §5.15 step 7 — "optionally publish the new schedule to all guardians in one action".
+         *
+         *     No `scope_type`: the step's whole definition is *all guardians*, and offering a narrower
+         *     audience here would be a second announcements composer hiding inside a wizard. A manager
+         *     who wants one group has `4f`.
+         */
+        RolloverAnnounceIn: {
+            /** Body */
+            body: string;
+            /** Title */
+            title: string;
+        };
+        /** RolloverAnnounceOut */
+        RolloverAnnounceOut: {
+            /**
+             * Announcement Id
+             * Format: uuid
+             */
+            announcement_id: string;
+            /** Families */
+            families: number;
+        };
+        /**
+         * RolloverGroupsIn
+         * @description §5.15 step 3. **There is no `carry_forward` list, and that is the design.** A group is
+         *     not scoped to a training year — the year reaches it only through the sessions generated
+         *     for it — so carrying one forward unchanged is the absence of an operation. A field for it
+         *     would be a field the server ignores, which is worse than no field at all.
+         */
+        RolloverGroupsIn: {
+            /** Creates */
+            creates?: components["schemas"]["app__schemas__rollover__GroupCreate"][];
+            /** Renames */
+            renames?: components["schemas"]["GroupRename"][];
+            /** Retire */
+            retire?: string[];
+            /** Revive */
+            revive?: string[];
+        };
+        /** RolloverPricesIn */
+        RolloverPricesIn: {
+            /** Repricings */
+            repricings?: components["schemas"]["PlanRepricing"][];
+        };
+        /**
+         * RolloverStateOut
+         * @description What `GET /rollover/{id}` returns: the whole wizard, in one read.
+         *
+         *     One read rather than seven, because the rail renders every step's status at once and a
+         *     per-step fetch would show the manager a rail that fills in raggedly.
+         */
+        RolloverStateOut: {
+            /** Closures */
+            closures: number;
+            /** Complete */
+            complete: boolean;
+            /** Groups Active */
+            groups_active: number;
+            /** Price Plans Open */
+            price_plans_open: number;
+            /**
+             * Resume At
+             * @enum {string}
+             */
+            resume_at: "year" | "closures" | "groups" | "students" | "prices" | "generate" | "announce";
+            /** Sessions Generated */
+            sessions_generated: number;
+            /** Steps */
+            steps: components["schemas"]["RolloverStepOut"][];
+            /** Students Enrolled */
+            students_enrolled: number;
+            training_year: components["schemas"]["TrainingYearOut"];
+        };
+        /**
+         * RolloverStepOut
+         * @description One row of the wizard rail.
+         */
+        RolloverStepOut: {
+            /** Detail */
+            detail?: number | null;
+            /**
+             * Id
+             * @enum {string}
+             */
+            id: "year" | "closures" | "groups" | "students" | "prices" | "generate" | "announce";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "done" | "skipped";
+        };
+        /**
+         * RolloverStepPatch
+         * @description Acknowledge one step. `pending` is accepted so a manager can reopen a step they
+         *     ticked by mistake — a one-way ratchet would send them back through the whole wizard to
+         *     correct a single press.
+         */
+        RolloverStepPatch: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "done" | "skipped";
+        };
+        /**
+         * RolloverStudentsIn
+         * @description §5.15 step 4. **No `confirm` list either**, for the same reason as `carry_forward`: an
+         *     enrollment left alone continues, so confirming one writes nothing. §5.15 also forbids
+         *     automatic age-based promotion in v1, so every move here is named by a human.
+         */
+        RolloverStudentsIn: {
+            /** Moves */
+            moves?: components["schemas"]["EnrollmentMove"][];
+            /** Not Returning */
+            not_returning?: string[];
         };
         /**
          * RosterEntry
@@ -6947,6 +7578,19 @@ export interface components {
             note: string | null;
             /** Secondary Color Hex */
             secondary_color_hex: string | null;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+        };
+        /**
+         * StudentChargeDetails
+         * @description Charges for a student across all periods.
+         */
+        StudentChargeDetails: {
+            /** Charges */
+            charges: components["schemas"]["ChargeDetail"][];
             /**
              * Student Id
              * Format: uuid
@@ -7728,6 +8372,43 @@ export interface components {
             status: string;
             /** Timezone */
             timezone: string;
+        };
+        /**
+         * GroupCreate
+         * @description A group created during the rollover. Same fields as `POST /groups`, because a group
+         *     made here must be indistinguishable from one made there — a rollover that produced a
+         *     second-class group would show up as a bug six months later, in a different screen.
+         */
+        app__schemas__rollover__GroupCreate: {
+            /** Age Max */
+            age_max?: number | null;
+            /** Age Min */
+            age_min?: number | null;
+            /**
+             * Class Id
+             * Format: uuid
+             */
+            class_id: string;
+            /** Description */
+            description?: string | null;
+            /** Name */
+            name: string;
+        };
+        /** GroupCreate */
+        app__schemas__structure__GroupCreate: {
+            /** Age Max */
+            age_max?: number | null;
+            /** Age Min */
+            age_min?: number | null;
+            /**
+             * Class Id
+             * Format: uuid
+             */
+            class_id: string;
+            /** Description */
+            description?: string | null;
+            /** Name */
+            name: string;
         };
         /**
          * StudioOut
@@ -9842,7 +10523,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["GroupCreate"];
+                "application/json": components["schemas"]["app__schemas__structure__GroupCreate"];
             };
         };
         responses: {
@@ -11188,6 +11869,134 @@ export interface operations {
             };
         };
     };
+    request_deletion_api_v1_privacy_delete_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeletionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeletionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_deletion_status_api_v1_privacy_delete__deletion_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                deletion_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeletionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    request_data_export_api_v1_privacy_export_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DataExportRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataExportResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_export_status_api_v1_privacy_export__job_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataExportResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_products_api_v1_products_get: {
         parameters: {
             query?: {
@@ -11826,6 +12635,329 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RegistrationDecisionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_student_charges_api_v1_reports__studio_id__charges__student_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                studio_id: string;
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudentChargeDetails"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_monthly_report_api_v1_reports__studio_id__monthly_get: {
+        parameters: {
+            query: {
+                year: number;
+                month: number;
+            };
+            header?: never;
+            path: {
+                studio_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MonthlyReportSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    send_monthly_report_api_v1_reports__studio_id__send_monthly_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                studio_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReportDeliveryRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportDeliveryResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_rollover_state_api_v1_rollover__training_year_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                training_year_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RolloverStateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    announce_rollover_api_v1_rollover__training_year_id__announce_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                training_year_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RolloverAnnounceIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RolloverAnnounceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    apply_rollover_groups_api_v1_rollover__training_year_id__groups_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                training_year_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RolloverGroupsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkOutcomeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    apply_rollover_prices_api_v1_rollover__training_year_id__prices_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                training_year_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RolloverPricesIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkOutcomeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_rollover_step_api_v1_rollover__training_year_id__steps__step_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                training_year_id: string;
+                step_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RolloverStepPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RolloverStateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    apply_rollover_students_api_v1_rollover__training_year_id__students_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                training_year_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RolloverStudentsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkOutcomeOut"];
                 };
             };
             /** @description Validation Error */

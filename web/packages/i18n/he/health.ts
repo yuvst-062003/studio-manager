@@ -31,6 +31,10 @@ export const health: Bundle = {
   'declaration.signatureHint': 'חתמו באצבע במסגרת',
   'declaration.signatureClear': 'ניקוי החתימה',
   'declaration.signatureRequired': 'יש לחתום כדי לשלוח',
+  // The keyboard route to signing. SPEC 6.1 makes the declaration a hard gate, so a pad
+  // that only answers to a finger locked a parent out of the entire app.
+  'declaration.signatureTyped': 'או הקלידו את שמכם המלא',
+  'declaration.signatureTypedHint': 'השם שתקלידו ייחתם במסגרת שלמעלה',
   'declaration.submit': 'שליחת ההצהרה',
   'declaration.submitting': 'שולח…',
   'declaration.submitted': 'ההצהרה נשלחה',

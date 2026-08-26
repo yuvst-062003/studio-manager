@@ -49,11 +49,17 @@ const monthStyle: CSSProperties = {
  * 15 March in Jerusalem, and in a judo club almost every event starts in the evening.
  */
 export function EventDateBadge({ startsAt }: { startsAt: string }) {
-  const [, month, day] = studioDayKey(startsAt).split('-')
+  const key = studioDayKey(startsAt)
+  const [, month, day] = key.split('-')
   return (
-    <div style={blockStyle}>
+    // A <time> with a machine-readable dateTime, not two bare numeric spans. As spans a
+    // screen reader announced "15" then "03" — two numbers with nothing marking them as a
+    // date, let alone which was which. `dateTime` carries the Jerusalem day key, so the
+    // machine-readable value and the rendered one cannot disagree about the timezone
+    // question this component exists to answer.
+    <time dateTime={key} style={blockStyle}>
       <span style={dayStyle}>{day}</span>
       <span style={monthStyle}>{month}</span>
-    </div>
+    </time>
   )
 }

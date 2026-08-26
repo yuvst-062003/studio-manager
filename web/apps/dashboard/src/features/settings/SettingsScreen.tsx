@@ -18,8 +18,11 @@
 // The gate is a hard block in the parent app only; nothing on the mat is ever blocked,
 // because a hard block would stop the RECORD from being accurate without making anyone
 // safer. Building the toggle would ship a control that either does nothing or contradicts
-// the spec, so it is absent and this comment is why. It belongs with conflict C9, the
-// canvas edits that are recorded but not yet applied.
+// the spec, so it is absent and this comment is why.
+//
+// W6 CLOSED THE OTHER HALF (C10, 2026-08-26): the row is gone from artboard 3f as well, so
+// the mockup and this panel now agree and nobody has to discover the rule from a comment.
+// tests/contracts/test_canvas_matches_spec.py fails if the canvas regains it.
 // ─────────────────────────────────────────────────────────────────────────────
 import { useEffect, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'

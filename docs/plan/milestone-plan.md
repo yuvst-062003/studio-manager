@@ -1178,6 +1178,21 @@ accept that it ships without a visual reference and say so out loud. Splitting M
 scheduling assumptions of a cleanup pass — but that edges toward inventing a milestone, so it
 is a suggestion rather than part of the plan above.
 
+**Resolved 2026-08-26 (W6): it ships without an artboard, said out loud.** Designing a 62nd
+screen inside the wave whose exit gate is *"all 61 artboards pass the a11y/RTL sweep"* would
+move the gate while standing on it — and the count is now asserted by a test, so the move
+would have had to be deliberate and visible anyway.
+
+The wizard is instead built against a reference that **already exists and is already swept**:
+`web/packages/ui/src/setup-wizard/`. The rollover mirrors its step rail, its resume rule
+(first `pending` step, never step 1), its per-step `{ locale, status, onDone, onSkip }`
+contract, and its status-as-words labelling. That is a stronger constraint than a fresh
+mockup would have been, because it is executable: the setup wizard's own tests fail when the
+pattern drifts, and a PNG does not.
+
+INVENTORY.md stays at **61**. Anyone adding the artboard later should update the count and
+`tests/contracts/test_canvas_matches_spec.py` in the same commit.
+
 ### C6 — §7 carries an endpoint §4.3 explicitly forbids 🟡
 
 §7 lists `POST /people/{id}/payment-mode`. §4.3 states: *"There is **no** `payment_mode` on a
@@ -1209,16 +1224,61 @@ day. Add to `allow` in M0:
 prefix problem, so add `Bash(.venv/bin/alembic downgrade:*)` to `deny` too. A deny that does not
 match is worse than no deny, because it reads as protection.
 
-### C9 — the D9 canvas edits are recorded but not applied 🟡
+### C9 — the D9 canvas edits are recorded but not applied ✅ *resolved 2026-08-26 (W6)*
 
-decisions.md's own "Applied vs. pending" table marks D9.1, D9.2 and D9.3 as **not yet applied
-to the canvas**. The artboards still show in-app chat, the weight column and the `קבלות` title.
+> **This section as originally written is now wrong, and is kept because the resolution is
+> about exactly that.** It read: *decisions.md's own "Applied vs. pending" table marks D9.1,
+> D9.2 and D9.3 as not yet applied to the canvas. The artboards still show in-app chat, the
+> weight column and the `קבלות` title.* Recommendation was to run the Claude Design edit pass
+> rather than rely on the ▲ markers in Part 4, *because the mockup is what a human opens at
+> 2am, not this table*.
 
-The port happens in M3/M6/M7/M8, and a lane reading `2b` in a browser will build the chat.
-**Either** run the Claude Design edit pass before W2 opens, **or** accept the divergence and
-rely on the ▲ markers in Part 4 plus each lane's opening prompt (both carry the reduction
-explicitly — see [lanes.md](lanes.md)). The second is cheaper; the first is safer. Recommend
-the edit pass, because the mockup is what a human opens at 2am, not this table.
+**Resolved as APPLY — and they were already applied.** The edit pass ran on 2026-08-24, the
+day after this was written, and decisions.md's Applied-vs-pending table has recorded all
+three as *"edited + owner-approved 2026-08-24"* ever since. This section was never revised,
+so a conflict that had been closed for two days went on blocking W6 as an open holdback.
+
+Verified against the artboards themselves, not against a table:
+
+| | Asserted | State |
+|---|---|---|
+| `2b` | no `שיחה עם המשרד`, `עדכוני מועדון` inbox present | applied |
+| `7c` | no `משקל` / `קטגוריה` column; six columns, RSVP + consent + payment | applied |
+| `12f` | titled `תשלומים`; receipt affordance narrowed to card rows | applied |
+
+The shipped code matches on all three and already carried its own negatives.
+
+**What actually needed fixing was the prose**, which is the failure this conflict was about
+in the first place: a decision recorded in one place and contradicted in another. Corrected
+here, and in the two source comments that still said *"the canvas still shows it"*.
+
+**The durable close is a test, not a paragraph.** `tests/contracts/test_canvas_matches_spec.py`
+asserts each reduction against the artboard markup and runs in every lane, so an undone edit
+fails at the moment the canvas changes rather than after a lane has faithfully rebuilt the cut
+feature from it.
+
+### C10 — artboard `3f` draws a setting SPEC §5.5 says must not exist ✅ *resolved 2026-08-26 (W6)*
+
+`3f`'s הגדרות panel carried a **חסימת השתתפות ללא הצהרת בריאות** toggle. §5.5 states there is
+**no `block_attendance_without_health` setting** — *"nothing to configure"*.
+
+**Resolved: the artboard loses the row.** Three reasons, in order of weight.
+
+1. **§5.5's rule is reasoned, not incidental.** Blocking a row in an app does not stop a child
+   stepping onto a mat — the coach controls that physically and can decline the child. A hard
+   block would only stop the *record* from being accurate, making the data worse without
+   making anyone safer. Changing the spec means re-opening a safety argument in order to keep
+   a mockup.
+2. **The drawn row contradicted itself.** Its own subtitle read *"המאמן יראה התראה, החניך לא
+   ייחסם אוטומטית"* — a switch labelled *block* that promised not to block. As drawn it did
+   not describe a hard block at all, so there was no coherent thing to implement.
+3. **The cheap edit is the mockup.** M1.10 shipped the panel without the row, sixteen files
+   carry the rule in comments, and `SettingsScreen.test.tsx` fails if the row is added back.
+   One row against sixteen files plus a spec change.
+
+`3f` now matches the shipped panel exactly: three toggles, none of them this one. The artboard
+carries a comment naming what was removed and why, and the same contract test above fails if
+it reappears.
 
 ---
 

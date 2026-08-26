@@ -22,7 +22,7 @@
 // the dialog needs to say.
 import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { Alert, Button, Checkbox, EmptyState, StatusChip } from '@studio/ui'
+import { Alert, Button, Checkbox, EmptyState, StatusChip, useModalDialog } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { BeltTransition } from './BeltTransition'
@@ -93,6 +93,7 @@ export function ExamEligibilityScreen({
   const [loaded, setLoaded] = useState(false)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [confirming, setConfirming] = useState(false)
+  const dialogRef = useModalDialog(confirming, () => setConfirming(false))
   const [promoted, setPromoted] = useState(false)
   const [failed, setFailed] = useState(false)
 
@@ -245,7 +246,17 @@ export function ExamEligibilityScreen({
       )}
 
       {confirming ? (
-        <div aria-label={t(locale, 'events.exam.confirmPromotion')} role="alertdialog" style={dialogStyle}>
+        <div
+          aria-label={t(locale, 'events.exam.confirmPromotion')}
+          // The attribute and the trap arrive together. On its own `aria-modal` told a
+          // screen reader the eligibility table was unavailable while Tab still walked
+          // back into it — on the screen that performs an irreversible bulk promotion.
+          aria-modal="true"
+          ref={dialogRef}
+          role="alertdialog"
+          style={dialogStyle}
+          tabIndex={-1}
+        >
           {/* The key exists and the canvas never draws it — on the screen that performs an
               effectively irreversible bulk write. */}
           <p style={{ margin: 0 }}>{t(locale, 'events.belt.groupPromoteHint')}</p>

@@ -45,6 +45,19 @@
   --disabled-surface: #e8e7e3;
   --belt-ring: #17150f;
 
+  /* The overlay behind a modal surface. It was USED by NavDrawer and never DEFINED, so
+   * `background: var(--scrim)` was invalid-at-computed-value-time and fell back to
+   * `transparent` — the drawer opened over a fully legible page with nothing signalling
+   * that the rest of it was unavailable. Opaque enough to dim, translucent enough that a
+   * parent can see the drawer is over their own screen and not a new one. */
+  --scrim: rgb(23 21 15 / 45%);
+
+  /* A surface that sits above `--surface` rather than beside it: a popover, a sheet, the
+   * announcement composer's preview card. In light mode the ground already reads as
+   * "behind", so raising means going whiter; in dark mode a raised surface must go
+   * LIGHTER, not darker, or it reads as a hole. */
+  --surface-raised: #fff;
+
   /* ═══ TIER 3 · STRUCTURAL · type ══════════════════════════════════════════════
    * rem, not px: a user who has raised their browser font size gets a UI that scales
    * with them. 4h is drawn in px against a 16px root, so the conversions are exact. */
@@ -121,6 +134,13 @@
   --on-accent: #141311;
   --disabled-surface: #343430;
   --belt-ring: #fffefb;
+
+  /* Darker than the light scrim: dimming an already-dark page needs more, or the drawer
+   * and the page behind it end up at almost the same luminance. */
+  --scrim: rgb(0 0 0 / 62%);
+
+  /* Lighter than `--surface` (#1e1d1a), not darker. Elevation in dark mode is light. */
+  --surface-raised: #272521;
 }
 
 *,

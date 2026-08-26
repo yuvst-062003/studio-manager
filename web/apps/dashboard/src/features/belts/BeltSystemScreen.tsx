@@ -173,7 +173,15 @@ export function BeltSystemScreen({
         <p style={hintStyle}>{t(locale, 'events.belt.perClassHint')}</p>
       </header>
 
-      {refusal ? <p style={errorStyle}>{refusal}</p> : null}
+      {/* `role="alert"` because this appears AFTER load, in response to a press: without it
+          a screen-reader user presses save, nothing is announced, and the only signal that
+          the write was refused is that the text above turned red — SC 1.4.1 and 4.1.3 in one
+          line. Every other error in the tree already does this; this one was missed. */}
+      {refusal ? (
+        <p role="alert" style={errorStyle}>
+          {refusal}
+        </p>
+      ) : null}
 
       {loaded && ladder.length === 0 ? (
         <EmptyState title={t(locale, 'events.belt.empty')} />

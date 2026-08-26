@@ -29,10 +29,10 @@ const buttonStyle: CSSProperties = {
   justifyContent: 'center',
   minBlockSize: '44px',
   paddingInline: 'var(--space-4)',
-  borderRadius: 'var(--radius-2)',
+  borderRadius: 'var(--radius-md)',
   border: 'var(--border-width-hairline) solid var(--border)',
   background: 'var(--surface)',
-  color: 'var(--text)',
+  color: 'var(--fg)',
   textDecoration: 'none',
 }
 

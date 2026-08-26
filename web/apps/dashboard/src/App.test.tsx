@@ -45,6 +45,9 @@ describe('routeFromHash', () => {
     ['#/staff', 'staff'],
     ['#/settings', 'settings'],
     ['#/setup', 'setup'],
+    // §5.15's rollover is one hash and one screen: the wizard's seven steps are its own
+    // state, and `resume_at` is the only correct answer to "where was I".
+    ['#/rollover', 'rollover'],
     ['', 'home'],
     ['#/nothing-here', 'home'],
   ])('maps %s to %s', (hash, expected) => {

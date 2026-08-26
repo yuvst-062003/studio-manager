@@ -96,10 +96,29 @@ def test_the_four_obligations_m0_4_handed_to_m1_are_recorded():
     assert len(carried) >= 5, "four M0.4 obligations plus the staging superuser debt"
 
 
-def test_every_holdback_kind_is_represented():
-    grouped = derive.group_holdbacks(load())
-    for kind, items in grouped.items():
-        assert items, f"no open holdback of kind {kind}"
+def test_every_holdback_kind_gets_a_bucket_even_when_it_is_empty():
+    """`group_holdbacks` returns one bucket per kind in `KIND_ORDER`, in that order,
+    and every open holdback lands in exactly one of them.
+
+    **This test used to assert each bucket was NON-empty, and that was backwards.** W6
+    closed the last open `conflict` -- C5, C9 and C10 all resolved on 2026-08-26 -- and the
+    build went red for it. A gate that fails because a category of problem has been
+    eliminated is a gate that punishes the outcome it exists to track, and the pressure it
+    creates is to leave one conflict open rather than to close it.
+
+    What the function actually promises is that the cockpit can render a heading for every
+    kind without checking whether it has rows, and that is what is asserted here. An empty
+    `conflict` bucket is the goal state, not a regression.
+    """
+    state = load()
+    grouped = derive.group_holdbacks(state)
+
+    assert tuple(grouped) == derive.KIND_ORDER
+
+    open_ids = {h.id for h in state.holdbacks if h.status == "open"}
+    bucketed = [h.id for items in grouped.values() for h in items]
+    assert sorted(bucketed) == sorted(open_ids)
+    assert len(bucketed) == len(set(bucketed)), "a holdback appears in two buckets"
 
 
 def test_nothing_measurable_is_declared():

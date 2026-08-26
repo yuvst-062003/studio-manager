@@ -1,5 +1,10 @@
 """Report generation service for monthly billing summaries."""
 
+from __future__ import annotations
+
+import uuid
+from typing import Any
+
 from sqlalchemy import select
 
 from app.core.clock import now
@@ -13,7 +18,7 @@ class ReportService:
     def __init__(self, session: TenantSession) -> None:
         self.session = session
 
-    def monthly_summary(self, year: int, month: int) -> dict:
+    def monthly_summary(self, year: int, month: int) -> dict[str, Any]:
         """Get summary of charges for a given billing period.
 
         Groups charges by status (open/paid) and counts distinct students.
@@ -76,7 +81,7 @@ class ReportService:
             "pending_agorot": pending_agorot,
         }
 
-    def student_charges(self, student_id: uuid.UUID) -> list[dict]:
+    def student_charges(self, student_id: uuid.UUID) -> list[dict[str, Any]]:
         """Get all charges for a student across all periods.
 
         Used for invoice generation and charge history display.

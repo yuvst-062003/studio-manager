@@ -9,7 +9,15 @@
 // telephone."
 import { useEffect, useMemo, useState } from 'react'
 import { apiFetch, useDisplayMode, useSession } from '@studio/core'
-import { AppShell, InstallWalkthrough, LanguagePicker, SignIn, ThemeProvider } from '@studio/ui'
+import {
+  AccountDrawerFooter,
+  AppShell,
+  InstallWalkthrough,
+  LanguagePicker,
+  SignIn,
+  ThemeProvider,
+  useDocumentLocale,
+} from '@studio/ui'
 import { DevBar } from '@studio/ui/dev-bar'
 import type { InstallPromptEvent } from '@studio/ui'
 import type { Locale } from '@studio/i18n'
@@ -24,6 +32,7 @@ import {
   makeParentEventsClient,
 } from './features/events'
 import { BeltProgressScreen, makeParentBeltsClient } from './features/belts'
+import { InboxScreen, makeParentCommsClient } from './features/comms'
 import { AddSibling, makePeopleClient } from './features/people'
 // §5.10's payments tab. Mounted here because nothing imported it: `PaymentsScreen` is
 // artboard `12f`, the subject of E2E-3 and E2E-4, and it was unreachable in a running app.
@@ -38,9 +47,18 @@ const NAV = [
   // to index.html and put the parent back on home. The same correction both W2 lanes made
   // for their own entries.
   { key: 'payments', labelKey: 'common.nav.payments', href: '#/payments' },
-  { key: 'announcements', labelKey: 'common.nav.announcements', href: '/announcements' },
+  // A hash, and mounted below. `/announcements` matched nothing — `matchLandingPath`
+  // accepts only `/t/<slug>` — so the link fell through `navigateFallback` to index.html
+  // and put the parent back on home. `InboxScreen` (§5.11's one-way inbox, artboard `2b`)
+  // existed and was tested but was never imported by anything, so the whole screen was
+  // unreachable in a running app. Same defect and same correction as `/payments`.
+  { key: 'announcements', labelKey: 'common.nav.announcements', href: '#/announcements' },
   { key: 'addChild', labelKey: 'people.sibling.title', href: '#/add-child' },
-  { key: 'settings', labelKey: 'common.nav.settings', href: '/settings' },
+  // NO settings entry. `/settings` matched no route in either app, so the link fell
+  // through the service worker's navigateFallback to index.html and put the user back
+  // on home in silence. Artboard 2e draws these controls in the DRAWER, not on a
+  // page, and that is where they now are — see `AccountDrawerFooter`, passed as
+  // `drawerFooter` below, under the studio switcher `AppShell` already renders.
 ]
 
 /**
@@ -80,6 +98,10 @@ export default function App() {
   // a measurement that lies to make a dev tab convenient is worse than the gate.
   const installed = displayMode !== 'browser' || import.meta.env.MODE === 'development'
   const [locale, setLocale] = useState<Locale>('he')
+  // `<html lang>` and `<html dir>` follow the choice. index.html ships `lang="he" dir="rtl"`
+  // as a literal, so without this a parent who picks English or Russian reads LTR copy inside
+  // an RTL document and hears it announced with a Hebrew voice.
+  useDocumentLocale(locale)
   const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null)
   // Both memoised for the same reason: each screen reads through its client in an effect
   // keyed on the client, so a fresh object every render would re-fetch forever — the
@@ -89,6 +111,7 @@ export default function App() {
   const peopleClient = useMemo(() => makePeopleClient(apiFetch), [])
   const eventsClient = useMemo(() => makeParentEventsClient(apiFetch), [])
   const beltsClient = useMemo(() => makeParentBeltsClient(apiFetch), [])
+  const commsClient = useMemo(() => makeParentCommsClient(apiFetch), [])
   const hash = useHash()
   const today = useToday()
   // §5.4(c)'s add-a-sibling is one hash away from home. Hash and not a path: it is an
@@ -105,6 +128,8 @@ export default function App() {
   // the hash because 12h is per CHILD per event: a family with two children on one
   // competition has two answers to give, and an event id alone cannot say which.
   const onEvents = hash === '#/events'
+  // §5.11's one-way inbox — artboard `2b`, and D9.1's reason it has no second half.
+  const onAnnouncements = hash === '#/announcements'
   const invite = hash.startsWith('#/events/') ? hash.slice('#/events/'.length).split('/') : []
   // 12d, per child per class: a ladder belongs to a class (§5.9), so a child who trains
   // in two disciplines has two progressions to look at.
@@ -165,6 +190,7 @@ export default function App() {
           title={session.activeStudioName ?? ''}
           items={NAV}
           locale={locale}
+          drawerFooter={<AccountDrawerFooter locale={locale} onChooseLocale={setLocale} />}
           studios={session.studios.map((s) => ({
             studioId: s.studio_id,
             studioName: s.studio_name,
@@ -224,6 +250,8 @@ export default function App() {
               now={today}
               studentId={invite[1]!}
             />
+          ) : onAnnouncements ? (
+            <InboxScreen client={commsClient} locale={locale} />
           ) : onEvents ? (
             <ParentEventsScreen
               client={eventsClient}

@@ -57,7 +57,7 @@ const linkStyle: CSSProperties = {
   paddingBlock: 'var(--space-2)',
   paddingInline: 'var(--space-3)',
   textDecoration: 'none',
-  borderRadius: 'var(--radius-2)',
+  borderRadius: 'var(--radius-md)',
   border: 'var(--border-width-hairline) solid var(--border)',
 }
 

@@ -73,8 +73,55 @@ describe('SignaturePad', () => {
       lineTo: vi.fn((x: number, y: number) => strokes.push({ x, y })),
       stroke: vi.fn(),
       clearRect: vi.fn(),
+      // Added with the typed-name route below: it renders the name INTO the canvas, so the
+      // recorder has to answer the text calls or the fallback throws instead of signing.
+      save: vi.fn(),
+      restore: vi.fn(),
+      fillText: vi.fn(),
+      fillStyle: '',
+      font: '',
+      textAlign: '',
+      textBaseline: '',
     })) as unknown as typeof HTMLCanvasElement.prototype.getContext
     HTMLCanvasElement.prototype.toDataURL = vi.fn(() => 'data:image/png;base64,AAAA')
+  })
+
+  it('a parent who cannot use a pointer can still sign, by typing their name', async () => {
+    // SC 2.1.1, at the highest cost this product can charge for it. §6.1 step 6 makes the
+    // declaration a HARD GATE — until it is signed, no other screen in the parent app is
+    // reachable — so a pad that only answered to a pointer did not lack an affordance, it
+    // locked a keyboard-only parent out of the entire product with no way to report it from
+    // inside. The typed name is rendered into the canvas, so the backend still receives one
+    // base64 PNG and `signature_image` still holds ink.
+    const onChange = vi.fn()
+    render(<SignaturePad locale="he" onChange={onChange} />)
+
+    const field = screen.getByLabelText(t('he', 'health.declaration.signatureTyped'))
+    await userEvent.type(field, 'דנה כהן')
+
+    expect(onChange).toHaveBeenCalled()
+    expect(onChange.mock.calls.at(-1)?.[0]).toBe('data:image/png;base64,AAAA')
+  })
+
+  it('clearing the typed name un-signs the pad rather than leaving stale ink', async () => {
+    // Emitting `null` is what the form reads to keep its submit button disabled. A pad that
+    // kept the last PNG after the field was emptied would let a parent submit a signature
+    // they had visibly just deleted.
+    const onChange = vi.fn()
+    render(<SignaturePad locale="he" onChange={onChange} />)
+    const field = screen.getByLabelText(t('he', 'health.declaration.signatureTyped'))
+    await userEvent.type(field, 'א')
+    await userEvent.clear(field)
+    expect(onChange).toHaveBeenLastCalledWith(null)
+  })
+
+  it('the typed field is NOT direction-isolated, unlike the canvas', () => {
+    // The canvas is pinned to `ltr` because a STROKE PATH must not mirror. A name is text: a
+    // Hebrew name has to lay out right-to-left like every other name in the app, and copying
+    // the canvas's exception onto it would be cargo-culting the fix.
+    render(<SignaturePad locale="he" onChange={vi.fn()} />)
+    const field = screen.getByLabelText(t('he', 'health.declaration.signatureTyped'))
+    expect(field.getAttribute('dir')).toBeNull()
   })
 
   it('the canvas is direction-isolated, so a stroke cannot be flipped by an RTL ancestor', () => {

@@ -410,3 +410,74 @@ def test_a_coach_cannot_list_payment_orders(client, request, caller):
     who = request.getfixturevalue(caller)
     response = client.get("/api/v1/payment-orders", headers=who.headers)
     assert response.status_code == 403
+
+
+# -- §5.10's covered-elsewhere explanation ------------------------------------
+#
+# The double-payment GUARD has always held: `OrderService.create` refuses a charge already
+# inside a holding order, and `selectable_charges` omits it. What the read shape could not
+# say was WHY. A parent whose September charge sits in an order they opened on another
+# device saw the row, tapped it, and got a generic error — the refusal was correct and
+# unexplained. `is_covered_elsewhere` is that explanation, and it is computed from exactly
+# the predicate the refusal uses, so the screen and the server cannot drift apart.
+
+
+def test_a_charge_inside_an_open_order_reads_as_covered_elsewhere(
+    client, as_manager, an_open_charge, an_order
+):
+    response = client.get(
+        "/api/v1/charges",
+        params={"payer_person_id": str(an_order.order.payer_person_id)},
+        headers=as_manager.headers,
+    )
+    assert response.status_code == 200, response.text
+    covered = {row["id"]: row["is_covered_elsewhere"] for row in response.json()["items"]}
+    assert covered[str(an_open_charge)] is True
+
+
+def test_a_charge_in_no_order_reads_as_not_covered(
+    client, as_manager, an_open_charge, a_priced_student
+):
+    """The default has to be False rather than absent. A client reading an optional field
+    would render "covered elsewhere" for every charge on a server that never sets it."""
+    response = client.get(
+        "/api/v1/charges",
+        params={"payer_person_id": str(a_priced_student.payer_person_id)},
+        headers=as_manager.headers,
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["items"][0]["is_covered_elsewhere"] is False
+
+
+def test_an_expired_order_releases_the_explanation_with_the_claim(
+    client, as_manager, an_open_charge, an_order, tenant_session
+):
+    """§5.10 — an expired order releases its charges. The flag has to follow, or the row
+    stays greyed out for ever with an explanation that is no longer true."""
+    from app.models.billing import PaymentOrder
+
+    order = tenant_session.get(PaymentOrder, an_order.order.id)
+    assert order is not None
+    order.status = "expired"
+    tenant_session.commit()
+
+    response = client.get(
+        "/api/v1/charges",
+        params={"payer_person_id": str(an_order.order.payer_person_id)},
+        headers=as_manager.headers,
+    )
+    assert response.status_code == 200, response.text
+    covered = {row["id"]: row["is_covered_elsewhere"] for row in response.json()["items"]}
+    assert covered[str(an_open_charge)] is False
+
+
+def test_a_payer_reads_the_same_flag_on_their_own_charges(
+    client, as_guardian_of, a_priced_student, an_open_charge, an_order
+):
+    """`/me/charges` is the route `12f` actually calls. The manager route agreeing and the
+    parent route not would put the explanation everywhere except the screen it is for."""
+    parent = as_guardian_of(a_priced_student.student_id)
+    response = client.get("/api/v1/me/charges", headers=parent.headers)
+    assert response.status_code == 200, response.text
+    rows = response.json()["items"]
+    assert rows == [] or all("is_covered_elsewhere" in row for row in rows)

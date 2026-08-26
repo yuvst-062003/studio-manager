@@ -68,6 +68,7 @@ from app.services.audit import AuditService
 from app.services.billing import BillingService
 from app.services.billing.catalogue import CatalogueService
 from app.services.billing.errors import ConflictError, NotFoundError, RefusedError
+from app.services.billing.orders import OrderService
 from app.services.billing.reconciliation import ReconciliationService
 from app.services.billing.run import BillingRunService
 
@@ -113,7 +114,9 @@ def _actor(request: Request) -> uuid.UUID | None:
 
 
 # -- projections --------------------------------------------------------------
-def _charge_out(charge: Charge, allocated_agorot: int) -> ChargeOut:
+def _charge_out(
+    charge: Charge, allocated_agorot: int, *, is_covered_elsewhere: bool = False
+) -> ChargeOut:
     return ChargeOut(
         id=charge.id,
         payer_person_id=charge.payer_person_id,
@@ -128,7 +131,21 @@ def _charge_out(charge: Charge, allocated_agorot: int) -> ChargeOut:
         status=charge.status,
         created_by=charge.created_by,
         allocated_agorot=allocated_agorot,
+        is_covered_elsewhere=is_covered_elsewhere,
     )
+
+
+def _charge_page(session: TenantSessionDep, pairs: list[tuple[Charge, int]]) -> list[ChargeOut]:
+    """§5.10's covered-elsewhere flag, resolved once per page rather than once per row.
+
+    Both charge listings need it and neither should issue a query per row: `12f` renders a
+    year of charges, so a per-row lookup is twelve round trips to answer one question.
+    """
+    covered = OrderService(session).covered_charge_ids([charge.id for charge, _ in pairs])
+    return [
+        _charge_out(charge, allocated, is_covered_elsewhere=charge.id in covered)
+        for charge, allocated in pairs
+    ]
 
 
 def _plan_out(plan: PricePlan) -> PricePlanOut:
@@ -417,7 +434,7 @@ def list_charges(
         limit=limit,
     )
     return ChargePage(
-        items=[_charge_out(charge, allocated) for charge, allocated in pairs],
+        items=_charge_page(session, pairs),
         next_cursor=next_cursor,
         has_more=next_cursor is not None,
     )
@@ -599,7 +616,7 @@ def my_charges(
         limit=limit,
     )
     return ChargePage(
-        items=[_charge_out(charge, allocated) for charge, allocated in pairs],
+        items=_charge_page(session, pairs),
         next_cursor=next_cursor,
         has_more=next_cursor is not None,
     )

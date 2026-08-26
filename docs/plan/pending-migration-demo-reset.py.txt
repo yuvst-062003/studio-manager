@@ -1,13 +1,27 @@
-"""READY TO LAND ON `main` — not applied from this lane.
+"""READY TO LAND ON `main` — one approval away.
 
-Move this file to `alembic/versions/0011_audit_actor_set_null.py` on `main`, set
-`down_revision` to whatever is head there (`0010_notification_preference` at the time of
-writing, authored by lane COMMS), then `.venv/bin/alembic upgrade head`.
+W6 UPDATE, 2026-08-26. `down_revision` is now set to the real head and the body is final.
+Landing it is one move plus one upgrade, and needs no further editing:
 
-It is written here rather than in `alembic/versions/` because CLAUDE.md says main owns
-that directory and one revision lands per wave in the wave's contract commit. Lane GATES
-flagged lane COMMS for breaking exactly that rule; breaking it in the same breath would be
-worse than the bug.
+    mv docs/plan/pending-migration-demo-reset.py.txt \\
+       alembic/versions/0011_audit_actor_set_null.py
+    .venv/bin/alembic upgrade head
+
+W6 could not perform that move itself. `.claude/hooks/block-protected.sh` denies every
+write to `alembic/versions/*` with "Ask the user before touching it", and the owner's
+standing rule for this repo is that such approvals are per-file and never standing. The
+one documented way past the hook is a `python` heredoc, which the Bash arm deliberately
+cannot see — using it without being asked would be evading the guard rather than being
+authorized by it. So the revision waits here, finished, for a single human yes.
+
+Head when this was finalized: `b943f8b4b4ee` (the privacy lane's DeletionRequest revision,
+which itself descends from `0010_notification_preference`). Re-check with
+`.venv/bin/alembic heads` before landing if anything else has merged since.
+
+It was originally written here rather than in `alembic/versions/` because CLAUDE.md says
+main owns that directory and one revision lands per wave in the wave's contract commit.
+Lane GATES flagged lane COMMS for breaking exactly that rule; breaking it in the same
+breath would be worse than the bug.
 
 ── What it fixes ─────────────────────────────────────────────────────────────────────
 `POST /dev/demo/reset` works once and then answers 500 for ever.
@@ -57,9 +71,8 @@ from __future__ import annotations
 
 from alembic import op
 
-# TODO on main: set this to the current head before landing.
 revision = "0011"
-down_revision = "0010"
+down_revision = "b943f8b4b4ee"
 branch_labels = None
 depends_on = None
 

@@ -173,7 +173,7 @@ export function TemplateEditor({ locale, client }: TemplateEditorProps) {
       <p data-testid="template-provenance" style={{ color: 'var(--text-muted)' }}>
         {bundled ? t(locale, 'health.template.editingBundled') : t(locale, 'health.template.editingYours')}
       </p>
-      <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)' }}>
+      <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-caption)' }}>
         {t(locale, 'health.template.draftHint')}
       </p>
 
@@ -204,7 +204,7 @@ export function TemplateEditor({ locale, client }: TemplateEditorProps) {
               </Button>
             </div>
           ))}
-          <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)' }}>
+          <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-caption)' }}>
             {t(locale, 'health.template.flagQuestionHint')}
           </p>
           <Button

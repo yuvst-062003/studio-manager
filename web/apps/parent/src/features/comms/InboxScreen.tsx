@@ -58,7 +58,7 @@ const rowTitleStyle: CSSProperties = {
   margin: 0,
 }
 
-const bodyStyle: CSSProperties = { color: 'var(--text)', margin: 0 }
+const bodyStyle: CSSProperties = { color: 'var(--fg)', margin: 0 }
 
 const metaStyle: CSSProperties = {
   color: 'var(--text-secondary)',

@@ -99,7 +99,7 @@ export function HealthBadge({
       <div data-testid={`health-badge-${studentId}`} style={rowStyle}>
         <StatusChip label={`⚠ ${t(locale, 'health.badge.missing')}`} status="debt" />
         {/* §5.5 — the coach can still mark them present, and the hint says so out loud. */}
-        <span style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)' }}>
+        <span style={{ color: 'var(--text-muted)', fontSize: 'var(--text-caption)' }}>
           {t(locale, 'health.badge.missingHint')}
         </span>
         {onRemind ? (
@@ -118,7 +118,7 @@ export function HealthBadge({
       ) : null}
       {raised.length > 0 ? (
         <>
-          <span style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)' }}>
+          <span style={{ color: 'var(--text-muted)', fontSize: 'var(--text-caption)' }}>
             {t(locale, 'health.flag.title')}
           </span>
           {raised.map((flag) => (
@@ -126,7 +126,7 @@ export function HealthBadge({
           ))}
           {/* §11.2 — the full record is manager-only and every read of it is audit-logged. A
               coach seeing a chip and no way to open anything is the design, not a gap. */}
-          <span style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)' }}>
+          <span style={{ color: 'var(--text-muted)', fontSize: 'var(--text-caption)' }}>
             {t(locale, 'health.flag.detailsRestricted')}
           </span>
         </>

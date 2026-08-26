@@ -363,8 +363,73 @@ waves:
     mode: sequential
     lanes: []
     exit_gate: all 61 artboards pass the a11y/RTL sweep in he and en, light and dark
-    status: pending
-    pieces: []
+    status: shipped
+    opened: 2026-08-26
+    closed: 2026-08-27
+    pieces:
+      - id: M10.0
+        title: >-
+          The test suite collects again. tests/privacy and tests/reports both shipped a
+          test_fixtures_build.py and neither directory had an __init__.py, so pytest
+          refused to collect the whole suite on main. Four missing package markers added
+          (config, core, privacy, reports), matching the ten directories that had them.
+        status: shipped
+        on: 2026-08-26
+      - id: M10.1
+        title: >-
+          C9 resolved as APPLY, and it was already applied. All three D9 reductions verified
+          present in both the canvas and the shipped code; the stale claims in
+          milestone-plan.md and two source comments corrected. C10 resolved as REMOVE FROM
+          THE CANVAS: artboard 3f no longer draws the health-declaration attendance block
+          SPEC §5.5 forbids. Both are now held by tests/contracts/test_canvas_matches_spec.py,
+          which also asserts the artboard count is 61.
+        status: shipped
+        on: 2026-08-26
+      - id: M10.2
+        title: >-
+          §5.10's covered-elsewhere explanation. ChargeOut carries is_covered_elsewhere,
+          computed from the same HOLDING_STATUSES predicate the double-payment refusal uses,
+          resolved once per page rather than once per row; the parent payments screen reads
+          it instead of a hardcoded false. Closes the residue of HB-e2e-parent-billing-api.
+        status: shipped
+        on: 2026-08-26
+      - id: M10.3
+        title: >-
+          §5.15's rollover wizard, backend. RolloverService orchestrates the seven steps over
+          the existing W2/W4/W5 mechanisms and adds the three that had none — bulk group
+          rename/retire/revive/create, bulk student move and not-returning, and bulk
+          repricing that closes old plans rather than overwriting them. Resumable state is
+          derived where observable and acknowledged where not, held in studio.settings under
+          a rollover key, so the wave needs no migration. No automatic age-based promotion,
+          asserted by a test.
+        status: shipped
+        on: 2026-08-26
+      - id: M10.4
+        title: >-
+          §5.15's rollover wizard, dashboard UI. Seven steps behind #/rollover, mirroring the
+          setup wizard's architecture — the container never computes completeness, each step
+          reports its own outcome, and resume lands on the first pending step rather than on
+          step 1. The two derived steps offer no control, because the server 409s them.
+          Destructive presses go through a focus-trapped confirm dialog; bulk refusals render
+          per row with a machine-readable reason the i18n layer translates. 31 tests.
+        status: shipped
+        on: 2026-08-26
+      - id: M10.5
+        title: >-
+          The a11y and RTL sweep. The blocker it found was the exit gate itself: all three
+          apps held the locale in React state and never wrote it to the document, so every
+          index.html's literal `lang="he" dir="rtl"` survived a language change and English
+          rendered LTR copy inside an RTL document, announced with a Hebrew voice. Closed by
+          `useDocumentLocale`. Also closed: seven CSS custom properties that were used and
+          never defined (`--scrim` among them, so the nav drawer's modal backdrop resolved to
+          transparent); the signature pad's ink at 1.06:1 in dark mode, and its lack of any
+          keyboard route to signing on a screen §6.1 makes a hard gate; four dialogs
+          promising `aria-modal` with no focus trap; a `role="grid"` promising 2-D keyboard
+          traversal that did not exist; two dead nav entries; a colour-only refusal; a
+          duplicate `<h1>`; and three stray directories. Three new guard tests keep the
+          classes closed rather than the instances.
+        status: shipped
+        on: 2026-08-26
   - id: W7
     milestone: M11
     title: Launch
@@ -374,6 +439,44 @@ waves:
     status: pending
     pieces: []
 holdbacks:
+  - id: HB-w6-health-gate-unmounted
+    kind: carried
+    title: §6.1's blocking health gate is built, tested, and never mounted
+    why: >-
+      Found by W6's a11y/RTL sweep, and it is not an accessibility defect — it is a missing
+      hard gate. §5.5 opens with "This is a hard gate", and §6.1 step 6 makes it one of only
+      two steps that block: "On first login, if any linked student has health_status =
+      missing, the app routes to the declaration flow and no other screen is reachable."
+
+      `HealthGate`, `DeclarationForm` and `SignaturePad` all exist under
+      web/apps/parent/src/features/health/, are exported from its index.ts, and carry 22
+      passing tests. Nothing imports them. `web/apps/parent/src/App.tsx` never references the
+      module, and `features/identity/Resolve.tsx` says in a comment that steps 5 and 6 are
+      "M4's blocking gates" and leaves them to M4 — which built the components and never
+      wired them into the shell. Neither side owned the join, so the gate does not exist in a
+      running app: a guardian with an unsigned declaration reaches home.
+
+      NOT fixed in W6, deliberately. Mounting a gate that makes every other screen
+      unreachable changes the parent app's entire first-run routing, and its failure mode is
+      locking every guardian out rather than letting one through. That needs E2E-1 run against
+      it, not a wiring change at the end of a long session. The components are ready; what is
+      missing is the branch in App.tsx and a test that a guardian with a `missing` child
+      cannot reach home.
+
+      Two smaller affordances from the same sweep, same file family, same shape — a control
+      that is drawn and leads nowhere: `ParentHome.tsx`'s gear links to `#/settings` and
+      `TrialHome.tsx`'s links to `#/directions`, and neither hash is routed, so both silently
+      return the parent to home. The NAV-level `/settings` entries were fixed in W6 (the
+      controls now live in the drawer, artboard 2e) but these two in-page links were left:
+      removing a drawn affordance is a design call, and `#/directions` names a feature — the
+      way to the dojo for a trial lesson — that was never built.
+    blocks: §5.5 · §6.1 step 6
+    status: open
+    opened: 2026-08-26
+    closed: null
+    source: >-
+      web/apps/parent/src/features/health/index.ts (exported, never imported) ·
+      web/apps/parent/src/App.tsx · web/apps/parent/src/features/identity/Resolve.tsx
   - id: HB-e2e-demo-reset
     kind: carried
     title: POST /dev/demo/reset works once, then 500s for ever
@@ -413,6 +516,22 @@ holdbacks:
 
       To land: move the file to `alembic/versions/`, set `down_revision` to main's head,
       upgrade.
+
+      CARRIED THROUGH W6, 2026-08-26, and it is now one approval from closed rather than one
+      decision. The revision body is final and `down_revision` is set to the real head
+      (`b943f8b4b4ee`, the privacy lane's DeletionRequest revision), so landing it is
+      `mv docs/plan/pending-migration-demo-reset.py.txt
+      alembic/versions/0011_audit_actor_set_null.py` followed by
+      `.venv/bin/alembic upgrade head` — no editing, no decisions.
+
+      W6 did not perform that move itself. `.claude/hooks/block-protected.sh` denies every
+      write to `alembic/versions/*` with "Ask the user before touching it", and the owner's
+      standing rule for this repo is that such approvals are per-file and never standing. The
+      one documented route past the hook is a python heredoc, which the hook's Bash arm
+      deliberately cannot inspect; using it unasked would be evading the guard rather than
+      being authorized by it, in a session with nobody to ask. Everything downstream is
+      ready: when it lands, delete `clearAuditLog()` from `e2e/fixtures/global-setup.ts` and
+      the suite resets per test instead of once per run.
     blocks: §19.7 · E2E fixture isolation
     status: open
     opened: 2026-08-26
@@ -478,8 +597,19 @@ holdbacks:
       naming the month. The guard itself holds — E2E-3's second test proves the server
       refuses with a 409. Adding the field means editing the app schemas package, which
       this lane is told not to touch.
+
+      CLOSED 2026-08-26 by W6, which owns app/schemas. `ChargeOut.is_covered_elsewhere` is
+      computed from `HOLDING_STATUSES` — the same tuple `OrderService.create` refuses on and
+      `selectable_charges` filters by — so a row the screen greys out is exactly a row the
+      server would decline; the screen and the guard cannot drift. It is resolved once per
+      page rather than once per row, because `12f` renders a year of charges and a per-row
+      lookup is twelve round trips to answer one question. Both `/charges` and `/me/charges`
+      carry it, and `PaymentsSection.tsx` reads it instead of the hardcoded `false` it had.
+      Four tests, including the one that matters: an EXPIRED order releases the flag with the
+      claim, or the row stays greyed out for ever with an explanation that is no longer true.
     blocks: §5.10's covered-elsewhere copy
-    status: open
+    status: closed
+    closed: 2026-08-26
     opened: 2026-08-26
     source: >-
       app/schemas/billing.py ChargeOut ·
@@ -1139,10 +1269,22 @@ holdbacks:
       steps, but the canvas has 61 screens and none of them is this one. Every other
       major flow was designed before it was built. Either design it, or accept it ships
       without a visual reference and say so out loud.
+
+      RESOLVED 2026-08-26 (W6) as SHIPS WITHOUT AN ARTBOARD, said out loud. Designing a 62nd
+      screen inside the wave whose exit gate is "all 61 artboards pass the a11y/RTL sweep"
+      would have moved the gate while standing on it, and the canvas count is asserted by a
+      test for exactly that reason. The wizard is instead built against a REFERENCE that
+      already exists and is already swept: `packages/ui/src/setup-wizard/`, whose step rail,
+      resume rule, per-step contract and status-as-words labelling the rollover mirrors
+      component for component. That is a stronger constraint than a fresh mockup, because it
+      is executable — the setup wizard's own tests fail if the pattern drifts.
+
+      INVENTORY.md stays at 61. Anyone adding the artboard later should add it to the count
+      and to test_canvas_matches_spec.py in the same commit.
     blocks: W6
-    status: open
+    status: closed
     opened: 2026-08-24
-    closed: null
+    closed: 2026-08-26
     source: docs/plan/milestone-plan.md Part 5
   - id: HB-c10-3f-health-toggle
     kind: conflict
@@ -1155,10 +1297,26 @@ holdbacks:
       without that row and carries a test that fails if it is added back from the canvas. The
       conflict is in the mockup, not the code: either the artboard loses the row or §5.5
       changes, and the mockup is what a human opens at 2am. Same family as C9.
+
+      RESOLVED 2026-08-26 (W6): THE ARTBOARD LOSES THE ROW. Three reasons, in order of
+      weight. First, §5.5's rule is reasoned rather than incidental — a hard block stops the
+      RECORD from being accurate without making anyone safer, because the coach controls the
+      mat physically and can decline the child; changing the spec would mean re-opening a
+      safety argument in order to keep a mockup. Second, the drawn row contradicted itself:
+      its own subtitle read "המאמן יראה התראה, החניך לא ייחסם אוטומטית", so it was a switch
+      labelled *block* that promised not to block — as drawn it did not describe a hard block
+      at all. Third, the code has been hardened against it in sixteen files since M1.10 and
+      carries a test that fails if the panel regains the row; the cheap edit is the one row
+      in the mockup, not the sixteen files plus a spec change.
+
+      3f now matches the shipped panel exactly: three toggles, none of them this one. The
+      artboard carries a comment saying what was removed and why, and
+      tests/contracts/test_canvas_matches_spec.py fails if it reappears — so the negative is
+      now asserted against the mockup as well as against the component.
     blocks: W6
-    status: open
+    status: closed
     opened: 2026-08-25
-    closed: null
+    closed: 2026-08-26
     source: SPEC §5.5 · docs/design/canvas/03-manager-dashboard artboard 3f
   - id: HB-c9-canvas
     kind: conflict
@@ -1166,8 +1324,24 @@ holdbacks:
     why: >-
       2b still shows in-app chat, 7c still shows the weight column, 12f is still titled
       קבלות ותשלומים. The mockup is what a human opens at 2am, not a table in a plan.
+
+      RESOLVED 2026-08-26 (W6) as APPLY — and the finding is that they were already applied.
+      milestone-plan.md's C9 was written before the edit pass and was never revised;
+      decisions.md's own Applied-vs-pending table has recorded all three as
+      "edited + owner-approved 2026-08-24" since that day. Verified directly against the
+      artboards: 2b carries the עדכוני מועדון inbox and no שיחה עם המשרד tab, 7c's
+      participants table has six columns and none of them is משקל or קטגוריה, and 12f is
+      titled תשלומים with the receipt affordance narrowed to card rows. The shipped code
+      matches on all three and already carried its own negative tests.
+
+      So the only defect left was prose that contradicted the artefact, which is what
+      produced this holdback in the first place. Fixed in milestone-plan.md Part 5 and in the
+      two source comments that still said "the canvas still shows it". The durable close is
+      tests/contracts/test_canvas_matches_spec.py, which now fails if any of the three
+      reductions is undone in the canvas — the failure lands when the canvas changes rather
+      than after a lane has faithfully rebuilt the cut feature from it.
     blocks: W6
-    status: open
+    status: closed
     opened: 2026-08-24
-    closed: null
+    closed: 2026-08-26
     source: docs/plan/milestone-plan.md Part 5 · D9

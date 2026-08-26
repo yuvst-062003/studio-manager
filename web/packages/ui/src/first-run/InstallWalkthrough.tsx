@@ -28,7 +28,7 @@ const stepsStyle: CSSProperties = {
 
 const shotStyle: CSSProperties = {
   maxInlineSize: '100%',
-  borderRadius: 'var(--radius-2)',
+  borderRadius: 'var(--radius-md)',
   border: 'var(--border-width-hairline) solid var(--border)',
 }
 

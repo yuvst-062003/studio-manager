@@ -143,7 +143,8 @@ class DeletionRequest(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
     subject_person_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True), ForeignKey("person.id", ondelete="RESTRICT"), nullable=False
     )
-    #: Who requested the deletion. Same as subject in guardian requests, a manager for admin requests.
+    #: Who requested the deletion. Same as the subject for a guardian's own request, a
+    #: manager for an admin one.
     requested_by_person_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True), ForeignKey("person.id", ondelete="RESTRICT"), nullable=False
     )

@@ -312,3 +312,12 @@ component layer.
 | D9.2 cut weight column from `7c` | yes | **yes — edited + owner-approved 2026-08-24** |
 | D9.3 retitle `12f` to תשלומים | yes | **yes — edited + owner-approved 2026-08-24** |
 | SPEC.md §2.2 contradiction | yes | **yes — SPEC.md edited 2026-08-24** |
+| C10 — `3f` loses the health-block toggle | yes | **yes — canvas edited 2026-08-26 (W6)** |
+
+**All three D9 rows were re-verified against the artboard markup on 2026-08-26**, because
+`milestone-plan.md`'s C9 still claimed the opposite and that claim was blocking W6. They were
+applied. The divergence was between two documents, not between a document and the canvas.
+
+**The table is no longer the only record.** `tests/contracts/test_canvas_matches_spec.py`
+asserts each of these against the artboard HTML and runs in every lane, so an undone edit
+fails when the canvas changes rather than when someone next reads this file.

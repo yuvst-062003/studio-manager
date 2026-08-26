@@ -9,6 +9,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { apiFetch, useDisplayMode, useSession } from '@studio/core'
 import {
+  AccountDrawerFooter,
   AppShell,
   InstallWalkthrough,
   LanguagePicker,
@@ -17,6 +18,7 @@ import {
   ThemeProvider,
   makeSetupClient,
   registerM1WizardSteps,
+  useDocumentLocale,
 } from '@studio/ui'
 import { DevBar } from '@studio/ui/dev-bar'
 import type { InstallPromptEvent } from '@studio/ui'
@@ -67,7 +69,11 @@ const NAV = [
   // `/events`, so the path form would be a link to a 404.
   { key: 'events', labelKey: 'events.title', href: '#/events' },
   { key: 'announcements', labelKey: 'common.nav.announcements', href: '/announcements' },
-  { key: 'settings', labelKey: 'common.nav.settings', href: '/settings' },
+  // NO settings entry. `/settings` matched no route in either app, so the link fell
+  // through the service worker's navigateFallback to index.html and put the user back
+  // on home in silence. Artboard 9e — the inventory calls it "אותה מגירה", the same drawer as the parent app's 2e draws these controls in the DRAWER, not on a
+  // page, and that is where they now are — see `AccountDrawerFooter`, passed as
+  // `drawerFooter` below, under the studio switcher `AppShell` already renders.
 ]
 
 /**
@@ -107,6 +113,9 @@ export default function App() {
   // a measurement that lies to make a dev tab convenient is worse than the gate.
   const installed = displayMode !== 'browser' || import.meta.env.MODE === 'development'
   const [locale, setLocale] = useState<Locale>('he')
+  // See the parent app's note: index.html's `dir="rtl"` is a literal, and the locale in
+  // React state was never written back to the document.
+  useDocumentLocale(locale)
   const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null)
   // Memoised: SetupWizard reads through this in an effect keyed on the client, so a fresh
   // object every render would re-fetch progress forever.
@@ -188,6 +197,7 @@ export default function App() {
           title={session.activeStudioName ?? ''}
           items={NAV}
           locale={locale}
+          drawerFooter={<AccountDrawerFooter locale={locale} onChooseLocale={setLocale} />}
           studios={session.studios.map((s) => ({
             studioId: s.studio_id,
             studioName: s.studio_name,

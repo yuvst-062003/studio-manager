@@ -8,9 +8,10 @@
 // Closed means NOT RENDERED, never moved off-screen. An off-screen drawer is still in the
 // tab order and still read aloud by a screen reader — a keyboard user would tab into a
 // menu they cannot see.
-import { useEffect, useRef } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import { t } from '@studio/i18n'
+// Sibling module rather than the barrel: importing '.' from inside the package is a cycle.
+import { useModalDialog } from '../useModalDialog'
 import type { Locale } from '@studio/i18n'
 
 export type NavItem = {
@@ -60,9 +61,9 @@ const linkStyle: CSSProperties = {
   // §6.2 — 'large tap targets ... no interaction requiring precision'. 44px is the
   // smallest target iOS treats as reliably hittable, and a coach is using this on a mat.
   minBlockSize: '44px',
-  color: 'var(--text)',
+  color: 'var(--fg)',
   textDecoration: 'none',
-  borderRadius: 'var(--radius-2)',
+  borderRadius: 'var(--radius-md)',
 }
 
 export function NavDrawer({
@@ -78,18 +79,11 @@ export function NavDrawer({
   locale: Locale
   footer?: ReactNode
 }) {
-  const panelRef = useRef<HTMLElement | null>(null)
-
-  useEffect(() => {
-    if (!open) return
-    const onKeyDown = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') onClose()
-    }
-    globalThis.addEventListener('keydown', onKeyDown)
-    // Focus moves into the drawer, or a keyboard user opens a menu and stays outside it.
-    panelRef.current?.focus()
-    return () => globalThis.removeEventListener('keydown', onKeyDown)
-  }, [open, onClose])
+  // Replaces this component's own Escape listener and one-shot `panelRef.focus()`. Both
+  // were correct as far as they went and neither TRAPPED Tab, so a keyboard user could
+  // walk out of an open drawer into the page it was covering, and neither RESTORED focus
+  // on close, so dismissing the menu dropped them at the top of the document.
+  const panelRef = useModalDialog(open, onClose)
 
   if (!open) return null
 
@@ -99,27 +93,40 @@ export function NavDrawer({
           which a keyboard reaches. A backdrop with a role would announce a control that
           adds nothing. */}
       <div style={backdropStyle} onClick={onClose} data-testid="nav-backdrop" />
-      <nav
+      {/* Two roles, two elements, and that is the reason for the extra div. The drawer draws
+          a full-viewport backdrop, so it IS modal and has to say so — but `role="dialog"` on
+          the <nav> REPLACES its implicit `navigation` role rather than adding to it, and one
+          element cannot be both. The dialog is the container; the menu inside it stays a nav,
+          so a screen-reader user still finds it under landmarks.
+
+          `aria-modal="true"` and the focus trap arrive together: the attribute alone told
+          assistive technology the page behind was unavailable while Tab still walked out of
+          the drawer into it. */}
+      <div
         aria-label={t(locale, 'common.nav.menu')}
+        aria-modal="true"
         ref={panelRef}
+        role="dialog"
         style={drawerStyle}
         tabIndex={-1}
       >
         <button type="button" onClick={onClose}>
           {t(locale, 'common.nav.closeMenu')}
         </button>
-        <ul style={listStyle}>
-          {items.map((item) => (
-            <li key={item.key}>
-              <a href={item.href} style={linkStyle}>
-                {item.icon}
-                {t(locale, item.labelKey)}
-              </a>
-            </li>
-          ))}
-        </ul>
+        <nav aria-label={t(locale, 'common.nav.menu')}>
+          <ul style={listStyle}>
+            {items.map((item) => (
+              <li key={item.key}>
+                <a href={item.href} style={linkStyle}>
+                  {item.icon}
+                  {t(locale, item.labelKey)}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </nav>
         {footer}
-      </nav>
+      </div>
     </>
   )
 }

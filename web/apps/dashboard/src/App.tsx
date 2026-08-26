@@ -26,6 +26,10 @@ import type { Locale } from '@studio/i18n'
 import { ScheduleSection } from './features/schedule/ScheduleSection'
 import { makeScheduleClient } from './features/schedule/client'
 import { useToday } from './features/schedule/useToday'
+// §5.15's rollover — "the single highest-leverage screen in the product", and the one flow
+// a manager runs once a year. Its own route rather than a panel inside `#/schedule`,
+// because it is seven steps long and has to survive a closed tab.
+import { RolloverWizard, makeRolloverClient } from './features/rollover'
 import { StaffScreen } from './features/staff/StaffScreen'
 import { SettingsScreen } from './features/settings/SettingsScreen'
 import {
@@ -75,6 +79,7 @@ const NAV = [
   { key: 'schedule', labelKey: 'schedule.week.title', href: '#/schedule' },
   { key: 'groups', labelKey: 'schedule.groups.title', href: '#/groups' },
   { key: 'closures', labelKey: 'schedule.closure.title', href: '#/closures' },
+  { key: 'rollover', labelKey: 'schedule.rollover.nav', href: '#/rollover' },
   { key: 'students', labelKey: 'people.student.plural', href: '#/students' },
   { key: 'alerts', labelKey: 'people.alerts.title', href: '#/alerts' },
   { key: 'billing', labelKey: 'billing.debt.title', href: '#/billing' },
@@ -100,6 +105,7 @@ export type DashboardRoute =
   | 'alerts'
   | 'billing'
   | 'attendance'
+  | 'rollover'
 
 /** Unknown hashes resolve to home rather than to a blank page. */
 export function routeFromHash(hash: string): DashboardRoute {
@@ -111,6 +117,11 @@ export function routeFromHash(hash: string): DashboardRoute {
   // keeps this shared file to one NAV group and one branch per vertical rather than one
   // per screen, which is what let both W2 lanes edit it without colliding on every screen.
   if (name === 'schedule' || name === 'closures' || name.startsWith('groups')) return 'schedule'
+  // §5.15's rollover. One hash and one screen: the wizard's own seven steps are its
+  // internal state, not routes — a manager who bookmarked step 5 would land on a step the
+  // server may since have answered, and `resume_at` is the only correct answer to "where
+  // was I".
+  if (name === 'rollover') return 'rollover'
   if (name.startsWith('students')) return 'students'
   if (name === 'alerts') return 'alerts'
   // M6's family: `#/billing` is `3e`'s collections board and
@@ -180,6 +191,9 @@ export default function App() {
   const peopleClient = useMemo(() => makeDashboardPeopleClient(apiFetch), [])
   const eventsClient = useMemo(() => makeDashboardEventsClient(apiFetch), [])
   const beltsClient = useMemo(() => makeDashboardBeltsClient(apiFetch), [])
+  // Memoised for the same reason `setupClient` is: RolloverWizard reads through this in an
+  // effect keyed on the client, so a fresh object every render would re-fetch for ever.
+  const rolloverClient = useMemo(() => makeRolloverClient(apiFetch), [])
   // Stable for as long as the studio's day is. `new Date().toISOString()` in this
   // render body was a new value every render, and downstream that is an effect
   // dependency worth `1 + 3N` requests.
@@ -256,6 +270,9 @@ export default function App() {
             <AlertCentre locale={locale} client={peopleClient} />
           ) : null}
           {route === 'attendance' ? <AttendanceSection locale={locale} /> : null}
+          {route === 'rollover' ? (
+            <RolloverWizard locale={locale} client={rolloverClient} />
+          ) : null}
           {route === 'billing' ? (
             <BillingSection
               locale={locale}

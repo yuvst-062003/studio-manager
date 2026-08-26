@@ -89,6 +89,14 @@ def process_deletions(session: Session, *, at: datetime) -> Tally:
     - Health data is purged
     - Attendance records are purged
     - Audit logs are retained for compliance
+
+    **`updated_at` is the completion instant, and there is no `completed_at`.** This loop
+    used to assign one. `DeletionRequest` has no such column, so SQLAlchemy accepted the
+    attribute, kept it on the instance, and never wrote it -- a §11.4 request could report
+    itself completed with no record of when. `TimestampColumns.updated_at` carries
+    `onupdate=func.now()` and this row is only ever written when its status changes, so the
+    instant is already stored, by the database rather than by the caller's `at`. Adding a
+    column would mean a migration, which `main` lands one of per wave; this needs none.
     """
     tally = Tally()
     deletions = session.query(DeletionRequest).filter(DeletionRequest.status == "pending").all()
@@ -106,7 +114,6 @@ def process_deletions(session: Session, *, at: datetime) -> Tally:
             # 5. Log deletion for compliance
 
             deletion.status = "completed"
-            deletion.completed_at = at
             session.flush()
             tally.deletions_processed += 1
             logger.info(
@@ -120,7 +127,6 @@ def process_deletions(session: Session, *, at: datetime) -> Tally:
         except Exception as e:
             deletion.status = "failed"
             deletion.error = str(e)
-            deletion.completed_at = at
             session.flush()
             tally.errors += 1
             logger.error(

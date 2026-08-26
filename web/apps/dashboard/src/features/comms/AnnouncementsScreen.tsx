@@ -59,7 +59,7 @@ const lineStyle: CSSProperties = { color: 'var(--fg)', margin: 0 }
 const lockScreenStyle: CSSProperties = {
   background: 'var(--surface-raised, var(--surface))',
   border: 'var(--border-width-hairline) solid var(--border)',
-  borderRadius: 'var(--radius-2)',
+  borderRadius: 'var(--radius-md)',
   display: 'flex',
   flexDirection: 'column',
   gap: 'var(--space-1)',
