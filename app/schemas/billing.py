@@ -24,7 +24,7 @@ import uuid
 from datetime import date, datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.schemas._pagination import CursorPage
 
@@ -132,6 +132,20 @@ class ChargeAdjustmentIn(BaseModel):
 
     amount_agorot: int = Field(description="Negative for a credit. Never zero.")
     reason: str = Field(min_length=1, max_length=200)
+
+    @field_validator("amount_agorot")
+    @classmethod
+    def _never_zero(cls, value: int) -> int:
+        """The docstring above said "Never zero" and nothing enforced it.
+
+        Zero is the one value that records nothing while looking like a correction: it
+        writes an audit entry saying a manager adjusted a family's balance by no money at
+        all, which is indistinguishable from a mis-click and impossible to explain later.
+        A caller that means "no adjustment" should not be calling this.
+        """
+        if value == 0:
+            raise ValueError("an adjustment of zero records nothing; omit it instead")
+        return value
 
 
 class BillingRunOut(BaseModel):

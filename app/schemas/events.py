@@ -22,7 +22,7 @@ import uuid
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from app.schemas._pagination import CursorPage
 
@@ -96,6 +96,36 @@ class EventCreateIn(BaseModel):
     requires_consent: bool = False
     consent_text: str | None = Field(default=None, max_length=4000)
     targets: list[EventTargetOut] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _consent_says_what_is_being_consented_to(self) -> EventCreateIn:
+        """§5.8, and the `event_consent_has_text` CHECK on the model.
+
+        The CHECK is the backstop, not the gate. A constraint violation reaches the
+        manager as a 500 with no field attached, so the form cannot mark the offending
+        input and the manager cannot tell what went wrong -- while the actual failure is
+        an ordinary validation error the API should have returned. Enforcing it here is
+        what makes the CHECK the thing that never fires.
+        """
+        if self.requires_consent and not (self.consent_text or "").strip():
+            raise ValueError(
+                "consent_text is required when requires_consent is set: a consent form "
+                "with no text asks a parent to agree to nothing"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _an_event_does_not_end_before_it_starts(self) -> EventCreateIn:
+        """The `event_time_range` CHECK, for the same reason as the consent pairing above.
+
+        Only checked when `ends_at` is given. It is nullable here while the model column is
+        not, because §5.8 lets a manager pencil in a date before the schedule is settled --
+        so the service supplies the end when it creates the row. That gap is the service's
+        to close and is deliberately not papered over here.
+        """
+        if self.ends_at is not None and self.ends_at <= self.starts_at:
+            raise ValueError("ends_at must be after starts_at")
+        return self
 
 
 class EventUpdateIn(BaseModel):
