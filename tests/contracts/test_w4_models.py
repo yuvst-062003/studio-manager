@@ -306,3 +306,39 @@ def test_exactly_one_side_of_the_payment_ipn_cycle_defers():
     assert matched_fk.use_alter is True
     # Named, because Alembic cannot drop an auto-named constraint it added by ALTER.
     assert matched_fk.constraint.name == "fk_upay_ipn_record_matched_payment_id"
+
+
+# -- the two constraints W2 deferred to this wave ------------------------------
+def test_the_student_belt_cache_points_at_a_real_rank():
+    """W2 left `student.current_belt_id` with no foreign key because `belt_rank` is
+    created here: a `ForeignKey` string is resolved at mapper-configuration time, so
+    writing it before this wave would have failed every test in the suite rather than one.
+
+    A UUID column with no constraint behind it is a dangling pointer the database is happy
+    to accept, and §5.9's progression screen reads it on every render.
+
+    `SET NULL` rather than `RESTRICT`. A studio reorganising its ladder is an ordinary
+    thing, and a rank that cannot be deleted because one child holds it is a schema
+    fighting the club; demoting that child to "no belt recorded" is the recoverable
+    outcome, and `student_belt` still holds the history of how they got there.
+    """
+    column = Base.metadata.tables["student"].c.current_belt_id
+    fk = next(iter(column.foreign_keys), None)
+    assert fk is not None, "student.current_belt_id still has no foreign key"
+    assert fk.column.table.name == "belt_rank"
+    assert fk.ondelete == "SET NULL"
+
+
+def test_the_student_price_points_at_a_real_plan_and_the_plan_cannot_vanish():
+    """The other half of W2's deferral -- and it is on `student`, not `enrollment` (C11).
+
+    `RESTRICT` rather than `SET NULL`, and the asymmetry with the belt above is the point.
+    A student silently losing their price is a student §5.10's run skips, which surfaces
+    as a month where a family was simply not billed -- and nobody notices a charge that
+    was never raised. Deleting a price plan that is in use is refused outright instead.
+    """
+    column = Base.metadata.tables["student"].c.price_plan_id
+    fk = next(iter(column.foreign_keys), None)
+    assert fk is not None, "student.price_plan_id still has no foreign key"
+    assert fk.column.table.name == "price_plan"
+    assert fk.ondelete == "RESTRICT"

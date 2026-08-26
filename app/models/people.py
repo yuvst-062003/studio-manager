@@ -98,10 +98,11 @@ class Student(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
     model allows an adult student who is also their own guardian, and a second name/
     birthdate column here would immediately let the two drift apart.
 
-    `current_belt_id` and `price_plan_id` carry no foreign key: `belt_rank` and
-    `price_plan` are W4's tables. W4's contract commit adds both constraints, exactly as
-    W2's adds `guardian.student_id`'s. A forward reference in a `ForeignKey` string would
-    fail at mapper-configuration time, which is every test in the suite rather than one.
+    `current_belt_id` and `price_plan_id` point at `belt_rank` and `price_plan`, which are
+    W4's tables. **Both constraints were added in W4's contract commit, not in W2**, and
+    the delay was not tidiness: a `ForeignKey` string is resolved at mapper-configuration
+    time, so writing one before W4 promoted those models would have failed every test in
+    the suite rather than one. `guardian.student_id` was deferred the same way in W1.
 
     **`price_plan_id` is here and not on `enrollment` — that is C11.** The club prices by
     how often a child trains, not by which groups they attend, so one student has one
@@ -139,14 +140,28 @@ class Student(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
     source: Mapped[str | None] = mapped_column(String(40))
     joined_on: Mapped[date | None] = mapped_column(Date)
     left_on: Mapped[date | None] = mapped_column(Date)
-    #: W4's `belt_rank`. Unconstrained until that wave's contract commit — see the class
-    #: docstring.
-    current_belt_id: Mapped[uuid.UUID | None] = mapped_column(PGUUID(as_uuid=True))
+    #: W4's `belt_rank`, constrained since that wave's contract commit — see the class
+    #: docstring for why it could not be written in W2.
+    #:
+    #: `SET NULL`: a studio reorganising its ladder is an ordinary thing, and a rank that
+    #: cannot be deleted because one child holds it is a schema fighting the club. The
+    #: child demotes to "no belt recorded", and `student_belt` still holds the history of
+    #: how they got there.
+    current_belt_id: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("belt_rank.id", ondelete="SET NULL")
+    )
     health_status: Mapped[str] = mapped_column(String(15), nullable=False, default="missing")
-    #: §5.10, C11 — the tuition price, **per student**. W4's `price_plan`, unconstrained
-    #: until that wave's contract commit. Nullable: a `lead` or `trial` has no price yet,
+    #: §5.10, C11 — the tuition price, **per student**. W4's `price_plan`, constrained
+    #: since that wave's contract commit. Nullable: a `lead` or `trial` has no price yet,
     #: and §5.4 makes setting one part of the manager's conversion decision.
-    price_plan_id: Mapped[uuid.UUID | None] = mapped_column(PGUUID(as_uuid=True))
+    #:
+    #: `RESTRICT`, unlike the belt above, and the asymmetry is the point: a student
+    #: silently losing their price is a student §5.10's run skips, which surfaces as a
+    #: month where a family was simply not billed — and nobody notices a charge that was
+    #: never raised.
+    price_plan_id: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("price_plan.id", ondelete="RESTRICT")
+    )
 
 
 class StudentFreeze(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):

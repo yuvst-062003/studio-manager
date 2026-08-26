@@ -33,8 +33,10 @@ from sqlalchemy.orm import Session as OrmSession
 
 ROOT = Path(__file__).resolve().parents[2]
 
-#: The two seams whose return type is still in `app/models/_pending/`. Named once so the
-#: day W4 and W5 move their models up, the greps land here.
+#: The two W4/W5 seams. `create_charge -> Charge` resolves in-process since W4's contract
+#: commit promoted `billing.py`; `enqueue -> Notification` still names
+#: `app/models/_pending/`, which is the only reason the subprocess below survives. Named
+#: once so the day W5 moves `comms.py` up, the greps land here and this helper can go.
 _CREATE_CHARGE = "app.services.billing.BillingService.create_charge"
 _ENQUEUE = "app.services.comms.NotificationService.enqueue"
 
@@ -55,11 +57,14 @@ def _signature(func):
 def _pending_signature(dotted: str) -> dict[str, Any]:
     """One seam's fully-resolved signature, computed in a **fresh interpreter**.
 
-    Two seams name models that live in `app/models/_pending/` until W4 and W5 migrate
-    them: `BillingService.create_charge -> Charge` and `NotificationService.enqueue ->
-    Notification`. Importing either **anywhere in this process** registers its table in
+    One seam still names a model in `app/models/_pending/`: `NotificationService.enqueue ->
+    Notification`, until W5's contract commit migrates `comms.py`. `create_charge ->
+    Charge` was in the same position until W4 promoted `billing.py`, and is resolved here
+    now only because both seams share this helper.
+
+    Importing `comms` **anywhere in this process** registers `notification` in
     `Base.metadata` with nothing behind it -- and `DemoStudioService.wipe_plan` derives
-    the reset's wipe from that metadata, so it would then issue `DELETE FROM charge`
+    the reset's wipe from that metadata, so it would then issue `DELETE FROM notification`
     against a database holding no such relation, in whichever unrelated test happened to
     run after this module. An order-dependent failure three suites away is the worst
     possible way to pay for an import.
@@ -69,11 +74,11 @@ def _pending_signature(dotted: str) -> dict[str, Any]:
     reason. The assertions keep their full strength -- every annotation is really resolved
     against the really-imported class, `eval_str=True` and all -- they just compare
     `repr`s, because a class cannot cross a process boundary. This helper is deleted the
-    day both models move up into `app/models/`.
+    day W5 moves `comms.py` up, which is the last model it is here for.
     """
     script = textwrap.dedent(f"""
         import inspect, json
-        from app.models._pending.billing import Charge      # noqa: F401 -- resolves the annotation
+        from app.models.billing import Charge               # noqa: F401 -- resolves the annotation
         from app.models._pending.comms import Notification  # noqa: F401
         module_name, class_name, method = {dotted!r}.rsplit(".", 2)
         module = __import__(module_name, fromlist=[class_name])

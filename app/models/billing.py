@@ -539,7 +539,17 @@ class RecurringSubscription(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base)
     __tablename__ = "recurring_subscription"
     __tenant_table_args__ = (
         CheckConstraint("status IN ('active', 'cancelled')", name="recurring_subscription_status"),
-        CheckConstraint("amount_agorot > 0", name="recurring_subscription_amount_positive"),
+        # **Not `recurring_subscription_amount_positive`.** NAMING_CONVENTION expands `ck`
+        # to `ck_%(table_name)s_%(constraint_name)s`, so repeating the table name in the
+        # constraint name -- the habit everywhere else in this schema -- produces
+        # `ck_recurring_subscription_recurring_subscription_amount_positive`: 64
+        # characters, one over Postgres's 63-character identifier limit. Postgres
+        # truncates silently, the model and the database then disagree about the name
+        # forever, and `test_the_migrations_match_the_models` is red on a schema that is
+        # otherwise correct. That test's own docstring records catching this exact class
+        # of bug once before. `recurring_subscription` is simply the first table name long
+        # enough to expose it; the generated name here is still conventionally prefixed.
+        CheckConstraint("amount_agorot > 0", name="amount_positive"),
         Index(
             "uq_recurring_subscription_active_payer",
             "studio_id",

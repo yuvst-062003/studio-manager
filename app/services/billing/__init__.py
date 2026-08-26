@@ -24,13 +24,14 @@ import uuid
 from datetime import date
 from typing import TYPE_CHECKING
 
-# The model lives in `app/models/_pending/` until W4's contract commit migrates it, and
-# importing it at runtime would register `charge` in `Base.metadata` with no table behind
-# it -- which is `alembic check` red and a demo reset that fails on a missing relation.
-# `from __future__ import annotations` makes every annotation a string, so the guard costs
-# the signature nothing: mypy and the IDE resolve `Charge`, the interpreter never does.
+# `Charge` is imported under TYPE_CHECKING only. Until W4's contract commit the reason was
+# that the model lived in `app/models/_pending/` and importing it would have registered
+# `charge` in `Base.metadata` with no table behind it. That reason is gone; the guard
+# stays because pulling a model into a service module for the sake of one annotation is
+# how an import cycle starts, and `from __future__ import annotations` makes it free --
+# mypy and the IDE resolve `Charge`, the interpreter never does.
 if TYPE_CHECKING:
-    from app.models._pending.billing import Charge
+    from app.models.billing import Charge
 
 from app.schemas.billing import ChargeKind
 
