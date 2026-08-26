@@ -2,8 +2,13 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 import { manifest } from './manifest.config'
+import { workspaceAliases } from '../../tools/workspace-aliases'
 
 export default defineConfig({
+  // The same map vitest.config.ts applies. A test-only alias would give a lane green tests
+  // and a dev server still serving main's components, which is the worse half of the bug --
+  // it looks fixed. See tools/workspace-aliases.ts.
+  resolve: { alias: workspaceAliases() },
   plugins: [
     react(),
     VitePWA({
