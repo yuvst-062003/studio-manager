@@ -227,8 +227,13 @@ waves:
     mode: parallel
     lanes: [MONEY, EVENTS]
     exit_gate: E2E-3 uPay happy path · E2E-4 forged IPN
-    status: pending
-    pieces: []
+    status: active
+    opened: 2026-08-26
+    pieces:
+      - id: W4.0
+        title: Contract commit — revision 0008, the lane gates and the lane fixtures
+        status: shipped
+        on: 2026-08-26
   - id: W5
     milestone: M8 ∥ M9
     title: Communication ∥ Reports and privacy completion

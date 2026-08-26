@@ -17,6 +17,7 @@ import uuid
 from datetime import UTC, date, datetime
 
 import pytest
+from app.models.billing import PricePlan
 from app.models.people import Enrollment, StudentFreeze, StudentStatusHistory, TrialBooking
 from app.services.people.enrollments import EnrollmentService
 from app.services.people.errors import RefusedError
@@ -269,7 +270,24 @@ def test_converting_a_trial_creates_the_enrollment_and_sets_the_price_on_the_stu
     StudentStatusService.transition(tenant_session, student=student, to_status="trial", at=T0)
     tenant_session.commit()
 
-    plan = uuid.uuid4()
+    # A REAL price plan row, not an invented UUID. W4's contract commit gave
+    # `student.price_plan_id` its foreign key to `price_plan` -- the constraint W2
+    # deferred because the table did not exist yet -- so a made-up id is now a
+    # ForeignKeyViolation rather than a value the column quietly accepted. That is the
+    # constraint working: C11 makes this column the number the whole billing run prices
+    # from, and one pointing at nothing is a student the run silently skips.
+    price_plan = PricePlan(
+        studio_id=student.studio_id,
+        name="פעמיים בשבוע",
+        sessions_per_week=2,
+        monthly_amount_agorot=25_000,
+        registration_fee_agorot=10_000,
+        active_from=date(2026, 9, 1),
+    )
+    tenant_session.add(price_plan)
+    tenant_session.flush()
+    plan = price_plan.id
+
     StudentService.convert(
         tenant_session,
         student_id=student.id,
