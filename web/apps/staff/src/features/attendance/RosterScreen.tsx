@@ -291,11 +291,51 @@ export function RosterScreen({
   }
 }
 
-/** A v5-shaped id derived from the session and the student, so the same row cycled twice
- *  amends one queued op. Not `crypto.randomUUID()`: a fresh id per tap is a fresh op per
- *  tap, and §10.5's idempotency is keyed on this value. */
+/**
+ * A UUID derived from the session and the student, so the same row cycled twice amends one
+ * queued op. Not `crypto.randomUUID()`: a fresh id per tap is a fresh op per tap, and
+ * §10.5's idempotency is keyed on this value.
+ *
+ * **It has to be an actual UUID.** This returned `${sessionId}:${studentId}` — the
+ * docstring already said "v5-shaped", so the intent was right and the implementation was
+ * not. `AttendanceIn.client_mark_id` is a `uuid.UUID` and `BulkPresentIn`'s prefix is one
+ * too, so every flush of every mark was refused with a 422 and the queue could never
+ * drain. Nothing surfaced it: the roster is optimistic by design, so the screen looked
+ * correct the whole time, and no code called `flush` at all until this wave.
+ *
+ * Derived rather than hashed with SubtleCrypto, which is async — and `queueMark` is called
+ * from a click handler that must not await anything, because §10.3's whole point is that
+ * the local write is not an API call. A 128-bit FNV-1a mix over the pair gives the two
+ * properties that matter: the same pair always yields the same id, and different pairs
+ * effectively never collide. Version and variant bits are set so it is a well-formed v4 to
+ * anything that parses it.
+ */
 function markId(sessionId: string, studentId: string): string {
-  return `${sessionId}:${studentId}`
+  const source = `${sessionId}:${studentId}`
+  // Four independently-seeded FNV-1a passes, 32 bits each. One pass would give 32 bits of
+  // spread across a whole club's marks, which is not enough to be careless with.
+  const words = [0x811c9dc5, 0x01000193, 0x9e3779b9, 0x85ebca6b].map((seed) => {
+    let hash = seed >>> 0
+    for (let index = 0; index < source.length; index += 1) {
+      hash ^= source.charCodeAt(index)
+      hash = Math.imul(hash, 0x01000193) >>> 0
+    }
+    return hash >>> 0
+  })
+  const hex = words.map((word) => word.toString(16).padStart(8, '0')).join('')
+  const bytes = hex.match(/.{2}/g)!
+  // v4 version and RFC 4122 variant, so the shape is honest about being derived garbage
+  // rather than pretending to be a v5 of some namespace it was never hashed against.
+  bytes[6] = ((parseInt(bytes[6]!, 16) & 0x0f) | 0x40).toString(16).padStart(2, '0')
+  bytes[8] = ((parseInt(bytes[8]!, 16) & 0x3f) | 0x80).toString(16).padStart(2, '0')
+  const flat = bytes.join('')
+  return [
+    flat.slice(0, 8),
+    flat.slice(8, 12),
+    flat.slice(12, 16),
+    flat.slice(16, 20),
+    flat.slice(20, 32),
+  ].join('-')
 }
 
 /** §10.1's four modes to the four keys `attendance.network.*` carries. `api-down` renders as

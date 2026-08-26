@@ -13,21 +13,47 @@ import { Button, EmptyState } from '@studio/ui'
 import { formatDateInStudioZone } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { AlertSectionProps } from '../AlertCentre'
-import type { RegistrationRequestOut } from '../peopleClient'
+import type { GroupOption, RegistrationRequestOut } from '../peopleClient'
 
 export function PendingRequestsAlert({ locale, client }: AlertSectionProps) {
   const [rows, setRows] = useState<RegistrationRequestOut[]>([])
+  const [groups, setGroups] = useState<GroupOption[]>([])
+  // Which request is being decided, and into which group. §5.4 puts the group on the
+  // DECISION, so it is picked here rather than read off the submission — the group a
+  // parent asked for is a preference the queue renders, and the manager may override it.
+  const [deciding, setDeciding] = useState<string | null>(null)
+  const [chosenGroup, setChosenGroup] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [reloads, setReloads] = useState(0)
 
   useEffect(() => {
     let live = true
-    client
-      .pendingRequests()
-      .then((body) => live && setRows(body.items))
-      .catch(() => live && setRows([]))
+    void (async () => {
+      const [pending, groupList] = await Promise.all([
+        client.pendingRequests().catch(() => ({ items: [] as RegistrationRequestOut[] })),
+        client.groups().catch(() => ({ items: [] as GroupOption[] })),
+      ])
+      if (!live) return
+      setRows(pending.items)
+      setGroups(groupList.items)
+    })()
     return () => {
       live = false
     }
-  }, [client])
+  }, [client, reloads])
+
+  async function approve(requestId: string) {
+    if (!chosenGroup || busy) return
+    setBusy(true)
+    try {
+      await client.approve(requestId, chosenGroup)
+      setDeciding(null)
+      setChosenGroup('')
+      setReloads((n) => n + 1)
+    } finally {
+      setBusy(false)
+    }
+  }
 
   return (
     <section aria-labelledby="alert-requests" data-testid="alert-pending-requests">
@@ -54,10 +80,44 @@ export function PendingRequestsAlert({ locale, client }: AlertSectionProps) {
                 <span data-testid="alert-request-new">{t(locale, 'people.request.newFamily')}</span>
               )}
               {/* §5.4 — approving is where the group is chosen, so the button opens the
-                  decision rather than approving in place. */}
-              <Button data-testid={`alert-request-approve-${row.id}`}>
-                {t(locale, 'people.request.approveInGroup')}
-              </Button>
+                  decision rather than approving in place. It had no handler at all, so the
+                  queue rendered and a manager could act on nothing in it. */}
+              {deciding === row.id ? (
+                <>
+                  <label>
+                    {t(locale, 'people.student.group')}
+                    <select
+                      data-testid="alert-request-group"
+                      value={chosenGroup}
+                      onChange={(event) => setChosenGroup(event.target.value)}
+                    >
+                      <option value="">—</option>
+                      {groups.map((group) => (
+                        <option key={group.id} value={group.id}>
+                          {group.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <Button
+                    data-testid="alert-request-approve-confirm"
+                    disabled={!chosenGroup || busy}
+                    onClick={() => void approve(row.id)}
+                  >
+                    {t(locale, 'people.request.approve')}
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  data-testid={`alert-request-approve-${row.id}`}
+                  onClick={() => {
+                    setDeciding(row.id)
+                    setChosenGroup('')
+                  }}
+                >
+                  {t(locale, 'people.request.approveInGroup')}
+                </Button>
+              )}
             </li>
           ))}
         </ul>

@@ -21,15 +21,42 @@ set -euo pipefail
 cd "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 if ! docker compose -f docker-compose.yml exec -T db \
-     pg_isready -U studio_migrator -d studio_manager >/dev/null 2>&1; then
+     pg_isready -U studio_migrator -d postgres >/dev/null 2>&1; then
   cat >&2 <<'MSG'
-✋ No database. The E2E suite needs one — GET /api/v1/health reads alembic_version.
+✋ No database server. The E2E suite needs one — GET /api/v1/health reads alembic_version.
 
     ./scripts/dev-db.sh up && .venv/bin/alembic upgrade head
 
 Then re-run `npm --prefix web run test:e2e`.
 MSG
   exit 1
+fi
+
+# The database this deployment is actually configured for, asked of the settings object
+# rather than parsed out of .env by hand — one reader, so the script and the app can never
+# disagree about which database the suite is asserting against.
+DB_NAME="$(.venv/bin/python -c '
+from urllib.parse import urlparse
+from app.core.config import settings
+print(urlparse(settings.MIGRATION_DATABASE_URL.replace("+psycopg", "")).path.lstrip("/"))
+')"
+
+# Created if absent, and this is what makes a per-worktree database practical.
+#
+# `tests/conftest.py` reads DATABASE_URL, so pytest runs against whatever the E2E stack
+# runs against. Sharing one database between the two means a backend test run truncating
+# tables underneath a live E2E run; sharing it between two lane worktrees means one lane's
+# migration deciding the other lane's schema, which is how `alembic upgrade head` on this
+# branch started failing on a revision it has never seen. A database per worktree fixes
+# both, but only if it survives `dev-db.sh reset`, which drops the volume.
+if ! docker compose -f docker-compose.yml exec -T db \
+     psql -U studio_migrator -d postgres -tAc \
+     "select 1 from pg_database where datname = '${DB_NAME}'" | grep -q 1; then
+  echo "▸ creating database ${DB_NAME}" >&2
+  docker compose -f docker-compose.yml exec -T db \
+    createdb -U studio_migrator -O studio_migrator "${DB_NAME}"
+  echo "▸ migrating ${DB_NAME} to head" >&2
+  .venv/bin/alembic upgrade head >&2
 fi
 
 # 127.0.0.1, matching every app's vite.config.ts proxy target. uvicorn binds IPv4 only and

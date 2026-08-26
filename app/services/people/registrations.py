@@ -288,11 +288,22 @@ class RegistrationService:
                 guardian_last_name=" ".join(
                     (guardian_blob.get("display_name") or "הורה").split(" ")[1:]
                 ),
-                # L7 -- if the queue already matched a Person, reuse their VERIFIED address
-                # so `StudentService.create` links rather than duplicates. §5.4a: "No second
-                # invitation, no second account, no second login."
-                guardian_email=parent.email if parent else guardian_blob.get("email"),
-                guardian_phone=parent.phone if parent else guardian_blob.get("phone"),
+                # L7 -- if the queue already matched a Person, hand `StudentService.create`
+                # their ID so it links rather than duplicates. §5.4a: "No second invitation,
+                # no second account, no second login."
+                #
+                # The ID and not the address. This passed `parent.email` once, meaning to
+                # "reuse their VERIFIED address" -- but `person.email` is not that address:
+                # §5.4a matches on what `auth_identity` holds, and `matching.py` says
+                # "person.email alone is therefore never a key". So for any matched parent
+                # whose Person row carried no address -- every §19.3 persona, and anyone a
+                # manager created without typing one -- the match found nobody, a duplicate
+                # parent was created, and they were issued an invitation with neither an
+                # email nor a phone on it. The check constraint refused, and the whole
+                # approval 500'd.
+                guardian_person_id=parent.id if parent else None,
+                guardian_email=guardian_blob.get("email"),
+                guardian_phone=guardian_blob.get("phone"),
                 at=at,
                 actor_person_id=actor_person_id,
                 status="pending_approval",

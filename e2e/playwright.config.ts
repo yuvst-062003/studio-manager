@@ -8,11 +8,13 @@ import { API_ORIGIN, ORIGINS } from './origins'
  * SPEC §13's E2E layer: "Playwright — the five flows below", all of which must pass before
  * release.
  *
- * ── These specs do not pass yet, and that is the point ────────────────────────────────
- * They are written in the contract commit, ahead of every implementation, so each wave's
- * exit gate is a file that already exists rather than one written under deadline at the end
- * of the wave. A gate authored after the code it judges tends to describe what the code
- * does. The wave that fills each flow in is named at the top of its spec.
+ * ── These specs pass, as of W5's gates lane ───────────────────────────────────────────
+ * They were written in the contract commit ahead of every implementation, so each wave's
+ * exit gate was a file that already existed rather than one written under deadline at the
+ * end of the wave. A gate authored after the code it judges tends to describe what the code
+ * does — and this one did not: filling the five bodies in found nine defects that every
+ * unit suite was green through, from a payments screen no parent could load to an offline
+ * queue that never sent anything. Each is named in the spec that found it.
  *
  * ── The prerequisite, landed in W5's contract commit ──────────────────────────────────
  * `@playwright/test` used to be absent — `web/package.json` carried `playwright`, the
@@ -24,9 +26,10 @@ import { API_ORIGIN, ORIGINS } from './origins'
  * pinned to `1.62.1`, matching the driver exactly — a runner and driver that disagree fail
  * in ways that read as browser bugs.
  *
- * What is still owed is HB-w3-e2e-harness: a seed-and-authenticate fixture over the §19.4
- * dev routes, and a rewrite of the spec bodies against the testid vocabulary the apps
- * actually expose. All fifteen tests are `test.fixme`-gated until then.
+ * HB-w3-e2e-harness owed a seed-and-authenticate fixture over the §19.4 dev routes and a
+ * rewrite of the spec bodies against the vocabulary the apps actually expose. Both are
+ * done: `fixtures/` holds the first, the five specs are the second, and no `test.fixme`
+ * remains.
  *
  * ── `NODE_PATH`, and why the install alone was not enough ─────────────────────────────
  * Installing the runner did not make the suite loadable, and the reason is structural
@@ -59,13 +62,24 @@ import { API_ORIGIN, ORIGINS } from './origins'
  *    projects can express; the second one has to be absolute. `./origins.ts` holds them so
  *    the rewrite has one place to read them from.
  *
- * 2. **Every spec currently runs in all three projects** — `testDir` is this directory and
- *    no project narrows it, so the five files are collected three times. That is 45 skips
- *    today and would be 45 *runs* the moment the bodies are un-gated. It is left wrong on
- *    purpose: the flows are named for journeys rather than apps, so no filename filter
- *    splits them correctly, and guessing one now would bake a wrong assumption into the
- *    file the harness session is about to rewrite. Narrowing belongs in that session,
- *    with the bodies in front of it.
+ * 2. **Each spec now runs in exactly one project**, which is the decision the contract
+ *    commit deferred to this session. It was right to defer: the flows are named for
+ *    journeys rather than apps, so no filename filter splits them, and the thing that does
+ *    split them is only visible with the bodies in front of you — **whose surface the
+ *    flow's actor is on**.
+ *
+ *    | Spec | Project | Why |
+ *    |---|---|---|
+ *    | `01-registration-to-active` | `parent` | It starts with a stranger on the public landing, and §6.1 walks that funnel on a phone. |
+ *    | `02-offline-attendance`     | `staff`  | The actor is a coach on the mat. |
+ *    | `03-upay-happy-path`        | `parent` | A parent choosing months and pressing pay. |
+ *    | `04-forged-ipn`             | `dashboard` | The assertions are the manager's ledger, the IPN log and the alert centre. |
+ *    | `05-schedule-change`        | `dashboard` | A manager changing a group's rules. |
+ *
+ *    Fifteen runs instead of forty-five, and each test runs under the device profile the
+ *    person in it is actually holding. The other apps a flow touches are reached by
+ *    absolute `ORIGINS`, which is what finding 1 above is about — so narrowing costs no
+ *    coverage, it only stops walking each journey three times to learn the same thing.
  *
  * The mobile profile is on `parent` alone: §6.1 walks flow 1 on a phone and §6.5 ships the
  * parent app as a phone product. The staff app is *also* used on a phone, on the mat — that
@@ -113,6 +127,11 @@ const devServer = (workspace: string, url: string) => ({
 
 export default defineConfig({
   testDir: '.',
+  //: One reset for the whole run, not one per test. `fixtures/global-setup.ts` carries the
+  //: measurement behind that: /dev/demo/reset works once and then 500s, because `audit_log`
+  //: is never wiped, `person` is, and the actor foreign key between them is RESTRICT. Each
+  //: test isolates itself by building its own entities instead.
+  globalSetup: './fixtures/global-setup.ts',
   //: Generous, because flow 3 waits on a simulated IPN and §5.10 builds the UI for a delay
   //: rather than for instant confirmation.
   timeout: 60_000,
@@ -120,6 +139,15 @@ export default defineConfig({
   //: See the module docstring. A flake here is a finding.
   retries: 0,
   fullyParallel: false,
+  //: **One worker, and this is a correctness requirement rather than a preference.**
+  //: `fullyParallel: false` still runs separate FILES concurrently, and every test in this
+  //: suite builds its scenario inside the one demo studio — which holds at most one active
+  //: training year (`uq_training_year_one_active`). Activating a year CLOSES the incumbent,
+  //: and a closed year cannot be reactivated, so two files building scenarios at the same
+  //: time permanently close each other's: the group page then finds the other test's year
+  //: and renders a group with no sessions. Sequential is the only safe arrangement until
+  //: the fixture can have a studio per worker.
+  workers: 1,
   reporter: env.CI ? [['github'], ['html', { open: 'never' }]] : [['list']],
   use: {
     locale: 'he-IL',
@@ -132,17 +160,21 @@ export default defineConfig({
     {
       //: Managers + coaches. Desktop until someone decides otherwise — see the docstring.
       name: 'staff',
+      testMatch: /02-offline-attendance\.spec\.ts$/,
       use: { ...devices['Desktop Chrome'], baseURL: ORIGINS.staff },
     },
     {
       //: §6.1 and §6.5 — the parent app is a phone product and flow 1 is walked on one.
       //: A registration funnel that only works at 1440px is a funnel that leaks.
       name: 'parent',
+      testMatch: /0(1-registration-to-active|3-upay-happy-path)\.spec\.ts$/,
       use: { ...devices['Pixel 7'], baseURL: ORIGINS.parent },
     },
     {
-      //: Manager web. The one surface that genuinely is a desktop product.
+      //: Manager web. The one surface that genuinely is a desktop product. It also carries
+      //: the two fixture specs, which address the API rather than any one app.
       name: 'dashboard',
+      testMatch: /(0(4-forged-ipn|5-schedule-change)|fixtures\/(fixtures|scenario))\.spec\.ts$/,
       use: { ...devices['Desktop Chrome'], baseURL: ORIGINS.dashboard },
     },
   ],

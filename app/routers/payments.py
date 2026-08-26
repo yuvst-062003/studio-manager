@@ -271,6 +271,105 @@ def _order_out(service: OrderService, order: PaymentOrder) -> PaymentOrderOut:
     )
 
 
+# -- what a payer may read about their own money ------------------------------
+#
+# §5.10's payments screen (`1b`/`12f`) needs three reads before it can render anything: the
+# open charges, the balance, and the payments already made. All three existed and all three
+# are `ManagerOrOwner`, so a parent opening the screen got 403 three times and it could not
+# load at all. `POST /payment-orders` below has always resolved the payer from the session
+# rather than the body, so the write half was already right; the read half is these three.
+# `/me/charges` and `/me/balance` live in `billing.py`, beside the projections they need.
+#
+# `/me/...`, matching `/me/students` and `/me/events`, which is the shape the parent app
+# already uses for "mine". Widening the manager routes instead would have been the smaller
+# diff and the wrong one: `?payer_person_id=` is a parameter, and a parameter that decides
+# whose money you see is one somebody will eventually pass another family's id to. Here
+# there is no id to pass -- the payer IS the caller, and `_caller` is the only source.
+#
+# No role dependency, for the reason `_caller`'s own docstring gives: §3.1 says "guardian
+# is not a role", so `require_roles` would refuse every parent in the product and admit
+# every coach with no children.
+
+
+class MyStandingOrderOut(BaseModel):
+    """Whether §5.10's second double-payment guard applies to the person asking."""
+
+    active: bool
+
+
+@router.get("/me/standing-order", response_model=MyStandingOrderOut)
+def my_standing_order(request: Request, session: TenantSessionDep) -> MyStandingOrderOut:
+    """§5.10's second guard, from the side of the person it is a guard for.
+
+    'If the payer has an active recurring_subscription, the credit-card option shows a
+    warning before opening uPay. **A warning, not a block — the parent decides.**' The
+    parent could not be told: `GET /recurring-subscriptions` is manager-only, so
+    `PaymentsScreen`'s `hasActiveSubscription` had no payer-facing source and the warning
+    §5.10 requires was unreachable by the only person it addresses.
+
+    A boolean and not the subscription. The screen asks one question, the answer is not
+    money, and a family's mandate details are the reconciliation queue's business.
+    """
+    return MyStandingOrderOut(
+        active=OrderService(session).has_active_subscription(_caller(request))
+    )
+
+
+@router.get("/me/payments", response_model=PaymentPage)
+def my_payments(
+    request: Request,
+    session: TenantSessionDep,
+    after: uuid.UUID | None = None,
+    limit: int = Query(default=DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
+) -> PaymentPage:
+    """`12f`'s history — what this person has already paid, by every route."""
+    service = PaymentService(session)
+    rows, next_cursor = service.list_payments(
+        payer_person_id=_caller(request), after=after, limit=limit
+    )
+    return PaymentPage(
+        items=[_out(service, row) for row in rows],
+        next_cursor=next_cursor,
+        has_more=next_cursor is not None,
+    )
+
+
+class PaymentOrderPage(BaseModel):
+    """§7's cursor page, over orders. Same shape as `ChargePage` and `PaymentPage`."""
+
+    items: list[PaymentOrderOut]
+    next_cursor: uuid.UUID | None = None
+    has_more: bool = False
+
+
+@router.get("/payment-orders", response_model=PaymentOrderPage)
+def list_payment_orders(
+    _: ManagerOrOwner,
+    session: TenantSessionDep,
+    order_status: str | None = Query(default=None, alias="status"),
+    after: uuid.UUID | None = None,
+    limit: int = Query(default=DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
+) -> PaymentOrderPage:
+    """§5.10's alert centre asks two questions about orders and had no way to ask either.
+
+    'On a mismatch a high-priority manager alert is raised', and the last threat row is
+    'nightly job flags orders `pending` for more than 24h'. Both are counts over
+    `payment_order`, and §7 exposed only `POST /payment-orders` and
+    `GET /payment-orders/{public_ref}` — so `DebtAlert` shipped with `amountMismatches` and
+    `staleOrders` props that nothing in the product could fill.
+
+    Manager-or-owner, and deliberately not `coach`-tagged: §3.2 gives a coach no financial
+    read, and invariant 3 enforces that against the tag.
+    """
+    service = OrderService(session)
+    rows, next_cursor = service.list_orders(status=order_status, after=after, limit=limit)
+    return PaymentOrderPage(
+        items=[_order_out(service, row) for row in rows],
+        next_cursor=next_cursor,
+        has_more=next_cursor is not None,
+    )
+
+
 @router.post("/payment-orders", response_model=PaymentOrderOut, status_code=status.HTTP_201_CREATED)
 def create_payment_order(
     body: PaymentOrderCreateIn,

@@ -355,3 +355,58 @@ def test_the_handout_options_carry_no_money_field(client, as_lead_coach, as_mana
     assert items
     for item in items:
         assert set(item) == {"id", "name"}
+
+
+def test_a_manager_lists_payment_orders_by_status(
+    client, tenant_session, studio, as_manager, a_priced_student, three_open_months
+):
+    """§5.10's manager alert counts `amount_mismatch` orders and stale `pending` ones, and
+    nothing could ask for either: §7 exposed `POST /payment-orders` and
+    `GET /payment-orders/{public_ref}` and no way to find out which orders exist.
+
+    So `DebtAlert` shipped with `amountMismatches` and `staleOrders` props that nothing
+    could fill — the component, the copy and the slot registration all real, and the
+    high-priority alert §5.10 requires unable to be raised.
+
+    The order is created through the service rather than the route because the route takes
+    its payer from the session: a manager cannot open an order over somebody else's
+    charges, which is `test_an_order_over_someone_else_s_charge_is_refused` and correct.
+    """
+    from app.services.billing.orders import OrderService
+    from tests.billing.conftest import T0
+
+    order = OrderService(tenant_session).create(
+        studio.id,
+        payer_person_id=a_priced_student.payer_person_id,
+        charge_ids=[three_open_months[0]],
+        max_payments=1,
+        at=T0,
+    )
+    tenant_session.commit()
+
+    listed = client.get(
+        "/api/v1/payment-orders",
+        params={"status": "pending"},
+        headers=as_manager.headers,
+    )
+    assert listed.status_code == 200, listed.text
+    assert str(order.public_ref) in [row["public_ref"] for row in listed.json()["items"]]
+
+    # A status nothing is in returns an empty page, not everything — the filter is the
+    # whole point, since the alert asks "how many are wrong" and not "how many exist".
+    empty = client.get(
+        "/api/v1/payment-orders",
+        params={"status": "amount_mismatch"},
+        headers=as_manager.headers,
+    )
+    assert empty.status_code == 200
+    assert empty.json()["items"] == []
+
+
+@pytest.mark.parametrize("caller", ["as_lead_coach", "as_assistant_coach"])
+def test_a_coach_cannot_list_payment_orders(client, request, caller):
+    """§3.2 — a coach has no financial read at all, and invariant 3 enforces it against the
+    router tag. Asserted here from the client's side as well."""
+    who = request.getfixturevalue(caller)
+    response = client.get("/api/v1/payment-orders", headers=who.headers)
+    assert response.status_code == 403

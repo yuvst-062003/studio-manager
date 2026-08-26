@@ -49,11 +49,23 @@ import {
   makeDashboardBeltsClient,
   registerBeltsWizardStep,
 } from './features/belts'
+// `3e` תשלומים וגבייה and §5.10's money alert. Nothing imported either: the collections
+// screen, the reconciliation queue and `DebtAlert` were built, unit-tested and unreachable,
+// which is what made W4's exit gate untestable through a browser.
+import { BillingSection } from './features/billing/BillingSection'
+// `4c` נוכחות — what was not marked. Nothing imported AttendanceReport, so §5.14's
+// "unmarked is a real state and is not absence" had no screen in a running app.
+import { AttendanceSection } from './features/attendance/AttendanceSection'
+
+import { registerBillingAlertSection } from './features/billing/BillingAlertSection'
 
 registerM1WizardSteps(apiFetch)
 // Seam 4 — `6c` composes sections from four milestones. This lane registers the three it
 // owns; M4's, M5's and M6's land the same way without reopening AlertCentre.tsx.
 registerPeopleAlerts()
+// Seam 4 again — M6's section, at the order `features/people/register.ts` left for it:
+// "M6's debt alert belongs above a trial queue", and its own orders start at 20.
+registerBillingAlertSection()
 // Seam 4 again — §5.1's wizard. One registerSlot call from this lane's own file, at the
 // order WIZARD_STEP_ORDER gives `belts`. SetupWizard.tsx is not reopened, and neither is
 // packages/ui/src/setup-wizard/register.ts, which registers M1's own four steps.
@@ -65,6 +77,8 @@ const NAV = [
   { key: 'closures', labelKey: 'schedule.closure.title', href: '#/closures' },
   { key: 'students', labelKey: 'people.student.plural', href: '#/students' },
   { key: 'alerts', labelKey: 'people.alerts.title', href: '#/alerts' },
+  { key: 'billing', labelKey: 'billing.debt.title', href: '#/billing' },
+  { key: 'attendance', labelKey: 'common.nav.attendance', href: '#/attendance' },
   { key: 'events', labelKey: 'events.title', href: '#/events' },
   { key: 'belts', labelKey: 'events.belt.title', href: '#/belts' },
   { key: 'exams', labelKey: 'events.exam.plural', href: '#/exams' },
@@ -84,6 +98,8 @@ export type DashboardRoute =
   | 'schedule'
   | 'students'
   | 'alerts'
+  | 'billing'
+  | 'attendance'
 
 /** Unknown hashes resolve to home rather than to a blank page. */
 export function routeFromHash(hash: string): DashboardRoute {
@@ -97,6 +113,12 @@ export function routeFromHash(hash: string): DashboardRoute {
   if (name === 'schedule' || name === 'closures' || name.startsWith('groups')) return 'schedule'
   if (name.startsWith('students')) return 'students'
   if (name === 'alerts') return 'alerts'
+  // M6's family: `#/billing` is `3e`'s collections board and
+  // `#/billing/reconciliation` is §5.10's unmatched-payment queue.
+  if (name.startsWith('billing')) return 'billing'
+  // M5's `4c`. `#/attendance` is the chase list; the register itself is the staff
+  // app's screen, on its own origin.
+  if (name === 'attendance') return 'attendance'
   // Lane EVENTS' family: `#/events`, `#/events/<id>` and `#/events/new`, decided in
   // features/events/. Same shape as lane SCHEDULE's three hashes above.
   if (name.startsWith('events')) return 'events'
@@ -232,6 +254,13 @@ export default function App() {
           ) : null}
           {route === 'alerts' ? (
             <AlertCentre locale={locale} client={peopleClient} />
+          ) : null}
+          {route === 'attendance' ? <AttendanceSection locale={locale} /> : null}
+          {route === 'billing' ? (
+            <BillingSection
+              locale={locale}
+              view={hash.includes('reconciliation') ? 'reconciliation' : 'collections'}
+            />
           ) : null}
           {route === 'exams' && !examRoute ? (
             <ExamsScreen

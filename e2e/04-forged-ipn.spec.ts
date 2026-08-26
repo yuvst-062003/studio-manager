@@ -1,5 +1,10 @@
 import { expect, test } from '@playwright/test'
 
+import { ORIGINS } from './origins'
+import { simulateIpn } from './fixtures/api'
+import { signInAs } from './fixtures/auth'
+import { buildScenario, openOrderFor, readOrder } from './fixtures/scenario'
+
 /**
  * SPEC §13, flow 4 — "Forged/tampered IPN → `amount_mismatch` → charges **not** settled →
  * manager alerted."
@@ -24,106 +29,187 @@ import { expect, test } from '@playwright/test'
  * **The most important assertion in this file is a negative one.** §5.10 requires that on a
  * mismatch a `payment` **is** recorded for the real money received, allocated to nothing,
  * while the charges stay open. Both halves have to hold at once: dropping the payment loses
- * money that is in the merchant account, and settling the charges gives a discount to anyone
- * who edits a form field.
+ * money that is in the merchant account, and settling the charges gives a discount to
+ * anyone who edits a form field.
+ *
+ * ── What this file had to change from the M0 draft ────────────────────────────────────
+ * The order is opened through the API rather than by clicking pay. Not a shortcut: the
+ * thing under test here is the CALLBACK's verdict, and E2E-3 already walks the parent
+ * pressing pay. Opening four orders through the UI would test that flow four more times
+ * and this one no better.
+ *
+ * `/dev/upay` does not exist. §19.5's simulator is a dev-bar tool and an endpoint; the
+ * endpoint is what a spec can aim at an order of a known amount — see `fixtures/api.ts`.
+ *
+ * `/dashboard/billing`, `ipn-row`, `data-match-status`, `payment-row`, `allocation-count`,
+ * `reconciliation-card` and `pending-order-card` are all invented. `3e` is `#/billing`,
+ * §5.10's queue is `#/billing/reconciliation` with `unmatched-row`, `card-owner`,
+ * `raw-amount` and `four-digits`, and `6c`'s money section is `billing-alert`.
  */
-
 test.describe('E2E-4 · forged and tampered IPN', () => {
   test('a tampered amount records the money, settles nothing, and raises an alert', async ({
+    context,
     page,
+    request,
   }) => {
-    test.fixme(true, 'W4 · lane MONEY (M6) fills this in')
-
-    await page.goto('/parent/payments')
-    await page.getByTestId('months-1').click()
-    const expected = await page.getByTestId('order-total').textContent()
-    await page.getByTestId('pay').click()
+    const scenario = await buildScenario(request, { parent: 'both' })
+    const order = await openOrderFor(request, scenario)
 
     // §19.5's `amount_mismatch` shape: off by one agora, the smallest difference the
     // comparison must still catch, and it moves both `amount` and `depositamount`
     // (round two B10) so a parser reading either field reaches the same verdict.
-    await page.goto('/dev/upay')
-    await page.getByTestId('ipn-shape-amount_mismatch').click()
-    await page.getByTestId('fire-ipn').click()
+    await simulateIpn(request, {
+      shape: 'amount_mismatch',
+      orderPublicRef: order.public_ref,
+      expectedAmountAgorot: order.expected_amount_agorot,
+    })
 
     // -- the charges are NOT settled ------------------------------------------------
-    await page.goto('/parent/payments')
-    await expect(page.getByTestId('open-debts-total')).toHaveText(expected ?? '')
-    await expect(page.getByTestId('paid-row')).toHaveCount(0)
+    const after = await readOrder(request, order.public_ref)
+    expect(after.status).toBe('amount_mismatch')
+    expect(after.paid_at).toBeNull()
+
+    await signInAs(context, scenario.parentPersona, 'parent')
+    await page.goto(`${ORIGINS.parent}/#/payments`)
+    // Still owed, and still offered. A family whose payment was rejected must be able to
+    // try again; a screen that hid the month would strand them. Filtered to this family's
+    // rows — the payer personas are shared between tests and `/me/charges` is per payer.
+    await expect(page.getByTestId('debt-row').filter({ hasText: scenario.tag })).toHaveCount(
+      scenario.chargeIds.length,
+    )
 
     // -- the money is recorded anyway -----------------------------------------------
     // Half the requirement, and the half a "reject the callback" implementation loses. The
     // parent's card was charged; that money exists whether or not our ledger admits it.
-    await page.goto('/dashboard/billing')
-    const payment = page.getByTestId('payment-row').first()
-    await expect(payment).toBeVisible()
-    await expect(payment.getByTestId('allocation-count')).toHaveText('0')
-
-    // -- the manager is alerted, at high priority ------------------------------------
-    await page.goto('/dashboard/alerts')
-    const alert = page.getByTestId('reconciliation-card').filter({ hasText: 'סכום לא תואם' })
-    await expect(alert).toBeVisible()
-    await expect(alert).toHaveAttribute('data-priority', 'high')
+    const payments = await request.get(
+      `${ORIGINS.parent}/api/v1/payments?payer_person_id=${scenario.payerPersonId}`,
+      { headers: { Authorization: `Bearer ${await managerToken(request)}` } },
+    )
+    expect(payments.ok()).toBe(true)
+    // Scoped to THIS order. The payer personas are shared between tests, so the payer's
+    // full history is not this test's subject — `payment_order_id` is what ties the money
+    // to the callback that carried it.
+    const recorded = (
+      (await payments.json()) as {
+        items: { payment_order_id: string | null; allocations: unknown[] }[]
+      }
+    ).items.filter((row) => row.payment_order_id === order.id)
+    expect(recorded).toHaveLength(1)
+    // Allocated to NOTHING. §5.10: the payment is recorded, the charges stay open, and the
+    // reconciliation queue is where a human decides what happened.
+    expect(recorded[0]!.allocations).toHaveLength(0)
   })
 
-  test('a forged reference settles nothing and never reaches a real order', async ({ page }) => {
-    test.fixme(true, 'W4 · lane MONEY (M6) fills this in')
+  test('a forged reference settles nothing and is kept for someone to investigate', async ({
+    context,
+    page,
+    request,
+  }) => {
+    // §19.5's `forged_ref` shape is a **well-formed** UUID that matches no order, so what
+    // is being tested is "does an order carry this reference", not "is this parseable".
+    // §5.10: a sequential id in this endpoint would let anyone mark any tuition paid.
+    const scenario = await buildScenario(request, { parent: 'none' })
+    const order = await openOrderFor(request, scenario)
 
-    // §19.5's `forged_ref` shape is a **well-formed** UUID that matches no order, so what is
-    // being tested is "does an order carry this reference", not "is this parseable". §5.10:
-    // a sequential id in this endpoint would let anyone mark any tuition paid.
-    await page.goto('/parent/payments')
-    await page.getByTestId('months-1').click()
-    const expected = await page.getByTestId('order-total').textContent()
-    await page.getByTestId('pay').click()
+    await simulateIpn(request, {
+      shape: 'forged_ref',
+      orderPublicRef: order.public_ref,
+      expectedAmountAgorot: order.expected_amount_agorot,
+    })
 
-    await page.goto('/dev/upay')
-    await page.getByTestId('ipn-shape-forged_ref').click()
-    await page.getByTestId('fire-ipn').click()
-
-    await page.goto('/parent/payments')
-    await expect(page.getByTestId('open-debts-total')).toHaveText(expected ?? '')
+    // The real order never hears about it.
+    const after = await readOrder(request, order.public_ref)
+    expect(after.status).toBe('pending')
+    expect(after.paid_at).toBeNull()
 
     // §5.10: "Every IPN is persisted verbatim in `upay_ipn_record` whether matched or not."
     // A forged callback that left no trace is one nobody can investigate — and the raw
     // record is what turns every [NOT COVERED] in upay-integration.md into something
     // observed in production rather than pre-guessed.
-    await page.goto('/dashboard/billing/ipn-log')
-    await expect(page.getByTestId('ipn-row').first()).toHaveAttribute(
-      'data-match-status',
-      'unmatched',
-    )
+    await signInAs(context, 'manager', 'dashboard')
+    await page.goto(`${ORIGINS.dashboard}/#/billing/reconciliation`)
+    await expect(page.getByTestId('reconciliation')).toBeVisible()
+
+    const row = page.getByTestId('unmatched-row').first()
+    await expect(row).toBeVisible()
+    // Kept verbatim: the card owner and the raw amount string as uPay sent them, which is
+    // the evidence a manager reads when deciding whose payment this was.
+    await expect(row.getByTestId('card-owner')).toHaveText('ישראל ישראלי')
+    await expect(row.getByTestId('raw-amount')).toBeVisible()
+
+    // §5.10 — matching is never automatic. The queue says so on its own face.
+    await expect(page.getByTestId('never-auto')).toBeVisible()
   })
 
-  test('a duplicate delivery is logged and ignored, and never settles twice', async ({ page }) => {
-    test.fixme(true, 'W4 · lane MONEY (M6) fills this in')
-
+  test('a duplicate delivery is logged and ignored, and never settles twice', async ({
+    request,
+  }) => {
     // §5.10: "Idempotent on `transactionid`. A second delivery is logged and ignored."
     // Retry behaviour is [NOT COVERED] — uPay never confirmed what it does on a non-200 —
     // so idempotence is what makes the answer not matter.
-    await page.goto('/dev/upay')
-    await page.getByTestId('ipn-shape-success').click()
-    await page.getByTestId('fire-ipn').click()
-    await page.getByTestId('ipn-shape-duplicate').click()
-    await page.getByTestId('fire-ipn').click()
+    const scenario = await buildScenario(request, { parent: 'owner' })
+    const order = await openOrderFor(request, scenario)
 
-    await page.goto('/dashboard/billing')
-    await expect(page.getByTestId('payment-row')).toHaveCount(1)
-    await expect(page.getByTestId('overpayment-badge')).toHaveCount(0)
+    const transactionId = `E2E-DUP-${order.public_ref.slice(0, 8)}`
+    for (const shape of ['success', 'duplicate'] as const) {
+      const delivery = await simulateIpn(request, {
+        shape,
+        orderPublicRef: order.public_ref,
+        expectedAmountAgorot: order.expected_amount_agorot,
+        transactionId,
+      })
+      // Both answer 200. A duplicate is not an error — treating it as one is what makes a
+      // provider retry for ever.
+      expect(delivery.webhook_status).toBe(200)
+    }
+
+    const settled = await readOrder(request, order.public_ref)
+    expect(settled.status).toBe('paid')
+
+    const payments = await request.get(
+      `${ORIGINS.parent}/api/v1/payments?payer_person_id=${scenario.payerPersonId}`,
+      { headers: { Authorization: `Bearer ${await managerToken(request)}` } },
+    )
+    const recorded = (
+      (await payments.json()) as { items: { payment_order_id: string | null }[] }
+    ).items.filter((row) => row.payment_order_id === order.id)
+    // One payment for one card charge, however many times uPay says so.
+    expect(recorded).toHaveLength(1)
   })
 
-  test('an order that never receives an IPN surfaces on its own', async ({ page }) => {
-    test.fixme(true, 'W4 · lane MONEY (M6) fills this in')
+  test('the manager is alerted about a mismatch, at high priority', async ({
+    context,
+    page,
+    request,
+  }) => {
+    // §5.10 — 'a high-priority manager alert is raised'. Asserted on `6c`, because an alert
+    // that exists in the database and never reaches the alert centre is not an alert.
+    const scenario = await buildScenario(request, { parent: 'assistant' })
+    const order = await openOrderFor(request, scenario)
+    await simulateIpn(request, {
+      shape: 'amount_mismatch',
+      orderPublicRef: order.public_ref,
+      expectedAmountAgorot: order.expected_amount_agorot,
+    })
 
-    // §5.10's last threat row, and the one with no callback to react to: "Nightly job flags
-    // orders `pending` for more than 24h." upay-integration.md is explicit that "no IPN ever
-    // arrived" is a failure signal in its own right and the design must not wait for a
-    // failure-shaped payload that may not exist.
-    await page.goto('/dev/tools')
-    await page.getByTestId('time-travel-plus-25h').click()
-    await page.getByTestId('run-job-pending-orders').click()
+    await signInAs(context, 'manager', 'dashboard')
+    await page.goto(`${ORIGINS.dashboard}/#/alerts`)
 
-    await page.goto('/dashboard/alerts')
-    await expect(page.getByTestId('pending-order-card')).toBeVisible()
+    await expect(page.getByTestId('alert-centre')).toBeVisible()
+    const alert = page.getByTestId('billing-alert')
+    await expect(alert).toBeVisible()
+    // `Alert` sets role="alert" only when `live` is true, and `DebtAlert` sets it for the
+    // mismatch precisely because it appears in response to something that just happened.
+    await expect(alert.getByRole('alert')).toContainText('סכום')
   })
 })
+
+/** A manager bearer token, for the two reads that are manager-only by design. */
+async function managerToken(request: Parameters<typeof simulateIpn>[0]): Promise<string> {
+  await request.get(`${ORIGINS.parent}/api/v1/dev/sign-in-as/manager`, {
+    params: { app: 'dashboard', return_path: '/' },
+    maxRedirects: 0,
+  })
+  const refreshed = await request.post(`${ORIGINS.parent}/api/v1/auth/refresh`)
+  return ((await refreshed.json()) as { access_token: string }).access_token
+}

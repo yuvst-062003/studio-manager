@@ -25,11 +25,19 @@ import {
 } from './features/events'
 import { BeltProgressScreen, makeParentBeltsClient } from './features/belts'
 import { AddSibling, makePeopleClient } from './features/people'
+// §5.10's payments tab. Mounted here because nothing imported it: `PaymentsScreen` is
+// artboard `12f`, the subject of E2E-3 and E2E-4, and it was unreachable in a running app.
+import { PaymentsSection } from './features/billing/PaymentsSection'
 
 const NAV = [
   { key: 'myChildren', labelKey: 'common.nav.myChildren', href: '/' },
   { key: 'calendar', labelKey: 'schedule.calendar.title', href: '#/calendar' },
-  { key: 'payments', labelKey: 'common.nav.payments', href: '/payments' },
+  // A hash, not a path. `/payments` matched nothing: `matchLandingPath` accepts only
+  // `/t/<slug>` (features/landing/route.ts, and route.test.ts:21 asserts
+  // `matchLandingPath('/payments')` is null), so the link fell through `navigateFallback`
+  // to index.html and put the parent back on home. The same correction both W2 lanes made
+  // for their own entries.
+  { key: 'payments', labelKey: 'common.nav.payments', href: '#/payments' },
   { key: 'announcements', labelKey: 'common.nav.announcements', href: '/announcements' },
   { key: 'addChild', labelKey: 'people.sibling.title', href: '#/add-child' },
   { key: 'settings', labelKey: 'common.nav.settings', href: '/settings' },
@@ -91,6 +99,8 @@ export default function App() {
   // screen would change only when something else happened to re-render App. One
   // subscription serves both lanes' routes.
   const addingChild = hash === '#/add-child'
+  // §5.10's payments tab, and `12f`'s history one hash below it.
+  const onPayments = hash === '#/payments'
   // 12h's list, and 7d's invite behind `#/events/<eventId>/<studentId>`. Both ids are in
   // the hash because 12h is per CHILD per event: a family with two children on one
   // competition has two answers to give, and an event id alone cannot say which.
@@ -192,6 +202,11 @@ export default function App() {
               hash={hash}
               today={today}
             />
+          ) : onPayments ? (
+            // No `access.parent` guard needed and none added: the routes behind this
+            // screen resolve the payer from the session, so a person with no charges sees
+            // an empty state rather than somebody else's money.
+            <PaymentsSection locale={locale} />
           ) : addingChild ? (
             <AddSibling locale={locale} client={peopleClient} />
           ) : belts.length === 2 ? (

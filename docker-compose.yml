@@ -8,6 +8,14 @@
 # Port 55433, not 5432 and not 55432 — both are already in use on the machine this
 # was built on, and a port collision reads as "postgres is broken" rather than
 # "wrong database".
+# The project name is pinned rather than inferred. `docker compose` names its project
+# after the directory it is run from, and every lane runs in a git worktree — so from
+# `../sm-e2e` the container this file describes is invisible: `dev-db.sh up` fails on a
+# name conflict it cannot explain, and `scripts/e2e-backend.sh`'s readiness probe reports
+# `service "db" is not running` and kills the whole Playwright webServer block. Pinning it
+# is a no-op in the main checkout, whose directory already carries this name.
+name: studio-manager
+
 services:
   db:
     image: postgres:18

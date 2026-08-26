@@ -16,6 +16,7 @@ import type { Locale } from '@studio/i18n'
 import { chipToneFor } from './StudentsScreen'
 import type {
   DashboardPeopleClient,
+  GroupOption,
   EnrollmentOut,
   StatusHistoryOut,
   StudentDetail,
@@ -43,6 +44,13 @@ export function StudentDetailScreen({
   const [enrollments, setEnrollments] = useState<EnrollmentOut[]>([])
   const [history, setHistory] = useState<StatusHistoryOut[]>([])
   const [plan, setPlan] = useState<StudentPricePlan | null>(null)
+  // §5.4a step 5 — 'Manager converts → picks group, sets price, status=active, enrollment
+  // created. Three decisions in one request, because they are one decision.'
+  const [groups, setGroups] = useState<GroupOption[]>([])
+  const [converting, setConverting] = useState(false)
+  const [convertGroup, setConvertGroup] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [reloads, setReloads] = useState(0)
 
   useEffect(() => {
     let live = true
@@ -51,19 +59,41 @@ export function StudentDetailScreen({
       client.enrollments(studentId),
       client.statusHistory(studentId),
       client.pricePlan(studentId),
+      client.groups().catch(() => ({ items: [] as GroupOption[] })),
     ])
-      .then(([detail, rows, statuses, pricePlan]) => {
+      .then(([detail, rows, statuses, pricePlan, groupList]) => {
         if (!live) return
         setStudent(detail)
         setEnrollments(rows)
         setHistory(statuses.items)
         setPlan(pricePlan)
+        setGroups(groupList.items)
       })
       .catch(() => undefined)
     return () => {
       live = false
     }
-  }, [client, studentId])
+  }, [client, studentId, reloads])
+
+  async function convert() {
+    if (!convertGroup || busy) return
+    setBusy(true)
+    try {
+      // `price_plan_id` is deliberately absent: C11 and L2 make the price an id this lane
+      // stores and never resolves, and the plans live on the billing screen. A conversion
+      // without one leaves the student unpriced, which the billing run reports rather than
+      // charging zero — see `_charge_one`'s `tally.unpriced`.
+      await client.convert(studentId, {
+        group_id: convertGroup,
+        started_on: new Date().toISOString().slice(0, 10),
+      })
+      setConverting(false)
+      setConvertGroup('')
+      setReloads((n) => n + 1)
+    } finally {
+      setBusy(false)
+    }
+  }
 
   if (!student) return <p data-testid="student-detail-loading" />
 
@@ -158,9 +188,43 @@ export function StudentDetailScreen({
         <Button variant="secondary" data-testid="detail-freeze">
           {t(locale, 'people.freeze.title')}
         </Button>
-        <Button variant="secondary" data-testid="detail-convert">
-          {t(locale, 'people.convert.title')}
-        </Button>
+        {/* §5.4a step 5. The button opens the decision rather than converting in place,
+            because the group is part of it — and it had no handler at all, so the one
+            action that turns a trial into a member did nothing when pressed. */}
+        {converting ? (
+          <>
+            <label>
+              {t(locale, 'people.convert.group')}
+              <select
+                data-testid="detail-convert-group"
+                value={convertGroup}
+                onChange={(event) => setConvertGroup(event.target.value)}
+              >
+                <option value="">—</option>
+                {groups.map((group) => (
+                  <option key={group.id} value={group.id}>
+                    {group.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <Button
+              data-testid="detail-convert-submit"
+              disabled={!convertGroup || busy}
+              onClick={() => void convert()}
+            >
+              {t(locale, 'people.convert.submit')}
+            </Button>
+          </>
+        ) : (
+          <Button
+            variant="secondary"
+            data-testid="detail-convert"
+            onClick={() => setConverting(true)}
+          >
+            {t(locale, 'people.convert.title')}
+          </Button>
+        )}
         <Button variant="ghost" data-testid="detail-mark-lost">
           {t(locale, 'people.convert.markLost')}
         </Button>

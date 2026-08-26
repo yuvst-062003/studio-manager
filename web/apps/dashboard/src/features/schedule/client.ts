@@ -145,13 +145,26 @@ export function makeScheduleClient(fetcher: Fetcher): ScheduleClient {
       }))
     },
     async listSessions({ from, to, groupId, coachPersonId }) {
-      const params = new URLSearchParams({ from, to })
-      if (groupId) params.set('group_id', groupId)
-      if (coachPersonId) params.set('coach_person_id', coachPersonId)
-      const body = await json<{ items: SessionRow[] }>(
-        await fetcher(`${API}/sessions?${params.toString()}`),
-      )
-      return body.items
+      // Paged to the end of the range, because the callers ask for a whole training year.
+      // `GET /sessions` defaults to 50 rows and two rules a week across §16's default year
+      // is about 104, so a single request rendered the first fifty and silently dropped
+      // the rest — no count, no "load more", nothing to notice. For a year that started
+      // last September that is every past lesson and not one future one, on a screen whose
+      // entire job is showing a manager what is coming.
+      const all: SessionRow[] = []
+      let cursor: string | null = null
+      do {
+        const params = new URLSearchParams({ from, to, limit: '200' })
+        if (groupId) params.set('group_id', groupId)
+        if (coachPersonId) params.set('coach_person_id', coachPersonId)
+        if (cursor) params.set('cursor', cursor)
+        const body = await json<{ items: SessionRow[]; next_cursor: string | null }>(
+          await fetcher(`${API}/sessions?${params.toString()}`),
+        )
+        all.push(...body.items)
+        cursor = body.next_cursor
+      } while (cursor)
+      return all
     },
     async getSchedule(groupId) {
       const body = await json<{ rules: ScheduleRule[] }>(

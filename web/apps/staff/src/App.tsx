@@ -38,6 +38,7 @@ import {
   registerAttendanceSections,
   useOfflinePriming,
 } from './features/attendance'
+import { useQueueFlusher } from './features/attendance/useQueueFlusher'
 import './features/attendance/attendance.css'
 
 // §5.1 — 'the staff app and dashboard route them into a resumable wizard'. Both mount the
@@ -125,6 +126,11 @@ export default function App() {
   // features/identity/Resolve.tsx reads `owner` from — because `Session` itself is
   // studio-agnostic and a person can hold different roles in different studios.
   const membership = session.studios.find((s) => s.studio_id === session.activeStudioId)
+  // §10.3's queue drained. Nothing called `flush` anywhere in the product, so every
+  // mark a coach took stayed in `pending_ops` and the register never reached the
+  // server. At the shell rather than on the roster: a coach who marks a register and
+  // navigates away before the signal returns must still have their marks sent.
+  useQueueFlusher(membership?.person_id ?? null)
   const viewerIsCoach =
     membership?.roles.some((role) => role === 'lead_coach' || role === 'assistant_coach') ?? false
   // Staff `9h` is one hash away from Today. The card (`9c`) and the mid-lesson trial

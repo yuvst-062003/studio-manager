@@ -672,9 +672,19 @@ class ScheduleService:
         dashboard's week view both render dozens at once, and an N+1 here is felt on a
         phone on a bus.
 
-        `attendance_taken` is `False` for every row in W2. The `attendance` table is W3's
-        and lives in `app/models/_pending/`, which this lane never imports — M5 fills the
-        field, and the shape does not change when it does.
+        `attendance_taken` is one of those three queries. It was hardcoded `False` while
+        the `attendance` table lived in `app/models/_pending/`, with a note saying M5 would
+        fill it; M5 landed without doing so, and the constant survived — so every ordinary
+        read of a session claimed its register was unsigned, and only
+        `bootstrap.py`, which overwrites the field after projecting, was ever right. §5.14's
+        sessions-held-versus-planned report counts exactly this, so a permanent `False` is
+        a number a club could act on.
+
+        A row exists here only once somebody has marked something, so "any row not
+        `unmarked`" is the whole test. `bootstrap.py` narrows further, to EXPECTED rows,
+        because it is answering "is this register finished" for a coach's own list; this is
+        answering "was it signed at all", and a child marked present who was not expected
+        still signed it.
         """
         if not rows:
             return []
@@ -700,6 +710,24 @@ class ScheduleService:
             if location_ids
             else {}
         )
+        # Read, never written, from here — the same standing as `guardian` and `enrollment`
+        # below. Imported in the body rather than at module scope so this lane's import
+        # graph does not gain a dependency on M5's models for a single boolean.
+        from app.models.attendance import Attendance
+
+        marked: set[uuid.UUID] = set(
+            self.session.execute(
+                select(Attendance.session_id)
+                .where(
+                    Attendance.session_id.in_({r.id for r in rows}),
+                    Attendance.status != "unmarked",
+                )
+                .distinct()
+            )
+            .scalars()
+            .all()
+        )
+
         staff_rows = self.session.execute(
             select(SessionStaff, Person.first_name, Person.last_name)
             .join(Person, Person.id == SessionStaff.person_id)
@@ -731,7 +759,7 @@ class ScheduleService:
                 is_ad_hoc=row.is_ad_hoc,
                 cancel_reason=row.cancel_reason,
                 staff=staff_by_session.get(row.id, []),
-                attendance_taken=False,
+                attendance_taken=row.id in marked,
             )
             for row in rows
         ]
