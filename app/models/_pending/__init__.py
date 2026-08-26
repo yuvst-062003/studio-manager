@@ -23,14 +23,20 @@ against it: C11 and C12 arrived from the club's real structure and changed `enro
 **Each wave's contract commit moves its own files up one directory** and autogenerates its
 revision:
 
-    W3  _pending/attendance.py  _pending/health.py   -> 0007
+    W3  _pending/attendance.py  _pending/health.py   -> 0007   DONE 2026-08-26
     W4  _pending/billing.py  _pending/events.py  _pending/belts.py  -> 0008
     W5  _pending/comms.py  _pending/reports.py  -> 0009
 
 `docs/plan/migrations/` carries a draft per wave saying what each revision must contain and
-what autogenerate gets wrong. `_pending/health.py` is a partial file: M1 already created
-`health_form_template` in revision `0005` as conflict C3's resolution, so that class stays
-in `app/models/health.py` and only W3's two tables wait here.
+what autogenerate gets wrong.
+
+W3 is the wave that showed what "move it up" actually means, and it was not a move both
+times. `_pending/attendance.py` became `app/models/attendance.py` whole; `_pending/health.py`
+was **appended** into the `app/models/health.py` M1 had already created, because
+`health_form_template` shipped in revision `0005` as conflict C3's resolution. Moving that
+file over the existing one would have deleted the template and broken M3's trial-booking
+flow. W4 and W5 have no such split -- every file below is a clean promotion -- but the rule
+to check first stands.
 
 Nothing outside this package may import from it. Two service seams did —
 `app/services/{billing,comms}/__init__.py` — and they now name the pending path explicitly,
