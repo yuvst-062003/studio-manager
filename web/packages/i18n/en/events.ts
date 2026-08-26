@@ -138,6 +138,7 @@ export const events: Bundle = {
   'belt.groupPromoteHint': 'Promote everyone who passed, in one action',
 
   // -- 7a / 9i / 12h — list chrome the audits found missing ------------------------
+  'list.loading': 'Loading…',
   'list.subtitle': 'One-off events — not part of the weekly schedule',
   'list.filterAll': 'All',
   'list.needsAttention': 'Need attention',

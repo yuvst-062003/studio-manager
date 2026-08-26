@@ -298,6 +298,118 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/belt-presets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Belt Presets
+         * @description §5.9's seeded sets, as data.
+         *
+         *     No session and no tenancy: a preset is versioned application data, the same shape as
+         *     `app/services/demo/fixtures.py`, and identical for every studio. That is what makes a
+         *     club seeded in September and one seeded in March comparable.
+         */
+        get: operations["list_belt_presets_api_v1_belt_presets_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/belt-ranks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Belt Ranks
+         * @description `5b`'s table, and the ladder every progression screen reads.
+         *
+         *     `class_id` is required rather than optional: `events.belt.perClassHint` says the system
+         *     is defined per class, and a studio-wide list of two disciplines' ranks interleaved by
+         *     `order_index` would be meaningless.
+         */
+        get: operations["list_belt_ranks_api_v1_belt_ranks_get"];
+        put?: never;
+        /** Create Belt Rank */
+        post: operations["create_belt_rank_api_v1_belt_ranks_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/belt-ranks/reorder": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reorder Belt Ranks */
+        post: operations["reorder_belt_ranks_api_v1_belt_ranks_reorder_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/belt-ranks/seed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Seed Belt Ranks
+         * @description `5d`'s wizard step and `5b`'s `events.belt.seedDefault` button, one route.
+         *
+         *     409 on a class that already has a ladder, rather than a merge: a second seed renumbers
+         *     ranks that `student_belt` rows point at, rewriting a child's history without touching
+         *     their row.
+         */
+        post: operations["seed_belt_ranks_api_v1_belt_ranks_seed_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/belt-ranks/{rank_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Belt Rank
+         * @description 409 when students hold it. `events.belt.deleteHeld` is the message, and `5b`'s row
+         *     already shows the count the refusal is about.
+         */
+        delete: operations["delete_belt_rank_api_v1_belt_ranks__rank_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Belt Rank */
+        patch: operations["update_belt_rank_api_v1_belt_ranks__rank_id__patch"];
+        trace?: never;
+    };
     "/api/v1/billing-runs": {
         parameters: {
             query?: never;
@@ -567,6 +679,273 @@ export interface paths {
         patch: operations["update_enrollment_api_v1_enrollments__enrollment_id__patch"];
         trace?: never;
     };
+    "/api/v1/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Events
+         * @description `7a`'s roundup and `9i`'s staff list.
+         *
+         *     Drafts are included. §4.3 hides them from *guardians*, not from staff -- a draft is the
+         *     manager's own work in progress, and `7a` draws one.
+         */
+        get: operations["list_events_api_v1_events_get"];
+        put?: never;
+        /**
+         * Create Event
+         * @description 201, and the event is a **draft**.
+         *
+         *     §4.3 keeps it invisible to guardians until published, which is what lets a manager
+         *     build one over several sittings. `EventCreateIn`'s two validators have already refused
+         *     consent-without-text and an end before a start, as ordinary 422s the form can mark --
+         *     the CHECK constraints behind them are the backstop, not the gate.
+         */
+        post: operations["create_event_api_v1_events_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/{event_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Event */
+        get: operations["read_event_api_v1_events__event_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Event
+         * @description 409 and not 403 on a published event: the caller may edit events, and this event is
+         *     past the point where an edit is an edit. §5.8 notifies on publish and on cancel, so a
+         *     PATCH that moved a published date silently would send the club a surprise.
+         */
+        patch: operations["update_event_api_v1_events__event_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/events/{event_id}.ics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Event Calendar File
+         * @description §5.8's הוסף ליומן.
+         *
+         *     A draft 404s -- §4.3 keeps it invisible to guardians, and a resolvable link would be
+         *     that invisibility leaking through a file extension.
+         */
+        get: operations["event_calendar_file_api_v1_events__event_id__ics_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/{event_id}/attendance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record Event Attendance
+         * @description §5.8 -- "attendance is taken on an event with the same UI as a session". §3.2 gives
+         *     every staff role "Take/edit attendance", including an assistant coach.
+         */
+        post: operations["record_event_attendance_api_v1_events__event_id__attendance_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/{event_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel Event
+         * @description The roster survives. §5.8 notifies on a cancellation and the office phones whoever
+         *     answered -- deleting the registrations would delete the list the call is made from.
+         */
+        post: operations["cancel_event_api_v1_events__event_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/{event_id}/consent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sign Event Consent
+         * @description §5.8's signed parent consent, and the other half of the gate.
+         *
+         *     Whichever of this and the RSVP completes the pair is the one that raises the fee, so
+         *     both routes end in the same service call and the charge is idempotent on
+         *     `registration.charge_id`.
+         */
+        post: operations["sign_event_consent_api_v1_events__event_id__consent_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/{event_id}/eligibility": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Event Eligibility
+         * @description `4d`'s table and `6b`'s counters, over the event's own roster.
+         *
+         *     The whole roster rather than a page: `4d` pre-selects the eligible rows and promotes
+         *     everyone ticked, so a truncated list would silently exclude candidates from a bulk
+         *     action whose button names a count.
+         */
+        get: operations["event_eligibility_api_v1_events__event_id__eligibility_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/{event_id}/exam-results": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record Exam Results
+         * @description §5.9 step 3 -- the result, the belt row and the cache, in one transaction.
+         *
+         *     **The commit is here and nowhere inside the service**, which is what makes the batch
+         *     atomic: a failure on the fourth candidate leaves the first three unwritten rather than
+         *     promoted, so a coach never has to work out which half of a save landed.
+         */
+        post: operations["record_exam_results_api_v1_events__event_id__exam_results_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/{event_id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Publish Event
+         * @description §5.8 -- every targeted student gets a registration at `rsvp='pending'`.
+         *
+         *     **Nothing is sent.** Publishing makes the event visible to guardians; an invitation is
+         *     a notification, and `NotificationService` is M8's (W5). Four artboards draw
+         *     "published, invitations not sent" as its own state and no column holds it.
+         */
+        post: operations["publish_event_api_v1_events__event_id__publish_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/{event_id}/registrations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Registrations
+         * @description `7c`'s participants table, and `9d`'s candidate list.
+         *
+         *     D9.2 -- six columns and none of them is a weight or a category. `charge_id` is
+         *     redacted for a coach: §3.2's hard rule reaches the roster too.
+         */
+        get: operations["list_registrations_api_v1_events__event_id__registrations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/{event_id}/rsvp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Answer Rsvp
+         * @description §5.8's מגיע / לא מגיע. Artboards `7d` and `12h`.
+         *
+         *     **No role dependency**: this is the guardian's route, and §3.2 resolves a guardian
+         *     per-record rather than by grant. The check is "is this caller a guardian of this
+         *     student", which `RsvpService.assert_guardian_of` answers.
+         *
+         *     A `yes` is recorded whether or not the consent is signed. §5.8 gates *confirmation*,
+         *     not the answer -- refusing the write would lose the fact that the parent said yes, and
+         *     `confirmed` in the response is what the screen renders.
+         */
+        post: operations["answer_rsvp_api_v1_events__event_id__rsvp_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/groups": {
         parameters: {
             query?: never;
@@ -827,6 +1206,31 @@ export interface paths {
         put?: never;
         /** Create Location */
         post: operations["create_location_api_v1_locations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Events
+         * @description `12h` -- the parent's own list, one row per child per event.
+         *
+         *     **Drafts never appear.** §4.3 makes a draft invisible to guardians, and that is the
+         *     whole reason drafts exist: a manager builds an event over several sittings without a
+         *     half-written one reaching the club. Filtered server-side rather than trusted to the
+         *     screen.
+         */
+        get: operations["my_events_api_v1_me_events_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1801,6 +2205,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/students/{student_id}/belts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Student Belts
+         * @description `12d`'s timeline, oldest first.
+         *
+         *     The whole history rather than a page of it: `12d` renders a progression strip over the
+         *     class's ladder, and a truncated history would draw a child as having skipped the grades
+         *     that fell off the end. The largest preset is twelve rungs.
+         */
+        get: operations["list_student_belts_api_v1_students__student_id__belts_get"];
+        put?: never;
+        /**
+         * Award Student Belt
+         * @description §5.9's award outside an exam -- `events.belt.awardOutsideExam`.
+         *
+         *     A coach awarding a stripe at the end of a session is a real thing in a children's club,
+         *     and requiring an event would make managers invent fake ones. The history row and
+         *     `student.current_belt_id` move together.
+         */
+        post: operations["award_student_belt_api_v1_students__student_id__belts_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/students/{student_id}/convert": {
         parameters: {
             query?: never;
@@ -2626,6 +3062,80 @@ export interface components {
             superseded: number;
         };
         /**
+         * BeltPresetOut
+         * @description A whole seeded set. `5d` renders the ranks each preset WOULD create, as a live
+         *     preview beside the cards, so the ladder has to be readable before it exists.
+         */
+        BeltPresetOut: {
+            /** Discipline */
+            discipline: string;
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            /** Ranks */
+            ranks: components["schemas"]["BeltRankPresetOut"][];
+        };
+        /** BeltRankIn */
+        BeltRankIn: {
+            /** Class Id */
+            class_id?: string | null;
+            /** Color Hex */
+            color_hex: string;
+            /** Kyu */
+            kyu?: number | null;
+            /** Name */
+            name: string;
+            /** Order Index */
+            order_index: number;
+            /** Secondary Color Hex */
+            secondary_color_hex?: string | null;
+        };
+        /**
+         * BeltRankOut
+         * @description One rung of one class's ladder.
+         *
+         *     Per-studio and per-class, because a children's ladder and an adults' ladder are
+         *     different sequences in the same club. `order_index` rather than sorting by `kyu`:
+         *     not every rank has a kyu (a striped junior belt often does not), and a null would
+         *     scatter those rows to one end of the list.
+         */
+        BeltRankOut: {
+            /** Class Id */
+            class_id: string | null;
+            /** Color Hex */
+            color_hex: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Kyu */
+            kyu: number | null;
+            /** Name */
+            name: string;
+            /** Order Index */
+            order_index: number;
+            /** Secondary Color Hex */
+            secondary_color_hex: string | null;
+        };
+        /**
+         * BeltRankPresetOut
+         * @description One rung of a preset, before any of it exists as a row.
+         */
+        BeltRankPresetOut: {
+            /** Color Hex */
+            color_hex: string;
+            /** Kyu */
+            kyu: number | null;
+            /** Name */
+            name: string;
+            /** Order Index */
+            order_index: number;
+            /** Secondary Color Hex */
+            secondary_color_hex: string | null;
+        };
+        /**
          * BillingRunIn
          * @description §7's `POST /billing-runs`, and the endpoint the dev bar's runJob tool triggers.
          *
@@ -2776,6 +3286,34 @@ export interface components {
             invitation_token?: string | null;
             /** State */
             state: string;
+        };
+        /**
+         * CandidateOut
+         * @description One candidate, and the evidence §5.9 names -- and nothing else.
+         *
+         *     **There is deliberately no attendance percentage, no debt and no blocker field.**
+         *     `events.exam.eligibleHint` says the current rank and the time held in it; `belt_rank`
+         *     carries no threshold column, so a criterion added here would have nowhere to be
+         *     configured. `6b`'s audit says that decision belonged in W4's contract commit, which did
+         *     not make it. A debt figure would also break §3.2's hard rule on a screen a lead coach
+         *     may open.
+         *
+         *     `months_at_rank` is reported for a manager to read, not compared against anything.
+         */
+        CandidateOut: {
+            current_rank: components["schemas"]["BeltRankOut"] | null;
+            /** Eligible */
+            eligible: boolean;
+            /** Months At Rank */
+            months_at_rank: number | null;
+            next_rank: components["schemas"]["BeltRankOut"] | null;
+            /** Student Display Name */
+            student_display_name: string;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
         };
         /**
          * ChargeAdjustmentIn
@@ -3015,6 +3553,18 @@ export interface components {
             /** Next Cursor */
             next_cursor?: string | null;
         };
+        /** CursorPage[BeltPresetOut] */
+        CursorPage_BeltPresetOut_: {
+            /**
+             * Has More
+             * @default false
+             */
+            has_more: boolean;
+            /** Items */
+            items: components["schemas"]["BeltPresetOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
         /** CursorPage[BillingRunOut] */
         CursorPage_BillingRunOut_: {
             /**
@@ -3024,6 +3574,18 @@ export interface components {
             has_more: boolean;
             /** Items */
             items: components["schemas"]["BillingRunOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** CursorPage[CandidateOut] */
+        CursorPage_CandidateOut_: {
+            /**
+             * Has More
+             * @default false
+             */
+            has_more: boolean;
+            /** Items */
+            items: components["schemas"]["CandidateOut"][];
             /** Next Cursor */
             next_cursor?: string | null;
         };
@@ -3048,6 +3610,66 @@ export interface components {
             has_more: boolean;
             /** Items */
             items: components["schemas"]["ClosureOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** CursorPage[EventExamResultOut] */
+        CursorPage_EventExamResultOut_: {
+            /**
+             * Has More
+             * @default false
+             */
+            has_more: boolean;
+            /** Items */
+            items: components["schemas"]["EventExamResultOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** CursorPage[EventOut] */
+        CursorPage_EventOut_: {
+            /**
+             * Has More
+             * @default false
+             */
+            has_more: boolean;
+            /** Items */
+            items: components["schemas"]["EventOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** CursorPage[EventRegistrationOut] */
+        CursorPage_EventRegistrationOut_: {
+            /**
+             * Has More
+             * @default false
+             */
+            has_more: boolean;
+            /** Items */
+            items: components["schemas"]["EventRegistrationOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** CursorPage[LadderRankOut] */
+        CursorPage_LadderRankOut_: {
+            /**
+             * Has More
+             * @default false
+             */
+            has_more: boolean;
+            /** Items */
+            items: components["schemas"]["LadderRankOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** CursorPage[ParentEventOut] */
+        CursorPage_ParentEventOut_: {
+            /**
+             * Has More
+             * @default false
+             */
+            has_more: boolean;
+            /** Items */
+            items: components["schemas"]["ParentEventOut"][];
             /** Next Cursor */
             next_cursor?: string | null;
         };
@@ -3132,6 +3754,18 @@ export interface components {
             has_more: boolean;
             /** Items */
             items: components["schemas"]["SessionOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** CursorPage[StudentBeltOut] */
+        CursorPage_StudentBeltOut_: {
+            /**
+             * Has More
+             * @default false
+             */
+            has_more: boolean;
+            /** Items */
+            items: components["schemas"]["StudentBeltOut"][];
             /** Next Cursor */
             next_cursor?: string | null;
         };
@@ -3264,6 +3898,312 @@ export interface components {
             group_name: string;
             /** Training Weekdays */
             training_weekdays?: number[];
+        };
+        /** EventAttendanceIn */
+        EventAttendanceIn: {
+            /** Marks */
+            marks: components["schemas"]["EventAttendanceMarkIn"][];
+        };
+        /** EventAttendanceMarkIn */
+        EventAttendanceMarkIn: {
+            /** Attended */
+            attended: boolean;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+        };
+        /** EventAttendanceOut */
+        EventAttendanceOut: {
+            /** Marked */
+            marked: number;
+        };
+        /**
+         * EventConsentIn
+         * @description Which child is being consented for.
+         *
+         *     **Not the consent text.** That lives on the event, and a signature carrying its own
+         *     wording would let a client sign something the manager never wrote.
+         */
+        EventConsentIn: {
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+        };
+        /** EventCreateIn */
+        EventCreateIn: {
+            /** Consent Text */
+            consent_text?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Ends At */
+            ends_at?: string | null;
+            /** Fee Agorot */
+            fee_agorot?: number | null;
+            /** Location Id */
+            location_id?: string | null;
+            /** Location Text */
+            location_text?: string | null;
+            /**
+             * Requires Consent
+             * @default false
+             */
+            requires_consent: boolean;
+            /** Rsvp Deadline */
+            rsvp_deadline?: string | null;
+            /**
+             * Starts At
+             * Format: date-time
+             */
+            starts_at: string;
+            /** Targets */
+            targets?: components["schemas"]["EventTargetOut"][];
+            /** Title */
+            title: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "competition" | "belt_exam" | "seminar" | "joint_training" | "trip" | "other";
+        };
+        /** EventExamResultIn */
+        EventExamResultIn: {
+            /**
+             * Belt Rank Id
+             * Format: uuid
+             */
+            belt_rank_id: string;
+            /** Note */
+            note?: string | null;
+            /**
+             * Result
+             * @enum {string}
+             */
+            result: "pass" | "fail";
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+        };
+        /**
+         * EventExamResultOut
+         * @description §5.13's grading, recorded against the exam event that produced it.
+         *
+         *     A pass here is what M7 turns into a `student_belt` row. Keeping the result and the
+         *     award separate means a mistaken pass can be corrected without inventing a belt history
+         *     the student never had.
+         */
+        EventExamResultOut: {
+            /**
+             * Belt Rank Id
+             * Format: uuid
+             */
+            belt_rank_id: string;
+            /** Belt Rank Name */
+            belt_rank_name: string;
+            /**
+             * Event Id
+             * Format: uuid
+             */
+            event_id: string;
+            /** Examiner Person Id */
+            examiner_person_id: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Note */
+            note: string | null;
+            /**
+             * Result
+             * @enum {string}
+             */
+            result: "pass" | "fail";
+            /** Student Display Name */
+            student_display_name: string;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+        };
+        /**
+         * EventOut
+         * @description One event, as `7a`/`7b` render it.
+         *
+         *     `location_id` and `location_text` are both here because §5.12's events happen at
+         *     places that are not the studio's own locations -- a competition is at someone else's
+         *     dojo, and forcing it into the `location` table would fill that table with rows nobody
+         *     schedules against.
+         */
+        EventOut: {
+            /** Consent Text */
+            consent_text: string | null;
+            /** Description */
+            description: string | null;
+            /** Ends At */
+            ends_at: string | null;
+            /** Fee Agorot */
+            fee_agorot: number | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Location Id */
+            location_id: string | null;
+            /** Location Text */
+            location_text: string | null;
+            /** Requires Consent */
+            requires_consent: boolean;
+            /** Rsvp Deadline */
+            rsvp_deadline: string | null;
+            /**
+             * Rsvp No Count
+             * @default 0
+             */
+            rsvp_no_count: number;
+            /**
+             * Rsvp Pending Count
+             * @default 0
+             */
+            rsvp_pending_count: number;
+            /**
+             * Rsvp Yes Count
+             * @default 0
+             */
+            rsvp_yes_count: number;
+            /**
+             * Starts At
+             * Format: date-time
+             */
+            starts_at: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "draft" | "published" | "cancelled" | "completed";
+            /** Targets */
+            targets?: components["schemas"]["EventTargetOut"][];
+            /** Title */
+            title: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "competition" | "belt_exam" | "seminar" | "joint_training" | "trip" | "other";
+        };
+        /**
+         * EventPublishedOut
+         * @description A publish reports the roster it just created.
+         *
+         *     Same reasoning as `HealthTemplatePublishedOut`: a publish that said nothing about what
+         *     it materialised would look identical to one that materialised nothing -- which is
+         *     exactly what an event with no targets does, and exactly the state a manager needs to
+         *     see before wondering why no parent replied.
+         */
+        EventPublishedOut: {
+            event: components["schemas"]["EventOut"];
+            /** Registrations Created */
+            registrations_created: number;
+        };
+        /**
+         * EventRegistrationOut
+         * @description One student's answer.
+         *
+         *     `charge_id` rather than an amount. The fee is a `charge` created through
+         *     `BillingService.create_charge`, so a registration row never holds money and the ledger
+         *     stays the only place a family's balance is computed from.
+         *
+         *     `consent_signed_at` is a timestamp, not the consent contents. §14's parental consent
+         *     for a competition is a health-adjacent record about a minor; what a manager's list
+         *     needs is whether it was signed, and the contents live behind an audit-logged read.
+         */
+        EventRegistrationOut: {
+            /** Attended */
+            attended: boolean | null;
+            /** Charge Id */
+            charge_id: string | null;
+            /** Consent Signed At */
+            consent_signed_at: string | null;
+            /**
+             * Event Id
+             * Format: uuid
+             */
+            event_id: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Responded At */
+            responded_at: string | null;
+            /** Responded By Person Id */
+            responded_by_person_id: string | null;
+            /**
+             * Rsvp
+             * @enum {string}
+             */
+            rsvp: "pending" | "yes" | "no";
+            /** Student Display Name */
+            student_display_name: string;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+        };
+        /** EventTargetOut */
+        EventTargetOut: {
+            /** Display Name */
+            display_name?: string | null;
+            /** Target Id */
+            target_id: string | null;
+            /**
+             * Target Type
+             * @enum {string}
+             */
+            target_type: "studio" | "class" | "group" | "student";
+        };
+        /**
+         * EventUpdateIn
+         * @description Every field optional. `status` is absent: publishing and cancelling are their own
+         *     transitions (§5.12 notifies on both), and a PATCH that could flip `draft` to
+         *     `published` as a side effect of an unrelated edit would send the club a surprise.
+         */
+        EventUpdateIn: {
+            /** Consent Text */
+            consent_text?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Ends At */
+            ends_at?: string | null;
+            /** Fee Agorot */
+            fee_agorot?: number | null;
+            /** Location Id */
+            location_id?: string | null;
+            /** Location Text */
+            location_text?: string | null;
+            /** Requires Consent */
+            requires_consent?: boolean | null;
+            /** Rsvp Deadline */
+            rsvp_deadline?: string | null;
+            /** Starts At */
+            starts_at?: string | null;
+            /** Targets */
+            targets?: components["schemas"]["EventTargetOut"][] | null;
+            /** Title */
+            title?: string | null;
+        };
+        /** ExamResultsIn */
+        ExamResultsIn: {
+            /** Results */
+            results: components["schemas"]["EventExamResultIn"][];
         };
         /**
          * GenerateSessionsOut
@@ -3788,6 +4728,39 @@ export interface components {
             /** Payment Id */
             payment_id?: string | null;
         };
+        /**
+         * LadderRankOut
+         * @description One rung, plus the two facts a ladder screen cannot render without.
+         *
+         *     Composed rather than added to `BeltRankOut`, which is W4's contract and not this lane's
+         *     to widen -- the same move `HealthTemplatePublishedOut` makes.
+         *
+         *     `next_rank_id` is `events.belt.next` and `holders` is `5b`'s חניכים column, which is
+         *     also the data a delete refusal explains itself with.
+         */
+        LadderRankOut: {
+            /** Class Id */
+            class_id: string | null;
+            /** Color Hex */
+            color_hex: string;
+            /** Holders */
+            holders: number;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Kyu */
+            kyu: number | null;
+            /** Name */
+            name: string;
+            /** Next Rank Id */
+            next_rank_id: string | null;
+            /** Order Index */
+            order_index: number;
+            /** Secondary Color Hex */
+            secondary_color_hex: string | null;
+        };
         /** LocationCreate */
         LocationCreate: {
             /** Address */
@@ -3931,6 +4904,20 @@ export interface components {
             identity_id: string;
             /** Studios */
             studios: components["schemas"]["StudioMembershipOut"][];
+        };
+        /**
+         * ParentEventOut
+         * @description `12h`'s row: the event, plus this family's own answer for one child.
+         *
+         *     Two objects rather than one flattened shape, because the answer is per-child and the
+         *     event is not -- a family with two children on one competition sees one event and two
+         *     answers, and flattening would duplicate the event on the screen.
+         */
+        ParentEventOut: {
+            /** Confirmed */
+            confirmed: boolean;
+            event: components["schemas"]["EventOut"];
+            registration: components["schemas"]["EventRegistrationOut"];
         };
         /**
          * PayerBalanceOut
@@ -4352,6 +5339,20 @@ export interface components {
             status: "active" | "cancelled";
         };
         /**
+         * RegistrationAnswerOut
+         * @description One registration, plus whether §5.8 counts it as confirmed.
+         *
+         *     `confirmed` is computed on the server because `RsvpService.is_confirmed` is the only
+         *     definition of the rule. A client re-deriving `rsvp == 'yes' and (not requires_consent
+         *     or signed)` would be a second implementation of the thing that decides whether a family
+         *     is billed.
+         */
+        RegistrationAnswerOut: {
+            /** Confirmed */
+            confirmed: boolean;
+            registration: components["schemas"]["EventRegistrationOut"];
+        };
+        /**
          * RegistrationDecisionIn
          * @description `POST /registration-requests/{id}/{approve|reject}`.
          *
@@ -4454,6 +5455,24 @@ export interface components {
             submitted_at: string;
         };
         /**
+         * ReorderLadderIn
+         * @description The finished order, whole.
+         *
+         *     A partial list would leave the omitted ranks at indices the named ones are about to
+         *     take, and a pairwise swap through `uq_belt_rank_class_order` has to pass through a
+         *     colliding intermediate state. `5b` reorders by drag; the API takes the result either
+         *     way.
+         */
+        ReorderLadderIn: {
+            /**
+             * Class Id
+             * Format: uuid
+             */
+            class_id: string;
+            /** Ordered Ids */
+            ordered_ids: string[];
+        };
+        /**
          * RosterEntry
          * @description One student on a coach's roster. **The W3 seam** (plan §1.3 seam 4).
          *
@@ -4499,6 +5518,29 @@ export interface components {
              * @enum {string}
              */
             status: "unmarked" | "present" | "absent_excused" | "absent_unexcused";
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+        };
+        /**
+         * RsvpAnswerIn
+         * @description `RsvpIn` from the contract carries only the answer; a route needs to know which
+         *     child it is about. Composed here rather than by widening the contract shape -- a family
+         *     with two children on one competition answers twice, and `RsvpIn` is what `7d`'s two
+         *     buttons post for one of them.
+         *
+         *     `pending` is not accepted, exactly as the contract's own shape refuses it: it is the
+         *     ABSENCE of an answer, and letting a caller send it would make "un-answer" a supported
+         *     action the office would then have to interpret.
+         */
+        RsvpAnswerIn: {
+            /**
+             * Rsvp
+             * @enum {string}
+             */
+            rsvp: "yes" | "no";
             /**
              * Student Id
              * Format: uuid
@@ -4633,6 +5675,16 @@ export interface components {
             group_id: string;
             /** Rules */
             rules?: components["schemas"]["ScheduleRuleOut"][];
+        };
+        /** SeedLadderIn */
+        SeedLadderIn: {
+            /**
+             * Class Id
+             * Format: uuid
+             */
+            class_id: string;
+            /** Preset Key */
+            preset_key: string;
         };
         /**
          * SessionCancelIn
@@ -4945,6 +5997,66 @@ export interface components {
              * @description Always null in M1. Weekly load is group_schedule_rule × session, both W2 contract models. Zero would report an idle coach rather than a missing measurement.
              */
             weekly_hours?: number | null;
+        };
+        /** StudentBeltIn */
+        StudentBeltIn: {
+            /**
+             * Awarded On
+             * Format: date
+             */
+            awarded_on: string;
+            /**
+             * Belt Rank Id
+             * Format: uuid
+             */
+            belt_rank_id: string;
+            /** Event Id */
+            event_id?: string | null;
+            /** Note */
+            note?: string | null;
+        };
+        /**
+         * StudentBeltOut
+         * @description One award. §5.13 keeps the whole history rather than a current-belt pointer alone,
+         *     because `12d` התקדמות חגורה is a timeline and "when did she get her orange belt" is the
+         *     question parents actually ask.
+         *
+         *     `event_id` is nullable: a belt awarded in class rather than at a graded exam is normal,
+         *     and requiring an event would make managers create fake ones.
+         */
+        StudentBeltOut: {
+            /** Awarded By Person Id */
+            awarded_by_person_id: string | null;
+            /**
+             * Awarded On
+             * Format: date
+             */
+            awarded_on: string;
+            /**
+             * Belt Rank Id
+             * Format: uuid
+             */
+            belt_rank_id: string;
+            /** Belt Rank Name */
+            belt_rank_name: string;
+            /** Color Hex */
+            color_hex: string;
+            /** Event Id */
+            event_id: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Note */
+            note: string | null;
+            /** Secondary Color Hex */
+            secondary_color_hex: string | null;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
         };
         /**
          * StudentConvertIn
@@ -6111,6 +7223,228 @@ export interface operations {
             };
         };
     };
+    list_belt_presets_api_v1_belt_presets_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CursorPage_BeltPresetOut_"];
+                };
+            };
+        };
+    };
+    list_belt_ranks_api_v1_belt_ranks_get: {
+        parameters: {
+            query: {
+                class_id: string;
+                after?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CursorPage_LadderRankOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_belt_rank_api_v1_belt_ranks_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BeltRankIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LadderRankOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reorder_belt_ranks_api_v1_belt_ranks_reorder_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReorderLadderIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CursorPage_LadderRankOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    seed_belt_ranks_api_v1_belt_ranks_seed_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SeedLadderIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CursorPage_LadderRankOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_belt_rank_api_v1_belt_ranks__rank_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rank_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_belt_rank_api_v1_belt_ranks__rank_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rank_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BeltRankIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LadderRankOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_billing_runs_api_v1_billing_runs_get: {
         parameters: {
             query?: {
@@ -6721,6 +8055,455 @@ export interface operations {
             };
         };
     };
+    list_events_api_v1_events_get: {
+        parameters: {
+            query?: {
+                type?: ("competition" | "belt_exam" | "seminar" | "joint_training" | "trip" | "other")[] | null;
+                after?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CursorPage_EventOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_event_api_v1_events_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EventCreateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_event_api_v1_events__event_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                event_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_event_api_v1_events__event_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                event_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EventUpdateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    event_calendar_file_api_v1_events__event_id__ics_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                event_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/calendar": unknown;
+                    "text/plain": string;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    record_event_attendance_api_v1_events__event_id__attendance_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                event_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EventAttendanceIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventAttendanceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_event_api_v1_events__event_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                event_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sign_event_consent_api_v1_events__event_id__consent_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                event_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EventConsentIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistrationAnswerOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    event_eligibility_api_v1_events__event_id__eligibility_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                event_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CursorPage_CandidateOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    record_exam_results_api_v1_events__event_id__exam_results_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                event_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExamResultsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CursorPage_EventExamResultOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    publish_event_api_v1_events__event_id__publish_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                event_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventPublishedOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_registrations_api_v1_events__event_id__registrations_get: {
+        parameters: {
+            query?: {
+                after?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                event_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CursorPage_EventRegistrationOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    answer_rsvp_api_v1_events__event_id__rsvp_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                event_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RsvpAnswerIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistrationAnswerOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_groups_api_v1_groups_get: {
         parameters: {
             query?: {
@@ -7220,6 +9003,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LocationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_events_api_v1_me_events_get: {
+        parameters: {
+            query?: {
+                after?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CursorPage_ParentEventOut_"];
                 };
             };
             /** @description Validation Error */
@@ -8975,6 +10790,75 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CursorPage_AttendanceOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_student_belts_api_v1_students__student_id__belts_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CursorPage_StudentBeltOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    award_student_belt_api_v1_students__student_id__belts_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StudentBeltIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudentBeltOut"];
                 };
             };
             /** @description Validation Error */

@@ -142,6 +142,7 @@ export const events: Bundle = {
   'belt.groupPromoteHint': 'Присвоить всем сдавшим, одним действием',
 
   // -- 7a / 9i / 12h — list chrome the audits found missing ------------------------
+  'list.loading': 'Загрузка…',
   'list.subtitle': 'Разовые события — вне недельного расписания',
   'list.filterAll': 'Все',
   'list.needsAttention': 'Требуют внимания',

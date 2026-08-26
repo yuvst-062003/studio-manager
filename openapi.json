@@ -363,6 +363,219 @@
         "title": "BatchResult",
         "type": "object"
       },
+      "BeltPresetOut": {
+        "description": "A whole seeded set. `5d` renders the ranks each preset WOULD create, as a live\npreview beside the cards, so the ladder has to be readable before it exists.",
+        "properties": {
+          "discipline": {
+            "title": "Discipline",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "ranks": {
+            "items": {
+              "$ref": "#/components/schemas/BeltRankPresetOut"
+            },
+            "title": "Ranks",
+            "type": "array"
+          }
+        },
+        "required": [
+          "key",
+          "discipline",
+          "name",
+          "ranks"
+        ],
+        "title": "BeltPresetOut",
+        "type": "object"
+      },
+      "BeltRankIn": {
+        "properties": {
+          "class_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Class Id"
+          },
+          "color_hex": {
+            "pattern": "^#[0-9a-fA-F]{6}$",
+            "title": "Color Hex",
+            "type": "string"
+          },
+          "kyu": {
+            "anyOf": [
+              {
+                "maximum": 20.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kyu"
+          },
+          "name": {
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "order_index": {
+            "minimum": 0.0,
+            "title": "Order Index",
+            "type": "integer"
+          },
+          "secondary_color_hex": {
+            "anyOf": [
+              {
+                "pattern": "^#[0-9a-fA-F]{6}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Secondary Color Hex"
+          }
+        },
+        "required": [
+          "name",
+          "order_index",
+          "color_hex"
+        ],
+        "title": "BeltRankIn",
+        "type": "object"
+      },
+      "BeltRankOut": {
+        "description": "One rung of one class's ladder.\n\nPer-studio and per-class, because a children's ladder and an adults' ladder are\ndifferent sequences in the same club. `order_index` rather than sorting by `kyu`:\nnot every rank has a kyu (a striped junior belt often does not), and a null would\nscatter those rows to one end of the list.",
+        "properties": {
+          "class_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Class Id"
+          },
+          "color_hex": {
+            "pattern": "^#[0-9a-fA-F]{6}$",
+            "title": "Color Hex",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kyu": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kyu"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "order_index": {
+            "title": "Order Index",
+            "type": "integer"
+          },
+          "secondary_color_hex": {
+            "anyOf": [
+              {
+                "pattern": "^#[0-9a-fA-F]{6}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Secondary Color Hex"
+          }
+        },
+        "required": [
+          "id",
+          "class_id",
+          "name",
+          "kyu",
+          "order_index",
+          "color_hex",
+          "secondary_color_hex"
+        ],
+        "title": "BeltRankOut",
+        "type": "object"
+      },
+      "BeltRankPresetOut": {
+        "description": "One rung of a preset, before any of it exists as a row.",
+        "properties": {
+          "color_hex": {
+            "title": "Color Hex",
+            "type": "string"
+          },
+          "kyu": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kyu"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "order_index": {
+            "title": "Order Index",
+            "type": "integer"
+          },
+          "secondary_color_hex": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Secondary Color Hex"
+          }
+        },
+        "required": [
+          "name",
+          "kyu",
+          "order_index",
+          "color_hex",
+          "secondary_color_hex"
+        ],
+        "title": "BeltRankPresetOut",
+        "type": "object"
+      },
       "BillingRunIn": {
         "description": "§7's `POST /billing-runs`, and the endpoint the dev bar's runJob tool triggers.\n\nA period, not a date range: §5.10 bills calendar months and `charge`'s idempotency key\nis `(student_id, period_year, period_month, kind)`.",
         "properties": {
@@ -658,6 +871,65 @@
           "state"
         ],
         "title": "CallbackRequest",
+        "type": "object"
+      },
+      "CandidateOut": {
+        "description": "One candidate, and the evidence §5.9 names -- and nothing else.\n\n**There is deliberately no attendance percentage, no debt and no blocker field.**\n`events.exam.eligibleHint` says the current rank and the time held in it; `belt_rank`\ncarries no threshold column, so a criterion added here would have nowhere to be\nconfigured. `6b`'s audit says that decision belonged in W4's contract commit, which did\nnot make it. A debt figure would also break §3.2's hard rule on a screen a lead coach\nmay open.\n\n`months_at_rank` is reported for a manager to read, not compared against anything.",
+        "properties": {
+          "current_rank": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BeltRankOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "eligible": {
+            "title": "Eligible",
+            "type": "boolean"
+          },
+          "months_at_rank": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Months At Rank"
+          },
+          "next_rank": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BeltRankOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "student_display_name": {
+            "title": "Student Display Name",
+            "type": "string"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "student_id",
+          "student_display_name",
+          "current_rank",
+          "next_rank",
+          "months_at_rank",
+          "eligible"
+        ],
+        "title": "CandidateOut",
         "type": "object"
       },
       "ChargeAdjustmentIn": {
@@ -1171,6 +1443,39 @@
         "title": "CursorPage[AttendanceOut]",
         "type": "object"
       },
+      "CursorPage_BeltPresetOut_": {
+        "properties": {
+          "has_more": {
+            "default": false,
+            "title": "Has More",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/BeltPresetOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "CursorPage[BeltPresetOut]",
+        "type": "object"
+      },
       "CursorPage_BillingRunOut_": {
         "properties": {
           "has_more": {
@@ -1202,6 +1507,39 @@
           "items"
         ],
         "title": "CursorPage[BillingRunOut]",
+        "type": "object"
+      },
+      "CursorPage_CandidateOut_": {
+        "properties": {
+          "has_more": {
+            "default": false,
+            "title": "Has More",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CandidateOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "CursorPage[CandidateOut]",
         "type": "object"
       },
       "CursorPage_ChargeOut_": {
@@ -1268,6 +1606,171 @@
           "items"
         ],
         "title": "CursorPage[ClosureOut]",
+        "type": "object"
+      },
+      "CursorPage_EventExamResultOut_": {
+        "properties": {
+          "has_more": {
+            "default": false,
+            "title": "Has More",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/EventExamResultOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "CursorPage[EventExamResultOut]",
+        "type": "object"
+      },
+      "CursorPage_EventOut_": {
+        "properties": {
+          "has_more": {
+            "default": false,
+            "title": "Has More",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/EventOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "CursorPage[EventOut]",
+        "type": "object"
+      },
+      "CursorPage_EventRegistrationOut_": {
+        "properties": {
+          "has_more": {
+            "default": false,
+            "title": "Has More",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/EventRegistrationOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "CursorPage[EventRegistrationOut]",
+        "type": "object"
+      },
+      "CursorPage_LadderRankOut_": {
+        "properties": {
+          "has_more": {
+            "default": false,
+            "title": "Has More",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/LadderRankOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "CursorPage[LadderRankOut]",
+        "type": "object"
+      },
+      "CursorPage_ParentEventOut_": {
+        "properties": {
+          "has_more": {
+            "default": false,
+            "title": "Has More",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ParentEventOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "CursorPage[ParentEventOut]",
         "type": "object"
       },
       "CursorPage_PaymentOut_": {
@@ -1499,6 +2002,39 @@
           "items"
         ],
         "title": "CursorPage[SessionOut]",
+        "type": "object"
+      },
+      "CursorPage_StudentBeltOut_": {
+        "properties": {
+          "has_more": {
+            "default": false,
+            "title": "Has More",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/StudentBeltOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "CursorPage[StudentBeltOut]",
         "type": "object"
       },
       "CursorPage_StudentSummaryOut_": {
@@ -1823,6 +2359,805 @@
           "group_name"
         ],
         "title": "EnrollmentWeekdayOptionsOut",
+        "type": "object"
+      },
+      "EventAttendanceIn": {
+        "properties": {
+          "marks": {
+            "items": {
+              "$ref": "#/components/schemas/EventAttendanceMarkIn"
+            },
+            "title": "Marks",
+            "type": "array"
+          }
+        },
+        "required": [
+          "marks"
+        ],
+        "title": "EventAttendanceIn",
+        "type": "object"
+      },
+      "EventAttendanceMarkIn": {
+        "properties": {
+          "attended": {
+            "title": "Attended",
+            "type": "boolean"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "student_id",
+          "attended"
+        ],
+        "title": "EventAttendanceMarkIn",
+        "type": "object"
+      },
+      "EventAttendanceOut": {
+        "properties": {
+          "marked": {
+            "title": "Marked",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "marked"
+        ],
+        "title": "EventAttendanceOut",
+        "type": "object"
+      },
+      "EventConsentIn": {
+        "description": "Which child is being consented for.\n\n**Not the consent text.** That lives on the event, and a signature carrying its own\nwording would let a client sign something the manager never wrote.",
+        "properties": {
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "student_id"
+        ],
+        "title": "EventConsentIn",
+        "type": "object"
+      },
+      "EventCreateIn": {
+        "properties": {
+          "consent_text": {
+            "anyOf": [
+              {
+                "maxLength": 4000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consent Text"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 4000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "ends_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ends At"
+          },
+          "fee_agorot": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fee Agorot"
+          },
+          "location_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location Id"
+          },
+          "location_text": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location Text"
+          },
+          "requires_consent": {
+            "default": false,
+            "title": "Requires Consent",
+            "type": "boolean"
+          },
+          "rsvp_deadline": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rsvp Deadline"
+          },
+          "starts_at": {
+            "format": "date-time",
+            "title": "Starts At",
+            "type": "string"
+          },
+          "targets": {
+            "items": {
+              "$ref": "#/components/schemas/EventTargetOut"
+            },
+            "title": "Targets",
+            "type": "array"
+          },
+          "title": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "competition",
+              "belt_exam",
+              "seminar",
+              "joint_training",
+              "trip",
+              "other"
+            ],
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "title",
+          "starts_at"
+        ],
+        "title": "EventCreateIn",
+        "type": "object"
+      },
+      "EventExamResultIn": {
+        "properties": {
+          "belt_rank_id": {
+            "format": "uuid",
+            "title": "Belt Rank Id",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "result": {
+            "enum": [
+              "pass",
+              "fail"
+            ],
+            "title": "Result",
+            "type": "string"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "student_id",
+          "belt_rank_id",
+          "result"
+        ],
+        "title": "EventExamResultIn",
+        "type": "object"
+      },
+      "EventExamResultOut": {
+        "description": "§5.13's grading, recorded against the exam event that produced it.\n\nA pass here is what M7 turns into a `student_belt` row. Keeping the result and the\naward separate means a mistaken pass can be corrected without inventing a belt history\nthe student never had.",
+        "properties": {
+          "belt_rank_id": {
+            "format": "uuid",
+            "title": "Belt Rank Id",
+            "type": "string"
+          },
+          "belt_rank_name": {
+            "title": "Belt Rank Name",
+            "type": "string"
+          },
+          "event_id": {
+            "format": "uuid",
+            "title": "Event Id",
+            "type": "string"
+          },
+          "examiner_person_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Examiner Person Id"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "result": {
+            "enum": [
+              "pass",
+              "fail"
+            ],
+            "title": "Result",
+            "type": "string"
+          },
+          "student_display_name": {
+            "title": "Student Display Name",
+            "type": "string"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "event_id",
+          "student_id",
+          "student_display_name",
+          "belt_rank_id",
+          "belt_rank_name",
+          "result",
+          "examiner_person_id",
+          "note"
+        ],
+        "title": "EventExamResultOut",
+        "type": "object"
+      },
+      "EventOut": {
+        "description": "One event, as `7a`/`7b` render it.\n\n`location_id` and `location_text` are both here because §5.12's events happen at\nplaces that are not the studio's own locations -- a competition is at someone else's\ndojo, and forcing it into the `location` table would fill that table with rows nobody\nschedules against.",
+        "properties": {
+          "consent_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consent Text"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "ends_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ends At"
+          },
+          "fee_agorot": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fee Agorot"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "location_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location Id"
+          },
+          "location_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location Text"
+          },
+          "requires_consent": {
+            "title": "Requires Consent",
+            "type": "boolean"
+          },
+          "rsvp_deadline": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rsvp Deadline"
+          },
+          "rsvp_no_count": {
+            "default": 0,
+            "title": "Rsvp No Count",
+            "type": "integer"
+          },
+          "rsvp_pending_count": {
+            "default": 0,
+            "title": "Rsvp Pending Count",
+            "type": "integer"
+          },
+          "rsvp_yes_count": {
+            "default": 0,
+            "title": "Rsvp Yes Count",
+            "type": "integer"
+          },
+          "starts_at": {
+            "format": "date-time",
+            "title": "Starts At",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "draft",
+              "published",
+              "cancelled",
+              "completed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "targets": {
+            "items": {
+              "$ref": "#/components/schemas/EventTargetOut"
+            },
+            "title": "Targets",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "competition",
+              "belt_exam",
+              "seminar",
+              "joint_training",
+              "trip",
+              "other"
+            ],
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "title",
+          "description",
+          "starts_at",
+          "ends_at",
+          "location_id",
+          "location_text",
+          "rsvp_deadline",
+          "fee_agorot",
+          "requires_consent",
+          "consent_text",
+          "status"
+        ],
+        "title": "EventOut",
+        "type": "object"
+      },
+      "EventPublishedOut": {
+        "description": "A publish reports the roster it just created.\n\nSame reasoning as `HealthTemplatePublishedOut`: a publish that said nothing about what\nit materialised would look identical to one that materialised nothing -- which is\nexactly what an event with no targets does, and exactly the state a manager needs to\nsee before wondering why no parent replied.",
+        "properties": {
+          "event": {
+            "$ref": "#/components/schemas/EventOut"
+          },
+          "registrations_created": {
+            "title": "Registrations Created",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "event",
+          "registrations_created"
+        ],
+        "title": "EventPublishedOut",
+        "type": "object"
+      },
+      "EventRegistrationOut": {
+        "description": "One student's answer.\n\n`charge_id` rather than an amount. The fee is a `charge` created through\n`BillingService.create_charge`, so a registration row never holds money and the ledger\nstays the only place a family's balance is computed from.\n\n`consent_signed_at` is a timestamp, not the consent contents. §14's parental consent\nfor a competition is a health-adjacent record about a minor; what a manager's list\nneeds is whether it was signed, and the contents live behind an audit-logged read.",
+        "properties": {
+          "attended": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attended"
+          },
+          "charge_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Charge Id"
+          },
+          "consent_signed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consent Signed At"
+          },
+          "event_id": {
+            "format": "uuid",
+            "title": "Event Id",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "responded_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Responded At"
+          },
+          "responded_by_person_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Responded By Person Id"
+          },
+          "rsvp": {
+            "enum": [
+              "pending",
+              "yes",
+              "no"
+            ],
+            "title": "Rsvp",
+            "type": "string"
+          },
+          "student_display_name": {
+            "title": "Student Display Name",
+            "type": "string"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "event_id",
+          "student_id",
+          "student_display_name",
+          "rsvp",
+          "responded_by_person_id",
+          "responded_at",
+          "consent_signed_at",
+          "charge_id",
+          "attended"
+        ],
+        "title": "EventRegistrationOut",
+        "type": "object"
+      },
+      "EventTargetOut": {
+        "properties": {
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "target_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Id"
+          },
+          "target_type": {
+            "enum": [
+              "studio",
+              "class",
+              "group",
+              "student"
+            ],
+            "title": "Target Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "target_type",
+          "target_id"
+        ],
+        "title": "EventTargetOut",
+        "type": "object"
+      },
+      "EventUpdateIn": {
+        "description": "Every field optional. `status` is absent: publishing and cancelling are their own\ntransitions (§5.12 notifies on both), and a PATCH that could flip `draft` to\n`published` as a side effect of an unrelated edit would send the club a surprise.",
+        "properties": {
+          "consent_text": {
+            "anyOf": [
+              {
+                "maxLength": 4000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consent Text"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 4000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "ends_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ends At"
+          },
+          "fee_agorot": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fee Agorot"
+          },
+          "location_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location Id"
+          },
+          "location_text": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location Text"
+          },
+          "requires_consent": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requires Consent"
+          },
+          "rsvp_deadline": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rsvp Deadline"
+          },
+          "starts_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Starts At"
+          },
+          "targets": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/EventTargetOut"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Targets"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "title": "EventUpdateIn",
+        "type": "object"
+      },
+      "ExamResultsIn": {
+        "properties": {
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/EventExamResultIn"
+            },
+            "title": "Results",
+            "type": "array"
+          }
+        },
+        "required": [
+          "results"
+        ],
+        "title": "ExamResultsIn",
         "type": "object"
       },
       "GenerateSessionsOut": {
@@ -2857,6 +4192,93 @@
         "title": "IpnMatchIn",
         "type": "object"
       },
+      "LadderRankOut": {
+        "description": "One rung, plus the two facts a ladder screen cannot render without.\n\nComposed rather than added to `BeltRankOut`, which is W4's contract and not this lane's\nto widen -- the same move `HealthTemplatePublishedOut` makes.\n\n`next_rank_id` is `events.belt.next` and `holders` is `5b`'s חניכים column, which is\nalso the data a delete refusal explains itself with.",
+        "properties": {
+          "class_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Class Id"
+          },
+          "color_hex": {
+            "pattern": "^#[0-9a-fA-F]{6}$",
+            "title": "Color Hex",
+            "type": "string"
+          },
+          "holders": {
+            "title": "Holders",
+            "type": "integer"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kyu": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kyu"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "next_rank_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Rank Id"
+          },
+          "order_index": {
+            "title": "Order Index",
+            "type": "integer"
+          },
+          "secondary_color_hex": {
+            "anyOf": [
+              {
+                "pattern": "^#[0-9a-fA-F]{6}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Secondary Color Hex"
+          }
+        },
+        "required": [
+          "id",
+          "class_id",
+          "name",
+          "kyu",
+          "order_index",
+          "color_hex",
+          "secondary_color_hex",
+          "next_rank_id",
+          "holders"
+        ],
+        "title": "LadderRankOut",
+        "type": "object"
+      },
       "LocationCreate": {
         "properties": {
           "address": {
@@ -3235,6 +4657,28 @@
           "acting_as_person_id"
         ],
         "title": "MeResponse",
+        "type": "object"
+      },
+      "ParentEventOut": {
+        "description": "`12h`'s row: the event, plus this family's own answer for one child.\n\nTwo objects rather than one flattened shape, because the answer is per-child and the\nevent is not -- a family with two children on one competition sees one event and two\nanswers, and flattening would duplicate the event on the screen.",
+        "properties": {
+          "confirmed": {
+            "title": "Confirmed",
+            "type": "boolean"
+          },
+          "event": {
+            "$ref": "#/components/schemas/EventOut"
+          },
+          "registration": {
+            "$ref": "#/components/schemas/EventRegistrationOut"
+          }
+        },
+        "required": [
+          "event",
+          "registration",
+          "confirmed"
+        ],
+        "title": "ParentEventOut",
         "type": "object"
       },
       "PayerBalanceOut": {
@@ -4149,6 +5593,24 @@
         "title": "RecurringSubscriptionOut",
         "type": "object"
       },
+      "RegistrationAnswerOut": {
+        "description": "One registration, plus whether §5.8 counts it as confirmed.\n\n`confirmed` is computed on the server because `RsvpService.is_confirmed` is the only\ndefinition of the rule. A client re-deriving `rsvp == 'yes' and (not requires_consent\nor signed)` would be a second implementation of the thing that decides whether a family\nis billed.",
+        "properties": {
+          "confirmed": {
+            "title": "Confirmed",
+            "type": "boolean"
+          },
+          "registration": {
+            "$ref": "#/components/schemas/EventRegistrationOut"
+          }
+        },
+        "required": [
+          "registration",
+          "confirmed"
+        ],
+        "title": "RegistrationAnswerOut",
+        "type": "object"
+      },
       "RegistrationDecisionIn": {
         "description": "`POST /registration-requests/{id}/{approve|reject}`.\n\n§5.4: **enrollment is always a manager decision.** Approving is where the group is\nchosen, which is why `group_id` lives on the decision and not on the submission — the\npublic link's only job is a first lesson.",
         "properties": {
@@ -4374,6 +5836,30 @@
         "title": "RegistrationRequestOut",
         "type": "object"
       },
+      "ReorderLadderIn": {
+        "description": "The finished order, whole.\n\nA partial list would leave the omitted ranks at indices the named ones are about to\ntake, and a pairwise swap through `uq_belt_rank_class_order` has to pass through a\ncolliding intermediate state. `5b` reorders by drag; the API takes the result either\nway.",
+        "properties": {
+          "class_id": {
+            "format": "uuid",
+            "title": "Class Id",
+            "type": "string"
+          },
+          "ordered_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Ordered Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "class_id",
+          "ordered_ids"
+        ],
+        "title": "ReorderLadderIn",
+        "type": "object"
+      },
       "RosterEntry": {
         "description": "One student on a coach's roster. **The W3 seam** (plan §1.3 seam 4).\n\n`health_status` and `derived_flags` are M4's to populate and M5's to render. They are\non this shape rather than fetched separately because the roster must render **offline**\n(§6.1) — a badge that needs a second request is a badge that is blank in a basement,\nwhich is the one place §5.5's warning actually matters.\n\n§5.5's gate is a **hard block in the parent app only**. Nothing on the mat is ever\nblocked: this shape carries the ⚠ and the coach can still mark the student present.\nThere is deliberately no `blocked` field, because there is deliberately no\n`block_attendance_without_health` setting.",
         "properties": {
@@ -4475,6 +5961,30 @@
           "display_name"
         ],
         "title": "RosterEntry",
+        "type": "object"
+      },
+      "RsvpAnswerIn": {
+        "description": "`RsvpIn` from the contract carries only the answer; a route needs to know which\nchild it is about. Composed here rather than by widening the contract shape -- a family\nwith two children on one competition answers twice, and `RsvpIn` is what `7d`'s two\nbuttons post for one of them.\n\n`pending` is not accepted, exactly as the contract's own shape refuses it: it is the\nABSENCE of an answer, and letting a caller send it would make \"un-answer\" a supported\naction the office would then have to interpret.",
+        "properties": {
+          "rsvp": {
+            "enum": [
+              "yes",
+              "no"
+            ],
+            "title": "Rsvp",
+            "type": "string"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "student_id",
+          "rsvp"
+        ],
+        "title": "RsvpAnswerIn",
         "type": "object"
       },
       "ScheduleImpactPreview": {
@@ -4703,6 +6213,25 @@
           "group_id"
         ],
         "title": "ScheduleRulesOut",
+        "type": "object"
+      },
+      "SeedLadderIn": {
+        "properties": {
+          "class_id": {
+            "format": "uuid",
+            "title": "Class Id",
+            "type": "string"
+          },
+          "preset_key": {
+            "title": "Preset Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "class_id",
+          "preset_key"
+        ],
+        "title": "SeedLadderIn",
         "type": "object"
       },
       "SessionCancelIn": {
@@ -5382,6 +6911,145 @@
           "status"
         ],
         "title": "StaffMemberOut",
+        "type": "object"
+      },
+      "StudentBeltIn": {
+        "properties": {
+          "awarded_on": {
+            "format": "date",
+            "title": "Awarded On",
+            "type": "string"
+          },
+          "belt_rank_id": {
+            "format": "uuid",
+            "title": "Belt Rank Id",
+            "type": "string"
+          },
+          "event_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Id"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "required": [
+          "belt_rank_id",
+          "awarded_on"
+        ],
+        "title": "StudentBeltIn",
+        "type": "object"
+      },
+      "StudentBeltOut": {
+        "description": "One award. §5.13 keeps the whole history rather than a current-belt pointer alone,\nbecause `12d` התקדמות חגורה is a timeline and \"when did she get her orange belt\" is the\nquestion parents actually ask.\n\n`event_id` is nullable: a belt awarded in class rather than at a graded exam is normal,\nand requiring an event would make managers create fake ones.",
+        "properties": {
+          "awarded_by_person_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Awarded By Person Id"
+          },
+          "awarded_on": {
+            "format": "date",
+            "title": "Awarded On",
+            "type": "string"
+          },
+          "belt_rank_id": {
+            "format": "uuid",
+            "title": "Belt Rank Id",
+            "type": "string"
+          },
+          "belt_rank_name": {
+            "title": "Belt Rank Name",
+            "type": "string"
+          },
+          "color_hex": {
+            "pattern": "^#[0-9a-fA-F]{6}$",
+            "title": "Color Hex",
+            "type": "string"
+          },
+          "event_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Id"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "secondary_color_hex": {
+            "anyOf": [
+              {
+                "pattern": "^#[0-9a-fA-F]{6}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Secondary Color Hex"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "student_id",
+          "belt_rank_id",
+          "belt_rank_name",
+          "color_hex",
+          "secondary_color_hex",
+          "awarded_on",
+          "awarded_by_person_id",
+          "event_id",
+          "note"
+        ],
+        "title": "StudentBeltOut",
         "type": "object"
       },
       "StudentConvertIn": {
@@ -7916,6 +9584,353 @@
         ]
       }
     },
+    "/api/v1/belt-presets": {
+      "get": {
+        "description": "§5.9's seeded sets, as data.\n\nNo session and no tenancy: a preset is versioned application data, the same shape as\n`app/services/demo/fixtures.py`, and identical for every studio. That is what makes a\nclub seeded in September and one seeded in March comparable.",
+        "operationId": "list_belt_presets_api_v1_belt_presets_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CursorPage_BeltPresetOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Belt Presets",
+        "tags": [
+          "belts"
+        ]
+      }
+    },
+    "/api/v1/belt-ranks": {
+      "get": {
+        "description": "`5b`'s table, and the ladder every progression screen reads.\n\n`class_id` is required rather than optional: `events.belt.perClassHint` says the system\nis defined per class, and a studio-wide list of two disciplines' ranks interleaved by\n`order_index` would be meaningless.",
+        "operationId": "list_belt_ranks_api_v1_belt_ranks_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "class_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Class Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "After"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CursorPage_LadderRankOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Belt Ranks",
+        "tags": [
+          "belts"
+        ]
+      },
+      "post": {
+        "operationId": "create_belt_rank_api_v1_belt_ranks_post",
+        "parameters": [
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BeltRankIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LadderRankOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Belt Rank",
+        "tags": [
+          "belts"
+        ]
+      }
+    },
+    "/api/v1/belt-ranks/reorder": {
+      "post": {
+        "operationId": "reorder_belt_ranks_api_v1_belt_ranks_reorder_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReorderLadderIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CursorPage_LadderRankOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reorder Belt Ranks",
+        "tags": [
+          "belts"
+        ]
+      }
+    },
+    "/api/v1/belt-ranks/seed": {
+      "post": {
+        "description": "`5d`'s wizard step and `5b`'s `events.belt.seedDefault` button, one route.\n\n409 on a class that already has a ladder, rather than a merge: a second seed renumbers\nranks that `student_belt` rows point at, rewriting a child's history without touching\ntheir row.",
+        "operationId": "seed_belt_ranks_api_v1_belt_ranks_seed_post",
+        "parameters": [
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SeedLadderIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CursorPage_LadderRankOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Seed Belt Ranks",
+        "tags": [
+          "belts"
+        ]
+      }
+    },
+    "/api/v1/belt-ranks/{rank_id}": {
+      "delete": {
+        "description": "409 when students hold it. `events.belt.deleteHeld` is the message, and `5b`'s row\nalready shows the count the refusal is about.",
+        "operationId": "delete_belt_rank_api_v1_belt_ranks__rank_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rank_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Rank Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Belt Rank",
+        "tags": [
+          "belts"
+        ]
+      },
+      "patch": {
+        "operationId": "update_belt_rank_api_v1_belt_ranks__rank_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rank_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Rank Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BeltRankIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LadderRankOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Belt Rank",
+        "tags": [
+          "belts"
+        ]
+      }
+    },
     "/api/v1/billing-runs": {
       "get": {
         "operationId": "list_billing_runs_api_v1_billing_runs_get",
@@ -9045,6 +11060,813 @@
         ]
       }
     },
+    "/api/v1/events": {
+      "get": {
+        "description": "`7a`'s roundup and `9i`'s staff list.\n\nDrafts are included. §4.3 hides them from *guardians*, not from staff -- a draft is the\nmanager's own work in progress, and `7a` draws one.",
+        "operationId": "list_events_api_v1_events_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "enum": [
+                      "competition",
+                      "belt_exam",
+                      "seminar",
+                      "joint_training",
+                      "trip",
+                      "other"
+                    ],
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Type"
+            }
+          },
+          {
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "After"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CursorPage_EventOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Events",
+        "tags": [
+          "events"
+        ]
+      },
+      "post": {
+        "description": "201, and the event is a **draft**.\n\n§4.3 keeps it invisible to guardians until published, which is what lets a manager\nbuild one over several sittings. `EventCreateIn`'s two validators have already refused\nconsent-without-text and an end before a start, as ordinary 422s the form can mark --\nthe CHECK constraints behind them are the backstop, not the gate.",
+        "operationId": "create_event_api_v1_events_post",
+        "parameters": [
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EventCreateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Event",
+        "tags": [
+          "events"
+        ]
+      }
+    },
+    "/api/v1/events/{event_id}": {
+      "get": {
+        "operationId": "read_event_api_v1_events__event_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "event_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Event Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Event",
+        "tags": [
+          "events"
+        ]
+      },
+      "patch": {
+        "description": "409 and not 403 on a published event: the caller may edit events, and this event is\npast the point where an edit is an edit. §5.8 notifies on publish and on cancel, so a\nPATCH that moved a published date silently would send the club a surprise.",
+        "operationId": "update_event_api_v1_events__event_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "event_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Event Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EventUpdateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Event",
+        "tags": [
+          "events"
+        ]
+      }
+    },
+    "/api/v1/events/{event_id}.ics": {
+      "get": {
+        "description": "§5.8's הוסף ליומן.\n\nA draft 404s -- §4.3 keeps it invisible to guardians, and a resolvable link would be\nthat invisibility leaking through a file extension.",
+        "operationId": "event_calendar_file_api_v1_events__event_id__ics_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "event_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Event Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/calendar": {},
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Event Calendar File",
+        "tags": [
+          "events"
+        ]
+      }
+    },
+    "/api/v1/events/{event_id}/attendance": {
+      "post": {
+        "description": "§5.8 -- \"attendance is taken on an event with the same UI as a session\". §3.2 gives\nevery staff role \"Take/edit attendance\", including an assistant coach.",
+        "operationId": "record_event_attendance_api_v1_events__event_id__attendance_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "event_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Event Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EventAttendanceIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventAttendanceOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Record Event Attendance",
+        "tags": [
+          "events"
+        ]
+      }
+    },
+    "/api/v1/events/{event_id}/cancel": {
+      "post": {
+        "description": "The roster survives. §5.8 notifies on a cancellation and the office phones whoever\nanswered -- deleting the registrations would delete the list the call is made from.",
+        "operationId": "cancel_event_api_v1_events__event_id__cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "event_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Event Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cancel Event",
+        "tags": [
+          "events"
+        ]
+      }
+    },
+    "/api/v1/events/{event_id}/consent": {
+      "post": {
+        "description": "§5.8's signed parent consent, and the other half of the gate.\n\nWhichever of this and the RSVP completes the pair is the one that raises the fee, so\nboth routes end in the same service call and the charge is idempotent on\n`registration.charge_id`.",
+        "operationId": "sign_event_consent_api_v1_events__event_id__consent_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "event_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Event Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EventConsentIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationAnswerOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Sign Event Consent",
+        "tags": [
+          "events"
+        ]
+      }
+    },
+    "/api/v1/events/{event_id}/eligibility": {
+      "get": {
+        "description": "`4d`'s table and `6b`'s counters, over the event's own roster.\n\nThe whole roster rather than a page: `4d` pre-selects the eligible rows and promotes\neveryone ticked, so a truncated list would silently exclude candidates from a bulk\naction whose button names a count.",
+        "operationId": "event_eligibility_api_v1_events__event_id__eligibility_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "event_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Event Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CursorPage_CandidateOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Event Eligibility",
+        "tags": [
+          "events"
+        ]
+      }
+    },
+    "/api/v1/events/{event_id}/exam-results": {
+      "post": {
+        "description": "§5.9 step 3 -- the result, the belt row and the cache, in one transaction.\n\n**The commit is here and nowhere inside the service**, which is what makes the batch\natomic: a failure on the fourth candidate leaves the first three unwritten rather than\npromoted, so a coach never has to work out which half of a save landed.",
+        "operationId": "record_exam_results_api_v1_events__event_id__exam_results_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "event_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Event Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExamResultsIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CursorPage_EventExamResultOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Record Exam Results",
+        "tags": [
+          "events"
+        ]
+      }
+    },
+    "/api/v1/events/{event_id}/publish": {
+      "post": {
+        "description": "§5.8 -- every targeted student gets a registration at `rsvp='pending'`.\n\n**Nothing is sent.** Publishing makes the event visible to guardians; an invitation is\na notification, and `NotificationService` is M8's (W5). Four artboards draw\n\"published, invitations not sent\" as its own state and no column holds it.",
+        "operationId": "publish_event_api_v1_events__event_id__publish_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "event_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Event Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventPublishedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Publish Event",
+        "tags": [
+          "events"
+        ]
+      }
+    },
+    "/api/v1/events/{event_id}/registrations": {
+      "get": {
+        "description": "`7c`'s participants table, and `9d`'s candidate list.\n\nD9.2 -- six columns and none of them is a weight or a category. `charge_id` is\nredacted for a coach: §3.2's hard rule reaches the roster too.",
+        "operationId": "list_registrations_api_v1_events__event_id__registrations_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "event_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Event Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "After"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CursorPage_EventRegistrationOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Registrations",
+        "tags": [
+          "events"
+        ]
+      }
+    },
+    "/api/v1/events/{event_id}/rsvp": {
+      "post": {
+        "description": "§5.8's מגיע / לא מגיע. Artboards `7d` and `12h`.\n\n**No role dependency**: this is the guardian's route, and §3.2 resolves a guardian\nper-record rather than by grant. The check is \"is this caller a guardian of this\nstudent\", which `RsvpService.assert_guardian_of` answers.\n\nA `yes` is recorded whether or not the consent is signed. §5.8 gates *confirmation*,\nnot the answer -- refusing the write would lose the fact that the parent said yes, and\n`confirmed` in the response is what the screen renders.",
+        "operationId": "answer_rsvp_api_v1_events__event_id__rsvp_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "event_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Event Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RsvpAnswerIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationAnswerOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Answer Rsvp",
+        "tags": [
+          "events"
+        ]
+      }
+    },
     "/api/v1/groups": {
       "get": {
         "operationId": "list_groups_api_v1_groups_get",
@@ -9851,6 +12673,69 @@
         "summary": "Create Location",
         "tags": [
           "structure"
+        ]
+      }
+    },
+    "/api/v1/me/events": {
+      "get": {
+        "description": "`12h` -- the parent's own list, one row per child per event.\n\n**Drafts never appear.** §4.3 makes a draft invisible to guardians, and that is the\nwhole reason drafts exist: a manager builds an event over several sittings without a\nhalf-written one reaching the club. Filtered server-side rather than trusted to the\nscreen.",
+        "operationId": "my_events_api_v1_me_events_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "After"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CursorPage_ParentEventOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "My Events",
+        "tags": [
+          "events"
         ]
       }
     },
@@ -12960,6 +15845,121 @@
         "tags": [
           "coach",
           "attendance"
+        ]
+      }
+    },
+    "/api/v1/students/{student_id}/belts": {
+      "get": {
+        "description": "`12d`'s timeline, oldest first.\n\nThe whole history rather than a page of it: `12d` renders a progression strip over the\nclass's ladder, and a truncated history would draw a child as having skipped the grades\nthat fell off the end. The largest preset is twelve rungs.",
+        "operationId": "list_student_belts_api_v1_students__student_id__belts_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CursorPage_StudentBeltOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Student Belts",
+        "tags": [
+          "belts"
+        ]
+      },
+      "post": {
+        "description": "§5.9's award outside an exam -- `events.belt.awardOutsideExam`.\n\nA coach awarding a stripe at the end of a session is a real thing in a children's club,\nand requiring an event would make managers invent fake ones. The history row and\n`student.current_belt_id` move together.",
+        "operationId": "award_student_belt_api_v1_students__student_id__belts_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StudentBeltIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentBeltOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Award Student Belt",
+        "tags": [
+          "belts"
         ]
       }
     },

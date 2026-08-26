@@ -36,6 +36,7 @@ import {
   makeDashboardPeopleClient,
   registerPeopleAlerts,
 } from './features/people'
+import { EventsScreen, makeDashboardEventsClient } from './features/events'
 
 registerM1WizardSteps(apiFetch)
 // Seam 4 — `6c` composes sections from four milestones. This lane registers the three it
@@ -48,6 +49,7 @@ const NAV = [
   { key: 'closures', labelKey: 'schedule.closure.title', href: '#/closures' },
   { key: 'students', labelKey: 'people.student.plural', href: '#/students' },
   { key: 'alerts', labelKey: 'people.alerts.title', href: '#/alerts' },
+  { key: 'events', labelKey: 'events.title', href: '#/events' },
   { key: 'staff', labelKey: 'common.dash.nav.staff', href: '#/staff' },
   { key: 'settings', labelKey: 'common.dash.nav.settings', href: '#/settings' },
   { key: 'setup', labelKey: 'common.dash.nav.setup', href: '#/setup' },
@@ -55,6 +57,7 @@ const NAV = [
 
 export type DashboardRoute =
   | 'home'
+  | 'events'
   | 'staff'
   | 'settings'
   | 'setup'
@@ -74,7 +77,15 @@ export function routeFromHash(hash: string): DashboardRoute {
   if (name === 'schedule' || name === 'closures' || name.startsWith('groups')) return 'schedule'
   if (name.startsWith('students')) return 'students'
   if (name === 'alerts') return 'alerts'
+  // Lane EVENTS' family: `#/events`, `#/events/<id>` and `#/events/new`, decided in
+  // features/events/. Same shape as lane SCHEDULE's three hashes above.
+  if (name.startsWith('events')) return 'events'
   return name === 'staff' || name === 'settings' || name === 'setup' ? name : 'home'
+}
+
+/** `#/events/<id>` → 7c; `#/events/new` → 7b; bare `#/events` → 7a's roundup. */
+export function eventRouteFrom(hash: string): string {
+  return hash.replace(/^#\/?events\/?/, '')
 }
 
 /** `#/students/<id>` → the card; `#/students/new` → 3c; bare `#/students` → the table. */
@@ -99,12 +110,27 @@ export default function App() {
   const session = useSession()
   const { route, hash } = useHashRoute()
   const studentRoute = studentRouteFrom(hash)
+  const eventRoute = eventRouteFrom(hash)
   const [locale, setLocale] = useState<Locale>('he')
+  // §3.2's hard rule, on the screen's side — and ONLY on the screen's side. The API has
+  // already redacted `fee_agorot` to null for a coach, so this cannot leak a price even if
+  // it were wrong. What it decides is narrower: whether an ABSENT fee may be rendered as
+  // "free". A redacted price and a genuinely free event are indistinguishable on the wire,
+  // and calling the first one free is worse than saying nothing.
+  //
+  // Read off the ACTIVE studio's membership: §19.4's persona switcher moves the active
+  // studio without a reload, and a role taken from the first membership in the list would
+  // then be somebody else's.
+  const canSeeMoney =
+    session.studios
+      .find((membership) => membership.studio_id === session.activeStudioId)
+      ?.roles.some((role) => role === 'owner' || role === 'manager') ?? false
   // Memoised: SetupWizard reads through this in an effect keyed on the client, so a fresh
   // object every render would re-fetch progress forever.
   const setupClient = useMemo(() => makeSetupClient(apiFetch), [])
   const scheduleClient = useMemo(() => makeScheduleClient(apiFetch), [])
   const peopleClient = useMemo(() => makeDashboardPeopleClient(apiFetch), [])
+  const eventsClient = useMemo(() => makeDashboardEventsClient(apiFetch), [])
   // Stable for as long as the studio's day is. `new Date().toISOString()` in this
   // render body was a new value every render, and downstream that is an effect
   // dependency worth `1 + 3N` requests.
@@ -179,6 +205,17 @@ export default function App() {
           ) : null}
           {route === 'alerts' ? (
             <AlertCentre locale={locale} client={peopleClient} />
+          ) : null}
+          {route === 'events' && !eventRoute ? (
+            <EventsScreen
+              client={eventsClient}
+              locale={locale}
+              now={today}
+              onOpen={(id) => {
+                globalThis.location.hash = `#/events/${id}`
+              }}
+              seesMoney={canSeeMoney}
+            />
           ) : null}
           {route === 'staff' ? <StaffScreen locale={locale} /> : null}
           {route === 'settings' ? <SettingsScreen locale={locale} /> : null}

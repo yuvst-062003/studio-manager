@@ -165,6 +165,7 @@ export const events: Bundle = {
   'belt.groupPromoteHint': 'קידום כל המועמדים שעברו, בפעולה אחת',
 
   // -- 7a / 9i / 12h — list chrome the audits found missing ------------------------
+  'list.loading': 'טוען…',
   'list.subtitle': 'אירועים חד-פעמיים — לא חלק מהלו״ז השבועי',
   'list.filterAll': 'הכל',
   'list.needsAttention': 'דורשים תשומת לב',
