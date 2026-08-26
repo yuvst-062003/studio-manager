@@ -35,7 +35,14 @@ from sqlalchemy import select
 from app.core.auth_context import AnyStaff, ManagerOrOwner
 from app.core.clock import now
 from app.core.tenancy import TenantSessionDep, require_current_studio_id
-from app.models.billing import BillingRun, Charge, PricePlan, Product
+from app.models.billing import (
+    BillingRun,
+    Charge,
+    PricePlan,
+    Product,
+    RecurringSubscription,
+    UpayIpnRecord,
+)
 from app.models.studio import Studio
 from app.schemas._pagination import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, IdempotencyKey
 from app.schemas.billing import (
@@ -44,17 +51,23 @@ from app.schemas.billing import (
     ChargeAdjustmentIn,
     ChargeOut,
     ChargePage,
+    IpnMatchIn,
     ManualChargeIn,
     PayerBalanceOut,
     PricePlanOut,
     PricePlanPage,
     ProductOut,
     ProductPage,
+    RecurringSubscriptionOut,
+    RecurringSubscriptionPage,
+    UpayIpnRecordOut,
+    UpayIpnRecordPage,
 )
 from app.services.audit import AuditService
 from app.services.billing import BillingService
 from app.services.billing.catalogue import CatalogueService
 from app.services.billing.errors import ConflictError, NotFoundError, RefusedError
+from app.services.billing.reconciliation import ReconciliationService
 from app.services.billing.run import BillingRunService
 
 router = APIRouter(tags=["billing"])
@@ -689,3 +702,260 @@ def update_billing_settings(
     studio.settings = settings_column
     session.commit()
     return BillingSettingsOut(**billing)
+
+
+# -- §5.10's הוראת קבע reconciliation ------------------------------------------
+class SubscriptionIn(BaseModel):
+    """**The manager's record of who is on the link. Not a mandate.**
+
+    G8: uPay cannot create a per-payer mandate, cannot vary its amount per payer, and its
+    recurring callbacks carry no customer identifier -- so there is no external reference,
+    no token and no provider id here, because there is nothing to store. `app/schemas/
+    billing.py` deliberately has no `RecurringSubscriptionIn` and
+    `tests/contracts/test_w4_schemas.py` asserts that; this is the *route's* input shape and
+    lives here, in this lane's own file.
+
+    **The parent never sets this.** It is manager-or-owner like everything else here.
+    """
+
+    payer_person_id: uuid.UUID
+    amount_agorot: int = Field(gt=0)
+    start_date: date
+
+
+class MatchSuggestionOut(BaseModel):
+    """One unmatched payment and the payer a fingerprint suggests.
+
+    `confidence` is **advisory** (§5.10 step 5). Nothing acts on a threshold: it is a number
+    a manager reads before tapping, never a gate anything passes.
+    """
+
+    ipn_id: uuid.UUID
+    payer_person_id: uuid.UUID
+    confidence: int
+    amount_agorot: int | None
+    card_owner_name: str | None
+    four_digits: str | None
+
+
+class MatchSuggestionsOut(BaseModel):
+    items: list[MatchSuggestionOut]
+    #: §5.10 step 5 on the screen. `billing.reconciliation.neverAuto` says the same in Hebrew.
+    never_auto: bool = True
+
+
+def _ipn_out(record: UpayIpnRecord) -> UpayIpnRecordOut:
+    """§11.7: the card owner name and last four are DATA here, on a manager-only screen,
+    which is where reconciling an unmatched הוראת קבע payment actually happens. They are
+    forbidden in *logs*, not in the one view that cannot work without them.
+
+    `amount` is the string uPay sent and `amount_agorot` is our parse of it, side by side --
+    a manager seeing both is the only way an amount mismatch is legible.
+    """
+    return UpayIpnRecordOut(
+        id=record.id,
+        received_at=record.received_at,
+        transactionid=record.transactionid,
+        order_public_ref=record.order_public_ref,
+        amount=record.amount,
+        amount_agorot=_parsed_agorot(record.amount),
+        card_owner_name=record.card_owner_name,
+        four_digits=record.four_digits,
+        payment_date=record.payment_date,
+        matched_payment_id=record.matched_payment_id,
+        match_status=record.match_status,
+        source_ip=record.source_ip,
+    )
+
+
+def _parsed_agorot(text: str) -> int | None:
+    from app.integrations.upay.ipn import UnparsableIpnAmountError, agorot_from_ipn_amount
+
+    try:
+        return agorot_from_ipn_amount(text)
+    except UnparsableIpnAmountError:
+        # Shown as null beside the raw string, which is exactly the case a manager needs to
+        # see: an amount we could not read is not an amount we should invent.
+        return None
+
+
+@router.get("/reconciliation/unmatched", response_model=UpayIpnRecordPage)
+def list_unmatched(
+    _: ManagerOrOwner,
+    session: TenantSessionDep,
+    after: uuid.UUID | None = None,
+    limit: int = Query(default=DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
+) -> UpayIpnRecordPage:
+    """`3e`'s reconciliation queue, left column: payments waiting for a human."""
+    rows, next_cursor = ReconciliationService(session).unmatched(
+        require_current_studio_id(), after=after, limit=limit
+    )
+    return UpayIpnRecordPage(
+        items=[_ipn_out(row) for row in rows],
+        next_cursor=next_cursor,
+        has_more=next_cursor is not None,
+    )
+
+
+@router.get("/reconciliation/suggestions", response_model=MatchSuggestionsOut)
+def list_suggestions(_: ManagerOrOwner, session: TenantSessionDep) -> MatchSuggestionsOut:
+    """§5.10 step 4. **A read with no side effect** -- computing a suggestion twice must
+    leave the ledger exactly where it was, because the manager's tap is the only thing that
+    moves money."""
+    rows = ReconciliationService(session).suggestions(require_current_studio_id())
+    return MatchSuggestionsOut(
+        items=[
+            MatchSuggestionOut(
+                ipn_id=row.ipn_id,
+                payer_person_id=row.payer_person_id,
+                confidence=row.confidence,
+                amount_agorot=row.amount_agorot,
+                card_owner_name=row.card_owner_name,
+                four_digits=row.four_digits,
+            )
+            for row in rows
+        ]
+    )
+
+
+@router.post("/reconciliation/match", response_model=UpayIpnRecordOut)
+def confirm_match(
+    _: ManagerOrOwner,
+    body: IpnMatchIn,
+    request: Request,
+    session: TenantSessionDep,
+    ipn_id: uuid.UUID,
+    payer_person_id: uuid.UUID | None = None,
+    idempotency_key: IdempotencyKey = None,
+) -> UpayIpnRecordOut:
+    """§5.10 step 3 and step 5.
+
+    `IpnMatchIn.match_status` is `Literal["manual", "ignored"]` -- **there is no `auto` a
+    client can send**, and that is the schema saying step 5 out loud: a match is a human's
+    decision or it is nothing.
+
+    **`ipn_id` and `payer_person_id` are query parameters, and `IpnMatchIn.payment_id` is
+    left for what it says.** The contract shape carries `payment_id` -- an existing
+    *payment* to link this callback to, for the case where a manager already recorded the
+    money by hand and now wants the evidence attached. §5.10 step 3's flow is the other one:
+    the system *creates* the payment, so what it needs is a payer, not a payment. Reusing
+    `payment_id` to carry a person id would have been a field lying about its own name in
+    the one place a wrong id sends the wrong parent a debt reminder.
+
+    `confirmed_by_person_id` comes from the request context, never the body. A client that
+    could name the confirmer could attribute someone else's decision, and the row that is
+    supposed to prove a human decided would prove the wrong human.
+    """
+    service = ReconciliationService(session)
+    studio_id = require_current_studio_id()
+    try:
+        if body.match_status == "ignored":
+            record = service.ignore(ipn_id)
+        else:
+            if payer_person_id is None:
+                raise RefusedError(
+                    "a manual match needs the payer it belongs to -- §5.10 step 3 creates "
+                    "the payment, so there is nobody to create it for without one"
+                )
+            service.confirm_match(
+                ipn_id,
+                payer_person_id=payer_person_id,
+                confirmed_by_person_id=_actor(request),
+                at=now(),
+            )
+            record = service.get_record(ipn_id)
+    except NotFoundError as exc:
+        raise _not_found("ipn record") from exc
+    except ConflictError as exc:
+        raise _conflict(exc) from exc
+    except RefusedError as exc:
+        raise _refused(exc) from exc
+    AuditService.record(
+        session,
+        action=f"reconciliation.{body.match_status}",
+        entity_type="upay_ipn_record",
+        entity_id=ipn_id,
+        studio_id=studio_id,
+        actor_person_id=_actor(request),
+        # §11.7 -- ids and the decision. Never the card owner name or the last four.
+        diff={"match_status": body.match_status},
+    )
+    session.commit()
+    return _ipn_out(record)
+
+
+@router.get("/recurring-subscriptions", response_model=RecurringSubscriptionPage)
+def list_subscriptions(
+    _: ManagerOrOwner,
+    session: TenantSessionDep,
+    after: uuid.UUID | None = None,
+    limit: int = Query(default=DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
+) -> RecurringSubscriptionPage:
+    rows, next_cursor = ReconciliationService(session).list_subscriptions(
+        require_current_studio_id(), after=after, limit=limit
+    )
+    return RecurringSubscriptionPage(
+        items=[_subscription_out(row) for row in rows],
+        next_cursor=next_cursor,
+        has_more=next_cursor is not None,
+    )
+
+
+@router.post(
+    "/recurring-subscriptions",
+    response_model=RecurringSubscriptionOut,
+    status_code=status.HTTP_201_CREATED,
+)
+def record_subscription(
+    _: ManagerOrOwner,
+    body: SubscriptionIn,
+    session: TenantSessionDep,
+    idempotency_key: IdempotencyKey = None,
+) -> RecurringSubscriptionOut:
+    """G8 -- a record of a mandate that exists at the provider, not one we can create."""
+    try:
+        row = ReconciliationService(session).record_subscription(
+            require_current_studio_id(),
+            payer_person_id=body.payer_person_id,
+            amount_agorot=body.amount_agorot,
+            start_date=body.start_date,
+        )
+    except ConflictError as exc:
+        raise _conflict(exc) from exc
+    except RefusedError as exc:
+        raise _refused(exc) from exc
+    session.commit()
+    return _subscription_out(row)
+
+
+@router.post(
+    "/recurring-subscriptions/{subscription_id}/cancel",
+    response_model=RecurringSubscriptionOut,
+)
+def cancel_subscription(
+    _: ManagerOrOwner,
+    subscription_id: uuid.UUID,
+    session: TenantSessionDep,
+    idempotency_key: IdempotencyKey = None,
+) -> RecurringSubscriptionOut:
+    """The family stopped. The row stays as history -- it is what explains why last March's
+    reconciliation expected them."""
+    try:
+        row = ReconciliationService(session).cancel_subscription(subscription_id, at=now())
+    except NotFoundError as exc:
+        raise _not_found("subscription") from exc
+    except ConflictError as exc:
+        raise _conflict(exc) from exc
+    session.commit()
+    return _subscription_out(row)
+
+
+def _subscription_out(row: RecurringSubscription) -> RecurringSubscriptionOut:
+    return RecurringSubscriptionOut(
+        id=row.id,
+        payer_person_id=row.payer_person_id,
+        amount_agorot=row.amount_agorot,
+        start_date=row.start_date,
+        status=row.status,
+        cancelled_at=row.cancelled_at,
+    )

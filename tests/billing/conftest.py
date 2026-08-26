@@ -36,7 +36,7 @@ from datetime import UTC, date, datetime, time
 import pytest
 from app.core.db import get_engine
 from app.core.tenancy import TenantSession, use_studio
-from app.models.billing import Charge, PricePlan
+from app.models.billing import Charge, PricePlan, UpayIpnRecord
 from app.models.identity import AuthIdentity
 from app.models.people import Student
 from app.models.person import Guardian, Person, RoleAssignment
@@ -931,3 +931,64 @@ def an_order(app_session: Session, studio: Studio, a_priced_student: PricedStude
         scoped.refresh(order)
         scoped.expunge(order)
     return OrderedCharges(order=order, charge_ids=charge_ids)
+
+
+def _shared_link_ipn(studio_id: uuid.UUID, *, suffix: str, amount: str = "250"):
+    """One הוראת קבע callback: no order reference, a card, an amount.
+
+    §5.10 step 1 -- 'All IPNs from the shared recurring link arrive with no `public_ref` and
+    land in `upay_ipn_record` with `match_status = 'unmatched'`.' The card owner name and
+    last four are the ONLY identifying data uPay provides, which is why the fingerprint is
+    built from them and why a human still has to confirm.
+    """
+    from app.integrations.upay.ipn import DEMO_CARD_OWNER, DEMO_FOUR_DIGITS
+
+    return UpayIpnRecord(
+        studio_id=studio_id,
+        received_at=T0,
+        source_ip="84.95.87.35",
+        raw_query=f"amount={amount}&transactionid=SO-{suffix}&productdescription=",
+        order_public_ref=None,
+        # Unique per studio: the index on this column is GLOBAL, so a literal would collide
+        # with every other test's row and with every previous run's.
+        transactionid=f"SO-{studio_id.hex[:12]}-{suffix}",
+        amount=amount,
+        card_owner_name=DEMO_CARD_OWNER,
+        four_digits=DEMO_FOUR_DIGITS,
+        payment_date=date(2026, 11, 3),
+        match_status="unmatched",
+    )
+
+
+@pytest.fixture
+def an_unmatched_ipn(app_session: Session, studio: Studio) -> UpayIpnRecord:
+    """One recurring payment waiting for a human to say whose it is."""
+    row = _shared_link_ipn(studio.id, suffix="1")
+    app_session.add(row)
+    app_session.commit()
+    return row
+
+
+@pytest.fixture
+def two_unmatched_ipns(app_session: Session, studio: Studio) -> tuple[UpayIpnRecord, ...]:
+    """The SAME card, two months. This is the pair §5.10 step 4 is about: confirming the
+    first teaches the fingerprint, and the second then arrives as a one-tap suggestion."""
+    rows = [_shared_link_ipn(studio.id, suffix="1"), _shared_link_ipn(studio.id, suffix="2")]
+    app_session.add_all(rows)
+    app_session.commit()
+    return tuple(rows)
+
+
+@pytest.fixture
+def a_confirming_manager(app_session: Session, studio: Studio) -> uuid.UUID:
+    """A real `person` row to be `confirmed_by_person_id`.
+
+    Not a random UUID: `fk_payment_recorded_by_person_id_person` refuses one, correctly --
+    §5.10 step 5's 'a human always confirms' is only worth anything if the human named is
+    somebody the database can actually resolve. A test that forged the id would be asserting
+    the rule against a value the product cannot produce.
+    """
+    row = Person(studio_id=studio.id, first_name="מנהלת", last_name="מאשרת")
+    app_session.add(row)
+    app_session.commit()
+    return row.id
