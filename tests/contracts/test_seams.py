@@ -242,15 +242,29 @@ def test_recompute_charge_status_takes_a_charge_and_returns_nothing():
     assert signature["return"] == repr(None)
 
 
-def test_the_billing_seams_refuse_rather_than_returning_nothing():
+def test_the_billing_seams_are_reached_through_a_session_bound_service():
+    """How M7 actually calls the seam: `BillingService(session).create_charge(...)`.
+
+    Neither seam signature has room for a database session -- W4's contract commit fixed
+    both before either worktree existed -- so M6 put the session on the constructor rather
+    than widening a method and breaking the contract. That constructor is now part of what
+    M7 builds against, which is why it is asserted here beside the methods it serves.
+
+    **This replaces an assertion that both bodies raised `NotImplementedError`.** That was
+    the right test while they were stubs: a `create_charge` that returned a detached
+    `Charge` would have let M7 build an event-fee flow that passed its own tests and
+    settled nothing. Now that lane MONEY has filled them in, the behaviour is owned by
+    `tests/billing/test_charges.py`, and asserting it here too would give two files an
+    opinion about one rule. The same move lane SCHEDULE made for
+    `ScheduleService.materialize_sessions`, three tests above.
+
+    The signature assertions above are untouched -- those are the seam.
+    """
     from app.services.billing import BillingService
 
-    with pytest.raises(NotImplementedError):
-        BillingService().create_charge(
-            uuid.uuid4(), uuid.uuid4(), "tuition", 32000, date(2026, 9, 1)
-        )
-    with pytest.raises(NotImplementedError):
-        BillingService().recompute_charge_status(uuid.uuid4())
+    parameters = _signature(BillingService.__init__).parameters
+    assert list(parameters) == ["self", "session"]
+    assert parameters["session"].annotation is OrmSession
 
 
 # -- W5: NotificationService.enqueue ------------------------------------------

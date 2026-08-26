@@ -363,6 +363,166 @@
         "title": "BatchResult",
         "type": "object"
       },
+      "BillingRunIn": {
+        "description": "§7's `POST /billing-runs`, and the endpoint the dev bar's runJob tool triggers.\n\nA period, not a date range: §5.10 bills calendar months and `charge`'s idempotency key\nis `(student_id, period_year, period_month, kind)`.",
+        "properties": {
+          "period_month": {
+            "maximum": 12.0,
+            "minimum": 1.0,
+            "title": "Period Month",
+            "type": "integer"
+          },
+          "period_year": {
+            "maximum": 2100.0,
+            "minimum": 2020.0,
+            "title": "Period Year",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "period_year",
+          "period_month"
+        ],
+        "title": "BillingRunIn",
+        "type": "object"
+      },
+      "BillingRunOut": {
+        "properties": {
+          "charges_created": {
+            "title": "Charges Created",
+            "type": "integer"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "period_month": {
+            "maximum": 12.0,
+            "minimum": 1.0,
+            "title": "Period Month",
+            "type": "integer"
+          },
+          "period_year": {
+            "title": "Period Year",
+            "type": "integer"
+          },
+          "started_at": {
+            "format": "date-time",
+            "title": "Started At",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "running",
+              "completed",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "period_year",
+          "period_month",
+          "started_at",
+          "finished_at",
+          "charges_created",
+          "status"
+        ],
+        "title": "BillingRunOut",
+        "type": "object"
+      },
+      "BillingSettingsOut": {
+        "description": "§5.10's three studio-level settings.\n\n`standing_order_link` is the shared recurring link the manager created once in the uPay\ndashboard and pasted here -- G8: we cannot create one, cannot vary its amount per payer,\nand cannot tell from its callbacks who paid.",
+        "properties": {
+          "cash_instructions": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cash Instructions"
+          },
+          "run_day": {
+            "default": 1,
+            "title": "Run Day",
+            "type": "integer"
+          },
+          "standing_order_link": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Standing Order Link"
+          }
+        },
+        "title": "BillingSettingsOut",
+        "type": "object"
+      },
+      "BillingSettingsPatch": {
+        "properties": {
+          "cash_instructions": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cash Instructions"
+          },
+          "run_day": {
+            "anyOf": [
+              {
+                "maximum": 28.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Day"
+          },
+          "standing_order_link": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Standing Order Link"
+          }
+        },
+        "title": "BillingSettingsPatch",
+        "type": "object"
+      },
       "Body_upload_logo_api_v1_studio_logo_post": {
         "properties": {
           "file": {
@@ -498,6 +658,181 @@
           "state"
         ],
         "title": "CallbackRequest",
+        "type": "object"
+      },
+      "ChargeAdjustmentIn": {
+        "description": "A correction, recorded as a new fact. §5.10 makes a credit a negative amount\nrather than an edit to the original charge, so the ledger stays append-only and last\nmonth's statement does not change after a parent has read it.",
+        "properties": {
+          "amount_agorot": {
+            "description": "Negative for a credit. Never zero.",
+            "title": "Amount Agorot",
+            "type": "integer"
+          },
+          "reason": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "amount_agorot",
+          "reason"
+        ],
+        "title": "ChargeAdjustmentIn",
+        "type": "object"
+      },
+      "ChargeCloseIn": {
+        "description": "§11.4 -- a financial row is never deleted, so a charge raised in error is closed and\nexplained. `reason` is mandatory because 'why' is the only thing that makes it auditable\na year later, when the family asks where their September went.",
+        "properties": {
+          "reason": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          },
+          "status": {
+            "pattern": "^(void|written_off)$",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "reason"
+        ],
+        "title": "ChargeCloseIn",
+        "type": "object"
+      },
+      "ChargeOut": {
+        "description": "One line of what a family owes.\n\n`original_amount_agorot` and `proration_note` travel together and are how a\nmid-month join is explained on the parent's screen rather than looking like an\narbitrary discount (§5.10).",
+        "properties": {
+          "allocated_agorot": {
+            "default": 0,
+            "title": "Allocated Agorot",
+            "type": "integer"
+          },
+          "amount_agorot": {
+            "title": "Amount Agorot",
+            "type": "integer"
+          },
+          "created_by": {
+            "enum": [
+              "billing_run",
+              "manual",
+              "event"
+            ],
+            "title": "Created By",
+            "type": "string"
+          },
+          "due_date": {
+            "format": "date",
+            "title": "Due Date",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "tuition",
+              "registration",
+              "event",
+              "manual"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "original_amount_agorot": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Original Amount Agorot"
+          },
+          "payer_person_id": {
+            "format": "uuid",
+            "title": "Payer Person Id",
+            "type": "string"
+          },
+          "period_month": {
+            "anyOf": [
+              {
+                "maximum": 12.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period Month"
+          },
+          "period_year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period Year"
+          },
+          "proration_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proration Note"
+          },
+          "status": {
+            "enum": [
+              "open",
+              "settled",
+              "void",
+              "written_off"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "student_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Student Id"
+          }
+        },
+        "required": [
+          "id",
+          "payer_person_id",
+          "student_id",
+          "kind",
+          "period_year",
+          "amount_agorot",
+          "original_amount_agorot",
+          "proration_note",
+          "due_date",
+          "status",
+          "created_by"
+        ],
+        "title": "ChargeOut",
         "type": "object"
       },
       "ChildMatchOut": {
@@ -836,6 +1171,72 @@
         "title": "CursorPage[AttendanceOut]",
         "type": "object"
       },
+      "CursorPage_BillingRunOut_": {
+        "properties": {
+          "has_more": {
+            "default": false,
+            "title": "Has More",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/BillingRunOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "CursorPage[BillingRunOut]",
+        "type": "object"
+      },
+      "CursorPage_ChargeOut_": {
+        "properties": {
+          "has_more": {
+            "default": false,
+            "title": "Has More",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ChargeOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "CursorPage[ChargeOut]",
+        "type": "object"
+      },
       "CursorPage_ClosureOut_": {
         "properties": {
           "has_more": {
@@ -867,6 +1268,138 @@
           "items"
         ],
         "title": "CursorPage[ClosureOut]",
+        "type": "object"
+      },
+      "CursorPage_PaymentOut_": {
+        "properties": {
+          "has_more": {
+            "default": false,
+            "title": "Has More",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PaymentOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "CursorPage[PaymentOut]",
+        "type": "object"
+      },
+      "CursorPage_PricePlanOut_": {
+        "properties": {
+          "has_more": {
+            "default": false,
+            "title": "Has More",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PricePlanOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "CursorPage[PricePlanOut]",
+        "type": "object"
+      },
+      "CursorPage_ProductOut_": {
+        "properties": {
+          "has_more": {
+            "default": false,
+            "title": "Has More",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ProductOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "CursorPage[ProductOut]",
+        "type": "object"
+      },
+      "CursorPage_RecurringSubscriptionOut_": {
+        "properties": {
+          "has_more": {
+            "default": false,
+            "title": "Has More",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RecurringSubscriptionOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "CursorPage[RecurringSubscriptionOut]",
         "type": "object"
       },
       "CursorPage_RegistrationRequestOut_": {
@@ -1065,6 +1598,39 @@
           "items"
         ],
         "title": "CursorPage[TrialBookingRow]",
+        "type": "object"
+      },
+      "CursorPage_UpayIpnRecordOut_": {
+        "properties": {
+          "has_more": {
+            "default": false,
+            "title": "Has More",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/UpayIpnRecordOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "CursorPage[UpayIpnRecordOut]",
         "type": "object"
       },
       "EnrollmentCreate": {
@@ -1680,6 +2246,83 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
+      "HandOverIn": {
+        "description": "§5.10's `11a`. **A coach names the item and the child, and nothing else.**\n\nThere is deliberately no amount here. §3.2 gives a coach no financial read, so the price\ncomes from `product.price_agorot` server-side and the payer from the student's primary\nguardian -- a coach who could send either could set a family's bill from the mat.",
+        "properties": {
+          "product_id": {
+            "format": "uuid",
+            "title": "Product Id",
+            "type": "string"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "product_id",
+          "student_id"
+        ],
+        "title": "HandOverIn",
+        "type": "object"
+      },
+      "HandOverOut": {
+        "description": "What `11a` renders after a hand-over: **that** a charge was created, never for how\nmuch. Invariant 3 inspects this shape because the route is `coach`-tagged, and a money\nfield here would make it name the exact field.",
+        "properties": {
+          "charge_id": {
+            "format": "uuid",
+            "title": "Charge Id",
+            "type": "string"
+          },
+          "product_name": {
+            "title": "Product Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "charge_id",
+          "product_name"
+        ],
+        "title": "HandOverOut",
+        "type": "object"
+      },
+      "HandoutOptionOut": {
+        "description": "§5.10's `11a`, and **invariant 3 as a shape rather than as a rule someone remembers**.\n\nA coach picks the item; the server prices it from `product.price_agorot`. There is no\nmoney field here, and that absence is the whole reason this shape exists instead of\nreusing `ProductOut`.",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "HandoutOptionOut",
+        "type": "object"
+      },
+      "HandoutOptionsOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/HandoutOptionOut"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "HandoutOptionsOut",
+        "type": "object"
+      },
       "HealthDeclarationFullOut": {
         "description": "**Manager and owner only, and every read is audit-logged** (§4.3, §11.2).\n\nSeparate from `HealthDeclarationOut` by inheritance so it cannot drift: adding a field\nto the coach-safe shape adds it here too, and adding one here never leaks downward.",
         "properties": {
@@ -2184,6 +2827,36 @@
         "title": "InviteOwnerRequest",
         "type": "object"
       },
+      "IpnMatchIn": {
+        "description": "§5.10: \"A wrong automatic match marks the wrong payer paid and sends the wrong\nparent a debt reminder. A human always confirms.\" So this exists and there is no\nendpoint that applies a suggestion without one.",
+        "properties": {
+          "match_status": {
+            "enum": [
+              "manual",
+              "ignored"
+            ],
+            "title": "Match Status",
+            "type": "string"
+          },
+          "payment_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payment Id"
+          }
+        },
+        "required": [
+          "match_status"
+        ],
+        "title": "IpnMatchIn",
+        "type": "object"
+      },
       "LocationCreate": {
         "properties": {
           "address": {
@@ -2294,6 +2967,219 @@
         "title": "LocationOut",
         "type": "object"
       },
+      "ManualChargeIn": {
+        "description": "§5.10's manual charge. `kind` excludes `tuition` and `billing_run` provenance on\npurpose -- a hand-made tuition charge is how a month ends up billed twice.",
+        "properties": {
+          "amount_agorot": {
+            "exclusiveMinimum": 0.0,
+            "title": "Amount Agorot",
+            "type": "integer"
+          },
+          "due_date": {
+            "format": "date",
+            "title": "Due Date",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "registration",
+              "event",
+              "manual"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "payer_person_id": {
+            "format": "uuid",
+            "title": "Payer Person Id",
+            "type": "string"
+          },
+          "student_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Student Id"
+          }
+        },
+        "required": [
+          "payer_person_id",
+          "kind",
+          "amount_agorot",
+          "due_date"
+        ],
+        "title": "ManualChargeIn",
+        "type": "object"
+      },
+      "ManualPaymentIn": {
+        "description": "G8's consequence. הוראת קבע and bank transfers are marked paid by a human in the\nsame flow as cash, because our provider cannot create a per-payer recurring mandate\nprogrammatically -- so this shape is the *normal* route for recurring money, not an\nexception path.",
+        "properties": {
+          "amount_agorot": {
+            "title": "Amount Agorot",
+            "type": "integer"
+          },
+          "charge_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Charge Ids",
+            "type": "array"
+          },
+          "external_receipt_number": {
+            "anyOf": [
+              {
+                "maxLength": 60,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "External Receipt Number"
+          },
+          "method": {
+            "enum": [
+              "standing_order",
+              "bank_transfer",
+              "cash",
+              "credit_adjustment"
+            ],
+            "title": "Method",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "payer_person_id": {
+            "format": "uuid",
+            "title": "Payer Person Id",
+            "type": "string"
+          },
+          "received_at": {
+            "format": "date-time",
+            "title": "Received At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "payer_person_id",
+          "method",
+          "amount_agorot",
+          "received_at"
+        ],
+        "title": "ManualPaymentIn",
+        "type": "object"
+      },
+      "MatchSuggestionOut": {
+        "description": "One unmatched payment and the payer a fingerprint suggests.\n\n`confidence` is **advisory** (§5.10 step 5). Nothing acts on a threshold: it is a number\na manager reads before tapping, never a gate anything passes.",
+        "properties": {
+          "amount_agorot": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount Agorot"
+          },
+          "card_owner_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Card Owner Name"
+          },
+          "confidence": {
+            "title": "Confidence",
+            "type": "integer"
+          },
+          "four_digits": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Four Digits"
+          },
+          "ipn_id": {
+            "format": "uuid",
+            "title": "Ipn Id",
+            "type": "string"
+          },
+          "payer_person_id": {
+            "format": "uuid",
+            "title": "Payer Person Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ipn_id",
+          "payer_person_id",
+          "confidence",
+          "amount_agorot",
+          "card_owner_name",
+          "four_digits"
+        ],
+        "title": "MatchSuggestionOut",
+        "type": "object"
+      },
+      "MatchSuggestionsOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MatchSuggestionOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "never_auto": {
+            "default": true,
+            "title": "Never Auto",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "MatchSuggestionsOut",
+        "type": "object"
+      },
       "MeResponse": {
         "properties": {
           "access": {
@@ -2349,6 +3235,599 @@
           "acting_as_person_id"
         ],
         "title": "MeResponse",
+        "type": "object"
+      },
+      "PayerBalanceOut": {
+        "description": "What a parent sees on `12f` תשלומים (D9.3 — titled תשלומים, not קבלות ותשלומים).\n\n`balance_agorot` is negative when the family is in credit. §5.10 makes that real via\ncredit adjustments, and `MoneyDisplay` wraps the amount in `<bdi>` precisely so a\nnegative reads as a credit in a right-to-left sentence rather than as a debt.",
+        "properties": {
+          "balance_agorot": {
+            "title": "Balance Agorot",
+            "type": "integer"
+          },
+          "charged_agorot": {
+            "title": "Charged Agorot",
+            "type": "integer"
+          },
+          "open_charge_count": {
+            "title": "Open Charge Count",
+            "type": "integer"
+          },
+          "paid_agorot": {
+            "title": "Paid Agorot",
+            "type": "integer"
+          },
+          "payer_person_id": {
+            "format": "uuid",
+            "title": "Payer Person Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "payer_person_id",
+          "charged_agorot",
+          "paid_agorot",
+          "balance_agorot",
+          "open_charge_count"
+        ],
+        "title": "PayerBalanceOut",
+        "type": "object"
+      },
+      "PaymentAllocationOut": {
+        "description": "The join that settles a charge. Its own amount, because one payment covers several\nmonths and the split is the fact that has to survive (§5.10's \"N months\").",
+        "properties": {
+          "amount_agorot": {
+            "title": "Amount Agorot",
+            "type": "integer"
+          },
+          "charge_id": {
+            "format": "uuid",
+            "title": "Charge Id",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "payment_id": {
+            "format": "uuid",
+            "title": "Payment Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "payment_id",
+          "charge_id",
+          "amount_agorot"
+        ],
+        "title": "PaymentAllocationOut",
+        "type": "object"
+      },
+      "PaymentCompleteOut": {
+        "description": "What the return page renders. `status` is the ORDER's, read from our own row --\nnever anything uPay put in the redirect's query string.",
+        "properties": {
+          "public_ref": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Public Ref"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "public_ref"
+        ],
+        "title": "PaymentCompleteOut",
+        "type": "object"
+      },
+      "PaymentOrderCreateIn": {
+        "description": "The parent picks charges; the server prices them. `expected_amount_agorot` is\nabsent on purpose -- §5.10 compares the IPN against a server-side sum, and a\nclient-supplied expected amount would be the thing it is compared to.",
+        "properties": {
+          "charge_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Charge Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "charge_ids"
+        ],
+        "title": "PaymentOrderCreateIn",
+        "type": "object"
+      },
+      "PaymentOrderOut": {
+        "description": "§5.10. `public_ref` is a UUIDv4 and is the only identifier that reaches uPay -- a\nsequential id here would let anyone mark any family's tuition paid by guessing.",
+        "properties": {
+          "charge_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Charge Ids",
+            "type": "array"
+          },
+          "expected_amount_agorot": {
+            "title": "Expected Amount Agorot",
+            "type": "integer"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "max_payments": {
+            "title": "Max Payments",
+            "type": "integer"
+          },
+          "paid_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paid At"
+          },
+          "payer_person_id": {
+            "format": "uuid",
+            "title": "Payer Person Id",
+            "type": "string"
+          },
+          "public_ref": {
+            "format": "uuid",
+            "title": "Public Ref",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "paid",
+              "failed",
+              "amount_mismatch",
+              "expired"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "payer_person_id",
+          "public_ref",
+          "expected_amount_agorot",
+          "max_payments",
+          "status",
+          "expires_at",
+          "paid_at"
+        ],
+        "title": "PaymentOrderOut",
+        "type": "object"
+      },
+      "PaymentOut": {
+        "description": "§11.4 — never deleted. Israeli tax law requires roughly seven years of financial\nrecords, so a reversal is `reversed_at` plus a reason on the row, not a DELETE.",
+        "properties": {
+          "allocations": {
+            "items": {
+              "$ref": "#/components/schemas/PaymentAllocationOut"
+            },
+            "title": "Allocations",
+            "type": "array"
+          },
+          "amount_agorot": {
+            "title": "Amount Agorot",
+            "type": "integer"
+          },
+          "external_receipt_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "External Receipt Number"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "method": {
+            "enum": [
+              "upay_card",
+              "standing_order",
+              "bank_transfer",
+              "cash",
+              "credit_adjustment"
+            ],
+            "title": "Method",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "payer_person_id": {
+            "format": "uuid",
+            "title": "Payer Person Id",
+            "type": "string"
+          },
+          "payment_order_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payment Order Id"
+          },
+          "received_at": {
+            "format": "date-time",
+            "title": "Received At",
+            "type": "string"
+          },
+          "recorded_by_person_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recorded By Person Id"
+          },
+          "reversal_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reversal Reason"
+          },
+          "reversed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reversed At"
+          }
+        },
+        "required": [
+          "id",
+          "payer_person_id",
+          "method",
+          "amount_agorot",
+          "received_at",
+          "recorded_by_person_id",
+          "payment_order_id",
+          "note",
+          "external_receipt_number",
+          "reversed_at",
+          "reversal_reason"
+        ],
+        "title": "PaymentOut",
+        "type": "object"
+      },
+      "PaymentReversalIn": {
+        "properties": {
+          "reason": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "PaymentReversalIn",
+        "type": "object"
+      },
+      "PricePlanCloseIn": {
+        "description": "A price change: close the current plan, open its successor the next day. There is\ndeliberately no shape that edits an amount in place.",
+        "properties": {
+          "closes_on": {
+            "format": "date",
+            "title": "Closes On",
+            "type": "string"
+          },
+          "replacement_amount_agorot": {
+            "minimum": 0.0,
+            "title": "Replacement Amount Agorot",
+            "type": "integer"
+          },
+          "replacement_registration_fee_agorot": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Replacement Registration Fee Agorot"
+          }
+        },
+        "required": [
+          "closes_on",
+          "replacement_amount_agorot"
+        ],
+        "title": "PricePlanCloseIn",
+        "type": "object"
+      },
+      "PricePlanIn": {
+        "description": "§5.10's plan, and C11 in a shape: `sessions_per_week` and **no group**.\n\nDefined here rather than in `app/schemas/billing.py` because that file is W4's contract\ncommit and this lane does not widen it -- the contract authored the read shapes both\nlanes share and left the write shapes to whoever built the routes.",
+        "properties": {
+          "active_from": {
+            "format": "date",
+            "title": "Active From",
+            "type": "string"
+          },
+          "monthly_amount_agorot": {
+            "minimum": 0.0,
+            "title": "Monthly Amount Agorot",
+            "type": "integer"
+          },
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "registration_fee_agorot": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Registration Fee Agorot"
+          },
+          "sessions_per_week": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 14.0,
+            "title": "Sessions Per Week",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "sessions_per_week",
+          "monthly_amount_agorot",
+          "active_from"
+        ],
+        "title": "PricePlanIn",
+        "type": "object"
+      },
+      "PricePlanOut": {
+        "description": "§5.10 step 1 prices from here. `active_to` is null for the current plan, which is\nwhat lets a mid-year price change leave last month's charges explainable.\n\n**No `group_id` and no `class_id`** — C11. A plan is scoped by training volume and\nchosen per student (`StudentOut.price_plan_id`); a group has no price.",
+        "properties": {
+          "active_from": {
+            "format": "date",
+            "title": "Active From",
+            "type": "string"
+          },
+          "active_to": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active To"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "monthly_amount_agorot": {
+            "title": "Monthly Amount Agorot",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "registration_fee_agorot": {
+            "title": "Registration Fee Agorot",
+            "type": "integer"
+          },
+          "sessions_per_week": {
+            "title": "Sessions Per Week",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "sessions_per_week",
+          "monthly_amount_agorot",
+          "registration_fee_agorot",
+          "active_from",
+          "active_to"
+        ],
+        "title": "PricePlanOut",
+        "type": "object"
+      },
+      "ProductIn": {
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "price_agorot": {
+            "minimum": 0.0,
+            "title": "Price Agorot",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "price_agorot"
+        ],
+        "title": "ProductIn",
+        "type": "object"
+      },
+      "ProductOut": {
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_active": {
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "price_agorot": {
+            "title": "Price Agorot",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "price_agorot",
+          "is_active"
+        ],
+        "title": "ProductOut",
+        "type": "object"
+      },
+      "ProductPatch": {
+        "description": "Every field optional. There is no `quantity` and there will not be one -- §4.3 and\n§5.10 both say inventory is a different product.",
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Active"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "price_agorot": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Agorot"
+          }
+        },
+        "title": "ProductPatch",
         "type": "object"
       },
       "ProtectedSessionOut": {
@@ -2614,6 +4093,60 @@
           "address"
         ],
         "title": "PublicLandingOut",
+        "type": "object"
+      },
+      "RecurringSubscriptionOut": {
+        "description": "G8 — a record of a mandate that exists at the provider, not one we can create.\nNothing in the API creates or varies these; they are entered when a parent sets one up\nat the bank and cancelled when they stop.",
+        "properties": {
+          "amount_agorot": {
+            "title": "Amount Agorot",
+            "type": "integer"
+          },
+          "cancelled_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancelled At"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "payer_person_id": {
+            "format": "uuid",
+            "title": "Payer Person Id",
+            "type": "string"
+          },
+          "start_date": {
+            "format": "date",
+            "title": "Start Date",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "active",
+              "cancelled"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "payer_person_id",
+          "amount_agorot",
+          "start_date",
+          "status",
+          "cancelled_at"
+        ],
+        "title": "RecurringSubscriptionOut",
         "type": "object"
       },
       "RegistrationDecisionIn": {
@@ -4864,6 +6397,33 @@
         "title": "StudioUpdate",
         "type": "object"
       },
+      "SubscriptionIn": {
+        "description": "**The manager's record of who is on the link. Not a mandate.**\n\nG8: uPay cannot create a per-payer mandate, cannot vary its amount per payer, and its\nrecurring callbacks carry no customer identifier -- so there is no external reference,\nno token and no provider id here, because there is nothing to store. `app/schemas/\nbilling.py` deliberately has no `RecurringSubscriptionIn` and\n`tests/contracts/test_w4_schemas.py` asserts that; this is the *route's* input shape and\nlives here, in this lane's own file.\n\n**The parent never sets this.** It is manager-or-owner like everything else here.",
+        "properties": {
+          "amount_agorot": {
+            "exclusiveMinimum": 0.0,
+            "title": "Amount Agorot",
+            "type": "integer"
+          },
+          "payer_person_id": {
+            "format": "uuid",
+            "title": "Payer Person Id",
+            "type": "string"
+          },
+          "start_date": {
+            "format": "date",
+            "title": "Start Date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "payer_person_id",
+          "amount_agorot",
+          "start_date"
+        ],
+        "title": "SubscriptionIn",
+        "type": "object"
+      },
       "SwitchStudioRequest": {
         "properties": {
           "studio_id": {
@@ -5477,6 +7037,157 @@
           "location_name"
         ],
         "title": "TrialSlotOut",
+        "type": "object"
+      },
+      "UpayFormOut": {
+        "description": "§5.10 step 2's form, as data. The client builds the POST and auto-submits it.",
+        "properties": {
+          "action": {
+            "title": "Action",
+            "type": "string"
+          },
+          "fields": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Fields",
+            "type": "object"
+          }
+        },
+        "required": [
+          "action",
+          "fields"
+        ],
+        "title": "UpayFormOut",
+        "type": "object"
+      },
+      "UpayIpnRecordOut": {
+        "description": "The reconciliation screen's row.\n\n`amount` is a **string**, and that is the point: it is uPay's inbound rendering kept\nexactly as sent, because the integer alone would lose the evidence of what arrived.\n`amount_agorot` beside it is our parse of the same value, so a manager sees both when\nthey disagree -- which is the only way an amount mismatch is legible.\n\n§11.7 forbids the card owner name and last four digits in application *logs*. They are\ndata here, on a manager-only screen, which is where reconciling an unmatched הוראת קבע\npayment actually happens.",
+        "properties": {
+          "amount": {
+            "title": "Amount",
+            "type": "string"
+          },
+          "amount_agorot": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount Agorot"
+          },
+          "card_owner_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Card Owner Name"
+          },
+          "four_digits": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Four Digits"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "match_status": {
+            "enum": [
+              "auto",
+              "manual",
+              "unmatched",
+              "ignored"
+            ],
+            "title": "Match Status",
+            "type": "string"
+          },
+          "matched_payment_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Matched Payment Id"
+          },
+          "order_public_ref": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Order Public Ref"
+          },
+          "payment_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payment Date"
+          },
+          "received_at": {
+            "format": "date-time",
+            "title": "Received At",
+            "type": "string"
+          },
+          "source_ip": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Ip"
+          },
+          "transactionid": {
+            "title": "Transactionid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "received_at",
+          "transactionid",
+          "order_public_ref",
+          "amount",
+          "amount_agorot",
+          "card_owner_name",
+          "four_digits",
+          "payment_date",
+          "matched_payment_id",
+          "match_status",
+          "source_ip"
+        ],
+        "title": "UpayIpnRecordOut",
         "type": "object"
       },
       "ValidationError": {
@@ -6202,6 +7913,656 @@
         "summary": "Start",
         "tags": [
           "identity"
+        ]
+      }
+    },
+    "/api/v1/billing-runs": {
+      "get": {
+        "operationId": "list_billing_runs_api_v1_billing_runs_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "After"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CursorPage_BillingRunOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Billing Runs",
+        "tags": [
+          "billing"
+        ]
+      },
+      "post": {
+        "description": "Run the month now. **Safe to press twice** -- §5.10 step 5, and\n`billing.run.idempotentHint` is that promise written on the button.\n\n`now()` rather than a wall clock, so §19.5's `X-Dev-Now` reaches the run and a manager\ncan test December's billing in November.",
+        "operationId": "create_billing_run_api_v1_billing_runs_post",
+        "parameters": [
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BillingRunIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingRunOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Billing Run",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/v1/billing/settings": {
+      "get": {
+        "description": "What `1b` renders for the standing-order and cash routes.",
+        "operationId": "read_billing_settings_api_v1_billing_settings_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingSettingsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Read Billing Settings",
+        "tags": [
+          "billing"
+        ]
+      },
+      "patch": {
+        "description": "A partial write. `exclude_unset` is what stops the הגדרות panel's one-field autosave\nblanking the other two.",
+        "operationId": "update_billing_settings_api_v1_billing_settings_patch",
+        "parameters": [
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BillingSettingsPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingSettingsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Billing Settings",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/v1/charges": {
+      "get": {
+        "description": "§7's `GET /charges?payer_person_id&status`. `allocated_agorot` travels with each row\nbecause §4.3 settles a charge by summing allocations -- a client rendering\n`amount_agorot` alone would show a fully-paid charge as outstanding.",
+        "operationId": "list_charges_api_v1_charges_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "payer_person_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Payer Person Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "student_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Student Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "kind",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Kind"
+            }
+          },
+          {
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "After"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CursorPage_ChargeOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Charges",
+        "tags": [
+          "billing"
+        ]
+      },
+      "post": {
+        "description": "§5.10's manual charge. Goes through `BillingService.create_charge` and **not** an\ninsert: one writer, so a manual charge and the monthly run cannot disagree about what a\ncharge is.\n\n`ManualChargeIn.kind` excludes `tuition` on purpose -- a hand-made tuition charge is how\na month ends up billed twice, beside a run that believes it did its job.",
+        "operationId": "create_charge_api_v1_charges_post",
+        "parameters": [
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ManualChargeIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChargeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Charge",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/v1/charges/from-product": {
+      "post": {
+        "description": "A coach hands a child a גי and the club bills the family for it.\n\nEverything financial happens on this side of the boundary: the amount is read from the\nproduct, the payer from the primary guardian (§4.3 -- captured at creation, so changing\nthe guardian later leaves the charge with whoever owed it), and neither is echoed back.\n\nAn inactive product is refused: handing out an item the club stopped selling would raise\na charge at a price nobody currently offers.",
+        "operationId": "hand_over_product_api_v1_charges_from_product_post",
+        "parameters": [
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HandOverIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandOverOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Hand Over Product",
+        "tags": [
+          "billing",
+          "billing",
+          "coach"
+        ]
+      }
+    },
+    "/api/v1/charges/{charge_id}": {
+      "get": {
+        "operationId": "get_charge_api_v1_charges__charge_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "charge_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Charge Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChargeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Charge",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/v1/charges/{charge_id}/adjust": {
+      "post": {
+        "description": "A correction recorded as a **new** charge, never an edit to the original.\n\n§5.10 makes a credit a negative amount rather than an edit, so the ledger stays\nappend-only and last month's statement does not change after a parent has read it. The\n201 and the new id are that rule visible from the outside.",
+        "operationId": "adjust_charge_api_v1_charges__charge_id__adjust_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "charge_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Charge Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChargeAdjustmentIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChargeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Adjust Charge",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/v1/charges/{charge_id}/close": {
+      "post": {
+        "description": "Void or write off. §11.4 forbids deleting a financial row, so this is how a charge\nstops counting without ceasing to exist.",
+        "operationId": "close_charge_api_v1_charges__charge_id__close_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "charge_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Charge Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChargeCloseIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChargeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Close Charge",
+        "tags": [
+          "billing"
         ]
       }
     },
@@ -7576,6 +9937,478 @@
         ]
       }
     },
+    "/api/v1/payers/{payer_person_id}/balance": {
+      "get": {
+        "description": "`12f`'s summary card and `3e`'s household row.\n\nNegative is a family in credit. `MoneyDisplay` wraps the amount in `<bdi>` precisely so\na negative reads as a credit in a right-to-left sentence rather than as a debt.",
+        "operationId": "payer_balance_api_v1_payers__payer_person_id__balance_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "payer_person_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Payer Person Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PayerBalanceOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Payer Balance",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/v1/payment-complete": {
+      "get": {
+        "description": "§5.10 step 5's `returnurl`. **It marks nothing paid.**\n\n'The redirect is never the source of truth -- a closed tab still produces an IPN.' So\nthis reports the order's current status and says, in `billing.order.verifyingHint`, that\nthe window can be closed. uPay appends its own payload to this URL and every field of it\nis ignored here: it is client-submitted, unsigned, and the IPN is what settles anything.",
+        "operationId": "payment_complete_api_v1_payment_complete_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "ref",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Ref"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentCompleteOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Payment Complete",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/v1/payment-orders": {
+      "post": {
+        "description": "§5.10 step 1. **The payer is always the caller** and never a field in the body.\n\n`PaymentOrderCreateIn` carries only `charge_ids`, and that is the contract shape making\nthe decision: an order is created by the person who is about to stand in front of uPay's\nhosted page with their own card. A manager settling a family's debt uses\n`POST /payments`, which is the flow for money that arrives by every other route.\n\nTaking the payer from the request rather than the body also closes the obvious hole --\na body-supplied payer would let anyone open an order over anyone's charges.\n\n**`max_payments` is a query parameter, not a body field**, because\n`PaymentOrderCreateIn` is W4's contract shape and carries only `charge_ids`. `1b` draws\nan instalments chip group, so the count has to reach the server somehow; widening a\nshape another wave authored is the one way it must not. Capped at `MAX_INSTALLMENTS`\nhere and again in `OrderService.create`, because the dashboard's dropdown stops at 12\nand behaviour above it was never tested against this account.",
+        "operationId": "create_payment_order_api_v1_payment_orders_post",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "max_payments",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "maximum": 12,
+              "minimum": 1,
+              "title": "Max Payments",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaymentOrderCreateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentOrderOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Payment Order",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/v1/payment-orders/{public_ref}": {
+      "get": {
+        "description": "The status the return page polls, and §5.10 step 5's whole point.\n\n'The redirect is **never** the source of truth -- the IPN arrives ~5 minutes later.'\nSo this is a read the parent's browser repeats while `billing.order.verifying` is on\nscreen; it reports `pending` honestly rather than guessing from the redirect.\n\nReadable by the payer, or by a manager. `public_ref` is unguessable, but \"unguessable\"\nis not \"authorised\" -- a reference that leaked through a shared browser history would\notherwise expose what a family owes.",
+        "operationId": "read_payment_order_api_v1_payment_orders__public_ref__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "public_ref",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Public Ref",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentOrderOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Payment Order",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/v1/payment-orders/{public_ref}/form": {
+      "get": {
+        "description": "§5.10 step 2's hidden fields. **Fields, not HTML.**\n\nThe client builds and auto-submits the POST. Returning rendered HTML from an API the\nTypeScript client is generated against would hand that client a `string` where every\nother route has a model, and the form's own fields would stop being type-checked.\n\nA demo studio gets a 409 rather than a form (§19.6 restriction 5): its payment step\nrenders §19.5's IPN simulator, which never leaves our origin.",
+        "operationId": "read_payment_order_form_api_v1_payment_orders__public_ref__form_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "public_ref",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Public Ref",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpayFormOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Payment Order Form",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/v1/payments": {
+      "get": {
+        "description": "`12f`'s history and `3e`'s per-household drill-down.",
+        "operationId": "list_payments_api_v1_payments_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "payer_person_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Payer Person Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "After"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CursorPage_PaymentOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Payments",
+        "tags": [
+          "billing"
+        ]
+      },
+      "post": {
+        "description": "§5.10's manual payment -- cash, transfer, הוראת קבע or a credit adjustment.\n\nNaming `charge_ids` allocates to exactly those; leaving it empty records the money and\nallocates nothing, which is what the reconciliation queue then resolves. Either way the\ncharge is settled by its allocations and never by a field written here.",
+        "operationId": "record_payment_api_v1_payments_post",
+        "parameters": [
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ManualPaymentIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Record Payment",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/v1/payments/{payment_id}/reverse": {
+      "post": {
+        "description": "A returned cheque, a chargeback, a payment recorded against the wrong family.\n\n§11.4 -- never a DELETE. The row stays with `reversed_at` and a reason, the allocations\ngo, and every charge they touched is recomputed. Without that last step the club would\nshow a month as paid that it was never paid for, invisible in every debt report.",
+        "operationId": "reverse_payment_api_v1_payments__payment_id__reverse_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "payment_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Payment Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaymentReversalIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reverse Payment",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
     "/api/v1/platform/studios": {
       "get": {
         "description": "§18.3's studio list, M1's subset: the rows, not the health chips (C4 -- M9 owns\nthose, and the operations board with them).",
@@ -7733,6 +10566,431 @@
         "summary": "Suspend",
         "tags": [
           "platform"
+        ]
+      }
+    },
+    "/api/v1/price-plans": {
+      "get": {
+        "description": "Dashboard `5a` and the wizard's step 4. Current plan first, closed ones below.",
+        "operationId": "list_price_plans_api_v1_price_plans_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "After"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CursorPage_PricePlanOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Price Plans",
+        "tags": [
+          "billing"
+        ]
+      },
+      "post": {
+        "operationId": "create_price_plan_api_v1_price_plans_post",
+        "parameters": [
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PricePlanIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PricePlanOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Price Plan",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/v1/price-plans/{plan_id}/close": {
+      "post": {
+        "description": "§5.10 -- 'Plans are versioned so a price change never rewrites history.' Returns the\nSUCCESSOR, which is the row `5a` then renders as current.",
+        "operationId": "close_price_plan_api_v1_price_plans__plan_id__close_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "plan_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Plan Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PricePlanCloseIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PricePlanOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Close Price Plan",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/v1/products": {
+      "get": {
+        "operationId": "list_products_api_v1_products_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "include_inactive",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Include Inactive",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "After"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CursorPage_ProductOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Products",
+        "tags": [
+          "billing"
+        ]
+      },
+      "post": {
+        "operationId": "create_product_api_v1_products_post",
+        "parameters": [
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Product",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/v1/products/handout-options": {
+      "get": {
+        "description": "What staff `11a`'s picker renders. **Names only, never prices** (invariant 3).\n\nActive products only: a coach handing out an item the club stopped selling would create\na charge for a price nobody currently offers.",
+        "operationId": "list_handout_options_api_v1_products_handout_options_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandoutOptionsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Handout Options",
+        "tags": [
+          "billing",
+          "billing",
+          "coach"
+        ]
+      }
+    },
+    "/api/v1/products/{product_id}": {
+      "patch": {
+        "description": "`exclude_unset` is what makes this a partial write rather than a blanking one.",
+        "operationId": "update_product_api_v1_products__product_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "product_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Product Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Product",
+        "tags": [
+          "billing"
         ]
       }
     },
@@ -7945,6 +11203,367 @@
         "summary": "Public Logo",
         "tags": [
           "public"
+        ]
+      }
+    },
+    "/api/v1/reconciliation/match": {
+      "post": {
+        "description": "§5.10 step 3 and step 5.\n\n`IpnMatchIn.match_status` is `Literal[\"manual\", \"ignored\"]` -- **there is no `auto` a\nclient can send**, and that is the schema saying step 5 out loud: a match is a human's\ndecision or it is nothing.\n\n**`ipn_id` and `payer_person_id` are query parameters, and `IpnMatchIn.payment_id` is\nleft for what it says.** The contract shape carries `payment_id` -- an existing\n*payment* to link this callback to, for the case where a manager already recorded the\nmoney by hand and now wants the evidence attached. §5.10 step 3's flow is the other one:\nthe system *creates* the payment, so what it needs is a payer, not a payment. Reusing\n`payment_id` to carry a person id would have been a field lying about its own name in\nthe one place a wrong id sends the wrong parent a debt reminder.\n\n`confirmed_by_person_id` comes from the request context, never the body. A client that\ncould name the confirmer could attribute someone else's decision, and the row that is\nsupposed to prove a human decided would prove the wrong human.",
+        "operationId": "confirm_match_api_v1_reconciliation_match_post",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "ipn_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Ipn Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "payer_person_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Payer Person Id"
+            }
+          },
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IpnMatchIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpayIpnRecordOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Confirm Match",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/v1/reconciliation/suggestions": {
+      "get": {
+        "description": "§5.10 step 4. **A read with no side effect** -- computing a suggestion twice must\nleave the ledger exactly where it was, because the manager's tap is the only thing that\nmoves money.",
+        "operationId": "list_suggestions_api_v1_reconciliation_suggestions_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatchSuggestionsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Suggestions",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/v1/reconciliation/unmatched": {
+      "get": {
+        "description": "`3e`'s reconciliation queue, left column: payments waiting for a human.",
+        "operationId": "list_unmatched_api_v1_reconciliation_unmatched_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "After"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CursorPage_UpayIpnRecordOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Unmatched",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/v1/recurring-subscriptions": {
+      "get": {
+        "operationId": "list_subscriptions_api_v1_recurring_subscriptions_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "After"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CursorPage_RecurringSubscriptionOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Subscriptions",
+        "tags": [
+          "billing"
+        ]
+      },
+      "post": {
+        "description": "G8 -- a record of a mandate that exists at the provider, not one we can create.",
+        "operationId": "record_subscription_api_v1_recurring_subscriptions_post",
+        "parameters": [
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubscriptionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecurringSubscriptionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Record Subscription",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/v1/recurring-subscriptions/{subscription_id}/cancel": {
+      "post": {
+        "description": "The family stopped. The row stays as history -- it is what explains why last March's\nreconciliation expected them.",
+        "operationId": "cancel_subscription_api_v1_recurring_subscriptions__subscription_id__cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "subscription_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Subscription Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecurringSubscriptionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cancel Subscription",
+        "tags": [
+          "billing"
         ]
       }
     },
@@ -10964,6 +14583,48 @@
         "summary": "Grant Override",
         "tags": [
           "people"
+        ]
+      }
+    },
+    "/api/v1/webhooks/upay/{public_ref}": {
+      "get": {
+        "description": "§5.10's IPN. **Always 200**, including for a forgery and including on a bug.\n\nA non-200 invites retries whose behaviour nobody has observed, and by the time anything\nhere can fail the bytes are already safe -- which is what makes answering 200 to a\nforged callback the right answer rather than a lax one.\n\n`SessionDep`, not `TenantSessionDep`: there is no authenticated caller, so there is no\nstudio in context and the tenant-scoped dependency would 401 every real payment. The\nscope is opened from the order's own `studio_id` once the order is found.",
+        "operationId": "upay_ipn_api_v1_webhooks_upay__public_ref__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "public_ref",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Public Ref",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Upay Ipn",
+        "tags": [
+          "billing"
         ]
       }
     }
