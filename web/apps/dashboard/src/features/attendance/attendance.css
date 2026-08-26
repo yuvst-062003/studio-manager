@@ -1,0 +1,75 @@
+/* Dashboard artboards 4c and 1e. Tokens only — never a hex.
+ *
+ * 1e's "▲ D8/D12 — the retired grey, twice more": #7a766d appears five times across the
+ * dashboard export and --cancelled supersedes it. Nothing here reads a value from the canvas.
+ *
+ * D10 — logical properties. 4c's own range holds exactly one physical declaration, a
+ * `border-right` on the sidebar divider that "lands correctly here only because of where the
+ * sidebar falls; mirrored to LTR it becomes the sidebar's outer edge". That sidebar is M9's
+ * (4c finding 2) and is not built here, so the property never arrives. */
+
+/* 1e finding 2 — the popover's roster is clipped, not scrollable, "with no scroll
+ * affordance. A group larger than fits has nowhere to go." */
+.quickview__list {
+  max-block-size: 22rem;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.quickview__list button {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  inline-size: 100%;
+  padding-block: var(--space-2);
+  padding-inline: var(--space-2);
+  border: 0;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+/* §5.7 — a parent's advance notice is not cycled by a click. The cursor says the row is not
+ * the control the ones above it are. */
+.quickview__list button[data-pre-reported='true'] {
+  cursor: default;
+}
+
+/* Must not mirror: every count and time on both artboards (4c and 1e RTL sections). */
+[data-testid='quickview-summary'],
+[data-testid='unmarked-list'] span {
+  font-variant-numeric: tabular-nums;
+}
+
+[data-testid='quickview-bulk-hint'],
+[data-testid='unmarked-not-absence'] {
+  color: var(--text-secondary);
+  font-size: var(--text-caption);
+}
+
+/* 4c — the `ממתין לסימון` card is drawn with a dashed border in --pending, the same role its
+ * count pill and its unmarked squares carry. One state, one token. */
+[data-testid='unmarked-list'] {
+  margin: 0;
+  padding: var(--space-3);
+  border: var(--border-width-hairline) dashed var(--pending);
+  border-radius: var(--radius-lg);
+  list-style: none;
+}
+
+[data-testid='unmarked-list'] li {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  padding-block: var(--space-2);
+}
+
+[data-testid='group-rates'] ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}

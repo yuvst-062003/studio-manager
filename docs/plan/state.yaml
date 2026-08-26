@@ -169,6 +169,34 @@ waves:
         title: Contract commit — revision 0007, the lane gates and the lane fixtures
         status: shipped
         on: 2026-08-26
+      - id: M5.1
+        title: §10.5's conflict rules as a pure resolver, and the roster's expected-vs-enrolled split
+        status: shipped
+        on: 2026-08-26
+      - id: M5.2
+        title: Batch marking idempotent on client_mark_id, the bulk rule, and the parent's advance notice
+        status: shipped
+        on: 2026-08-26
+      - id: M5.3
+        title: /sessions/{id}/attendance, /attendance/batch, /absence-reports and /sync/bootstrap
+        status: shipped
+        on: 2026-08-26
+      - id: M5.4
+        title: §10.1's four network states, pending_ops, the two-day cache and the flusher
+        status: shipped
+        on: 2026-08-26
+      - id: M5.5
+        title: The roster-row container, and the student-card, alert-centre and dev-bar slot fills
+        status: shipped
+        on: 2026-08-26
+      - id: M5.6
+        title: Artboards — staff 1c/9f/9g/2d, parent 12a, dashboard 4c/1e
+        status: shipped
+        on: 2026-08-26
+      - id: M5.7
+        title: §6.1's blocking offline prime and §6.5's blocking stale-queue warning
+        status: shipped
+        on: 2026-08-26
   - id: W4
     milestone: M6 ∥ M7
     title: Money ∥ Events and belts

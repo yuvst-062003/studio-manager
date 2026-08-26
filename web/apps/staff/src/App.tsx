@@ -26,12 +26,26 @@ import { ScheduleSection } from './features/schedule/ScheduleSection'
 import { makeStaffScheduleClient } from './features/schedule/client'
 import { useToday } from './features/schedule/useToday'
 import { StudentsSearch, makeStaffPeopleClient } from './features/people'
+import {
+  OfflinePrimingGate,
+  RosterScreen,
+  makeStaffAttendanceClient,
+  registerAttendanceSections,
+  useOfflinePriming,
+} from './features/attendance'
+import './features/attendance/attendance.css'
 
 // §5.1 — 'the staff app and dashboard route them into a resumable wizard'. Both mount the
 // SAME wizard from @studio/ui; no step lives in one app's feature directory. Registered
 // at module load so the slot is populated before anything renders, and `apiFetch` is
 // passed in because @studio/ui must not depend on @studio/core.
 registerM1WizardSteps(apiFetch)
+
+// §19.4's `📴 offline` and `🐌 slow` toggles, plus the `student-card` attendance strip and
+// the `alert-centre` conflict cards. Registered at module load for the same reason the
+// wizard steps are: the slots must be populated before anything renders. The containers
+// themselves are never reopened — that is what seam 4 buys.
+registerAttendanceSections()
 
 const NAV = [
   { key: 'today', labelKey: 'common.nav.today', href: '/' },
@@ -40,7 +54,9 @@ const NAV = [
   // `/students` were links to a 404.
   { key: 'schedule', labelKey: 'common.nav.schedule', href: '#/schedule' },
   { key: 'students', labelKey: 'common.nav.students', href: '#/students' },
-  { key: 'attendance', labelKey: 'common.nav.attendance', href: '/attendance' },
+  // A hash, not a path: there is no server route behind `/attendance`, so the path form was
+  // a link to a 404 — the same correction both W2 lanes made independently.
+  { key: 'attendance', labelKey: 'common.nav.attendance', href: '#/attendance' },
   { key: 'announcements', labelKey: 'common.nav.announcements', href: '/announcements' },
   { key: 'settings', labelKey: 'common.nav.settings', href: '/settings' },
 ]
@@ -74,6 +90,11 @@ export default function App() {
   const setupClient = useMemo(() => makeSetupClient(apiFetch), [])
   const scheduleClient = useMemo(() => makeStaffScheduleClient(apiFetch), [])
   const peopleClient = useMemo(() => makeStaffPeopleClient(apiFetch), [])
+  const attendanceClient = useMemo(() => makeStaffAttendanceClient(apiFetch), [])
+  // §6.1 step 6 — "offline prime: today's and tomorrow's sessions + rosters are fetched and
+  // written to IndexedDB BEFORE the coach reaches Today", and "the first launch BLOCKS on
+  // this fetch". The gate below renders instead of the app while it runs.
+  const priming = useOfflinePriming(attendanceClient)
   const hash = useHash()
   const today = useToday()
   // 9a's filter defaults from who is looking: a coach opening the app wants their own day,
@@ -92,6 +113,10 @@ export default function App() {
   // screen would change only when something else happened to re-render App. One
   // subscription serves both lanes' routes.
   const onStudents = hash === '#/students'
+  // §5.7's register, opened from a session. The id is in the hash so the back button works
+  // and a link survives a reload — the same shape both W2 lanes settled on, and the reason
+  // NAV's `/attendance` entry became a hash below.
+  const rosterSessionId = hash.startsWith('#/attendance/') ? hash.slice('#/attendance/'.length) : null
 
   useEffect(() => {
     // Chromium fires this when it considers the app installable; iOS never does, which
@@ -162,7 +187,32 @@ export default function App() {
               whoever is holding the phone, so the check cannot live in the link. Lane
               PEOPLE's branch inherits the same protection from being below it: a person
               without staff access takes the `Resolve` arm and gets §6.1's refusal. */}
-          {session.access.staff && hash.startsWith('#/schedule') ? (
+          {session.access.staff && rosterSessionId ? (
+            // §6.1 step 6 — "today's and tomorrow's sessions + rosters are fetched and
+            // written to IndexedDB BEFORE the coach reaches Today", and "the first launch
+            // blocks on this fetch".
+            //
+            // The FETCH starts at launch: `useOfflinePriming` runs on mount above, so the
+            // cache is filling while the coach walks through the tour and Today. What is
+            // gated here is the roster itself — the one screen a missing cache actually
+            // costs something on, and the one this lane owns.
+            //
+            // §6.1's own order puts the prime after the tour, and the tour lives in
+            // `features/identity/Resolve.tsx`, which belongs to no lane in this wave.
+            // `OfflinePrimingGate` and `useOfflinePriming` are exported from this lane's
+            // barrel so whoever owns that sequence can put the gate in front of Today
+            // without reopening anything here.
+            priming.state !== 'ready' ? (
+              <OfflinePrimingGate locale={locale} onRetry={priming.retry} state={priming.state} />
+            ) : (
+              <RosterScreen
+                client={attendanceClient}
+                locale={locale}
+                personId={membership?.person_id ?? null}
+                sessionId={rosterSessionId}
+              />
+            )
+          ) : session.access.staff && hash.startsWith('#/schedule') ? (
             <ScheduleSection
               locale={locale}
               client={scheduleClient}

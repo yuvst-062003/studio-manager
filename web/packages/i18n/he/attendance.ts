@@ -26,7 +26,16 @@ export const attendance: Bundle = {
   // §5.14 — `unmarked` is a real state. A report must never treat it as absent.
   'roster.unmarked': 'לא סומן',
   'roster.unmarkedCount': 'לא סומנו {{count}} חניכים',
+  // §5.7's collapsed section — students enrolled in the group but not expected at THIS
+  // session (C12). `סמן הכל נוכח` never touches it and its rows never count toward `לא סומן`.
+  'roster.notExpectedToday': 'לא אמורים להגיע היום',
+  'roster.notExpectedHint': 'אפשר לסמן גם אותם — ילד שהגיע ביום נוסף הוא ילד אמיתי',
   'roster.markAllPresent': 'סימון כולם כנוכחים',
+  // `9f` finding 1 — the button as DRAWN overwrites every parent's advance notice, under a
+  // hint row announcing those notices. This is the label that tells the truth about what the
+  // server does, and `source.preReportedHint` is the sentence it is agreeing with.
+  'roster.markAllPresentHint': 'לא ידרוס דיווחי הורים או סימונים קיימים',
+  'roster.longPressToOverride': 'לחיצה ארוכה כדי לשנות דיווח של הורה',
   'roster.tapToToggle': 'לחיצה על שורה מחליפה מצב',
   'roster.saved': 'הנוכחות נשמרה',
   'roster.editAnytime': 'אפשר לערוך את הנוכחות בכל זמן',
@@ -46,6 +55,9 @@ export const attendance: Bundle = {
   // -- parent absence reporting (parent 12a) -------------------------------------
   'absence.title': 'דיווח היעדרות',
   'absence.subtitle': 'עד תחילת השיעור',
+  // `12a` finding 7 and `12i` finding 9 — the parent's word for their own children is not
+  // `חניכים`. `people.student.plural` is the club's noun; this is the family's.
+  'absence.chooseChild': 'מי מהילדים',
   'absence.chooseSession': 'בחירת שיעור',
   'absence.reason': 'סיבה',
   'absence.reasonOptional': 'סיבה — לא חובה',
@@ -64,6 +76,10 @@ export const attendance: Bundle = {
   // The state navigator.onLine cannot see: a captive portal that routes nowhere.
   'network.intermittent': 'חיבור לא יציב',
   'network.slow': 'חיבור איטי',
+  // §10.1's fifth row — "API down, client online... Distinguished from offline". A coach
+  // with four bars told `לא מקוון` stops trusting the indicator entirely.
+  'network.apiDown': 'השרת אינו זמין',
+  'network.apiDownHint': 'השרת אינו זמין, ננסה שוב. הסימונים נשמרים במכשיר',
   'network.offlineHint': 'הסימונים נשמרים במכשיר ויסונכרנו כשהחיבור יחזור',
   'network.intermittentHint': 'יש רשת אבל אין תשובה מהשרת. הסימונים נשמרים במכשיר',
 
@@ -101,6 +117,27 @@ export const attendance: Bundle = {
   'conflict.review': 'בדיקת ההתנגשות',
 
   // -- the manager view (dashboard 4c) --------------------------------------------
+  // §5.14 — 'this is why `unmarked` must be a real state'. `4c` finding 1: the rule is
+  // encoded in the sequence strip and stated nowhere on the screen.
+  'report.unmarkedNotAbsence': 'שיעורים שלא סומנו אינם נספרים כהיעדרות',
+  'report.markNow': 'סימון עכשיו',
+  'report.remindCoach': 'תזכורת למאמן',
+  'report.byGroup': 'אחוז נוכחות לפי קבוצה',
+  'summary.title': 'סיכום מפגש',
+  // §5.13 — 'Visible to coaches of that student's groups and to all managers. NEVER
+  // visible to guardians.' `9g` finding 2: the note card is the only one of three on that
+  // screen that states no audience, and a coach writing about a child should know who reads it.
+  'summary.noteAudience': 'המאמנים של הקבוצה והמנהלים רואים את ההערה. הורים לא רואים אותה',
+  'summary.whatNext': 'מה לעשות עכשיו',
+  'summary.backToRoster': 'חזרה לרשימת הנוכחות',
+  'summary.finish': 'סיום ושמירה',
+  'card.recentAttendance': 'נוכחות אחרונה',
+  'card.markPresent': 'סימון כנוכח',
+  'card.markAbsent': 'סימון כנעדר',
+  // `1e` finding 3 — the popover's × carries no handler and there is no backdrop, so
+  // dismissal is undecided on the artboard. Decided here, and it needs an accessible name:
+  // `common` has only `nav.closeMenu`, which is the drawer's.
+  'quickView.close': 'סגירת התצוגה המהירה',
   'report.title': 'נוכחות',
   'report.unmarkedSessions': 'שיעורים שלא סומנו',
   'report.consecutiveAbsences': 'נעדרים ברצף',
