@@ -67,6 +67,49 @@ def test_a_matching_token_is_allowed_and_a_wrong_one_is_not():
     )
 
 
+def test_an_empty_configured_token_is_no_token_at_all():
+    """.env.example ships `DEV_TOOLS_TOKEN=` and its own comment says an unset token means
+    "this machine only". An empty string is not None, so the guard read it as a
+    CONFIGURED token and got both halves wrong at once.
+
+    Locally it was too strict: copying that file to a local env file -- which its first
+    line instructs -- made every /dev/* route 403, and
+    tests/restrictions/test_02_no_dev_routes_in_production.py went red on a machine where
+    nothing was misconfigured. Found by opening W4's lane worktrees, whose config came
+    from the committed template rather than from whatever the original developer's
+    predated.
+
+    On staging it was too permissive, which is the half that matters: `compare_digest("",
+    "")` is True, so a deployment with an empty DEV_TOOLS_TOKEN authorised anyone who
+    sent an empty X-Dev-Token header -- to reset the demo studio, or to invent a payment.
+    """
+    # Too strict, locally.
+    assert dev_tools_allowed(
+        env="development", is_developer=False, presented_token=None, configured_token=""
+    )
+    # Too permissive, on a public origin. Falls through to the env rule and is refused.
+    assert not dev_tools_allowed(
+        env="staging", is_developer=False, presented_token="", configured_token=""
+    )
+    assert not dev_tools_allowed(
+        env="staging", is_developer=False, presented_token=None, configured_token=""
+    )
+
+
+def test_a_real_token_is_still_required_when_one_is_set():
+    """The other half of the fix. Treating empty as unconfigured must not weaken the case
+    the token exists for: a non-empty token still gates staging completely."""
+    assert not dev_tools_allowed(
+        env="staging", is_developer=False, presented_token="", configured_token="s3cret"
+    )
+    assert not dev_tools_allowed(
+        env="staging", is_developer=False, presented_token=None, configured_token="s3cret"
+    )
+    assert dev_tools_allowed(
+        env="staging", is_developer=False, presented_token="s3cret", configured_token="s3cret"
+    )
+
+
 def test_production_is_refused_on_every_input():
     """Defence in depth. The router is not mounted in production at all, so this branch
     is unreachable through HTTP -- which is exactly why it must be asserted directly."""

@@ -35,7 +35,13 @@ def dev_tools_allowed(
         return False
     if is_developer:
         return True
-    if configured_token is not None:
+    # An EMPTY token is no token. The committed environment template ships the key with an
+    # empty value and says so in a comment -- "an unset token means this machine only" --
+    # and `SecretStr("")` is not None, so reading it as a configured token got both halves
+    # wrong at once. Locally it refused every /dev/* call on a machine where nothing was
+    # misconfigured; on a public origin it was worse, because `compare_digest("", "")` is
+    # True, so an empty configured value authorised anyone who sent an empty header.
+    if configured_token:
         return presented_token is not None and secrets.compare_digest(
             presented_token, configured_token
         )
