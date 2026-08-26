@@ -225,6 +225,7 @@ export const events: Bundle = {
   // has its reason on screen. `student_belt.belt_rank_id` is ON DELETE RESTRICT.
   'belt.deleteHeld': 'לא ניתן למחוק דרגה שהוענקה לחניכים',
   'belt.holders': 'חניכים בדרגה',
+  'belt.noClassYet': 'מערכת החגורות תוגדר אחרי יצירת החוגים',
   'belt.presetTitle': 'איזו מערכת חגורות נהוגה אצלכם?',
   'belt.presetScratch': 'הגדרה ידנית',
   'belt.presetRankCount': 'דרגות בערכה',

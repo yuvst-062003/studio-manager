@@ -12,6 +12,7 @@ export type BeltRankIn = components['schemas']['BeltRankIn']
 export type LadderRankOut = components['schemas']['LadderRankOut']
 export type BeltPresetOut = components['schemas']['BeltPresetOut']
 export type StudentBeltOut = components['schemas']['StudentBeltOut']
+export type ClassOut = components['schemas']['ClassOut']
 
 export type Page<T> = { items: T[]; next_cursor: string | null; has_more: boolean }
 
@@ -78,6 +79,17 @@ export function makeDashboardBeltsClient(fetcher: Fetcher) {
           body: JSON.stringify({ class_id: classId, preset_key: presetKey }),
         }),
       ),
+
+    /**
+     * M1's `/classes`, read because a ladder belongs to a class.
+     *
+     * Reading another lane's ENDPOINT is not touching another lane's file -- an API is the
+     * seam. `5d` needs this because `WIZARD_STEP_ORDER` puts `belts` at step 2 and
+     * `groups` at step 3, so at the moment this step runs a studio may legitimately have
+     * no class at all.
+     */
+    classes: async (): Promise<{ items: ClassOut[]; next_cursor: string | null }> =>
+      json(await fetcher('/api/v1/classes')),
 
     /** `12d`'s timeline and `4d`'s history column. */
     studentBelts: async (studentId: string): Promise<Page<StudentBeltOut>> =>

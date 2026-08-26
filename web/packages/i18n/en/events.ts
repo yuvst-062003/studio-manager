@@ -187,6 +187,7 @@ export const events: Bundle = {
   'belt.moveDown': 'Move down',
   'belt.deleteHeld': 'A rank awarded to students cannot be deleted',
   'belt.holders': 'Students at this rank',
+  'belt.noClassYet': 'The belt system is defined once the classes exist',
   'belt.presetTitle': 'Which belt system does your club use?',
   'belt.presetScratch': 'Set it up by hand',
   'belt.presetRankCount': 'ranks in this set',

@@ -42,12 +42,20 @@ import {
   EventsScreen,
   makeDashboardEventsClient,
 } from './features/events'
-import { BeltSystemScreen, makeDashboardBeltsClient } from './features/belts'
+import {
+  BeltSystemScreen,
+  makeDashboardBeltsClient,
+  registerBeltsWizardStep,
+} from './features/belts'
 
 registerM1WizardSteps(apiFetch)
 // Seam 4 — `6c` composes sections from four milestones. This lane registers the three it
 // owns; M4's, M5's and M6's land the same way without reopening AlertCentre.tsx.
 registerPeopleAlerts()
+// Seam 4 again — §5.1's wizard. One registerSlot call from this lane's own file, at the
+// order WIZARD_STEP_ORDER gives `belts`. SetupWizard.tsx is not reopened, and neither is
+// packages/ui/src/setup-wizard/register.ts, which registers M1's own four steps.
+registerBeltsWizardStep(makeDashboardBeltsClient(apiFetch))
 
 const NAV = [
   { key: 'schedule', labelKey: 'schedule.week.title', href: '#/schedule' },

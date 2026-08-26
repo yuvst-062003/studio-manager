@@ -191,6 +191,7 @@ export const events: Bundle = {
   'belt.moveDown': 'Ниже в порядке',
   'belt.deleteHeld': 'Нельзя удалить степень, присвоенную ученикам',
   'belt.holders': 'Учеников в степени',
+  'belt.noClassYet': 'Система поясов задаётся после создания секций',
   'belt.presetTitle': 'Какая система поясов принята у вас?',
   'belt.presetScratch': 'Задать вручную',
   'belt.presetRankCount': 'степеней в наборе',
