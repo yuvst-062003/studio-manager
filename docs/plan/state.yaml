@@ -282,6 +282,10 @@ waves:
         title: Dashboard 5a prices, the alert-centre card and the dev bar's runJob
         status: shipped
         on: 2026-08-26
+      - id: M6.13
+        title: Lane close — i18n mirrors, the four IPN shapes measured, the handover
+        status: shipped
+        on: 2026-08-26
   - id: W5
     milestone: M8 ∥ M9
     title: Communication ∥ Reports and privacy completion
