@@ -131,7 +131,18 @@ def send_monthly_report(
     Enqueues a notification through the COMMS lane's notification system.
     The report PDF is generated and attached by the notification worker.
     """
+    from fastapi import HTTPException
+    from sqlalchemy import select
+
+    from app.models.person import Person
     from app.services.comms import NotificationService
+
+    # Validate that recipient person belongs to the current studio
+    person = session.execute(
+        select(Person).where(Person.id == body.to_person_id)
+    ).scalar_one_or_none()
+    if not person:
+        raise HTTPException(status_code=404, detail="Recipient not found in studio")
 
     try:
         notification = NotificationService(session).enqueue(
