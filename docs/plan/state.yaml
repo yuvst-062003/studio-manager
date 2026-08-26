@@ -254,6 +254,71 @@ waves:
     status: pending
     pieces: []
 holdbacks:
+  - id: HB-w3-e2e-harness
+    kind: carried
+    title: W3's E2E gate cannot be met by filling in the specs — there is no harness and the specs assume an app that was never built
+    why: >-
+      W3's stated exit gate is E2E-2 (offline attendance → sync → dashboard) and E2E-1
+      complete with health. Both lanes correctly left these to the merge plan. Attempting
+      them on 2026-08-26 found the specs cannot be un-fixme'd, because three of their
+      assumptions are false about the product that exists.
+
+      One — every spec deep-links. Seventeen `page.goto()` calls across the five files
+      address `/staff/today`, `/dashboard/attendance`, `/parent/absence` and so on. There
+      is no router: `web/package.json` carries no react-router or wouter, and each app is a
+      single-page state machine driven from its entry state. No deep link in any spec can
+      resolve.
+
+      Two — the specs assume one origin. `playwright.config.ts` sets a single
+      `baseURL` of localhost:5173, but staff, parent and dashboard are three separate Vite
+      apps. A single baseURL cannot reach all three; this needs three Playwright projects,
+      which is a config decision nobody has made.
+
+      Three — the testid vocabulary is fiction. The specs name `session-card`, `roster`,
+      `offline-banner`, `student-row`, `mark-present`, `pending-ops-count`, `force-flush`,
+      `present-count`, `unmarked-count`, `mark-all-present` and `source-badge`. NONE of
+      the eleven exists. The apps expose 239 distinct testids and the lanes built a
+      different, richer vocabulary — `roster-screen`, `roster-list`, `roster-counts`,
+      `session-row`, `unmarked-list`, `unmarked-not-absence`, `summary-sync`. The specs
+      were authored in M0 against an imagined UI and never reconciled.
+
+      There is also no `webServer` block, so nothing starts the backend or the three dev
+      servers, and no fixture seeds or authenticates. `/dev/demo/reset` and `/dev/act-as`
+      (§19.4) are the right tools for both and already exist — that part is tractable.
+
+      What this is NOT: a lane defect. Both lanes are feature-complete and their own gates
+      are green (1656 backend, 1400 frontend, `lane-check.sh` green for both verticals).
+      What is unproven is that the two features work TOGETHER through a real browser, which
+      is exactly what an E2E gate is for and exactly what no unit suite can substitute for.
+
+      What closes this: one focused session to build the harness — three Playwright
+      projects, a `webServer` block, a seed-and-authenticate fixture over the §19.4 dev
+      routes — and then rewrite the three W3-relevant spec bodies against the vocabulary
+      the apps actually expose. HB-w2-e2e-gate's owed W2 subsets fall out of the same work,
+      since 05-schedule-change is one of the files being rewritten either way.
+
+      Estimated wrongly once already: this was scoped as "half a session, run the
+      journeys" before the three mismatches were found. It is its own session.
+    blocks: W3 exit gate
+    status: open
+    opened: 2026-08-26
+  - id: HB-w3-manual-offline
+    kind: carried
+    title: The 90-minute real-device airplane-mode run has not happened
+    why: >-
+      §6.5 traded away a native container's storage guarantee deliberately, and §10.6 makes
+      `pending_ops` exempt from eviction under all circumstances. The lane asserts that in
+      unit tests and manages it as §6.5 requires — standalone mode, `navigator.storage.persist()`,
+      a blocking warning on a stale queue.
+
+      None of that proves iOS suspends the way we assumed. The merge plan says so in its own
+      words: "the dev bar's offline toggle proves the code path; it does not prove iOS
+      suspends the way you assumed." It needs a person, a real phone, 90 minutes in airplane
+      mode, and a reconnect. No automated gate substitutes for it, and this entry exists so
+      that absence is visible rather than implied.
+    blocks: W7 launch
+    status: open
+    opened: 2026-08-26
   - id: HB-w2-e2e-gate
     kind: carried
     title: W2 closed with its E2E exit gate unmet, and the W2 subsets owed in W3
