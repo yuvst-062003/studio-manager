@@ -4,6 +4,85 @@
  */
 
 export interface paths {
+    "/api/v1/absence-reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Report Absence
+         * @description §5.7's "לא אגיע היום".
+         *
+         *     **Deliberately not queueable** (§10.2): "a parent's absence pre-report requires a
+         *     connection on purpose — it is time-critical and worthless if it lands after the lesson.
+         *     The app says so rather than queuing it into the void." The deadline is checked against
+         *     the *server's* clock, because a device an hour behind would otherwise file a pre-report
+         *     for a lesson already in progress.
+         */
+        post: operations["report_absence_api_v1_absence_reports_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/absence-reports/{session_id}/{student_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Cancel Absence Report
+         * @description Artboard `12a`'s `ביטול הדיווח`.
+         *
+         *     Keyed on (session, student) rather than on the report's own id, because that pair is
+         *     what the parent app has: it renders the notice from the roster, which carries
+         *     `has_absence_report` and not a report id.
+         */
+        delete: operations["cancel_absence_report_api_v1_absence_reports__session_id___student_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/attendance/batch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Apply Batch
+         * @description §7's `POST /attendance/batch  (idempotent)` — the offline queue drains here.
+         *
+         *     **200 and not 201**, even when rows are created: the queue replays this request, and a
+         *     client that treated 201 as "new work happened" would raise a fresh toast on every
+         *     reconnect for marks it made three hours ago.
+         *
+         *     Idempotency is per *mark* on `client_mark_id`, not per request. `Idempotency-Key` is
+         *     accepted for consistency with the rest of the API and is not what makes this safe — a
+         *     request-level key would make the second attempt a no-op that silently dropped the marks
+         *     the first attempt never delivered.
+         */
+        post: operations["apply_batch_api_v1_attendance_batch_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/accept-invitation": {
         parameters: {
             query?: never;
@@ -915,6 +994,50 @@ export interface paths {
         patch: operations["patch_session_api_v1_sessions__session_id__patch"];
         trace?: never;
     };
+    "/api/v1/sessions/{session_id}/attendance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Session Roster
+         * @description Artboards `1c` and `9f`. §3.2 gives every staff role the register.
+         */
+        get: operations["get_session_roster_api_v1_sessions__session_id__attendance_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sessions/{session_id}/attendance/bulk-present": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Bulk Present
+         * @description §5.7's `סמן הכל נוכח`.
+         *
+         *     It never overwrites a parent's advance notice, whatever the request body says — see
+         *     `AttendanceService._bulk_touches`. Artboards `9f` and `1e` both draw a button that does,
+         *     and `attendance.source.preReportedHint` already ships the copy saying it does not.
+         */
+        post: operations["bulk_present_api_v1_sessions__session_id__attendance_bulk_present_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/sessions/{session_id}/cancel": {
         parameters: {
             query?: never;
@@ -1072,6 +1195,27 @@ export interface paths {
         head?: never;
         /** Update Student */
         patch: operations["update_student_api_v1_students__student_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/students/{student_id}/attendance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Student Attendance
+         * @description Artboard `2d`'s eight marks and `4a`'s twelve — the two artboards disagree on the
+         *     window (`2d` finding 9), so the count is the caller's and neither is baked in here.
+         */
+        get: operations["student_attendance_api_v1_students__student_id__attendance_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/students/{student_id}/convert": {
@@ -1441,6 +1585,35 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/sync/bootstrap": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Bootstrap
+         * @description Everything a coach needs for a date window, in one payload.
+         *
+         *     **Both parameters are optional and default to today and tomorrow**, which is §6.1's
+         *     window verbatim. A first launch has no watermark to compute a range from, and making
+         *     it invent one would put the definition of "the window" in every client rather than
+         *     here.
+         *
+         *     The window is clamped to §10.6's two days and echoed back in `from_time`/`to_time`, so
+         *     a client asking for a week gets two days and can *tell* that it did — it evicts against
+         *     what it received rather than what it asked for.
+         */
+        get: operations["bootstrap_api_v1_sync_bootstrap_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/training-years": {
         parameters: {
             query?: never;
@@ -1601,6 +1774,59 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /**
+         * AbsenceReportIn
+         * @description `POST /absence-reports`. §5.7's "הודיעו מראש".
+         *
+         *     §10.2: this **requires a connection on purpose** and the parent app says so, rather
+         *     than queuing into the void. There is deliberately no `client_mark_id` here — an
+         *     offline pre-report that syncs after the class started is not a pre-report, and giving
+         *     it a queue id would imply otherwise.
+         */
+        AbsenceReportIn: {
+            /** Reason */
+            reason?: string | null;
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+        };
+        /** AbsenceReportOut */
+        AbsenceReportOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Reason */
+            reason: string | null;
+            /**
+             * Reported By Person Id
+             * Format: uuid
+             */
+            reported_by_person_id: string;
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+        };
+        /**
          * AcceptInvitationRequest
          * @description §6.1 step 3's `[ יש לי קוד הזמנה ]` branch.
          *
@@ -1627,6 +1853,167 @@ export interface components {
             /** Staff */
             staff: boolean;
         };
+        /**
+         * AttendanceConflictOut
+         * @description One dismissible card. §10.5: "nothing is silently dropped".
+         *
+         *     A card is raised **beside** stored marks, never instead of them. `count` is how many
+         *     marks it concerns, which is what artboard `1c`'s copy interpolates
+         *     (`השיעור בוטל — התקבלו 22 סימוני נוכחות`).
+         */
+        AttendanceConflictOut: {
+            /** Count */
+            count: number;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "session_cancelled" | "student_unenrolled" | "rejected";
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
+            /** Student Ids */
+            student_ids?: string[];
+        };
+        /**
+         * AttendanceIn
+         * @description One mark, as the client produces it.
+         *
+         *     `client_mark_id` is **required and client-generated**. §10.3: the local write is not
+         *     an API call, so the id cannot come from one — it exists in `pending_ops` before the
+         *     device has any idea when it will next reach a network. It is what makes a replay
+         *     idempotent (§10.5, "same device flushes twice → no-op").
+         *
+         *     `device_marked_at` is likewise the client's clock, not the server's. §10.5 resolves a
+         *     two-coach conflict on it, because resolving on arrival time would let whoever
+         *     reconnected second overwrite the earlier mark.
+         */
+        AttendanceIn: {
+            /**
+             * Client Mark Id
+             * Format: uuid
+             */
+            client_mark_id: string;
+            /**
+             * Device Marked At
+             * Format: date-time
+             */
+            device_marked_at: string;
+            /** Note */
+            note?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "unmarked" | "present" | "absent_excused" | "absent_unexcused";
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+        };
+        /** AttendanceOut */
+        AttendanceOut: {
+            /**
+             * Client Mark Id
+             * Format: uuid
+             */
+            client_mark_id: string;
+            /**
+             * Device Marked At
+             * Format: date-time
+             */
+            device_marked_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Marked At
+             * Format: date-time
+             */
+            marked_at: string;
+            /** Marked By Person Id */
+            marked_by_person_id: string | null;
+            /** Note */
+            note: string | null;
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "coach" | "parent" | "bulk" | "system";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "unmarked" | "present" | "absent_excused" | "absent_unexcused";
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+        };
+        /**
+         * BatchAttendanceIn
+         * @description `POST /attendance/batch` — §7 marks it **(idempotent)**.
+         *
+         *     The batch is the offline queue's flush. It is idempotent per *mark*, on
+         *     `client_mark_id`, rather than per request: a queue that partially reached the server
+         *     must be safe to resend whole, and a request-level key would make the second attempt a
+         *     no-op that silently dropped the marks the first attempt never delivered.
+         */
+        BatchAttendanceIn: {
+            /** Marks */
+            marks: components["schemas"]["AttendanceIn"][];
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
+            /** Session Status Seen */
+            session_status_seen?: string | null;
+        };
+        /**
+         * BatchResult
+         * @description What the server did with a flush.
+         *
+         *     Four numbers rather than one, because the client shows different things for each:
+         *
+         *     * `applied` — written. The queue entry is done.
+         *     * `replayed` — the same `client_mark_id` was already stored (§10.5). **Also done**: a
+         *       replay is a successful flush, not a failure, and a client that retried it forever
+         *       would never drain its queue.
+         *     * `superseded` — somebody else's later mark won on `device_marked_at`. Done too, and
+         *       worth showing: the coach's tap did reach the server and did not take effect.
+         *     * `conflicts` — stored, and a human has to decide.
+         */
+        BatchResult: {
+            /**
+             * Applied
+             * @default 0
+             */
+            applied: number;
+            /** Conflicts */
+            conflicts?: components["schemas"]["AttendanceConflictOut"][];
+            /**
+             * Replayed
+             * @default 0
+             */
+            replayed: number;
+            /**
+             * Superseded
+             * @default 0
+             */
+            superseded: number;
+        };
         /** Body_upload_logo_api_v1_studio_logo_post */
         Body_upload_logo_api_v1_studio_logo_post: {
             /**
@@ -1642,6 +2029,66 @@ export interface components {
              * @description The studio's own declaration, as a PDF.
              */
             file: string;
+        };
+        /**
+         * BootstrapPayload
+         * @description `GET /sync/bootstrap?from&to` — §6.1's offline priming payload.
+         *
+         *     **Everything the staff app needs before it loses the network.** §6.1 makes first launch
+         *     block on this, so it is one round trip by design rather than a convenience wrapper.
+         *
+         *     `server_time` is carried so the client can detect clock skew: §10.5 resolves conflicts
+         *     on `device_marked_at`, and a device whose clock is an hour out would win or lose every
+         *     conflict for the wrong reason. §10.4's staleness banner is computed from it too.
+         */
+        BootstrapPayload: {
+            /**
+             * From Time
+             * Format: date-time
+             */
+            from_time: string;
+            /** Rosters */
+            rosters?: {
+                [key: string]: components["schemas"]["RosterEntry"][];
+            };
+            /**
+             * Server Time
+             * Format: date-time
+             */
+            server_time: string;
+            /** Sessions */
+            sessions?: components["schemas"]["SessionOut"][];
+            /**
+             * To Time
+             * Format: date-time
+             */
+            to_time: string;
+        };
+        /**
+         * BulkPresentIn
+         * @description `POST /sessions/{id}/attendance/bulk-present`.
+         *
+         *     §5.7's "bulk mark with the pre-report protection rule", and the rule is in the name of
+         *     the field below. §10.5: **a parent pre-report never loses to a bulk action regardless
+         *     of timestamp.** The default is therefore to protect, so a caller that omits the field
+         *     gets the safe branch rather than overwriting every parent who reported this morning.
+         */
+        BulkPresentIn: {
+            /**
+             * Client Mark Id Prefix
+             * Format: uuid
+             */
+            client_mark_id_prefix: string;
+            /**
+             * Device Marked At
+             * Format: date-time
+             */
+            device_marked_at: string;
+            /**
+             * Respect Absence Reports
+             * @default true
+             */
+            respect_absence_reports: boolean;
         };
         /** CallbackRequest */
         CallbackRequest: {
@@ -1793,6 +2240,18 @@ export interface components {
              * Format: uuid
              */
             training_year_id: string;
+        };
+        /** CursorPage[AttendanceOut] */
+        CursorPage_AttendanceOut_: {
+            /**
+             * Has More
+             * @default false
+             */
+            has_more: boolean;
+            /** Items */
+            items: components["schemas"]["AttendanceOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
         };
         /** CursorPage[ClosureOut] */
         CursorPage_ClosureOut_: {
@@ -2683,6 +3142,58 @@ export interface components {
             submitted_at: string;
         };
         /**
+         * RosterEntry
+         * @description One student on a coach's roster. **The W3 seam** (plan §1.3 seam 4).
+         *
+         *     `health_status` and `derived_flags` are M4's to populate and M5's to render. They are
+         *     on this shape rather than fetched separately because the roster must render **offline**
+         *     (§6.1) — a badge that needs a second request is a badge that is blank in a basement,
+         *     which is the one place §5.5's warning actually matters.
+         *
+         *     §5.5's gate is a **hard block in the parent app only**. Nothing on the mat is ever
+         *     blocked: this shape carries the ⚠ and the coach can still mark the student present.
+         *     There is deliberately no `blocked` field, because there is deliberately no
+         *     `block_attendance_without_health` setting.
+         */
+        RosterEntry: {
+            /** Absence Reason */
+            absence_reason?: string | null;
+            /** Belt Color Hex */
+            belt_color_hex?: string | null;
+            /** Belt Name */
+            belt_name?: string | null;
+            /** Derived Flags */
+            derived_flags?: {
+                [key: string]: boolean;
+            };
+            /** Display Name */
+            display_name: string;
+            /**
+             * Has Absence Report
+             * @default false
+             */
+            has_absence_report: boolean;
+            /**
+             * Health Status
+             * @default missing
+             * @enum {string}
+             */
+            health_status: "missing" | "trial_signed" | "signed";
+            /** Source */
+            source?: ("coach" | "parent" | "bulk" | "system") | null;
+            /**
+             * Status
+             * @default unmarked
+             * @enum {string}
+             */
+            status: "unmarked" | "present" | "absent_excused" | "absent_unexcused";
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+        };
+        /**
          * ScheduleImpactPreview
          * @description §5.6's impact dialog: "showing exactly what will change before it changes."
          *
@@ -2978,6 +3489,15 @@ export interface components {
             expires_in: number;
             /** Studios */
             studios: components["schemas"]["StudioMembershipOut"][];
+        };
+        /**
+         * SessionRosterOut
+         * @description `GET /sessions/{id}/attendance`.
+         */
+        SessionRosterOut: {
+            /** Roster */
+            roster?: components["schemas"]["RosterEntry"][];
+            session: components["schemas"]["SessionOut"];
         };
         /**
          * SessionStaffIn
@@ -3842,6 +4362,108 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    report_absence_api_v1_absence_reports_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AbsenceReportIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AbsenceReportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_absence_report_api_v1_absence_reports__session_id___student_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    apply_batch_api_v1_attendance_batch_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BatchAttendanceIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BatchResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     accept_invitation_code_api_v1_auth_accept_invitation_post: {
         parameters: {
             query?: never;
@@ -5484,6 +6106,75 @@ export interface operations {
             };
         };
     };
+    get_session_roster_api_v1_sessions__session_id__attendance_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionRosterOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    bulk_present_api_v1_sessions__session_id__attendance_bulk_present_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkPresentIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BatchResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     cancel_session_api_v1_sessions__session_id__cancel_post: {
         parameters: {
             query?: never;
@@ -5817,6 +6508,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StudentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    student_attendance_api_v1_students__student_id__attendance_get: {
+        parameters: {
+            query?: {
+                cursor?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CursorPage_AttendanceOut_"];
                 };
             };
             /** @description Validation Error */
@@ -6462,6 +7187,38 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    bootstrap_api_v1_sync_bootstrap_get: {
+        parameters: {
+            query?: {
+                from?: string | null;
+                to?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BootstrapPayload"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
             };
         };
     };

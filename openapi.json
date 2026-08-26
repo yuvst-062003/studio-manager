@@ -1,6 +1,89 @@
 {
   "components": {
     "schemas": {
+      "AbsenceReportIn": {
+        "description": "`POST /absence-reports`. §5.7's \"הודיעו מראש\".\n\n§10.2: this **requires a connection on purpose** and the parent app says so, rather\nthan queuing into the void. There is deliberately no `client_mark_id` here — an\noffline pre-report that syncs after the class started is not a pre-report, and giving\nit a queue id would imply otherwise.",
+        "properties": {
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "session_id": {
+            "format": "uuid",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "student_id",
+          "session_id"
+        ],
+        "title": "AbsenceReportIn",
+        "type": "object"
+      },
+      "AbsenceReportOut": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "reported_by_person_id": {
+            "format": "uuid",
+            "title": "Reported By Person Id",
+            "type": "string"
+          },
+          "session_id": {
+            "format": "uuid",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "student_id",
+          "session_id",
+          "reported_by_person_id",
+          "reason",
+          "created_at"
+        ],
+        "title": "AbsenceReportOut",
+        "type": "object"
+      },
       "AcceptInvitationRequest": {
         "description": "§6.1 step 3's `[ יש לי קוד הזמנה ]` branch.\n\nThe callback already accepts an `invitation_token`, but that only helps someone who\nhas the code BEFORE they sign in. A parent whose email differs from the invitation by\none character signs in successfully, matches nothing, and needs a way forward that is\nnot \"sign out and start again with a code you were not told to keep\".",
         "properties": {
@@ -36,6 +119,250 @@
         "title": "AppAccessOut",
         "type": "object"
       },
+      "AttendanceConflictOut": {
+        "description": "One dismissible card. §10.5: \"nothing is silently dropped\".\n\nA card is raised **beside** stored marks, never instead of them. `count` is how many\nmarks it concerns, which is what artboard `1c`'s copy interpolates\n(`השיעור בוטל — התקבלו 22 סימוני נוכחות`).",
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "kind": {
+            "enum": [
+              "session_cancelled",
+              "student_unenrolled",
+              "rejected"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "session_id": {
+            "format": "uuid",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "student_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Student Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "kind",
+          "session_id",
+          "count"
+        ],
+        "title": "AttendanceConflictOut",
+        "type": "object"
+      },
+      "AttendanceIn": {
+        "description": "One mark, as the client produces it.\n\n`client_mark_id` is **required and client-generated**. §10.3: the local write is not\nan API call, so the id cannot come from one — it exists in `pending_ops` before the\ndevice has any idea when it will next reach a network. It is what makes a replay\nidempotent (§10.5, \"same device flushes twice → no-op\").\n\n`device_marked_at` is likewise the client's clock, not the server's. §10.5 resolves a\ntwo-coach conflict on it, because resolving on arrival time would let whoever\nreconnected second overwrite the earlier mark.",
+        "properties": {
+          "client_mark_id": {
+            "format": "uuid",
+            "title": "Client Mark Id",
+            "type": "string"
+          },
+          "device_marked_at": {
+            "format": "date-time",
+            "title": "Device Marked At",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "status": {
+            "enum": [
+              "unmarked",
+              "present",
+              "absent_excused",
+              "absent_unexcused"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "student_id",
+          "status",
+          "client_mark_id",
+          "device_marked_at"
+        ],
+        "title": "AttendanceIn",
+        "type": "object"
+      },
+      "AttendanceOut": {
+        "properties": {
+          "client_mark_id": {
+            "format": "uuid",
+            "title": "Client Mark Id",
+            "type": "string"
+          },
+          "device_marked_at": {
+            "format": "date-time",
+            "title": "Device Marked At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "marked_at": {
+            "format": "date-time",
+            "title": "Marked At",
+            "type": "string"
+          },
+          "marked_by_person_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Marked By Person Id"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "session_id": {
+            "format": "uuid",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "source": {
+            "enum": [
+              "coach",
+              "parent",
+              "bulk",
+              "system"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "unmarked",
+              "present",
+              "absent_excused",
+              "absent_unexcused"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "session_id",
+          "student_id",
+          "status",
+          "source",
+          "marked_by_person_id",
+          "marked_at",
+          "device_marked_at",
+          "client_mark_id",
+          "note"
+        ],
+        "title": "AttendanceOut",
+        "type": "object"
+      },
+      "BatchAttendanceIn": {
+        "description": "`POST /attendance/batch` — §7 marks it **(idempotent)**.\n\nThe batch is the offline queue's flush. It is idempotent per *mark*, on\n`client_mark_id`, rather than per request: a queue that partially reached the server\nmust be safe to resend whole, and a request-level key would make the second attempt a\nno-op that silently dropped the marks the first attempt never delivered.",
+        "properties": {
+          "marks": {
+            "items": {
+              "$ref": "#/components/schemas/AttendanceIn"
+            },
+            "maxItems": 500,
+            "minItems": 1,
+            "title": "Marks",
+            "type": "array"
+          },
+          "session_id": {
+            "format": "uuid",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "session_status_seen": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Status Seen"
+          }
+        },
+        "required": [
+          "session_id",
+          "marks"
+        ],
+        "title": "BatchAttendanceIn",
+        "type": "object"
+      },
+      "BatchResult": {
+        "description": "What the server did with a flush.\n\nFour numbers rather than one, because the client shows different things for each:\n\n* `applied` — written. The queue entry is done.\n* `replayed` — the same `client_mark_id` was already stored (§10.5). **Also done**: a\n  replay is a successful flush, not a failure, and a client that retried it forever\n  would never drain its queue.\n* `superseded` — somebody else's later mark won on `device_marked_at`. Done too, and\n  worth showing: the coach's tap did reach the server and did not take effect.\n* `conflicts` — stored, and a human has to decide.",
+        "properties": {
+          "applied": {
+            "default": 0,
+            "title": "Applied",
+            "type": "integer"
+          },
+          "conflicts": {
+            "items": {
+              "$ref": "#/components/schemas/AttendanceConflictOut"
+            },
+            "title": "Conflicts",
+            "type": "array"
+          },
+          "replayed": {
+            "default": 0,
+            "title": "Replayed",
+            "type": "integer"
+          },
+          "superseded": {
+            "default": 0,
+            "title": "Superseded",
+            "type": "integer"
+          }
+        },
+        "title": "BatchResult",
+        "type": "object"
+      },
       "Body_upload_logo_api_v1_studio_logo_post": {
         "properties": {
           "file": {
@@ -64,6 +391,79 @@
           "file"
         ],
         "title": "Body_upload_source_pdf_api_v1_health_templates__template_id__source_pdf_post",
+        "type": "object"
+      },
+      "BootstrapPayload": {
+        "description": "`GET /sync/bootstrap?from&to` — §6.1's offline priming payload.\n\n**Everything the staff app needs before it loses the network.** §6.1 makes first launch\nblock on this, so it is one round trip by design rather than a convenience wrapper.\n\n`server_time` is carried so the client can detect clock skew: §10.5 resolves conflicts\non `device_marked_at`, and a device whose clock is an hour out would win or lose every\nconflict for the wrong reason. §10.4's staleness banner is computed from it too.",
+        "properties": {
+          "from_time": {
+            "format": "date-time",
+            "title": "From Time",
+            "type": "string"
+          },
+          "rosters": {
+            "additionalProperties": {
+              "items": {
+                "$ref": "#/components/schemas/RosterEntry"
+              },
+              "type": "array"
+            },
+            "propertyNames": {
+              "format": "uuid"
+            },
+            "title": "Rosters",
+            "type": "object"
+          },
+          "server_time": {
+            "format": "date-time",
+            "title": "Server Time",
+            "type": "string"
+          },
+          "sessions": {
+            "items": {
+              "$ref": "#/components/schemas/SessionOut"
+            },
+            "title": "Sessions",
+            "type": "array"
+          },
+          "to_time": {
+            "format": "date-time",
+            "title": "To Time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "server_time",
+          "from_time",
+          "to_time"
+        ],
+        "title": "BootstrapPayload",
+        "type": "object"
+      },
+      "BulkPresentIn": {
+        "description": "`POST /sessions/{id}/attendance/bulk-present`.\n\n§5.7's \"bulk mark with the pre-report protection rule\", and the rule is in the name of\nthe field below. §10.5: **a parent pre-report never loses to a bulk action regardless\nof timestamp.** The default is therefore to protect, so a caller that omits the field\ngets the safe branch rather than overwriting every parent who reported this morning.",
+        "properties": {
+          "client_mark_id_prefix": {
+            "format": "uuid",
+            "title": "Client Mark Id Prefix",
+            "type": "string"
+          },
+          "device_marked_at": {
+            "format": "date-time",
+            "title": "Device Marked At",
+            "type": "string"
+          },
+          "respect_absence_reports": {
+            "default": true,
+            "title": "Respect Absence Reports",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "client_mark_id_prefix",
+          "device_marked_at"
+        ],
+        "title": "BulkPresentIn",
         "type": "object"
       },
       "CallbackRequest": {
@@ -401,6 +801,39 @@
           "source"
         ],
         "title": "ClosureOut",
+        "type": "object"
+      },
+      "CursorPage_AttendanceOut_": {
+        "properties": {
+          "has_more": {
+            "default": false,
+            "title": "Has More",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AttendanceOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "CursorPage[AttendanceOut]",
         "type": "object"
       },
       "CursorPage_ClosureOut_": {
@@ -2408,6 +2841,109 @@
         "title": "RegistrationRequestOut",
         "type": "object"
       },
+      "RosterEntry": {
+        "description": "One student on a coach's roster. **The W3 seam** (plan §1.3 seam 4).\n\n`health_status` and `derived_flags` are M4's to populate and M5's to render. They are\non this shape rather than fetched separately because the roster must render **offline**\n(§6.1) — a badge that needs a second request is a badge that is blank in a basement,\nwhich is the one place §5.5's warning actually matters.\n\n§5.5's gate is a **hard block in the parent app only**. Nothing on the mat is ever\nblocked: this shape carries the ⚠ and the coach can still mark the student present.\nThere is deliberately no `blocked` field, because there is deliberately no\n`block_attendance_without_health` setting.",
+        "properties": {
+          "absence_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Absence Reason"
+          },
+          "belt_color_hex": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Belt Color Hex"
+          },
+          "belt_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Belt Name"
+          },
+          "derived_flags": {
+            "additionalProperties": {
+              "type": "boolean"
+            },
+            "title": "Derived Flags",
+            "type": "object"
+          },
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "has_absence_report": {
+            "default": false,
+            "title": "Has Absence Report",
+            "type": "boolean"
+          },
+          "health_status": {
+            "default": "missing",
+            "enum": [
+              "missing",
+              "trial_signed",
+              "signed"
+            ],
+            "title": "Health Status",
+            "type": "string"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "enum": [
+                  "coach",
+                  "parent",
+                  "bulk",
+                  "system"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "status": {
+            "default": "unmarked",
+            "enum": [
+              "unmarked",
+              "present",
+              "absent_excused",
+              "absent_unexcused"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "student_id",
+          "display_name"
+        ],
+        "title": "RosterEntry",
+        "type": "object"
+      },
       "ScheduleImpactPreview": {
         "description": "§5.6's impact dialog: \"showing exactly what will change before it changes.\"\n\nThe three protected counts are listed separately rather than summed, because the\nmanager's question is not \"how many are safe\" but \"what am I about to lose\". E2E-5\nasserts `sessions_protected_manually_edited` is non-zero for a group with an edited\nsession and that those sessions are unchanged afterwards.",
         "properties": {
@@ -2963,6 +3499,26 @@
           "active_studio_id"
         ],
         "title": "SessionResponse",
+        "type": "object"
+      },
+      "SessionRosterOut": {
+        "description": "`GET /sessions/{id}/attendance`.",
+        "properties": {
+          "roster": {
+            "items": {
+              "$ref": "#/components/schemas/RosterEntry"
+            },
+            "title": "Roster",
+            "type": "array"
+          },
+          "session": {
+            "$ref": "#/components/schemas/SessionOut"
+          }
+        },
+        "required": [
+          "session"
+        ],
+        "title": "SessionRosterOut",
         "type": "object"
       },
       "SessionStaffIn": {
@@ -5121,6 +5677,182 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/absence-reports": {
+      "post": {
+        "description": "§5.7's \"לא אגיע היום\".\n\n**Deliberately not queueable** (§10.2): \"a parent's absence pre-report requires a\nconnection on purpose — it is time-critical and worthless if it lands after the lesson.\nThe app says so rather than queuing it into the void.\" The deadline is checked against\nthe *server's* clock, because a device an hour behind would otherwise file a pre-report\nfor a lesson already in progress.",
+        "operationId": "report_absence_api_v1_absence_reports_post",
+        "parameters": [
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AbsenceReportIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AbsenceReportOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Report Absence",
+        "tags": [
+          "coach",
+          "attendance"
+        ]
+      }
+    },
+    "/api/v1/absence-reports/{session_id}/{student_id}": {
+      "delete": {
+        "description": "Artboard `12a`'s `ביטול הדיווח`.\n\nKeyed on (session, student) rather than on the report's own id, because that pair is\nwhat the parent app has: it renders the notice from the roster, which carries\n`has_absence_report` and not a report id.",
+        "operationId": "cancel_absence_report_api_v1_absence_reports__session_id___student_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cancel Absence Report",
+        "tags": [
+          "coach",
+          "attendance"
+        ]
+      }
+    },
+    "/api/v1/attendance/batch": {
+      "post": {
+        "description": "§7's `POST /attendance/batch  (idempotent)` — the offline queue drains here.\n\n**200 and not 201**, even when rows are created: the queue replays this request, and a\nclient that treated 201 as \"new work happened\" would raise a fresh toast on every\nreconnect for marks it made three hours ago.\n\nIdempotency is per *mark* on `client_mark_id`, not per request. `Idempotency-Key` is\naccepted for consistency with the rest of the API and is not what makes this safe — a\nrequest-level key would make the second attempt a no-op that silently dropped the marks\nthe first attempt never delivered.",
+        "operationId": "apply_batch_api_v1_attendance_batch_post",
+        "parameters": [
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchAttendanceIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Apply Batch",
+        "tags": [
+          "coach",
+          "attendance"
+        ]
+      }
+    },
     "/api/v1/auth/accept-invitation": {
       "post": {
         "description": "§6.1 step 3 -- '[ יש לי קוד הזמנה ]'.\n\nThe same `accept_invitation` the callback uses, reached by someone who is already\nsigned in. Without it, a correctly-invited parent whose email differs from the\ninvitation by one character has no way forward at all -- and cannot tell their\nsituation apart from a genuine refusal.",
@@ -7778,6 +8510,125 @@
         ]
       }
     },
+    "/api/v1/sessions/{session_id}/attendance": {
+      "get": {
+        "description": "Artboards `1c` and `9f`. §3.2 gives every staff role the register.",
+        "operationId": "get_session_roster_api_v1_sessions__session_id__attendance_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionRosterOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Session Roster",
+        "tags": [
+          "coach",
+          "attendance"
+        ]
+      }
+    },
+    "/api/v1/sessions/{session_id}/attendance/bulk-present": {
+      "post": {
+        "description": "§5.7's `סמן הכל נוכח`.\n\nIt never overwrites a parent's advance notice, whatever the request body says — see\n`AttendanceService._bulk_touches`. Artboards `9f` and `1e` both draw a button that does,\nand `attendance.source.preReportedHint` already ships the copy saying it does not.",
+        "operationId": "bulk_present_api_v1_sessions__session_id__attendance_bulk_present_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkPresentIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Bulk Present",
+        "tags": [
+          "coach",
+          "attendance"
+        ]
+      }
+    },
     "/api/v1/sessions/{session_id}/cancel": {
       "post": {
         "operationId": "cancel_session_api_v1_sessions__session_id__cancel_post",
@@ -8416,6 +9267,80 @@
         "summary": "Update Student",
         "tags": [
           "people"
+        ]
+      }
+    },
+    "/api/v1/students/{student_id}/attendance": {
+      "get": {
+        "description": "Artboard `2d`'s eight marks and `4a`'s twelve — the two artboards disagree on the\nwindow (`2d` finding 9), so the count is the caller's and neither is baked in here.",
+        "operationId": "student_attendance_api_v1_students__student_id__attendance_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CursorPage_AttendanceOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Student Attendance",
+        "tags": [
+          "coach",
+          "attendance"
         ]
       }
     },
@@ -9405,6 +10330,75 @@
         "summary": "Upload Logo",
         "tags": [
           "studio"
+        ]
+      }
+    },
+    "/api/v1/sync/bootstrap": {
+      "get": {
+        "description": "Everything a coach needs for a date window, in one payload.\n\n**Both parameters are optional and default to today and tomorrow**, which is §6.1's\nwindow verbatim. A first launch has no watermark to compute a range from, and making\nit invent one would put the definition of \"the window\" in every client rather than\nhere.\n\nThe window is clamped to §10.6's two days and echoed back in `from_time`/`to_time`, so\na client asking for a week gets two days and can *tell* that it did — it evicts against\nwhat it received rather than what it asked for.",
+        "operationId": "bootstrap_api_v1_sync_bootstrap_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BootstrapPayload"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Bootstrap",
+        "tags": [
+          "coach",
+          "attendance"
         ]
       }
     },
