@@ -71,6 +71,40 @@ describe('TextField', () => {
     expect(screen.getByLabelText('טלפון')).toHaveAttribute('id', 'phone')
   })
 
+  it('renders a textarea when multiline, and keeps every accessibility wire', async () => {
+    // Four artboards want a multi-line field -- 7b's event consent text (4000 chars),
+    // 12c, 9g and 9d's examiner note -- and the whole reason it belongs to the primitive
+    // rather than to whichever lane needs it first is that the label wiring,
+    // aria-describedby, aria-invalid and data-state are written ONCE. Two lanes each
+    // building a local <textarea> is how those four diverge.
+    const user = userEvent.setup()
+    renderIn(<TextField error="חובה למלא נוסח" label="נוסח האישור" multiline rows={4} />)
+
+    const field = screen.getByLabelText('נוסח האישור')
+    expect(field.tagName).toBe('TEXTAREA')
+    expect(field).toBeInvalid()
+    expect(field).toHaveAccessibleDescription('חובה למלא נוסח')
+    expect(field).toHaveAttribute('data-state', 'error')
+    expect(field).toHaveAttribute('rows', '4')
+
+    await user.type(field, 'שורה')
+    expect(field).toHaveValue('שורה')
+  })
+
+  it('is an input when multiline is absent, so nothing changes for the other twenty fields', () => {
+    renderIn(<TextField label="שם" />)
+    expect(screen.getByLabelText('שם').tagName).toBe('INPUT')
+  })
+
+  it('forwards textarea-only attributes, which an input would reject', () => {
+    // The discriminated union earns its keep here: `rows` and `maxLength` on a textarea
+    // are not the same attribute set as `type` and `inputMode` on an input, and a shared
+    // prop bag typed as the intersection would accept neither cleanly.
+    renderIn(<TextField label="הערה" maxLength={500} multiline rows={2} />)
+    const field = screen.getByLabelText('הערה')
+    expect(field).toHaveAttribute('maxlength', '500')
+  })
+
   it('forwards native input attributes such as type and inputMode', () => {
     renderIn(<TextField inputMode="tel" label="טלפון" type="tel" />)
     const input = screen.getByLabelText('טלפון')

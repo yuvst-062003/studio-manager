@@ -168,6 +168,23 @@
   padding-inline: var(--field-pad-inline);
 }
 
+/* `multiline` — the textarea branch. It inherits every rule above, which is the point:
+   the border, the focus ring and the error state are the same field, drawn taller.
+
+   `resize: block` and not `vertical` (D10/G12): the growth direction is the block axis in
+   every writing mode, and `vertical` happens to mean the same thing only because both
+   locales here are horizontal. `vertical` is kept first as the fallback for anything that
+   does not know the logical keyword, and the logical one overrides it where it is known.
+
+   Growth is deliberately one-axis. A textarea resizable on the inline axis can be dragged
+   wider than its own form column, which in RTL pushes its start edge off the reading side. */
+.studio-field__input--multiline {
+  line-height: var(--leading-normal);
+  min-block-size: 6rem;
+  resize: vertical;
+  resize: block;
+}
+
 .studio-field__input::placeholder {
   color: var(--text-muted);
 }
