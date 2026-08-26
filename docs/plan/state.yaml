@@ -197,6 +197,30 @@ waves:
         title: §6.1's blocking offline prime and §6.5's blocking stale-queue warning
         status: shipped
         on: 2026-08-26
+      - id: M4.1
+        title: The derived-flag pipeline and W3's cross-lane seam filled
+        status: shipped
+        on: 2026-08-26
+      - id: M4.2
+        title: D11's editable full template — draft, publish, and the studio's own PDF
+        status: shipped
+        on: 2026-08-26
+      - id: M4.3
+        title: The declaration flow — encrypted answers and signature, audit-logged full reads
+        status: shipped
+        on: 2026-08-26
+      - id: M4.4
+        title: Hebrew signed-PDF rendering with an embedded Noto face, bidi, and the golden fixture
+        status: shipped
+        on: 2026-08-26
+      - id: M4.5
+        title: The day 1/3/7 reminder ladder, and renewal only when the studio asked for one
+        status: shipped
+        on: 2026-08-26
+      - id: M4.6
+        title: Artboards — parent 12c, dashboard 4e, and the roster-row badge (conflict C2)
+        status: shipped
+        on: 2026-08-26
   - id: W4
     milestone: M6 ∥ M7
     title: Money ∥ Events and belts
