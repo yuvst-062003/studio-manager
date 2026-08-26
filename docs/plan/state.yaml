@@ -332,9 +332,22 @@ waves:
         on: 2026-08-26
       - id: W5.G3
         title: >-
-          Lane GATES — E2E-1, E2E-2, E2E-3 and E2E-4. Blocked on product defects found by
-          building the harness; see HB-e2e-parent-billing-api, HB-e2e-registration-approval
-          and HB-e2e-demo-reset.
+          Lane GATES — the payer-facing billing reads (/me/charges, /me/balance,
+          /me/payments), the parent payments screen mounted behind #/payments, and §19.6's
+          demo-studio simulator branch. E2E-3 green with no fixme.
+        status: shipped
+        on: 2026-08-26
+      - id: W5.G4
+        title: >-
+          Lane GATES — the E2E stack owns its own database, so pytest and a live E2E run
+          stop sharing rows and one lane's migration stops deciding another's schema.
+        status: shipped
+        on: 2026-08-26
+      - id: W5.G5
+        title: >-
+          Lane GATES — E2E-1, E2E-2 and E2E-4. E2E-1 blocked on
+          HB-e2e-registration-approval; E2E-4 partly blocked on HB-e2e-manager-alert-counts;
+          E2E-2 not started.
         status: pending
   - id: W6
     milestone: M10
@@ -415,12 +428,63 @@ holdbacks:
       What closes this: parent-reachable reads for a payer's own charges, balance and
       payments. That is W4's design decision, not a gate lane's — the `/me/*` shape the rest
       of the parent app uses is the obvious candidate.
+
+      AMENDED 2026-08-26 by lane GATES, and PARTLY CLOSED. `/me/charges`, `/me/balance` and
+      `/me/payments` now exist, the screen is mounted behind `#/payments`, and E2E-3 is
+      green with no fixme. §19.6's client half is closed with it: the demo studio's payment
+      step renders the simulator branch instead of a generic error.
+
+      Two smaller reads are still missing and both cost a §5.10 assertion. `ChargeOut`
+      carries no field saying a charge already sits inside an open order, so
+      `covered-elsewhere` cannot render for a parent and the double-payment refusal arrives
+      as a generic error rather than naming the month — the guard holds, the explanation
+      does not. And `GET /recurring-subscriptions` is manager-only, so the standing-order
+      warning can never be shown to the person §5.10 says decides, which is why E2E-3's
+      third test is absent rather than written against an implementation that is not there.
+
+      The three that landed are in `app/routers/billing.py` and `app/routers/payments.py`,
+      which is W4's code. It was done here because without it E2E-3 could not be written at
+      all and W4's exit gate stays theatre — the same reasoning that gave this lane the
+      App.tsx exception. The parent app's own `billingClient.ts` is untouched; the container
+      implements the same interface, so lane MONEY's file changes when lane MONEY changes it.
     blocks: E2E-3 · W4 exit gate
     status: open
     opened: 2026-08-26
     source: >-
       app/routers/billing.py list_charges/payer_balance/list_products ·
       web/apps/parent/src/features/billing/billingClient.ts · SPEC §5.10 · §19.6
+  - id: HB-e2e-manager-alert-counts
+    kind: carried
+    title: §5.10's high-priority manager alert has no endpoint behind its numbers
+    why: >-
+      `DebtAlert` renders §5.10's "a high-priority manager alert is raised" from three
+      counts — `overdueHouseholds`, `amountMismatches` and `staleOrders`. The last two are
+      facts about `payment_order`, and there is no endpoint that lists or counts orders:
+      §7 exposes `POST /payment-orders` and `GET /payment-orders/{public_ref}` and nothing
+      else. So the component exists, the copy exists, `registerBillingAlerts` exists, and
+      nothing can supply the numbers.
+
+      The same gap accounts for §5.10's last threat row, "nightly job flags orders pending
+      for more than 24h": the job can flag them, and the alert centre cannot count them.
+
+      Found while writing E2E-4, whose first test ends "and the manager is alerted, at high
+      priority" and whose fourth is entirely about the pending-order sweep. The rest of
+      that flow is provable and the backend behaviour is correct — verified on 2026-08-26
+      by firing all four §19.5 shapes at real orders: success settles and allocates,
+      amount_mismatch leaves the order `amount_mismatch` with the charges open and the raw
+      "319.99" in the IPN log, forged_ref leaves the order `pending` and lands unmatched,
+      and a duplicate delivery creates no second payment.
+
+      What closes this: a manager-facing read over payment orders, filterable by status —
+      or a counts endpoint for the alert centre, which is the narrower answer. Either is a
+      W4 decision rather than a gate lane's, which is why E2E-4 is not written around a
+      guess.
+    blocks: E2E-4 · W4 exit gate
+    status: open
+    opened: 2026-08-26
+    source: >-
+      web/apps/dashboard/src/features/billing/DebtAlert.tsx · app/routers/payments.py ·
+      SPEC §5.10
   - id: HB-e2e-registration-approval
     kind: carried
     title: Approving a parent-app registration request 500s for any guardian without an email
