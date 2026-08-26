@@ -15,7 +15,9 @@ yet. That is the point: the contract exists before either implementation does.
 
 from __future__ import annotations
 
+import ast
 import inspect
+import textwrap
 import uuid
 from datetime import date
 from functools import cache
@@ -277,8 +279,37 @@ def test_enqueue_is_typed_end_to_end():
     assert signature["return"].endswith("comms.Notification'>")
 
 
-def test_enqueue_is_the_only_way_in_and_refuses_rather_than_returning_nothing():
+def test_enqueue_is_implemented_and_is_still_the_only_way_in():
+    """This asserted `pytest.raises(NotImplementedError)` until lane COMMS (M8) landed.
+
+    What the test is FOR has not changed, so the assertion moved rather than went away. The
+    seam is the one entry point: §5.11's rule is that every message reaches both levels, and
+    a caller that wrote the `notification` row itself would produce an inbox entry with no
+    push and no `notification_delivery` rows -- no delivery report, and the silent-failure
+    gap §5.11 exists to close reopens for exactly the alerts M9 raises.
+
+    Two halves, both structural, because this file is deliberately signature-only and has no
+    database: the seam has a real body now, and it has not grown a second public door for a
+    caller to slip through. The behaviour those two stand for is asserted against a real
+    database in `tests/comms/test_the_fan_out.py`.
+    """
     from app.services.comms import NotificationService
 
-    with pytest.raises(NotImplementedError):
-        NotificationService().enqueue(uuid.uuid4(), "belt_awarded", "t", "b", {})
+    source = textwrap.dedent(inspect.getsource(NotificationService.enqueue))
+    body = ast.parse(source).body[0].body
+    if body and isinstance(body[0], ast.Expr) and isinstance(body[0].value, ast.Constant):
+        body = body[1:]
+    assert body, "enqueue is a docstring and nothing else"
+    assert not (len(body) == 1 and isinstance(body[0], ast.Raise)), (
+        "enqueue still refuses -- W5's seam was reverted"
+    )
+
+    public = {
+        name
+        for name in vars(NotificationService)
+        if not name.startswith("_") and callable(getattr(NotificationService, name))
+    }
+    assert public == {"enqueue"}, (
+        f"NotificationService grew a second entry point: {sorted(public - {'enqueue'})}. "
+        "M9 is a pure caller of enqueue, and a second door is a message with no delivery row."
+    )

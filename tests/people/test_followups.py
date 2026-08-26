@@ -22,11 +22,13 @@ from tests.people.conftest import T0, TODAY, make_session
 
 @pytest.fixture
 def sent(monkeypatch):
-    """Capture what the ladder would send, instead of letting W5's seam refuse.
+    """Capture what the ladder chose to send, without going through the real fan-out.
 
-    The seam raising `NotImplementedError` is the real state of the world until lane COMMS
-    lands, and `test_the_worker_survives_the_comms_seam_refusing` asserts that path. Every
-    other test needs to see WHICH messages the ladder chose, which is what this records.
+    Lane COMMS (M8) filled W5's seam in, so the unfaked path now writes rows rather than
+    refusing -- `test_the_reminder_goes_out_and_the_state_changes_happen_regardless`
+    exercises that end to end. Every other test here needs to see WHICH messages the ladder
+    chose, and asserting that against the database would be testing M8's fan-out from M3's
+    directory.
     """
     calls: list[dict] = []
 
@@ -295,12 +297,17 @@ def test_a_freeze_that_ran_out_is_expired_by_the_same_run(tenant_session, a_grou
 # -- the seams and the wiring --------------------------------------------------
 
 
-def test_the_worker_survives_the_comms_seam_refusing(
+def test_the_reminder_goes_out_and_the_state_changes_happen_regardless(
     tenant_session, studio, a_group, a_training_year
 ):
-    """W5's seam raises until lane COMMS lands. The state changes -- the lost sweep and the
-    freeze expiry -- must still run, and the refusals must be counted rather than swallowed:
-    a run reporting "3 reminders sent" when none were is worse than one that says so."""
+    """**Updated by lane COMMS (M8), which filled W5's seam in.**
+
+    This asserted `tally.undeliverable >= 1` and `tally.reminders == 0` while
+    `NotificationService.enqueue` raised. The property being protected was never the refusal
+    -- it was that the state changes which do NOT depend on comms happen either way, and that
+    the counters do not lie about what was sent. Both still hold, with the numbers the other
+    way round.
+    """
     lesson = make_session(
         studio_id=studio.id,
         group_id=a_group,
@@ -326,9 +333,10 @@ def test_the_worker_survives_the_comms_seam_refusing(
     followups.run_for_studio(tenant_session, at=T0, tally=tally)
     tenant_session.commit()
 
-    assert tally.undeliverable >= 1
-    assert tally.reminders == 0
-    # The part that does not depend on comms still happened.
+    assert tally.undeliverable == 0
+    assert tally.reminders >= 1
+    # The part that does not depend on comms still happened -- which is what this test was
+    # really about, both before the seam landed and now.
     assert tally.marked_lost == 1
     assert stale.status == "lost"
 
