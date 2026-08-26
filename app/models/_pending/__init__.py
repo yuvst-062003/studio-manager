@@ -15,19 +15,19 @@ metadata rather than from a list:
 
 `main` owns `alembic/versions/**` and authors **one revision per wave, in that wave's
 contract commit** — so the nine files this package originally held could not be migrated
-by the branch that wrote them, and migrating them all on `main` at once would have
-committed W3–W5's schemas before those waves had checked them against the club. Two
-remain. W2 is the argument for that caution rather than
-against it: C11 and C12 arrived from the club's real structure and changed `enrollment`,
-`price_plan` and `charge` on the day the contract was written — and W4 then found three
-documents still describing the pre-C11 shape a wave later.
+by the branch that wrote them, and migrating them all on `main` at once would have committed
+W3–W5's schemas before those waves had checked them against the club. **None remain: W5
+promoted the last two and this package is now empty.** W2 is the argument for that caution
+rather than against it: C11 and C12 arrived from the club's real structure and changed
+`enrollment`, `price_plan` and `charge` on the day the contract was written — and W4 then found
+three documents still describing the pre-C11 shape a wave later.
 
 **Each wave's contract commit moves its own files up one directory** and autogenerates its
 revision:
 
     W3  _pending/attendance.py  _pending/health.py   -> 0007   DONE 2026-08-26
     W4  _pending/billing.py  _pending/events.py  _pending/belts.py  -> 0008   DONE 2026-08-26
-    W5  _pending/comms.py  _pending/reports.py  -> 0009
+    W5  _pending/comms.py  _pending/reports.py  -> 0009   DONE 2026-08-26
 
 `docs/plan/migrations/` carries a draft per wave saying what each revision must contain and
 what autogenerate gets wrong.
@@ -37,11 +37,20 @@ times. `_pending/attendance.py` became `app/models/attendance.py` whole; `_pendi
 was **appended** into the `app/models/health.py` M1 had already created, because
 `health_form_template` shipped in revision `0005` as conflict C3's resolution. Moving that
 file over the existing one would have deleted the template and broken M3's trial-booking
-flow. W4's three files were all clean promotions, checked before the move; W5's two are
-expected to be, but the rule to check first stands.
+flow. W4's three files were all clean promotions, checked before the move; W5's two were
+checked the same way and were clean. The rule to check first stands for anything added
+here later.
 
-Nothing outside this package may import from it. One service seam still does —
-`app/services/comms/__init__.py` — and it names the pending path explicitly, so the day W5
-moves the file is the day the import stops lying. `app/services/billing/__init__.py` was
-the other, until W4's contract commit promoted `billing.py`.
+Nothing outside this package may import from it, and as of W5 nothing does.
+`app/services/comms/__init__.py` was the last seam naming a pending path, and W5's contract
+commit repointed it at `app.models.comms` — the day the file moved was the day the import
+stopped lying, exactly as this docstring said it would be.
+`app/services/billing/__init__.py` was the other, until W4 promoted `billing.py`.
+`tests/contracts/test_seams.py` dropped its subprocess helper in the same commit and for the
+same reason: the isolation existed only because a pending model could not be imported.
+
+**The package is kept, empty, rather than deleted.** The leading underscore IS the
+mechanism — `app/models/__init__.py` imports every sibling module whose name does not begin
+with one — so this is where a model authored ahead of its wave goes. Deleting it would make
+the next person to write one rediscover why it cannot simply sit in `app/models/`.
 """

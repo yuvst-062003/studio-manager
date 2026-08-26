@@ -67,9 +67,16 @@ class DataExportRequest(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
         # A completed export has a bundle; anything else does not yet have one. Stated as a
         # constraint because "completed with no object_key" is a live link to nothing, and
         # the guardian would be told their data is ready when it is not.
+        #
+        # `key` rather than `bundle` only because of length. The naming convention prepends
+        # `ck_<table>_`, and this table's name is 19 characters, so the obvious
+        # `..._bundle_when_completed` rendered as a 64-character identifier -- one over
+        # PostgreSQL's 63-byte limit. SQLAlchemy then hash-truncates it while the migration
+        # writes the full name, and the two disagree forever: `alembic check` reports drift
+        # on a schema nobody changed. Caught by that gate in W5's contract commit.
         CheckConstraint(
             "(status = 'completed') = (object_key IS NOT NULL)",
-            name="data_export_request_bundle_when_completed",
+            name="data_export_request_key_when_completed",
         ),
         CheckConstraint(
             "(status IN ('completed', 'failed', 'expired')) = (completed_at IS NOT NULL)",

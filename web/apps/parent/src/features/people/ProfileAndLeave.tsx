@@ -11,7 +11,7 @@
 // is rendered with the hint that says exactly what it decides and nothing more.
 import { useState } from 'react'
 import type { CSSProperties } from 'react'
-import { Alert, Button, Card, StatusChip } from '@studio/ui'
+import { Alert, Button, Card, StatusChip, useSlot } from '@studio/ui'
 import { formatDateInStudioZone } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
@@ -24,6 +24,20 @@ const pageStyle: CSSProperties = {
   maxInlineSize: '30rem',
   marginInline: 'auto',
   inlineSize: '100%',
+}
+
+/**
+ * What every `parent-profile` section receives.
+ *
+ * A **CONTAINER**, the same shape as dashboard `6c` (plan §1.3, seam 4). W5's contract
+ * commit opened this slot for M9's data-export request row (§11.3): a guardian asks for
+ * their own students' data from this screen, and lane REPORTS owns that row while lane
+ * PEOPLE owns this file. The section reads `students` rather than asking the container to
+ * fetch for it, so a later lane can add a row against a table this file has never heard of.
+ */
+export type ProfileSectionProps = {
+  locale: Locale
+  students: StudentSummary[]
 }
 
 /**
@@ -75,6 +89,7 @@ export function ProfileAndLeave({
   const [leaving, setLeaving] = useState<string | null>(null)
   const [leftOn, setLeftOn] = useState('')
   const [sending, setSending] = useState(false)
+  const profileSections = useSlot<ProfileSectionProps>('parent-profile')
 
   return (
     <section style={pageStyle} aria-labelledby="profile-title" data-testid="profile-and-leave">
@@ -159,6 +174,13 @@ export function ProfileAndLeave({
           ))}
         </ul>
       </section>
+
+      {/* Sections other lanes register. M9's data-export row is the first. Empty renders
+          nothing at all -- no heading, no placeholder -- because a guardian should not be
+          shown an empty box promising a feature that has not shipped. */}
+      {profileSections.map(({ key, render: Section }) => (
+        <Section key={key} locale={locale} students={students} />
+      ))}
     </section>
   )
 }

@@ -818,7 +818,7 @@ belt ranks including **bi-colour** grades · grading history · belt exams.
 | Models | `announcement`, `notification`, `notification_delivery`, `push_token`, `calendar_feed` · `data_export_request` |
 | Migration | one revision, both verticals |
 | **Seam** | `NotificationService.enqueue(person_id, kind, title, body, payload) -> Notification` — M9's jobs are pure callers |
-| i18n | `*/comms.ts`, `*/reports.ts`, `*/privacy.ts` |
+| i18n | `*/comms.ts`, `*/reports.ts` — **no `*/privacy.ts`**: `types.ts` lists nine namespaces and `index.ts` is authored once, so privacy strings live in `reports.ts` under `privacy.*`, exactly as belt strings live in `events.ts`. Same lane, so a second namespace buys no isolation. |
 | Slots | `alert-centre` at-risk cards (M8) · parent profile data-export row (M9, into M3's `12i`) |
 
 ### Lane COMMS — M8
@@ -859,7 +859,7 @@ are the same question — a parent in a Safari tab has no Push API to grant perm
 **Owns** `app/{models,services,routers}/reports*`, `app/routers/privacy.py`,
 `app/routers/platform.py`, `app/workers/retention.py`, `tests/reports/**`, `tests/privacy/**`,
 `web/apps/dashboard/src/features/{reports,privacy,platform}/**`,
-`web/apps/parent/src/features/privacy/**`, `web/packages/i18n/*/{reports,privacy}.ts`
+`web/apps/parent/src/features/privacy/**`, `web/packages/i18n/*/reports.ts`
 
 **Builds** — financial, operational and funnel reports with CSV/XLSX export on every table ·
 studio overview · data export · anonymization · retention job · the platform console's

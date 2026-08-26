@@ -767,11 +767,11 @@ YOU OWN, and nothing else:
   app/workers/retention.py          tests/reports/**   tests/privacy/**
   web/apps/dashboard/src/features/{reports,privacy,platform}/**
   web/apps/parent/src/features/privacy/**
-  web/packages/i18n/{he,en,ru}/{reports,privacy}.ts
+  web/packages/i18n/{he,en,ru}/reports.ts   ← privacy strings go here, under privacy.*
 
 DO NOT modify: alembic/versions/**, app/schemas/**, app/models/__init__.py,
 app/main.py, web/packages/{ui,core,api-client}/**, any i18n file other than
-reports.ts and privacy.ts, or anything under app/services/comms/ or
+reports.ts, or anything under app/services/comms/ or
 web/apps/*/src/features/comms/. STOP AND TELL ME.
 
 You are the CALLER this wave. Your at-risk and retention jobs notify through

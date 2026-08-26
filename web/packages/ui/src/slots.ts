@@ -14,7 +14,19 @@
 // lane invents a second one.
 import type { ComponentType } from 'react'
 
-export type SlotId = 'student-card' | 'roster-row' | 'alert-centre' | 'setup-wizard' | 'dev-bar'
+// `parent-profile` was added in W5's contract commit, and is the only id not authored in
+// M0. M9's data-export request row (§11.3) lands on parent `12i`, which is M3's
+// `features/people/ProfileAndLeave.tsx` — and M9 does not own that directory. Without a slot
+// the row could only arrive as a REPORTS-lane edit to a PEOPLE-lane file, which is the exact
+// cross-lane edit seam 4 exists to prevent. Adding the id on `main`, before the worktrees,
+// is the mechanism working as designed rather than an exception to it.
+export type SlotId =
+  | 'student-card'
+  | 'roster-row'
+  | 'alert-centre'
+  | 'parent-profile'
+  | 'setup-wizard'
+  | 'dev-bar'
 
 /**
  * A section a lane registered. `P` is the props the container passes — they come from

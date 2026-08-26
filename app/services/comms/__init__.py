@@ -18,13 +18,13 @@ from __future__ import annotations
 import uuid
 from typing import TYPE_CHECKING, Any
 
-# The model lives in `app/models/_pending/` until W5's contract commit migrates it, and
-# importing it at runtime would register `notification` in `Base.metadata` with no table behind
-# it -- which is `alembic check` red and a demo reset that fails on a missing relation.
-# `from __future__ import annotations` makes every annotation a string, so the guard costs
-# the signature nothing: mypy and the IDE resolve `Notification`, the interpreter never does.
+# W5's contract commit promoted the model out of `app/models/_pending/`, so this now names a
+# real, migrated table. The TYPE_CHECKING guard stays: it costs the signature nothing --
+# `from __future__ import annotations` makes every annotation a string, so mypy and the IDE
+# resolve `Notification` while the interpreter never does -- and it keeps this service from
+# importing the model layer at runtime for a return type it does not construct.
 if TYPE_CHECKING:
-    from app.models._pending.comms import Notification
+    from app.models.comms import Notification
 
 
 class NotificationService:
