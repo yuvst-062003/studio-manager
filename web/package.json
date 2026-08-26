@@ -14,7 +14,8 @@
     "lint": "eslint . && stylelint \"**/*.css\" --allow-empty-input",
     "test": "vitest run --reporter=dot",
     "build": "npm run build --workspaces --if-present",
-    "installability": "node scripts/check-installability.mjs"
+    "installability": "node scripts/check-installability.mjs",
+    "generate:api-client": "cd .. && .venv/bin/python scripts/export_openapi.py && cd web && npx openapi-typescript ../openapi.json -o packages/api-client/src/schema.d.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
