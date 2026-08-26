@@ -182,4 +182,5 @@ export const billing: Bundle = {
   'product.size': 'Размер',
   'product.colour': 'Цвет',
   'product.handOutPolicy': 'Цена товара не показывается тренерам',
+  'dialog.cancel': 'Отмена',
 }

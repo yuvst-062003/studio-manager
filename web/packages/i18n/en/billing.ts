@@ -178,4 +178,5 @@ export const billing: Bundle = {
   'product.size': 'Size',
   'product.colour': 'Colour',
   'product.handOutPolicy': 'The item price is not shown to coaches',
+  'dialog.cancel': 'Cancel',
 }

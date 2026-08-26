@@ -274,6 +274,14 @@ waves:
         title: Staff 11a — a coach hands an item over and never sees a price
         status: shipped
         on: 2026-08-26
+      - id: M6.11
+        title: Dashboard 3e collections and the reconciliation queue
+        status: shipped
+        on: 2026-08-26
+      - id: M6.12
+        title: Dashboard 5a prices, the alert-centre card and the dev bar's runJob
+        status: shipped
+        on: 2026-08-26
   - id: W5
     milestone: M8 ∥ M9
     title: Communication ∥ Reports and privacy completion

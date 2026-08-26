@@ -49,10 +49,33 @@ def test_core_resolves_the_cross_cutting_paths_m0_actually_built():
 
 
 def test_a_skipped_gate_says_so_out_loud():
-    """`billing` has an i18n namespace and nothing else yet. Every absent gate must name
-    itself; a silent skip is indistinguishable from a passing one."""
-    stdout = _run("billing", "--dry-run").stdout
+    """Every absent gate must name itself; a silent skip is indistinguishable from a passing
+    one, and a lane reading a green it never earned is the worst outcome this script has.
+
+    **Re-pointed by lane MONEY (M6).** This asked `billing`, whose docstring read "has an
+    i18n namespace and nothing else yet" -- true when it was written, and untrue the moment
+    M6 landed its routers, services, workers and three apps' worth of screens. Making it
+    untrue was the whole of the lane's job, so the test had to move rather than be deleted:
+    the RULE is about the script, not about billing.
+
+    `comms` is the vertical with gaps now -- W5 owns it and has not started, so it has an
+    i18n namespace and no backend, no tests and no frontend. When W5 fills it in, move this
+    to whichever vertical is then pending, exactly as this move was made.
+    """
+    stdout = _run("comms", "--dry-run").stdout
     assert "skipped" in stdout
+
+
+def test_a_fully_built_vertical_skips_nothing():
+    """The other half, and the reason the move above is safe.
+
+    `billing` is complete after M6, so every gate in it now has targets. If this ever goes
+    red, a path the lane owns has gone missing -- which is the failure the `skipped` line
+    exists to make visible, seen from the other side.
+    """
+    stdout = _run("billing", "--dry-run").stdout
+    assert "skipped" not in stdout, stdout
+    assert "7 scoped gates" in stdout
 
 
 def test_it_runs_the_frontend_tools_from_inside_the_web_workspace():

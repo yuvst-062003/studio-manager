@@ -205,4 +205,5 @@ export const billing: Bundle = {
   'product.size': 'מידה',
   'product.colour': 'צבע',
   'product.handOutPolicy': 'מחיר הפריט אינו מוצג למאמן',
+  'dialog.cancel': 'ביטול',
 }

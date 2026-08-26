@@ -233,8 +233,8 @@ describe('12f — payment history', () => {
     // §5.10 issues a חשבונית/קבלה for card payments only.
     renderHistory()
     const rows = screen.getAllByTestId('payment-row')
-    expect(within(rows[0]).getByTestId('email-receipt')).toBeInTheDocument()
-    expect(within(rows[1]).queryByTestId('email-receipt')).not.toBeInTheDocument()
+    expect(within(rows[0]!).getByTestId('email-receipt')).toBeInTheDocument()
+    expect(within(rows[1]!).queryByTestId('email-receipt')).not.toBeInTheDocument()
   })
 
   it('has no global email-the-receipts button', () => {
@@ -325,9 +325,9 @@ describe('12e — ordering items', () => {
 
   it('totals the selection in agorot', async () => {
     render(<OrderItemsScreen locale={LOCALE} products={PRODUCTS} onOrder={vi.fn()} />)
-    await userEvent.click(within(screen.getAllByTestId('product-row')[0]).getByRole('checkbox'))
+    await userEvent.click(within(screen.getAllByTestId('product-row')[0]!).getByRole('checkbox'))
     const amounts = [...document.querySelectorAll('.studio-money')]
-    expect(amounts[amounts.length - 1].textContent).toContain('180')
+    expect(amounts[amounts.length - 1]?.textContent).toContain('180')
   })
 
   it('renders the empty state when the club sells nothing', () => {

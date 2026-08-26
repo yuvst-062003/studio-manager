@@ -128,7 +128,7 @@ function matches(payment: PaymentOut, filter: Filter): boolean {
   // A payment has a method, not a kind; its kind is the kind of the charges it settled. With
   // no allocations there is nothing to classify it by, so it shows only under `all` -- which
   // is honest: an unallocated payment is precisely one nobody has decided the meaning of yet.
-  return payment.allocations.length > 0 && filter === 'tuition'
+  return (payment.allocations?.length ?? 0) > 0 && filter === 'tuition'
 }
 
 function filterLabel(locale: Locale, filter: Filter): string {

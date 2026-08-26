@@ -69,14 +69,14 @@ describe('11a — handing an item over', () => {
     // mat even by crafting a request.
     const handOut = vi.fn().mockResolvedValue(undefined)
     renderSheet({ client: stub({ handOut }) })
-    await userEvent.click(screen.getAllByTestId('handout-option')[0])
+    await userEvent.click(screen.getAllByTestId('handout-option')[0]!)
     await userEvent.click(screen.getByTestId('hand-over-confirm'))
     expect(handOut).toHaveBeenCalledWith({ productId: 'p1', studentId: 's1' })
   })
 
   it('confirms that a charge was created without naming an amount', async () => {
     renderSheet()
-    await userEvent.click(screen.getAllByTestId('handout-option')[0])
+    await userEvent.click(screen.getAllByTestId('handout-option')[0]!)
     await userEvent.click(screen.getByTestId('hand-over-confirm'))
     const confirmation = await screen.findByTestId('handed-out')
     expect(confirmation).toHaveTextContent('הפריט נמסר ונוצר חיוב')
@@ -116,7 +116,7 @@ describe('11a — handing an item over', () => {
     let release: (value: unknown) => void = () => {}
     const handOut = vi.fn().mockReturnValue(new Promise((resolve) => (release = resolve)))
     renderSheet({ client: stub({ handOut }) })
-    await userEvent.click(screen.getAllByTestId('handout-option')[0])
+    await userEvent.click(screen.getAllByTestId('handout-option')[0]!)
     await userEvent.click(screen.getByTestId('hand-over-confirm'))
     expect(screen.getByTestId('hand-over-confirm')).toBeDisabled()
     release(undefined)

@@ -129,7 +129,13 @@ export function PaymentsScreen({
             <div key={row.charge.id} style={rowStyle} data-testid="debt-row">
               {/* D7 — a belt fill always carries its ring. `BeltBar` has no prop that
                   turns it off and must not gain one. */}
-              <BeltBar colorHex={row.beltColorHex ?? 'var(--border)'} />
+              {/* `label` is required by the primitive, and that is G10 rather than
+                  bookkeeping: colour is never the only carrier, so the belt has to be
+                  readable by a screen reader too. */}
+              <BeltBar
+                colorHex={row.beltColorHex ?? 'var(--border)'}
+                label={row.studentName}
+              />
               <span>{periodLabel(row.charge)}</span>
               <span>{row.studentName}</span>
               <MoneyDisplay agorot={row.charge.amount_agorot} tone="debt" />
@@ -209,7 +215,11 @@ export function PaymentsScreen({
               </Button>
             </>
           )}
-          {error ? <Alert tone="danger">{error}</Alert> : null}
+          {error ? (
+            <Alert tone="danger" live iconLabel={t(locale, 'billing.card.pay')}>
+              {error}
+            </Alert>
+          ) : null}
         </div>
       </Card>
 
