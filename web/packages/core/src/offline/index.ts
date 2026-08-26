@@ -46,6 +46,7 @@ export { forcedMode, onForcedModeChange, setForcedMode } from './devTools'
 export {
   flushNow,
   networkMonitor,
+  offlineStorageIsDurable,
   offlineStore,
   queueChanged,
   setOfflineStore,

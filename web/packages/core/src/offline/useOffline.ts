@@ -9,12 +9,12 @@
 // two IndexedDB connections over the same data, and two monitors are two ping loops
 // disagreeing about the mode. `OfflineProvider` is not a context — it is a module-level
 // singleton, because a coach's queue is a property of the *device*, not of a React subtree.
-import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { forcedMode, onForcedModeChange } from './devTools'
 import { makeMonitor } from './network'
 import type { NetState, NetworkMonitor } from './network'
 import { listPending, pendingCount } from './pendingOps'
-import { indexedDbStore } from './store'
+import { indexedDbStore, memoryStore } from './store'
 import { staleQueueWarning } from './staleQueue'
 import type { StaleQueueWarning } from './staleQueue'
 import { dismissConflict, flush, listConflicts } from './sync'
@@ -23,18 +23,42 @@ import type { ConflictCard, NetworkMode, OfflineStore, PendingOp } from './types
 
 let store: OfflineStore | null = null
 let monitor: NetworkMonitor | null = null
+let durable = true
 
-/** The device's store. Created once, lazily, so importing this module in a test that never
- *  renders does not open an IndexedDB connection. */
+/**
+ * The device's store. Created once, lazily, so importing this module in a test that never
+ * renders does not open an IndexedDB connection.
+ *
+ * **Falls back to memory where IndexedDB does not exist**, and records that it did.
+ * §10.6 wants `pending_ops` durable and an in-memory queue is not — but the alternative is
+ * an exception thrown inside a tap handler on the mat, and §10.3 item 1 is absolute that a
+ * local write never fails. So the mark still lands, and `offlineStorageIsDurable()` is how
+ * the staff app knows to show §6.5's blocking warning immediately rather than after a day:
+ * on this device, unsynced work really will not survive a reload.
+ */
 export function offlineStore(): OfflineStore {
-  store ??= indexedDbStore()
+  if (store === null) {
+    if (globalThis.indexedDB === undefined) {
+      durable = false
+      store = memoryStore()
+    } else {
+      store = indexedDbStore()
+    }
+  }
   return store
+}
+
+/** Whether the queue is on durable storage. `false` means §6.5's warning applies from the
+ *  first mark rather than after a day, because nothing here survives a reload. */
+export function offlineStorageIsDurable(): boolean {
+  return durable
 }
 
 /** Tests only — the same escape hatch `clearSlot` gives the slot registry. Module-level
  *  state outlives a test file without it. */
 export function setOfflineStore(replacement: OfflineStore | null): void {
   store = replacement
+  durable = true
   queueVersion += 1
   notifyQueue()
 }
@@ -171,20 +195,37 @@ export function useConflicts(): {
   }
 }
 
-/** §6.5's blocking warning. `null` while it is still being read, so a caller can tell "we
- *  do not know yet" from "nothing is wrong" and not flash the block on every mount. */
-export function useStaleQueueWarning(nowIso: string): StaleQueueWarning | null {
+/**
+ * §6.5's blocking warning. `null` while it is still being read, so a caller can tell "we do
+ * not know yet" from "nothing is wrong" and not flash the block on every mount.
+ *
+ * Takes the device **clock**, not an instant, and holds it in a ref rather than a
+ * dependency. A caller writing `clock={() => new Date().toISOString()}` inline gives a new
+ * function identity every render, and a function in the dependency array would re-run the
+ * effect on each one — an effect loop on the screen a coach taps thirty times. The ref keeps
+ * the latest clock without making it a trigger; the queue version is the only trigger, which
+ * is also the only thing that can change the answer.
+ */
+export function useStaleQueueWarning(clock: () => string): StaleQueueWarning | null {
   const version = useQueueVersion()
+  const clockRef = useRef(clock)
+  // Written in an effect, not during render: react-hooks forbids touching `.current` while
+  // rendering, and it is right to — a ref mutated in a render body is invisible to
+  // concurrent rendering's bookkeeping. The effect below runs after, so the first read uses
+  // the clock the hook was constructed with and every later one uses the latest.
+  useEffect(() => {
+    clockRef.current = clock
+  }, [clock])
   const [warning, setWarning] = useState<StaleQueueWarning | null>(null)
   useEffect(() => {
     let live = true
-    void staleQueueWarning(offlineStore(), nowIso).then((next) => {
+    void staleQueueWarning(offlineStore(), clockRef.current()).then((next) => {
       if (live) setWarning(next)
     })
     return () => {
       live = false
     }
-  }, [version, nowIso])
+  }, [version])
   return warning
 }
 

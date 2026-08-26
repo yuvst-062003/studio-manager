@@ -30,6 +30,13 @@ export async function queueMark(input: {
   payload: Record<string, unknown>
   deviceMarkedAt: string
   personId: string | null
+  /**
+   * When it entered the queue. Defaults to `deviceMarkedAt`, and that default is the point:
+   * §6.5's blocking warning compares this against the screen's clock, and a queue stamped
+   * from `new Date()` while the screen reads an injected clock declares itself stale the
+   * moment it is written. **One clock per device.**
+   */
+  queuedAt?: string
   store?: OfflineStore
 }): Promise<void> {
   await enqueue(input.store ?? offlineStore(), {
@@ -39,7 +46,7 @@ export async function queueMark(input: {
     student_id: input.studentId,
     payload: input.payload,
     device_marked_at: input.deviceMarkedAt,
-    queued_at: new Date().toISOString(),
+    queued_at: input.queuedAt ?? input.deviceMarkedAt,
     person_id: input.personId,
     attempts: 0,
   })

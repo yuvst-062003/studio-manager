@@ -1,0 +1,149 @@
+/* Staff artboards 1c, 9f, 9g and 2d. Tokens only — never a hex.
+ *
+ * 1c's "▲ Never read a hex out of the export": the canvas's dark ink and dark success green
+ * both disagree with tokens.css, and D12 changed the dark --paid deliberately, because D3
+ * requires belt colours stay distinct from semantics. The token layer is authoritative.
+ *
+ * D10 — logical properties throughout. The roster row is the mirror of an LTR
+ * checkbox-on-the-left roster (9f), and it gets that from DOM order plus `dir` with no
+ * physical offset anywhere in this file. */
+
+.roster-row {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  inline-size: 100%;
+  padding-block: var(--space-3);
+  padding-inline: var(--space-3);
+  border: 0;
+  border-block-end: var(--border-width-hairline) solid var(--border);
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.roster-row__text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-inline-size: 0;
+}
+
+.roster-row__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.roster-row__note {
+  color: var(--text-secondary);
+  font-size: var(--text-caption);
+}
+
+/* 9f: the note line's text depends on state. `הודיעו מראש` is the parent's advance notice
+ * and carries --pending, the same role as the notified mark it sits beside. */
+.roster-row__note[data-note='pre-reported'] {
+  color: var(--pending);
+}
+
+/* §5.7 — an excused absence "requires a long-press to override". The row is still a button
+ * and still reachable; the cursor says the ordinary tap does something different here. */
+.roster-row[data-pre-reported='true'] {
+  cursor: default;
+}
+
+/* 1c's three count tiles. Finding 6 on that spec: --paid and --pending have no tint tokens
+ * and the tiles need both. Until the token layer grows them, the tile carries a semantic
+ * BORDER — which 1c's own table lists ("the absent tile" under --debt/--danger) and which
+ * needs no new token. */
+[data-testid='roster-counts'],
+[data-testid='summary-counts'] {
+  display: flex;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+[data-testid='roster-counts'] li,
+[data-testid='summary-counts'] li {
+  flex: 1;
+  padding: var(--space-3);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+
+  /* Must not mirror: the counts are numerals (1c, 9f, 9g RTL sections). */
+  font-variant-numeric: tabular-nums;
+}
+
+[data-count='present'] {
+  border-color: var(--paid);
+}
+
+[data-count='absent'] {
+  border-color: var(--danger);
+}
+
+/* 9g finding 3 — "notified in advance" renders with no semantic colour on 9g and --pending
+ * on 1c and 9f. Third rendering of one state; this is the one, and it is --pending. */
+[data-count='unmarked'],
+[data-count='pre-reported'] {
+  border-color: var(--pending);
+}
+
+[data-testid='roster-list'],
+[data-testid='roster-not-expected'] ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* §5.7's collapsed section. Set apart from the roster proper so a coach can see at a glance
+ * that these students are not part of today's counts. */
+[data-testid='roster-not-expected'] {
+  margin-block-start: var(--space-4);
+  color: var(--text-secondary);
+}
+
+[data-testid='roster-not-expected'] summary {
+  padding-block: var(--space-3);
+  cursor: pointer;
+}
+
+/* 2d finding 5 — `ButtonVariant` has no filled positive variant, and the mark-present button
+ * is a solid fill. Composed here rather than inlined (D10 forbids the inline style), and
+ * bound to --accent and NOT --paid: 2d finding 6, the two hold the same light-mode value, so
+ * a payment token would render identically and pass review, then diverge in dark where D12
+ * moved --paid. §3.2 says a coach sees no payment data. */
+.attendance-mark-present {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-fg);
+}
+
+[data-testid='student-card-attendance-strip'] {
+  display: flex;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Must not mirror: percentages and dates (2d RTL section). 2d notes that none of its numeric
+ * spans sets tabular figures where 1c and 4a do; normalised here. */
+[data-testid='student-card-attendance-rate'],
+[data-testid='roster-pending'] {
+  color: var(--text-secondary);
+  font-size: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+[data-testid='attendance-conflicts'] {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
