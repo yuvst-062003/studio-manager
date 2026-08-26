@@ -7,6 +7,7 @@
 export { EventsScreen, splitByTime } from './EventsScreen'
 export { EventCard, chipStatusFor, invitedCount } from './EventCard'
 export { EventForm, validate } from './EventForm'
+export { EventPage, isConfirmed, tally } from './EventPage'
 export { EventDateBadge } from './EventDateBadge'
 export { EVENT_TYPES, makeDashboardEventsClient } from './client'
 export type {
