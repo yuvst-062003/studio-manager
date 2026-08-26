@@ -14,35 +14,6 @@ picker showed an empty list in production.
 
 from __future__ import annotations
 
-import uuid
-from datetime import date
+from app.services.schedule.service import ConflictError, NotFoundError, ScheduleService
 
-from app.models.schedule import Session
-
-
-class ScheduleService:
-    """§5.6's session materialization. Lane SCHEDULE (M2) fills these in.
-
-    **The invariant every method here inherits**, from §5.6 and E2E-5: changing a rule
-    rewrites **only future** sessions. A session in the past, a session carrying
-    `is_manually_edited`, and an ad-hoc session are never overwritten. That rule lives
-    with the writer, not with the callers, which is why M3 reads through this class rather
-    than querying `session` itself.
-    """
-
-    def materialize_sessions(
-        self,
-        group_id: uuid.UUID,
-        from_date: date,
-        to_date: date,
-    ) -> list[Session]:
-        """Every session for `group_id` in `[from_date, to_date]`, in start order.
-
-        Materialized, not projected: the rows exist in `session` before this returns, so a
-        caller may hold their ids. §5.6 generates a whole training year at once and this
-        is the range-scoped form of the same operation.
-
-        Closures (§5.6) are skipped. A date the studio is closed produces no session, and
-        that is why a parent's month view can show a gap without a cancelled row.
-        """
-        raise NotImplementedError("M2 — lane SCHEDULE owns app/services/schedule/**")
+__all__ = ["ConflictError", "NotFoundError", "ScheduleService"]

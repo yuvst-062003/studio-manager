@@ -23,44 +23,60 @@ import {
 import { DevBar } from '@studio/ui/dev-bar'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
+import { ScheduleSection } from './features/schedule/ScheduleSection'
+import { makeScheduleClient } from './features/schedule/client'
+import { useToday } from './features/schedule/useToday'
 import { StaffScreen } from './features/staff/StaffScreen'
 import { SettingsScreen } from './features/settings/SettingsScreen'
 
 registerM1WizardSteps(apiFetch)
 
 const NAV = [
+  { key: 'schedule', labelKey: 'schedule.week.title', href: '#/schedule' },
+  { key: 'groups', labelKey: 'schedule.groups.title', href: '#/groups' },
+  { key: 'closures', labelKey: 'schedule.closure.title', href: '#/closures' },
   { key: 'staff', labelKey: 'common.dash.nav.staff', href: '#/staff' },
   { key: 'settings', labelKey: 'common.dash.nav.settings', href: '#/settings' },
   { key: 'setup', labelKey: 'common.dash.nav.setup', href: '#/setup' },
 ]
 
-export type DashboardRoute = 'home' | 'staff' | 'settings' | 'setup'
+export type DashboardRoute = 'home' | 'staff' | 'settings' | 'setup' | 'schedule'
 
 /** Unknown hashes resolve to home rather than to a blank page. */
 export function routeFromHash(hash: string): DashboardRoute {
   const name = hash.replace(/^#\/?/, '')
+  // The schedule vertical owns three top-level hashes plus `#/groups/<id>`, and decides
+  // between them itself in features/schedule/ScheduleSection.tsx. Collapsing them to one
+  // route here is what keeps this file's diff to a NAV entry and a single branch — it is
+  // the one file lane PEOPLE also edits this wave.
+  if (name === 'schedule' || name === 'closures' || name.startsWith('groups')) return 'schedule'
   return name === 'staff' || name === 'settings' || name === 'setup' ? name : 'home'
 }
 
-function useHashRoute(): DashboardRoute {
-  const [route, setRoute] = useState<DashboardRoute>(() =>
-    routeFromHash(globalThis.location?.hash ?? ''),
-  )
+function useHashRoute(): { route: DashboardRoute; hash: string } {
+  const [hash, setHash] = useState<string>(() => globalThis.location?.hash ?? '')
   useEffect(() => {
-    const onChange = () => setRoute(routeFromHash(globalThis.location?.hash ?? ''))
+    const onChange = () => setHash(globalThis.location?.hash ?? '')
     globalThis.addEventListener('hashchange', onChange)
     return () => globalThis.removeEventListener('hashchange', onChange)
   }, [])
-  return route
+  // The raw hash travels with the route: the schedule section needs `#/groups/<id>`, which
+  // the route enum deliberately does not carry.
+  return { route: routeFromHash(hash), hash }
 }
 
 export default function App() {
   const session = useSession()
-  const route = useHashRoute()
+  const { route, hash } = useHashRoute()
   const [locale, setLocale] = useState<Locale>('he')
   // Memoised: SetupWizard reads through this in an effect keyed on the client, so a fresh
   // object every render would re-fetch progress forever.
   const setupClient = useMemo(() => makeSetupClient(apiFetch), [])
+  const scheduleClient = useMemo(() => makeScheduleClient(apiFetch), [])
+  // Stable for as long as the studio's day is. `new Date().toISOString()` in this
+  // render body was a new value every render, and downstream that is an effect
+  // dependency worth `1 + 3N` requests.
+  const today = useToday()
 
   // §6.5 deliberately does NOT gate the dashboard on standalone mode the way the two
   // phone apps are gated. It is the desktop surface: a manager opens it in a browser tab
@@ -102,6 +118,14 @@ export default function App() {
             />
           }
         >
+          {route === 'schedule' ? (
+            <ScheduleSection
+              locale={locale}
+              client={scheduleClient}
+              hash={hash}
+              today={today}
+            />
+          ) : null}
           {route === 'staff' ? <StaffScreen locale={locale} /> : null}
           {route === 'settings' ? <SettingsScreen locale={locale} /> : null}
           {route === 'setup' ? <SetupWizard client={setupClient} locale={locale} /> : null}

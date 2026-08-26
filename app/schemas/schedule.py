@@ -175,6 +175,20 @@ class SchedulePutIn(BaseModel):
     apply: bool = False
 
 
+class ProtectedSessionOut(BaseModel):
+    """One session the change will not touch, named rather than merely counted.
+
+    §5.6's dialog prints the manually-edited ones as bullets — `· 15.11 אימון ים 90 דק'` —
+    because "2 sessions were manually edited" tells a manager nothing about which two. The
+    shape carries no title: `session` has no name column, and inventing one here would be a
+    field with nothing behind it. The client renders the date and the time range.
+    """
+
+    id: uuid.UUID
+    starts_at: datetime
+    ends_at: datetime
+
+
 class ScheduleImpactPreview(BaseModel):
     """§5.6's impact dialog: "showing exactly what will change before it changes."
 
@@ -193,8 +207,124 @@ class ScheduleImpactPreview(BaseModel):
     sessions_protected_manually_edited: int
     sessions_protected_ad_hoc: int
     first_affected_date: date | None = None
+    #: §5.6's bullet list. Only the manually-edited ones: the past is a count (there is
+    #: nothing to decide about it) and an ad-hoc session was never going to be touched.
+    protected_manually_edited_sessions: list[ProtectedSessionOut] = Field(default_factory=list)
+    #: **C12.** Students this change leaves expecting nothing — `attends_weekdays` no
+    #: longer intersects any day the group trains on. They vanish off the roster and stop
+    #: being counted absent, which looks exactly like the feature working. The dialog says
+    #: `⚠ 3 תלמידים לא רשומים לאף יום אחרי השינוי`; this is the 3.
+    students_left_unscheduled: int = 0
 
 
 SessionPage = CursorPage[SessionOut]
 TrainingYearPage = CursorPage[TrainingYearOut]
 ClosurePage = CursorPage[ClosureOut]
+
+
+class ClosureCreatedOut(ClosureOut):
+    """§5.6 — 'adding one cancels the affected sessions and notifies the affected
+    guardians'. The count is returned rather than left for the client to discover on the
+    next fetch, because a manager who has just closed a fortnight needs to see how many
+    lessons that cost before they navigate away. The notification is §5.11's and lands
+    in W5."""
+
+    sessions_cancelled: int = 0
+
+
+class GenerateSessionsOut(BaseModel):
+    """§5.15 step 6 — 'materialize every session for the year … and show a summary of what
+    was created'."""
+
+    training_year_id: uuid.UUID
+    groups: int
+    sessions_created: int
+
+
+class ScheduleRulesOut(BaseModel):
+    """`GET /groups/{id}/schedule`. Only rules still in force: a superseded rule is history
+    the editor must not offer back for editing."""
+
+    group_id: uuid.UUID
+    rules: list[ScheduleRuleOut] = Field(default_factory=list)
+
+
+class SessionStaffIn(BaseModel):
+    """Who is actually on the mat for this one session. Distinct from `group_staff`, which
+    is who normally coaches the group — §5.14's 'sessions without a coach' report is the
+    difference between the two."""
+
+    person_id: uuid.UUID
+    role: str = Field(pattern=SESSION_STAFF_ROLE_PATTERN)
+    is_substitute: bool = False
+
+
+class SessionCreate(BaseModel):
+    """§5.6 — 'They can also add an ad-hoc session that belongs to no rule.'
+
+    `is_ad_hoc` is not a field a caller may set: every session created here is ad-hoc by
+    construction, and a flag the client controlled would let a caller mint a session that a
+    regenerate then silently destroys.
+    """
+
+    group_id: uuid.UUID
+    training_year_id: uuid.UUID
+    starts_at: datetime
+    ends_at: datetime
+    location_id: uuid.UUID | None = None
+    staff: list[SessionStaffIn] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _the_session_ends_after_it_starts(self) -> SessionCreate:
+        if self.ends_at <= self.starts_at:
+            raise ValueError("ends_at must be after starts_at")
+        return self
+
+
+class SessionPatch(BaseModel):
+    """§5.6's per-session override.
+
+    **Every field is optional and absence is not `null`.** `location_id: null` clears the
+    location; omitting `location_id` leaves it alone. The service distinguishes them with
+    `model_fields_set`, which is the only way to express "remove the room" and "do not
+    touch the room" in one shape.
+
+    Times move as a pair. A start without an end would silently redefine the duration, and
+    "the class is an hour shorter now" is not something anyone typed.
+    """
+
+    starts_at: datetime | None = None
+    ends_at: datetime | None = None
+    location_id: uuid.UUID | None = None
+    staff: list[SessionStaffIn] | None = None
+
+    @model_validator(mode="after")
+    def _times_move_together(self) -> SessionPatch:
+        moved = {"starts_at", "ends_at"} & self.model_fields_set
+        if moved and len(moved) != 2:
+            raise ValueError("starts_at and ends_at must be given together")
+        if self.starts_at and self.ends_at and self.ends_at <= self.starts_at:
+            raise ValueError("ends_at must be after starts_at")
+        return self
+
+
+class SessionCancelIn(BaseModel):
+    """§5.6 — 'or cancel it with a reason'. The reason is required by the column's own
+    check constraint, so a blank one is refused here rather than at the database."""
+
+    reason: str = Field(min_length=1, max_length=200)
+
+
+class SessionNoteCreate(BaseModel):
+    body: str = Field(min_length=1)
+
+
+class SessionNoteOut(BaseModel):
+    id: uuid.UUID
+    session_id: uuid.UUID
+    author_person_id: uuid.UUID
+    body: str
+    created_at: datetime
+
+
+SessionNotePage = CursorPage[SessionNoteOut]

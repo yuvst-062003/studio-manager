@@ -237,6 +237,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/closures": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Closures */
+        get: operations["list_closures_api_v1_closures_get"];
+        put?: never;
+        /** Create Closure */
+        post: operations["create_closure_api_v1_closures_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/groups": {
         parameters: {
             query?: never;
@@ -249,6 +267,31 @@ export interface paths {
         put?: never;
         /** Create Group */
         post: operations["create_group_api_v1_groups_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/groups/{group_id}/schedule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Group Schedule */
+        get: operations["get_group_schedule_api_v1_groups__group_id__schedule_get"];
+        /**
+         * Put Group Schedule
+         * @description §7 — 'PUT returns an impact preview before applying.'
+         *
+         *     One endpoint serves both halves because `apply` is the only difference, and defaulting
+         *     it to `false` means a caller that forgets the field gets a preview rather than an
+         *     unreviewed rewrite of a whole training year.
+         */
+        put: operations["put_group_schedule_api_v1_groups__group_id__schedule_put"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -317,6 +360,31 @@ export interface paths {
          *     -- they see `derived_flags` and nothing else (§5.5).
          */
         get: operations["list_health_templates_api_v1_health_templates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/holiday-presets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Holiday Presets
+         * @description §5.6 — **proposals the manager ticks, never automatic closures.**
+         *
+         *     No session dependency, deliberately: this route reads nothing and writes nothing, and
+         *     a database handle it did not need would be a database handle a later edit could use.
+         *     A Gregorian year always straddles two Hebrew ones, which is why 2026 answers with both
+         *     Pesach of 5786 and Rosh Hashanah of 5787.
+         */
+        get: operations["list_holiday_presets_api_v1_holiday_presets_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -406,6 +474,77 @@ export interface paths {
          *     `studios_for_identity` skips a non-active one.
          */
         post: operations["suspend_api_v1_platform_studios__studio_id__suspend_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Sessions */
+        get: operations["list_sessions_api_v1_sessions_get"];
+        put?: never;
+        /** Create Ad Hoc Session */
+        post: operations["create_ad_hoc_session_api_v1_sessions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sessions/{session_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Session */
+        get: operations["get_session_api_v1_sessions__session_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Patch Session */
+        patch: operations["patch_session_api_v1_sessions__session_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/sessions/{session_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel Session */
+        post: operations["cancel_session_api_v1_sessions__session_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sessions/{session_id}/notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Notes */
+        get: operations["list_notes_api_v1_sessions__session_id__notes_get"];
+        put?: never;
+        /** Add Note */
+        post: operations["add_note_api_v1_sessions__session_id__notes_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -542,6 +681,62 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/training-years": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Training Years */
+        get: operations["list_training_years_api_v1_training_years_get"];
+        put?: never;
+        /** Create Training Year */
+        post: operations["create_training_year_api_v1_training_years_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/training-years/{training_year_id}/activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Activate Training Year */
+        post: operations["activate_training_year_api_v1_training_years__training_year_id__activate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/training-years/{training_year_id}/generate-sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Generate Sessions
+         * @description §5.15 step 6. Safe to press twice — `materialize_sessions` keeps a session already
+         *     sitting at the wanted instant rather than adding a second one.
+         */
+        post: operations["generate_sessions_api_v1_training_years__training_year_id__generate_sessions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -625,6 +820,161 @@ export interface components {
             is_active: boolean;
             /** Name */
             name: string;
+        };
+        /** ClosureCreate */
+        ClosureCreate: {
+            /**
+             * Date From
+             * Format: date
+             */
+            date_from: string;
+            /**
+             * Date To
+             * Format: date
+             */
+            date_to: string;
+            /** Reason */
+            reason: string;
+            /**
+             * Source
+             * @default manual
+             */
+            source: string;
+            /**
+             * Training Year Id
+             * Format: uuid
+             */
+            training_year_id: string;
+        };
+        /**
+         * ClosureCreatedOut
+         * @description §5.6 — 'adding one cancels the affected sessions and notifies the affected
+         *     guardians'. The count is returned rather than left for the client to discover on the
+         *     next fetch, because a manager who has just closed a fortnight needs to see how many
+         *     lessons that cost before they navigate away. The notification is §5.11's and lands
+         *     in W5.
+         */
+        ClosureCreatedOut: {
+            /**
+             * Date From
+             * Format: date
+             */
+            date_from: string;
+            /**
+             * Date To
+             * Format: date
+             */
+            date_to: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Reason */
+            reason: string;
+            /**
+             * Sessions Cancelled
+             * @default 0
+             */
+            sessions_cancelled: number;
+            /** Source */
+            source: string;
+            /**
+             * Training Year Id
+             * Format: uuid
+             */
+            training_year_id: string;
+        };
+        /** ClosureOut */
+        ClosureOut: {
+            /**
+             * Date From
+             * Format: date
+             */
+            date_from: string;
+            /**
+             * Date To
+             * Format: date
+             */
+            date_to: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Reason */
+            reason: string;
+            /** Source */
+            source: string;
+            /**
+             * Training Year Id
+             * Format: uuid
+             */
+            training_year_id: string;
+        };
+        /** CursorPage[ClosureOut] */
+        CursorPage_ClosureOut_: {
+            /**
+             * Has More
+             * @default false
+             */
+            has_more: boolean;
+            /** Items */
+            items: components["schemas"]["ClosureOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** CursorPage[SessionNoteOut] */
+        CursorPage_SessionNoteOut_: {
+            /**
+             * Has More
+             * @default false
+             */
+            has_more: boolean;
+            /** Items */
+            items: components["schemas"]["SessionNoteOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** CursorPage[SessionOut] */
+        CursorPage_SessionOut_: {
+            /**
+             * Has More
+             * @default false
+             */
+            has_more: boolean;
+            /** Items */
+            items: components["schemas"]["SessionOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** CursorPage[TrainingYearOut] */
+        CursorPage_TrainingYearOut_: {
+            /**
+             * Has More
+             * @default false
+             */
+            has_more: boolean;
+            /** Items */
+            items: components["schemas"]["TrainingYearOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /**
+         * GenerateSessionsOut
+         * @description §5.15 step 6 — 'materialize every session for the year … and show a summary of what
+         *     was created'.
+         */
+        GenerateSessionsOut: {
+            /** Groups */
+            groups: number;
+            /** Sessions Created */
+            sessions_created: number;
+            /**
+             * Training Year Id
+             * Format: uuid
+             */
+            training_year_id: string;
         };
         /** GroupCreate */
         GroupCreate: {
@@ -760,6 +1110,30 @@ export interface components {
             version: number;
         };
         /**
+         * HolidayPresetOut
+         * @description §7 — `GET /holiday-presets?year=2026`.
+         *
+         *     §5.6 is emphatic that these are **proposals the manager ticks, never automatic
+         *     closures**. The shape carries no `applied` flag for that reason: a preset is not a
+         *     thing that can be in a state, it is a suggestion. Ticking one creates a `Closure`.
+         */
+        HolidayPresetOut: {
+            /**
+             * Date From
+             * Format: date
+             */
+            date_from: string;
+            /**
+             * Date To
+             * Format: date
+             */
+            date_to: string;
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+        };
+        /**
          * InvitationOut
          * @description §5.3's token, returned exactly once.
          *
@@ -838,6 +1212,32 @@ export interface components {
             /** Studios */
             studios: components["schemas"]["StudioMembershipOut"][];
         };
+        /**
+         * ProtectedSessionOut
+         * @description One session the change will not touch, named rather than merely counted.
+         *
+         *     §5.6's dialog prints the manually-edited ones as bullets — `· 15.11 אימון ים 90 דק'` —
+         *     because "2 sessions were manually edited" tells a manager nothing about which two. The
+         *     shape carries no title: `session` has no name column, and inventing one here would be a
+         *     field with nothing behind it. The client renders the date and the time range.
+         */
+        ProtectedSessionOut: {
+            /**
+             * Ends At
+             * Format: date-time
+             */
+            ends_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Starts At
+             * Format: date-time
+             */
+            starts_at: string;
+        };
         /** ProviderListResponse */
         ProviderListResponse: {
             /** Items */
@@ -875,6 +1275,283 @@ export interface components {
             timezone: string;
         };
         /**
+         * ScheduleImpactPreview
+         * @description §5.6's impact dialog: "showing exactly what will change before it changes."
+         *
+         *     The three protected counts are listed separately rather than summed, because the
+         *     manager's question is not "how many are safe" but "what am I about to lose". E2E-5
+         *     asserts `sessions_protected_manually_edited` is non-zero for a group with an edited
+         *     session and that those sessions are unchanged afterwards.
+         */
+        ScheduleImpactPreview: {
+            /** First Affected Date */
+            first_affected_date?: string | null;
+            /** Protected Manually Edited Sessions */
+            protected_manually_edited_sessions?: components["schemas"]["ProtectedSessionOut"][];
+            /** Sessions Protected Ad Hoc */
+            sessions_protected_ad_hoc: number;
+            /** Sessions Protected Manually Edited */
+            sessions_protected_manually_edited: number;
+            /** Sessions Protected Past */
+            sessions_protected_past: number;
+            /** Sessions To Cancel */
+            sessions_to_cancel: number;
+            /** Sessions To Create */
+            sessions_to_create: number;
+            /** Sessions To Update */
+            sessions_to_update: number;
+            /**
+             * Students Left Unscheduled
+             * @default 0
+             */
+            students_left_unscheduled: number;
+        };
+        /**
+         * SchedulePutIn
+         * @description `PUT /groups/{id}/schedule`. §7: "PUT returns an impact preview before applying."
+         *
+         *     `apply` is what makes one endpoint serve both halves. `false` (the default) computes
+         *     the preview and writes nothing; `true` performs the change. Defaulting to the harmless
+         *     branch means a caller that forgets the field gets a preview rather than an unreviewed
+         *     rewrite of a whole training year's sessions.
+         */
+        SchedulePutIn: {
+            /**
+             * Apply
+             * @default false
+             */
+            apply: boolean;
+            /**
+             * Effective From
+             * Format: date
+             */
+            effective_from: string;
+            /** Rules */
+            rules: components["schemas"]["ScheduleRuleIn"][];
+        };
+        /**
+         * ScheduleRuleIn
+         * @description One weekly rule. `weekday` is 0–6 with **0 = Sunday**, matching Israel's working
+         *     week and Postgres's `EXTRACT(DOW)`.
+         */
+        ScheduleRuleIn: {
+            /**
+             * Effective From
+             * Format: date
+             */
+            effective_from: string;
+            /**
+             * End Time
+             * Format: time
+             */
+            end_time: string;
+            /** Location Id */
+            location_id?: string | null;
+            /**
+             * Start Time
+             * Format: time
+             */
+            start_time: string;
+            /** Weekday */
+            weekday: number;
+        };
+        /** ScheduleRuleOut */
+        ScheduleRuleOut: {
+            /**
+             * Effective From
+             * Format: date
+             */
+            effective_from: string;
+            /** Effective To */
+            effective_to?: string | null;
+            /**
+             * End Time
+             * Format: time
+             */
+            end_time: string;
+            /**
+             * Group Id
+             * Format: uuid
+             */
+            group_id: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Location Id */
+            location_id?: string | null;
+            /**
+             * Start Time
+             * Format: time
+             */
+            start_time: string;
+            /** Weekday */
+            weekday: number;
+        };
+        /**
+         * ScheduleRulesOut
+         * @description `GET /groups/{id}/schedule`. Only rules still in force: a superseded rule is history
+         *     the editor must not offer back for editing.
+         */
+        ScheduleRulesOut: {
+            /**
+             * Group Id
+             * Format: uuid
+             */
+            group_id: string;
+            /** Rules */
+            rules?: components["schemas"]["ScheduleRuleOut"][];
+        };
+        /**
+         * SessionCancelIn
+         * @description §5.6 — 'or cancel it with a reason'. The reason is required by the column's own
+         *     check constraint, so a blank one is refused here rather than at the database.
+         */
+        SessionCancelIn: {
+            /** Reason */
+            reason: string;
+        };
+        /**
+         * SessionCreate
+         * @description §5.6 — 'They can also add an ad-hoc session that belongs to no rule.'
+         *
+         *     `is_ad_hoc` is not a field a caller may set: every session created here is ad-hoc by
+         *     construction, and a flag the client controlled would let a caller mint a session that a
+         *     regenerate then silently destroys.
+         */
+        SessionCreate: {
+            /**
+             * Ends At
+             * Format: date-time
+             */
+            ends_at: string;
+            /**
+             * Group Id
+             * Format: uuid
+             */
+            group_id: string;
+            /** Location Id */
+            location_id?: string | null;
+            /** Staff */
+            staff?: components["schemas"]["SessionStaffIn"][];
+            /**
+             * Starts At
+             * Format: date-time
+             */
+            starts_at: string;
+            /**
+             * Training Year Id
+             * Format: uuid
+             */
+            training_year_id: string;
+        };
+        /** SessionNoteCreate */
+        SessionNoteCreate: {
+            /** Body */
+            body: string;
+        };
+        /** SessionNoteOut */
+        SessionNoteOut: {
+            /**
+             * Author Person Id
+             * Format: uuid
+             */
+            author_person_id: string;
+            /** Body */
+            body: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
+        };
+        /**
+         * SessionOut
+         * @description One materialized session. G3 — `starts_at`/`ends_at` are UTC instants; the client
+         *     renders them in Asia/Jerusalem regardless of locale (`@studio/core`'s `datetime`).
+         */
+        SessionOut: {
+            /**
+             * Attendance Taken
+             * @default false
+             */
+            attendance_taken: boolean;
+            /** Cancel Reason */
+            cancel_reason: string | null;
+            /**
+             * Ends At
+             * Format: date-time
+             */
+            ends_at: string;
+            /**
+             * Group Id
+             * Format: uuid
+             */
+            group_id: string;
+            /** Group Name */
+            group_name: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Ad Hoc */
+            is_ad_hoc: boolean;
+            /** Is Manually Edited */
+            is_manually_edited: boolean;
+            /** Location Id */
+            location_id: string | null;
+            /** Location Name */
+            location_name: string | null;
+            /** Staff */
+            staff?: components["schemas"]["SessionStaffOut"][];
+            /**
+             * Starts At
+             * Format: date-time
+             */
+            starts_at: string;
+            /** Status */
+            status: string;
+            /**
+             * Training Year Id
+             * Format: uuid
+             */
+            training_year_id: string;
+        };
+        /**
+         * SessionPatch
+         * @description §5.6's per-session override.
+         *
+         *     **Every field is optional and absence is not `null`.** `location_id: null` clears the
+         *     location; omitting `location_id` leaves it alone. The service distinguishes them with
+         *     `model_fields_set`, which is the only way to express "remove the room" and "do not
+         *     touch the room" in one shape.
+         *
+         *     Times move as a pair. A start without an end would silently redefine the duration, and
+         *     "the class is an hour shorter now" is not something anyone typed.
+         */
+        SessionPatch: {
+            /** Ends At */
+            ends_at?: string | null;
+            /** Location Id */
+            location_id?: string | null;
+            /** Staff */
+            staff?: components["schemas"]["SessionStaffIn"][] | null;
+            /** Starts At */
+            starts_at?: string | null;
+        };
+        /**
          * SessionResponse
          * @description The access token lives in the body, never in a cookie (§10.3).
          *
@@ -893,6 +1570,40 @@ export interface components {
             expires_in: number;
             /** Studios */
             studios: components["schemas"]["StudioMembershipOut"][];
+        };
+        /**
+         * SessionStaffIn
+         * @description Who is actually on the mat for this one session. Distinct from `group_staff`, which
+         *     is who normally coaches the group — §5.14's 'sessions without a coach' report is the
+         *     difference between the two.
+         */
+        SessionStaffIn: {
+            /**
+             * Is Substitute
+             * @default false
+             */
+            is_substitute: boolean;
+            /**
+             * Person Id
+             * Format: uuid
+             */
+            person_id: string;
+            /** Role */
+            role: string;
+        };
+        /** SessionStaffOut */
+        SessionStaffOut: {
+            /** Display Name */
+            display_name: string;
+            /** Is Substitute */
+            is_substitute: boolean;
+            /**
+             * Person Id
+             * Format: uuid
+             */
+            person_id: string;
+            /** Role */
+            role: string;
         };
         /**
          * SetupProgressOut
@@ -1044,6 +1755,43 @@ export interface components {
              * Format: uuid
              */
             studio_id: string;
+        };
+        /** TrainingYearCreate */
+        TrainingYearCreate: {
+            /**
+             * Ends On
+             * Format: date
+             */
+            ends_on: string;
+            /** Name */
+            name: string;
+            /**
+             * Starts On
+             * Format: date
+             */
+            starts_on: string;
+        };
+        /** TrainingYearOut */
+        TrainingYearOut: {
+            /**
+             * Ends On
+             * Format: date
+             */
+            ends_on: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /**
+             * Starts On
+             * Format: date
+             */
+            starts_on: string;
+            /** Status */
+            status: string;
         };
         /** ValidationError */
         ValidationError: {
@@ -1437,6 +2185,75 @@ export interface operations {
             };
         };
     };
+    list_closures_api_v1_closures_get: {
+        parameters: {
+            query?: {
+                training_year_id?: string | null;
+                cursor?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CursorPage_ClosureOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_closure_api_v1_closures_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClosureCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClosureCreatedOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_groups_api_v1_groups_get: {
         parameters: {
             query?: {
@@ -1490,6 +2307,75 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GroupOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_group_schedule_api_v1_groups__group_id__schedule_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                group_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScheduleRulesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_group_schedule_api_v1_groups__group_id__schedule_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                group_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SchedulePutIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScheduleImpactPreview"];
                 };
             };
             /** @description Validation Error */
@@ -1607,6 +2493,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthTemplateListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_holiday_presets_api_v1_holiday_presets_get: {
+        parameters: {
+            query: {
+                year: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HolidayPresetOut"][];
                 };
             };
             /** @description Validation Error */
@@ -1791,6 +2708,257 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["app__schemas__platform__StudioOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_sessions_api_v1_sessions_get: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+                group_id?: string | null;
+                coach_person_id?: string | null;
+                cursor?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CursorPage_SessionOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_ad_hoc_session_api_v1_sessions_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SessionCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_session_api_v1_sessions__session_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_session_api_v1_sessions__session_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SessionPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_session_api_v1_sessions__session_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SessionCancelIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_notes_api_v1_sessions__session_id__notes_get: {
+        parameters: {
+            query?: {
+                cursor?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CursorPage_SessionNoteOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_note_api_v1_sessions__session_id__notes_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SessionNoteCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionNoteOut"];
                 };
             };
             /** @description Validation Error */
@@ -2020,6 +3188,142 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    list_training_years_api_v1_training_years_get: {
+        parameters: {
+            query?: {
+                cursor?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CursorPage_TrainingYearOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_training_year_api_v1_training_years_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TrainingYearCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrainingYearOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    activate_training_year_api_v1_training_years__training_year_id__activate_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                training_year_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrainingYearOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    generate_sessions_api_v1_training_years__training_year_id__generate_sessions_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                training_year_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GenerateSessionsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
             };
         };
     };

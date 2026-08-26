@@ -22,6 +22,9 @@ import { DevBar } from '@studio/ui/dev-bar'
 import type { InstallPromptEvent } from '@studio/ui'
 import type { Locale } from '@studio/i18n'
 import { Resolve } from './features/identity/Resolve'
+import { ScheduleSection } from './features/schedule/ScheduleSection'
+import { makeStaffScheduleClient } from './features/schedule/client'
+import { useToday } from './features/schedule/useToday'
 
 // §5.1 — 'the staff app and dashboard route them into a resumable wizard'. Both mount the
 // SAME wizard from @studio/ui; no step lives in one app's feature directory. Registered
@@ -31,12 +34,27 @@ registerM1WizardSteps(apiFetch)
 
 const NAV = [
   { key: 'today', labelKey: 'common.nav.today', href: '/' },
-  { key: 'schedule', labelKey: 'common.nav.schedule', href: '/schedule' },
+  { key: 'schedule', labelKey: 'common.nav.schedule', href: '#/schedule' },
   { key: 'students', labelKey: 'common.nav.students', href: '/students' },
   { key: 'attendance', labelKey: 'common.nav.attendance', href: '/attendance' },
   { key: 'announcements', labelKey: 'common.nav.announcements', href: '/announcements' },
   { key: 'settings', labelKey: 'common.nav.settings', href: '/settings' },
 ]
+
+/**
+ * Lane SCHEDULE's screens route on `location.hash`, matching the dashboard: real `<a href>`
+ * links that survive the back button and open-in-new-tab, with no router dependency
+ * (`.claude/rules/ui-rtl-a11y.md` forbids adding one without asking).
+ */
+function useHash(): string {
+  const [hash, setHash] = useState<string>(() => globalThis.location?.hash ?? '')
+  useEffect(() => {
+    const onChange = () => setHash(globalThis.location?.hash ?? '')
+    globalThis.addEventListener('hashchange', onChange)
+    return () => globalThis.removeEventListener('hashchange', onChange)
+  }, [])
+  return hash
+}
 
 export default function App() {
   const session = useSession()
@@ -50,6 +68,16 @@ export default function App() {
   // Memoised: SetupWizard reads through this in an effect keyed on the client, so a fresh
   // object every render would re-fetch progress forever.
   const setupClient = useMemo(() => makeSetupClient(apiFetch), [])
+  const scheduleClient = useMemo(() => makeStaffScheduleClient(apiFetch), [])
+  const hash = useHash()
+  const today = useToday()
+  // 9a's filter defaults from who is looking: a coach opening the app wants their own day,
+  // a manager wants the club's. Both facts come off the ACTIVE membership — the same place
+  // features/identity/Resolve.tsx reads `owner` from — because `Session` itself is
+  // studio-agnostic and a person can hold different roles in different studios.
+  const membership = session.studios.find((s) => s.studio_id === session.activeStudioId)
+  const viewerIsCoach =
+    membership?.roles.some((role) => role === 'lead_coach' || role === 'assistant_coach') ?? false
 
   useEffect(() => {
     // Chromium fires this when it considers the app installable; iOS never does, which
@@ -111,11 +139,26 @@ export default function App() {
             />
           }
         >
-          <Resolve
-            session={session}
-            locale={locale}
-            wizard={<SetupWizard client={setupClient} locale={locale} />}
-          />
+          {/* §6.1's first-run routing still owns the default screen: `Resolve` decides
+              between the setup wizard, the tour and the refusal. A coach who has navigated
+              to #/schedule is past first run — but `access.staff` is re-checked here so the
+              hash can never route around §6.1's third arm, the refusal. */}
+          {session.access.staff && hash.startsWith('#/schedule') ? (
+            <ScheduleSection
+              locale={locale}
+              client={scheduleClient}
+              hash={hash}
+              today={today}
+              viewerPersonId={membership?.person_id}
+              viewerIsCoach={viewerIsCoach}
+            />
+          ) : (
+            <Resolve
+              session={session}
+              locale={locale}
+              wizard={<SetupWizard client={setupClient} locale={locale} />}
+            />
+          )}
         </AppShell>
       ) : null}
     </ThemeProvider>
