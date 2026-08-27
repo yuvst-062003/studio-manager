@@ -71,6 +71,12 @@ export type DebtRow = {
  * 550 needs both, labelled — one bare link has them sign one mandate and underpay for the
  * other child every month. Only this payer's own children ever appear.
  */
+export type PrepayTerms = {
+  cashMonths: number
+  chequeMonths: number
+  monthlyTotalAgorot: number
+}
+
 export type StandingOrderLink = {
   studentName: string
   planName: string
@@ -85,9 +91,30 @@ export type PaymentsScreenProps = {
   hasActiveSubscription: boolean
   standingOrderLinks: readonly StandingOrderLink[]
   cashInstructions: string | null
+  /**
+   * The club's own prepayment rules and this payer's monthly price, from
+   * `GET /me/prepay-terms`. The screen does no arithmetic of its own beyond
+   * `months × monthly` — G2 is an integer rule, and two places that compute the same
+   * product are two places that can round differently.
+   *
+   * A term of 0, or a payer with no plan, means that route settles open charges only —
+   * which is how cash behaved before prepayment existed.
+   */
+  prepayTerms: PrepayTerms
+  /**
+   * What is left of money already handed over. **Derived into "paid ahead", never stored.**
+   * A stored `paid_through = 2026-11-30` becomes a lie the moment the family upgrades to
+   * 400 ₪, because 600 ₪ no longer reaches the end of November; credit ÷ the CURRENT
+   * monthly total is always true and recomputes itself after any plan change.
+   */
+  creditAgorot: number
   /** The payer's own promises, both routes — a pending one turns its card into a status. */
   promises?: readonly PaymentPromiseOut[]
-  onPaymentPromise?: (chargeIds: string[], method: PromiseMethod) => Promise<void>
+  onPaymentPromise?: (
+    chargeIds: string[],
+    method: PromiseMethod,
+    prepayMonths: number,
+  ) => Promise<void>
   onOrderOpened: (form: { action: string; fields: Record<string, string> }) => void
   onOpenHistory: () => void
 }
@@ -99,6 +126,8 @@ export function PaymentsScreen({
   hasActiveSubscription,
   standingOrderLinks,
   cashInstructions,
+  prepayTerms,
+  creditAgorot,
   promises = [],
   onPaymentPromise,
   onOrderOpened,
@@ -195,6 +224,27 @@ export function PaymentsScreen({
           </div>
         </Card>
       </section>
+
+      {creditAgorot > 0 ? (
+        // §6 -- 'and the credit is what remembers'. Derived here from two live numbers,
+        // so a plan change re-answers it without anything being rewritten.
+        <Card>
+          <div data-testid="paid-ahead">
+            <h3>{t(locale, 'billing.prepay.paidAhead')}</h3>
+            <MoneyDisplay agorot={creditAgorot} tone="paid" />
+            <p>{coverageLabel(locale, creditAgorot, prepayTerms.monthlyTotalAgorot)}</p>
+            {remainderOf(creditAgorot, prepayTerms.monthlyTotalAgorot) > 0 ? (
+              <span data-testid="paid-ahead-part">
+                {t(locale, 'billing.prepay.andPartOfNext')}{' '}
+                <MoneyDisplay
+                  agorot={remainderOf(creditAgorot, prepayTerms.monthlyTotalAgorot)}
+                  tone="paid"
+                />
+              </span>
+            ) : null}
+          </div>
+        </Card>
+      ) : null}
 
       <h2>{t(locale, 'billing.howToPay.title')}</h2>
 
@@ -313,13 +363,18 @@ export function PaymentsScreen({
           pending={pending}
           chosen={chosen}
           inFlight={promiseInFlight}
+          // `months x monthly` is the ONE product this screen computes, and it is integer
+          // arithmetic on two integers the server sent (G2). A term of 0, or a payer with
+          // no plan, makes it 0 and the card falls back to settling open charges.
+          forwardMonths={method === 'cash' ? prepayTerms.cashMonths : prepayTerms.chequeMonths}
+          monthlyTotalAgorot={prepayTerms.monthlyTotalAgorot}
           onPaymentPromise={
             onPaymentPromise
-              ? (chargeIds) => {
+              ? (chargeIds, prepayMonths) => {
                   if (promiseInFlight) return
                   setPromiseInFlight(true)
                   setError(null)
-                  onPaymentPromise(chargeIds, method)
+                  onPaymentPromise(chargeIds, method, prepayMonths)
                     .catch(() => setError(t(locale, 'common.error.generic')))
                     .finally(() => setPromiseInFlight(false))
                 }
@@ -345,6 +400,8 @@ function PromiseCard({
   pending,
   chosen,
   inFlight,
+  forwardMonths,
+  monthlyTotalAgorot,
   onPaymentPromise,
 }: {
   locale: Locale
@@ -354,7 +411,9 @@ function PromiseCard({
   pending: PaymentPromiseOut | null
   chosen: readonly ChargeOut[]
   inFlight: boolean
-  onPaymentPromise?: (chargeIds: string[]) => void
+  forwardMonths: number
+  monthlyTotalAgorot: number
+  onPaymentPromise?: (chargeIds: string[], prepayMonths: number) => void
 }) {
   // Say a decline out loud exactly until the family acts on it, and say it on the card it
   // belongs to: the newest DECIDED promise OF THIS METHOD being a decline, with nothing
@@ -363,6 +422,12 @@ function PromiseCard({
   const latestDecided =
     promises.find((row) => row.method === method && row.decided_at !== null) ?? null
   const declined = !pending && latestDecided?.status === 'declined' ? latestDecided : null
+
+  // The club's rule for THIS route. Zero months, or a payer with no plan, buys nothing —
+  // and a card offering to sell a year of a subscription the family does not have is worse
+  // than a card that simply settles what is owed.
+  const forwardAgorot = forwardMonths * monthlyTotalAgorot
+  const openAgorot = selectionTotal(chosen)
 
   return (
     <Card>
@@ -394,12 +459,44 @@ function PromiseCard({
                 </span>
               </Alert>
             ) : null}
-            {onPaymentPromise && chosen.length > 0 ? (
+            {forwardAgorot > 0 ? (
+              // §6's breakdown. Shown rather than one figure, because 900 ₪ with no
+              // explanation is the number a parent phones the office about.
+              <div data-testid={`promise-breakdown-${method}`}>
+                <p>
+                  <span data-testid="promise-term-months">{forwardMonths}</span>{' '}
+                  {t(locale, 'billing.prepay.termMonths')}
+                </p>
+                <div style={totalRowStyle}>
+                  <span>{t(locale, 'billing.prepay.openCharges')}</span>
+                  <MoneyDisplay agorot={openAgorot} tone="debt" />
+                </div>
+                <div style={totalRowStyle}>
+                  <span>{t(locale, 'billing.prepay.forward')}</span>
+                  <span data-testid="promise-forward-total">
+                    <MoneyDisplay agorot={forwardAgorot} tone="debt" />
+                  </span>
+                </div>
+                <div style={totalRowStyle}>
+                  <span>{t(locale, 'billing.prepay.total')}</span>
+                  <span data-testid="promise-grand-total">
+                    <MoneyDisplay agorot={openAgorot + forwardAgorot} tone="debt" />
+                  </span>
+                </div>
+                <p>{t(locale, 'billing.prepay.note')}</p>
+              </div>
+            ) : null}
+            {onPaymentPromise && (chosen.length > 0 || forwardAgorot > 0) ? (
               <Button
                 variant="secondary"
                 data-testid={`promise-button-${method}`}
                 disabled={inFlight}
-                onClick={() => onPaymentPromise(chosen.map((charge) => charge.id))}
+                onClick={() =>
+                  onPaymentPromise(
+                    chosen.map((charge) => charge.id),
+                    forwardAgorot > 0 ? forwardMonths : 0,
+                  )
+                }
               >
                 {t(locale, `billing.${method}.request`)}
               </Button>
@@ -409,6 +506,25 @@ function PromiseCard({
       </div>
     </Card>
   )
+}
+
+/**
+ * §6's honest degradation. Whole months first, then what is left over — a credit rounded
+ * UP to the next month would tell a family they owe nothing in a month they partly do.
+ *
+ * A monthly total of 0 (a payer with no plan) covers no months at all rather than
+ * dividing by zero: the money is real, but there is no subscription to measure it in.
+ */
+function coverageLabel(locale: Locale, creditAgorot: number, monthlyAgorot: number): string {
+  const months = monthlyAgorot > 0 ? Math.floor(creditAgorot / monthlyAgorot) : 0
+  if (months === 1) return t(locale, 'billing.prepay.coversOneMonth')
+  return t(locale, 'billing.prepay.coversMonths').replace('{{count}}', String(months))
+}
+
+/** What the credit covers beyond whole months. Integer arithmetic (G2). */
+function remainderOf(creditAgorot: number, monthlyAgorot: number): number {
+  if (monthlyAgorot <= 0) return creditAgorot
+  return creditAgorot % monthlyAgorot
 }
 
 /** `2026-09` from the charge's own period. Data, not copy — `1b`'s strings table says the

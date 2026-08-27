@@ -117,6 +117,14 @@ export function PaymentPromisesPanel({
               {formatDateInStudioZone(promise.created_at, locale)}
             </span>
             <MoneyDisplay agorot={promise.total_agorot} tone="pending" />
+            {/* Why the number is large. 3,600 ₪ with no explanation is what a manager
+                phones the office about; "12 months forward" is the answer, and it is what
+                they are being handed a bundle of cheques for. */}
+            {promise.prepay_months > 0 ? (
+              <span data-testid="promise-forward-months">
+                {promise.prepay_months} {t(locale, 'billing.prepay.forwardMonths')}
+              </span>
+            ) : null}
             <Button
               variant="primary"
               data-testid="promise-confirm"

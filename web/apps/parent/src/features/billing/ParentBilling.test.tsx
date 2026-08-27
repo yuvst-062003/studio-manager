@@ -89,6 +89,8 @@ function renderPay(props: Partial<Parameters<typeof PaymentsScreen>[0]> = {}) {
         },
       ]}
       cashInstructions={null}
+      prepayTerms={{ cashMonths: 0, chequeMonths: 0, monthlyTotalAgorot: 0 }}
+      creditAgorot={0}
       onOrderOpened={vi.fn()}
       onOpenHistory={vi.fn()}
       {...props}
@@ -200,6 +202,7 @@ function promise(
     status: 'pending',
     method,
     total_agorot: 50_000,
+    prepay_months: 0,
     charge_ids: ['c1'],
     created_at: '2026-09-01T09:00:00Z',
     decided_at: null,
@@ -304,10 +307,13 @@ describe('1b — the two hand-carried routes', () => {
     // cannot count later — §10's whole reason for existing.
     const onPaymentPromise = vi.fn().mockResolvedValue(undefined)
     renderPay({ onPaymentPromise })
+    // The third argument is the forward term, 0 here because `renderPay`'s default terms
+    // offer no months — a route with no term is the settle-what-is-owed promise this
+    // object has always been.
     await userEvent.click(screen.getByTestId('promise-button-cheque'))
-    expect(onPaymentPromise).toHaveBeenCalledWith(['c1', 'c2'], 'cheque')
+    expect(onPaymentPromise).toHaveBeenCalledWith(['c1', 'c2'], 'cheque', 0)
     await userEvent.click(screen.getByTestId('promise-button-cash'))
-    expect(onPaymentPromise).toHaveBeenLastCalledWith(['c1', 'c2'], 'cash')
+    expect(onPaymentPromise).toHaveBeenLastCalledWith(['c1', 'c2'], 'cash', 0)
   })
 
   it('reports a pending cheque promise on the cheque card', () => {
@@ -347,6 +353,93 @@ describe('1b — the two hand-carried routes', () => {
     expect(screen.queryByTestId('promise-declined-cash')).not.toBeInTheDocument()
     // And the route is open again — a decline is not a ban.
     expect(screen.getByTestId('promise-button-cheque')).toBeInTheDocument()
+  })
+})
+
+describe('1b — prepayment and credit', () => {
+  // The club sells a monthly subscription and collects it in lumps: 900 ₪ of cash for three
+  // months, twelve cheques for a year. The ledger holds that as an ordinary payment with a
+  // short allocation list — the surplus IS the credit — and this screen is where a parent
+  // declares one and later sees what is left of it.
+  const TERMS = { cashMonths: 3, chequeMonths: 12, monthlyTotalAgorot: 30_000 }
+
+  it('offers the club\'s own term on each route, with the breakdown', () => {
+    // §6 — the breakdown is shown rather than a single figure, because 900 ₪ with no
+    // explanation is the kind of number a parent phones the office about.
+    renderPay({ prepayTerms: TERMS, onPaymentPromise: vi.fn() })
+    const cash = screen.getByTestId('route-cash')
+    expect(within(cash).getByTestId('promise-term-months')).toHaveTextContent('3')
+    // Two debt rows at 250 each are selected by the default 2-month picker, plus three
+    // months forward at 300.
+    expect(within(cash).getByTestId('promise-forward-total')).toHaveTextContent('900')
+    expect(within(cash).getByTestId('promise-grand-total')).toHaveTextContent('1,400')
+  })
+
+  it('prices each route at its own term', () => {
+    // Cash three months forward, twelve cheques. The club's two rules are different
+    // numbers, and a card that showed one of them on both would collect the wrong amount
+    // for whichever route it got wrong.
+    renderPay({ prepayTerms: TERMS, onPaymentPromise: vi.fn() })
+    expect(
+      within(screen.getByTestId('route-cheque')).getByTestId('promise-term-months'),
+    ).toHaveTextContent('12')
+  })
+
+  it('sends the term with the promise, so the manager knows what was bought', async () => {
+    const onPaymentPromise = vi.fn().mockResolvedValue(undefined)
+    renderPay({ prepayTerms: TERMS, onPaymentPromise })
+    await userEvent.click(screen.getByTestId('promise-button-cheque'))
+    expect(onPaymentPromise).toHaveBeenCalledWith(['c1', 'c2'], 'cheque', 12)
+  })
+
+  it('a term of 0 returns the route to settling open charges only', () => {
+    // §5 — how cash behaved before prepayment existed, and how a club that does not
+    // collect forward still works.
+    renderPay({
+      prepayTerms: { cashMonths: 0, chequeMonths: 12, monthlyTotalAgorot: 30_000 },
+      onPaymentPromise: vi.fn(),
+    })
+    const cash = screen.getByTestId('route-cash')
+    expect(within(cash).queryByTestId('promise-forward-total')).not.toBeInTheDocument()
+    expect(within(cash).getByTestId('promise-button-cash')).toBeInTheDocument()
+  })
+
+  it('offers no forward months to a family with no plan', () => {
+    // `monthly_total_agorot` is 0 for a payer whose children have no price plan, and
+    // `months × 0` is a term that buys nothing. Offering it would be a card promising to
+    // sell a year of a subscription the family does not have.
+    renderPay({
+      prepayTerms: { cashMonths: 3, chequeMonths: 12, monthlyTotalAgorot: 0 },
+      onPaymentPromise: vi.fn(),
+    })
+    expect(
+      within(screen.getByTestId('route-cash')).queryByTestId('promise-forward-total'),
+    ).not.toBeInTheDocument()
+  })
+
+  it('says what the credit covers, derived and never stored', () => {
+    // §6 — a stored `paid_through` becomes a lie the moment the family upgrades, because
+    // 600 ₪ no longer reaches the end of November. Credit ÷ the CURRENT monthly total is
+    // always true and recomputes itself after any plan change.
+    renderPay({ prepayTerms: TERMS, creditAgorot: 60_000 })
+    const ahead = screen.getByTestId('paid-ahead')
+    expect(ahead).toBeInTheDocument()
+    expect(ahead).toHaveTextContent(t(LOCALE, 'billing.prepay.coversMonths').replace('{{count}}', '2'))
+    expect(within(ahead).queryByTestId('paid-ahead-part')).not.toBeInTheDocument()
+  })
+
+  it('degrades honestly when the credit does not reach a whole month', () => {
+    // 'covers October, and 200 ₪ of November' — the sentence the spec writes out, because
+    // rounding it up to two months would tell a family they owe nothing when they do.
+    renderPay({ prepayTerms: TERMS, creditAgorot: 50_000 })
+    const ahead = screen.getByTestId('paid-ahead')
+    expect(ahead).toHaveTextContent(t(LOCALE, 'billing.prepay.coversOneMonth'))
+    expect(within(ahead).getByTestId('paid-ahead-part')).toBeInTheDocument()
+  })
+
+  it('says nothing at all when there is no credit', () => {
+    renderPay({ prepayTerms: TERMS, creditAgorot: 0 })
+    expect(screen.queryByTestId('paid-ahead')).not.toBeInTheDocument()
   })
 })
 

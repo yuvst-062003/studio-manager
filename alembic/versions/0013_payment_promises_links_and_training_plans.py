@@ -24,12 +24,22 @@ what every successor plan is born as, because a uPay shared link carries a fixed
 copying it forward would under-collect all year in silence. No CHECK: the https-only rule
 and the host allowlist are configuration (`STANDING_ORDER_LINK_HOSTS`), and a constraint
 would freeze one environment's payment provider into the schema.
+
+**Part 3 -- prepayment.** The club collects a monthly subscription in lumps: cash three
+months forward, twelve cheques for a year. Nothing new holds that money -- a `payment`
+whose allocations total less than its amount already leaves a surplus, and that surplus IS
+the credit. So this adds only the parent's way of DECLARING one: `prepay_months` on the
+promise, whole months bought forward beyond the charges it names. `payment_id` records
+which payment a confirmed promise produced, which is what lets a surplus be recognised as
+an expected prepayment rather than an anomaly. Both nullable-or-defaulted, because every
+promise that exists today declared no forward months and settled charges only.
 """
 
 from collections.abc import Sequence
 
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.dialects import postgresql
 
 revision: str = "0013"
 down_revision: str | None = "0012"
@@ -125,8 +135,44 @@ def upgrade() -> None:
     # -- Part 2: the standing-order link, per price plan -------------------------
     op.add_column("price_plan", sa.Column("standing_order_link_url", sa.Text(), nullable=True))
 
+    # -- Part 3: prepayment ------------------------------------------------------
+    # 0 is the honest backfill: every promise raised so far settled open charges only,
+    # because no forward offer existed to accept.
+    op.add_column(
+        "payment_promise",
+        sa.Column("prepay_months", sa.Integer(), nullable=False, server_default="0"),
+    )
+    op.execute(
+        "ALTER TABLE payment_promise"
+        " ADD CONSTRAINT ck_payment_promise_payment_promise_prepay_months"
+        " CHECK (prepay_months >= 0)"
+    )
+    # SET NULL rather than CASCADE: §11.4 never deletes a financial row, so this only fires
+    # if one is ever removed by hand, and a promise that lost its payment must survive to
+    # say that it was confirmed.
+    op.add_column(
+        "payment_promise",
+        sa.Column("payment_id", postgresql.UUID(as_uuid=True), nullable=True),
+    )
+    op.create_foreign_key(
+        "fk_payment_promise_payment_id_payment",
+        "payment_promise",
+        "payment",
+        ["payment_id"],
+        ["id"],
+        ondelete="SET NULL",
+    )
+
 
 def downgrade() -> None:
+    op.drop_constraint("fk_payment_promise_payment_id_payment", "payment_promise")
+    op.drop_column("payment_promise", "payment_id")
+    op.execute(
+        "ALTER TABLE payment_promise"
+        " DROP CONSTRAINT ck_payment_promise_payment_promise_prepay_months"
+    )
+    op.drop_column("payment_promise", "prepay_months")
+
     op.drop_column("price_plan", "standing_order_link_url")
 
     op.execute("ALTER TABLE payment DROP CONSTRAINT ck_payment_payment_method")

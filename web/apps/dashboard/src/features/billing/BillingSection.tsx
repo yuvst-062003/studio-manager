@@ -11,7 +11,7 @@ import { PaymentPromisesPanel } from './PaymentPromisesPanel'
 import { CollectionsScreen } from './CollectionsScreen'
 import type { HouseholdRow } from './CollectionsScreen'
 import { ReconciliationQueue } from './ReconciliationQueue'
-import { makeDashboardBillingClient } from './billingClient'
+import { creditByPayer, makeDashboardBillingClient } from './billingClient'
 import type {
   ChargeOut,
   MatchSuggestion,
@@ -61,6 +61,10 @@ export function householdsFrom(
   charges: readonly ChargeOut[],
   today: Date,
   students: readonly StudentNameRow[] = [],
+  // Credit per payer, from `creditByPayer` over the studio's payments. Passed in rather
+  // than fetched per row: a club has tens of families and one balance request each would
+  // be tens of requests to render one column.
+  credit: ReadonlyMap<string, number> = new Map(),
 ): HouseholdRow[] {
   const studentById = new Map(students.map((student) => [student.id, student]))
   const byPayer = new Map<string, ChargeOut[]>()
@@ -86,6 +90,7 @@ export function householdsFrom(
         (sum, row) => sum + row.amount_agorot - (row.allocated_agorot ?? 0),
         0,
       ),
+      creditAgorot: credit.get(payerPersonId) ?? 0,
       monthsInDebt: new Set(rows.map((row) => `${row.period_year}-${row.period_month}`)).size,
       daysOverdue: Math.max(
         0,
@@ -103,12 +108,13 @@ export function BillingSection({ locale, view }: { locale: Locale; view: 'collec
   const [unmatched, setUnmatched] = useState<UpayIpnRecordOut[]>([])
   const [suggestions, setSuggestions] = useState<MatchSuggestion[]>([])
   const [expected, setExpected] = useState<RecurringSubscriptionOut[]>([])
+  const [credit, setCredit] = useState<ReadonlyMap<string, number>>(new Map())
   const [reloads, setReloads] = useState(0)
 
   useEffect(() => {
     let alive = true
     void (async () => {
-      const [open, ipns, suggested, subscriptions, names] = await Promise.all([
+      const [open, ipns, suggested, subscriptions, names, payments] = await Promise.all([
         json<{ items: ChargeOut[] }>('/api/v1/charges?status=open&limit=200', { items: [] }),
         client.unmatched().catch(() => [] as UpayIpnRecordOut[]),
         client.suggestions().catch(() => ({ items: [] as MatchSuggestion[], never_auto: true })),
@@ -117,6 +123,11 @@ export function BillingSection({ locale, view }: { locale: Locale; view: 'collec
         }),
         // D1 — the names the household rows render and the checkbox labels read from.
         json<{ items: StudentNameRow[] }>('/api/v1/students?limit=200', { items: [] }),
+        // §7 — a family who paid three months of cash forward is not a debtor for the
+        // months they paid, and a manager who sends them a reminder without seeing that
+        // makes a phone call nobody enjoys. One read, subtracted the same way
+        // `BillingService.payer_credit` does it.
+        client.payments().catch(() => []),
       ])
       if (!alive) return
       setCharges(open.items)
@@ -124,6 +135,7 @@ export function BillingSection({ locale, view }: { locale: Locale; view: 'collec
       setUnmatched(ipns)
       setSuggestions(suggested.items)
       setExpected(subscriptions.items)
+      setCredit(creditByPayer(payments))
     })()
     return () => {
       alive = false
@@ -149,7 +161,7 @@ export function BillingSection({ locale, view }: { locale: Locale; view: 'collec
     )
   }
 
-  const households = householdsFrom(charges, new Date(), students)
+  const households = householdsFrom(charges, new Date(), students, credit)
   return (
     <>
     {/* Above the debt board, because a pending cash request IS tonight's collections

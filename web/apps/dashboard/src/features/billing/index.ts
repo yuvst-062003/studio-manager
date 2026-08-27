@@ -9,3 +9,4 @@ export { makeDashboardBillingClient, ageBucket, escalationRung, daysOverdue } fr
 export type { DashboardBillingClient, MatchSuggestion } from './billingClient'
 export { agorotFromShekels } from './money'
 export { StandingOrderLinksPanel } from './StandingOrderLinksPanel'
+export { PrepayTermsPanel } from './PrepayTermsPanel'

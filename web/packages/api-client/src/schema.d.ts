@@ -1677,6 +1677,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/prepay-terms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Prepay Terms
+         * @description Prepayment spec §9. No role dependency, like every other `/me/*` read (§3.1 --
+         *     "guardian is not a role").
+         *
+         *     The monthly total is this payer's OWN, summed across their active children: a parent
+         *     with two children thinks in "three months for both", and credit is payer-level anyway.
+         */
+        get: operations["my_prepay_terms_api_v1_me_prepay_terms_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/products": {
         parameters: {
             query?: never;
@@ -4449,6 +4473,16 @@ export interface components {
             /** Cash Instructions */
             cash_instructions?: string | null;
             /**
+             * Cash Prepay Months
+             * @default 3
+             */
+            cash_prepay_months: number;
+            /**
+             * Cheque Prepay Months
+             * @default 12
+             */
+            cheque_prepay_months: number;
+            /**
              * Run Day
              * @default 1
              */
@@ -4458,6 +4492,10 @@ export interface components {
         BillingSettingsPatch: {
             /** Cash Instructions */
             cash_instructions?: string | null;
+            /** Cash Prepay Months */
+            cash_prepay_months?: number | null;
+            /** Cheque Prepay Months */
+            cheque_prepay_months?: number | null;
             /** Run Day */
             run_day?: number | null;
         };
@@ -6388,6 +6426,8 @@ export interface components {
              * Format: uuid
              */
             payer_person_id: string;
+            /** Prepay Months */
+            prepay_months: number;
             /** Status */
             status: string;
             /** Total Agorot */
@@ -6758,6 +6798,11 @@ export interface components {
             balance_agorot: number;
             /** Charged Agorot */
             charged_agorot: number;
+            /**
+             * Credit Agorot
+             * @default 0
+             */
+            credit_agorot: number;
             /** Open Charge Count */
             open_charge_count: number;
             /** Paid Agorot */
@@ -6914,13 +6959,18 @@ export interface components {
         /** PaymentPromiseCreateIn */
         PaymentPromiseCreateIn: {
             /** Charge Ids */
-            charge_ids: string[];
+            charge_ids?: string[];
             /**
              * Method
              * @default cash
              * @enum {string}
              */
             method: "cash" | "cheque";
+            /**
+             * Prepay Months
+             * @default 0
+             */
+            prepay_months: number;
         };
         /** PaymentPromiseListOut */
         PaymentPromiseListOut: {
@@ -6945,6 +6995,8 @@ export interface components {
             id: string;
             /** Method */
             method: string;
+            /** Prepay Months */
+            prepay_months: number;
             /** Status */
             status: string;
             /** Total Agorot */
@@ -6973,6 +7025,25 @@ export interface components {
             plan_id: string;
             /** Registration Fee Agorot */
             registration_fee_agorot?: number | null;
+        };
+        /**
+         * PrepayTermsOut
+         * @description What the parent's cash and cheque cards need to draw their breakdown.
+         *
+         *     The payer's monthly total travels with the terms so the screen renders from server
+         *     numbers rather than computing the same product twice -- G2 is an integer rule, and two
+         *     places that multiply months by a price are two places that can round differently.
+         *
+         *     `0` on a route means the club does not offer months forward that way; the card falls
+         *     back to settling open charges, which is how cash behaved before this existed.
+         */
+        PrepayTermsOut: {
+            /** Cash Prepay Months */
+            cash_prepay_months: number;
+            /** Cheque Prepay Months */
+            cheque_prepay_months: number;
+            /** Monthly Total Agorot */
+            monthly_total_agorot: number;
         };
         /**
          * PricePlanCloseIn
@@ -11916,6 +11987,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_prepay_terms_api_v1_me_prepay_terms_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrepayTermsOut"];
                 };
             };
         };

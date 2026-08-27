@@ -45,6 +45,21 @@ export const billing: Bundle = {
   'cheque.pendingTitle': 'Waiting for the manager',
   'cheque.declined': 'The cheque request was declined — pay another way or talk to the manager.',
 
+  'prepay.termMonths': 'months forward',
+  'prepay.openCharges': 'Open charges',
+  'prepay.forward': 'Paid forward',
+  'prepay.total': 'Total',
+  'prepay.note': 'The club records the payment when the money arrives.',
+  'prepay.termsTitle': 'Paying forward',
+  'prepay.termsHint': 'How many months forward the club collects, per payment route',
+  'prepay.termsZeroHint': '0 removes the forward offer for that route',
+  'prepay.forwardMonths': 'months forward',
+  'prepay.credit': 'In credit',
+  'prepay.paidAhead': 'Paid ahead',
+  'prepay.coversOneMonth': 'Covers one month of training',
+  'prepay.coversMonths': 'Covers {{count}} months of training',
+  'prepay.andPartOfNext': 'And of the month after that:',
+
   'promise.blocked': 'A payment request is already waiting for the manager — you can send another once it is handled.',
 
   'promise.manager.title': 'Payment requests',

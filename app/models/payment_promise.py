@@ -16,6 +16,15 @@ looked like when raised; confirmation always recomputes from the charges' outsta
 amounts at that moment, so a promise raised before a partial card payment cannot
 over-collect.
 
+**A promise has two halves and they never double-count.** ``charges`` are specific open
+charges it settles; ``prepay_months`` is whole future months, priced at the payer's
+monthly total. The club collects three months of cash or twelve cheques at a time, and
+``payment_promise_charge`` can only name charges that already exist -- so the forward half
+is a COUNT OF MONTHS rather than a list of rows, and what it buys becomes an unallocated
+surplus on the confirmed payment. That surplus is the credit; the billing run's step 7
+spends it. There is no second mechanism and no "prepayment" table, because a ``payment``
+with a short allocation list already means exactly this.
+
 A pending promise does NOT claim its charges the way a payment order does: a parent who
 said "cash" and then pays by card mid-week has simply changed their mind, and the
 confirmation path treats already-settled charges as work already done.
@@ -55,6 +64,7 @@ class PaymentPromise(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
         ),
         CheckConstraint("method IN ('cash', 'cheque')", name="payment_promise_method"),
         CheckConstraint("total_agorot > 0", name="payment_promise_total_positive"),
+        CheckConstraint("prepay_months >= 0", name="payment_promise_prepay_months"),
         Index("ix_payment_promise_studio_id_status", "studio_id", "status"),
         Index("ix_payment_promise_studio_id_payer_person_id", "studio_id", "payer_person_id"),
     )
@@ -66,6 +76,19 @@ class PaymentPromise(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
     method: Mapped[str] = mapped_column(String(12), nullable=False, default="cash")
     #: What the parent saw when they raised it. G2 -- agorot, integer.
     total_agorot: Mapped[int] = mapped_column(Integer, nullable=False)
+    #: Whole months of tuition bought forward, BEYOND the charges this promise names. 0 is
+    #: the ordinary settle-what-is-owed promise, and is what a studio with a term of 0
+    #: configured can raise at all.
+    prepay_months: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    #: The payment a confirmed promise produced, or null while it is pending or declined.
+    #:
+    #: Recorded so a surplus can be RECOGNISED. §5.10 already surfaces an unallocated
+    #: surplus for a manager to look at, and a prepaying family creates one deliberately
+    #: every time they pay -- without this link every one of them is an anomaly nobody
+    #: asked for.
+    payment_id: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("payment.id", ondelete="SET NULL")
+    )
     decided_by_person_id: Mapped[uuid.UUID | None] = mapped_column(
         PGUUID(as_uuid=True), ForeignKey("person.id", ondelete="SET NULL")
     )

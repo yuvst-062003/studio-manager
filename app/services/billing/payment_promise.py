@@ -15,9 +15,10 @@ from datetime import datetime
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models.billing import Charge, PaymentAllocation
+from app.models.billing import Charge, PaymentAllocation, PricePlan
 from app.models.payment_promise import PROMISE_METHODS, PaymentPromise, PaymentPromiseCharge
-from app.models.person import Person
+from app.models.people import Student
+from app.models.person import Guardian, Person
 from app.services.audit import AuditService
 from app.services.billing.errors import ConflictError, NotFoundError, RefusedError
 from app.services.billing.payments import PaymentService
@@ -35,6 +36,31 @@ class PaymentPromiseService:
         ).scalar_one()
         return charge.amount_agorot - int(allocated)
 
+    def monthly_total_agorot(self, payer_person_id: uuid.UUID) -> int:
+        """What one month of tuition costs this payer, across ALL their active children.
+
+        Prepayment spec §4: the sum runs over every active student, because a parent with
+        two children thinks in "three months for both" and credit is payer-level in any
+        case. Only plans that are still open count -- a student pointing at last year's
+        closed plan is priced by whatever the run will actually raise, and the run reads
+        `student.price_plan_id` directly, so a closed plan there is a data problem this
+        method must not paper over by inventing a price.
+
+        Integer arithmetic throughout (G2). `prepay_months x monthly` never touches a float.
+        """
+        rows = self._session.execute(
+            select(func.coalesce(func.sum(PricePlan.monthly_amount_agorot), 0))
+            .select_from(Student)
+            .join(Guardian, Guardian.student_id == Student.id)
+            .join(PricePlan, PricePlan.id == Student.price_plan_id)
+            .where(
+                Guardian.person_id == payer_person_id,
+                Student.status == "active",
+                PricePlan.active_to.is_(None),
+            )
+        ).scalar_one()
+        return int(rows)
+
     def create(
         self,
         studio_id: uuid.UUID,
@@ -43,6 +69,7 @@ class PaymentPromiseService:
         charge_ids: list[uuid.UUID],
         at: datetime,
         method: str = "cash",
+        prepay_months: int = 0,
     ) -> PaymentPromise:
         """§5.10's human-recorded routes, said out loud. Every refusal is reachable from
         a client.
@@ -50,11 +77,22 @@ class PaymentPromiseService:
         A charge already inside another PENDING promise is refused -- two live promises
         over one month would show the manager the same money twice. Promises already
         decided do not block: a declined promise's charges are free to try again.
+
+        **The two halves never double-count.** `charge_ids` settles charges that exist;
+        `prepay_months` buys whole months that do not, priced at the payer's monthly total.
+        Either may be empty -- a family with nothing owed may still pay three months
+        forward, and a family with no plan may still settle a shop item -- but a promise
+        that is neither is a promise about nothing.
         """
         if method not in PROMISE_METHODS:
             raise RefusedError(f"method must be one of {', '.join(PROMISE_METHODS)}")
-        if not charge_ids:
-            raise RefusedError("a payment promise needs at least one charge")
+        if prepay_months < 0:
+            raise RefusedError("prepay_months cannot be negative")
+        forward = prepay_months * self.monthly_total_agorot(payer_person_id)
+        if not charge_ids and forward <= 0:
+            raise RefusedError(
+                "a payment promise needs at least one charge or a month bought forward"
+            )
         already_pending = set(
             self._session.execute(
                 select(PaymentPromiseCharge.charge_id)
@@ -93,7 +131,10 @@ class PaymentPromiseService:
             payer_person_id=payer_person_id,
             status="pending",
             method=method,
-            total_agorot=total,
+            # Display, never settlement -- what the parent saw when they raised it.
+            # Confirmation recomputes both halves.
+            total_agorot=total + forward,
+            prepay_months=prepay_months,
         )
         self._session.add(row)
         self._session.flush()
@@ -110,7 +151,12 @@ class PaymentPromiseService:
             entity_id=row.id,
             studio_id=studio_id,
             actor_person_id=payer_person_id,
-            diff={"total_agorot": total, "charges": len(charges), "method": method},
+            diff={
+                "total_agorot": total + forward,
+                "charges": len(charges),
+                "method": method,
+                "prepay_months": prepay_months,
+            },
         )
         self._session.flush()
         return row
@@ -177,9 +223,22 @@ class PaymentPromiseService:
     ) -> PaymentPromise:
         """The manager's ✓ -- the money changed hands.
 
-        Records one payment over what the promise's charges are STILL owed and allocates
-        it to exactly those charges. A promise whose charges were all settled some other
-        way in the meantime is marked received with no payment at all -- the money
+        Records ONE payment for both halves and allocates it to exactly the promise's own
+        charges. Whatever remains is left **unallocated**, and that remainder is the
+        credit the billing run's step 7 will spend over the coming months. There is no
+        second mechanism and no "prepayment" row: a payment with a short allocation list
+        already means this.
+
+        **Both halves are recomputed here, never read from `total_agorot`.** The charges
+        half can only shrink -- a card payment that landed in between settles the month and
+        the promise collects less rather than double-collecting, which is the rule this
+        object has always had. The forward half is re-priced at the payer's monthly total
+        as it stands now, because that is the price of the months being bought; the two can
+        only disagree if a plan change lands between raising and confirming, and a plan
+        change moves on the 1st while a promise lives for days.
+
+        A promise whose charges were all settled some other way in the meantime and which
+        buys no months forward is marked received with no payment at all -- the money
         conversation is over either way, and inventing a zero payment would put a
         meaningless row in the ledger.
         """
@@ -195,17 +254,24 @@ class PaymentPromiseService:
             if outstanding > 0:
                 outstanding_total += outstanding
                 payable.append(charge_id)
-        if outstanding_total > 0:
-            PaymentService(self._session).record(
+        forward = row.prepay_months * self.monthly_total_agorot(row.payer_person_id)
+        amount = outstanding_total + forward
+        if amount > 0:
+            payment = PaymentService(self._session).record(
                 row.studio_id,
                 payer_person_id=row.payer_person_id,
                 method=row.method,
-                amount_agorot=outstanding_total,
+                amount_agorot=amount,
+                # Exactly the promise's own charges, never `allocate_oldest_first`: this
+                # money was offered over named months, and the surplus is deliberate rather
+                # than something to spread over whatever else happens to be open. Step 7
+                # spends it, on the run, in the order the ledger decides.
                 received_at=at,
                 charge_ids=payable,
                 recorded_by_person_id=actor_person_id,
                 note=f"payment promise {row.id}",
             )
+            row.payment_id = payment.id
         row.status = "received"
         row.decided_by_person_id = actor_person_id
         row.decided_at = at
@@ -216,7 +282,7 @@ class PaymentPromiseService:
             entity_id=row.id,
             studio_id=row.studio_id,
             actor_person_id=actor_person_id,
-            diff={"amount_agorot": outstanding_total},
+            diff={"amount_agorot": amount, "forward_agorot": forward},
         )
         self._session.flush()
         return row

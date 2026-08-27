@@ -12,6 +12,39 @@ export type BillingRunOut = components['schemas']['BillingRunOut']
 export type UpayIpnRecordOut = components['schemas']['UpayIpnRecordOut']
 export type RecurringSubscriptionOut = components['schemas']['RecurringSubscriptionOut']
 export type PayerBalanceOut = components['schemas']['PayerBalanceOut']
+export type PaymentOut = components['schemas']['PaymentOut']
+export type BillingSettingsOut = components['schemas']['BillingSettingsOut']
+
+/**
+ * Credit per payer: **payments minus allocations**, the same subtraction
+ * `BillingService.payer_credit` makes on the server.
+ *
+ * Derived here from the payments list the collections screen already reads, rather than
+ * asking for one balance per household — a club has tens of families and that would be
+ * tens of requests to render one column.
+ *
+ * A reversed payment is money recorded as never having arrived: its allocations are gone
+ * and its amount must not count either, or a bounced cheque reads as credit.
+ */
+export function creditByPayer(
+  payments: readonly {
+    payer_person_id: string
+    amount_agorot: number
+    reversed_at: string | null
+    allocations?: readonly { amount_agorot: number }[]
+  }[],
+): Map<string, number> {
+  const credit = new Map<string, number>()
+  for (const payment of payments) {
+    if (payment.reversed_at !== null) continue
+    const allocated = (payment.allocations ?? []).reduce((sum, a) => sum + a.amount_agorot, 0)
+    credit.set(
+      payment.payer_person_id,
+      (credit.get(payment.payer_person_id) ?? 0) + payment.amount_agorot - allocated,
+    )
+  }
+  return credit
+}
 
 export type Fetcher = (path: string, init?: RequestInit) => Promise<Response>
 
@@ -45,6 +78,9 @@ export type DashboardBillingClient = {
   confirmMatch(ipnId: string, payerPersonId: string): Promise<void>
   ignoreIpn(ipnId: string): Promise<void>
   pricePlans(): Promise<PricePlanOut[]>
+  payments(): Promise<PaymentOut[]>
+  billingSettings(): Promise<BillingSettingsOut>
+  saveBillingSettings(patch: Partial<BillingSettingsOut>): Promise<BillingSettingsOut>
   setStandingOrderLink(planId: string, url: string | null): Promise<PricePlanOut>
   closePricePlan(planId: string, closesOn: string, amountAgorot: number): Promise<PricePlanOut>
   createPricePlan(input: {
@@ -73,6 +109,8 @@ export type ManagerPaymentPromiseOut = {
   status: 'pending' | 'received' | 'declined'
   method: PromiseMethod
   total_agorot: number
+  /** Whole months bought forward. Why a 3,600 ₪ promise is 3,600 ₪. */
+  prepay_months: number
   payer_person_id: string
   payer_name: string
   charge_count: number
@@ -143,6 +181,24 @@ export function makeDashboardBillingClient(fetcher: Fetcher): DashboardBillingCl
     },
     async pricePlans() {
       return (await json<{ items: PricePlanOut[] }>(await fetcher('/api/v1/price-plans'))).items
+    },
+    async payments() {
+      return (await json<{ items: PaymentOut[] }>(await fetcher('/api/v1/payments'))).items
+    },
+    async billingSettings() {
+      return json<BillingSettingsOut>(await fetcher('/api/v1/billing/settings'))
+    },
+    // A PARTIAL write. `exclude_unset` on the server is what stops the הגדרות panel's
+    // one-field autosave blanking the other settings, and sending a whole object here
+    // would defeat it from the client side.
+    async saveBillingSettings(patch: Partial<BillingSettingsOut>) {
+      return json<BillingSettingsOut>(
+        await fetcher('/api/v1/billing/settings', {
+          method: 'PATCH',
+          headers: JSON_HEADERS,
+          body: JSON.stringify(patch),
+        }),
+      )
     },
     // The ONE in-place edit `price_plan` allows, and it has its own route for that reason:
     // a general `PATCH /price-plans/{id}` would be an invitation to put the amount in it,

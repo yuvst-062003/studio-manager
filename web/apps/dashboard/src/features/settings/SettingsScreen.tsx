@@ -30,7 +30,7 @@ import { apiFetch } from '@studio/core'
 import { Card, Switch, TextField } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
-import { StandingOrderLinksPanel, makeDashboardBillingClient } from '../billing'
+import { PrepayTermsPanel, StandingOrderLinksPanel, makeDashboardBillingClient } from '../billing'
 
 type StudioDetails = {
   name: string
@@ -183,7 +183,10 @@ export function SettingsScreen({ locale }: { locale: Locale }) {
 
         {section === 'payments' ? (
           <div data-testid="settings-panel-payments">
+            {/* One screen answers "how may a family pay this club": the link per plan for
+                the הוראת קבע route, and how many months forward the other two collect. */}
             <StandingOrderLinksPanel locale={locale} client={billingClient} />
+            <PrepayTermsPanel locale={locale} client={billingClient} />
           </div>
         ) : (
         <Card>

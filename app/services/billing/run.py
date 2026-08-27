@@ -22,11 +22,12 @@ from datetime import UTC, date, datetime, timedelta
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models.billing import BillingRun, Charge, PricePlan
+from app.models.billing import BillingRun, Charge, Payment, PricePlan
 from app.models.people import Enrollment, Student, StudentFreeze
 from app.models.person import Guardian
 from app.models.schedule import Session as SessionRow
 from app.services.billing.errors import ConflictError
+from app.services.billing.payments import PaymentService
 from app.services.billing.service import BillingService
 from app.services.people.attendance_pattern import expected_weekdays
 from app.services.people.group_days import studio_weekday
@@ -95,6 +96,11 @@ class _Tally:
     #: freeze and was billed anyway is a phone call; a family who was frozen and does not
     #: appear in the run's own record is a number nobody can explain next month.
     frozen: list[str] = field(default_factory=list)
+    #: Step 7 -- agorot of existing credit spent on this period's charges. Reported for the
+    #: same reason `frozen` is: a run that settled 40 families out of money already in the
+    #: drawer looks, from `charges_created` alone, exactly like a run that collected
+    #: nothing.
+    credit_applied: int = 0
 
 
 class _AlreadyChargedError(Exception):
@@ -134,6 +140,9 @@ class BillingRunService:
         due = period_end(period_year, period_month)
         for student_id, price_plan_id in self._billable_students(studio_id, starts, due, tally):
             self._charge_one(studio_id, student_id, price_plan_id, starts, due, tally)
+        # Step 7, after every charge for the period has been raised and INSIDE the same
+        # transaction. See `_apply_credit`.
+        self._apply_credit(tally)
         run.charges_created = tally.charged
         run.finished_at = at
         run.status = "completed"
@@ -144,11 +153,71 @@ class BillingRunService:
             "prorated": tally.prorated,
             "unpriced": tally.unpriced,
             "frozen": tally.frozen,
+            "credit_applied": tally.credit_applied,
         }
         self._session.flush()
         return run
 
     # -- internals ------------------------------------------------------------
+    def _apply_credit(self, tally: _Tally) -> None:
+        """**Step 7 -- spend money that has already arrived.**
+
+        The club sells a monthly subscription and collects it in lumps: 900 ₪ of cash for
+        three months, twelve cheques for a year. Each of those leaves a `payment` whose
+        allocations total less than its amount, and that surplus IS the credit. This step
+        allocates it to the payer's open charges, oldest first, until the credit is
+        exhausted or no open charge remains.
+
+        **It must be in the same transaction as steps 1-6, and it is because it is in the
+        same method.** If the drawdown were a separate job, every prepaid family in the
+        club would appear in the manager's collections list as a debtor for as long as the
+        gap lasted, and the parent's app would show a debt they had already paid. A family
+        who has paid ahead must never, at any instant, read as owing money.
+
+        Nothing about steps 1-6 changes. The run still raises one tuition charge per
+        student at their plan's amount, still prorates the first month, still skips frozen
+        students, still charges the registration fee once. This only spends what is there.
+
+        Oldest-first, and each charge FULLY before the next: `allocate_oldest_first` is the
+        same rule §5.10's reconciliation uses, so a partial credit settles the oldest debt
+        rather than scattering across several and settling none -- which is what a manager
+        doing it by hand would do, and what keeps the collections list one row shorter
+        rather than two rows lighter.
+
+        Scoped by the session, not by an argument: `TenantSession` filters every query by
+        the active studio and fails closed without one, so "every payer with credit" is
+        already "every payer in THIS studio with credit".
+        """
+        payments = PaymentService(self._session)
+        holders = list(
+            self._session.execute(
+                select(Payment.payer_person_id)
+                .where(Payment.reversed_at.is_(None))
+                .group_by(Payment.payer_person_id)
+            ).scalars()
+        )
+        for payer_person_id in holders:
+            unspent = list(
+                self._session.execute(
+                    select(Payment.id)
+                    .where(
+                        Payment.payer_person_id == payer_person_id,
+                        Payment.reversed_at.is_(None),
+                    )
+                    # Oldest money first, so a family's September cash is spent before their
+                    # October cash -- which is the order they handed it over in and the only
+                    # order that makes a statement readable.
+                    .order_by(Payment.received_at, Payment.id)
+                ).scalars()
+            )
+            for payment_id in unspent:
+                if payments.unallocated_agorot(payment_id) <= 0:
+                    continue
+                for row in payments.allocate_oldest_first(
+                    payment_id, payer_person_id=payer_person_id
+                ):
+                    tally.credit_applied += row.amount_agorot
+
     def _open_run(
         self, studio_id: uuid.UUID, period_year: int, period_month: int, at: datetime
     ) -> BillingRun:

@@ -13,7 +13,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { apiFetch } from '@studio/core'
 import type { Locale } from '@studio/i18n'
 import { PaymentsScreen } from './PaymentsScreen'
-import type { DebtRow, StandingOrderLink } from './PaymentsScreen'
+import type { DebtRow, PrepayTerms, StandingOrderLink } from './PaymentsScreen'
 import type {
   BillingClient,
   ChargeOut,
@@ -28,6 +28,21 @@ type Fetcher = (path: string, init?: RequestInit) => Promise<Response>
 
 /** `GET /me/standing-order-links` on the wire. Snake case here, camel at the screen. */
 type WireLink = { student_name: string; plan_name: string; amount_agorot: number; url: string }
+
+/** `GET /me/prepay-terms`. Zeroes when the read fails, which is the settle-open-charges
+ *  behaviour cash had before prepayment existed — a card that cannot price a forward term
+ *  must not offer one. */
+type WireTerms = {
+  cash_prepay_months: number
+  cheque_prepay_months: number
+  monthly_total_agorot: number
+}
+
+const NO_TERMS: WireTerms = {
+  cash_prepay_months: 0,
+  cheque_prepay_months: 0,
+  monthly_total_agorot: 0,
+}
 
 const JSON_HEADERS = { 'Content-Type': 'application/json' }
 
@@ -56,7 +71,7 @@ export function makeParentBillingClient(fetcher: Fetcher): BillingClient {
       const response = await fetcher('/api/v1/me/payment-promises')
       return (await json<{ items: PaymentPromiseOut[] }>(response)).items
     },
-    async createPromise(chargeIds, promiseMethod) {
+    async createPromise(chargeIds, promiseMethod, prepayMonths) {
       // `method` in the body, not in the path: the two routes are one row and one
       // endpoint, so the server's `PROMISE_METHODS` check is the only place a third
       // method could ever be refused.
@@ -64,7 +79,11 @@ export function makeParentBillingClient(fetcher: Fetcher): BillingClient {
         await fetcher('/api/v1/me/payment-promises', {
           method: 'POST',
           headers: JSON_HEADERS,
-          body: JSON.stringify({ charge_ids: chargeIds, method: promiseMethod }),
+          body: JSON.stringify({
+            charge_ids: chargeIds,
+            method: promiseMethod,
+            prepay_months: prepayMonths,
+          }),
         }),
       )
     },
@@ -115,6 +134,12 @@ export function PaymentsSection({ locale }: { locale: Locale }) {
   const [standingOrder, setStandingOrder] = useState(false)
   const [promises, setPromises] = useState<readonly PaymentPromiseOut[]>([])
   const [standingOrderLinks, setStandingOrderLinks] = useState<readonly StandingOrderLink[]>([])
+  const [prepayTerms, setPrepayTerms] = useState<PrepayTerms>({
+    cashMonths: 0,
+    chequeMonths: 0,
+    monthlyTotalAgorot: 0,
+  })
+  const [creditAgorot, setCreditAgorot] = useState(0)
   const [loaded, setLoaded] = useState(false)
   // Bumped to re-read after an order opens. A counter rather than calling the loader
   // directly, so there is exactly one place that writes `debts` — `react-hooks`'
@@ -125,7 +150,7 @@ export function PaymentsSection({ locale }: { locale: Locale }) {
   useEffect(() => {
     let alive = true
     void (async () => {
-      const [charges, promiseRows, mandate, children, links] = await Promise.all([
+      const [charges, promiseRows, mandate, children, links, terms, balance] = await Promise.all([
         client.openCharges(''),
         // The payer's own promises, both routes, beside the charges: a pending one badges
         // its rows and swaps its card's button for a status; a declined one is said out
@@ -156,6 +181,16 @@ export function PaymentsSection({ locale }: { locale: Locale }) {
         apiFetch('/api/v1/me/standing-order-links')
           .then((r) => (r.ok ? (r.json() as Promise<{ items: WireLink[] }>) : { items: [] }))
           .catch(() => ({ items: [] as WireLink[] })),
+        // The club's own prepayment rules and this payer's monthly price. Read here rather
+        // than computed in the screen: `months x monthly` is integer arithmetic on money
+        // (G2), and the server is the one place that knows both numbers.
+        apiFetch('/api/v1/me/prepay-terms')
+          .then((r) => (r.ok ? (r.json() as Promise<WireTerms>) : NO_TERMS))
+          .catch(() => NO_TERMS),
+        // `credit_agorot` beside `balance_agorot`, never merged: the "paid ahead" line is
+        // derived from it and the monthly price, so a plan change re-answers it with
+        // nothing stored to become wrong.
+        client.balance('').catch(() => null),
       ])
       const nameOf = new Map(
         children.items.map((child) => [child.id, `${child.first_name} ${child.last_name}`]),
@@ -163,6 +198,12 @@ export function PaymentsSection({ locale }: { locale: Locale }) {
       if (!alive) return
       setStandingOrder(mandate.active)
       setPromises(promiseRows)
+      setPrepayTerms({
+        cashMonths: terms.cash_prepay_months,
+        chequeMonths: terms.cheque_prepay_months,
+        monthlyTotalAgorot: terms.monthly_total_agorot,
+      })
+      setCreditAgorot(balance?.credit_agorot ?? 0)
       setStandingOrderLinks(
         links.items.map((link) => ({
           studentName: link.student_name,
@@ -203,6 +244,8 @@ export function PaymentsSection({ locale }: { locale: Locale }) {
       debts={debts}
       hasActiveSubscription={standingOrder}
       standingOrderLinks={standingOrderLinks}
+      prepayTerms={prepayTerms}
+      creditAgorot={creditAgorot}
       // `GET /billing/settings` is manager-only, so the studio's own cash instructions
       // still have no payer-facing source. The screen falls back to the default copy
       // rather than showing a parent a 403. The standing-order link no longer falls back
@@ -210,8 +253,8 @@ export function PaymentsSection({ locale }: { locale: Locale }) {
       // have a single studio-wide link at one amount.
       cashInstructions={null}
       promises={promises}
-      onPaymentPromise={async (chargeIds, promiseMethod) => {
-        await client.createPromise(chargeIds, promiseMethod)
+      onPaymentPromise={async (chargeIds, promiseMethod, prepayMonths) => {
+        await client.createPromise(chargeIds, promiseMethod, prepayMonths)
         refresh()
       }}
       onOrderOpened={(form) => {

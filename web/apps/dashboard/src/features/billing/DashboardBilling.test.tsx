@@ -13,11 +13,12 @@ import { ReconciliationQueue } from './ReconciliationQueue'
 import { PricePlansScreen } from './PricePlansScreen'
 import { PaymentPromisesPanel } from './PaymentPromisesPanel'
 import { StandingOrderLinksPanel } from './StandingOrderLinksPanel'
+import { PrepayTermsPanel } from './PrepayTermsPanel'
 import { PRICES_WIZARD_ORDER, PricesWizardStep } from './PricesWizardStep'
 import { DebtAlert } from './DebtAlert'
 import { DEBT_ALERT_ORDER } from './register'
 import { RUN_JOB_ORDER } from './RunJobTool'
-import { ageBucket, daysOverdue, escalationRung } from './billingClient'
+import { ageBucket, creditByPayer, daysOverdue, escalationRung } from './billingClient'
 import { agorotFromShekels } from './money'
 import type { DashboardBillingClient, ManagerPaymentPromiseOut } from './billingClient'
 
@@ -29,6 +30,7 @@ function household(overrides: Partial<HouseholdRow> = {}): HouseholdRow {
     payerName: 'משפחת כהן',
     studentNames: ['דנה', 'יוסי'],
     balanceAgorot: 64_000,
+    creditAgorot: 0,
     monthsInDebt: 2,
     daysOverdue: 5,
     ...overrides,
@@ -49,6 +51,13 @@ function stub(overrides: Partial<DashboardBillingClient> = {}): DashboardBilling
     products: vi.fn().mockResolvedValue([]),
     paymentPromises: vi.fn().mockResolvedValue([]),
     setStandingOrderLink: vi.fn().mockResolvedValue({}),
+    billingSettings: vi.fn().mockResolvedValue({
+      cash_prepay_months: 3,
+      cheque_prepay_months: 12,
+      run_day: 1,
+      cash_instructions: null,
+    }),
+    saveBillingSettings: vi.fn().mockResolvedValue({}),
     confirmPromise: vi.fn().mockResolvedValue(undefined),
     declinePromise: vi.fn().mockResolvedValue(undefined),
     ...overrides,
@@ -68,6 +77,7 @@ function managerPromise(
     payer_person_id: 'payer-1',
     payer_name: 'משפחת כהן',
     charge_count: 3,
+    prepay_months: 0,
     created_at: '2026-09-01T09:00:00Z',
     ...overrides,
   }
@@ -644,5 +654,83 @@ describe('the wizard\'s prices step', () => {
     renderStep({ client: stub({ pricePlans: vi.fn().mockResolvedValue([]) }), onDone })
     await userEvent.click(screen.getByTestId('wizard-prices-done'))
     expect(onDone).toHaveBeenCalled()
+  })
+})
+
+describe('prepayment, on the manager\'s side', () => {
+  it('derives credit per payer the way the server does — payments minus allocations', () => {
+    // The same formula as `BillingService.payer_credit`, over the payments list the
+    // collections screen already needs. A reversed payment is money recorded as never
+    // having arrived, so it is credit on neither side of the subtraction.
+    const payments = [
+      {
+        id: 'p1',
+        payer_person_id: 'payer-1',
+        amount_agorot: 90_000,
+        reversed_at: null,
+        allocations: [{ amount_agorot: 30_000 }],
+      },
+      {
+        id: 'p2',
+        payer_person_id: 'payer-1',
+        amount_agorot: 30_000,
+        reversed_at: '2026-09-05T00:00:00Z',
+        allocations: [],
+      },
+      {
+        id: 'p3',
+        payer_person_id: 'payer-2',
+        amount_agorot: 25_000,
+        reversed_at: null,
+        allocations: [{ amount_agorot: 25_000 }],
+      },
+    ]
+    const credit = creditByPayer(payments)
+    expect(credit.get('payer-1')).toBe(60_000)
+    // Fully allocated: money that settled charges is not credit.
+    expect(credit.get('payer-2') ?? 0).toBe(0)
+  })
+
+  it('shows a household\'s credit beside its balance, never merged into it', () => {
+    // §7 — a manager about to phone a family should see "owes 640 ₪, paid ahead 600 ₪"
+    // before dialling. One number that meant neither is what merging them produces.
+    renderCollections({
+      households: [household({ creditAgorot: 60_000 })],
+    })
+    const row = screen.getAllByTestId('household-row')[0]!
+    expect(within(row).getByTestId('household-credit')).toHaveTextContent('600')
+  })
+
+  it('says nothing about credit for a household that has none', () => {
+    renderCollections({ households: [household()] })
+    expect(screen.queryByTestId('household-credit')).not.toBeInTheDocument()
+  })
+
+  it('lets the manager set the club\'s own prepayment terms', async () => {
+    // §5 — cash three months forward, twelve cheques. Configuration rather than constants,
+    // on the one screen that answers "how may a family pay this club".
+    const saveBillingSettings = vi.fn().mockResolvedValue({})
+    render(<PrepayTermsPanel locale={LOCALE} client={stub({ saveBillingSettings })} />)
+    const cash = await screen.findByTestId('prepay-term-cash')
+    await userEvent.clear(cash)
+    await userEvent.type(cash, '6')
+    await userEvent.tab()
+    expect(saveBillingSettings).toHaveBeenCalledWith({ cash_prepay_months: 6 })
+  })
+
+  it('shows how many months forward a promise buys, beside its amount', async () => {
+    // 3,600 ₪ with no explanation is the number a manager phones the office about. Twelve
+    // months forward is why it is large, and it is what they are holding cheques for.
+    render(
+      <PaymentPromisesPanel
+        locale={LOCALE}
+        client={stub({
+          paymentPromises: vi
+            .fn()
+            .mockResolvedValue([managerPromise('r1', 'cheque', { prepay_months: 12 })]),
+        })}
+      />,
+    )
+    expect(await screen.findByTestId('promise-forward-months')).toHaveTextContent('12')
   })
 })

@@ -334,6 +334,14 @@ class PayerBalanceOut(BaseModel):
     paid_agorot: int
     balance_agorot: int
     open_charge_count: int
+    #: Money handed over that settles nothing yet -- the club collects three months of cash
+    #: or twelve cheques at a time, and this is what is left of it.
+    #:
+    #: **A sibling of `balance_agorot`, never merged into it.** `paid_agorot` counts
+    #: ALLOCATIONS so the balance agrees with the charges it is the balance of; folding
+    #: credit in would make a prepaid family read as having a negative debt, which is not
+    #: what a debt figure means. A manager about to phone a family needs both facts.
+    credit_agorot: int = 0
 
 
 ChargePage = CursorPage[ChargeOut]

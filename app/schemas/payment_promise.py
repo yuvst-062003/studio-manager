@@ -16,8 +16,14 @@ from pydantic import BaseModel, Field
 
 
 class PaymentPromiseCreateIn(BaseModel):
-    charge_ids: list[uuid.UUID] = Field(min_length=1, max_length=50)
+    #: May be empty when `prepay_months` is not: a family with nothing owed may still buy
+    #: three months forward. The service refuses a promise that is neither.
+    charge_ids: list[uuid.UUID] = Field(default_factory=list, max_length=50)
     method: Literal["cash", "cheque"] = "cash"
+    #: Whole months bought forward beyond the charges above, priced at the payer's monthly
+    #: total. Capped at the same two years the studio setting is: a longer term is a
+    #: deposit, not a prepayment.
+    prepay_months: int = Field(default=0, ge=0, le=24)
 
 
 class PaymentPromiseOut(BaseModel):
@@ -25,6 +31,7 @@ class PaymentPromiseOut(BaseModel):
     status: str
     method: str
     total_agorot: int
+    prepay_months: int
     charge_ids: list[uuid.UUID]
     created_at: datetime.datetime
     decided_at: datetime.datetime | None
@@ -39,6 +46,9 @@ class ManagerPaymentPromiseOut(BaseModel):
     status: str
     method: str
     total_agorot: int
+    #: Beside the amount in the manager's queue, because "3,600 ₪" with no explanation is
+    #: the number they phone the office about. Twelve months forward is why it is large.
+    prepay_months: int
     payer_person_id: uuid.UUID
     payer_name: str
     charge_count: int

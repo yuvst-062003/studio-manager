@@ -928,6 +928,16 @@
             ],
             "title": "Cash Instructions"
           },
+          "cash_prepay_months": {
+            "default": 3,
+            "title": "Cash Prepay Months",
+            "type": "integer"
+          },
+          "cheque_prepay_months": {
+            "default": 12,
+            "title": "Cheque Prepay Months",
+            "type": "integer"
+          },
           "run_day": {
             "default": 1,
             "title": "Run Day",
@@ -950,6 +960,32 @@
               }
             ],
             "title": "Cash Instructions"
+          },
+          "cash_prepay_months": {
+            "anyOf": [
+              {
+                "maximum": 24.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cash Prepay Months"
+          },
+          "cheque_prepay_months": {
+            "anyOf": [
+              {
+                "maximum": 24.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cheque Prepay Months"
           },
           "run_day": {
             "anyOf": [
@@ -5225,6 +5261,10 @@
             "title": "Payer Person Id",
             "type": "string"
           },
+          "prepay_months": {
+            "title": "Prepay Months",
+            "type": "integer"
+          },
           "status": {
             "title": "Status",
             "type": "string"
@@ -5239,6 +5279,7 @@
           "status",
           "method",
           "total_agorot",
+          "prepay_months",
           "payer_person_id",
           "payer_name",
           "charge_count",
@@ -6055,6 +6096,11 @@
             "title": "Charged Agorot",
             "type": "integer"
           },
+          "credit_agorot": {
+            "default": 0,
+            "title": "Credit Agorot",
+            "type": "integer"
+          },
           "open_charge_count": {
             "title": "Open Charge Count",
             "type": "integer"
@@ -6402,7 +6448,6 @@
               "type": "string"
             },
             "maxItems": 50,
-            "minItems": 1,
             "title": "Charge Ids",
             "type": "array"
           },
@@ -6414,11 +6459,15 @@
             ],
             "title": "Method",
             "type": "string"
+          },
+          "prepay_months": {
+            "default": 0,
+            "maximum": 24.0,
+            "minimum": 0.0,
+            "title": "Prepay Months",
+            "type": "integer"
           }
         },
-        "required": [
-          "charge_ids"
-        ],
         "title": "PaymentPromiseCreateIn",
         "type": "object"
       },
@@ -6474,6 +6523,10 @@
             "title": "Method",
             "type": "string"
           },
+          "prepay_months": {
+            "title": "Prepay Months",
+            "type": "integer"
+          },
           "status": {
             "title": "Status",
             "type": "string"
@@ -6488,6 +6541,7 @@
           "status",
           "method",
           "total_agorot",
+          "prepay_months",
           "charge_ids",
           "created_at",
           "decided_at"
@@ -6541,6 +6595,30 @@
           "monthly_amount_agorot"
         ],
         "title": "PlanRepricing",
+        "type": "object"
+      },
+      "PrepayTermsOut": {
+        "description": "What the parent's cash and cheque cards need to draw their breakdown.\n\nThe payer's monthly total travels with the terms so the screen renders from server\nnumbers rather than computing the same product twice -- G2 is an integer rule, and two\nplaces that multiply months by a price are two places that can round differently.\n\n`0` on a route means the club does not offer months forward that way; the card falls\nback to settling open charges, which is how cash behaved before this existed.",
+        "properties": {
+          "cash_prepay_months": {
+            "title": "Cash Prepay Months",
+            "type": "integer"
+          },
+          "cheque_prepay_months": {
+            "title": "Cheque Prepay Months",
+            "type": "integer"
+          },
+          "monthly_total_agorot": {
+            "title": "Monthly Total Agorot",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "cash_prepay_months",
+          "cheque_prepay_months",
+          "monthly_total_agorot"
+        ],
+        "title": "PrepayTermsOut",
         "type": "object"
       },
       "PricePlanCloseIn": {
@@ -16004,6 +16082,28 @@
           }
         },
         "summary": "My Payments",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/v1/me/prepay-terms": {
+      "get": {
+        "description": "Prepayment spec §9. No role dependency, like every other `/me/*` read (§3.1 --\n\"guardian is not a role\").\n\nThe monthly total is this payer's OWN, summed across their active children: a parent\nwith two children thinks in \"three months for both\", and credit is payer-level anyway.",
+        "operationId": "my_prepay_terms_api_v1_me_prepay_terms_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrepayTermsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "My Prepay Terms",
         "tags": [
           "billing"
         ]

@@ -35,7 +35,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.tenancy import get_current_studio_id
-from app.models.billing import Charge, PaymentAllocation
+from app.models.billing import Charge, Payment, PaymentAllocation
 from app.schemas.billing import ChargeKind
 from app.services.billing.errors import ConflictError, NotFoundError, RefusedError
 
@@ -278,6 +278,41 @@ class BillingService:
             .where(Charge.payer_person_id == payer_person_id, Charge.status == "open")
         ).scalar_one()
         return (int(charged), int(paid), int(open_count))
+
+    def payer_credit(self, payer_person_id: uuid.UUID) -> int:
+        """Money this payer has handed over that settles nothing yet. **The sibling of
+        `payer_balance`, never merged into it.**
+
+            credit = sum(payment.amount_agorot) - sum(payment_allocation.amount_agorot)
+
+        It lives beside `payer_balance` because they are the two halves of one question,
+        and splitting them across two modules is how they drift apart.
+
+        **Why a sibling rather than a negative balance.** `balance_agorot` counts
+        allocations precisely so it agrees with the charges it is the balance of; folding
+        credit in would make a prepaid family read as having a negative debt, which is not
+        what a debt figure means. A manager about to phone a family needs to see "owes
+        nothing, paid ahead 600 ₪" -- two facts, not one number that means neither.
+
+        Reversed payments are excluded from BOTH sides. A reversal deletes its allocations
+        and records the money as never having arrived, so counting a bounced cheque as
+        credit would spend it in the next billing run.
+        """
+        received = self._session.execute(
+            select(func.coalesce(func.sum(Payment.amount_agorot), 0)).where(
+                Payment.payer_person_id == payer_person_id,
+                Payment.reversed_at.is_(None),
+            )
+        ).scalar_one()
+        allocated = self._session.execute(
+            select(func.coalesce(func.sum(PaymentAllocation.amount_agorot), 0))
+            .join(Payment, Payment.id == PaymentAllocation.payment_id)
+            .where(
+                Payment.payer_person_id == payer_person_id,
+                Payment.reversed_at.is_(None),
+            )
+        ).scalar_one()
+        return int(received) - int(allocated)
 
     def close_charge(self, charge_id: uuid.UUID, *, status: str, reason: str) -> Charge:
         """Void or write off a charge. **The one place outside `recompute_charge_status`

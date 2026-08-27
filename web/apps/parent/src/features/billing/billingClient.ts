@@ -40,6 +40,9 @@ export type PaymentPromiseOut = {
   status: 'pending' | 'received' | 'declined'
   method: PromiseMethod
   total_agorot: number
+  /** Whole months bought forward beyond the charges named below. 0 is the ordinary
+   *  settle-what-is-owed promise. */
+  prepay_months: number
   charge_ids: string[]
   created_at: string
   decided_at: string | null
@@ -48,7 +51,11 @@ export type PaymentPromiseOut = {
 export type BillingClient = {
   openCharges(payerPersonId: string): Promise<ChargeOut[]>
   promises(): Promise<PaymentPromiseOut[]>
-  createPromise(chargeIds: string[], method: PromiseMethod): Promise<PaymentPromiseOut>
+  createPromise(
+    chargeIds: string[],
+    method: PromiseMethod,
+    prepayMonths: number,
+  ): Promise<PaymentPromiseOut>
   balance(payerPersonId: string): Promise<PayerBalanceOut>
   payments(payerPersonId: string): Promise<PaymentOut[]>
   products(): Promise<ProductOut[]>

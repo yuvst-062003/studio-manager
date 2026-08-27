@@ -69,6 +69,7 @@ from app.services.billing import BillingService
 from app.services.billing.catalogue import CatalogueService
 from app.services.billing.errors import ConflictError, NotFoundError, RefusedError
 from app.services.billing.orders import OrderService
+from app.services.billing.payment_promise import PaymentPromiseService
 from app.services.billing.reconciliation import ReconciliationService
 from app.services.billing.run import BillingRunService
 from app.services.people.students import StudentService
@@ -732,18 +733,53 @@ def my_standing_order_links(
     )
 
 
+class PrepayTermsOut(BaseModel):
+    """What the parent's cash and cheque cards need to draw their breakdown.
+
+    The payer's monthly total travels with the terms so the screen renders from server
+    numbers rather than computing the same product twice -- G2 is an integer rule, and two
+    places that multiply months by a price are two places that can round differently.
+
+    `0` on a route means the club does not offer months forward that way; the card falls
+    back to settling open charges, which is how cash behaved before this existed.
+    """
+
+    cash_prepay_months: int
+    cheque_prepay_months: int
+    monthly_total_agorot: int
+
+
+@router.get("/me/prepay-terms", response_model=PrepayTermsOut)
+def my_prepay_terms(request: Request, session: TenantSessionDep) -> PrepayTermsOut:
+    """Prepayment spec §9. No role dependency, like every other `/me/*` read (§3.1 --
+    "guardian is not a role").
+
+    The monthly total is this payer's OWN, summed across their active children: a parent
+    with two children thinks in "three months for both", and credit is payer-level anyway.
+    """
+    _studio, billing = _settings_of(session, require_current_studio_id())
+    settings_out = BillingSettingsOut(**billing)
+    return PrepayTermsOut(
+        cash_prepay_months=settings_out.cash_prepay_months,
+        cheque_prepay_months=settings_out.cheque_prepay_months,
+        monthly_total_agorot=PaymentPromiseService(session).monthly_total_agorot(_caller(request)),
+    )
+
+
 @router.get("/me/balance", response_model=PayerBalanceOut)
 def my_balance(request: Request, session: TenantSessionDep) -> PayerBalanceOut:
     """`12f`'s summary card. Negative is a family in credit, and `MoneyDisplay` wraps the
     amount in `<bdi>` precisely so that reads as a credit in a right-to-left sentence."""
     payer_person_id = _caller(request)
-    charged, paid, open_count = BillingService(session).payer_balance(payer_person_id)
+    billing = BillingService(session)
+    charged, paid, open_count = billing.payer_balance(payer_person_id)
     return PayerBalanceOut(
         payer_person_id=payer_person_id,
         charged_agorot=charged,
         paid_agorot=paid,
         balance_agorot=charged - paid,
         open_charge_count=open_count,
+        credit_agorot=billing.payer_credit(payer_person_id),
     )
 
 
@@ -756,13 +792,17 @@ def payer_balance(
     Negative is a family in credit. `MoneyDisplay` wraps the amount in `<bdi>` precisely so
     a negative reads as a credit in a right-to-left sentence rather than as a debt.
     """
-    charged, paid, open_count = BillingService(session).payer_balance(payer_person_id)
+    billing = BillingService(session)
+    charged, paid, open_count = billing.payer_balance(payer_person_id)
     return PayerBalanceOut(
         payer_person_id=payer_person_id,
         charged_agorot=charged,
         paid_agorot=paid,
         balance_agorot=charged - paid,
         open_charge_count=open_count,
+        # §7 -- a payer with credit is not a debtor, and a manager about to phone a family
+        # should see "paid ahead 600 ₪" before dialling.
+        credit_agorot=billing.payer_credit(payer_person_id),
     )
 
 
@@ -860,6 +900,13 @@ class BillingSettingsOut(BaseModel):
     #: Which day of the month the run fires on. §5.10: 'a configurable day (default the 1st)'.
     run_day: int = 1
 
+    #: The club's own prepayment rules: cash three months forward, twelve cheques. Settings
+    #: rather than constants, because they ARE the club's rules and another club's differ.
+    #: `0` removes the forward offer for that route and returns it to settling open charges
+    #: only, which is how cash behaved before prepayment existed.
+    cash_prepay_months: int = 3
+    cheque_prepay_months: int = 12
+
     #: Tolerated on the way IN, dropped on the way out. `_settings_of` reads whatever JSONB
     #: is in the column, and a studio that was configured before §13 still has the old key
     #: sitting there; without this the first read after deploy is a 500.
@@ -868,6 +915,10 @@ class BillingSettingsOut(BaseModel):
 
 class BillingSettingsPatch(BaseModel):
     cash_instructions: str | None = Field(default=None, max_length=1000)
+    #: Capped at two years. A term longer than that is not a prepayment, it is a deposit,
+    #: and it would price forward months at a plan the club has certainly re-priced by then.
+    cash_prepay_months: int | None = Field(default=None, ge=0, le=24)
+    cheque_prepay_months: int | None = Field(default=None, ge=0, le=24)
     #: 1..28, not 1..31. A run day of the 30th never fires in February, which is a month
     #: nobody is billed and nobody notices until March.
     run_day: int | None = Field(default=None, ge=1, le=28)

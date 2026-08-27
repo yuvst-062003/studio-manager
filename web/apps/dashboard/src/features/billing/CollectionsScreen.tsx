@@ -43,6 +43,10 @@ export type HouseholdRow = {
   /** The children this payer's open charges name. A flat summary, never a row key. */
   studentNames: readonly string[]
   balanceAgorot: number
+  /** Money already handed over that settles nothing yet. **Beside the balance, never
+   *  merged into it** — a manager about to phone a family needs "owes 640 ₪, paid ahead
+   *  600 ₪", which is two facts. One number that meant neither is what merging produces. */
+  creditAgorot: number
   monthsInDebt: number
   daysOverdue: number
 }
@@ -204,6 +208,15 @@ export function CollectionsScreen({
                   {t(locale, `billing.debt.escalation.${escalationRung(row.daysOverdue)}`)}
                 </span>
                 <MoneyDisplay agorot={row.balanceAgorot} tone="debt" label={row.payerName} />
+                {/* §7 — beside the debt, never merged into it. A family who has paid ahead
+                    is not a debtor for the part they paid, and a manager who sends them a
+                    reminder without seeing this makes a phone call nobody enjoys. */}
+                {row.creditAgorot > 0 ? (
+                  <span data-testid="household-credit">
+                    {t(locale, 'billing.prepay.credit')}{' '}
+                    <MoneyDisplay agorot={row.creditAgorot} tone="paid" label={row.payerName} />
+                  </span>
+                ) : null}
                 <Button variant="secondary" data-testid="send-reminder">
                   {t(locale, 'billing.debt.sendReminder')}
                 </Button>

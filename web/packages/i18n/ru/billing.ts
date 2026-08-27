@@ -49,6 +49,21 @@ export const billing: Bundle = {
   'cheque.pendingTitle': 'Ожидает подтверждения менеджера',
   'cheque.declined': 'Запрос на оплату чеками отклонён — оплатите иначе или свяжитесь с менеджером.',
 
+  'prepay.termMonths': 'месяцев вперёд',
+  'prepay.openCharges': 'Открытые счета',
+  'prepay.forward': 'Оплата вперёд',
+  'prepay.total': 'Итого',
+  'prepay.note': 'Клуб запишет платёж, когда деньги поступят.',
+  'prepay.termsTitle': 'Оплата вперёд',
+  'prepay.termsHint': 'На сколько месяцев вперёд клуб собирает оплату по каждому способу',
+  'prepay.termsZeroHint': '0 отключает предложение оплаты вперёд для этого способа',
+  'prepay.forwardMonths': 'мес. вперёд',
+  'prepay.credit': 'В кредите',
+  'prepay.paidAhead': 'Оплачено вперёд',
+  'prepay.coversOneMonth': 'Покрывает один месяц занятий',
+  'prepay.coversMonths': 'Покрывает {{count}} мес. занятий',
+  'prepay.andPartOfNext': 'И из следующего за ним месяца:',
+
   'promise.blocked': 'Запрос на оплату уже ожидает менеджера — новый можно отправить после его обработки.',
 
   'promise.manager.title': 'Запросы на оплату',
