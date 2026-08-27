@@ -230,6 +230,31 @@ link that must be signed `לפני עלייה למזרן`.
 
 ## Log
 
+### 2026-08-27 · S5 — the offline machinery, made visible
+
+**What was wrong.** The machinery was complete and invisible: `usePendingCount` had one
+consumer on a screen S2 only just made reachable, `ConflictSection` targeted a container
+only the dashboard mounts (fixed in S1), and **nobody mounted `useNetworkMonitor`**, so the
+probe loop the whole §10.1 state machine depends on never ran — the mode could only change
+when a real request happened to fail.
+
+**What shipped.** `NetworkStatus` in the staff shell, above every screen: the §10.1 mode
+label (all five, `api-down` keeping its own `השרת אינו זמין` words) and the pending count,
+rendered only when there is something to say. It is also the app's single
+`useNetworkMonitor` mount, so the probe loop now actually runs. The conflict surface needed
+no new code — S1's `staff-alerts` container plus the existing `ConflictSection` registration
+already put §10.5's cards in the shell — so S5's contribution there is the test.
+
+**The test** (`offlineVisible.test.tsx`) walks §6.1's exact path in one it(): forced-offline
+shows the badge, a queued mark shows the count, a reconnect flush against a server that
+answers `session_cancelled` drains the queue, quiets the strip, and raises a card that is
+visible and dismissible in this app. A second test pins that the pending badge is about the
+queue, not the network — marks waiting on a working connection still show.
+
+**Vocabulary decision.** No second vocabulary was invented: the shell reads the same
+`attendance.network.*` / `attendance.sync.*` keys the roster and the parent AbsenceScreen
+already use, and `slow` stays an offline-path mode per §10.1.
+
 ### 2026-08-27 · S4 — three of the four defects closed, the fourth sequenced
 
 **The coach 403.** The spec pointed at the ungated `<SetupWizard>` mount at `App.tsx:366`,

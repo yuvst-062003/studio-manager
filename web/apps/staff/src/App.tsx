@@ -65,6 +65,7 @@ import {
   registerCommsSections,
 } from './features/comms'
 import { StaffAlerts } from './StaffAlerts'
+import { NetworkStatus } from './NetworkStatus'
 import './features/attendance/attendance.css'
 
 // §5.1 — 'the staff app and dashboard route them into a resumable wizard'. Both mount the
@@ -330,6 +331,10 @@ export default function App() {
               at-risk child must be visible from Today and from the roster, not behind a
               navigation the coach has no reason to make. Every fill renders null when it
               has nothing to say. */}
+          {/* S5 — the offline machinery made visible: network mode and queue depth, in the
+              shell, so a coach in a basement sees it from Today and from the roster alike.
+              Also the app's one `useNetworkMonitor` mount, which starts the probe loop. */}
+          {session.access.staff ? <NetworkStatus locale={locale} /> : null}
           {session.access.staff ? <StaffAlerts client={commsClient} locale={locale} /> : null}
           {/* §6.1's first-run routing still owns the DEFAULT screen: `Resolve` decides
               between the setup wizard, the tour and the refusal. Both W2 lanes hang a

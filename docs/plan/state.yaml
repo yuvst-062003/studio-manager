@@ -573,7 +573,8 @@ waves:
         on: 2026-08-27
       - id: S5
         title: Staff — offline made visible
-        status: pending
+        status: shipped
+        on: 2026-08-27
       - id: S6
         title: Staff — register completion (header, pre-reported, health flag)
         status: pending
