@@ -1,5 +1,5 @@
 {
-  "$comment": "The only place a hostname is written. `base_domain` records the name the club has CHOSEN and that ISOC-IL confirmed unregistered on 2026-08-25 — it does NOT mean the domain is bought or that DNS points anywhere. The `environments` hosts below are still the Railway-generated ones and must stay that way until the CNAMEs resolve, because app/core/cors.py builds the credentialed-request allowlist from them and pointing it at a host that does not exist would break every app. HB-domain in docs/plan/state.yaml stays open until the swap is done and verified. When it is, replace the hosts here and nothing else in the repo changes — every manifest start_url and scope is relative, so no rebuild is needed either.",
+  "$comment": "The only place a hostname is written. `base_domain` was bought at LiveDNS and the staging CNAMEs were created 2026-08-26; the staging hosts below are the custom subdomains (swapped 2026-08-27) and app/core/cors.py builds the credentialed-request allowlist from them. The frontends additionally need the api host BAKED IN at build time as VITE_API_ORIGIN (a Railway service variable on each static service — see web/packages/core/src/identity/session.ts), so a host change here means setting that variable to match and redeploying the three apps. Production hosts stay PENDING until production services exist; HB-domain's production half stays open until then.",
   "base_domain": "gladiatorclub.co.il",
   "railway_project": "studio-manager",
   "railway_project_id": "375bada8-df9f-4afe-8f24-aa37bb5da9ed",
@@ -11,10 +11,10 @@
       "dashboard": "http://localhost:5175"
     },
     "staging": {
-      "api": "https://api-staging-1e4d.up.railway.app",
-      "staff": "https://staff-staging-e067.up.railway.app",
-      "parent": "https://parent-staging.up.railway.app",
-      "dashboard": "https://dashboard-staging-0f4b.up.railway.app"
+      "api": "https://api.staging.gladiatorclub.co.il",
+      "staff": "https://staff.staging.gladiatorclub.co.il",
+      "parent": "https://app.staging.gladiatorclub.co.il",
+      "dashboard": "https://admin.staging.gladiatorclub.co.il"
     },
     "production": {
       "api": "https://PENDING-production-services",

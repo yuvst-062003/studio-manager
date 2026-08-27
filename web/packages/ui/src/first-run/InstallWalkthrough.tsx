@@ -6,9 +6,10 @@
 // (`beforeinstallprompt` is Chromium-only)." So iOS is TAUGHT and Chromium is PROMPTED,
 // and the two paths are genuinely different rather than one path with a fallback.
 //
-// §6.5: "An App Store build would not remove that install step, only make it familiar. So
-// the install is treated as part of onboarding, not an afterthought" — which is why this
-// renders before the app, not as a dismissible banner beside it.
+// §6.5: "An App Store build would not remove that install step, only make it familiar."
+// This USED to render before the app as a wall; the 2026-08-27 feature pass reversed
+// that product decision — the browser tab is a first-class way to use the app, and this
+// walkthrough now opens on demand from InstallBanner's nudge (`#/install` in both apps).
 import { useState } from 'react'
 import type { CSSProperties } from 'react'
 import { t } from '@studio/i18n'
@@ -104,11 +105,37 @@ export function InstallWalkthrough({
             <li>{t(locale, 'common.install.ios.step2')}</li>
             <li>{t(locale, 'common.install.ios.step3')}</li>
           </ol>
-          <img
-            src="/install/ios-share-menu.png"
-            alt={t(locale, 'common.install.ios.screenshotAlt')}
+          {/* An abstract share-sheet illustration, inline like the icon above. This was
+              a bitmap at /install/ios-share-menu.png that no app ever shipped — a broken
+              image rendered as its alt text, discovered when the walkthrough became a
+              reachable screen (2026-08-27). Abstract on purpose: rows need no locale. */}
+          <svg
+            role="img"
+            aria-label={t(locale, 'common.install.ios.screenshotAlt')}
+            viewBox="0 0 280 150"
             style={shotStyle}
-          />
+          >
+            <rect x="0" y="0" width="280" height="150" rx="12" fill="var(--surface)" />
+            <rect x="16" y="18" width="140" height="10" rx="5" fill="var(--border)" />
+            <rect x="16" y="44" width="180" height="10" rx="5" fill="var(--border)" />
+            <rect x="8" y="66" width="264" height="34" rx="8" fill="var(--ground)" />
+            <rect
+              x="8"
+              y="66"
+              width="264"
+              height="34"
+              rx="8"
+              fill="none"
+              stroke="var(--fg)"
+              strokeWidth="1.5"
+            />
+            <rect x="20" y="75" width="120" height="12" rx="6" fill="var(--fg)" />
+            <g stroke="var(--fg)" strokeWidth="1.5" fill="none">
+              <rect x="242" y="72" width="22" height="22" rx="5" />
+              <path d="M253 77v12M247 83h12" />
+            </g>
+            <rect x="16" y="116" width="160" height="10" rx="5" fill="var(--border)" />
+          </svg>
         </div>
       ) : deferredPrompt ? (
         // Chromium. §6.5's table: 'Install prompt — beforeinstallprompt — a real button.'

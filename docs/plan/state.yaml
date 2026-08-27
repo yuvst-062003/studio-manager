@@ -1060,12 +1060,15 @@ holdbacks:
       site. M1 has now shipped auth, so the risk it named is live: if the domain is not
       there, the refresh token gets moved to IndexedDB to make staging work and the
       workaround becomes the architecture. base_domain in infra/railway/domains.json records
-      the chosen name; the environment hosts there are still Railway's and must stay so
-      until the CNAMEs resolve, because app/core/cors.py builds its allowlist from them.
+      the chosen name. Closed 2026-08-27: the domain was bought at LiveDNS, the four staging
+      CNAMEs resolve, and domains.json's staging hosts are the custom subdomains — the
+      refresh cookie is first-party-site again. Production hosts stay PENDING in that file
+      until production services exist, which is standing-up-production work, not this
+      external dependency.
     blocks: W1
-    status: open
+    status: closed
     opened: 2026-08-24
-    closed: null
+    closed: 2026-08-27
     source: SPEC §15 item 5 · infra/railway/README.md
   - id: HB-upay
     kind: external

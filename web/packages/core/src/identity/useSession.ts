@@ -6,7 +6,7 @@
 // second while the first is true is a flash of the wrong app on every cold start.
 import { useCallback, useEffect, useState } from 'react'
 import type { AppAccess, SessionState, StudioMembership } from './session'
-import { getAccessToken, refresh, signOut, startListeningForPersonaSwitch } from './session'
+import { apiUrl, getAccessToken, refresh, signOut, startListeningForPersonaSwitch } from './session'
 
 export type SessionStatus = 'loading' | 'anonymous' | 'signed-in'
 
@@ -53,7 +53,7 @@ export function useSession(): Session {
     // access queries from the database rather than reading them off the token — §3.1's
     // "a query, not a role check" is only true if something asks.
     try {
-      const response = await fetch('/api/v1/auth/me', {
+      const response = await fetch(apiUrl('/api/v1/auth/me'), {
         credentials: 'include',
         headers: { Authorization: `Bearer ${getAccessToken() ?? ''}` },
       })

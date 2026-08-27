@@ -10,6 +10,7 @@
 // disagreeing about the mode. `OfflineProvider` is not a context — it is a module-level
 // singleton, because a coach's queue is a property of the *device*, not of a React subtree.
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { apiUrl } from '../identity/session'
 import { forcedMode, onForcedModeChange } from './devTools'
 import { makeMonitor } from './network'
 import type { NetState, NetworkMonitor } from './network'
@@ -68,7 +69,7 @@ export function networkMonitor(): NetworkMonitor {
     // A HEAD against the liveness probe. §10.1: "Mode is derived from actual request
     // outcomes against a lightweight ping" — `GET /api/v1/health` is core's, it touches no
     // studio data, and it is the one endpoint that answers the question being asked.
-    ping: () => fetch('/api/v1/health', { method: 'HEAD', cache: 'no-store' }),
+    ping: () => fetch(apiUrl('/api/v1/health'), { method: 'HEAD', cache: 'no-store' }),
     now: () => Date.now(),
     forced: forcedMode,
   })

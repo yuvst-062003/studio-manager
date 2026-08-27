@@ -990,60 +990,51 @@ a {
   margin-inline-end: auto;
 }
 
-.studio-signin {
-  min-block-size: 80dvh;
+/* The sign-in screen's styles moved to first-run/gladiator-signin.css with the
+ * Gladiator design pass (2026-08-27) — they are scoped to the one screen that uses
+ * them, and that file's header explains why its fonts live outside fonts.css. */
+
+/* §6.5's install nudge — the banner that replaced the install wall. An ordinary
+ * themed surface, unlike the sign-in: it sits inside the app. */
+.studio-install-banner {
   display: flex;
   align-items: center;
-  justify-content: center;
-  padding: var(--space-5);
-}
-
-.studio-signin__card {
-  inline-size: 100%;
-  max-inline-size: 24rem;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-block-end: var(--space-4);
+  padding: var(--space-3) var(--space-4);
   background: var(--surface);
   border: var(--border-width-hairline) solid var(--border);
-  border-radius: var(--radius-xl);
-  padding: var(--space-6) var(--space-5);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-  text-align: center;
+  border-radius: var(--radius-md);
 }
 
-.studio-signin__mark {
-  inline-size: 44px;
-  block-size: 44px;
-  border-radius: 12px;
-  background: var(--fg);
-  margin-inline: auto;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.studio-signin__mark::after {
-  content: '';
-  inline-size: 20px;
-  block-size: 5px;
-  background: var(--ground);
-  border-radius: 1px;
-}
-
-.studio-signin__title {
-  margin: 0;
-  font-size: var(--text-title);
-  font-weight: var(--weight-semibold);
-}
-
-.studio-signin__tagline {
-  margin: 0;
-  color: var(--text-muted);
+.studio-install-banner__text {
+  flex: 1 1 12rem;
   font-size: var(--text-body);
 }
 
-.studio-signin__note {
-  margin: 0;
+.studio-install-banner__actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.studio-install-banner__cta,
+.studio-install-banner__dismiss {
+  min-block-size: 36px;
+  padding-inline: var(--space-3);
+  border-radius: var(--radius-md);
+  font-size: var(--text-body);
+  cursor: pointer;
+}
+
+.studio-install-banner__cta {
+  background: var(--fg);
+  color: var(--ground);
+  border: var(--border-width-hairline) solid var(--fg);
+}
+
+.studio-install-banner__dismiss {
+  background: transparent;
   color: var(--text-muted);
-  font-size: var(--text-caption);
+  border: var(--border-width-hairline) solid var(--border);
 }

@@ -1,0 +1,267 @@
+/* The Gladiator sign-in — docs/design "Gladiator Login 5a", implemented 2026-08-27.
+ *
+ * This screen deliberately commits to ONE look in both themes: the cream ground, the
+ * sun-and-throw artwork and the red rule are the club's brand moment, not a data
+ * surface, so every color here is a literal from the mock rather than a theme token.
+ * The explicit background on the root is what keeps a dark host theme from bleeding
+ * through behind the artwork.
+ *
+ * Archivo lives HERE and not in fonts.css on purpose. fonts.css is gated by
+ * fonts.test.ts to exactly one family (D6/G14: "one family, one loading strategy",
+ * because every family is an asset to cache before a coach walks into a basement).
+ * That argument is about screens that must work offline — and this one cannot: OAuth
+ * needs the network before anything else happens. One latin-only variable-weight file
+ * (34KB) carries the wordmark; every translated string on the screen stays in Rubik.
+ */
+@font-face {
+  font-family: Archivo;
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400 800;
+  src: url('./assets/archivo-latin-wght.woff2') format('woff2-variations');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215,
+    U+FEFF, U+FFFD;
+}
+
+.gsignin {
+  position: relative;
+  min-block-size: 100vh;
+  min-block-size: 100svh;
+  overflow: hidden;
+  background: #f4f0eb;
+  color: #1a1a1a;
+  display: grid;
+  grid-template-columns: minmax(320px, 42%) 1fr;
+  font-family: 'Rubik Variable', Archivo, Helvetica, sans-serif;
+}
+
+/* ── the artwork ─────────────────────────────────────────────────────────────
+ * Two decorative layers as pseudo-elements rather than <img>: the composition is
+ * pure ornament (the mock ships both with alt=""), and a background needs no TS
+ * module declaration for the asset import. Internal placement stays PHYSICAL even
+ * in RTL — it is a picture, not text, and mirroring a judo throw redraws it wrong. */
+.gsignin__art {
+  position: relative;
+  grid-column: 2;
+  grid-row: 1;
+  place-self: center center;
+  inline-size: 84%;
+
+  /* The composition is a PICTURE: it must not mirror in RTL, so the container is
+   * declared LTR and the logical offsets below resolve physically inside it. */
+  direction: ltr;
+  max-inline-size: 720px;
+  aspect-ratio: 430 / 436;
+  margin-inline-end: 8%;
+}
+
+.gsignin__art::before {
+  content: '';
+  position: absolute;
+  inset-block: 0;
+  inset-inline: 0;
+  background: url('./assets/gladiator-sun.png') center / contain no-repeat;
+}
+
+.gsignin__art::after {
+  content: '';
+  position: absolute;
+  inset-inline-start: 71%;
+  inset-block-start: 58%;
+  transform: translate(-50%, -50%);
+  block-size: 69%;
+  aspect-ratio: 533 / 524;
+  background: url('./assets/gladiator-throw.png') center / contain no-repeat;
+  filter: drop-shadow(0 4px 10px rgb(90 0 0 / 28%));
+}
+
+/* The fade that keeps the form legible over the artwork's edge. A gradient has no
+ * logical direction, so RTL gets its own angle below. */
+.gsignin__scrim {
+  position: absolute;
+  inset-block: 0;
+  inset-inline: 0;
+  background: linear-gradient(
+    100deg,
+    rgb(244 240 235 / 97%) 0%,
+    rgb(244 240 235 / 93%) 34%,
+    rgb(244 240 235 / 22%) 56%,
+    rgb(244 240 235 / 0%) 78%
+  );
+  pointer-events: none;
+}
+
+[dir='rtl'] .gsignin__scrim {
+  background: linear-gradient(
+    260deg,
+    rgb(244 240 235 / 97%) 0%,
+    rgb(244 240 235 / 93%) 34%,
+    rgb(244 240 235 / 22%) 56%,
+    rgb(244 240 235 / 0%) 78%
+  );
+}
+
+/* ── the form column ───────────────────────────────────────────────────────── */
+.gsignin__form {
+  position: relative;
+  grid-column: 1;
+  grid-row: 1;
+  align-self: center;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(16px, 2.2vh, 28px);
+  padding: clamp(24px, 5%, 72px);
+  inline-size: 100%;
+}
+
+.gsignin__wordmark {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1em;
+}
+
+.gsignin__wordmark-name {
+  font: 800 clamp(30px, 3.4vw, 52px) / 1 Archivo, 'Rubik Variable', sans-serif;
+  letter-spacing: 0.02em;
+  color: #232326;
+}
+
+.gsignin__wordmark-club {
+  font: 500 clamp(15px, 1.7vw, 26px) / 1.1 Archivo, 'Rubik Variable', sans-serif;
+  letter-spacing: 0.44em;
+  color: rgb(35 35 38 / 70%);
+}
+
+/* The wordmark is Latin script inside an RTL document; without this the browser lays
+ * the letterspaced CLUB out from the wrong edge. */
+.gsignin__wordmark [dir],
+.gsignin__wordmark-name,
+.gsignin__wordmark-club {
+  direction: ltr;
+  text-align: start;
+}
+
+.gsignin__rule {
+  block-size: 2px;
+  inline-size: clamp(40px, 4vw, 72px);
+  background: #c8161d;
+}
+
+.gsignin__stack {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(9px, 1.2vh, 14px);
+  inline-size: 100%;
+  max-inline-size: 400px;
+}
+
+/* Rubik stands in for the mock's IBM Plex Mono: the eyebrow is translated copy, and
+ * Plex carries no Hebrew — the tracking and the red are what the treatment is. */
+.gsignin__eyebrow {
+  font-size: clamp(10px, 0.8vw, 12px);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #c8161d;
+}
+
+.gsignin__btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 100%;
+  box-sizing: border-box;
+  padding: clamp(11px, 1.5vh, 16px) 16px;
+  border-radius: 3px;
+  font-size: clamp(13px, 1.05vw, 16px);
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  text-decoration: none;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+
+.gsignin__btn:focus-visible {
+  outline: 2px solid #c8161d;
+  outline-offset: 2px;
+}
+
+.gsignin__btn--google {
+  background: #fff;
+  color: #1c1c1c;
+  border: 1px solid rgb(28 28 28 / 24%);
+}
+
+.gsignin__btn--google:hover {
+  background: #faf8f5;
+  border-color: rgb(28 28 28 / 44%);
+}
+
+.gsignin__btn--apple {
+  background: #111112;
+  color: #fff;
+  border: 1px solid #111112;
+}
+
+.gsignin__btn--apple:hover {
+  background: #000;
+}
+
+.gsignin__fine {
+  margin: 0.4em 0 0;
+  font-size: clamp(12px, 0.85vw, 14px);
+  line-height: 1.5;
+  color: rgb(26 26 26 / 74%);
+  text-wrap: pretty;
+}
+
+/* The language picker floats in the top start corner, above the artwork — §6.1 still
+ * puts language before login, it just no longer pushes the brand screen down. */
+.gsignin__lang {
+  position: absolute;
+  inset-block-start: clamp(12px, 2vh, 24px);
+  inset-inline-start: clamp(16px, 3vw, 40px);
+  z-index: 1;
+}
+
+@media (width <= 820px) {
+  .gsignin {
+    grid-template-columns: 1fr;
+    grid-template-rows: 44vh 1fr;
+  }
+
+  .gsignin__art {
+    grid-column: 1;
+    grid-row: 1;
+    inline-size: 92%;
+    margin-inline-end: 0;
+    align-self: end;
+  }
+
+  .gsignin__form {
+    grid-column: 1;
+    grid-row: 2;
+    align-self: start;
+    padding: clamp(20px, 6%, 40px);
+  }
+
+  .gsignin__scrim,
+  [dir='rtl'] .gsignin__scrim {
+    background: linear-gradient(
+      to bottom,
+      rgb(244 240 235 / 0%) 40%,
+      rgb(244 240 235 / 72%) 66%,
+      rgb(244 240 235 / 98%) 84%
+    );
+  }
+
+  .gsignin__stack {
+    max-inline-size: none;
+  }
+}

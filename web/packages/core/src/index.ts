@@ -13,6 +13,7 @@ export type { PersistenceResult } from './persistentStorage'
 export {
   ACT_AS_EVENT,
   apiFetch,
+  apiUrl,
   clearSession,
   getAccessToken,
   refresh,

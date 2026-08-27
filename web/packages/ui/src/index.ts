@@ -81,6 +81,7 @@ export type { SignInProvider } from './first-run/SignIn'
 export { RefusalScreen } from './first-run/RefusalScreen'
 export { InstallWalkthrough, isIosSafari } from './first-run/InstallWalkthrough'
 export type { InstallPromptEvent } from './first-run/InstallWalkthrough'
+export { InstallBanner } from './first-run/InstallBanner'
 
 // §5.1's setup wizard. The container reads useSlot('setup-wizard') — the id M0 already
 // declared — so M7's belts step and M6's prices step land as one file plus one line in

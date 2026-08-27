@@ -21,6 +21,7 @@ import {
   ThemeProvider,
   makeSetupClient,
   registerM1WizardSteps,
+  useDocumentLocale,
 } from '@studio/ui'
 import type { SideNavGroup } from '@studio/ui'
 import { DevBar } from '@studio/ui/dev-bar'
@@ -362,6 +363,10 @@ export default function App() {
   const beltsClassId = hash.replace(/^#\/?belts\/?/, '')
   const examRoute = hash.replace(/^#\/?exams\/?/, '')
   const [locale, setLocale] = useState<Locale>('he')
+  // index.html ships `lang="he" dir="rtl"` as literals; without this the manager who
+  // picks English or Russian reads LTR copy laid out RTL (found on the sign-in screen's
+  // design pass, 2026-08-27 — parent and staff already do this).
+  useDocumentLocale(locale)
   // §3.2's hard rule, on the screen's side — and ONLY on the screen's side. The API has
   // already redacted `fee_agorot` to null for a coach, so this cannot leak a price even if
   // it were wrong. What it decides is narrower: whether an ABSENT fee may be rendered as
@@ -399,13 +404,14 @@ export default function App() {
   return (
     <ThemeProvider>
       {session.status === 'anonymous' ? (
-        <>
-          <LanguagePicker locale={locale} onChoose={setLocale} />
-          {/* app="dashboard", not "staff": the OAuth callback routes the browser back to
-              the app named here, and this screen's app is this one (design pass — the
-              wrong name sent a signed-in manager to the staff origin). */}
-          <SignIn locale={locale} app="dashboard" />
-        </>
+        // app="dashboard", not "staff": the OAuth callback routes the browser back to
+        // the app named here, and this screen's app is this one (design pass — the
+        // wrong name sent a signed-in manager to the staff origin).
+        <SignIn
+          locale={locale}
+          app="dashboard"
+          languagePicker={<LanguagePicker locale={locale} onChoose={setLocale} />}
+        />
       ) : null}
 
       {session.status === 'signed-in' ? (

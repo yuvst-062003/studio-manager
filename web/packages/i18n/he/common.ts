@@ -7,6 +7,9 @@ export const common: Bundle = {
   'appName.staff': 'Gladiator Coach',
   'appName.parent': 'Gladiator',
   'appName.dashboard': 'Gladiator Manager',
+  // The sign-in wordmark. Identical in all three locales — same rule as appName above.
+  'brand.wordmark': 'GLADIATOR',
+  'brand.club': 'CLUB',
   'hello.title': 'הבסיס עובד',
   'hello.fontProof.hebrew': 'אבגד הוזח',
   'hello.fontProof.latin': 'ABCD efgh',
@@ -53,6 +56,10 @@ export const common: Bundle = {
   'auth.tagline.staff': 'הנוכחות של היום, גם בלי קליטה.',
   'auth.tagline.dashboard': 'ניהול המועדון — לוח, גבייה וחניכים.',
   'auth.noProviders': 'לא מוגדר ספק התחברות בסביבה הזו. בסביבת פיתוח: /dev/sign-in-as.',
+  'auth.eyebrow.parent': 'כניסה להורים',
+  'auth.eyebrow.staff': 'כניסת מאמנים',
+  'auth.eyebrow.dashboard': 'כניסת מנהלים',
+  'auth.noPasswords': 'בלי סיסמאות. הגישה נקבעת לפי החשבון שאיתו הוזמנתם.',
   'dash.nav.daily': 'יומיום',
   'dash.nav.club': 'מועדון',
   'dash.nav.money': 'כספים ומסמכים',
@@ -87,13 +94,17 @@ export const common: Bundle = {
   // not instructions for the parent most likely to need this screen.
   'install.title': 'התקנת האפליקציה',
   'install.why': 'התקנה נדרשת כדי לקבל התראות ולעבוד גם בלי אינטרנט',
-  'install.ios.step1': '1. הקישו על כפתור השיתוף בשורת הכתובת',
-  'install.ios.step2': '2. גללו ובחרו ״הוספה למסך הבית״',
-  'install.ios.step3': '3. הקישו ״הוספה״ ופתחו את האפליקציה מהמסך הבית',
+  'install.ios.step1': 'הקישו על כפתור השיתוף בשורת הכתובת',
+  'install.ios.step2': 'גללו ובחרו ״הוספה למסך הבית״',
+  'install.ios.step3': 'הקישו ״הוספה״ ופתחו את האפליקציה מהמסך הבית',
   'install.ios.shareIcon': 'כפתור השיתוף',
   'install.ios.screenshotAlt': 'צילום מסך של תפריט השיתוף בספארי, עם ״הוספה למסך הבית״ מסומן',
   'install.button': 'התקנה',
   'install.done': 'האפליקציה מותקנת',
+  'install.banner.text': 'התקינו את האפליקציה — התראות ועבודה גם בלי אינטרנט',
+  'install.banner.cta': 'להתקנה',
+  'install.banner.dismiss': 'לא עכשיו',
+  'install.back': 'חזרה',
   // §19.4's persona switcher. These are §19.4's own labels, verbatim from the artboard:
   //   בעלים · מנהל · מאמן ראשי · מאמן משנה
   //   הורה (3 ילדים) · הורה (ילד אחד) · הורה (ניסיון) · הורה+מאמן · ללא הרשאות

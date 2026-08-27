@@ -32,6 +32,26 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
+describe('apiUrl', () => {
+  it('leaves paths relative when no API origin is baked in', async () => {
+    // The development and test shape: the Vite proxy makes relative paths reach the API.
+    const { apiUrl } = await import('./session')
+    expect(apiUrl('/api/v1/health')).toBe('/api/v1/health')
+  })
+
+  it('prefixes every path with VITE_API_ORIGIN when a build bakes one in', async () => {
+    // The deployed shape: the static host has no proxy, so the bundle must carry the
+    // API's absolute origin or every call gets the SPA shell back as HTML — which is
+    // exactly how staging's sign-in screen ended up with zero buttons.
+    vi.stubEnv('VITE_API_ORIGIN', 'https://api.example.test')
+    vi.resetModules()
+    const { apiUrl } = await import('./session')
+    expect(apiUrl('/api/v1/health')).toBe('https://api.example.test/api/v1/health')
+    vi.unstubAllEnvs()
+    vi.resetModules()
+  })
+})
+
 describe('the access token', () => {
   it('is held in memory and never in storage', () => {
     // §11.7 — an XSS can read every storage API. It cannot read a module-scoped variable.

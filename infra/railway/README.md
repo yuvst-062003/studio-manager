@@ -18,9 +18,12 @@ staging up in M0 rather than W4 removes that as a late blocker.
 
 ## The domain
 
-§15 item 5 (a stable HTTPS domain) is **still outstanding**, and was deliberately
-deferred out of M0 on 2026-08-25. It now blocks **W1**, and that is as far as it can
-be pushed. `HB-domain` in [`state.yaml`](../../docs/plan/state.yaml) carries the record.
+§15 item 5 (a stable HTTPS domain) is **done for staging** (2026-08-27):
+`gladiatorclub.co.il` was bought at LiveDNS, the four staging CNAMEs resolve, and
+`domains.json`'s staging hosts are the custom subdomains. `HB-domain` in
+[`state.yaml`](../../docs/plan/state.yaml) carries the record; production hosts follow
+when production services exist. The analysis below is kept because it explains *why*
+the custom domain is load-bearing.
 
 The reason people give for it is trust: an invitation link people install from should
 not be a random subdomain — §6.5 makes the install the product's main adoption risk,
@@ -95,7 +98,14 @@ Until it lands, these are Railway-generated subdomains. Every hostname lives in
 [`domains.json`](domains.json) and nowhere else, so the swap is one file. Manifest
 `start_url` and `scope` are relative, so no rebuild is needed either.
 
-Two things need the host and are *not* solved by that file:
+Three things need the host and are *not* solved by that file:
+
+* **The frontends' API origin** — the apps call the API cross-origin, and a static
+  bundle has no server to ask at runtime, so the api host is BAKED IN at build time:
+  each static service carries a `VITE_API_ORIGIN` service variable, the Dockerfiles
+  declare it as a build ARG, and `packages/core/src/identity/session.ts` reads it.
+  Changing the api host means updating that variable on all three services and
+  redeploying them, not just editing domains.json.
 
 * **The API's CORS allowlist** — solved. `app/core/cors.py` shipped in M1 and reads
   `domains.json`, so it follows the swap with no second edit.

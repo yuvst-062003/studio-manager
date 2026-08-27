@@ -13,6 +13,7 @@ import {
   AccountDrawerFooter,
   AppShell,
   Icon,
+  InstallBanner,
   InstallWalkthrough,
   LanguagePicker,
   SignIn,
@@ -91,23 +92,19 @@ function useHash(): string {
 export default function App() {
   const session = useSession()
   const displayMode = useDisplayMode()
-  // M0 already drew this line: core's isInstalled() is display-mode !== 'browser', so a
-  // fullscreen or minimal-ui home-screen launch counts too. Its own docstring names
-  // M1's onboarding gate as the caller.
+  // M0 drew this line: core's isInstalled() is display-mode !== 'browser', so a
+  // fullscreen or minimal-ui home-screen launch counts too. Since the 2026-08-27
+  // feature pass this no longer GATES anything — the app runs fully in a browser tab —
+  // it only decides whether the home screen shows InstallBanner's nudge.
   //
-  // The `MODE` disjunct opens the gate on the VITE DEV SERVER only, so this app can be
-  // worked on in an ordinary tab — the dev server serves no service worker
-  // (`devOptions: { enabled: false }`), so there is nothing to install from and the gate
-  // would otherwise be unreachable rather than merely inconvenient.
-  //
-  // It is not a weakening of §6.5. `import.meta.env.MODE` is replaced by a string literal
-  // at build time, so in a real build this folds to `'production' === 'development'` and
-  // the branch is eliminated from the bundle: there is no flag to flip and nothing to
-  // forget. Under vitest MODE is 'test', which is why this app's own
-  // install-walkthrough tests still exercise the real gate.
+  // The `MODE` disjunct hides the nudge on the VITE DEV SERVER, which serves no service
+  // worker (`devOptions: { enabled: false }`) — there is nothing to install from, so the
+  // banner would point at a dead end. `import.meta.env.MODE` is replaced by a string
+  // literal at build time, so in a real build the disjunct folds away. Under vitest MODE
+  // is 'test', which is what lets this app's tests exercise the real banner.
   //
   // `useDisplayMode()` is deliberately left alone: M8 reports install rates from it, and
-  // a measurement that lies to make a dev tab convenient is worse than the gate.
+  // a measurement that lies to make a dev tab convenient is worse than no banner.
   const installed = displayMode !== 'browser' || import.meta.env.MODE === 'development'
   const [locale, setLocale] = useState<Locale>('he')
   // `<html lang>` and `<html dir>` follow the choice. index.html ships `lang="he" dir="rtl"`
@@ -178,6 +175,8 @@ export default function App() {
   // 12e — the item shop (feature pass: built in W4, mounted by nothing).
   const onShop = hash === '#/shop'
   const onDirections = hash === '#/directions'
+  // §6.5's walkthrough, now an on-demand screen behind InstallBanner's nudge.
+  const onInstall = hash === '#/install'
   // 12h's list, and 7d's invite behind `#/events/<eventId>/<studentId>`. Both ids are in
   // the hash because 12h is per CHILD per event: a family with two children on one
   // competition has two answers to give, and an event id alone cannot say which.
@@ -235,21 +234,15 @@ export default function App() {
     )
   }
 
-  if (!installed) {
-    return (
-      <ThemeProvider>
-        <InstallWalkthrough locale={locale} installed={false} deferredPrompt={installPrompt} />
-      </ThemeProvider>
-    )
-  }
-
   return (
     <ThemeProvider>
       {session.status === 'anonymous' ? (
-        <>
-          <LanguagePicker locale={locale} onChoose={setLocale} />
-          <SignIn locale={locale} app="parent" />
-        </>
+        // Language before login (§6.1) — the picker floats over the sign-in screen.
+        <SignIn
+          locale={locale}
+          app="parent"
+          languagePicker={<LanguagePicker locale={locale} onChoose={setLocale} />}
+        />
       ) : null}
 
       {session.status === 'signed-in' ? (
@@ -354,6 +347,19 @@ export default function App() {
             <ShopSection locale={locale} />
           ) : onDirections ? (
             <DirectionsScreen locale={locale} />
+          ) : onInstall ? (
+            <section aria-label={t(locale, 'common.install.title')}>
+              <a href="#/">{t(locale, 'common.install.back')}</a>
+              {installed ? (
+                <p>{t(locale, 'common.install.done')}</p>
+              ) : (
+                <InstallWalkthrough
+                  locale={locale}
+                  installed={false}
+                  deferredPrompt={installPrompt}
+                />
+              )}
+            </section>
           ) : onProfile ? (
             <ProfileSection locale={locale} />
           ) : addingChild ? (
@@ -385,7 +391,16 @@ export default function App() {
               }}
             />
           ) : (
-            <Resolve session={session} locale={locale} />
+            <>
+              <InstallBanner
+                locale={locale}
+                installed={installed}
+                onOpenWalkthrough={() => {
+                  globalThis.location.hash = '#/install'
+                }}
+              />
+              <Resolve session={session} locale={locale} />
+            </>
           )}
           </HealthGate>
           )}

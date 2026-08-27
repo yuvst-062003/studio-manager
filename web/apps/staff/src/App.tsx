@@ -2,16 +2,19 @@
 //
 //   1 שפה (BEFORE login) → 2 welcome → 3 resolve → 4 tour → 5 התראות → 6 offline prime
 //
-// The install gate sits in front of all of it. §6.5: "the install is treated as part of
-// onboarding, not an afterthought" — and for the staff app §10.6 makes it load-bearing
-// rather than nice, because `pending_ops` must never be reclaimed and only a home-screen
-// web app is exempt from Safari's 7-day script-storage cap.
+// The install WALL that used to sit in front of all of it fell in the 2026-08-27 feature
+// pass: the app runs fully in a browser tab, and installing is InstallBanner's nudge plus
+// the on-demand walkthrough at `#/install`. §10.6's stake is real — only a home-screen
+// web app is exempt from Safari's 7-day script-storage cap, so `pending_ops` is safest
+// installed — which is why the nudge names what installing buys, but it is a pitch now,
+// not a gate.
 import { useEffect, useMemo, useState } from 'react'
 import { apiFetch, useDisplayMode, useSession } from '@studio/core'
 import {
   AccountDrawerFooter,
   AppShell,
   Icon,
+  InstallBanner,
   InstallWalkthrough,
   LanguagePicker,
   SetupWizard,
@@ -99,23 +102,19 @@ function useHash(): string {
 export default function App() {
   const session = useSession()
   const displayMode = useDisplayMode()
-  // M0 already drew this line: core's isInstalled() is display-mode !== 'browser', so a
-  // fullscreen or minimal-ui home-screen launch counts too. Its own docstring names
-  // M1's onboarding gate as the caller.
+  // M0 drew this line: core's isInstalled() is display-mode !== 'browser', so a
+  // fullscreen or minimal-ui home-screen launch counts too. Since the 2026-08-27
+  // feature pass this no longer GATES anything — it only decides whether the home
+  // screen shows InstallBanner's nudge.
   //
-  // The `MODE` disjunct opens the gate on the VITE DEV SERVER only, so this app can be
-  // worked on in an ordinary tab — the dev server serves no service worker
-  // (`devOptions: { enabled: false }`), so there is nothing to install from and the gate
-  // would otherwise be unreachable rather than merely inconvenient.
-  //
-  // It is not a weakening of §6.5. `import.meta.env.MODE` is replaced by a string literal
-  // at build time, so in a real build this folds to `'production' === 'development'` and
-  // the branch is eliminated from the bundle: there is no flag to flip and nothing to
-  // forget. Under vitest MODE is 'test', which is why this app's own
-  // install-walkthrough tests still exercise the real gate.
+  // The `MODE` disjunct hides the nudge on the VITE DEV SERVER, which serves no service
+  // worker (`devOptions: { enabled: false }`) — nothing to install from, so the banner
+  // would point at a dead end. `import.meta.env.MODE` is replaced by a string literal at
+  // build time, so in a real build the disjunct folds away; under vitest MODE is 'test',
+  // which is what lets this app's tests exercise the real banner.
   //
   // `useDisplayMode()` is deliberately left alone: M8 reports install rates from it, and
-  // a measurement that lies to make a dev tab convenient is worse than the gate.
+  // a measurement that lies to make a dev tab convenient is worse than no banner.
   const installed = displayMode !== 'browser' || import.meta.env.MODE === 'development'
   const [locale, setLocale] = useState<Locale>('he')
   // See the parent app's note: index.html's `dir="rtl"` is a literal, and the locale in
@@ -161,6 +160,8 @@ export default function App() {
   // screen would change only when something else happened to re-render App. One
   // subscription serves both lanes' routes.
   const onStudents = hash === '#/students'
+  // §6.5's walkthrough, now an on-demand screen behind InstallBanner's nudge.
+  const onInstall = hash === '#/install'
   const onCash = hash === '#/cash'
   const onJoinLink = hash === '#/join-link'
   // §5.7's register, opened from a session. The id is in the hash so the back button works
@@ -183,25 +184,16 @@ export default function App() {
     return () => globalThis.removeEventListener('beforeinstallprompt', onPrompt)
   }, [])
 
-  // §6.5 — 'first run does not proceed until the app is running in standalone display
-  // mode.' Rendered INSTEAD of the app, not beside it.
-  if (!installed) {
-    return (
-      <ThemeProvider>
-        <InstallWalkthrough locale={locale} installed={false} deferredPrompt={installPrompt} />
-      </ThemeProvider>
-    )
-  }
-
   return (
     <ThemeProvider>
       {session.status === 'anonymous' ? (
         // §6.1's ordering rationale: 'language before login, because a Russian-speaking
-        // parent cannot read a Hebrew consent screen.'
-        <>
-          <LanguagePicker locale={locale} onChoose={setLocale} />
-          <SignIn locale={locale} app="staff" />
-        </>
+        // parent cannot read a Hebrew consent screen.' The picker floats over the screen.
+        <SignIn
+          locale={locale}
+          app="staff"
+          languagePicker={<LanguagePicker locale={locale} onChoose={setLocale} />}
+        />
       ) : null}
 
       {session.status === 'signed-in' ? (
@@ -290,7 +282,22 @@ export default function App() {
               whoever is holding the phone, so the check cannot live in the link. Lane
               PEOPLE's branch inherits the same protection from being below it: a person
               without staff access takes the `Resolve` arm and gets §6.1's refusal. */}
-          {session.access.staff && rosterSessionId ? (
+          {onInstall ? (
+            // Needs no access guard: installing the app is every signed-in person's
+            // business, and the screen shows nothing from any studio.
+            <section aria-label={t(locale, 'common.install.title')}>
+              <a href="#/">{t(locale, 'common.install.back')}</a>
+              {installed ? (
+                <p>{t(locale, 'common.install.done')}</p>
+              ) : (
+                <InstallWalkthrough
+                  locale={locale}
+                  installed={false}
+                  deferredPrompt={installPrompt}
+                />
+              )}
+            </section>
+          ) : session.access.staff && rosterSessionId ? (
             // §6.1 step 6 — "today's and tomorrow's sessions + rosters are fetched and
             // written to IndexedDB BEFORE the coach reaches Today", and "the first launch
             // blocks on this fetch".
@@ -342,11 +349,20 @@ export default function App() {
               }}
             />
           ) : (
-            <Resolve
-              session={session}
-              locale={locale}
-              wizard={<SetupWizard client={setupClient} locale={locale} />}
-            />
+            <>
+              <InstallBanner
+                locale={locale}
+                installed={installed}
+                onOpenWalkthrough={() => {
+                  globalThis.location.hash = '#/install'
+                }}
+              />
+              <Resolve
+                session={session}
+                locale={locale}
+                wizard={<SetupWizard client={setupClient} locale={locale} />}
+              />
+            </>
           )}
         </AppShell>
       ) : null}

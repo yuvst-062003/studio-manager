@@ -20,6 +20,31 @@
 const AUTH_BASE = '/api/v1/auth'
 
 /**
+ * Where the API lives. Empty in development and test: the Vite dev server proxies
+ * `/api` to uvicorn (each app's vite.config.ts), so relative paths reach the API and the
+ * refresh cookie stays same-origin on localhost. A deployed build has no proxy in front
+ * of its static host — every `/api` request would get the SPA shell back as HTML — so the
+ * build bakes the API's absolute origin in via `VITE_API_ORIGIN` and calls cross-origin:
+ * CORS comes from `app/core/cors.py`'s allowlist, and the cookie flows because the custom
+ * domain makes api and app same-SITE (infra/railway/README.md § The domain).
+ *
+ * `@studio/ui`'s SignIn reads the same variable itself — ui must not import core, and the
+ * OAuth start links it renders are top-level navigations to this origin.
+ */
+// The literal `import.meta.env.VITE_API_ORIGIN` form, deliberately: both Vite's build
+// and vitest's transform recognise and replace exactly that expression — a cast or an
+// aliased read survives untransformed and evaluates to undefined.
+const API_ORIGIN: string = import.meta.env.VITE_API_ORIGIN ?? ''
+
+/**
+ * Absolute URL for an API path — the one place the origin is prepended. Callers keep
+ * writing `/api/v1/...`; in a dev build this returns the path unchanged.
+ */
+export function apiUrl(path: string): string {
+  return `${API_ORIGIN}${path}`
+}
+
+/**
  * §19.4's dev bar dispatches this after a persona switch. Declared here as well as in
  * `@studio/ui` because the two packages must not import each other — `core` does not
  * depend on `ui`, and a dev tool is the last thing that should reverse that. A shared
@@ -119,7 +144,7 @@ export function refresh(): Promise<SessionState | null> {
 
   inFlightRefresh = (async () => {
     try {
-      const response = await fetch(`${AUTH_BASE}/refresh`, {
+      const response = await fetch(apiUrl(`${AUTH_BASE}/refresh`), {
         method: 'POST',
         credentials: 'include',
       })
@@ -149,7 +174,7 @@ export function refresh(): Promise<SessionState | null> {
  */
 export async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
   const send = (token: string | null): Promise<Response> =>
-    fetch(path, {
+    fetch(apiUrl(path), {
       ...init,
       credentials: 'include',
       headers: {
@@ -168,7 +193,7 @@ export async function apiFetch(path: string, init: RequestInit = {}): Promise<Re
 
 export async function signOut(): Promise<void> {
   try {
-    await fetch(`${AUTH_BASE}/logout`, { method: 'POST', credentials: 'include' })
+    await fetch(apiUrl(`${AUTH_BASE}/logout`), { method: 'POST', credentials: 'include' })
   } catch {
     // A network error must not leave someone looking signed in on a device they just
     // asked to be signed out of. The server-side revocation is what logout is FOR, so

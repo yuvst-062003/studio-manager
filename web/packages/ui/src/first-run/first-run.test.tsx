@@ -7,6 +7,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { t } from '@studio/i18n'
+import { InstallBanner } from './InstallBanner'
 import { InstallWalkthrough, isIosSafari } from './InstallWalkthrough'
 import { LanguagePicker } from './LanguagePicker'
 import { RefusalScreen } from './RefusalScreen'
@@ -101,6 +102,43 @@ describe('SignIn', () => {
     )
     const { container } = render(<SignIn locale="he" app="staff" />)
     await waitFor(() => expect(container.querySelectorAll('a')).toHaveLength(0))
+  })
+})
+
+describe('InstallBanner', () => {
+  beforeEach(() => localStorage.clear())
+
+  it('renders nothing once the app runs from a home screen', () => {
+    const { container } = render(
+      <InstallBanner locale="he" installed onOpenWalkthrough={vi.fn()} />,
+    )
+    expect(container.firstChild).toBeNull()
+  })
+
+  it('pitches the install and opens the walkthrough on demand', async () => {
+    const onOpen = vi.fn()
+    render(<InstallBanner locale="he" installed={false} onOpenWalkthrough={onOpen} />)
+    expect(screen.getByText(t('he', 'common.install.banner.text'))).toBeInTheDocument()
+    await userEvent.click(
+      screen.getByRole('button', { name: t('he', 'common.install.banner.cta') }),
+    )
+    expect(onOpen).toHaveBeenCalledOnce()
+  })
+
+  it('remembers a dismissal across visits', async () => {
+    // A nudge that reappears on every visit is a wall with extra steps — the choice
+    // "I use this in the browser" is stored per device.
+    const first = render(
+      <InstallBanner locale="he" installed={false} onOpenWalkthrough={vi.fn()} />,
+    )
+    await userEvent.click(screen.getByTestId('install-banner-dismiss'))
+    expect(screen.queryByTestId('install-banner')).toBeNull()
+    first.unmount()
+
+    const second = render(
+      <InstallBanner locale="he" installed={false} onOpenWalkthrough={vi.fn()} />,
+    )
+    expect(second.container.firstChild).toBeNull()
   })
 })
 

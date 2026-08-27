@@ -10,45 +10,49 @@
 // credentials are configured. A button for an unconfigured provider fails one step AFTER
 // the user has picked their account — which is worse than no button, and is what keeps
 // Apple invisible until HB-apple-developer closes.
+//
+// The face is the Gladiator split screen (docs/design "Gladiator Login 5a", 2026-08-27):
+// wordmark, red rule, role eyebrow, provider buttons over the sun-and-throw artwork.
+// Layout and copy follow the document direction; the artwork keeps its physical
+// composition — see gladiator-signin.css.
 import { useEffect, useState } from 'react'
-import type { CSSProperties } from 'react'
+import type { ReactNode } from 'react'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
+import './gladiator-signin.css'
 
 export type SignInProvider = { name: string; start_url: string }
 
-const listStyle: CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 'var(--space-3)',
-}
-
-const buttonStyle: CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  minBlockSize: '44px',
-  paddingInline: 'var(--space-4)',
-  borderRadius: 'var(--radius-md)',
-  border: 'var(--border-width-hairline) solid var(--border)',
-  background: 'var(--surface)',
-  color: 'var(--fg)',
-  textDecoration: 'none',
-}
+/**
+ * Where the API lives. The same variable `@studio/core` bakes into `apiUrl` — declared
+ * again here because ui must not import core (the dependency runs the other way). Empty
+ * in development, where the Vite proxy makes relative paths reach the API; absolute in a
+ * deployed build, where the start links below must navigate to the API's own origin for
+ * the callback to set its cookie there.
+ */
+const API_ORIGIN: string = import.meta.env.VITE_API_ORIGIN ?? ''
 
 const LABEL: Record<string, string> = {
   google: 'common.auth.continueWithGoogle',
   apple: 'common.auth.continueWithApple',
 }
 
+const BUTTON_CLASS: Record<string, string> = {
+  google: 'gsignin__btn gsignin__btn--google',
+  apple: 'gsignin__btn gsignin__btn--apple',
+}
+
 export function SignIn({
   locale,
   app,
   returnPath = '/',
+  languagePicker,
 }: {
   locale: Locale
   app: 'staff' | 'parent' | 'dashboard'
   returnPath?: string
+  /** §6.1 puts language before login; the screen floats it over the artwork. */
+  languagePicker?: ReactNode
 }) {
   const [providers, setProviders] = useState<SignInProvider[] | null>(null)
 
@@ -56,7 +60,9 @@ export function SignIn({
     let alive = true
     void (async () => {
       try {
-        const response = await fetch('/api/v1/auth/providers', { credentials: 'include' })
+        const response = await fetch(`${API_ORIGIN}/api/v1/auth/providers`, {
+          credentials: 'include',
+        })
         if (!response.ok) return
         const body = await response.json()
         if (alive) setProviders(body.items ?? [])
@@ -71,32 +77,43 @@ export function SignIn({
   }, [])
 
   return (
-    // The design pass gave this a face: no artboard draws a sign-in (the canvas starts
-    // past it), so the card composes the system — the ink mark, the app's name, one line
-    // of purpose, and the provider buttons. Nothing else: §6.1 step 2 is two buttons.
-    <div className="studio-signin" data-testid="sign-in">
-      <div className="studio-signin__card">
-        <div className="studio-signin__mark" aria-hidden="true" />
-        <h1 className="studio-signin__title">{t(locale, `common.appName.${app}`)}</h1>
-        <p className="studio-signin__tagline">{t(locale, `common.auth.tagline.${app}`)}</p>
-        <div style={listStyle}>
+    <div className="gsignin" data-testid="sign-in">
+      {languagePicker ? <div className="gsignin__lang">{languagePicker}</div> : null}
+      <div className="gsignin__art" aria-hidden="true" />
+      <div className="gsignin__scrim" />
+      <div className="gsignin__form">
+        {/* The wordmark is the visual; the app's full name stays the accessible one —
+            'Gladiator Coach' distinguishes the three apps where GLADIATOR CLUB cannot. */}
+        <h1 className="gsignin__wordmark" aria-label={t(locale, `common.appName.${app}`)}>
+          <span aria-hidden="true" className="gsignin__wordmark-name">
+            {t(locale, 'common.brand.wordmark')}
+          </span>
+          <span aria-hidden="true" className="gsignin__wordmark-club">
+            {t(locale, 'common.brand.club')}
+          </span>
+        </h1>
+        <div className="gsignin__rule" aria-hidden="true" />
+        <div className="gsignin__stack">
+          <span className="gsignin__eyebrow">{t(locale, `common.auth.eyebrow.${app}`)}</span>
           {(providers ?? []).map((provider) => (
             <a
               key={provider.name}
-              style={buttonStyle}
-              href={`${provider.start_url}?app=${app}&return_path=${encodeURIComponent(returnPath)}`}
+              className={BUTTON_CLASS[provider.name] ?? 'gsignin__btn gsignin__btn--google'}
+              href={`${API_ORIGIN}${provider.start_url}?app=${app}&return_path=${encodeURIComponent(returnPath)}`}
             >
               {t(locale, LABEL[provider.name] ?? 'common.auth.continueWithGoogle')}
             </a>
           ))}
+          {providers !== null && providers.length === 0 ? (
+            // The state every developer machine is in: no OAuth client configured, so the
+            // list is honestly empty. Saying so beats a card with a hole in it — and in
+            // production this renders only if configuration is genuinely broken, which is
+            // exactly when a person at this screen should be told something is wrong.
+            <p className="gsignin__fine">{t(locale, 'common.auth.noProviders')}</p>
+          ) : (
+            <p className="gsignin__fine">{t(locale, 'common.auth.noPasswords')}</p>
+          )}
         </div>
-        {providers !== null && providers.length === 0 ? (
-          // The state every developer machine is in: no OAuth client configured, so the
-          // list is honestly empty. Saying so beats a card with a hole in it — and in
-          // production this renders only if configuration is genuinely broken, which is
-          // exactly when a person at this screen should be told something is wrong.
-          <p className="studio-signin__note">{t(locale, 'common.auth.noProviders')}</p>
-        ) : null}
       </div>
     </div>
   )
