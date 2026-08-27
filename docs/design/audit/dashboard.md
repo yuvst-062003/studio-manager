@@ -271,6 +271,39 @@ is the single cheapest item in this spec.
 
 ## Log
 
+### 2026-08-27 · F5 — staff, from a table into a lifecycle (+ F8's hours and banner)
+
+**What was wrong.** `app/routers/staff.py` was one GET; `features/staff/` issued zero
+writes; הוספת איש צוות had never been built on either side.
+
+**What was built.** `POST /staff/invitations` (+ `/resend`, `DELETE`), `PATCH
+/staff/{person_id}`, `POST /staff/{person_id}/deactivate` — all ManagerOrOwner, all
+audited, all riding the existing Invitation table and §5.3's binding: the Person and role
+assignments are created at invite time, and accepting merely attaches a login
+(`accept_invitation`, unchanged). `list_staff` filters people with a pending invitation
+out of the "active" half so an invitee lists once, as invited. The screen grew the form,
+per-row resend/revoke, a role editor, deactivate, and the header summary.
+
+**Decisions.**
+- **No email is sent, deliberately.** No mailer exists anywhere in this product (§5.11
+  permits none even for notifications); the platform's owner invite and §5.4b's
+  onboarding link both hand the credential to a human to share. The invitation token is
+  returned exactly once with instructions, and the invitee uses §6.1's "יש לי קוד
+  הזמנה". The spec's "the recipient receives mail" assumed machinery that has never
+  existed — recorded as a stale premise, not routed around silently.
+- **A group's only lead coach cannot be deactivated: the server answers 409
+  `sole_lead_coach` with the group names.** Forcing a reassignment inside the deactivate
+  call would bury a scheduling decision inside an HR action, and silent orphaning is the
+  uncovered-banner's defect class. The owner cannot be deactivated at all, and `owner`
+  cannot be granted or revoked through the role editor (§3.1).
+
+**F8, two promises kept while here.** `weekly_hours` measures this week's staffed
+sessions (0 is a measurement now; a pending invitation stays an em dash), and the
+session-level banner renders a real `sessions_without_coach` count. Both stale keys
+(`staff.hoursUnknown`, `staff.uncovered.sessionsLater`) are deleted from all three
+locales.
+
+
 ### 2026-08-27 · F1 adoption + F11 — recovery everywhere, tables from one primitive
 
 **Stale claims, first.** The spec's counts — "43 screens catch an API error, 40 render a

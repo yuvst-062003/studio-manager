@@ -468,7 +468,8 @@ waves:
         status: pending
       - id: F5
         title: Dashboard — staff lifecycle (invitations, roles, deactivate)
-        status: pending
+        status: shipped
+        on: 2026-08-27
       - id: F6
         title: Dashboard — wizards can reopen steps
         status: pending

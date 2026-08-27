@@ -74,11 +74,14 @@ def test_a_coach_row_carries_the_groups_they_are_assigned_to(
     assert [group["id"] for group in coach["groups"]] == [str(a_group)]
 
 
-def test_weekly_hours_is_null_and_not_zero(client, as_manager) -> None:
-    """Zero is a measurement. Null is 'W2 has not built the thing that measures it', and
-    a screen that printed 0 would be reporting an idle coach."""
+def test_weekly_hours_is_zero_when_no_sessions_are_staffed(client, as_manager) -> None:
+    """F8 flipped this column from null to measured: sessions exist now, so 0 IS the
+    measurement for a person staffing nothing this week. A pending invitation still
+    carries null — it staffs nothing by definition."""
     body = client.get(STAFF, headers=as_manager.headers).json()
-    assert all(row["weekly_hours"] is None for row in body["items"])
+    assert all(
+        row["weekly_hours"] == 0.0 for row in body["items"] if row["person_id"] is not None
+    )
 
 
 def test_permissions_come_from_the_role_and_are_not_stored(client, as_manager) -> None:
@@ -237,3 +240,126 @@ def test_one_studio_never_sees_anothers_staff(
 
     body = client.get(STAFF, headers=stranger.headers).json()
     assert all(row["person_id"] != str(as_manager.person_id) for row in body["items"])
+
+
+# -- F5: the lifecycle --------------------------------------------------------
+def test_invite_resend_revoke_round_trip(client, as_manager) -> None:
+    created = client.post(
+        f"{STAFF}/invitations",
+        json={"email": "coach@example.invalid", "roles": ["lead_coach"], "first_name": "רון"},
+        headers=as_manager.headers,
+    )
+    assert created.status_code == 201, created.text
+    body = created.json()
+    assert body["token"]
+
+    listed = client.get(STAFF, headers=as_manager.headers).json()
+    row = next(r for r in listed["items"] if r["email"] == "coach@example.invalid")
+    assert row["status"] == "invited"
+    assert row["invitation_id"] == body["id"]
+
+    resent = client.post(
+        f"{STAFF}/invitations/{body['id']}/resend", headers=as_manager.headers
+    ).json()
+    # A new token every time — the old hash dies with it.
+    assert resent["token"] != body["token"]
+
+    revoked = client.delete(f"{STAFF}/invitations/{body['id']}", headers=as_manager.headers)
+    assert revoked.status_code == 204
+    after = client.get(STAFF, headers=as_manager.headers).json()
+    assert all(r["email"] != "coach@example.invalid" for r in after["items"])
+
+
+def test_accepting_a_staff_invitation_makes_the_person_staff(
+    client, fake_provider, as_manager, app_session
+) -> None:
+    """The §5.3 binding, end to end: sign in as a stranger, accept with the token, and
+    the pre-created role assignments are theirs."""
+    from tests.conftest import sign_in
+
+    created = client.post(
+        f"{STAFF}/invitations",
+        json={"email": "newcoach@example.invalid", "roles": ["assistant_coach"]},
+        headers=as_manager.headers,
+    ).json()
+
+    subject = f"newcoach-{uuid.uuid4()}"
+    code = f"code-{subject}"
+    fake_provider.register(code=code, subject=subject, email="newcoach@example.invalid")
+    signed = sign_in(client, code=code, app_name="staff")
+    token = signed.json()["access_token"]
+    accepted = client.post(
+        "/api/v1/auth/accept-invitation",
+        json={"token": created["token"]},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert accepted.status_code == 200, accepted.text
+
+    listed = client.get(STAFF, headers=as_manager.headers).json()
+    row = next(r for r in listed["items"] if r["email"] == "newcoach@example.invalid")
+    assert row["status"] == "active"
+    assert row["roles"] == ["assistant_coach"]
+
+
+def test_role_change_reconciles_grants_and_revocations(client, as_manager, app_session, studio):
+    person_id = _add_coach(app_session, studio.id, name="חילופי", role="assistant_coach")
+    changed = client.patch(
+        f"{STAFF}/{person_id}",
+        json={"roles": ["lead_coach"]},
+        headers=as_manager.headers,
+    )
+    assert changed.status_code == 204, changed.text
+    listed = client.get(STAFF, headers=as_manager.headers).json()
+    row = next(r for r in listed["items"] if r["person_id"] == str(person_id))
+    assert row["roles"] == ["lead_coach"]
+
+
+def test_deactivate_revokes_and_closes_group_assignments(
+    client, as_manager, app_session, studio, a_group
+):
+    lead = _add_coach(app_session, studio.id, name="ראשי", role="lead_coach", group_id=a_group)
+    backup = _add_coach(app_session, studio.id, name="גיבוי", role="lead_coach", group_id=a_group)
+
+    gone = client.post(f"{STAFF}/{lead}/deactivate", headers=as_manager.headers)
+    assert gone.status_code == 204, gone.text
+    listed = client.get(STAFF, headers=as_manager.headers).json()
+    assert all(r["person_id"] != str(lead) for r in listed["items"])
+    assert any(r["person_id"] == str(backup) for r in listed["items"])
+
+
+def test_deactivating_a_groups_only_lead_coach_is_refused(
+    client, as_manager, app_session, studio, a_group
+):
+    """F5's deferred decision, decided as REFUSE: forcing a reassignment inside the
+    deactivate call would bury a scheduling decision inside an HR action."""
+    lead = _add_coach(app_session, studio.id, name="יחיד", role="lead_coach", group_id=a_group)
+    refused = client.post(f"{STAFF}/{lead}/deactivate", headers=as_manager.headers)
+    assert refused.status_code == 409
+    assert refused.json()["detail"]["code"] == "sole_lead_coach"
+
+
+def test_the_owner_cannot_be_deactivated(client, as_owner, as_manager) -> None:
+    refused = client.post(
+        f"{STAFF}/{as_owner.person_id}/deactivate", headers=as_manager.headers
+    )
+    assert refused.status_code == 409
+    assert refused.json()["detail"]["code"] == "owner_immovable"
+
+
+def test_granting_owner_through_a_role_edit_is_refused(client, as_manager, app_session, studio):
+    person_id = _add_coach(app_session, studio.id, name="שאפתן", role="lead_coach")
+    refused = client.patch(
+        f"{STAFF}/{person_id}",
+        json={"roles": ["owner"]},
+        headers=as_manager.headers,
+    )
+    assert refused.status_code == 422
+
+
+def test_the_lifecycle_is_manager_only(client, as_lead_coach) -> None:
+    refused = client.post(
+        f"{STAFF}/invitations",
+        json={"email": "x@example.invalid", "roles": ["lead_coach"]},
+        headers=as_lead_coach.headers,
+    )
+    assert refused.status_code == 403

@@ -1,5 +1,6 @@
 // Dashboard artboard 3d — צוות.
 import { render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { t } from '@studio/i18n'
 import { StaffScreen } from './StaffScreen'
@@ -45,17 +46,18 @@ describe('StaffScreen', () => {
     expect(screen.getByText('מתחילים')).toBeInTheDocument()
   })
 
-  it('shows an em dash for weekly hours and says why', async () => {
-    // Not 0 — a zero is a measurement, and it would read as an idle coach rather than as
-    // a number W2 has not built the source for.
-    stub({ items: [MANAGER], groups_without_coach: [] })
+  it('renders measured weekly hours, and an em dash only where nothing can staff', async () => {
+    // F8 — the column measures now. A pending invitation stays an em dash: it staffs
+    // nothing by definition, and a zero there would be a fake measurement.
+    stub({
+      items: [{ ...MANAGER, weekly_hours: 4.5 }, INVITED],
+      groups_without_coach: [],
+      sessions_without_coach: 0,
+    })
     render(<StaffScreen locale="he" />)
-    expect(await screen.findByTestId('staff-hours-cell')).toHaveTextContent(
-      t('he', 'common.staff.noHours'),
-    )
-    expect(screen.getByTestId('staff-hours-note')).toHaveTextContent(
-      t('he', 'common.staff.hoursUnknown'),
-    )
+    const cells = await screen.findAllByTestId('staff-hours-cell')
+    expect(cells[0]).toHaveTextContent('4.5')
+    expect(cells[1]).toHaveTextContent(t('he', 'common.staff.noHours'))
   })
 
   it('identifies a pending invitation by its address rather than an empty cell', async () => {
@@ -86,14 +88,11 @@ describe('StaffScreen', () => {
     )
   })
 
-  it('names the session-level banner as later work', async () => {
-    // 3d draws 'שיעורים ללא מאמן'. A manager who knows that and sees the group-level
-    // version would otherwise read it as a regression.
-    stub({ items: [MANAGER], groups_without_coach: [] })
+  it('renders the session-level banner from a measurement (F8)', async () => {
+    // 3d draws 'שיעורים ללא מאמן' and the number is real now.
+    stub({ items: [MANAGER], groups_without_coach: [], sessions_without_coach: 2 })
     render(<StaffScreen locale="he" />)
-    expect(await screen.findByTestId('staff-sessions-note')).toHaveTextContent(
-      t('he', 'common.staff.uncovered.sessionsLater'),
-    )
+    expect(await screen.findByTestId('staff-sessions-uncovered')).toHaveTextContent('2')
   })
 
   it('never renders a money chip for a coach', async () => {
@@ -115,5 +114,74 @@ describe('StaffScreen', () => {
     render(<StaffScreen locale="he" />)
     await waitFor(() => expect(screen.getByTestId('load-failed')).toBeInTheDocument())
     expect(screen.getByTestId('load-failed-retry')).toBeInTheDocument()
+  })
+})
+
+describe('F5 — the lifecycle', () => {
+  it('creates an invitation and shows the one-time code with its instruction', async () => {
+    const calls: { url: string; body: unknown }[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input)
+        if (url.includes('/staff/invitations')) {
+          calls.push({ url, body: JSON.parse(String(init?.body)) })
+          return new Response(
+            JSON.stringify({
+              id: 'inv1',
+              email: 'coach@example.invalid',
+              expires_at: '2026-09-10T00:00:00Z',
+              token: 'the-one-time-code',
+            }),
+            { status: 201 },
+          )
+        }
+        return new Response(
+          JSON.stringify({ items: [], groups_without_coach: [], sessions_without_coach: 0 }),
+          { status: 200 },
+        )
+      }),
+    )
+    render(<StaffScreen locale="he" />)
+    await userEvent.click(await screen.findByTestId('invite-open'))
+    await userEvent.type(screen.getByLabelText(t('he', 'common.staff.invite.email')), 'coach@example.invalid')
+    await userEvent.click(screen.getByTestId('invite-submit'))
+    expect(await screen.findByTestId('invite-token')).toHaveTextContent('the-one-time-code')
+    expect(calls[0]?.body).toMatchObject({
+      email: 'coach@example.invalid',
+      roles: ['lead_coach'],
+    })
+  })
+
+  it('renders the sole-lead-coach refusal with the group names', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input)
+        if (url.includes('/deactivate')) {
+          return new Response(
+            JSON.stringify({
+              detail: {
+                code: 'sole_lead_coach',
+                message: 'reassign first',
+                details: { groups: ['מתחילים'] },
+              },
+            }),
+            { status: 409 },
+          )
+        }
+        return new Response(
+          JSON.stringify({
+            items: [MANAGER],
+            groups_without_coach: [],
+            sessions_without_coach: 0,
+          }),
+          { status: 200 },
+        )
+      }),
+    )
+    render(<StaffScreen locale="he" />)
+    await userEvent.click(await screen.findByTestId(`deactivate-${MANAGER.person_id}`))
+    expect(await screen.findByTestId('staff-refusal')).toHaveTextContent('מתחילים')
   })
 })

@@ -67,9 +67,7 @@ class ReminderService:
         # the send is stamped with app.core.clock.now(), and §19's dev clock can put that
         # anywhere while the database column keeps wall time. Comparing the two would
         # make the rate limit a function of which clock a test froze.
-        stmt = select(Notification.person_id, Notification.payload).where(
-            Notification.kind == kind
-        )
+        stmt = select(Notification.person_id, Notification.payload).where(Notification.kind == kind)
         rows = self.session.execute(stmt).all()
         cutoff = (at - RATE_LIMIT).isoformat()
         return {

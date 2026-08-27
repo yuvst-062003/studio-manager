@@ -13,6 +13,8 @@ class StaffGroupOut(BaseModel):
 class StaffMemberOut(BaseModel):
     #: None for a pending invitation — nobody has accepted it, so no Person exists yet.
     person_id: str | None = None
+    #: Present only on a pending invitation — the id resend and revoke act on (F5).
+    invitation_id: str | None = None
     first_name: str | None = None
     last_name: str | None = None
     email: str | None = None
@@ -21,9 +23,8 @@ class StaffMemberOut(BaseModel):
     weekly_hours: float | None = Field(
         default=None,
         description=(
-            "Always null in M1. Weekly load is group_schedule_rule × session, both W2 "
-            "contract models. Zero would report an idle coach rather than a missing "
-            "measurement."
+            "F8: measured from this week's staffed sessions. Null only on a pending "
+            "invitation, which staffs nothing yet."
         ),
     )
     #: Derived from §3.2's matrix, never stored.
@@ -33,6 +34,9 @@ class StaffMemberOut(BaseModel):
 
 class StaffListResponse(BaseModel):
     items: list[StaffMemberOut]
+    #: F8 — 3d's banner at its drawn resolution: this week's scheduled sessions with
+    #: nobody staffing them.
+    sessions_without_coach: int = 0
     groups_without_coach: list[StaffGroupOut] = Field(
         description=(
             "3d's banner, at the resolution M1 can answer. It draws 'sessions this week "
@@ -40,3 +44,25 @@ class StaffListResponse(BaseModel):
             "sharpens this to that."
         )
     )
+
+
+class StaffInvitationIn(BaseModel):
+    email: str = Field(min_length=3, max_length=320)
+    roles: list[str] = Field(min_length=1, max_length=3)
+    first_name: str | None = None
+    last_name: str | None = None
+
+
+class StaffInvitationOut(BaseModel):
+    """The token, exactly once (F5, on the platform invite's pattern). Only its SHA-256
+    is stored, and there is no mailer in this product: the link is the manager's to
+    share, like §5.4b's onboarding link."""
+
+    id: str
+    email: str
+    expires_at: str
+    token: str
+
+
+class StaffRolesIn(BaseModel):
+    roles: list[str] = Field(min_length=1, max_length=3)
