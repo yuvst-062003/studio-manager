@@ -492,6 +492,7 @@
   color: var(--fg);
   cursor: pointer;
   font-size: var(--text-label);
+
   /* §6.2's thumb rule — a chip is a tap target. */
   min-block-size: 44px;
   display: inline-flex;

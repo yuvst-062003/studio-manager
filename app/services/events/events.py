@@ -249,9 +249,7 @@ class EventService:
         return {event_id: (row[0], row[1], row[2]) for event_id, row in tally.items()}
 
     @staticmethod
-    def consent_counts(
-        session: TenantSession, event_ids: list[uuid.UUID]
-    ) -> dict[uuid.UUID, int]:
+    def consent_counts(session: TenantSession, event_ids: list[uuid.UUID]) -> dict[uuid.UUID, int]:
         """Signed consents per event — 9i's `כל האישורים נחתמו` line."""
         if not event_ids:
             return {}

@@ -50,6 +50,10 @@ RELOADABLE = (
     # this harness must not leave frozen to whichever environment imported it first.
     "app.core.tenancy",
     "app.routers.health",
+    # P1 (2026-08-27) -- the uPay return leg resolves the parent app's origin with
+    # app_origin("parent", settings.ENV), so orders.py reads .ENV off a module-scope
+    # `settings` binding like the entries above it.
+    "app.services.billing.orders",
     # W2's contract session -- the OAuth callback's GET arm resolves the app it must send
     # the browser back to with app_origin(transaction.app, settings.ENV), so identity.py
     # now reads .ENV off a module-scope `settings` binding like the entries above it.

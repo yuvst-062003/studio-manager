@@ -14,7 +14,9 @@ def test_the_real_file_parses():
 
 def test_every_wave_in_the_milestone_plan_is_present():
     ids = [w.id for w in load().waves]
-    assert ids == ["W0", "W1", "W2", "W3", "W4", "W5", "W6", "W7"]
+    # W8C is the 2026-08-27 completion run — the four surface-completion specs
+    # (dashboard F, parent P, staff S, landing L) tracked as one wave.
+    assert ids == ["W0", "W1", "W2", "W3", "W4", "W5", "W6", "W7", "W8C"]
 
 
 def test_the_parallel_waves_name_their_two_lanes():
