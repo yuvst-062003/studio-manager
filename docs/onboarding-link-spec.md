@@ -1,7 +1,12 @@
-# §5.4b — Member onboarding link (draft)
+# §5.4b — Member onboarding link
 
-> Drafted 2026-08-27 from a design discussion. Written in SPEC.md's voice and numbered
-> §5.4b so it can be merged after §5.4a once reviewed. Nothing here is implemented.
+> Drafted 2026-08-27 from a design discussion, written in SPEC.md's voice and numbered
+> §5.4b so it can be merged after §5.4a. **Implemented**: `app/routers/onboarding.py`
+> carries the five routes, and `web/apps/parent/src/features/onboarding/JoinFlow.tsx`
+> is routed at `/join/<token>` — with `FirstRegistration` (12j) as its done state since
+> the completion run. (An earlier header said "Nothing here is implemented"; it was
+> written before the build and never revisited — corrected by P0, because a spec that
+> mis-states its own status is worse than no spec.)
 
 ## Purpose and scope
 

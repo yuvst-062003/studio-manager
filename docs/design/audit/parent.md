@@ -254,6 +254,32 @@ Build: belt with date and next exam; an **8-session attendance strip** with coun
 
 ## Log
 
+### 2026-08-27 · P0 + P12 — the re-verify closed, and this file's functional dimension
+
+**P0's four corrections held, and the drift continued as predicted.** The three "404
+endpoints" ship (W8); home delegates the health warning to the gate; `#/directions` is
+routed; §5.4b is implemented and its spec's header now says so (fixed). Further drift
+found by this run, recorded in the entries above: `registerPeopleSections` ran only in
+tests (a real guardian's card rendered NO sections — worse than this file's claim),
+`GET /belt-ranks` 403'd every guardian, 12d had bars but no entry point, the switcher
+was wired at neither end, and uPay's returnurl landed parents on raw JSON.
+
+**The functional dimension, in one table** — what a screenshot could not see, now fixed
+and guarded:
+
+| Screen | Functional defect found | Closed by |
+|---|---|---|
+| student card 2c | container mounted by nothing; sections registered only by tests | P1/P2 + slot-wiring guard |
+| absence 12a | no route — the product could not produce an absence report | P1 + reachability guard |
+| payments 12f | linked hash with no route; receipt button would have been inert | P1 |
+| return leg | uPay's returnurl answered raw JSON | P1 |
+| calendar 12b | attendance layer promised, never drawn | P3 + dead-key guard |
+| landing 13a | session hook fired on an anonymous page | P4/L6 + zero-auth test |
+| belts 12d | ladder read 403'd guardians; no entry linked it | P7 |
+| every screen | failed reads wearing empty states | P8 + recovery guard |
+| drawer 2e | switcher rendered by nothing | P9 |
+
+
 ### 2026-08-27 · P4–P11 — the rest of the parent surface
 
 **P4/L6.** The public routes resolve BEFORE any session hook can mount — the old shape
