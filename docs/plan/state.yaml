@@ -151,7 +151,7 @@ waves:
       - id: M3.7
         title: Artboards — parent 13a/13b/13c/12j/12g/12i/2c, staff 11b/9c/9h, dashboard 3b/3c/4a/6c
         status: shipped
-        on: 2026-08-26
+        on: 2026-08-27
       - id: M3.8
         title: The schedule seam threaded through — the request's session, and public.py's own scope
         status: shipped
@@ -637,7 +637,8 @@ waves:
         on: 2026-08-27
       - id: L8
         title: Landing — the record
-        status: pending
+        status: shipped
+        on: 2026-08-27
 holdbacks:
   - id: HB-w6-health-gate-unmounted
     kind: carried

@@ -29,12 +29,16 @@ This is not the logged-in app shell: no nav, no tab bar, no back control.
 6. **Location card** — heading + address · a map placeholder · two buttons.
 7. **Footer band** — inverted ground. Club identity + the one-free-trial disclaimer.
 
-### The picker is one control, not two
+### The picker — amended 2026-08-27 (landing decision 3)
 
 The "when you can come" card (region 4) is **informational only** — its rows carry no pointer
-affordance and no selected state. The only picker is the **chip group inside the form**, where each
-chip encodes day + time and sometimes a group hint. Do not build a two-step group→slot flow; the
-canvas has a one-step slot picker with the group folded into the label.
+affordance and no selected state. The only picker is inside the form.
+
+**The earlier rule here — "do not build a two-step group→slot flow" — was wrong, and the code
+was right.** §5.4a asks group and slot **per child**, groups filter by each child's age, and a
+flat chip list cannot express "Uri in the 18:30 group, Noa in the 16:00 one." The rule is now:
+**one-step chips (`SlotChips`) when there is exactly one child — no fieldset naming anybody —
+and the per-child flow the moment a sibling is added.** A test pins each half.
 
 Chip states: selected (ink fill) · unselected (outline) · plus a "call me instead" escape hatch
 styled as unselected. **There is no waitlist state** — see the capacity decision below.

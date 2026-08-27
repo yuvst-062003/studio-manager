@@ -195,3 +195,46 @@ disclaimer, error and empty states.
    `Button`, the footer.
 5. **Retick `M3.7`** honestly, and add the states none of the three artboards draw: loading, field
    validation, submit-in-flight, submit failure, and no-slots.
+
+
+## Log
+
+### 2026-08-27 · L0–L8 — the gap closed, and the three decisions that closed it
+
+**Decision 1 — copy is studio-editable; chrome is translated.** The club writes its own
+pitch: `headline`, `about`, `address`, and now `phone` and `trial_steps`, all in
+`studio.settings.landing`, rendered as data. i18n keys carry only headings, buttons and
+states. Reasoning: the precedent already existed (headline/about/address were data), and a
+shared Hebrew sentence about "ג׳ודו מגיל 5" is simply wrong for a club that teaches from
+four. A club that wrote nothing gets honest fallbacks (the chrome offer as the hero
+headline) or the region hidden (trial steps) — never placeholder copy pretending to be theirs.
+
+**Decision 2 — the stats strip is cut.** Removed from the canvas (13a and 13c) and from
+both specs, and `tests/contracts/test_canvas_matches_spec.py::test_13a_and_13c_have_no_stats_strip`
+holds it removed, in the same shape as C10's and D9.2's assertions. Reasoning: no field
+carries the numbers, and computing them would publish a live headcount on an
+unauthenticated endpoint — which sits badly beside `PublicGroupOut`'s written refusal
+("No class id, no staff, no enrollment count").
+
+**Decision 3 — the picker spec was amended to match the code.** 13a's spec said "do not
+build a two-step group→slot flow"; `BookingFlow` builds one, and the code was the right
+half. §5.4a asks group and slot per child and groups filter by each child's age — a flat
+chip list cannot say "Uri at 18:30, Noa at 16:00". The amended rule: one-step `SlotChips`
+for a single child (no fieldset naming anybody), the per-child flow once a sibling is
+added. Both halves are pinned by tests.
+
+**What was widened, exactly.** `PublicLandingOut` gained `phone` (from settings, L1),
+`belt_ladder` (L2's rule: colours from `belt_rank.color_hex`, never the canvas — the design
+file draws the black belt near-white) and `trial_steps` (decision 1). The ladder is the
+first active class's by name, deterministically — a one-class club simply gets its ladder.
+`PublicGroupOut` gained `training_times` (`HH:MM`, Asia/Jerusalem, a set because a group
+can train at two hours) and **nothing else** — its narrowness is the contract, and the
+docstring now says what was added and why.
+
+**One artboard claim refused in 13b:** the drawn "WhatsApp sent" row is not built — nothing
+sends a WhatsApp, and a confirmation must not claim a message went out. The declaration row
+states the fact that is true (signed at step 3), which is also why the drawn
+`חתימה על ההצהרה` button stays moot.
+
+**L0's finding** — the audit's SHELL verdict was a 503 empty state — is recorded in
+`docs/design/audit/parent.md`'s log so the next capture does not re-file it.
