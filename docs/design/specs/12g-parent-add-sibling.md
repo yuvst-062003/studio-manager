@@ -29,8 +29,8 @@ No tab bar. This reads as a pushed screen over the profile.
 | State | What renders |
 |---|---|
 | **Group card — selected** | Filled radio, 2px ring on the card. |
-| **Group card — available** | Unselected radio, hairline ring, capacity shown. |
-| **Group card — full** | Unselected, with status text offering a waitlist. **Plain coloured text, not a chip.** |
+| **Group card — available** | Unselected radio, hairline ring. **No capacity** — see below. |
+| **Group card — full** | **Does not exist.** A group has no cap. |
 | **Fields** | Both drawn pre-filled and valid. The name field carries the emphasised border, the date field the default one. |
 | **Required** | **Nothing is marked required** — no asterisk, no `חובה`. |
 | **Validation error** | **Not drawn** on any field. |
@@ -57,8 +57,8 @@ No D8-retired grey.
 
 - **The back icon points right**, correct for RTL. It is a fixed path and **must be pinned, not
   auto-mirrored** — a generic `dir`-flip rule would turn it into a forward arrow.
-- **Must not mirror:** the date of birth (`DD.MM.YYYY`, tabular), the schedule times, the capacity
-  ratio, and — most carefully — **the two prices in the discount sentence**. Bidi reordering must not
+- **Must not mirror:** the date of birth (`DD.MM.YYYY`, tabular), the schedule times, the age
+  range, and — most carefully — **the two prices in the discount sentence**. Bidi reordering must not
   separate a number from `₪` or swap which reads as the new price and which as the old.
 - No phone number on this artboard, unlike `12i`.
 
@@ -73,11 +73,11 @@ No D8-retired grey.
 | The four containers | `Card` | |
 | Discount banner | `Alert` | `tone="paid"` — `AlertTone` is `danger \| pending \| paid`, so this one fits exactly. |
 | The two prices | `MoneyDisplay` | Takes `agorot`, `tone`, `label`. **It must render inline inside a sentence**, not as a block. Check that before assuming. |
-| Group option card | *feature-specific* | `Card` + `Radio` + a status variant (available / full-with-waitlist). |
+| Group option card | *feature-specific* | `Card` + `Radio`. One state — there is no full/waitlist variant. |
 | Header, footer bar | *app shell* | |
 | Numbered info card | `Card` | Inline `1 · 2 · 3` prose, not a stepper. |
 
-The `מלאה` status is **not** a `StatusChip` — it is plain coloured text with no pill. Do not force it.
+**There is no `מלאה` status.** A group has no cap — see [`13a`](13a-parent-landing-mobile.md) finding 5.
 
 ## Strings → keys
 
@@ -89,8 +89,6 @@ The `מלאה` status is **not** a `StatusChip` — it is plain coloured text wi
 | `תאריך לידה` | `people.student.birthdate` | exact |
 | `קבוצה מבוקשת` | `people.student.group` (`קבוצה`) | Wording differs — "requested group" carries the §5.4 nuance that it is a request. Worth its own key. |
 | group name · schedule · age range | `people.landing.ageRange`, `landing.weeklySchedule` | Labels exist; the composed lines are data. |
-| `14/20` | — | **No key** for a capacity ratio. |
-| `מלאה — אפשר להצטרף לרשימת המתנה` | — | **No waitlist key anywhere**, same gap as `13a`. Finding. |
 | `הנחת אח/ות 10% תחול אוטומטית — 288₪ לחודש במקום 320₪` | — | **No key.** `billing.plan.*` has no sibling-discount member and §5.10's plan model does not mention one. **This is a pricing rule stated in a mockup and nowhere else.** Finding. |
 | `מה קורה אחרי השליחה` | — | **No key.** |
 | `1 · המועדון מאשר את השיבוץ` | `people.sibling.pendingHint` (`הבקשה תיבדק במשרד המועדון`) | Same intent, different wording. |
@@ -106,7 +104,8 @@ The `מלאה` status is **not** a `StatusChip` — it is plain coloured text wi
    needs to come off the screen.
 2. **No single-date primitive.** Date of birth needs one, and so does `3c`, and so does `12i`.
 3. **Step 3 hardcodes a child's name** into the sentence.
-4. **No waitlist key**, and the waitlist appears on `13a`, `13c` and here.
+4. **Capacity: settled — there is no limit.** The occupancy ratio and the waitlist line were removed
+   from this artboard on 2026-08-27, along with `13a`'s and `13c`'s. See [`13a`](13a-parent-landing-mobile.md) finding 5.
 5. **Nothing is marked required** and no field draws an error.
 6. **`MoneyDisplay` must work inline**, mid-sentence, with two amounts in one line.
 7. **A bare `ביטול` lives in `schedule`.** It belongs in `common`.

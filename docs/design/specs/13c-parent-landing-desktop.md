@@ -58,8 +58,7 @@ were dropped for desktop.
 
 Nine strings are **reworded**, not merely reflowed: the subheadline (desktop adds the city and
 "a full lesson"), the belt caption (desktop drops "from white to black"), all three benefit bodies,
-two benefit titles, the schedule cards' availability lines (desktop spells out
-`הקבוצה מלאה — רשימת המתנה` where mobile says only `מלאה`), and the headline's line break falls at a
+two benefit titles, and the headline's line break falls at a
 different word. Two strings are **desktop-only**: the top-bar address and the WhatsApp contact row.
 One is **dropped**: the `איך נראה שיעור ניסיון` section heading.
 
@@ -70,8 +69,8 @@ built. G4 forbids inlining, so the choice cannot be deferred to the component.
 ## States
 
 Same as `13a`, with the same gaps: no loading, no field validation, no submit-in-flight, no error,
-no "no slots" state. The chip group again draws selected · unselected · waitlist. The
-availability status is again plain coloured text, not a chip.
+no "no slots" state. The chip group draws selected · unselected — **no waitlist**, and the schedule
+cards carry **no availability line at all**. See `13a`'s capacity decision.
 
 The **WhatsApp contact row carries no pointer affordance** in the markup, unlike mobile's WhatsApp
 button. Whether it is clickable here is undecided.
@@ -120,3 +119,5 @@ See [`13a`](13a-parent-landing-mobile.md#strings--keys). Every gap there applies
 3. **The location card and footer are absent from the artboard** and may be below the fold. Confirm.
 4. **A physical `border-right`** does the divider's work.
 5. **The WhatsApp row's interactivity is undeclared.**
+6. **Capacity: settled — there is no limit.** Same as [`13a`](13a-parent-landing-mobile.md) finding 5.
+   The three schedule cards lost their availability lines and the amber "full" card treatment.

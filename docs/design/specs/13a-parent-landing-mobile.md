@@ -33,8 +33,8 @@ affordance and no selected state. The only picker is the **chip group inside the
 chip encodes day + time and sometimes a group hint. Do not build a two-step group→slot flow; the
 canvas has a one-step slot picker with the group folded into the label.
 
-Chip states: selected (ink fill) · unselected (outline) · **waitlist** (dashed `--pending` border,
-`--pending` text) · plus a "call me instead" escape hatch styled as unselected.
+Chip states: selected (ink fill) · unselected (outline) · plus a "call me instead" escape hatch
+styled as unselected. **There is no waitlist state** — see the capacity decision below.
 
 ## States
 
@@ -45,7 +45,7 @@ Chip states: selected (ink fill) · unselected (outline) · **waitlist** (dashed
 | **Submitting** | **Not drawn** on the button. `people.landing.submitting` exists. |
 | **Validation error** | **Not drawn** on any field. |
 | **Submit failure** | **Not drawn**, and `13b` has no sad-path twin — so the failure has to live here, inline. |
-| **Group full** | Drawn as informational text on the group row, and as the waitlist chip variant. |
+| **Group full** | **Does not exist.** A group has no cap — see the capacity decision below. |
 
 **There is no sign-in affordance anywhere on this artboard.** No login, no "already registered".
 That matters: `people.landing.signInFirst` and `landing.signInHint` exist, and §5.4 is explicit that
@@ -63,7 +63,6 @@ spec disagree** — see findings.
 | Ink | `--fg` | headlines, submit fill, selected chip fill |
 | Secondary text | `--text-secondary` | descriptions, subheadlines, stat captions, disclaimers |
 | Muted text | `--text-muted` | form labels and placeholders — **at D8's floor, with zero headroom** |
-| Semantic — full / waitlist | `--pending` | the "full" label and the waitlist chip's border |
 | Belt | `belt_rank.color_hex` via `BeltBar` | the hero strip; the group rows' accent bars |
 
 **The hero band uses three different opacities of on-inverted text.** Pick one role per job rather
@@ -96,7 +95,7 @@ than three near-values. No D8-retired grey appears.
 | The three cards | `Card` | |
 | Four form fields | `TextField` | `label`, `hint`, `error`. The phone field is drawn in an emphasised state — that is `TextField`'s focused or filled state, not a separate component. |
 | Submit, navigate, WhatsApp | `Button` | `primary` and `secondary`. |
-| Slot chip group | *feature-specific* | Single-select, **wrapping**, with a third "waitlist" visual state. `SegmentedControl` takes a flat `options` list and renders one track — it does not wrap and has no per-option variant. Build `SlotChips`. |
+| Slot chip group | *feature-specific* | Single-select, **wrapping**, two states. `SegmentedControl` takes a flat `options` list and renders one track — it does not wrap and has no per-option variant. Build `SlotChips`. |
 | Hero belt strip | `BeltBar` | If `BeltBar` can render a full ladder with no "current" marker. If not, that is a variant to add, **not** a reason to draw bare swatches. |
 | Hero, stats, steps, group rows, map, footer | *feature-specific* | Marketing composition. `StudentRow` does not fit the group rows — those are anonymous public schedule rows, not enrolled students. |
 
@@ -112,14 +111,12 @@ than three near-values. No D8-retired grey appears.
 | `בחרו קבוצה לפי גיל — הזמנים קבועים כל שבוע.` | `people.landing.chooseGroup` | Wording differs. |
 | `גילאי 5–7` | `people.landing.ageRange` (`גילאים`) | The label exists; the range is data. |
 | `ראשון וחמישי · 16:00` | `people.landing.weeklySchedule` (`מתאמנים בימים`) | The label exists; the composed line does not. |
-| `6 מקומות` / `מלאה` | — | **No key.** §5.4 makes capacity near-irrelevant (children enrol, they do not book) yet the public page shows remaining places. Worth confirming that is intended. |
 | `נשמור לכם מקום` | — | **No key** for the form heading. |
 | `שם הילד` | `people.student.firstName` (`שם פרטי`) | Wording differs. |
 | `גיל` | `people.student.age` | exact |
 | `שם ההורה` | `people.guardian.one` (`הורה`) | Needs a name-of-parent key. |
 | `טלפון` | `people.student.phone` | exact |
 | `מתי נוח לכם` | `people.landing.chooseSlot` | Wording differs. |
-| `17:00 — רשימת המתנה` | — | **No waitlist key anywhere.** Finding. |
 | `שתדברו איתי` | — | **No key.** |
 | `שריון מקום לשיעור ניסיון` | `people.landing.submit` (`שריון מקום לשיעור`) | Near-exact. |
 | the disclaimer under submit | — | **No key**, and it makes two promises: we will contact you, and the health declaration is signed before training. The second is M4's. |
@@ -138,5 +135,7 @@ than three near-values. No D8-retired grey appears.
    *data*, and so, arguably, is the pitch.
 3. **Two belt palettes and a black belt drawn near-white.** Render from `belt_rank.color_hex`.
 4. **No error state and no submit-failure path**, on either this screen or `13b`.
-5. **The public page shows remaining capacity**, which §5.4 says is near-irrelevant to this product.
+5. **Capacity: settled — there is no limit.** A group has no cap, so the page shows no remaining
+   places, no `מלאה` state and no waiting list. Removed from the canvas 2026-08-27; the API already
+   refuses to carry it (`PublicGroupOut` — "no enrollment count"). Do not reintroduce any of the three.
 6. **`landing.noSlots` / `noSlotsHint` / `submitting` have keys and no drawn state.**
