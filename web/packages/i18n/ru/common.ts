@@ -47,6 +47,11 @@ export const common: Bundle = {
   'dev.actingAs': 'действует как',
   'dev.noPersona': 'нет активной роли',
   // The shell and the nav drawer.
+  'search.label': 'Поиск',
+  'search.placeholder': 'Поиск ученика, родителя, группы или тренера',
+  'search.guardians': 'Родители',
+  'search.noResults': 'Ничего не найдено',
+  'dash.forbidden': 'Этот экран доступен только менеджерам',
   'nav.menu': 'меню',
   'nav.more': 'Ещё',
   'nav.closeMenu': 'закрыть меню',

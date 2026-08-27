@@ -484,10 +484,12 @@ waves:
         status: pending
       - id: F9
         title: Dashboard — global search
-        status: pending
+        status: shipped
+        on: 2026-08-27
       - id: F10
         title: Dashboard — role-aware navigation
-        status: pending
+        status: shipped
+        on: 2026-08-27
       - id: F11
         title: Dashboard — phone layout via Table card fallback
         status: shipped

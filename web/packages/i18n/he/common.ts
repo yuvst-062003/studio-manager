@@ -42,6 +42,11 @@ export const common: Bundle = {
   'dev.noPersona': 'אין פרסונה פעילה',
   // The shell and the nav drawer. §6.2's staff screens and §6.3's parent screens name
   // these; a lane adds its own entries beside them as its screens land.
+  'search.label': 'חיפוש',
+  'search.placeholder': 'חיפוש חניך, הורה, קבוצה או מאמן',
+  'search.guardians': 'הורים',
+  'search.noResults': 'לא נמצאו תוצאות',
+  'dash.forbidden': 'המסך הזה זמין למנהלים בלבד',
   'nav.menu': 'תפריט',
   'nav.more': 'עוד',
   'nav.closeMenu': 'סגירת התפריט',

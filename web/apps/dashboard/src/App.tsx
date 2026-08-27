@@ -13,6 +13,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { apiFetch, useSession } from '@studio/core'
 import {
   AppShell,
+  EmptyState,
   Icon,
   LanguagePicker,
   SetupWizard,
@@ -77,6 +78,7 @@ import { DocumentsSection } from './features/health/DocumentsSection'
 import { PricesSection } from './features/billing/PricesSection'
 import { ReportsSection } from './features/reports/ReportsSection'
 import { BeltsIndex } from './features/belts/BeltsIndex'
+import { GlobalSearch } from './GlobalSearch'
 
 import { registerBillingAlertSection } from './features/billing/BillingAlertSection'
 // §5.1's step 4. `WIZARD_STEP_ORDER` has reserved `prices` since M1 and nothing had ever
@@ -105,6 +107,35 @@ registerPricesWizardStep(makeDashboardBillingClient(apiFetch))
 // The S1 slot-wiring guard now fails the build on any register* export no app calls.
 registerCommsAlerts(makeDashboardCommsClient(apiFetch))
 registerBillingDevTools(makeDashboardBillingClient(apiFetch))
+
+// F10 — the doors a coach's role cannot open stay out of their nav. The API was never
+// the hole (/staff is ManagerOrOwner, fees are redacted); the hole was offering doors
+// that answer 403.
+const MANAGER_ONLY_KEYS = new Set([
+  'rollover',
+  'alerts',
+  'billing',
+  'prices',
+  'documents',
+  'reports',
+  'staff',
+  'settings',
+  'setup',
+  'closures',
+])
+
+const MANAGER_ONLY_ROUTES = new Set([
+  'rollover',
+  'alerts',
+  'billing',
+  'prices',
+  'documents',
+  'reports',
+  'staff',
+  'settings',
+  'setup',
+  'closures',
+])
 
 const NAV = [
   { key: 'schedule', labelKey: 'schedule.week.title', href: '#/schedule' },
@@ -295,23 +326,27 @@ function sideNavGroups(
           icon: <Icon name="belts" />,
           active: route === 'belts' || route === 'exams',
         },
-        {
-          key: 'staff',
-          label: t(locale, 'common.dash.nav.staff'),
-          href: '#/staff',
-          icon: <Icon name="profile" />,
-          active: route === 'staff',
-        },
-        {
-          key: 'rollover',
-          label: t(locale, 'common.dash.nav.rollover'),
-          href: '#/rollover',
-          icon: <Icon name="sync" />,
-          active: route === 'rollover',
-        },
       ],
     },
   ]
+  if (canSeeMoney) {
+    groups[1]!.items.push(
+      {
+        key: 'staff',
+        label: t(locale, 'common.dash.nav.staff'),
+        href: '#/staff',
+        icon: <Icon name="profile" />,
+        active: route === 'staff',
+      },
+      {
+        key: 'rollover',
+        label: t(locale, 'common.dash.nav.rollover'),
+        href: '#/rollover',
+        icon: <Icon name="sync" />,
+        active: route === 'rollover',
+      },
+    )
+  }
   if (canSeeMoney) {
     groups.push({
       key: 'money',
@@ -436,7 +471,7 @@ export default function App() {
       {session.status === 'signed-in' ? (
         <AppShell
           title={session.activeStudioName ?? ''}
-          items={NAV}
+          items={canSeeMoney ? NAV : NAV.filter((entry) => !MANAGER_ONLY_KEYS.has(entry.key))}
           locale={locale}
           sideNav={
             <SideNav
@@ -444,13 +479,17 @@ export default function App() {
               studioName={session.activeStudioName ?? ''}
               studioNote={t(locale, 'common.appName.dashboard')}
               groups={sideNavGroups(route, hash, locale, canSeeMoney, badges)}
-              settingsItem={{
-                key: 'settings',
-                label: t(locale, 'common.dash.nav.settings'),
-                href: '#/settings',
-                icon: <Icon name="settings" />,
-                active: route === 'settings',
-              }}
+              settingsItem={
+                canSeeMoney
+                  ? {
+                      key: 'settings',
+                      label: t(locale, 'common.dash.nav.settings'),
+                      href: '#/settings',
+                      icon: <Icon name="settings" />,
+                      active: route === 'settings',
+                    }
+                  : undefined
+              }
               footer={
                 // The canvas's user footer, real since /auth/me carries display_name
                 // (feature pass 2026-08-27). No note line: the only candidate is the
@@ -481,6 +520,14 @@ export default function App() {
             />
           }
         >
+          {/* F9 — one search, every screen, keyboard-reachable ('/'). Manager-only,
+              like the route behind it. */}
+          {canSeeMoney ? <GlobalSearch locale={locale} /> : null}
+          {/* F10 — a typed hash for a forbidden route refuses gracefully instead of
+              rendering a broken screen: the doors match the nav. */}
+          {!canSeeMoney && MANAGER_ONLY_ROUTES.has(route) ? (
+            <EmptyState title={t(locale, 'common.dash.forbidden')} />
+          ) : null}
           {route === 'schedule' ? (
             <ScheduleSection
               locale={locale}

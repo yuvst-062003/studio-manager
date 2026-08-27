@@ -39,6 +39,11 @@ export const common: Bundle = {
   'dev.actingAs': 'acting as',
   'dev.noPersona': 'no active persona',
   // The shell and the nav drawer.
+  'search.label': 'Search',
+  'search.placeholder': 'Search a student, parent, group or coach',
+  'search.guardians': 'Parents',
+  'search.noResults': 'No results',
+  'dash.forbidden': 'This screen is available to managers only',
   'nav.menu': 'menu',
   'nav.more': 'More',
   'nav.closeMenu': 'close the menu',

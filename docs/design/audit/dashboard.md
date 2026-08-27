@@ -271,6 +271,25 @@ is the single cheapest item in this spec.
 
 ## Log
 
+### 2026-08-27 · F9 + F10 — one search box, and doors that match the role
+
+**F9.** `GET /api/v1/search` (ManagerOrOwner) answers students by their own name, by a
+guardian's name, or by a guardian's phone — the telephone case, where the manager knows
+the parent — plus guardians, groups and staff, all through the tenant filter, with a test
+asserting a second studio's rows never appear and nothing health-shaped in any result.
+The shell renders one search box on every screen: `/` focuses it, arrows walk the
+results, results are real links. A guardian result opens their child's card, because the
+product has no guardian page and the card lists the guardians.
+
+**F10.** Nav derives from the ACTIVE membership's roles (the same read `canSeeMoney`
+makes — off `activeStudioId`, never the first membership, because §19.4's persona
+switcher moves the studio without a reload). A coach's drawer and side nav lose the
+money group, staff, rollover, settings, setup, alerts, documents, reports and closures;
+a typed hash for any of those refuses with `המסך הזה זמין למנהלים בלבד` instead of a
+screen of 403s. Tests cover coach and owner navs, the typed-hash refusal, and the
+search's absence for a coach.
+
+
 ### 2026-08-27 · F8 — the dashboard's promises become the things they promised
 
 - **Alert centre:** the self-contradicting `sectionsComeLater` line is gone — the billing

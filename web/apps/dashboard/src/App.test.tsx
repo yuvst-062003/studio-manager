@@ -137,3 +137,86 @@ describe('dashboard shell', () => {
     await waitFor(() => expect(screen.getByTestId('setup-wizard')).toBeInTheDocument())
   })
 })
+
+describe('F10 — navigation knows who is looking', () => {
+  const COACH_SESSION = {
+    ...SESSION,
+    studios: [
+      { studio_id: 's', studio_name: 'מכבי', studio_is_demo: false, roles: ['lead_coach'] },
+    ],
+  }
+  const COACH_SIGNED_IN = {
+    '/auth/refresh': { access_token: 'tok', expires_in: 900, ...COACH_SESSION },
+    '/auth/me': COACH_SESSION,
+    '/api/v1/sessions': { items: [] },
+  }
+
+  it('a coach sees no money, staff, settings or rollover doors', async () => {
+    stubApi(COACH_SIGNED_IN)
+    render(<App />)
+    await screen.findAllByRole('link', { name: t('he', 'people.student.plural') })
+    expect(screen.queryByRole('link', { name: t('he', 'billing.debt.title') })).toBeNull()
+    expect(screen.queryByRole('link', { name: t('he', 'common.dash.nav.staff') })).toBeNull()
+    expect(screen.queryByRole('link', { name: t('he', 'common.dash.nav.rollover') })).toBeNull()
+    expect(screen.queryByRole('link', { name: t('he', 'common.dash.nav.settings') })).toBeNull()
+  })
+
+  it('an owner sees the full nav, including money', async () => {
+    stubApi(SIGNED_IN)
+    render(<App />)
+    expect(
+      (await screen.findAllByRole('link', { name: t('he', 'billing.debt.title') })).length,
+    ).toBeGreaterThan(0)
+  })
+
+  it('a typed #/prices refuses gracefully for a coach', async () => {
+    globalThis.location.hash = '#/prices'
+    stubApi(COACH_SIGNED_IN)
+    render(<App />)
+    expect(await screen.findByText(t('he', 'common.dash.forbidden'))).toBeInTheDocument()
+  })
+})
+
+describe('F9 — the global search', () => {
+  it('renders for a manager and finds a student', async () => {
+    globalThis.location.hash = '#/schedule'
+    stubApi({
+      ...SIGNED_IN,
+      '/api/v1/search': {
+        students: [{ id: 'st1', name: 'דנה לוי', status: 'active' }],
+        guardians: [],
+        groups: [],
+        staff: [],
+      },
+    })
+    render(<App />)
+    const box = await screen.findByTestId('global-search')
+    const user = (await import('@testing-library/user-event')).default
+    await user.type(box, 'דנה')
+    const result = await screen.findByTestId('search-student-st1')
+    expect(result).toHaveAttribute('href', '#/students/st1')
+  })
+
+  it('does not render for a coach — the route behind it is manager-only', async () => {
+    stubApi({
+      '/auth/refresh': {
+        access_token: 'tok',
+        expires_in: 900,
+        ...SESSION,
+        studios: [
+          { studio_id: 's', studio_name: 'מ', studio_is_demo: false, roles: ['assistant_coach'] },
+        ],
+      },
+      '/auth/me': {
+        ...SESSION,
+        studios: [
+          { studio_id: 's', studio_name: 'מ', studio_is_demo: false, roles: ['assistant_coach'] },
+        ],
+      },
+      '/api/v1/sessions': { items: [] },
+    })
+    render(<App />)
+    await screen.findAllByRole('link', { name: t('he', 'people.student.plural') })
+    expect(screen.queryByTestId('global-search')).toBeNull()
+  })
+})
