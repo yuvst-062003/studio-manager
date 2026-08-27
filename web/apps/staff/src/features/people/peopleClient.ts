@@ -5,6 +5,7 @@ export type StudentSummary = components['schemas']['StudentSummaryOut']
 export type StudentDetail = components['schemas']['StudentDetailOut']
 export type EnrollmentOut = components['schemas']['EnrollmentOut']
 export type WeekdayOptions = components['schemas']['EnrollmentWeekdayOptionsOut']
+export type GroupOut = components['schemas']['GroupOut']
 
 export type Fetcher = (path: string, init?: RequestInit) => Promise<Response>
 
@@ -18,10 +19,16 @@ async function json<T>(response: Response): Promise<T> {
 export function makeStaffPeopleClient(fetcher: Fetcher) {
   return {
     /** Staff `9h`. §3.2 scopes a coach to their own groups server-side, not here. */
-    search: (query: string): Promise<{ items: StudentSummary[] }> =>
-      fetcher(`/api/v1/students?q=${encodeURIComponent(query)}`).then(
-        json<{ items: StudentSummary[] }>,
-      ),
+    search: (query: string, groupId?: string): Promise<{ items: StudentSummary[] }> =>
+      fetcher(
+        `/api/v1/students?q=${encodeURIComponent(query)}${
+          groupId ? `&group_id=${groupId}` : ''
+        }`,
+      ).then(json<{ items: StudentSummary[] }>),
+
+    /** 9h's class tabs. The same scoping note applies: a coach receives their own. */
+    groups: (): Promise<{ items: GroupOut[] }> =>
+      fetcher('/api/v1/groups').then(json<{ items: GroupOut[] }>),
 
     student: (id: string): Promise<StudentDetail> =>
       fetcher(`/api/v1/students/${id}`).then(json<StudentDetail>),

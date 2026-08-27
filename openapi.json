@@ -10874,6 +10874,17 @@
       "StudentSummaryOut": {
         "description": "The row dashboard `3b` and staff `9h` render, and the only student shape a coach\nreceives from a list.\n\n`group_names` and not `group_ids`: C11 makes several live enrollments normal, and\n`3b`'s column shows what a manager reads rather than what a client would have to join.",
         "properties": {
+          "attendance_percent": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attendance Percent"
+          },
           "birthdate": {
             "anyOf": [
               {

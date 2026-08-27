@@ -288,7 +288,12 @@ export const people: Bundle = {
   'error.notFound': 'Не найдено',
   'error.forbidden': 'У вас нет прав на это действие',
   'error.generic': 'Что-то пошло не так. Попробуйте ещё раз',
-  'search.placeholder': 'Имя ученика',
+  'search.placeholder': 'Поиск по имени ученика или родителя',
+  'tabs.allStudents': 'Все ученики',
+  'tabs.myClasses': 'Мои классы · {{count}}',
+  'tabs.allClasses': 'Все классы · {{count}}',
+  'health.missingCount': '{{count}} учеников без декларации здоровья',
+  'tenure.months': '{{count}} мес.',
   'table.results': 'Результатов: {n}',
   'table.loadMore': 'Показать ещё',
 }

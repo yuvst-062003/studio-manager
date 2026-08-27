@@ -27,9 +27,10 @@ import uuid
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 
-from sqlalchemy import Select, or_, select
-from sqlalchemy.orm import Session
+from sqlalchemy import Select, func, or_, select
+from sqlalchemy.orm import Session, aliased
 
+from app.models.attendance import Attendance
 from app.models.people import (
     Enrollment,
     Student,
@@ -86,6 +87,8 @@ class StudentRow:
     group_names: list[str]
     frozen_until: date | None
     guardian_display_names: list[str]
+    #: 9h — present / (present + absent) over marked sessions; None until anything was.
+    attendance_percent: int | None = None
 
 
 class StudentService:
@@ -332,8 +335,28 @@ class StudentService:
                 )
             )
         if q:
+            # 9h — `חיפוש לפי שם חניך או הורה`. A coach is more often told a parent's
+            # name than a child's, so the query matches the child's name OR any
+            # guardian's. The alias matters: `Person` in the base query IS the student.
             like = f"%{q.strip()}%"
-            stmt = stmt.where(or_(Person.first_name.ilike(like), Person.last_name.ilike(like)))
+            guardian_person = aliased(Person)
+            guardian_match = (
+                select(Guardian.student_id)
+                .join(guardian_person, guardian_person.id == Guardian.person_id)
+                .where(
+                    or_(
+                        guardian_person.first_name.ilike(like),
+                        guardian_person.last_name.ilike(like),
+                    )
+                )
+            )
+            stmt = stmt.where(
+                or_(
+                    Person.first_name.ilike(like),
+                    Person.last_name.ilike(like),
+                    Student.id.in_(guardian_match),
+                )
+            )
         if after is not None:
             stmt = stmt.where(Student.id > after)
 
@@ -370,6 +393,16 @@ class StudentService:
                 .order_by(StudentFreeze.from_date.desc())
                 .limit(1)
             ).scalar_one_or_none()
+        marked = {
+            status: count
+            for status, count in session.execute(
+                select(Attendance.status, func.count())
+                .where(Attendance.student_id == student.id, Attendance.status != "unmarked")
+                .group_by(Attendance.status)
+            ).all()
+        }
+        present = marked.get("present", 0)
+        absent = sum(count for status, count in marked.items() if status.startswith("absent"))
         return StudentRow(
             id=student.id,
             person_id=person.id,
@@ -385,6 +418,11 @@ class StudentService:
             group_names=group_names,
             frozen_until=frozen_until,
             guardian_display_names=[f"{first} {last}" for first, last in guardians],
+            # Excluding unmarked from BOTH halves, like the student-card strip: an
+            # unmarked register says nothing about the child (§5.14).
+            attendance_percent=(
+                round(100 * present / (present + absent)) if present + absent else None
+            ),
         )
 
     @staticmethod

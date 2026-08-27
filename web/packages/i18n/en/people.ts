@@ -286,7 +286,12 @@ export const people: Bundle = {
   'error.notFound': 'Not found',
   'error.forbidden': 'You do not have permission for this',
   'error.generic': 'Something went wrong. Try again',
-  'search.placeholder': 'Student name',
+  'search.placeholder': 'Search by student or parent name',
+  'tabs.allStudents': 'All students',
+  'tabs.myClasses': 'My classes · {{count}}',
+  'tabs.allClasses': 'All classes · {{count}}',
+  'health.missingCount': '{{count}} students with a missing health declaration',
+  'tenure.months': '{{count}} months',
   'table.results': '{n} results',
   'table.loadMore': 'Load more',
 }

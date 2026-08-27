@@ -228,6 +228,26 @@ def test_updating_a_student_is_manager_only(client, as_manager, as_lead_coach):
 # -- shapes and paging ---------------------------------------------------------
 
 
+def test_search_finds_a_child_by_partial_name_and_by_parent_name(client, as_manager):
+    """9h -- `חיפוש לפי שם חניך או הורה`. A coach is more often told a parent's name than
+    a child's; the guardian's first name must find the child, and the alias in the service
+    keeps the guardian match from colliding with the student's own Person row."""
+    payload = _payload()
+    payload["first_name"] = "עמית-חיפוש"
+    payload["guardian"]["first_name"] = "שירה-חיפוש"
+    created = _create(client, as_manager, payload)
+    student_id = created["student"]["id"]
+
+    by_child = client.get("/api/v1/students?q=עמית-חי", headers=as_manager.headers).json()
+    assert student_id in [row["id"] for row in by_child["items"]]
+
+    by_parent = client.get("/api/v1/students?q=שירה-חיפוש", headers=as_manager.headers).json()
+    assert student_id in [row["id"] for row in by_parent["items"]]
+
+    by_nobody = client.get("/api/v1/students?q=לא-קיים-כזה", headers=as_manager.headers).json()
+    assert by_nobody["items"] == []
+
+
 def test_the_list_is_a_cursor_page(client, as_manager):
     _create(client, as_manager)
     body = client.get("/api/v1/students?limit=1", headers=as_manager.headers).json()

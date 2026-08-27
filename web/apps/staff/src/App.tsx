@@ -430,6 +430,8 @@ export default function App() {
             <StudentsSearch
               locale={locale}
               client={peopleClient}
+              now={today}
+              viewerIsCoach={viewerIsCoach}
               onOpen={(studentId) => {
                 globalThis.location.hash = `#/students/${studentId}`
               }}

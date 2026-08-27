@@ -321,7 +321,12 @@ export const people: Bundle = {
   'error.notFound': 'לא נמצא',
   'error.forbidden': 'אין לכם הרשאה לפעולה הזו',
   'error.generic': 'משהו השתבש. נסו שוב',
-  'search.placeholder': 'שם החניך',
+  'search.placeholder': 'חיפוש לפי שם חניך או הורה',
+  'tabs.allStudents': 'כל החניכים',
+  'tabs.myClasses': 'הכיתות שלי · {{count}}',
+  'tabs.allClasses': 'כל הכיתות · {{count}}',
+  'health.missingCount': '{{count}} חניכים עם הצהרת בריאות חסרה',
+  'tenure.months': '{{count}} חודשים',
   'table.results': '{n} תוצאות',
   'table.loadMore': 'טעינת עוד',
 }

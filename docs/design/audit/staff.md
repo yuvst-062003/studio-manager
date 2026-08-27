@@ -230,6 +230,34 @@ link that must be signed `לפני עלייה למזרן`.
 
 ## Log
 
+### 2026-08-27 · S8 — search became 9h: tabs, banner, and a row that says something
+
+**Search by parent name** landed server-side: `list_students`' `q` now matches the child's
+name OR any guardian's, through an aliased `Person` join (the un-aliased one IS the
+student — the alias is the whole fix). Tested end to end: partial Hebrew child name,
+guardian first name, and a no-match query.
+
+**The class tabs re-ask the server.** Each tab sets `group_id` on the same endpoint rather
+than filtering client-side, because §3.2's coach scoping lives in that query and a local
+filter would have to re-implement it to be right. The all-tab groups rows by class with
+counted headers (`מתחילים · 25`); a child in two groups appears under both, which is the
+truthful answer to "who trains here". `הכיתות שלי · N` for a coach, `כל הכיתות · N` for a
+manager — same screen, §3.2's difference carried by the server's scope.
+
+**The banner** counts `health_status === 'missing'` from the summaries already on screen —
+status only, never contents, per the hard rule.
+
+**The row meta** is `מתחילים · 5 חודשים · 92%`: tenure from `joined_on` against the app
+clock, and a new `attendance_percent` on `StudentSummaryOut` — present/(present+absent)
+over MARKED sessions only, None until anything was marked, the same
+unmarked-says-nothing rule the 2d strip pins.
+
+**Decision — the rate renders neutrally, NOT coloured against an exam threshold.** The
+spec's `9h` line asks for threshold colouring, but the product already settled that there
+is no exam threshold (the 2d strip *states* so, with a test). Colouring against a line
+that officially does not exist would re-introduce it by the back door. If the club ever
+sets one, the colour goes here.
+
 ### 2026-08-27 · S7 — the day became cards, and the picker learned to answer
 
 **Today (9a/1d).** The screen had the right bones — the strip, the coach filter, the

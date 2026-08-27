@@ -9556,6 +9556,8 @@ export interface components {
          *     `3b`'s column shows what a manager reads rather than what a client would have to join.
          */
         StudentSummaryOut: {
+            /** Attendance Percent */
+            attendance_percent?: number | null;
             /** Birthdate */
             birthdate: string | null;
             /** Current Belt Color Hex */

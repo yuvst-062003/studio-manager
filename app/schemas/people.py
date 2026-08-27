@@ -376,6 +376,10 @@ class StudentSummaryOut(BaseModel):
     #: Where the student came from — 'onboarding_link' rows get 3b's chip so a manager
     #: can spot self-registered families that still need a look (feature pass 2026-08-27).
     source: str | None = None
+    #: 9h's `92%` — present / (present + absent) over MARKED sessions only, like the
+    #: student-card strip: an unmarked register says nothing about the child. `None`
+    #: until anything was marked, so a new student shows nothing rather than 0%.
+    attendance_percent: int | None = None
 
 
 class StudentDetailOut(BaseModel):

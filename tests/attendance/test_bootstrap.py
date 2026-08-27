@@ -218,3 +218,43 @@ def test_a_session_read_the_ordinary_way_also_says_its_register_was_signed(
     app_session.commit()
 
     assert client.get(url, headers=as_lead_coach.headers).json()["attendance_taken"] is True
+
+
+def test_the_students_list_carries_an_attendance_percent_over_marked_sessions_only(
+    client, app_session, studio, a_group, a_training_year, an_enrolled_student, as_manager
+):
+    """9h's `92%`. Present / (present + absent) — the unmarked row is in NEITHER half,
+    the same rule the student-card strip already pins: an unmarked register says nothing
+    about the child."""
+    import uuid
+
+    from app.models.attendance import Attendance
+
+    # One attendance row per (session, student) — five marks need five sessions.
+    statuses = ("present", "present", "present", "absent_unexcused", "unmarked")
+    for offset, status in enumerate(statuses):
+        extra = make_session(
+            studio_id=studio.id,
+            group_id=a_group,
+            training_year_id=a_training_year,
+            starts_at=T0 - timedelta(days=offset + 1),
+        )
+        app_session.add(extra)
+        app_session.flush()
+        app_session.add(
+            Attendance(
+                studio_id=studio.id,
+                session_id=extra.id,
+                student_id=an_enrolled_student,
+                status=status,
+                source="coach",
+                marked_at=T0,
+                device_marked_at=T0,
+                client_mark_id=uuid.uuid4(),
+            )
+        )
+    app_session.commit()
+
+    rows = client.get("/api/v1/students", headers=as_manager.headers).json()["items"]
+    mine = next(row for row in rows if row["id"] == str(an_enrolled_student))
+    assert mine["attendance_percent"] == 75

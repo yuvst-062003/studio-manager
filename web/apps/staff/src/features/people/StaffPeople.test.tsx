@@ -81,6 +81,7 @@ const ASSISTANT: Actor = {
 function makeClient(over: Partial<StaffPeopleClient> = {}): StaffPeopleClient {
   return {
     search: vi.fn(() => Promise.resolve({ items: [summary()] })),
+    groups: vi.fn(() => Promise.resolve({ items: [] })),
     student: vi.fn(() => Promise.resolve(DETAIL)),
     enrollments: vi.fn(() => Promise.resolve(ENROLLMENTS)),
     weekdayOptions: vi.fn(() =>
@@ -438,5 +439,81 @@ describe('chipToneFor', () => {
       expect(chipToneFor(status)).toBeTruthy()
       expect(t('he', `people.status.${status}`)).not.toBe(`people.status.${status}`)
     }
+  })
+})
+
+
+// -- 9h completion (S8): tabs, banner, meta line --------------------------------
+
+describe('StudentsSearch — S8', () => {
+  const GROUPS = [
+    { id: 'g1', class_id: 'c1', name: 'מתחילים', description: null, age_min: null, age_max: null, is_active: true },
+    { id: 'g2', class_id: 'c1', name: 'נבחרת', description: null, age_min: null, age_max: null, is_active: true },
+    { id: 'g3', class_id: 'c1', name: 'ישן', description: null, age_min: null, age_max: null, is_active: false },
+  ]
+
+  it('renders a tab per ACTIVE class and re-asks the server when one is chosen', async () => {
+    const client = makeClient({ groups: vi.fn(() => Promise.resolve({ items: GROUPS })) })
+    render(<StudentsSearch locale="he" client={client} viewerIsCoach />)
+    // The retired group is no tab; the all-tab carries the count of live ones.
+    expect(await screen.findByTestId('class-tab-g1')).toBeInTheDocument()
+    expect(screen.queryByTestId('class-tab-g3')).toBeNull()
+    expect(screen.getByTestId('class-tab-all')).toHaveTextContent('הכיתות שלי · 2')
+
+    await userEvent.click(screen.getByTestId('class-tab-g2'))
+    // The tab filter is the SERVER's — §3.2's coach scoping lives in the query.
+    await waitFor(() => expect(client.search).toHaveBeenLastCalledWith('', 'g2'))
+  })
+
+  it('groups the all-tab by class with counted headers', async () => {
+    const client = makeClient({
+      groups: vi.fn(() => Promise.resolve({ items: GROUPS })),
+      search: vi.fn(() =>
+        Promise.resolve({
+          items: [
+            summary(),
+            summary({ id: 'st2', first_name: 'דן', group_names: ['נבחרת'] }),
+            summary({ id: 'st3', first_name: 'רות', group_names: ['מתחילים', 'נבחרת'] }),
+          ],
+        }),
+      ),
+    })
+    render(<StudentsSearch locale="he" client={client} />)
+    const headers = await screen.findAllByTestId('class-header')
+    const texts = headers.map((node) => node.textContent)
+    // רות trains in both groups, so she is under both headers — truthfully.
+    expect(texts).toContain('מתחילים · 2')
+    expect(texts).toContain('נבחרת · 2')
+  })
+
+  it('warns on missing health declarations — status only, never contents', async () => {
+    const client = makeClient({
+      search: vi.fn(() =>
+        Promise.resolve({
+          items: [
+            summary({ id: 'st4', health_status: 'missing' }),
+            summary({ id: 'st5', health_status: 'missing' }),
+            summary(),
+          ],
+        }),
+      ),
+    })
+    render(<StudentsSearch locale="he" client={client} />)
+    expect(await screen.findByTestId('health-missing-banner')).toHaveTextContent(
+      '2 חניכים עם הצהרת בריאות חסרה',
+    )
+  })
+
+  it('shows tenure and the attendance rate on the row, neutrally', async () => {
+    // Neutral deliberately: the product settled that there is no exam threshold (the 2d
+    // strip states so), so there is no line to colour 92% against.
+    const client = makeClient({
+      search: vi.fn(() =>
+        Promise.resolve({ items: [summary({ attendance_percent: 92 })] }),
+      ),
+    })
+    render(<StudentsSearch locale="he" client={client} now="2027-02-10T12:00:00Z" />)
+    const row = await screen.findByText(/92%/)
+    expect(row).toHaveTextContent('מתחילים · 5 חודשים · 92%')
   })
 })
