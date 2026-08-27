@@ -438,6 +438,160 @@ waves:
     exit_gate: production cutover done; the iOS install walkthrough validated on real parents' phones
     status: pending
     pieces: []
+  - id: W8C
+    milestone: completion
+    title: Functional completion — dashboard, parent, staff, landing
+    mode: sequential
+    lanes: []
+    exit_gate: every workstream's own Done-when in the four 2026-08-27 completion specs holds; all gates green
+    status: active
+    opened: 2026-08-27
+    source: docs/superpowers/specs/2026-08-27-{dashboard,parent,staff,landing}-completion-design.md
+    pieces:
+      - id: F0
+        title: Dashboard — re-verify audit claims against the tree
+        status: pending
+      - id: F1
+        title: Dashboard — LoadFailed and Table primitives
+        status: pending
+      - id: F2
+        title: Dashboard — wire the four inert controls with existing routes, plus the no-handler guard
+        status: pending
+      - id: F3
+        title: Dashboard — calendar session popover, QuickViewRoster, DELETE /sessions for ad-hoc
+        status: pending
+      - id: F4
+        title: Dashboard — schedule vertical write half (coach assignment, groups, classes, locations)
+        status: pending
+      - id: F5
+        title: Dashboard — staff lifecycle (invitations, roles, deactivate)
+        status: pending
+      - id: F6
+        title: Dashboard — wizards can reopen steps
+        status: pending
+      - id: F7
+        title: Dashboard — reminders and exports backends
+        status: pending
+      - id: F8
+        title: Dashboard — replace stale comes-later promises with real data
+        status: pending
+      - id: F9
+        title: Dashboard — global search
+        status: pending
+      - id: F10
+        title: Dashboard — role-aware navigation
+        status: pending
+      - id: F11
+        title: Dashboard — phone layout via Table card fallback
+        status: pending
+      - id: F12
+        title: Dashboard — bulk actions outside the rollover wizard
+        status: pending
+      - id: F13
+        title: Dashboard — audit log and functional dimension
+        status: pending
+      - id: P0
+        title: Parent — re-verify audit claims against the tree
+        status: pending
+      - id: P1
+        title: Parent — route the seven unreachable screens, AbsenceScreen first
+        status: pending
+      - id: P2
+        title: Parent — student card's four missing sections
+        status: pending
+      - id: P3
+        title: Parent — calendar shows attendance
+        status: pending
+      - id: P4
+        title: Parent — landing shell 401 fix and 13b wiring
+        status: pending
+      - id: P5
+        title: Parent — inbox and events list
+        status: pending
+      - id: P6
+        title: Parent — add-a-sibling group cards
+        status: pending
+      - id: P7
+        title: Parent — single-segment belt link resolves or refuses
+        status: pending
+      - id: P8
+        title: Parent — recovery on a phone network
+        status: pending
+      - id: P9
+        title: Parent — two-club guardian
+        status: pending
+      - id: P10
+        title: Parent — bars and the comes-later strings
+        status: pending
+      - id: P11
+        title: Parent — health renewal vs the gate (investigation)
+        status: pending
+      - id: P12
+        title: Parent — audit log and functional dimension
+        status: pending
+      - id: S1
+        title: Staff — call the registration functions; slot guard tests
+        status: pending
+      - id: S2
+        title: Staff — route the seven unreachable screens, SessionSummary first
+        status: pending
+      - id: S3
+        title: Staff — student card entry points
+        status: pending
+      - id: S4
+        title: Staff — four defects (403, 401 race, bare attendance hash, tour)
+        status: pending
+      - id: S5
+        title: Staff — offline made visible
+        status: pending
+      - id: S6
+        title: Staff — register completion (header, pre-reported, health flag)
+        status: pending
+      - id: S7
+        title: Staff — today and the date picker
+        status: pending
+      - id: S8
+        title: Staff — student search
+        status: pending
+      - id: S9
+        title: Staff — events and exam results
+        status: pending
+      - id: S10
+        title: Staff — permission boundaries are UI
+        status: pending
+      - id: S11
+        title: Staff — recovery and bars
+        status: pending
+      - id: S12
+        title: Staff — audit log and functional dimension
+        status: pending
+      - id: L0
+        title: Landing — re-verify; SHELL was the 503 empty state
+        status: pending
+      - id: L1
+        title: Landing — phone and time-of-day API fields
+        status: pending
+      - id: L2
+        title: Landing — display token, SlotChips, BeltBar ladder variant
+        status: pending
+      - id: L3
+        title: Landing — cut the stats strip from the canvas
+        status: pending
+      - id: L4
+        title: Landing — 13a/13c composition
+        status: pending
+      - id: L5
+        title: Landing — 13b confirmation
+        status: pending
+      - id: L6
+        title: Landing — anonymous page makes no authenticated call
+        status: pending
+      - id: L7
+        title: Landing — the states no artboard draws
+        status: pending
+      - id: L8
+        title: Landing — the record
+        status: pending
 holdbacks:
   - id: HB-w6-health-gate-unmounted
     kind: carried
