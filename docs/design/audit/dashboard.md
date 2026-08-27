@@ -271,6 +271,34 @@ is the single cheapest item in this spec.
 
 ## Log
 
+### 2026-08-27 · F0 + F13 — the re-verify, closed, and the record's functional dimension
+
+**F0's verdict on this file and the spec.** The same-day design pass moved the tree
+under both documents. Claims that no longer held when the completion run re-checked
+them, worked findings in this log's entries: the "40 dead-end error screens" (really 6 +
+6 of a second class), the "no @media/table primitive" framing (three hand-built tables
+remained), F8's claim that the at-risk card was registered (it never ran — S1's guard
+found it), the rollover client's "setStep is typed done|skipped" (it already accepted
+pending), F5's "sends the email" (no mailer has ever existed in this product), and F8's
+capacity promise (capacity was cut by a settled decision the spec predates). The
+BeltBar/F0 worked example held: `BeltSystemScreen` is routed and renders bars once a
+class has ranks — the audit's zero was the capture's seeded state, not the source.
+
+**The functional dimension, in one table.** What a screenshot could not see, per screen,
+as of this run's close — all now fixed and guarded:
+
+| Screen | Functional defect found | Guard that keeps it closed |
+|---|---|---|
+| every screen | dead-end failure renders; fail-as-loaded catches | `load-failed-recovery.test.ts` |
+| detail/trials/collections/attendance/events | 10 buttons with no handler | `inert-buttons.test.ts` |
+| week board | inert session blocks; QuickViewRoster unreachable | `unreachable-screens.test.ts` |
+| alert centre | at-risk fill never registered | `slot-wiring.test.ts` |
+| staff · groups · students | promises outliving shipped features | `dead-promise-keys.test.ts` |
+
+**C10 and D9.2 stay pinned** — no work in this run touched `3f`'s toggle or `7c`'s
+weight column, and `test_canvas_matches_spec.py` still asserts both.
+
+
 ### 2026-08-27 · F12 — bulk actions outside the rollover wizard
 
 `POST /students/bulk` reuses the rollover's bulk SHAPE — `BulkOutcome`, per-row

@@ -450,7 +450,8 @@ waves:
     pieces:
       - id: F0
         title: Dashboard — re-verify audit claims against the tree
-        status: pending
+        status: shipped
+        on: 2026-08-27
       - id: F1
         title: Dashboard — LoadFailed and Table primitives
         status: shipped
@@ -500,7 +501,8 @@ waves:
         on: 2026-08-27
       - id: F13
         title: Dashboard — audit log and functional dimension
-        status: pending
+        status: shipped
+        on: 2026-08-27
       - id: P0
         title: Parent — re-verify audit claims against the tree
         status: pending
