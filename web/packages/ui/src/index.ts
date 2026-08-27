@@ -82,6 +82,14 @@ export { RefusalScreen } from './first-run/RefusalScreen'
 export { InstallWalkthrough, isIosSafari } from './first-run/InstallWalkthrough'
 export type { InstallPromptEvent } from './first-run/InstallWalkthrough'
 export { InstallBanner } from './first-run/InstallBanner'
+export { UpdateToast } from './sw-update/UpdateToast'
+export {
+  SW_LAUNCH_GRACE_MS,
+  SW_UPDATE_CHECK_INTERVAL_MS,
+  SW_UPDATE_EVENT,
+  onSwUpdateReady,
+} from './sw-update/swUpdate'
+export type { SwUpdateDetail } from './sw-update/swUpdate'
 
 // §5.1's setup wizard. The container reads useSlot('setup-wizard') — the id M0 already
 // declared — so M7's belts step and M6's prices step land as one file plus one line in

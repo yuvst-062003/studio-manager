@@ -19,6 +19,7 @@ import {
   SignIn,
   TabBar,
   ThemeProvider,
+  UpdateToast,
   useDocumentLocale,
 } from '@studio/ui'
 import { DevBar } from '@studio/ui/dev-bar'
@@ -236,6 +237,8 @@ export default function App() {
 
   return (
     <ThemeProvider>
+      {/* New-build toast — floats over whatever is open, in every session state. */}
+      <UpdateToast locale={locale} />
       {session.status === 'anonymous' ? (
         // Language before login (§6.1) — the picker floats over the sign-in screen.
         <SignIn

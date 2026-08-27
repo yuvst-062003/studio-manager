@@ -105,6 +105,9 @@ export const common: Bundle = {
   'install.banner.cta': 'להתקנה',
   'install.banner.dismiss': 'לא עכשיו',
   'install.back': 'חזרה',
+  'update.available': 'גרסה חדשה זמינה',
+  'update.reload': 'רענון',
+  'update.dismiss': 'אחר כך',
   // §19.4's persona switcher. These are §19.4's own labels, verbatim from the artboard:
   //   בעלים · מנהל · מאמן ראשי · מאמן משנה
   //   הורה (3 ילדים) · הורה (ילד אחד) · הורה (ניסיון) · הורה+מאמן · ללא הרשאות

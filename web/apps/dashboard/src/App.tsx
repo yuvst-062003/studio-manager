@@ -19,6 +19,7 @@ import {
   SideNav,
   SignIn,
   ThemeProvider,
+  UpdateToast,
   makeSetupClient,
   registerM1WizardSteps,
   useDocumentLocale,
@@ -403,6 +404,8 @@ export default function App() {
 
   return (
     <ThemeProvider>
+      {/* New-build toast — floats over whatever is open, in every session state. */}
+      <UpdateToast locale={locale} />
       {session.status === 'anonymous' ? (
         // app="dashboard", not "staff": the OAuth callback routes the browser back to
         // the app named here, and this screen's app is this one (design pass — the

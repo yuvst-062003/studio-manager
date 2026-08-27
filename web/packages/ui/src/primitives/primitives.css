@@ -994,6 +994,51 @@ a {
  * Gladiator design pass (2026-08-27) — they are scoped to the one screen that uses
  * them, and that file's header explains why its fonts live outside fonts.css. */
 
+/* The new-version toast (sw-update/UpdateToast). Floats above the tab bar; a themed
+ * surface like any other, because it appears inside whatever screen is open. */
+.studio-update-toast {
+  position: fixed;
+  inset-block-end: calc(72px + env(safe-area-inset-bottom, 0px));
+  inset-inline: var(--space-4);
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-inline: auto;
+  max-inline-size: 28rem;
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 12%);
+}
+
+.studio-update-toast__text {
+  flex: 1 1 auto;
+  font-size: var(--text-body);
+}
+
+.studio-update-toast__reload,
+.studio-update-toast__dismiss {
+  min-block-size: 36px;
+  padding-inline: var(--space-3);
+  border-radius: var(--radius-md);
+  font-size: var(--text-body);
+  cursor: pointer;
+}
+
+.studio-update-toast__reload {
+  background: var(--fg);
+  color: var(--ground);
+  border: var(--border-width-hairline) solid var(--fg);
+}
+
+.studio-update-toast__dismiss {
+  background: transparent;
+  color: var(--text-muted);
+  border: var(--border-width-hairline) solid var(--border);
+}
+
 /* §6.5's install nudge — the banner that replaced the install wall. An ordinary
  * themed surface, unlike the sign-in: it sits inside the app. */
 .studio-install-banner {

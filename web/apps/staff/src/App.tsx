@@ -21,6 +21,7 @@ import {
   SignIn,
   TabBar,
   ThemeProvider,
+  UpdateToast,
   makeSetupClient,
   registerM1WizardSteps,
   useDocumentLocale,
@@ -186,6 +187,8 @@ export default function App() {
 
   return (
     <ThemeProvider>
+      {/* New-build toast — floats over whatever is open, in every session state. */}
+      <UpdateToast locale={locale} />
       {session.status === 'anonymous' ? (
         // §6.1's ordering rationale: 'language before login, because a Russian-speaking
         // parent cannot read a Hebrew consent screen.' The picker floats over the screen.

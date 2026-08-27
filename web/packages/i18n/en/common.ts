@@ -102,6 +102,9 @@ export const common: Bundle = {
   'install.banner.cta': 'Install',
   'install.banner.dismiss': 'Not now',
   'install.back': 'Back',
+  'update.available': 'A new version is ready',
+  'update.reload': 'Refresh',
+  'update.dismiss': 'Later',
   // §19.4's persona switcher.
   'dev.persona.label': 'acting as',
   'dev.persona.placeholder': 'choose a persona',
