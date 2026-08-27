@@ -482,7 +482,8 @@ waves:
         on: 2026-08-27
       - id: F8
         title: Dashboard — replace stale comes-later promises with real data
-        status: pending
+        status: shipped
+        on: 2026-08-27
       - id: F9
         title: Dashboard — global search
         status: shipped
@@ -512,10 +513,12 @@ waves:
         on: 2026-08-27
       - id: P2
         title: Parent — student card's four missing sections
-        status: pending
+        status: shipped
+        on: 2026-08-27
       - id: P3
         title: Parent — calendar shows attendance
-        status: pending
+        status: shipped
+        on: 2026-08-27
       - id: P4
         title: Parent — landing shell 401 fix and 13b wiring
         status: pending

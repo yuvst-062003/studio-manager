@@ -173,6 +173,15 @@ export const schedule: Bundle = {
   'closure.endBeforeStart': 'תאריך הסיום אינו יכול להקדים את תאריך ההתחלה',
 
   // -- the parent's month (12b) ----------------------------------------------------
+  'calendar.legend': 'מקרא',
+  'calendar.legend.present': 'נכחו',
+  'calendar.legend.absent': 'לא נכחו',
+  'calendar.legend.notified': 'הודעתם מראש',
+  'calendar.legend.planned': 'מתוכנן',
+  'calendar.legend.unmarked': 'לא סומן',
+  'calendar.summary': '{had} מפגשים שהיו · {planned} מתוכננים · {pct}%',
+  'calendar.childAll': 'כל הילדים',
+  'calendar.childOf': 'הלוח של {name}',
   'calendar.title': 'לוח הילד',
   'calendar.previousMonth': 'חודש קודם',
   'calendar.nextMonth': 'חודש הבא',
@@ -180,7 +189,6 @@ export const schedule: Bundle = {
   'calendar.past': 'שיעורים שהיו',
   'calendar.empty': 'אין שיעורים בחודש הזה',
   'calendar.emptyHint': 'לוח השיעורים נקבע על ידי המועדון',
-  'calendar.attendanceComesLater': 'הנוכחות שהייתה תוצג בהמשך',
 
   // -- groups and cycles (4b) ------------------------------------------------------
   'groups.title': 'קבוצות ומחזורים',

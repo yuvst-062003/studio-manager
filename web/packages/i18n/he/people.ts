@@ -270,7 +270,6 @@ export const people: Bundle = {
 
   // -- the containers (parent 2c, dashboard 6c) ---------------------------------
   'card.title': 'כרטיס חניך',
-  'card.sectionsComeLater': 'חגורה, נוכחות, מסמכים ותשלום יתווספו בהמשך',
   'card.details': 'פרטים',
   'card.enrollments': 'קבוצות',
   'alerts.title': 'מרכז התראות',

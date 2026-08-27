@@ -170,11 +170,39 @@ describe('ChildCalendar (12b)', () => {
     expect(screen.getByText(t('he', 'schedule.calendar.emptyHint'))).toBeInTheDocument()
   })
 
-  it('states that past attendance arrives with M5 rather than rendering a blank column', async () => {
+  it('carries real attendance per day, with the legend — P3', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input)
+        if (url.includes('/me/attendance')) {
+          return new Response(
+            JSON.stringify({
+              items: [
+                {
+                  session_id: 'past',
+                  student_id: 'st1',
+                  status: 'present',
+                  starts_at: '2026-11-02T14:00:00Z',
+                },
+              ],
+            }),
+            { status: 200 },
+          )
+        }
+        return new Response(JSON.stringify({ items: [] }), { status: 200 })
+      }),
+    )
     render(calendar())
+    const day = await screen.findByTestId('calendar-day-2026-11-02')
+    await waitFor(() => expect(day).toHaveAttribute('data-state', 'present'))
+    expect(screen.getByTestId('calendar-legend')).toBeInTheDocument()
+    expect(screen.getByTestId('calendar-summary')).toBeInTheDocument()
+    // The stale promise is gone with the feature it promised.
     expect(
-      await screen.findByText(t('he', 'schedule.calendar.attendanceComesLater')),
-    ).toBeInTheDocument()
+      document.body.textContent ?? '',
+    ).not.toContain('הנוכחות שהייתה תוצג בהמשך')
+    vi.unstubAllGlobals()
   })
 
   it.each(['light', 'dark'] as const)('renders in %s', (theme) => {

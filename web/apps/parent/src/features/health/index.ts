@@ -16,3 +16,4 @@ export type {
   TemplateSchema,
   TemplateSection,
 } from './healthClient'
+export { registerHealthSections } from './StudentCardHealthSection'

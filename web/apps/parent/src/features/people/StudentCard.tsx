@@ -13,7 +13,6 @@
 // special case: one code path means M4 lands into a container that has already been
 // exercised by real sections rather than by a test double.
 import { useSlot } from '@studio/ui'
-import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import type { EnrollmentOut, GuardianOut, StudentSummary } from './peopleClient'
 
@@ -52,9 +51,6 @@ export function StudentCard({
           guardians={guardians}
         />
       ))}
-      {/* Honest about what is not here yet, rather than a page that looks finished and is
-          missing four sections. */}
-      <p data-testid="student-card-pending">{t(locale, 'people.card.sectionsComeLater')}</p>
     </article>
   )
 }

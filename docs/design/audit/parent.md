@@ -254,6 +254,31 @@ Build: belt with date and next exam; an **8-session attendance strip** with coun
 
 ## Log
 
+### 2026-08-27 · P2 + P3 — the card's four quarters, and a calendar that answers its question
+
+**P2.** The four sections M4, M5, M6 and M7 each left for someone else are registered:
+belt (BeltBar with its D7 ring, current belt + date + past promotions, from
+`/students/{id}/belts`), attendance (the shared `AttendanceStrip` primitive over
+`GET /me/attendance` — this surface and the staff card cannot drift apart now),
+documents (declaration STATUS from the summary the container already holds — no fetch,
+no contents, per §5.5), and payment (P1's `PaymentStrip`, household balance per §6.3).
+`people.card.sectionsComeLater` is deleted from all three locales, with its render sites
+in `StudentCard` and `FirstRegistration`. **One simplification, decided:** the belt
+section shows current + history but not the "next exam" caption — exam scheduling is
+readable through `/me/events` and renders on the events screen; duplicating it on the
+card would give the product two answers about the same exam. The full progression stays
+on `12d`, one tap away.
+
+**P3.** Every day in the month carries its real state — from `GET /me/attendance`, whose
+docstring names this screen as its second consumer — worst-first when two children share
+a day (an absence outranks a presence), with the four-state legend, the per-child
+switcher (`הלוח של דנה`), a month/week toggle, the month summary
+(`X מפגשים שהיו · Y מתוכננים · Z%`), and colour never alone. A filed absence report
+renders as `הודעתם מראש`, which P1's routing finally made producible. The month window
+sits well inside the endpoint's 62-day cap; a year view would not, and none is offered.
+`schedule.calendar.attendanceComesLater` is deleted.
+
+
 ### 2026-08-27 · P1 — the seven screens nothing rendered, plus the container nobody counted
 
 **What was wrong.** Seven built, tested components were referenced only by their barrels.

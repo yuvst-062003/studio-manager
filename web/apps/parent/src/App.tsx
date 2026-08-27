@@ -32,6 +32,7 @@ import { ScheduleSection, isCalendarRoute } from './features/schedule/ScheduleSe
 // of routing, so nothing in the product could produce an absence report — the state the
 // staff roster, the dashboard count and `הודעתם מראש` are all built to read.
 import { AbsenceScreen, makeAbsenceClient } from './features/absence'
+import { registerAttendanceSections } from './features/attendance'
 // §5.12's subscription panel, rendered under the calendar it feeds (P1).
 import { CalendarSync } from './features/comms'
 import { makeParentScheduleClient } from './features/schedule/client'
@@ -43,7 +44,7 @@ import {
   ParentEventsScreen,
   makeParentEventsClient,
 } from './features/events'
-import { BeltProgressScreen, makeParentBeltsClient } from './features/belts'
+import { BeltProgressScreen, makeParentBeltsClient, registerBeltSections } from './features/belts'
 import { InboxScreen, makeParentCommsClient } from './features/comms'
 import { AddSibling, ProfileSection, makePeopleClient, registerPeopleSections } from './features/people'
 // `2c` behind `#/student/<id>` — the composite card the slot system was built for (P2).
@@ -64,7 +65,7 @@ import { ShopSection } from './features/billing'
 // §6.1 step 6 — the BLOCKING declaration. Mounted here because nothing imported it
 // (HB-w6-health-gate-unmounted): the gate, the form and the pad were built and tested in
 // W3 and a guardian with an unsigned declaration still reached home.
-import { HealthGate, firstStudentNeedingDeclaration, makeHealthClient } from './features/health'
+import { HealthGate, firstStudentNeedingDeclaration, makeHealthClient, registerHealthSections } from './features/health'
 import type { GatedStudent } from './features/health'
 
 // Seam 4 — the student card is a container and knows no section by name. This call was
@@ -73,8 +74,12 @@ import type { GatedStudent } from './features/health'
 // Found by the S1 slot-wiring guard; registered at module load so the slot is populated
 // before anything renders.
 registerPeopleSections()
-// M6's money rows on the same card — the section every wave left for someone else (P2).
+// P2 — the four sections M4, M5, M6 and M7 each left for someone else. The slot design
+// worked exactly as intended; nobody had used it until now.
 registerBillingSections()
+registerBeltSections()
+registerAttendanceSections()
+registerHealthSections()
 
 const NAV = [
   { key: 'myChildren', labelKey: 'common.nav.myChildren', href: '/' },

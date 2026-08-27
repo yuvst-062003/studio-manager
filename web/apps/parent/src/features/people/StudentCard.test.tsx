@@ -137,11 +137,9 @@ describe('StudentCard — the 2c container', () => {
     expect(document.body.textContent ?? '').not.toContain('₪')
   })
 
-  it('says the rest is coming rather than showing an empty page', () => {
+  it('carries no comes-later line — all four promised sections registered (P2)', () => {
     render(<StudentCard student={STUDENT} locale="he" />)
-    expect(screen.getByTestId('student-card-pending')).toHaveTextContent(
-      t('he', 'people.card.sectionsComeLater'),
-    )
+    expect(screen.queryByTestId('student-card-pending')).toBeNull()
   })
 
   it('renders this lane’s own sections through the registry too', () => {

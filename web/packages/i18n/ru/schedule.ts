@@ -146,6 +146,15 @@ export const schedule: Bundle = {
   'closure.cancelled': 'Отменено занятий: {{count}}',
   'closure.endBeforeStart': 'Дата окончания не может быть раньше даты начала',
 
+  'calendar.legend': 'Обозначения',
+  'calendar.legend.present': 'Были',
+  'calendar.legend.absent': 'Пропустили',
+  'calendar.legend.notified': 'Предупредили заранее',
+  'calendar.legend.planned': 'Запланировано',
+  'calendar.legend.unmarked': 'Не отмечено',
+  'calendar.summary': '{had} прошедших занятий · {planned} запланировано · {pct}%',
+  'calendar.childAll': 'Все дети',
+  'calendar.childOf': 'Календарь: {name}',
   'calendar.title': 'Расписание ребёнка',
   'calendar.previousMonth': 'Предыдущий месяц',
   'calendar.nextMonth': 'Следующий месяц',
@@ -153,7 +162,6 @@ export const schedule: Bundle = {
   'calendar.past': 'Прошедшие занятия',
   'calendar.empty': 'В этом месяце занятий нет',
   'calendar.emptyHint': 'Расписание занятий устанавливает клуб',
-  'calendar.attendanceComesLater': 'Прошедшая посещаемость появится позже',
 
   'groups.title': 'Группы и циклы',
   'group.coaches.title': 'Тренеры группы',

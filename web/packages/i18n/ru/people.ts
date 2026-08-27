@@ -241,8 +241,6 @@ export const people: Bundle = {
   'trialHome.waitingForClub': 'Клуб свяжется с вами после занятия',
 
   'card.title': 'Карточка ученика',
-  'card.sectionsComeLater':
-    'Пояс, посещаемость, документы и оплата появятся позже',
   'card.details': 'Данные',
   'card.enrollments': 'Группы',
   'alerts.title': 'Центр уведомлений',

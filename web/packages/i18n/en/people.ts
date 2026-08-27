@@ -238,8 +238,6 @@ export const people: Bundle = {
   'trialHome.waitingForClub': 'The club will get back to you after the class',
 
   'card.title': 'Student card',
-  'card.sectionsComeLater':
-    'Belt, attendance, documents and payment are added later',
   'card.details': 'Details',
   'card.enrollments': 'Groups',
   'alerts.title': 'Alert centre',

@@ -143,6 +143,15 @@ export const schedule: Bundle = {
   'closure.cancelled': '{{count}} sessions cancelled',
   'closure.endBeforeStart': 'The end date must not precede the start date',
 
+  'calendar.legend': 'Legend',
+  'calendar.legend.present': 'Attended',
+  'calendar.legend.absent': 'Missed',
+  'calendar.legend.notified': 'Notified in advance',
+  'calendar.legend.planned': 'Planned',
+  'calendar.legend.unmarked': 'Not marked',
+  'calendar.summary': '{had} sessions held · {planned} planned · {pct}%',
+  'calendar.childAll': 'All children',
+  'calendar.childOf': "{name}'s calendar",
   'calendar.title': "My child's calendar",
   'calendar.previousMonth': 'Previous month',
   'calendar.nextMonth': 'Next month',
@@ -150,7 +159,6 @@ export const schedule: Bundle = {
   'calendar.past': 'Past sessions',
   'calendar.empty': 'No sessions this month',
   'calendar.emptyHint': 'The club sets the lesson schedule',
-  'calendar.attendanceComesLater': 'Past attendance appears here later',
 
   'groups.title': 'Groups and cycles',
   'group.coaches.title': 'Group coaches',
