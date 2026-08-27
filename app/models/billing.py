@@ -128,6 +128,22 @@ class PricePlan(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
     registration_fee_agorot: Mapped[int | None] = mapped_column(Integer)
     active_from: Mapped[date] = mapped_column(Date, nullable=False)
     active_to: Mapped[date | None] = mapped_column(Date)
+    #: **The one column on this table that is edited in place, and the reason it is safe.**
+    #:
+    #: The immutability rule above protects `monthly_amount_agorot`, `sessions_per_week`,
+    #: `active_from` and `active_to` -- the facts that explain a charge raised last year.
+    #: A URL explains nothing about a historical charge: it is an operational pointer to a
+    #: page the provider may re-create at any time, and a typo in it must be fixable
+    #: without inventing a price change that never happened. Every write goes through
+    #: `AuditService.record`, so the history lives in `audit_log` rather than in extra
+    #: plan rows.
+    #:
+    #: **A successor plan is born NULL and never inherits this.** G8: a uPay shared link
+    #: carries a FIXED amount, so copying the 300 ₪ link onto a 320 ₪ successor would send
+    #: every family to sign a mandate at the old price -- the club under-collects all year
+    #: and no error appears anywhere. NULL degrades visibly instead: the parent's card
+    #: renders with its instructions and no anchor, and the dashboard badges the gap.
+    standing_order_link_url: Mapped[str | None] = mapped_column(Text)
 
 
 class Product(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):

@@ -915,7 +915,7 @@
         "type": "object"
       },
       "BillingSettingsOut": {
-        "description": "§5.10's three studio-level settings.\n\n`standing_order_link` is the shared recurring link the manager created once in the uPay\ndashboard and pasted here -- G8: we cannot create one, cannot vary its amount per payer,\nand cannot tell from its callbacks who paid.",
+        "description": "The studio-level billing settings.\n\n**There is deliberately no `standing_order_link` here.** There used to be -- one link\nfor the whole club -- and the payment-routes spec §13 removed it: a single link is a\nlink at ONE amount, and a uPay shared link cannot vary per payer (G8). A club with a\n300, a 400 and a 550 plan pointed at one link collects 300 from everyone. The link\nbelongs to the plan (`price_plan.standing_order_link_url`), one per amount, which is\nwhat the club's own letter already describes when it says \"links\", plural.\n\nIt is also why nothing ever rendered the old field: `PaymentsSection` hardcoded the\nparent screen's link to null for as long as it existed. A settings key a manager can\nfill in and no parent can ever see is worse than no key at all.",
         "properties": {
           "cash_instructions": {
             "anyOf": [
@@ -932,17 +932,6 @@
             "default": 1,
             "title": "Run Day",
             "type": "integer"
-          },
-          "standing_order_link": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Standing Order Link"
           }
         },
         "title": "BillingSettingsOut",
@@ -974,18 +963,6 @@
               }
             ],
             "title": "Run Day"
-          },
-          "standing_order_link": {
-            "anyOf": [
-              {
-                "maxLength": 500,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Standing Order Link"
           }
         },
         "title": "BillingSettingsPatch",
@@ -6686,6 +6663,17 @@
           "sessions_per_week": {
             "title": "Sessions Per Week",
             "type": "integer"
+          },
+          "standing_order_link_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Standing Order Link Url"
           }
         },
         "required": [
@@ -8912,6 +8900,70 @@
           "status"
         ],
         "title": "StaffMemberOut",
+        "type": "object"
+      },
+      "StandingOrderLinkIn": {
+        "description": "The one in-place edit `price_plan` allows. `null` clears the link.\n\nIts own route rather than a general `PATCH /price-plans/{id}`: this table is versioned\nand never edited in place, and a generic patch shape would be an invitation to add\n`monthly_amount_agorot` to it -- which is the edit `close_price_plan` exists to\nprevent. A route named after the one legal field cannot grow that way by accident.",
+        "properties": {
+          "url": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          }
+        },
+        "title": "StandingOrderLinkIn",
+        "type": "object"
+      },
+      "StandingOrderLinkListOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/StandingOrderLinkOut"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "StandingOrderLinkListOut",
+        "type": "object"
+      },
+      "StandingOrderLinkOut": {
+        "description": "One row per child whose ACTIVE plan carries a link.\n\nLabelled with the child and the plan because a payer may have two children on two\nplans: one bare link would have them sign one mandate and underpay for the other child\nevery month. `amount_agorot` travels with it so the parent can see WHICH mandate they\nare about to sign -- a uPay shared link charges a fixed amount and does not say so.",
+        "properties": {
+          "amount_agorot": {
+            "title": "Amount Agorot",
+            "type": "integer"
+          },
+          "plan_name": {
+            "title": "Plan Name",
+            "type": "string"
+          },
+          "student_name": {
+            "title": "Student Name",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "student_name",
+          "plan_name",
+          "amount_agorot",
+          "url"
+        ],
+        "title": "StandingOrderLinkOut",
         "type": "object"
       },
       "StudentBeltIn": {
@@ -16000,6 +16052,28 @@
         ]
       }
     },
+    "/api/v1/me/standing-order-links": {
+      "get": {
+        "description": "Payment-routes spec §6 -- **this payer's own children only.**\n\nThe full catalogue is never exposed here: a 300 ₪ payer who could see the 550 ₪ link\ncould sign the 550 ₪ mandate by accident, and the club would collect from a family\nthat never agreed to it. Closed plans are excluded by `links_for_students`, because a\nstudent still pointing at last year's plan would otherwise be handed a link at last\nyear's amount.\n\nNo role dependency, like every other `/me/*` read -- §3.1: \"guardian is not a role\".\n\n**Read live, never precached.** The parent app is an installed PWA and the rest of\nthis screen is cache-friendly; a stale payment link is not a stale roster, it sends a\nfamily to sign a mandate at the wrong amount and neither they nor the manager finds\nout until the reconciliation queue disagrees months later.",
+        "operationId": "my_standing_order_links_api_v1_me_standing_order_links_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandingOrderLinkListOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "My Standing Order Links",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
     "/api/v1/me/students": {
       "get": {
         "description": "§6.3's home, and L9 verbatim.\n\n**No role dependency**, deliberately. §3.1: \"guardian is not a role\"; §6.1 makes parent\naccess `EXISTS(guardian WHERE person_id = :me)`. `require_roles` here would refuse\nevery guardian in the product and admit every coach with no children.\n\nL8 -- no `is_primary` branch. Every guardian on a student sees the same list.\n\nNot paginated: this is one person's children. G16 is about lists that grow, and a\nfamily that outgrows one page is not a case the product has.",
@@ -17562,6 +17636,79 @@
           }
         },
         "summary": "Close Price Plan",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/v1/price-plans/{plan_id}/standing-order-link": {
+      "put": {
+        "description": "Payment-routes spec §5 -- Dashboard → Settings → Payments, and the wizard's prices\nstep. Audited on every write, because that is what makes an in-place edit safe on a\nversioned table: the history lives in `audit_log` rather than in extra plan rows.",
+        "operationId": "set_standing_order_link_api_v1_price_plans__plan_id__standing_order_link_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "plan_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Plan Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StandingOrderLinkIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PricePlanOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Standing Order Link",
         "tags": [
           "billing"
         ]

@@ -25,7 +25,6 @@ DEMO_STUDIO_SETTINGS: dict[str, Any] = {
     "upay": DEMO_UPAY_SETTINGS,
     # §5.10's two manual-payment strings. Present so the demo studio exercises the
     # payments screen's three options from M6's first day.
-    "standing_order_link": "https://example.invalid/demo-standing-order",
     "cash_instructions": "שלמו למאמן בתחילת החודש (נתוני הדגמה)",
     "billing_day": 1,
 }

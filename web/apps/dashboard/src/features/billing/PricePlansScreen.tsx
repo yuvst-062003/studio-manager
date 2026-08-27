@@ -10,7 +10,7 @@
 // what charged a child in two groups twice, at two different prices, silently and forever.
 import { useState } from 'react'
 import type { CSSProperties } from 'react'
-import { Button, Card, EmptyState, MoneyDisplay, TextField } from '@studio/ui'
+import { Button, Card, EmptyState, MoneyDisplay, StatusChip, TextField } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import type { DashboardBillingClient, PricePlanOut } from './billingClient'
@@ -27,6 +27,17 @@ const rowStyle: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   gap: 'var(--space-3)',
+}
+
+//: A URL is long and strong-LTR. `min-inline-size: 0` plus the ellipsis keeps it from
+//: pushing the row's amount off a 390-wide screen, and `<bdi>` keeps it from reordering
+//: the Hebrew around it. Logical properties throughout (D10).
+const urlStyle: CSSProperties = {
+  minInlineSize: 0,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+  color: 'var(--text-muted)',
 }
 
 export type PricePlansScreenProps = {
@@ -87,6 +98,19 @@ export function PricePlansScreen({ locale, client, plans, onChanged }: PricePlan
               ) : (
                 <span data-testid="plan-current">{plan.active_from}</span>
               )}
+              {/* §4 -- the FULL url, never a "link set" tick: a typo in a payment page has
+                  to be visible without clicking it. And the missing case is badged only on
+                  an ACTIVE plan; a closed plan's link is dead by definition, so badging it
+                  would put a permanent unfixable warning on every retired plan. */}
+              {plan.standing_order_link_url ? (
+                <span data-testid="plan-link" style={urlStyle}>
+                  <bdi>{plan.standing_order_link_url}</bdi>
+                </span>
+              ) : plan.active_to === null ? (
+                <span data-testid="plan-link-missing">
+                  <StatusChip status="pending" label={t(locale, 'billing.plan.linkMissing')} />
+                </span>
+              ) : null}
             </div>
           ))}
         </Card>

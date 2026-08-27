@@ -14,6 +14,16 @@ of duplicating: the tables rename, a `method` column ('cash' | 'cheque') says wh
 the parent used, and `cheque` joins the human-recorded payment methods so a confirmed
 cheque stops recording as `bank_transfer`. Renames are ALTER .. RENAME throughout --
 staging data survives, and every constraint keeps a name the models would generate.
+
+**Part 2 -- the standing-order link, per price plan.** `price_plan` is versioned by
+`active_from`/`active_to` and never edited in place, and this column is the deliberate
+exception: a URL explains nothing about a historical charge, so a typo in it must be
+fixable without inventing a price change that never happened. Nullable with no default and
+no backfill -- NULL means "the manager has not pasted this plan's link yet", which is also
+what every successor plan is born as, because a uPay shared link carries a fixed amount and
+copying it forward would under-collect all year in silence. No CHECK: the https-only rule
+and the host allowlist are configuration (`STANDING_ORDER_LINK_HOSTS`), and a constraint
+would freeze one environment's payment provider into the schema.
 """
 
 from collections.abc import Sequence
@@ -112,8 +122,13 @@ def upgrade() -> None:
         " 'credit_adjustment'))"
     )
 
+    # -- Part 2: the standing-order link, per price plan -------------------------
+    op.add_column("price_plan", sa.Column("standing_order_link_url", sa.Text(), nullable=True))
+
 
 def downgrade() -> None:
+    op.drop_column("price_plan", "standing_order_link_url")
+
     op.execute("ALTER TABLE payment DROP CONSTRAINT ck_payment_payment_method")
     op.execute(
         "ALTER TABLE payment ADD CONSTRAINT ck_payment_payment_method CHECK"

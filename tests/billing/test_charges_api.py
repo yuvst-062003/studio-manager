@@ -241,18 +241,16 @@ def test_the_billing_settings_round_trip(client, as_manager):
     """
     patched = client.patch(
         "/api/v1/billing/settings",
-        json={
-            "standing_order_link": "https://app.upay.co.il/recurring/abc",
-            "cash_instructions": "שלמו למאמן בתחילת החודש",
-            "run_day": 1,
-        },
+        json={"cash_instructions": "שלמו למאמן בתחילת החודש", "run_day": 1},
         headers=as_manager.headers,
     )
     assert patched.status_code == 200
     read = client.get("/api/v1/billing/settings", headers=as_manager.headers).json()
-    assert read["standing_order_link"] == "https://app.upay.co.il/recurring/abc"
     assert read["cash_instructions"] == "שלמו למאמן בתחילת החודש"
     assert read["run_day"] == 1
+    # Payment-routes spec §13 -- no studio-level fallback link. One link is a link at ONE
+    # amount, which is the bug the per-plan column exists to avoid.
+    assert "standing_order_link" not in read
 
 
 def test_the_run_day_is_a_day_of_the_month(client, as_manager):

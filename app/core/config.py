@@ -41,6 +41,19 @@ class Settings(BaseSettings):
     # and §19.6 means the demo studio never builds one.
     UPAY_MERCHANT_EMAIL: str | None = None
 
+    # The hosts a manager may paste a הוראת קבע link for (`price_plan.
+    # standing_order_link_url`). That URL is shown to parents as the club's official
+    # payment page, so a free-text field there is a phishing page with the club's name on
+    # it -- the link must be https and its host must be on this list. A club whose
+    # provider is not uPay asks for a configuration change, which is deliberately a higher
+    # bar than a text box and deliberately not a code change.
+    #
+    # **Empty means "our own payment provider"**, resolved from `UPAY_ENDPOINT` at call
+    # time in `validate_standing_order_link`. The host is deliberately NOT written here:
+    # §19.6 restriction 5 gives uPay's host exactly one home in `app/`, and a second copy
+    # in a settings default is the kind of duplicate that drifts and then disagrees.
+    STANDING_ORDER_LINK_HOSTS: tuple[str, ...] = ()
+
     # §5.2 -- "a short-lived access JWT (15 min) plus a rotating refresh token (30 days,
     # one-time-use, reuse detection revokes the family)". §10.3 reasons about both
     # numbers directly -- a coach on a mat for 90 minutes against a 15-minute token is

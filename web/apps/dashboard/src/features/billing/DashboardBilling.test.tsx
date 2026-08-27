@@ -3,7 +3,7 @@
 // The tests that carry weight are the three findings with teeth: the cash affordance must
 // create a payment and allocate it (never flag a charge), the charge-generation button must
 // carry invariant 5 in words, and a match suggestion must never be applied without a human.
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { t } from '@studio/i18n'
@@ -12,6 +12,8 @@ import type { HouseholdRow } from './CollectionsScreen'
 import { ReconciliationQueue } from './ReconciliationQueue'
 import { PricePlansScreen } from './PricePlansScreen'
 import { PaymentPromisesPanel } from './PaymentPromisesPanel'
+import { StandingOrderLinksPanel } from './StandingOrderLinksPanel'
+import { PRICES_WIZARD_ORDER, PricesWizardStep } from './PricesWizardStep'
 import { DebtAlert } from './DebtAlert'
 import { DEBT_ALERT_ORDER } from './register'
 import { RUN_JOB_ORDER } from './RunJobTool'
@@ -46,6 +48,7 @@ function stub(overrides: Partial<DashboardBillingClient> = {}): DashboardBilling
     createPricePlan: vi.fn().mockResolvedValue({}),
     products: vi.fn().mockResolvedValue([]),
     paymentPromises: vi.fn().mockResolvedValue([]),
+    setStandingOrderLink: vi.fn().mockResolvedValue({}),
     confirmPromise: vi.fn().mockResolvedValue(undefined),
     declinePromise: vi.fn().mockResolvedValue(undefined),
     ...overrides,
@@ -308,7 +311,50 @@ describe('5a — prices and plans', () => {
     registration_fee_agorot: 10_000,
     active_from: '2026-09-01',
     active_to: null,
+    standing_order_link_url: null,
   }
+
+  it('badges an active plan whose standing-order link is missing', () => {
+    // §3.2's visible half. A successor plan is born with a NULL link -- deliberately, so a
+    // 320 ₪ plan can never carry the 300 ₪ mandate -- and the badge is what turns that
+    // silence into a prompt. Without it the rollover's gift to the club is a year of
+    // parents who cannot find the link they were told to use.
+    render(<PricePlansScreen locale={LOCALE} client={stub()} plans={[PLAN]} onChanged={vi.fn()} />)
+    expect(screen.getByTestId('plan-link-missing')).toHaveTextContent(
+      t(LOCALE, 'billing.plan.linkMissing'),
+    )
+  })
+
+  it('shows the full URL rather than a "link set" tick', () => {
+    // §4 -- a typo in a payment URL has to be visible WITHOUT clicking it. A checkmark
+    // says a link exists; it cannot say the link is the right one.
+    const url = 'https://app.upay.co.il/recurring/300'
+    render(
+      <PricePlansScreen
+        locale={LOCALE}
+        client={stub()}
+        plans={[{ ...PLAN, standing_order_link_url: url }]}
+        onChanged={vi.fn()}
+      />,
+    )
+    expect(screen.getByTestId('plan-link')).toHaveTextContent(url)
+    expect(screen.queryByTestId('plan-link-missing')).not.toBeInTheDocument()
+  })
+
+  it('does not badge a CLOSED plan with no link', () => {
+    // A closed plan's link is dead by definition: its amount is not what anyone is billed
+    // any more. Badging it would put a permanent, unfixable warning on every plan the club
+    // has ever retired.
+    render(
+      <PricePlansScreen
+        locale={LOCALE}
+        client={stub()}
+        plans={[{ ...PLAN, active_to: '2026-12-31' }]}
+        onChanged={vi.fn()}
+      />,
+    )
+    expect(screen.queryByTestId('plan-link-missing')).not.toBeInTheDocument()
+  })
 
   it('offers to close and replace a plan, never to edit its amount', async () => {
     // §5.10 and §5.15: a price change CLOSES the current plan and opens a new one, because a
@@ -461,5 +507,142 @@ describe('the payment-promise queue', () => {
     expect(confirmPromise).toHaveBeenCalledWith('r1')
     await userEvent.click(await screen.findByTestId('promise-decline'))
     expect(declinePromise).toHaveBeenCalledWith('r1')
+  })
+})
+
+describe('Settings → Payments — the standing-order links', () => {
+  // §5's canonical editor. Two surfaces, one field: the wizard's prices step sets it as a
+  // plan is created, and this is where it is fixed afterwards -- which is the whole reason
+  // the column is the one exception to `price_plan` never being edited in place.
+  const ACTIVE = {
+    id: 'plan-1',
+    name: 'פעמיים בשבוע',
+    sessions_per_week: 2,
+    monthly_amount_agorot: 30_000,
+    registration_fee_agorot: 0,
+    active_from: '2026-09-01',
+    active_to: null,
+    standing_order_link_url: null,
+  }
+  const CLOSED = { ...ACTIVE, id: 'plan-0', active_to: '2026-08-31' }
+
+  it('lists active plans only — a closed plan\'s link is dead by definition', async () => {
+    render(
+      <StandingOrderLinksPanel
+        locale={LOCALE}
+        client={stub({ pricePlans: vi.fn().mockResolvedValue([ACTIVE, CLOSED]) })}
+      />,
+    )
+    expect(await screen.findAllByTestId('link-editor-row')).toHaveLength(1)
+  })
+
+  it('saves a pasted link against the plan it sits beside', async () => {
+    const setStandingOrderLink = vi.fn().mockResolvedValue({})
+    render(
+      <StandingOrderLinksPanel
+        locale={LOCALE}
+        client={stub({
+          pricePlans: vi.fn().mockResolvedValue([ACTIVE]),
+          setStandingOrderLink,
+        })}
+      />,
+    )
+    const field = await screen.findByTestId('link-editor-input')
+    await userEvent.type(field, 'https://app.upay.co.il/recurring/300')
+    await userEvent.tab()
+    expect(setStandingOrderLink).toHaveBeenCalledWith(
+      'plan-1',
+      'https://app.upay.co.il/recurring/300',
+    )
+  })
+
+  it('says so when the server refuses the host, rather than looking saved', async () => {
+    // The server is the only thing that knows the allowlist, and a field that silently
+    // keeps the text a manager typed is a field they will walk away from believing worked.
+    render(
+      <StandingOrderLinksPanel
+        locale={LOCALE}
+        client={stub({
+          pricePlans: vi.fn().mockResolvedValue([ACTIVE]),
+          setStandingOrderLink: vi.fn().mockRejectedValue(new Error('422')),
+        })}
+      />,
+    )
+    const field = await screen.findByTestId('link-editor-input')
+    await userEvent.type(field, 'https://evil.example/recurring/300')
+    await userEvent.tab()
+    expect(await screen.findByTestId('link-editor-error')).toHaveTextContent(
+      t(LOCALE, 'billing.plan.linkRefused'),
+    )
+  })
+})
+
+describe('the wizard\'s prices step', () => {
+  // §5's other surface: the link sits beside the amount as a plan is CREATED, so a club
+  // that already has its uPay links never has to come back for them. `WIZARD_STEPS` in
+  // `app/services/structure/setup.py` is a contract this feature does not touch -- `prices`
+  // is already step 4 there, and it was the only one of the six with nothing registered
+  // into its slot.
+  function renderStep(props: Record<string, unknown> = {}) {
+    return render(
+      <PricesWizardStep
+        locale={LOCALE}
+        status="pending"
+        onDone={vi.fn()}
+        onSkip={vi.fn()}
+        client={stub()}
+        {...props}
+      />,
+    )
+  }
+
+  it('registers at the order WIZARD_STEP_ORDER gives prices', () => {
+    // studio · belts · groups · prices · staff · students. A step registered at the wrong
+    // order lands the owner on the wrong panel after they finish the previous one.
+    expect(PRICES_WIZARD_ORDER).toBe(4)
+  })
+
+  it('creates a plan with the link the manager pasted beside the amount', async () => {
+    const createPricePlan = vi.fn().mockResolvedValue({ id: 'plan-9' })
+    const setStandingOrderLink = vi.fn().mockResolvedValue({})
+    renderStep({ client: stub({ createPricePlan, setStandingOrderLink }) })
+    await userEvent.type(screen.getByTestId('wizard-plan-name'), 'פעמיים בשבוע')
+    await userEvent.type(screen.getByTestId('wizard-plan-amount'), '300')
+    await userEvent.type(
+      screen.getByTestId('wizard-plan-link'),
+      'https://app.upay.co.il/recurring/300',
+    )
+    await userEvent.click(screen.getByTestId('wizard-plan-save'))
+    await waitFor(() => expect(createPricePlan).toHaveBeenCalled())
+    expect(createPricePlan).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'פעמיים בשבוע', monthlyAmountAgorot: 30_000 }),
+    )
+    expect(setStandingOrderLink).toHaveBeenCalledWith(
+      'plan-9',
+      'https://app.upay.co.il/recurring/300',
+    )
+  })
+
+  it('creates the plan when the link is left blank, and asks for nothing more', async () => {
+    // §5 and open item 4 -- OPTIONAL. A club may not have its uPay links on the day it
+    // sets the app up, and stopping setup for one would be a wall in front of a club that
+    // cannot pass it yet. The plan is created and the link is simply never sent.
+    const createPricePlan = vi.fn().mockResolvedValue({ id: 'plan-9' })
+    const setStandingOrderLink = vi.fn().mockResolvedValue({})
+    renderStep({ client: stub({ createPricePlan, setStandingOrderLink }) })
+    await userEvent.type(screen.getByTestId('wizard-plan-name'), 'פעמיים בשבוע')
+    await userEvent.type(screen.getByTestId('wizard-plan-amount'), '300')
+    await userEvent.click(screen.getByTestId('wizard-plan-save'))
+    await waitFor(() => expect(createPricePlan).toHaveBeenCalled())
+    expect(setStandingOrderLink).not.toHaveBeenCalled()
+  })
+
+  it('reports itself finished rather than letting the container guess', async () => {
+    // The container never computes completeness -- `packages/ui/src/setup-wizard/types.ts`
+    // says so, and it is what keeps this seam one-directional.
+    const onDone = vi.fn()
+    renderStep({ client: stub({ pricePlans: vi.fn().mockResolvedValue([]) }), onDone })
+    await userEvent.click(screen.getByTestId('wizard-prices-done'))
+    expect(onDone).toHaveBeenCalled()
   })
 })

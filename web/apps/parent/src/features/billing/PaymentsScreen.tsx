@@ -65,12 +65,25 @@ export type DebtRow = {
   coveredElsewhere: boolean
 }
 
+/**
+ * One הוראת קבע link, for one child. **A list, not a single link** (payment-routes §6): a
+ * uPay shared link charges a FIXED amount, so a payer with a child on 300 and a child on
+ * 550 needs both, labelled — one bare link has them sign one mandate and underpay for the
+ * other child every month. Only this payer's own children ever appear.
+ */
+export type StandingOrderLink = {
+  studentName: string
+  planName: string
+  amountAgorot: number
+  url: string
+}
+
 export type PaymentsScreenProps = {
   locale: Locale
   client: BillingClient
   debts: readonly DebtRow[]
   hasActiveSubscription: boolean
-  standingOrderLink: string | null
+  standingOrderLinks: readonly StandingOrderLink[]
   cashInstructions: string | null
   /** The payer's own promises, both routes — a pending one turns its card into a status. */
   promises?: readonly PaymentPromiseOut[]
@@ -84,7 +97,7 @@ export function PaymentsScreen({
   client,
   debts,
   hasActiveSubscription,
-  standingOrderLink,
+  standingOrderLinks,
   cashInstructions,
   promises = [],
   onPaymentPromise,
@@ -253,11 +266,30 @@ export function PaymentsScreen({
       <Card>
         <div data-testid="route-standing-order">
           <h3>{t(locale, 'billing.method.standingOrder')}</h3>
-          {standingOrderLink ? (
-            <a href={standingOrderLink} data-testid="standing-order-link">
-              {t(locale, 'billing.standingOrder.link')}
-            </a>
-          ) : null}
+          {/* An empty list renders exactly what this card rendered before there was a
+              source at all: the instructions, and no anchor. §3.2's degradation is
+              therefore not a special case — it is the same code path. */}
+          {standingOrderLinks.map((link) => (
+            <div key={link.url} style={rowStyle} data-testid="standing-order-row">
+              <span>{link.studentName}</span>
+              <span>{link.planName}</span>
+              {/* The amount the mandate will charge every month. A uPay shared link is
+                  fixed at one amount and the page it opens does not say which. */}
+              <MoneyDisplay agorot={link.amountAgorot} label={link.studentName} />
+              <a
+                href={link.url}
+                data-testid="standing-order-link"
+                // Two anchors reading 'קישור להקמת הוראת קבע' are two links a screen
+                // reader cannot tell apart, and telling them apart is the whole point.
+                aria-label={t(locale, 'billing.standingOrder.linkFor').replace(
+                  '{{name}}',
+                  link.studentName,
+                )}
+              >
+                {t(locale, 'billing.standingOrder.link')}
+              </a>
+            </div>
+          ))}
           <p>{t(locale, 'billing.standingOrder.instructions')}</p>
           {/* G8 on the screen: the app cannot confirm these, so the charges stay open
               until a manager reconciles them. Saying so is what stops a parent thinking

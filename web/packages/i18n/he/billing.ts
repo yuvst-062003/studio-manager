@@ -46,6 +46,9 @@ export const billing: Bundle = {
   'card.oldestFirst': 'נבחרים החיובים הוותיקים ביותר, לכל הילדים שאתם משלמים עבורם',
 
   'standingOrder.link': 'קישור להקמת הוראת קבע',
+  // One link per child, so the anchor text repeats — this is the accessible name that
+  // tells two otherwise identical links apart (SC 2.4.4).
+  'standingOrder.linkFor': 'הקמת הוראת קבע עבור {{name}}',
   'standingOrder.instructions': 'הקמת ההוראה מתבצעת באתר חברת הסליקה',
   'standingOrder.activeWarning': 'רשומה הוראת קבע פעילה — ודא שאינך משלם פעמיים',
   'standingOrder.notConfirmable': 'תשלום בהוראת קבע נרשם על ידי המועדון לאחר קבלתו',
@@ -207,6 +210,20 @@ export const billing: Bundle = {
   // §5.10 — plans are versioned, never edited in place, so history stays explicable.
   'plan.versionedHint': 'שינוי מחיר סוגר את המסלול הקיים ופותח חדש. חיובים קודמים נשמרים',
   'plan.closeCurrent': 'סגירת המסלול הנוכחי',
+
+  // Part A of the payment-routes spec -- the הוראת קבע link, one per plan.
+  //
+  // `plan.linkNeverInherited` is the sentence that protects the club's revenue: a uPay
+  // link charges a FIXED amount, so a successor plan is deliberately born without one.
+  // It is said on the screen because the manager is the only one who can fix it.
+  'plan.standingOrderLink': 'קישור להוראת קבע',
+  'plan.linkMissing': 'חסר קישור',
+  'plan.linkHint': 'הקישור שנוצר באתר חברת הסליקה עבור הסכום של המסלול הזה',
+  'plan.linkNeverInherited': 'מסלול חדש נפתח תמיד ללא קישור — קישור סליקה גובה סכום קבוע, והעתקתו הייתה גובה את המחיר הישן',
+  'plan.linkRefused': 'הקישור נדחה — נדרשת כתובת https של חברת הסליקה',
+  'plan.linkSaved': 'הקישור נשמר',
+  'plan.linksTitle': 'קישורי הוראת קבע',
+  'plan.linksEmpty': 'אין מסלולים פעילים',
 
   // -- the product catalog and handing an item over (12e, 11a) -------------------
   'product.title': 'פריטים למכירה',

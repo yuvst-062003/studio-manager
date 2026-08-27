@@ -30,6 +30,7 @@ export const billing: Bundle = {
   'card.oldestFirst': 'Выбираются самые старые начисления по всем детям, за которых вы платите',
 
   'standingOrder.link': 'Оформить постоянное поручение',
+  'standingOrder.linkFor': 'Оформить постоянное поручение для {{name}}',
   'standingOrder.instructions': 'Поручение оформляется на сайте платёжной компании',
   'standingOrder.activeWarning': 'Активное постоянное поручение уже есть — проверьте, что не платите дважды',
   'standingOrder.notConfirmable': 'Платёж по поручению записывается клубом после поступления',
@@ -212,4 +213,13 @@ export const billing: Bundle = {
   'product.colour': 'Цвет',
   'product.handOutPolicy': 'Цена товара не показывается тренерам',
   'dialog.cancel': 'Отмена',
+
+  'plan.standingOrderLink': 'Ссылка на постоянное поручение',
+  'plan.linkMissing': 'Ссылка отсутствует',
+  'plan.linkHint': 'Ссылка, созданная на сайте платёжной компании для суммы этого тарифа',
+  'plan.linkNeverInherited': 'Новый тариф всегда открывается без ссылки — платёжная ссылка списывает фиксированную сумму, и её копирование взимало бы старую цену',
+  'plan.linkRefused': 'Ссылка отклонена — нужен адрес https на домене платёжной компании',
+  'plan.linkSaved': 'Ссылка сохранена',
+  'plan.linksTitle': 'Ссылки на постоянное поручение',
+  'plan.linksEmpty': 'Нет активных тарифов',
 }

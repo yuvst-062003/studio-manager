@@ -45,6 +45,7 @@ export type DashboardBillingClient = {
   confirmMatch(ipnId: string, payerPersonId: string): Promise<void>
   ignoreIpn(ipnId: string): Promise<void>
   pricePlans(): Promise<PricePlanOut[]>
+  setStandingOrderLink(planId: string, url: string | null): Promise<PricePlanOut>
   closePricePlan(planId: string, closesOn: string, amountAgorot: number): Promise<PricePlanOut>
   createPricePlan(input: {
     name: string
@@ -142,6 +143,22 @@ export function makeDashboardBillingClient(fetcher: Fetcher): DashboardBillingCl
     },
     async pricePlans() {
       return (await json<{ items: PricePlanOut[] }>(await fetcher('/api/v1/price-plans'))).items
+    },
+    // The ONE in-place edit `price_plan` allows, and it has its own route for that reason:
+    // a general `PATCH /price-plans/{id}` would be an invitation to put the amount in it,
+    // which is the edit `closePricePlan` exists to prevent. `null` clears the link.
+    //
+    // The server holds the rules -- https, and a host on the configured allowlist -- so a
+    // rejection here is a real answer to render, not a validation this file should
+    // duplicate and then disagree with.
+    async setStandingOrderLink(planId: string, url: string | null) {
+      return json<PricePlanOut>(
+        await fetcher(`/api/v1/price-plans/${planId}/standing-order-link`, {
+          method: 'PUT',
+          headers: JSON_HEADERS,
+          body: JSON.stringify({ url }),
+        }),
+      )
     },
     // The payment-promise decisions (feature pass 2026-08-27): the payer said מזומן or
     // צ׳קים; these are the manager's ✓ and ✗.

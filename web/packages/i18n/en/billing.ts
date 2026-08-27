@@ -26,6 +26,7 @@ export const billing: Bundle = {
   'card.oldestFirst': 'The oldest charges are selected, across every child you pay for',
 
   'standingOrder.link': 'Set up a standing order',
+  'standingOrder.linkFor': 'Set up a standing order for {{name}}',
   'standingOrder.instructions': 'The mandate is created on the payment provider’s site',
   'standingOrder.activeWarning': 'A standing order is already active — check you are not paying twice',
   'standingOrder.notConfirmable': 'Standing-order payments are recorded by the club once received',
@@ -174,6 +175,15 @@ export const billing: Bundle = {
   'plan.empty': 'No plans defined',
   'plan.versionedHint': 'Changing a price closes the current plan and opens a new one. Past charges are preserved',
   'plan.closeCurrent': 'Close the current plan',
+
+  'plan.standingOrderLink': 'Standing-order link',
+  'plan.linkMissing': 'Link missing',
+  'plan.linkHint': 'The link created on the payment provider’s site for this plan’s amount',
+  'plan.linkNeverInherited': 'A new plan always opens without a link — a payment link charges a fixed amount, and copying it would collect the old price',
+  'plan.linkRefused': 'The link was refused — an https address on the payment provider’s domain is required',
+  'plan.linkSaved': 'Link saved',
+  'plan.linksTitle': 'Standing-order links',
+  'plan.linksEmpty': 'No active plans',
 
   // -- the product catalog and handing an item over (12e, 11a) -------------------
   'product.title': 'Items for sale',

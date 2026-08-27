@@ -41,6 +41,19 @@ describe('SettingsScreen', () => {
     }
   })
 
+  it('opens the payments section, which owns the standing-order links', async () => {
+    // Payment-routes §5 -- the canonical editor for `price_plan.standing_order_link_url`.
+    // It goes HERE rather than on 5a because the question this screen answers is 'how may
+    // a family pay this club', and the link is the answer for one of the routes.
+    stub()
+    render(<SettingsScreen locale="he" />)
+    const tab = await screen.findByTestId('settings-section-payments')
+    expect(tab).toBeEnabled()
+    await userEvent.click(tab)
+    expect(await screen.findByTestId('settings-panel-payments')).toBeInTheDocument()
+    expect(screen.getByTestId('standing-order-links')).toBeInTheDocument()
+  })
+
   it('disables the sections that are not built yet and labels them', async () => {
     stub()
     render(<SettingsScreen locale="he" />)

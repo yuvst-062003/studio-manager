@@ -80,7 +80,7 @@ def _progress(studio: Studio) -> dict[str, Any]:
 def _save(studio: Studio, progress: dict[str, Any]) -> None:
     """Merge into `settings`, never replace it.
 
-    `settings` is shared JSONB -- standing_order_link, cash_instructions, billing_day and
+    `settings` is shared JSONB -- cash_instructions, billing_day and
     retention_months all live there. A whole-column assignment would drop them silently,
     and the loss would surface in a billing run rather than here.
 

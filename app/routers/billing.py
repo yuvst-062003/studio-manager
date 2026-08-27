@@ -71,6 +71,7 @@ from app.services.billing.errors import ConflictError, NotFoundError, RefusedErr
 from app.services.billing.orders import OrderService
 from app.services.billing.reconciliation import ReconciliationService
 from app.services.billing.run import BillingRunService
+from app.services.people.students import StudentService
 
 router = APIRouter(tags=["billing"])
 
@@ -159,6 +160,10 @@ def _plan_out(plan: PricePlan) -> PricePlanOut:
         registration_fee_agorot=plan.registration_fee_agorot or 0,
         active_from=plan.active_from,
         active_to=plan.active_to,
+        # Shown to the manager in FULL, never as a "link set" checkmark: a typo in a
+        # payment URL has to be visible without clicking it. Not a secret and not scrubbed;
+        # it is a page any payer is meant to reach.
+        standing_order_link_url=plan.standing_order_link_url,
     )
 
 
@@ -253,6 +258,56 @@ def create_price_plan(
         studio_id=studio_id,
         actor_person_id=_actor(request),
         diff={"monthly_amount_agorot": plan.monthly_amount_agorot},
+    )
+    session.commit()
+    return _plan_out(plan)
+
+
+class StandingOrderLinkIn(BaseModel):
+    """The one in-place edit `price_plan` allows. `null` clears the link.
+
+    Its own route rather than a general `PATCH /price-plans/{id}`: this table is versioned
+    and never edited in place, and a generic patch shape would be an invitation to add
+    `monthly_amount_agorot` to it -- which is the edit `close_price_plan` exists to
+    prevent. A route named after the one legal field cannot grow that way by accident.
+    """
+
+    url: str | None = Field(default=None, max_length=500)
+
+
+@router.put(
+    "/price-plans/{plan_id}/standing-order-link",
+    response_model=PricePlanOut,
+)
+def set_standing_order_link(
+    _: ManagerOrOwner,
+    plan_id: uuid.UUID,
+    body: StandingOrderLinkIn,
+    request: Request,
+    session: TenantSessionDep,
+    idempotency_key: IdempotencyKey = None,
+) -> PricePlanOut:
+    """Payment-routes spec §5 -- Dashboard → Settings → Payments, and the wizard's prices
+    step. Audited on every write, because that is what makes an in-place edit safe on a
+    versioned table: the history lives in `audit_log` rather than in extra plan rows."""
+    try:
+        plan = CatalogueService(session).set_standing_order_link(plan_id, body.url)
+    except NotFoundError as exc:
+        raise _not_found("price plan") from exc
+    except RefusedError as exc:
+        raise _refused(exc) from exc
+    AuditService.record(
+        session,
+        action="price_plan.set_standing_order_link",
+        entity_type="price_plan",
+        entity_id=plan_id,
+        studio_id=require_current_studio_id(),
+        actor_person_id=_actor(request),
+        # The URL itself, because "someone changed the link" with no value is an entry
+        # that cannot answer the question it exists for. It is a public payment page, not
+        # a credential, and `diff` is written verbatim -- never a log message (the project
+        # rule: an f-string has no key for the scrubber to match).
+        diff={"standing_order_link_url": plan.standing_order_link_url},
     )
     session.commit()
     return _plan_out(plan)
@@ -622,6 +677,61 @@ def my_charges(
     )
 
 
+class StandingOrderLinkOut(BaseModel):
+    """One row per child whose ACTIVE plan carries a link.
+
+    Labelled with the child and the plan because a payer may have two children on two
+    plans: one bare link would have them sign one mandate and underpay for the other child
+    every month. `amount_agorot` travels with it so the parent can see WHICH mandate they
+    are about to sign -- a uPay shared link charges a fixed amount and does not say so.
+    """
+
+    student_name: str
+    plan_name: str
+    amount_agorot: int
+    url: str
+
+
+class StandingOrderLinkListOut(BaseModel):
+    items: list[StandingOrderLinkOut]
+
+
+@router.get("/me/standing-order-links", response_model=StandingOrderLinkListOut)
+def my_standing_order_links(
+    request: Request, session: TenantSessionDep
+) -> StandingOrderLinkListOut:
+    """Payment-routes spec §6 -- **this payer's own children only.**
+
+    The full catalogue is never exposed here: a 300 ₪ payer who could see the 550 ₪ link
+    could sign the 550 ₪ mandate by accident, and the club would collect from a family
+    that never agreed to it. Closed plans are excluded by `links_for_students`, because a
+    student still pointing at last year's plan would otherwise be handed a link at last
+    year's amount.
+
+    No role dependency, like every other `/me/*` read -- §3.1: "guardian is not a role".
+
+    **Read live, never precached.** The parent app is an installed PWA and the rest of
+    this screen is cache-friendly; a stale payment link is not a stale roster, it sends a
+    family to sign a mandate at the wrong amount and neither they nor the manager finds
+    out until the reconciliation queue disagrees months later.
+    """
+    students = StudentService.for_guardian(session, person_id=_caller(request))
+    by_id = {row.id: row for row in students}
+    links = CatalogueService(session).links_for_students(list(by_id))
+    return StandingOrderLinkListOut(
+        items=[
+            StandingOrderLinkOut(
+                student_name=f"{by_id[student_id].first_name} {by_id[student_id].last_name}",
+                plan_name=plan.name,
+                amount_agorot=plan.monthly_amount_agorot,
+                # Not Optional: `links_for_students` only returns plans that have one.
+                url=plan.standing_order_link_url or "",
+            )
+            for student_id, plan in links
+        ]
+    )
+
+
 @router.get("/me/balance", response_model=PayerBalanceOut)
 def my_balance(request: Request, session: TenantSessionDep) -> PayerBalanceOut:
     """`12f`'s summary card. Negative is a family in credit, and `MoneyDisplay` wraps the
@@ -732,21 +842,31 @@ SETTINGS_KEY = "billing"
 
 
 class BillingSettingsOut(BaseModel):
-    """§5.10's three studio-level settings.
+    """The studio-level billing settings.
 
-    `standing_order_link` is the shared recurring link the manager created once in the uPay
-    dashboard and pasted here -- G8: we cannot create one, cannot vary its amount per payer,
-    and cannot tell from its callbacks who paid.
+    **There is deliberately no `standing_order_link` here.** There used to be -- one link
+    for the whole club -- and the payment-routes spec §13 removed it: a single link is a
+    link at ONE amount, and a uPay shared link cannot vary per payer (G8). A club with a
+    300, a 400 and a 550 plan pointed at one link collects 300 from everyone. The link
+    belongs to the plan (`price_plan.standing_order_link_url`), one per amount, which is
+    what the club's own letter already describes when it says "links", plural.
+
+    It is also why nothing ever rendered the old field: `PaymentsSection` hardcoded the
+    parent screen's link to null for as long as it existed. A settings key a manager can
+    fill in and no parent can ever see is worse than no key at all.
     """
 
-    standing_order_link: str | None = None
     cash_instructions: str | None = None
     #: Which day of the month the run fires on. §5.10: 'a configurable day (default the 1st)'.
     run_day: int = 1
 
+    #: Tolerated on the way IN, dropped on the way out. `_settings_of` reads whatever JSONB
+    #: is in the column, and a studio that was configured before §13 still has the old key
+    #: sitting there; without this the first read after deploy is a 500.
+    model_config = {"extra": "ignore"}
+
 
 class BillingSettingsPatch(BaseModel):
-    standing_order_link: str | None = Field(default=None, max_length=500)
     cash_instructions: str | None = Field(default=None, max_length=1000)
     #: 1..28, not 1..31. A run day of the 30th never fires in February, which is a month
     #: nobody is billed and nobody notices until March.

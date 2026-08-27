@@ -13,7 +13,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { apiFetch } from '@studio/core'
 import type { Locale } from '@studio/i18n'
 import { PaymentsScreen } from './PaymentsScreen'
-import type { DebtRow } from './PaymentsScreen'
+import type { DebtRow, StandingOrderLink } from './PaymentsScreen'
 import type {
   BillingClient,
   ChargeOut,
@@ -25,6 +25,9 @@ import type {
 } from './billingClient'
 
 type Fetcher = (path: string, init?: RequestInit) => Promise<Response>
+
+/** `GET /me/standing-order-links` on the wire. Snake case here, camel at the screen. */
+type WireLink = { student_name: string; plan_name: string; amount_agorot: number; url: string }
 
 const JSON_HEADERS = { 'Content-Type': 'application/json' }
 
@@ -111,6 +114,7 @@ export function PaymentsSection({ locale }: { locale: Locale }) {
   const [debts, setDebts] = useState<readonly DebtRow[]>([])
   const [standingOrder, setStandingOrder] = useState(false)
   const [promises, setPromises] = useState<readonly PaymentPromiseOut[]>([])
+  const [standingOrderLinks, setStandingOrderLinks] = useState<readonly StandingOrderLink[]>([])
   const [loaded, setLoaded] = useState(false)
   // Bumped to re-read after an order opens. A counter rather than calling the loader
   // directly, so there is exactly one place that writes `debts` — `react-hooks`'
@@ -121,7 +125,7 @@ export function PaymentsSection({ locale }: { locale: Locale }) {
   useEffect(() => {
     let alive = true
     void (async () => {
-      const [charges, promiseRows, mandate, children] = await Promise.all([
+      const [charges, promiseRows, mandate, children, links] = await Promise.all([
         client.openCharges(''),
         // The payer's own promises, both routes, beside the charges: a pending one badges
         // its rows and swaps its card's button for a status; a declined one is said out
@@ -143,6 +147,15 @@ export function PaymentsSection({ locale }: { locale: Locale }) {
               : { items: [] },
           )
           .catch(() => ({ items: [] as { id: string; first_name: string; last_name: string }[] })),
+        // Payment-routes §6/§7 -- the הוראת קבע links for THIS payer's own children, read
+        // LIVE on every visit to the screen. Deliberately not part of any precache or
+        // offline bootstrap: a stale roster is an inconvenience, a stale payment link
+        // sends a family to sign a mandate at the wrong amount and nobody finds out until
+        // the reconciliation queue disagrees months later. `vite.config.ts` declares no
+        // `runtimeCaching`, and ParentBilling.test.tsx asserts that at the source.
+        apiFetch('/api/v1/me/standing-order-links')
+          .then((r) => (r.ok ? (r.json() as Promise<{ items: WireLink[] }>) : { items: [] }))
+          .catch(() => ({ items: [] as WireLink[] })),
       ])
       const nameOf = new Map(
         children.items.map((child) => [child.id, `${child.first_name} ${child.last_name}`]),
@@ -150,6 +163,14 @@ export function PaymentsSection({ locale }: { locale: Locale }) {
       if (!alive) return
       setStandingOrder(mandate.active)
       setPromises(promiseRows)
+      setStandingOrderLinks(
+        links.items.map((link) => ({
+          studentName: link.student_name,
+          planName: link.plan_name,
+          amountAgorot: link.amount_agorot,
+          url: link.url,
+        })),
+      )
       setDebts(
         charges.map((charge) => ({
           charge,
@@ -181,11 +202,12 @@ export function PaymentsSection({ locale }: { locale: Locale }) {
       client={client}
       debts={debts}
       hasActiveSubscription={standingOrder}
-      // `GET /billing/settings` is manager-only, so the shared uPay mandate link and the
-      // studio's own cash instructions have no payer-facing source yet. The screen falls
-      // back to the default copy rather than showing a parent a 403; neither blocks a
-      // payment, unlike the three reads that used to.
-      standingOrderLink={null}
+      standingOrderLinks={standingOrderLinks}
+      // `GET /billing/settings` is manager-only, so the studio's own cash instructions
+      // still have no payer-facing source. The screen falls back to the default copy
+      // rather than showing a parent a 403. The standing-order link no longer falls back
+      // to anything: it has a source of its own now, one per plan, per §13's refusal to
+      // have a single studio-wide link at one amount.
       cashInstructions={null}
       promises={promises}
       onPaymentPromise={async (chargeIds, promiseMethod) => {

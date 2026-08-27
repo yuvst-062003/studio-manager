@@ -80,7 +80,14 @@ function renderPay(props: Partial<Parameters<typeof PaymentsScreen>[0]> = {}) {
       client={stubClient()}
       debts={[debt('c1', 9), debt('c2', 10)]}
       hasActiveSubscription={false}
-      standingOrderLink="https://app.upay.co.il/recurring/abc"
+      standingOrderLinks={[
+        {
+          studentName: 'דנה',
+          planName: 'פעמיים בשבוע',
+          amountAgorot: 30_000,
+          url: 'https://app.upay.co.il/recurring/300',
+        },
+      ]}
       cashInstructions={null}
       onOrderOpened={vi.fn()}
       onOpenHistory={vi.fn()}
@@ -157,8 +164,9 @@ describe('1b — the pay screen', () => {
     // a boundary between two perfectly correct amounts.
     const { container } = renderPay()
     const amounts = [...container.querySelectorAll('.studio-money')]
-    // Two debt rows, the open-debts total, and the card route's selection total.
-    expect(amounts.length).toBe(4)
+    // Two debt rows, the open-debts total, the card route's selection total, and the one
+    // standing-order link's monthly amount.
+    expect(amounts.length).toBe(5)
     for (const amount of amounts) {
       expect(amount.textContent).not.toMatch(/₪\d/)
       expect(amount.querySelector('bdi')).not.toBeNull()
@@ -198,6 +206,82 @@ function promise(
     ...overrides,
   }
 }
+
+describe('1b — the standing-order links', () => {
+  // Part A of the payment-routes spec. The card and the string existed since W4 and the
+  // section hardcoded the prop to null, so no parent has ever seen a link — this is the
+  // missing SOURCE, and its shape is a LIST because a uPay link carries a fixed amount.
+  const TWO = [
+    {
+      studentName: 'דנה',
+      planName: 'פעמיים בשבוע',
+      amountAgorot: 30_000,
+      url: 'https://app.upay.co.il/recurring/300',
+    },
+    {
+      studentName: 'יוסי',
+      planName: 'כל יום',
+      amountAgorot: 55_000,
+      url: 'https://app.upay.co.il/recurring/550',
+    },
+  ]
+
+  it('gives a payer one labelled link per child, never one bare link', () => {
+    // §6 — a parent with a child on 300 and a child on 550 needs BOTH, labelled. One link
+    // has them sign one mandate and underpay for the other child every month, and nothing
+    // reports it until the reconciliation queue disagrees months later.
+    renderPay({ standingOrderLinks: TWO })
+    const links = screen.getAllByTestId('standing-order-link')
+    expect(links).toHaveLength(2)
+    expect(links[0]).toHaveAttribute('href', 'https://app.upay.co.il/recurring/300')
+    expect(links[1]).toHaveAttribute('href', 'https://app.upay.co.il/recurring/550')
+  })
+
+  it('names the child in each link, because the link text alone repeats', () => {
+    // SC 2.4.4: two anchors reading 'קישור להקמת הוראת קבע' are two links a screen-reader
+    // user cannot tell apart — and telling them apart is the entire point of the list.
+    renderPay({ standingOrderLinks: TWO })
+    const links = screen.getAllByTestId('standing-order-link')
+    expect(links[0]).toHaveAccessibleName(expect.stringContaining('דנה'))
+    expect(links[1]).toHaveAccessibleName(expect.stringContaining('יוסי'))
+  })
+
+  it('shows the amount each mandate will charge', () => {
+    // A uPay shared link charges a FIXED amount and never says which. A parent signing
+    // one is committing to a monthly figure the page they land on may not show them.
+    renderPay({ standingOrderLinks: TWO })
+    const card = screen.getByTestId('route-standing-order')
+    expect(within(card).getAllByText('דנה')).toHaveLength(1)
+    expect(card.querySelectorAll('.studio-money')).toHaveLength(2)
+  })
+
+  it('is never served from the service worker cache', async () => {
+    // §7 — the link is read live on every visit. This app is an installed PWA and the rest
+    // of the screen is cache-friendly, but a stale payment link is not a stale roster: it
+    // sends a family to sign a mandate at the wrong amount, and neither they nor the
+    // manager finds out until the reconciliation queue disagrees months later.
+    //
+    // Read from the SOURCE, the way `packages/core/src/offline/cache.test.ts` reads its
+    // own: the rule is 'no runtimeCaching rule exists for the API', and that is a fact
+    // about the config file rather than about anything a render can observe.
+    const config = (await import('../../../vite.config.ts?raw')).default as string
+    expect(config).not.toContain('runtimeCaching')
+    // And the precache glob is built assets only -- no JSON, so no API response.
+    expect(config).toMatch(/globPatterns:\s*\['\*\*\/\*\.\{js,css,html,woff2,png,svg,webmanifest\}'\]/)
+  })
+
+  it('renders the card with no anchor when no plan has a link', () => {
+    // §3.2's degradation, and the reason NULL is safe: the card keeps its instructions and
+    // loses its anchor. Exactly what the screen has always done, so the empty case is not
+    // a special case.
+    renderPay({ standingOrderLinks: [] })
+    expect(screen.getByTestId('route-standing-order')).toBeInTheDocument()
+    expect(screen.queryByTestId('standing-order-link')).not.toBeInTheDocument()
+    expect(screen.getByTestId('route-standing-order')).toHaveTextContent(
+      t(LOCALE, 'billing.standingOrder.instructions'),
+    )
+  })
+})
 
 describe('1b — the two hand-carried routes', () => {
   // The payment-routes spec §8: cheques are cash with a different word on the payment.

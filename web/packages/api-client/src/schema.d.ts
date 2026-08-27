@@ -1723,6 +1723,39 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/standing-order-links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Standing Order Links
+         * @description Payment-routes spec §6 -- **this payer's own children only.**
+         *
+         *     The full catalogue is never exposed here: a 300 ₪ payer who could see the 550 ₪ link
+         *     could sign the 550 ₪ mandate by accident, and the club would collect from a family
+         *     that never agreed to it. Closed plans are excluded by `links_for_students`, because a
+         *     student still pointing at last year's plan would otherwise be handed a link at last
+         *     year's amount.
+         *
+         *     No role dependency, like every other `/me/*` read -- §3.1: "guardian is not a role".
+         *
+         *     **Read live, never precached.** The parent app is an installed PWA and the rest of
+         *     this screen is cache-friendly; a stale payment link is not a stale roster, it sends a
+         *     family to sign a mandate at the wrong amount and neither they nor the manager finds
+         *     out until the reconciliation queue disagrees months later.
+         */
+        get: operations["my_standing_order_links_api_v1_me_standing_order_links_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/students": {
         parameters: {
             query?: never;
@@ -2305,6 +2338,28 @@ export interface paths {
          *     SUCCESSOR, which is the row `5a` then renders as current.
          */
         post: operations["close_price_plan_api_v1_price_plans__plan_id__close_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/price-plans/{plan_id}/standing-order-link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Standing Order Link
+         * @description Payment-routes spec §5 -- Dashboard → Settings → Payments, and the wizard's prices
+         *     step. Audited on every write, because that is what makes an in-place edit safe on a
+         *     versioned table: the history lives in `audit_log` rather than in extra plan rows.
+         */
+        put: operations["set_standing_order_link_api_v1_price_plans__plan_id__standing_order_link_put"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -4377,11 +4432,18 @@ export interface components {
         };
         /**
          * BillingSettingsOut
-         * @description §5.10's three studio-level settings.
+         * @description The studio-level billing settings.
          *
-         *     `standing_order_link` is the shared recurring link the manager created once in the uPay
-         *     dashboard and pasted here -- G8: we cannot create one, cannot vary its amount per payer,
-         *     and cannot tell from its callbacks who paid.
+         *     **There is deliberately no `standing_order_link` here.** There used to be -- one link
+         *     for the whole club -- and the payment-routes spec §13 removed it: a single link is a
+         *     link at ONE amount, and a uPay shared link cannot vary per payer (G8). A club with a
+         *     300, a 400 and a 550 plan pointed at one link collects 300 from everyone. The link
+         *     belongs to the plan (`price_plan.standing_order_link_url`), one per amount, which is
+         *     what the club's own letter already describes when it says "links", plural.
+         *
+         *     It is also why nothing ever rendered the old field: `PaymentsSection` hardcoded the
+         *     parent screen's link to null for as long as it existed. A settings key a manager can
+         *     fill in and no parent can ever see is worse than no key at all.
          */
         BillingSettingsOut: {
             /** Cash Instructions */
@@ -4391,8 +4453,6 @@ export interface components {
              * @default 1
              */
             run_day: number;
-            /** Standing Order Link */
-            standing_order_link?: string | null;
         };
         /** BillingSettingsPatch */
         BillingSettingsPatch: {
@@ -4400,8 +4460,6 @@ export interface components {
             cash_instructions?: string | null;
             /** Run Day */
             run_day?: number | null;
-            /** Standing Order Link */
-            standing_order_link?: string | null;
         };
         /** Body_upload_logo_api_v1_studio_logo_post */
         Body_upload_logo_api_v1_studio_logo_post: {
@@ -6984,6 +7042,8 @@ export interface components {
             registration_fee_agorot: number;
             /** Sessions Per Week */
             sessions_per_week: number;
+            /** Standing Order Link Url */
+            standing_order_link_url?: string | null;
         };
         /** ProductIn */
         ProductIn: {
@@ -8056,6 +8116,43 @@ export interface components {
              * @description Always null in M1. Weekly load is group_schedule_rule × session, both W2 contract models. Zero would report an idle coach rather than a missing measurement.
              */
             weekly_hours?: number | null;
+        };
+        /**
+         * StandingOrderLinkIn
+         * @description The one in-place edit `price_plan` allows. `null` clears the link.
+         *
+         *     Its own route rather than a general `PATCH /price-plans/{id}`: this table is versioned
+         *     and never edited in place, and a generic patch shape would be an invitation to add
+         *     `monthly_amount_agorot` to it -- which is the edit `close_price_plan` exists to
+         *     prevent. A route named after the one legal field cannot grow that way by accident.
+         */
+        StandingOrderLinkIn: {
+            /** Url */
+            url?: string | null;
+        };
+        /** StandingOrderLinkListOut */
+        StandingOrderLinkListOut: {
+            /** Items */
+            items: components["schemas"]["StandingOrderLinkOut"][];
+        };
+        /**
+         * StandingOrderLinkOut
+         * @description One row per child whose ACTIVE plan carries a link.
+         *
+         *     Labelled with the child and the plan because a payer may have two children on two
+         *     plans: one bare link would have them sign one mandate and underpay for the other child
+         *     every month. `amount_agorot` travels with it so the parent can see WHICH mandate they
+         *     are about to sign -- a uPay shared link charges a fixed amount and does not say so.
+         */
+        StandingOrderLinkOut: {
+            /** Amount Agorot */
+            amount_agorot: number;
+            /** Plan Name */
+            plan_name: string;
+            /** Student Name */
+            student_name: string;
+            /** Url */
+            url: string;
         };
         /** StudentBeltIn */
         StudentBeltIn: {
@@ -11863,6 +11960,26 @@ export interface operations {
             };
         };
     };
+    my_standing_order_links_api_v1_me_standing_order_links_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StandingOrderLinkListOut"];
+                };
+            };
+        };
+    };
     my_students_api_v1_me_students_get: {
         parameters: {
             query?: never;
@@ -12793,6 +12910,44 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PricePlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_standing_order_link_api_v1_price_plans__plan_id__standing_order_link_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                plan_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StandingOrderLinkIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };

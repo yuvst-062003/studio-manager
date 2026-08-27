@@ -80,6 +80,10 @@ class PricePlanOut(BaseModel):
     registration_fee_agorot: int
     active_from: date
     active_to: date | None
+    #: The הוראת קבע link for this plan, or null. Shown to the manager in FULL rather than
+    #: as a "link set" flag, so a typo is visible without clicking it; a NULL on an ACTIVE
+    #: plan is what the dashboard badges as "link missing".
+    standing_order_link_url: str | None = None
 
 
 class ProductOut(BaseModel):

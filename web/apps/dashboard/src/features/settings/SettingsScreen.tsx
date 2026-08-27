@@ -24,12 +24,13 @@
 // the mockup and this panel now agree and nobody has to discover the rule from a comment.
 // tests/contracts/test_canvas_matches_spec.py fails if the canvas regains it.
 // ─────────────────────────────────────────────────────────────────────────────
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import { apiFetch } from '@studio/core'
 import { Card, Switch, TextField } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
+import { StandingOrderLinksPanel, makeDashboardBillingClient } from '../billing'
 
 type StudioDetails = {
   name: string
@@ -46,7 +47,9 @@ type StudioDetails = {
 const SECTIONS = [
   { key: 'studio', owned: true },
   { key: 'prices', owned: false },
-  { key: 'payments', owned: false },
+  // Owned since the 2026-08-27 payment-routes pass: this is where the הוראת קבע link per
+  // price plan is set. One screen answers "how may a family pay this club".
+  { key: 'payments', owned: true },
   { key: 'documents', owned: false },
   { key: 'attendance', owned: false },
   { key: 'notifications', owned: false },
@@ -110,6 +113,9 @@ export function SettingToggle({
 
 export function SettingsScreen({ locale }: { locale: Locale }) {
   const [section, setSection] = useState<string>('studio')
+  // One client for the panel's lifetime; `useMemo` rather than a module constant so a test
+  // stubbing `fetch` gets the stub, the way every other section here does.
+  const billingClient = useMemo(() => makeDashboardBillingClient(apiFetch), [])
   const [details, setDetails] = useState<StudioDetails | null>(null)
   const [saveState, setSaveState] = useState<'idle' | 'saved' | 'failed'>('idle')
 
@@ -175,6 +181,11 @@ export function SettingsScreen({ locale }: { locale: Locale }) {
           </ul>
         </nav>
 
+        {section === 'payments' ? (
+          <div data-testid="settings-panel-payments">
+            <StandingOrderLinksPanel locale={locale} client={billingClient} />
+          </div>
+        ) : (
         <Card>
           {details === null ? (
             <p data-testid="settings-loading">{t(locale, 'common.setup.loading')}</p>
@@ -244,6 +255,7 @@ export function SettingsScreen({ locale }: { locale: Locale }) {
             </div>
           )}
         </Card>
+        )}
       </div>
     </section>
   )

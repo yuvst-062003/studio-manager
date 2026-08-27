@@ -20,7 +20,7 @@
 // docstring calls that distinction real money, and it is: sending `0` for a blank box would
 // quietly waive every studio's registration fee.
 import { useEffect, useMemo, useState } from 'react'
-import { Button, EmptyState, MoneyDisplay, TextField } from '@studio/ui'
+import { Button, EmptyState, MoneyDisplay, StatusChip, TextField } from '@studio/ui'
 import { parseShekels } from '@studio/core'
 import { t } from '@studio/i18n'
 import { fill } from './client'
@@ -180,6 +180,19 @@ export function PricesStep({
                 <tr key={plan.id} data-testid="rollover-plan-row">
                   <th scope="row" style={cellStyle}>
                     {plan.name}
+                    {/* §3.2 where it BITES. Repricing closes this plan and opens a
+                        successor with a deliberately NULL link -- a payment link charges a
+                        fixed amount, so inheriting it would sign every family up at last
+                        year's price. The manager would otherwise leave this step with
+                        every link gone and no reason to suspect it. */}
+                    {plan.standing_order_link_url === null && plan.active_to === null ? (
+                      <span data-testid={`rollover-plan-link-missing-${plan.id}`}>
+                        <StatusChip
+                          status="pending"
+                          label={t(locale, 'billing.plan.linkMissing')}
+                        />
+                      </span>
+                    ) : null}
                   </th>
                   <td style={cellStyle} data-testid={`rollover-plan-current-${plan.id}`}>
                     <MoneyDisplay agorot={plan.monthly_amount_agorot} label={plan.name} />

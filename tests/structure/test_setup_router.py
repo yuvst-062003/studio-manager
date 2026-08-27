@@ -98,7 +98,7 @@ def test_writing_progress_does_not_clobber_the_rest_of_settings(
     client, as_owner, app_session
 ) -> None:
     """`settings` is shared JSONB. A whole-column overwrite would silently drop
-    standing_order_link, billing_day and retention_months."""
+    cash_instructions, billing_day and retention_months."""
     studio = app_session.get(Studio, as_owner.studio_id)
     studio.settings = {**(studio.settings or {}), "billing_day": 10}
     app_session.commit()
