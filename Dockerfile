@@ -22,6 +22,14 @@ COPY infra/railway/domains.json ./infra/railway/domains.json
 COPY alembic.ini ./alembic.ini
 COPY alembic ./alembic
 
+# The same sentence as the paragraph above, applied to the two scripts that also have to
+# reach the private database: `railway ssh --service api` is the only shell that can, so
+# a script absent from this image is a script that cannot be run against a deployed
+# environment at all. By name rather than the whole directory -- the rest of scripts/ is
+# a developer's shell tooling, and the runtime image carries no more of it than line 16
+# carries of infra/.
+COPY scripts/bootstrap-owner.py scripts/verify-db-roles.py ./scripts/
+
 ENV PORT=8000
 EXPOSE 8000
 
