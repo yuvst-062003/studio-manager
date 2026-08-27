@@ -681,62 +681,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/cash-requests": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Cash Requests */
-        get: operations["list_cash_requests_api_v1_cash_requests_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/cash-requests/{request_id}/confirm": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Confirm Cash Request
-         * @description ✓ -- the notes changed hands. Records the cash payment over what is still owed and
-         *     settles exactly the request's charges; see CashService.confirm for the partial-payment
-         *     rule.
-         */
-        post: operations["confirm_cash_request_api_v1_cash_requests__request_id__confirm_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/cash-requests/{request_id}/decline": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Decline Cash Request */
-        post: operations["decline_cash_request_api_v1_cash_requests__request_id__decline_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/charges": {
         parameters: {
             query?: never;
@@ -1588,29 +1532,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/me/cash-requests": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** My Cash Requests */
-        get: operations["my_cash_requests_api_v1_me_cash_requests_get"];
-        put?: never;
-        /**
-         * Raise Cash Request
-         * @description 'אני אשלם במזומן' -- over these exact charges. The payer is the session, never the
-         *     body, for the same reason payment orders do it: a body-supplied payer would let anyone
-         *     volunteer anyone else's debt.
-         */
-        post: operations["raise_cash_request_api_v1_me_cash_requests_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/me/charges": {
         parameters: {
             query?: never;
@@ -1707,6 +1628,29 @@ export interface paths {
          *     never take a payer from the body.
          */
         post: operations["order_items_api_v1_me_orders_items_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/payment-promises": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My Payment Promises */
+        get: operations["my_payment_promises_api_v1_me_payment_promises_get"];
+        put?: never;
+        /**
+         * Raise Payment Promise
+         * @description 'אני אשלם במזומן' / 'אני אביא צ'קים' -- over these exact charges. The payer is the
+         *     session, never the body, for the same reason payment orders do it: a body-supplied
+         *     payer would let anyone volunteer anyone else's debt.
+         */
+        post: operations["raise_payment_promise_api_v1_me_payment_promises_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2142,6 +2086,62 @@ export interface paths {
         get: operations["read_payment_order_form_api_v1_payment_orders__public_ref__form_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payment-promises": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Payment Promises */
+        get: operations["list_payment_promises_api_v1_payment_promises_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payment-promises/{promise_id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm Payment Promise
+         * @description ✓ -- the money changed hands. Records the payment over what is still owed and
+         *     settles exactly the promise's charges; see PaymentPromiseService.confirm for the
+         *     partial-payment rule.
+         */
+        post: operations["confirm_payment_promise_api_v1_payment_promises__promise_id__confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payment-promises/{promise_id}/decline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Decline Payment Promise */
+        post: operations["decline_payment_promise_api_v1_payment_promises__promise_id__decline_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4576,37 +4576,6 @@ export interface components {
              */
             student_id: string;
         };
-        /** CashRequestCreateIn */
-        CashRequestCreateIn: {
-            /** Charge Ids */
-            charge_ids: string[];
-        };
-        /** CashRequestListOut */
-        CashRequestListOut: {
-            /** Items */
-            items: components["schemas"]["CashRequestOut"][];
-        };
-        /** CashRequestOut */
-        CashRequestOut: {
-            /** Charge Ids */
-            charge_ids: string[];
-            /**
-             * Created At
-             * Format: date-time
-             */
-            created_at: string;
-            /** Decided At */
-            decided_at: string | null;
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-            /** Status */
-            status: string;
-            /** Total Agorot */
-            total_agorot: number;
-        };
         /**
          * ChargeAdjustmentIn
          * @description A correction, recorded as a new fact. §5.10 makes a credit a negative amount
@@ -6333,13 +6302,13 @@ export interface components {
             /** Notes */
             notes: string | null;
         };
-        /** ManagerCashRequestListOut */
-        ManagerCashRequestListOut: {
+        /** ManagerPaymentPromiseListOut */
+        ManagerPaymentPromiseListOut: {
             /** Items */
-            items: components["schemas"]["ManagerCashRequestOut"][];
+            items: components["schemas"]["ManagerPaymentPromiseOut"][];
         };
-        /** ManagerCashRequestOut */
-        ManagerCashRequestOut: {
+        /** ManagerPaymentPromiseOut */
+        ManagerPaymentPromiseOut: {
             /** Charge Count */
             charge_count: number;
             /**
@@ -6352,6 +6321,8 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /** Method */
+            method: string;
             /** Payer Name */
             payer_name: string;
             /**
@@ -6410,7 +6381,7 @@ export interface components {
              * Method
              * @enum {string}
              */
-            method: "standing_order" | "bank_transfer" | "cash" | "credit_adjustment";
+            method: "standing_order" | "bank_transfer" | "cash" | "cheque" | "credit_adjustment";
             /** Note */
             note?: string | null;
             /**
@@ -6860,7 +6831,7 @@ export interface components {
              * Method
              * @enum {string}
              */
-            method: "upay_card" | "standing_order" | "bank_transfer" | "cash" | "credit_adjustment";
+            method: "upay_card" | "standing_order" | "bank_transfer" | "cash" | "cheque" | "credit_adjustment";
             /** Note */
             note: string | null;
             /**
@@ -6881,6 +6852,45 @@ export interface components {
             reversal_reason: string | null;
             /** Reversed At */
             reversed_at: string | null;
+        };
+        /** PaymentPromiseCreateIn */
+        PaymentPromiseCreateIn: {
+            /** Charge Ids */
+            charge_ids: string[];
+            /**
+             * Method
+             * @default cash
+             * @enum {string}
+             */
+            method: "cash" | "cheque";
+        };
+        /** PaymentPromiseListOut */
+        PaymentPromiseListOut: {
+            /** Items */
+            items: components["schemas"]["PaymentPromiseOut"][];
+        };
+        /** PaymentPromiseOut */
+        PaymentPromiseOut: {
+            /** Charge Ids */
+            charge_ids: string[];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Decided At */
+            decided_at: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Method */
+            method: string;
+            /** Status */
+            status: string;
+            /** Total Agorot */
+            total_agorot: number;
         };
         /** PaymentReversalIn */
         PaymentReversalIn: {
@@ -10053,99 +10063,6 @@ export interface operations {
             };
         };
     };
-    list_cash_requests_api_v1_cash_requests_get: {
-        parameters: {
-            query?: {
-                status?: string | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ManagerCashRequestListOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    confirm_cash_request_api_v1_cash_requests__request_id__confirm_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                request_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CashRequestOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    decline_cash_request_api_v1_cash_requests__request_id__decline_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                request_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CashRequestOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     list_charges_api_v1_charges_get: {
         parameters: {
             query?: {
@@ -11703,59 +11620,6 @@ export interface operations {
             };
         };
     };
-    my_cash_requests_api_v1_me_cash_requests_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CashRequestListOut"];
-                };
-            };
-        };
-    };
-    raise_cash_request_api_v1_me_cash_requests_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CashRequestCreateIn"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CashRequestOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     my_charges_api_v1_me_charges_get: {
         parameters: {
             query?: {
@@ -11861,6 +11725,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ItemOrderOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_payment_promises_api_v1_me_payment_promises_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentPromiseListOut"];
+                };
+            };
+        };
+    };
+    raise_payment_promise_api_v1_me_payment_promises_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PaymentPromiseCreateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentPromiseOut"];
                 };
             };
             /** @description Validation Error */
@@ -12455,6 +12372,100 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UpayFormOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_payment_promises_api_v1_payment_promises_get: {
+        parameters: {
+            query?: {
+                status?: string | null;
+                method?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManagerPaymentPromiseListOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_payment_promise_api_v1_payment_promises__promise_id__confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                promise_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentPromiseOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    decline_payment_promise_api_v1_payment_promises__promise_id__decline_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                promise_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentPromiseOut"];
                 };
             };
             /** @description Validation Error */

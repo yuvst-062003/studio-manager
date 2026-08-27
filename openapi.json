@@ -1285,93 +1285,6 @@
         "title": "CandidateOut",
         "type": "object"
       },
-      "CashRequestCreateIn": {
-        "properties": {
-          "charge_ids": {
-            "items": {
-              "format": "uuid",
-              "type": "string"
-            },
-            "maxItems": 50,
-            "minItems": 1,
-            "title": "Charge Ids",
-            "type": "array"
-          }
-        },
-        "required": [
-          "charge_ids"
-        ],
-        "title": "CashRequestCreateIn",
-        "type": "object"
-      },
-      "CashRequestListOut": {
-        "properties": {
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/CashRequestOut"
-            },
-            "title": "Items",
-            "type": "array"
-          }
-        },
-        "required": [
-          "items"
-        ],
-        "title": "CashRequestListOut",
-        "type": "object"
-      },
-      "CashRequestOut": {
-        "properties": {
-          "charge_ids": {
-            "items": {
-              "format": "uuid",
-              "type": "string"
-            },
-            "title": "Charge Ids",
-            "type": "array"
-          },
-          "created_at": {
-            "format": "date-time",
-            "title": "Created At",
-            "type": "string"
-          },
-          "decided_at": {
-            "anyOf": [
-              {
-                "format": "date-time",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Decided At"
-          },
-          "id": {
-            "format": "uuid",
-            "title": "Id",
-            "type": "string"
-          },
-          "status": {
-            "title": "Status",
-            "type": "string"
-          },
-          "total_agorot": {
-            "title": "Total Agorot",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "id",
-          "status",
-          "total_agorot",
-          "charge_ids",
-          "created_at",
-          "decided_at"
-        ],
-        "title": "CashRequestOut",
-        "type": "object"
-      },
       "ChargeAdjustmentIn": {
         "description": "A correction, recorded as a new fact. §5.10 makes a credit a negative amount\nrather than an edit to the original charge, so the ledger stays append-only and last\nmonth's statement does not change after a parent has read it.",
         "properties": {
@@ -5290,11 +5203,11 @@
         "title": "LocationOut",
         "type": "object"
       },
-      "ManagerCashRequestListOut": {
+      "ManagerPaymentPromiseListOut": {
         "properties": {
           "items": {
             "items": {
-              "$ref": "#/components/schemas/ManagerCashRequestOut"
+              "$ref": "#/components/schemas/ManagerPaymentPromiseOut"
             },
             "title": "Items",
             "type": "array"
@@ -5303,10 +5216,10 @@
         "required": [
           "items"
         ],
-        "title": "ManagerCashRequestListOut",
+        "title": "ManagerPaymentPromiseListOut",
         "type": "object"
       },
-      "ManagerCashRequestOut": {
+      "ManagerPaymentPromiseOut": {
         "properties": {
           "charge_count": {
             "title": "Charge Count",
@@ -5320,6 +5233,10 @@
           "id": {
             "format": "uuid",
             "title": "Id",
+            "type": "string"
+          },
+          "method": {
+            "title": "Method",
             "type": "string"
           },
           "payer_name": {
@@ -5343,13 +5260,14 @@
         "required": [
           "id",
           "status",
+          "method",
           "total_agorot",
           "payer_person_id",
           "payer_name",
           "charge_count",
           "created_at"
         ],
-        "title": "ManagerCashRequestOut",
+        "title": "ManagerPaymentPromiseOut",
         "type": "object"
       },
       "ManualChargeIn": {
@@ -5445,6 +5363,7 @@
               "standing_order",
               "bank_transfer",
               "cash",
+              "cheque",
               "credit_adjustment"
             ],
             "title": "Method",
@@ -6407,6 +6326,7 @@
               "standing_order",
               "bank_transfer",
               "cash",
+              "cheque",
               "credit_adjustment"
             ],
             "title": "Method",
@@ -6495,6 +6415,107 @@
           "reversal_reason"
         ],
         "title": "PaymentOut",
+        "type": "object"
+      },
+      "PaymentPromiseCreateIn": {
+        "properties": {
+          "charge_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Charge Ids",
+            "type": "array"
+          },
+          "method": {
+            "default": "cash",
+            "enum": [
+              "cash",
+              "cheque"
+            ],
+            "title": "Method",
+            "type": "string"
+          }
+        },
+        "required": [
+          "charge_ids"
+        ],
+        "title": "PaymentPromiseCreateIn",
+        "type": "object"
+      },
+      "PaymentPromiseListOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PaymentPromiseOut"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "PaymentPromiseListOut",
+        "type": "object"
+      },
+      "PaymentPromiseOut": {
+        "properties": {
+          "charge_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Charge Ids",
+            "type": "array"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "decided_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided At"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "method": {
+            "title": "Method",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "total_agorot": {
+            "title": "Total Agorot",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "method",
+          "total_agorot",
+          "charge_ids",
+          "created_at",
+          "decided_at"
+        ],
+        "title": "PaymentPromiseOut",
         "type": "object"
       },
       "PaymentReversalIn": {
@@ -12894,142 +12915,6 @@
         ]
       }
     },
-    "/api/v1/cash-requests": {
-      "get": {
-        "operationId": "list_cash_requests_api_v1_cash_requests_get",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "status",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Status"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ManagerCashRequestListOut"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "List Cash Requests",
-        "tags": [
-          "billing"
-        ]
-      }
-    },
-    "/api/v1/cash-requests/{request_id}/confirm": {
-      "post": {
-        "description": "✓ -- the notes changed hands. Records the cash payment over what is still owed and\nsettles exactly the request's charges; see CashService.confirm for the partial-payment\nrule.",
-        "operationId": "confirm_cash_request_api_v1_cash_requests__request_id__confirm_post",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "request_id",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "title": "Request Id",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CashRequestOut"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Confirm Cash Request",
-        "tags": [
-          "billing"
-        ]
-      }
-    },
-    "/api/v1/cash-requests/{request_id}/decline": {
-      "post": {
-        "operationId": "decline_cash_request_api_v1_cash_requests__request_id__decline_post",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "request_id",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "title": "Request Id",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CashRequestOut"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Decline Cash Request",
-        "tags": [
-          "billing"
-        ]
-      }
-    },
     "/api/v1/charges": {
       "get": {
         "description": "§7's `GET /charges?payer_person_id&status`. `allocated_agorot` travels with each row\nbecause §4.3 settles a charge by summing allocations -- a client rendering\n`amount_agorot` alone would show a fully-paid charge as outstanding.",
@@ -15742,67 +15627,6 @@
         ]
       }
     },
-    "/api/v1/me/cash-requests": {
-      "get": {
-        "operationId": "my_cash_requests_api_v1_me_cash_requests_get",
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CashRequestListOut"
-                }
-              }
-            },
-            "description": "Successful Response"
-          }
-        },
-        "summary": "My Cash Requests",
-        "tags": [
-          "billing"
-        ]
-      },
-      "post": {
-        "description": "'אני אשלם במזומן' -- over these exact charges. The payer is the session, never the\nbody, for the same reason payment orders do it: a body-supplied payer would let anyone\nvolunteer anyone else's debt.",
-        "operationId": "raise_cash_request_api_v1_me_cash_requests_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CashRequestCreateIn"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "201": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CashRequestOut"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Raise Cash Request",
-        "tags": [
-          "billing"
-        ]
-      }
-    },
     "/api/v1/me/charges": {
       "get": {
         "description": "§5.10 — the months this person owes, oldest first, which is the order the card route\nselects in.\n\n`allocated_agorot` travels with each row because §4.3 settles a charge by summing its\nallocations: a client rendering `amount_agorot` alone shows a part-paid charge as\nwholly outstanding.",
@@ -16004,6 +15828,67 @@
           }
         },
         "summary": "Order Items",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/v1/me/payment-promises": {
+      "get": {
+        "operationId": "my_payment_promises_api_v1_me_payment_promises_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentPromiseListOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "My Payment Promises",
+        "tags": [
+          "billing"
+        ]
+      },
+      "post": {
+        "description": "'אני אשלם במזומן' / 'אני אביא צ'קים' -- over these exact charges. The payer is the\nsession, never the body, for the same reason payment orders do it: a body-supplied\npayer would let anyone volunteer anyone else's debt.",
+        "operationId": "raise_payment_promise_api_v1_me_payment_promises_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaymentPromiseCreateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentPromiseOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Raise Payment Promise",
         "tags": [
           "billing"
         ]
@@ -16955,6 +16840,158 @@
           }
         },
         "summary": "Read Payment Order Form",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/v1/payment-promises": {
+      "get": {
+        "operationId": "list_payment_promises_api_v1_payment_promises_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "method",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Method"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagerPaymentPromiseListOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Payment Promises",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/v1/payment-promises/{promise_id}/confirm": {
+      "post": {
+        "description": "✓ -- the money changed hands. Records the payment over what is still owed and\nsettles exactly the promise's charges; see PaymentPromiseService.confirm for the\npartial-payment rule.",
+        "operationId": "confirm_payment_promise_api_v1_payment_promises__promise_id__confirm_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "promise_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Promise Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentPromiseOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Confirm Payment Promise",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/v1/payment-promises/{promise_id}/decline": {
+      "post": {
+        "operationId": "decline_payment_promise_api_v1_payment_promises__promise_id__decline_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "promise_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Promise Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentPromiseOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Decline Payment Promise",
         "tags": [
           "billing"
         ]

@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { apiFetch } from '@studio/core'
 import type { Locale } from '@studio/i18n'
-import { CashRequestsPanel } from './CashRequestsPanel'
+import { PaymentPromisesPanel } from './PaymentPromisesPanel'
 import { CollectionsScreen } from './CollectionsScreen'
 import type { HouseholdRow } from './CollectionsScreen'
 import { ReconciliationQueue } from './ReconciliationQueue'
@@ -155,7 +155,7 @@ export function BillingSection({ locale, view }: { locale: Locale; view: 'collec
     {/* Above the debt board, because a pending cash request IS tonight's collections
         news: the family already answered, and the board below still shows them in debt
         until the notes change hands. */}
-    <CashRequestsPanel locale={locale} client={client} onChanged={refresh} />
+    <PaymentPromisesPanel locale={locale} client={client} onChanged={refresh} />
     <CollectionsScreen
       locale={locale}
       client={client}

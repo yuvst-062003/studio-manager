@@ -17,12 +17,21 @@ import type { CSSProperties } from 'react'
 import { Alert, BeltBar, Button, Card, EmptyState, MoneyDisplay, SegmentedControl, StatusChip } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
-import type { BillingClient, CashRequestOut, ChargeOut } from './billingClient'
+import type {
+  BillingClient,
+  ChargeOut,
+  PaymentPromiseOut,
+  PromiseMethod,
+} from './billingClient'
 import { instalmentSplit, oldestMonths, selectionTotal } from './billingClient'
 
 //: §5.10's own chip groups: `[1] [2] [3] [6]` months, `[1] [2] [3]` instalments.
 const MONTH_OPTIONS = [1, 2, 3, 6]
 const INSTALMENT_OPTIONS = [1, 2, 3]
+
+//: The two routes a parent hands money over by. Mirrors `PROMISE_METHODS` in
+//: `app/models/payment_promise.py`, which is the constraint that actually refuses a third.
+const PROMISE_METHODS: readonly PromiseMethod[] = ['cash', 'cheque']
 
 const columnStyle: CSSProperties = {
   display: 'flex',
@@ -63,9 +72,9 @@ export type PaymentsScreenProps = {
   hasActiveSubscription: boolean
   standingOrderLink: string | null
   cashInstructions: string | null
-  /** The payer's own requests — a pending one turns the cash card into a status. */
-  cashRequests?: readonly CashRequestOut[]
-  onCashRequest?: (chargeIds: string[]) => Promise<void>
+  /** The payer's own promises, both routes — a pending one turns its card into a status. */
+  promises?: readonly PaymentPromiseOut[]
+  onPaymentPromise?: (chargeIds: string[], method: PromiseMethod) => Promise<void>
   onOrderOpened: (form: { action: string; fields: Record<string, string> }) => void
   onOpenHistory: () => void
 }
@@ -77,23 +86,21 @@ export function PaymentsScreen({
   hasActiveSubscription,
   standingOrderLink,
   cashInstructions,
-  cashRequests = [],
-  onCashRequest,
+  promises = [],
+  onPaymentPromise,
   onOrderOpened,
   onOpenHistory,
 }: PaymentsScreenProps) {
   const [months, setMonths] = useState(2)
   const [instalments, setInstalments] = useState(1)
   const [inFlight, setInFlight] = useState(false)
-  const [cashInFlight, setCashInFlight] = useState(false)
+  const [promiseInFlight, setPromiseInFlight] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const pendingCash = cashRequests.find((request) => request.status === 'pending') ?? null
-  const cashPendingChargeIds = new Set(pendingCash?.charge_ids ?? [])
-  // Say a decline out loud exactly until the family acts on it: the newest DECIDED
-  // request being a decline, with nothing pending, is the state that needs the sentence.
-  const latestDecided = cashRequests.find((request) => request.decided_at !== null) ?? null
-  const declinedCash = !pendingCash && latestDecided?.status === 'declined' ? latestDecided : null
+  // One live promise at a time across BOTH routes: the service refuses a second over the
+  // same charges, so a card that still offered its button would be offering a 409.
+  const pending = promises.find((row) => row.status === 'pending') ?? null
+  const pendingChargeIds = new Set(pending?.charge_ids ?? [])
 
   // Only charges nothing else already covers are selectable. §5.10's guard 1, and the
   // reason a covered row still RENDERS: hiding it would leave a parent looking for a month
@@ -157,8 +164,11 @@ export function PaymentsScreen({
                   {t(locale, 'billing.card.coveredElsewhere')}
                 </span>
               ) : null}
-              {cashPendingChargeIds.has(row.charge.id) ? (
-                <StatusChip status="pending" label={t(locale, 'billing.cash.pendingChip')} />
+              {pending && pendingChargeIds.has(row.charge.id) ? (
+                <StatusChip
+                  status="pending"
+                  label={t(locale, `billing.${pending.method}.pendingChip`)}
+                />
               ) : null}
             </div>
           ))}
@@ -256,48 +266,116 @@ export function PaymentsScreen({
         </div>
       </Card>
 
-      {/* -- מזומן ------------------------------------------------------------ */}
-      <Card>
-        <div data-testid="route-cash">
-          <h3>{t(locale, 'billing.method.cash')}</h3>
-          <p>{cashInstructions ?? t(locale, 'billing.cash.instructions')}</p>
-          {pendingCash ? (
-            // One live request at a time: while the manager holds one, the card reports
-            // it instead of offering a second.
-            <div data-testid="cash-pending">
-              <StatusChip status="pending" label={t(locale, 'billing.cash.pendingTitle')} />
-              <p>{t(locale, 'billing.cash.requested')}</p>
-              <MoneyDisplay agorot={pendingCash.total_agorot} tone="pending" />
-            </div>
-          ) : (
-            <>
-              {declinedCash ? (
-                <Alert tone="danger" live iconLabel={t(locale, 'billing.method.cash')}>
-                  {t(locale, 'billing.cash.declined')}
-                </Alert>
-              ) : null}
-              {onCashRequest && chosen.length > 0 ? (
-                <Button
-                  variant="secondary"
-                  data-testid="cash-request-button"
-                  disabled={cashInFlight}
-                  onClick={() => {
-                    if (cashInFlight) return
-                    setCashInFlight(true)
-                    setError(null)
-                    onCashRequest(chosen.map((charge) => charge.id))
-                      .catch(() => setError(t(locale, 'common.error.generic')))
-                      .finally(() => setCashInFlight(false))
-                  }}
-                >
-                  {t(locale, 'billing.cash.request')}
-                </Button>
-              ) : null}
-            </>
-          )}
-        </div>
-      </Card>
+      {/* -- מזומן וצ׳קים ------------------------------------------------------
+          Two cards, one mechanism. The payment-routes spec §8: cheques are cash with a
+          different word on the payment — same promise row, same two endings, same manager
+          confirming by hand — so the difference between these cards is a `method` string
+          and the copy it selects, and nothing else. */}
+      {PROMISE_METHODS.map((method) => (
+        <PromiseCard
+          key={method}
+          locale={locale}
+          method={method}
+          instructions={method === 'cash' ? cashInstructions : null}
+          promises={promises}
+          pending={pending}
+          chosen={chosen}
+          inFlight={promiseInFlight}
+          onPaymentPromise={
+            onPaymentPromise
+              ? (chargeIds) => {
+                  if (promiseInFlight) return
+                  setPromiseInFlight(true)
+                  setError(null)
+                  onPaymentPromise(chargeIds, method)
+                    .catch(() => setError(t(locale, 'common.error.generic')))
+                    .finally(() => setPromiseInFlight(false))
+                }
+              : undefined
+          }
+        />
+      ))}
     </div>
+  )
+}
+
+/**
+ * One of the two hand-carried routes. Rendered twice, and everything that differs between
+ * the two renders is reached through `method` — the i18n keys mirror each other key for
+ * key (`billing.cash.request` / `billing.cheque.request`), so a rule fixed here is fixed
+ * for both rather than for whichever one the reporter happened to be using.
+ */
+function PromiseCard({
+  locale,
+  method,
+  instructions,
+  promises,
+  pending,
+  chosen,
+  inFlight,
+  onPaymentPromise,
+}: {
+  locale: Locale
+  method: PromiseMethod
+  instructions: string | null
+  promises: readonly PaymentPromiseOut[]
+  pending: PaymentPromiseOut | null
+  chosen: readonly ChargeOut[]
+  inFlight: boolean
+  onPaymentPromise?: (chargeIds: string[]) => void
+}) {
+  // Say a decline out loud exactly until the family acts on it, and say it on the card it
+  // belongs to: the newest DECIDED promise OF THIS METHOD being a decline, with nothing
+  // pending anywhere, is the state that needs the sentence. A declined cheque promise must
+  // not make the cash card look broken.
+  const latestDecided =
+    promises.find((row) => row.method === method && row.decided_at !== null) ?? null
+  const declined = !pending && latestDecided?.status === 'declined' ? latestDecided : null
+
+  return (
+    <Card>
+      <div data-testid={`route-${method}`}>
+        <h3>{t(locale, `billing.method.${method}`)}</h3>
+        <p>{instructions ?? t(locale, `billing.${method}.instructions`)}</p>
+        {pending?.method === method ? (
+          // While the manager holds this one, the card reports it instead of offering a
+          // second.
+          <div data-testid={`promise-pending-${method}`}>
+            <StatusChip status="pending" label={t(locale, `billing.${method}.pendingTitle`)} />
+            <p>{t(locale, `billing.${method}.requested`)}</p>
+            <MoneyDisplay agorot={pending.total_agorot} tone="pending" />
+          </div>
+        ) : pending ? (
+          // The OTHER route is holding the live promise. Said rather than left as a card
+          // with a missing button, which reads as a bug.
+          <p data-testid={`promise-blocked-${method}`}>{t(locale, 'billing.promise.blocked')}</p>
+        ) : (
+          <>
+            {declined ? (
+              <Alert
+                tone="danger"
+                live
+                iconLabel={t(locale, `billing.method.${method}`)}
+              >
+                <span data-testid={`promise-declined-${method}`}>
+                  {t(locale, `billing.${method}.declined`)}
+                </span>
+              </Alert>
+            ) : null}
+            {onPaymentPromise && chosen.length > 0 ? (
+              <Button
+                variant="secondary"
+                data-testid={`promise-button-${method}`}
+                disabled={inFlight}
+                onClick={() => onPaymentPromise(chosen.map((charge) => charge.id))}
+              >
+                {t(locale, `billing.${method}.request`)}
+              </Button>
+            ) : null}
+          </>
+        )}
+      </div>
+    </Card>
   )
 }
 

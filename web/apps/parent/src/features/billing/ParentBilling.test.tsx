@@ -16,7 +16,7 @@ import { PaymentCompleteScreen } from './PaymentCompleteScreen'
 import { OrderItemsScreen } from './OrderItemsScreen'
 import { PaymentStrip } from './PaymentStrip'
 import { instalmentSplit, oldestMonths, selectionTotal } from './billingClient'
-import type { BillingClient, ChargeOut, PaymentOut } from './billingClient'
+import type { BillingClient, ChargeOut, PaymentOut, PaymentPromiseOut } from './billingClient'
 
 const LOCALE = 'he' as const
 
@@ -61,6 +61,8 @@ function debt(id: string, month: number, overrides: Partial<DebtRow> = {}): Debt
 function stubClient(overrides: Partial<BillingClient> = {}): BillingClient {
   return {
     openCharges: vi.fn().mockResolvedValue([]),
+    promises: vi.fn().mockResolvedValue([]),
+    createPromise: vi.fn(),
     balance: vi.fn(),
     payments: vi.fn().mockResolvedValue([]),
     products: vi.fn().mockResolvedValue([]),
@@ -180,6 +182,90 @@ describe('1b — the pay screen', () => {
   })
 })
 
+function promise(
+  id: string,
+  method: 'cash' | 'cheque',
+  overrides: Partial<PaymentPromiseOut> = {},
+): PaymentPromiseOut {
+  return {
+    id,
+    status: 'pending',
+    method,
+    total_agorot: 50_000,
+    charge_ids: ['c1'],
+    created_at: '2026-09-01T09:00:00Z',
+    decided_at: null,
+    ...overrides,
+  }
+}
+
+describe('1b — the two hand-carried routes', () => {
+  // The payment-routes spec §8: cheques are cash with a different word on the payment.
+  // Both end at a manager confirming by hand, so the screen offers them as two cards over
+  // one mechanism rather than two mechanisms — which is what makes every rule below hold
+  // for either method without being written twice.
+  it('offers cheques beside cash, so all four routes are visible', () => {
+    // §5.10 — nothing is ever hidden from the payments screen. The manager's own letter
+    // lists three ways to pay and the app served two of them.
+    renderPay()
+    expect(screen.getByTestId('route-card')).toBeInTheDocument()
+    expect(screen.getByTestId('route-standing-order')).toBeInTheDocument()
+    expect(screen.getByTestId('route-cash')).toBeInTheDocument()
+    expect(screen.getByTestId('route-cheque')).toBeInTheDocument()
+  })
+
+  it('raises a promise carrying the method the parent tapped', async () => {
+    // The method is the ONE thing that separates these two cards, and it is what the
+    // manager's queue filters on. A cheque promise raised as `cash` is a cheque the club
+    // cannot count later — §10's whole reason for existing.
+    const onPaymentPromise = vi.fn().mockResolvedValue(undefined)
+    renderPay({ onPaymentPromise })
+    await userEvent.click(screen.getByTestId('promise-button-cheque'))
+    expect(onPaymentPromise).toHaveBeenCalledWith(['c1', 'c2'], 'cheque')
+    await userEvent.click(screen.getByTestId('promise-button-cash'))
+    expect(onPaymentPromise).toHaveBeenLastCalledWith(['c1', 'c2'], 'cash')
+  })
+
+  it('reports a pending cheque promise on the cheque card', () => {
+    renderPay({ promises: [promise('r1', 'cheque')], onPaymentPromise: vi.fn() })
+    expect(screen.getByTestId('promise-pending-cheque')).toHaveTextContent('ממתין לאישור המנהל')
+    expect(screen.queryByTestId('promise-button-cheque')).not.toBeInTheDocument()
+  })
+
+  it('lets no second promise be raised while one of EITHER method is pending', () => {
+    // One live promise at a time, across both routes. Two pending promises over the same
+    // months would show the manager the same money twice, and the service refuses the
+    // second anyway — a card that still offered the button would be offering a 409.
+    renderPay({ promises: [promise('r1', 'cash')], onPaymentPromise: vi.fn() })
+    expect(screen.getByTestId('promise-pending-cash')).toBeInTheDocument()
+    expect(screen.queryByTestId('promise-button-cheque')).not.toBeInTheDocument()
+    // And it says why, rather than rendering a card with nothing in it.
+    expect(screen.getByTestId('promise-blocked-cheque')).toBeInTheDocument()
+  })
+
+  it('badges the charge rows a pending cheque promise covers, in its own words', () => {
+    renderPay({ promises: [promise('r1', 'cheque', { charge_ids: ['c1'] })], onPaymentPromise: vi.fn() })
+    expect(screen.getByText('צ׳קים בהמתנה')).toBeInTheDocument()
+    expect(screen.queryByText('מזומן בהמתנה')).not.toBeInTheDocument()
+  })
+
+  it('says a decline out loud, on the card it was declined on', () => {
+    // A decline the parent is never told about is silence they have to infer from a
+    // charge that stayed open. It belongs to the method that was declined: a declined
+    // cheque promise must not make the cash card look broken.
+    renderPay({
+      promises: [
+        promise('r1', 'cheque', { status: 'declined', decided_at: '2026-09-02T09:00:00Z' }),
+      ],
+      onPaymentPromise: vi.fn(),
+    })
+    expect(screen.getByTestId('promise-declined-cheque')).toBeInTheDocument()
+    expect(screen.queryByTestId('promise-declined-cash')).not.toBeInTheDocument()
+    // And the route is open again — a decline is not a ban.
+    expect(screen.getByTestId('promise-button-cheque')).toBeInTheDocument()
+  })
+})
+
 describe('the selection arithmetic', () => {
   it('selects the N oldest by due date even when the list arrives shuffled', () => {
     // Ship-audit B5. "Pay 2 months" is §5.10's money decision — the two OLDEST months —
@@ -253,6 +339,14 @@ describe('12f — payment history', () => {
     const rows = screen.getAllByTestId('payment-row')
     expect(within(rows[0]!).getByTestId('email-receipt')).toBeInTheDocument()
     expect(within(rows[1]!).queryByTestId('email-receipt')).not.toBeInTheDocument()
+  })
+
+  it('names a cheque payment rather than folding it into cash', () => {
+    // §10 — the club's question is 'how much of this year is sitting in undeposited
+    // cheques', and a history row that says מזומן cannot answer it. `methodKey`'s final
+    // `: 'cash'` is a fallback, so this failure is silent by construction.
+    renderHistory({ payments: [payment('p1', 'cheque')] })
+    expect(screen.getByTestId('payment-row')).toHaveTextContent('צ׳קים')
   })
 
   it('has no global email-the-receipts button', () => {

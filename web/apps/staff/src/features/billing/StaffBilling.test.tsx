@@ -9,6 +9,8 @@ import { describe, expect, it, vi } from 'vitest'
 import { t } from '@studio/i18n'
 import { HandOverSheet } from './HandOverSheet'
 import type { HandoutClient } from './handoutClient'
+import { PaymentPromisesSection } from './PaymentPromisesSection'
+import type { PromiseClient, StaffPromiseRow } from './promiseClient'
 
 const LOCALE = 'he' as const
 
@@ -125,5 +127,67 @@ describe('11a — handing an item over', () => {
   it('renders the empty state when the club sells nothing', () => {
     renderSheet({ options: [] })
     expect(screen.getByText('לא הוגדרו פריטים')).toBeInTheDocument()
+  })
+})
+
+describe('the payment-promise queue on the phone', () => {
+  // The one money surface this app carries, and it stays exactly this narrow: it calls
+  // ManagerOrOwner routes only, and neither the entry nor the screen exists for a coach.
+  // §13's third invariant is about coach-scoped endpoints, and this is not one.
+  function promiseRow(
+    id: string,
+    method: 'cash' | 'cheque',
+    overrides: Partial<StaffPromiseRow> = {},
+  ): StaffPromiseRow {
+    return {
+      id,
+      status: 'pending',
+      method,
+      total_agorot: 90_000,
+      payer_name: 'משפחת כהן',
+      charge_count: 3,
+      created_at: '2026-09-01T09:00:00Z',
+      ...overrides,
+    }
+  }
+
+  function promiseStub(overrides: Partial<PromiseClient> = {}): PromiseClient {
+    return {
+      pending: vi.fn().mockResolvedValue([]),
+      decide: vi.fn().mockResolvedValue(undefined),
+      ...overrides,
+    } as PromiseClient
+  }
+
+  it('says which route each promise is, standing at the door', async () => {
+    // The manager confirming at the door is holding either notes or a bundle of twelve
+    // cheques. A row that does not say which is a row they cannot check against what is
+    // in their hand.
+    render(
+      <PaymentPromisesSection
+        locale={LOCALE}
+        client={promiseStub({
+          pending: vi.fn().mockResolvedValue([promiseRow('r1', 'cheque')]),
+        })}
+      />,
+    )
+    expect(await screen.findByTestId('promise-method')).toHaveTextContent(
+      t(LOCALE, 'billing.method.cheque'),
+    )
+  })
+
+  it('confirms through the promise route', async () => {
+    const decide = vi.fn().mockResolvedValue(undefined)
+    render(
+      <PaymentPromisesSection
+        locale={LOCALE}
+        client={promiseStub({
+          pending: vi.fn().mockResolvedValue([promiseRow('r1', 'cash')]),
+          decide,
+        })}
+      />,
+    )
+    await userEvent.click(await screen.findByTestId('promise-confirm'))
+    expect(decide).toHaveBeenCalledWith('r1', 'confirm')
   })
 })

@@ -54,15 +54,23 @@ export type DashboardBillingClient = {
     activeFrom: string
   }): Promise<PricePlanOut>
   products(): Promise<ProductOut[]>
-  cashRequests(status?: string): Promise<ManagerCashRequestOut[]>
-  confirmCash(requestId: string): Promise<void>
-  declineCash(requestId: string): Promise<void>
+  paymentPromises(status?: string, method?: PromiseMethod): Promise<ManagerPaymentPromiseOut[]>
+  confirmPromise(promiseId: string): Promise<void>
+  declinePromise(promiseId: string): Promise<void>
 }
 
-/** The manager's view of 'אני אשלם במזומן' — who, how much, since when. */
-export type ManagerCashRequestOut = {
+/** The two routes a family hands money over by. Mirrors `PROMISE_METHODS` on the server. */
+export type PromiseMethod = 'cash' | 'cheque'
+
+/**
+ * The manager's view of 'אני אשלם במזומן' / 'אביא צ׳קים' — who, how much, by which route,
+ * since when. `method` is a column here rather than two queues, because the two endings
+ * are identical: ✓ records the payment over what the charges still owe, ✗ leaves them open.
+ */
+export type ManagerPaymentPromiseOut = {
   id: string
   status: 'pending' | 'received' | 'declined'
+  method: PromiseMethod
   total_agorot: number
   payer_person_id: string
   payer_name: string
@@ -135,19 +143,32 @@ export function makeDashboardBillingClient(fetcher: Fetcher): DashboardBillingCl
     async pricePlans() {
       return (await json<{ items: PricePlanOut[] }>(await fetcher('/api/v1/price-plans'))).items
     },
-    // The cash-request decisions (feature pass 2026-08-27): the payer said 'מזומן';
-    // these are the manager's ✓ and ✗.
-    async cashRequests(status?: string) {
-      const query = status ? `?status=${status}` : ''
+    // The payment-promise decisions (feature pass 2026-08-27): the payer said מזומן or
+    // צ׳קים; these are the manager's ✓ and ✗.
+    //
+    // Both filters go to the SERVER. A `method` filter applied in the browser would mean
+    // 'of the rows that happened to load', which is a different answer from the one the
+    // manager thinks they asked for.
+    async paymentPromises(status?: string, method?: PromiseMethod) {
+      const params = new URLSearchParams()
+      if (status) params.set('status', status)
+      if (method) params.set('method', method)
+      const query = params.size > 0 ? `?${params.toString()}` : ''
       return (
-        await json<{ items: ManagerCashRequestOut[] }>(await fetcher(`/api/v1/cash-requests${query}`))
+        await json<{ items: ManagerPaymentPromiseOut[] }>(
+          await fetcher(`/api/v1/payment-promises${query}`),
+        )
       ).items
     },
-    async confirmCash(requestId: string) {
-      await json(await fetcher(`/api/v1/cash-requests/${requestId}/confirm`, { method: 'POST' }))
+    async confirmPromise(promiseId: string) {
+      await json(
+        await fetcher(`/api/v1/payment-promises/${promiseId}/confirm`, { method: 'POST' }),
+      )
     },
-    async declineCash(requestId: string) {
-      await json(await fetcher(`/api/v1/cash-requests/${requestId}/decline`, { method: 'POST' }))
+    async declinePromise(promiseId: string) {
+      await json(
+        await fetcher(`/api/v1/payment-promises/${promiseId}/decline`, { method: 'POST' }),
+      )
     },
     async closePricePlan(planId, closesOn, amountAgorot) {
       return json<PricePlanOut>(

@@ -33,6 +33,7 @@ export const billing: Bundle = {
   'method.card': 'כרטיס אשראי',
   'method.standingOrder': 'הוראת קבע',
   'method.cash': 'מזומן',
+  'method.cheque': 'צ׳קים',
   'method.bankTransfer': 'העברה בנקאית',
   'method.creditAdjustment': 'זיכוי',
 
@@ -55,11 +56,30 @@ export const billing: Bundle = {
   'cash.pendingChip': 'מזומן בהמתנה',
   'cash.pendingTitle': 'ממתין לאישור המנהל',
   'cash.declined': 'בקשת המזומן נדחתה — אפשר לשלם בדרך אחרת או לדבר עם המנהל.',
-  'cash.manager.title': 'בקשות תשלום במזומן',
-  'cash.manager.empty': 'אין בקשות מזומן פתוחות.',
-  'cash.manager.confirm': 'המזומן התקבל',
-  'cash.manager.decline': 'לא התקבל',
-  'cash.manager.charges': 'חיובים',
+
+  // Cheques are cash with a different word on the payment, so the copy mirrors the cash
+  // set key for key. Every sentence stays true with the word swapped, which is the same
+  // reason the service behind them is one service and not two.
+  'cheque.instructions': 'מסרו את הצ׳קים למאמן, לפקודת העמותה',
+  'cheque.request': 'אביא צ׳קים',
+  'cheque.requested': 'הבקשה נשלחה למנהל — החיובים ייסגרו כשהצ׳קים יתקבלו.',
+  'cheque.pendingChip': 'צ׳קים בהמתנה',
+  'cheque.pendingTitle': 'ממתין לאישור המנהל',
+  'cheque.declined': 'בקשת התשלום בצ׳קים נדחתה — אפשר לשלם בדרך אחרת או לדבר עם המנהל.',
+
+  // One live promise at a time, across both routes — the service refuses a second, so the
+  // other card says why rather than offering a button that answers 409.
+  'promise.blocked': 'קיימת בקשת תשלום שממתינה למנהל — אפשר לשלוח בקשה נוספת לאחר שיטופל בה.',
+
+  // The manager's queue answers 'who is bringing money', not 'who is bringing cash' —
+  // the method is a column in it now rather than the name of the screen.
+  'promise.manager.title': 'בקשות תשלום',
+  'promise.manager.empty': 'אין בקשות תשלום פתוחות.',
+  'promise.manager.confirm': 'התשלום התקבל',
+  'promise.manager.decline': 'לא התקבל',
+  'promise.manager.charges': 'חיובים',
+  'promise.manager.method': 'אמצעי תשלום',
+  'promise.manager.filterAll': 'הכול',
   'shop.title': 'חנות המועדון',
   'shop.empty': 'אין פריטים למכירה כרגע.',
   'shop.order': 'הזמנה',

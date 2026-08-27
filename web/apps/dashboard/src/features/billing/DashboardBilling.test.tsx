@@ -11,12 +11,13 @@ import { CollectionsScreen } from './CollectionsScreen'
 import type { HouseholdRow } from './CollectionsScreen'
 import { ReconciliationQueue } from './ReconciliationQueue'
 import { PricePlansScreen } from './PricePlansScreen'
+import { PaymentPromisesPanel } from './PaymentPromisesPanel'
 import { DebtAlert } from './DebtAlert'
 import { DEBT_ALERT_ORDER } from './register'
 import { RUN_JOB_ORDER } from './RunJobTool'
 import { ageBucket, daysOverdue, escalationRung } from './billingClient'
 import { agorotFromShekels } from './money'
-import type { DashboardBillingClient } from './billingClient'
+import type { DashboardBillingClient, ManagerPaymentPromiseOut } from './billingClient'
 
 const LOCALE = 'he' as const
 
@@ -44,8 +45,29 @@ function stub(overrides: Partial<DashboardBillingClient> = {}): DashboardBilling
     closePricePlan: vi.fn().mockResolvedValue({}),
     createPricePlan: vi.fn().mockResolvedValue({}),
     products: vi.fn().mockResolvedValue([]),
+    paymentPromises: vi.fn().mockResolvedValue([]),
+    confirmPromise: vi.fn().mockResolvedValue(undefined),
+    declinePromise: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   } as DashboardBillingClient
+}
+
+function managerPromise(
+  id: string,
+  method: 'cash' | 'cheque',
+  overrides: Record<string, unknown> = {},
+): ManagerPaymentPromiseOut {
+  return {
+    id,
+    status: 'pending',
+    method,
+    total_agorot: 90_000,
+    payer_person_id: 'payer-1',
+    payer_name: 'משפחת כהן',
+    charge_count: 3,
+    created_at: '2026-09-01T09:00:00Z',
+    ...overrides,
+  }
 }
 
 function renderCollections(props: Record<string, unknown> = {}) {
@@ -385,5 +407,59 @@ describe('the alert-centre section and the dev bar', () => {
     // belongs above a trial queue". `tools.ts` fixes runJob at 40.
     expect(DEBT_ALERT_ORDER).toBe(10)
     expect(RUN_JOB_ORDER).toBe(40)
+  })
+})
+
+describe('the payment-promise queue', () => {
+  // The manager's half of both hand-carried routes. Confirm and decline are unchanged from
+  // the cash queue this replaces — what is new is that the queue can no longer answer "how
+  // much of this is cheques" by looking at the screen's title.
+  function renderPanel(props: Record<string, unknown> = {}) {
+    return render(<PaymentPromisesPanel locale={LOCALE} client={stub()} {...props} />)
+  }
+
+  it('names the method on every row', async () => {
+    // §10 — the club's question is 'how much of this year is sitting in undeposited
+    // cheques'. A queue that renders both methods identically cannot be asked it, and the
+    // manager confirms twelve cheques thinking they are one month of cash.
+    renderPanel({
+      client: stub({
+        paymentPromises: vi
+          .fn()
+          .mockResolvedValue([managerPromise('r1', 'cash'), managerPromise('r2', 'cheque')]),
+      }),
+    })
+    const rows = await screen.findAllByTestId('payment-promise-row')
+    expect(within(rows[0]!).getByTestId('promise-method')).toHaveTextContent('מזומן')
+    expect(within(rows[1]!).getByTestId('promise-method')).toHaveTextContent('צ׳קים')
+  })
+
+  it('asks the server for one method when the filter is set, never filters in the browser', async () => {
+    // The list is paged by the server and the filter has to mean the same thing as
+    // `?method=` does — a client-side filter over one page would silently mean 'of the
+    // rows that happened to load', which is a different and wrong answer.
+    const paymentPromises = vi.fn().mockResolvedValue([managerPromise('r1', 'cheque')])
+    renderPanel({ client: stub({ paymentPromises }) })
+    await screen.findAllByTestId('payment-promise-row')
+    // Queried by role: the filter is a `SegmentedControl`, so it is a radiogroup, and a
+    // testid here would let it stop being one without a test noticing.
+    await userEvent.click(screen.getByRole('radio', { name: t(LOCALE, 'billing.method.cheque') }))
+    expect(paymentPromises).toHaveBeenLastCalledWith('pending', 'cheque')
+  })
+
+  it('confirms and declines through the promise routes', async () => {
+    const confirmPromise = vi.fn().mockResolvedValue(undefined)
+    const declinePromise = vi.fn().mockResolvedValue(undefined)
+    renderPanel({
+      client: stub({
+        paymentPromises: vi.fn().mockResolvedValue([managerPromise('r1', 'cheque')]),
+        confirmPromise,
+        declinePromise,
+      }),
+    })
+    await userEvent.click(await screen.findByTestId('promise-confirm'))
+    expect(confirmPromise).toHaveBeenCalledWith('r1')
+    await userEvent.click(await screen.findByTestId('promise-decline'))
+    expect(declinePromise).toHaveBeenCalledWith('r1')
   })
 })

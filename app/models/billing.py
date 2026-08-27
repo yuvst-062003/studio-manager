@@ -66,6 +66,7 @@ PAYMENT_METHODS = (
     "standing_order",
     "bank_transfer",
     "cash",
+    "cheque",
     "credit_adjustment",
 )
 
@@ -278,7 +279,7 @@ class Payment(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
     __tenant_table_args__ = (
         CheckConstraint(
             "method IN ('upay_card', 'standing_order', 'bank_transfer', 'cash', "
-            "'credit_adjustment')",
+            "'cheque', 'credit_adjustment')",
             name="payment_method",
         ),
         CheckConstraint(

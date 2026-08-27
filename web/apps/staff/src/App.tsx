@@ -31,7 +31,7 @@ import type { InstallPromptEvent } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { Resolve } from './features/identity/Resolve'
-import { CashSection } from './features/billing/CashSection'
+import { PaymentPromisesSection } from './features/billing/PaymentPromisesSection'
 import { JoinLinkSection } from './features/people/JoinLinkSection'
 import { ScheduleSection } from './features/schedule/ScheduleSection'
 import { makeStaffScheduleClient } from './features/schedule/client'
@@ -147,9 +147,9 @@ export default function App() {
   useQueueFlusher(membership?.person_id ?? null)
   const viewerIsCoach =
     membership?.roles.some((role) => role === 'lead_coach' || role === 'assistant_coach') ?? false
-  // The one money surface this app carries (feature pass 2026-08-27): the cash-request
-  // decisions, for the manager standing at the door. §13's invariant is about
-  // coach-scoped endpoints, and neither the entry nor the screen exists for a coach.
+  // The one money surface this app carries (feature pass 2026-08-27): the payment-promise
+  // decisions -- cash and cheques -- for the manager standing at the door. §13's invariant
+  // is about coach-scoped endpoints, and neither the entry nor the screen exists for a coach.
   const viewerIsManager =
     membership?.roles.some((role) => role === 'owner' || role === 'manager') ?? false
   // Staff `9h` is one hash away from Today. The card (`9c`) and the mid-lesson trial
@@ -335,7 +335,7 @@ export default function App() {
               viewerIsCoach={viewerIsCoach}
             />
           ) : session.access.staff && viewerIsManager && onCash ? (
-            <CashSection locale={locale} />
+            <PaymentPromisesSection locale={locale} />
           ) : session.access.staff && viewerIsManager && onJoinLink ? (
             <JoinLinkSection locale={locale} />
           ) : session.access.staff && onStudents ? (

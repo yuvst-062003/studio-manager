@@ -42,10 +42,17 @@ ChargeStatus = Literal["open", "settled", "void", "written_off"]
 #: against the charges it claims to have produced.
 ChargeOrigin = Literal["billing_run", "manual", "event"]
 
-#: §4.3 / G8 — only `upay_card` arrives automatically. The other four are recorded by a
+#: §4.3 / G8 — only `upay_card` arrives automatically. The other five are recorded by a
 #: human, including `standing_order`: our provider cannot create a הוראת קבע mandate
 #: programmatically, so its payments are marked in-app exactly like a bank transfer.
-PaymentMethod = Literal["upay_card", "standing_order", "bank_transfer", "cash", "credit_adjustment"]
+#:
+#: This tuple and `PAYMENT_METHODS` in `app/models/billing.py` are one list living in two
+#: files, and the wire shape is the half that fails LOUDLY when they drift: a method the
+#: table accepts and this Literal does not is a 500 on a screen that was working, with
+#: nothing wrong in the database. Add to both or to neither.
+PaymentMethod = Literal[
+    "upay_card", "standing_order", "bank_transfer", "cash", "cheque", "credit_adjustment"
+]
 
 #: §5.10 — `amount_mismatch` is a real state, not a failure. A payment **is** recorded for
 #: the real amount received and allocated to nothing; collapsing it into `failed` would
@@ -206,7 +213,10 @@ class ManualPaymentIn(BaseModel):
     exception path."""
 
     payer_person_id: uuid.UUID
-    method: Literal["standing_order", "bank_transfer", "cash", "credit_adjustment"]
+    #: `upay_card` is excluded and `cheque` is not: a cheque handed over at the door never
+    #: passed through a promise, and §10's point is that it must reach the ledger as a
+    #: cheque rather than as a `bank_transfer` nobody can count later.
+    method: Literal["standing_order", "bank_transfer", "cash", "cheque", "credit_adjustment"]
     amount_agorot: int
     received_at: datetime
     charge_ids: list[uuid.UUID] = Field(default_factory=list)
