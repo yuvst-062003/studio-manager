@@ -34,7 +34,7 @@ not what was drawn and not what was approved.
    The address in the top bar is **desktop-only**; mobile has no address until its location card.
 2. **Body row**
    - **Main content** (flexible, on the right): headline · subheadline · belt strip + caption ·
-     three stat cards · "when you can come" heading · **three schedule cards side by side** ·
+     "when you can come" heading · **three schedule cards side by side** ·
      **three benefit columns**.
    - **Form panel** (fixed width, on the left, on `--surface`): heading + subtext · child's name ·
      age + parent's name (2-up) · phone · slot chips · submit · disclaimer · spacer ·
@@ -89,7 +89,7 @@ Muted text again sits at D8's floor with no headroom.
 - The form panel is on the left. See above.
 - The top bar's `flex: 1` spacer is direction-agnostic and safe.
 - The one physical property is the panel's divider. Named above.
-- **Must not mirror:** the phone in the top bar, the phone field, all times, the stat digits.
+- **Must not mirror:** the phone in the top bar, the phone field, all times.
 - Only the phone field carries tabular numerals. Carry that into `TextField`'s phone variant rather
   than leaving digit alignment to chance.
 

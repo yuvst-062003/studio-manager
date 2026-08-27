@@ -105,6 +105,23 @@ def test_7c_has_no_weight_or_category_column():
     assert "אישור הורה חתום" in board
 
 
+def test_13a_and_13c_have_no_stats_strip():
+    """Landing decision 2 (2026-08-27). No field carries `214 חניכים פעילים` /
+    `18 שנים ברעננה` / `4 מאמנים מוסמכים`, and computing them would publish a live
+    headcount on an unauthenticated endpoint — which sits badly beside `PublicGroupOut`'s
+    written refusal ("No class id, no staff, no enrollment count"). The strip was removed
+    from the canvas the way D9's cuts were; this is what keeps it removed.
+
+    The positive halves pin that the artboards themselves survived the cut: the hero
+    headline and the schedule heading are still drawn.
+    """
+    for artboard_id in ("13a", "13c"):
+        board = _artboard(PARENT, artboard_id)
+        assert "חניכים פעילים" not in board
+        assert "מאמנים מוסמכים" not in board
+        assert "מתי אפשר להגיע" in board
+
+
 def test_12f_is_titled_payments_and_scopes_the_receipt_to_card_rows():
     """D9.3. §5.10: uPay issues a חשבונית/קבלה for **card payments only**, and the system
     issues no tax document for cash, bank transfer or הוראת קבע.
