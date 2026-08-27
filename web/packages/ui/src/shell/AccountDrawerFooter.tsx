@@ -63,12 +63,20 @@ const optionStyle: CSSProperties = {
 export function AccountDrawerFooter({
   locale,
   onChooseLocale,
+  accountName,
 }: {
   locale: Locale
   onChooseLocale: (next: Locale) => void
+  /** 2e's header line — the signed-in person, now that /auth/me names them. */
+  accountName?: string | null
 }) {
   return (
     <div style={footerStyle}>
+      {accountName ? (
+        <div data-testid="account-name" style={{ fontWeight: 600 }}>
+          <bdi>{accountName}</bdi>
+        </div>
+      ) : null}
       {/* Native radios, like `ThemeControl` below: arrow-key navigation, the roving tab stop
           and the exclusive-group semantics all come free, and `role="radiogroup"` is
           explicit because a bare fieldset maps to ARIA `group` and would not announce

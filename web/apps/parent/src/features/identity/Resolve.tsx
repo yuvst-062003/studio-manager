@@ -41,6 +41,9 @@ export function Resolve({ session, locale }: { session: Session; locale: Locale 
   // 1a's debt alert — the same `/me/balance` read `12f` renders in full. Zero on failure:
   // a home that cannot ask about money shows no alert rather than a broken one.
   const [debtAgorot, setDebtAgorot] = useState(0)
+  const [attendance, setAttendance] = useState<
+    readonly { session_id: string; student_id: string; status: string }[]
+  >([])
   useEffect(() => {
     if (!session.access.parent) return
     let live = true
@@ -51,21 +54,33 @@ export function Resolve({ session, locale }: { session: Session; locale: Locale 
       })
       .catch(() => {})
     const now = new Date()
+    // 2a's strip reads back as well as forward: a week each way, one fetch.
+    const weekBack = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
     const weekOut = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
     const day = (d: Date) => d.toISOString().slice(0, 10)
     scheduleClient
-      .listSessions({ from: day(now), to: day(weekOut) })
+      .listSessions({ from: day(weekBack), to: day(weekOut) })
       .then((rows) => {
         if (!live) return
         setUpcoming(
           rows
-            .filter((row) => row.status === 'scheduled' && new Date(row.starts_at) >= now)
+            .filter((row) => row.status === 'scheduled')
             .sort((a, b) => a.starts_at.localeCompare(b.starts_at))
-            .slice(0, 5)
             .map((row) => ({ id: row.id, startsAt: row.starts_at, groupName: row.group_name })),
         )
       })
       .catch(() => live && setUpcoming([]))
+    // 2a's other half — what actually happened, for the strip's past days.
+    void apiFetch(`/api/v1/me/attendance?from=${day(weekBack)}&to=${day(now)}`)
+      .then((response) =>
+        response.ok
+          ? (response.json() as Promise<{ items: { session_id: string; student_id: string; status: string }[] }>)
+          : { items: [] },
+      )
+      .then((body) => {
+        if (live) setAttendance(body.items)
+      })
+      .catch(() => {})
     return () => {
       live = false
     }
@@ -163,6 +178,7 @@ export function Resolve({ session, locale }: { session: Session; locale: Locale 
             : null
       }
       upcoming={upcoming}
+      attendance={attendance}
       debtAgorot={debtAgorot}
     />
   )

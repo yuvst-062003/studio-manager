@@ -310,3 +310,74 @@ def test_an_ended_enrollment_is_dropped_by_date_even_when_its_status_lags(
     app_session.commit()
     _, rows = build_roster(tenant_session, a_session)
     assert rows == []
+
+
+# -- 2a: the family read (feature pass 2026-08-27) -----------------------------
+def test_a_guardian_reads_their_own_childs_attendance_and_nobody_elses(
+    client, app_session, studio, as_guardian, a_session, an_enrolled_student
+):
+    """The day strip's data: statuses per child per session, behind the same
+    EXISTS-on-guardian every /me route stands on. Another family's child in the same
+    session never appears."""
+    from app.models.attendance import Attendance
+    from app.models.person import Guardian
+
+    app_session.add(
+        Guardian(
+            studio_id=studio.id,
+            person_id=as_guardian.person_id,
+            student_id=an_enrolled_student,
+            relation="parent",
+            is_primary=False,
+        )
+    )
+    app_session.add(
+        Attendance(
+            studio_id=studio.id,
+            session_id=a_session,
+            student_id=an_enrolled_student,
+            status="present",
+            marked_at=T0,
+            device_marked_at=T0,
+            client_mark_id=uuid.uuid4(),
+        )
+    )
+    # Another family's mark in the same session -- must not leak.
+    from app.models.people import Student
+    from app.models.person import Person
+
+    stranger_person = Person(studio_id=studio.id, first_name="אחר", last_name="לגמרי")
+    app_session.add(stranger_person)
+    app_session.flush()
+    stranger = Student(
+        studio_id=studio.id, person_id=stranger_person.id, status="active", health_status="missing"
+    )
+    app_session.add(stranger)
+    app_session.flush()
+    app_session.add(
+        Attendance(
+            studio_id=studio.id,
+            session_id=a_session,
+            student_id=stranger.id,
+            status="present",
+            marked_at=T0,
+            device_marked_at=T0,
+            client_mark_id=uuid.uuid4(),
+        )
+    )
+    app_session.commit()
+
+    day = T0.date().isoformat()
+    body = client.get(
+        f"/api/v1/me/attendance?from={day}&to={day}", headers=as_guardian.headers
+    ).json()
+    students = {row["student_id"] for row in body["items"]}
+    assert students == {str(an_enrolled_student)}
+    assert body["items"][0]["status"] == "present"
+
+
+def test_the_family_read_refuses_an_unbounded_range(client, as_guardian):
+    response = client.get(
+        "/api/v1/me/attendance?from=2026-01-01&to=2026-12-31", headers=as_guardian.headers
+    )
+    assert response.status_code == 422

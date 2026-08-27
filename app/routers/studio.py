@@ -97,6 +97,22 @@ def read_studio(_: AnyStaff, session: TenantSessionDep) -> StudioOut:
     return StudioOut.model_validate(logo_service.studio_public_fields(studio))
 
 
+@router.get("/me/studio", response_model=StudioOut)
+def my_studio(request: Request, session: TenantSessionDep) -> StudioOut:
+    """The same public fields, for a GUARDIAN (feature pass 2026-08-27): the parent app's
+    הוראות הגעה screen needs the club's address and phone, and the only prior reads were
+    staff-gated or keyed by a slug the parent never holds. No role dependency, §3.1 --
+    'guardian is not a role'; the shape is the club's shop window, not a settings read."""
+    person_id = getattr(request.state, "person_id", None)
+    if not isinstance(person_id, uuid.UUID):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={"code": "unauthenticated", "message": "sign in first"},
+        )
+    studio = logo_service.active_studio(session, require_current_studio_id())
+    return StudioOut.model_validate(logo_service.studio_public_fields(studio))
+
+
 @router.patch("/studio", response_model=StudioOut)
 def update_studio(
     _: ManagerOrOwner, body: StudioUpdate, request: Request, session: TenantSessionDep

@@ -193,6 +193,59 @@ class EnrollmentService:
         return row
 
     @staticmethod
+    def move(
+        session: Session,
+        *,
+        enrollment_id: uuid.UUID,
+        group_id: uuid.UUID,
+        moved_on: date,
+        at: datetime,
+        actor_person_id: uuid.UUID | None,
+        schedule: ScheduleReader,
+    ) -> Enrollment:
+        """Staff 9c's מעבר כיתה, as ONE decision (feature pass 2026-08-27).
+
+        A move is end-plus-create in a single transaction: the old enrollment ends on the
+        move date, a new active one starts the same day in the target group. Not an
+        UPDATE of group_id -- §5.14's reports read history from enrollments, and a row
+        whose group silently changed would rewrite where the student trained all year.
+
+        `attends_weekdays` deliberately does NOT carry over: it names days of the OLD
+        group's schedule, and C12's pattern is a per-group decision the manager refines
+        after the move.
+        """
+        row = session.get(Enrollment, enrollment_id)
+        if row is None:
+            raise NotFoundError(str(enrollment_id))
+        if row.status == "ended":
+            raise RefusedError("this enrollment already ended; enrol the student instead")
+        if row.group_id == group_id:
+            raise RefusedError("the student is already in this group")
+        row.status = "ended"
+        row.ended_on = moved_on
+        created = EnrollmentService.create(
+            session,
+            student_id=row.student_id,
+            group_id=group_id,
+            started_on=moved_on,
+            attends_weekdays=None,
+            at=at,
+            actor_person_id=actor_person_id,
+            schedule=schedule,
+        )
+        AuditService.record(
+            session,
+            action="enrollment.moved",
+            entity_type="enrollment",
+            entity_id=row.id,
+            studio_id=row.studio_id,
+            actor_person_id=actor_person_id,
+            diff={"from_group": str(row.group_id), "to_group": str(group_id)},
+        )
+        session.flush()
+        return created
+
+    @staticmethod
     def list_for_student(
         session: Session, *, student_id: uuid.UUID, include_ended: bool = False
     ) -> list[tuple[Enrollment, Group]]:

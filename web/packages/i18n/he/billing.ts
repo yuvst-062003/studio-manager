@@ -50,6 +50,22 @@ export const billing: Bundle = {
   'standingOrder.notConfirmable': 'תשלום בהוראת קבע נרשם על ידי המועדון לאחר קבלתו',
 
   'cash.instructions': 'שלמו למאמן בתחילת החודש',
+  'cash.request': 'אבקש לשלם במזומן',
+  'cash.requested': 'הבקשה נשלחה למנהל — החיוב ייסגר כשהמזומן יתקבל.',
+  'cash.pendingChip': 'מזומן בהמתנה',
+  'cash.pendingTitle': 'ממתין לאישור המנהל',
+  'cash.declined': 'בקשת המזומן נדחתה — אפשר לשלם בדרך אחרת או לדבר עם המנהל.',
+  'cash.manager.title': 'בקשות תשלום במזומן',
+  'cash.manager.empty': 'אין בקשות מזומן פתוחות.',
+  'cash.manager.confirm': 'המזומן התקבל',
+  'cash.manager.decline': 'לא התקבל',
+  'cash.manager.charges': 'חיובים',
+  'shop.title': 'חנות המועדון',
+  'shop.empty': 'אין פריטים למכירה כרגע.',
+  'shop.order': 'הזמנה',
+  'shop.ordered': 'ההזמנה נוצרה — אפשר לשלם עכשיו בכרטיס או במזומן.',
+  'shop.toPayment': 'למסך התשלומים',
+  'shop.quantity': 'כמות',
 
   // D9.3 — the email affordance is card rows only, and the reason is on the screen.
   'receipt.email': 'שליחת קבלה במייל',

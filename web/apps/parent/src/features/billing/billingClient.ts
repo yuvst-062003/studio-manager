@@ -21,8 +21,20 @@ export type Fetcher = (path: string, init?: RequestInit) => Promise<Response>
 /** The uPay form as data: an action and hidden fields the client posts. */
 export type UpayForm = { action: string; fields: Record<string, string> }
 
+/** 'אני אשלם במזומן' over specific charges — raised here, decided by a manager. */
+export type CashRequestOut = {
+  id: string
+  status: 'pending' | 'received' | 'declined'
+  total_agorot: number
+  charge_ids: string[]
+  created_at: string
+  decided_at: string | null
+}
+
 export type BillingClient = {
   openCharges(payerPersonId: string): Promise<ChargeOut[]>
+  cashRequests(): Promise<CashRequestOut[]>
+  requestCash(chargeIds: string[]): Promise<CashRequestOut>
   balance(payerPersonId: string): Promise<PayerBalanceOut>
   payments(payerPersonId: string): Promise<PaymentOut[]>
   products(): Promise<ProductOut[]>

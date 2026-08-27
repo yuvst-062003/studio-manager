@@ -27,6 +27,8 @@ import type { InstallPromptEvent } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { Resolve } from './features/identity/Resolve'
+import { CashSection } from './features/billing/CashSection'
+import { JoinLinkSection } from './features/people/JoinLinkSection'
 import { ScheduleSection } from './features/schedule/ScheduleSection'
 import { makeStaffScheduleClient } from './features/schedule/client'
 import { useToday } from './features/schedule/useToday'
@@ -145,6 +147,11 @@ export default function App() {
   useQueueFlusher(membership?.person_id ?? null)
   const viewerIsCoach =
     membership?.roles.some((role) => role === 'lead_coach' || role === 'assistant_coach') ?? false
+  // The one money surface this app carries (feature pass 2026-08-27): the cash-request
+  // decisions, for the manager standing at the door. §13's invariant is about
+  // coach-scoped endpoints, and neither the entry nor the screen exists for a coach.
+  const viewerIsManager =
+    membership?.roles.some((role) => role === 'owner' || role === 'manager') ?? false
   // Staff `9h` is one hash away from Today. The card (`9c`) and the mid-lesson trial
   // (`11b`) open from a roster row, which is M5's screen — they are exported from
   // features/people for that lane to mount without reopening this file.
@@ -154,6 +161,8 @@ export default function App() {
   // screen would change only when something else happened to re-render App. One
   // subscription serves both lanes' routes.
   const onStudents = hash === '#/students'
+  const onCash = hash === '#/cash'
+  const onJoinLink = hash === '#/join-link'
   // §5.7's register, opened from a session. The id is in the hash so the back button works
   // and a link survives a reload — the same shape both W2 lanes settled on, and the reason
   // NAV's `/attendance` entry became a hash below.
@@ -198,9 +207,17 @@ export default function App() {
       {session.status === 'signed-in' ? (
         <AppShell
           title={session.activeStudioName ?? ''}
-          items={NAV}
+          items={
+            viewerIsManager
+              ? [
+                  ...NAV,
+                  { key: 'cash', labelKey: 'billing.cash.manager.title', href: '#/cash' },
+                  { key: 'joinLink', labelKey: 'people.join.card.title', href: '#/join-link' },
+                ]
+              : NAV
+          }
           locale={locale}
-          drawerFooter={<AccountDrawerFooter locale={locale} onChooseLocale={setLocale} />}
+          drawerFooter={<AccountDrawerFooter locale={locale} onChooseLocale={setLocale} accountName={session.displayName} />}
           studios={session.studios.map((s) => ({
             studioId: s.studio_id,
             studioName: s.studio_name,
@@ -307,6 +324,10 @@ export default function App() {
               viewerPersonId={membership?.person_id}
               viewerIsCoach={viewerIsCoach}
             />
+          ) : session.access.staff && viewerIsManager && onCash ? (
+            <CashSection locale={locale} />
+          ) : session.access.staff && viewerIsManager && onJoinLink ? (
+            <JoinLinkSection locale={locale} />
           ) : session.access.staff && onStudents ? (
             <StudentsSearch locale={locale} client={peopleClient} />
           ) : session.access.staff && examEventId ? (

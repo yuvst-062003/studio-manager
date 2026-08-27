@@ -129,4 +129,13 @@ export const reports: Bundle = {
   'privacy.photo.allowed': 'Фотографии публиковать можно',
   'privacy.photo.notAllowed': 'Фотографии публиковать нельзя',
   'privacy.photo.notRecorded': 'Согласие не зафиксировано',
+
+  // Send-monthly (feature pass 2026-08-27) — emails the report, so a confirm stands
+  // between the button and real inboxes.
+  'send.button': 'Отправить месячный отчёт на почту',
+  'send.title': 'Отправить месячный отчёт?',
+  'send.body': 'Отчёт за {{month}} будет отправлен на ваш адрес электронной почты.',
+  'send.confirm': 'Отправить',
+  'send.cancel': 'Отмена',
+  'send.done': 'Отчёт отправлен на почту',
 }

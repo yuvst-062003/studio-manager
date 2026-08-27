@@ -249,6 +249,7 @@ export const common: Bundle = {
   'home.noUpcoming': 'אין עדיין שיעורים מתוזמנים.',
   'home.noUpcomingWeek': 'אין שיעורים מתוזמנים בשבוע הקרוב.',
   'home.noAlerts': 'אין התראות פתוחות.',
+  'home.dayStrip': 'רצועת ימים',
   'home.debt.title': 'חוב פתוח',
   'home.debt.cta': 'לתשלום',
   'home.allChildren': 'הכל',

@@ -14,10 +14,10 @@
 // wrapper or a transform would flip `1,280₪` to `₪1,280`.
 import { useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { Alert, BeltBar, Button, Card, EmptyState, MoneyDisplay, SegmentedControl } from '@studio/ui'
+import { Alert, BeltBar, Button, Card, EmptyState, MoneyDisplay, SegmentedControl, StatusChip } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
-import type { BillingClient, ChargeOut } from './billingClient'
+import type { BillingClient, CashRequestOut, ChargeOut } from './billingClient'
 import { instalmentSplit, oldestMonths, selectionTotal } from './billingClient'
 
 //: §5.10's own chip groups: `[1] [2] [3] [6]` months, `[1] [2] [3]` instalments.
@@ -63,6 +63,9 @@ export type PaymentsScreenProps = {
   hasActiveSubscription: boolean
   standingOrderLink: string | null
   cashInstructions: string | null
+  /** The payer's own requests — a pending one turns the cash card into a status. */
+  cashRequests?: readonly CashRequestOut[]
+  onCashRequest?: (chargeIds: string[]) => Promise<void>
   onOrderOpened: (form: { action: string; fields: Record<string, string> }) => void
   onOpenHistory: () => void
 }
@@ -74,13 +77,23 @@ export function PaymentsScreen({
   hasActiveSubscription,
   standingOrderLink,
   cashInstructions,
+  cashRequests = [],
+  onCashRequest,
   onOrderOpened,
   onOpenHistory,
 }: PaymentsScreenProps) {
   const [months, setMonths] = useState(2)
   const [instalments, setInstalments] = useState(1)
   const [inFlight, setInFlight] = useState(false)
+  const [cashInFlight, setCashInFlight] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const pendingCash = cashRequests.find((request) => request.status === 'pending') ?? null
+  const cashPendingChargeIds = new Set(pendingCash?.charge_ids ?? [])
+  // Say a decline out loud exactly until the family acts on it: the newest DECIDED
+  // request being a decline, with nothing pending, is the state that needs the sentence.
+  const latestDecided = cashRequests.find((request) => request.decided_at !== null) ?? null
+  const declinedCash = !pendingCash && latestDecided?.status === 'declined' ? latestDecided : null
 
   // Only charges nothing else already covers are selectable. §5.10's guard 1, and the
   // reason a covered row still RENDERS: hiding it would leave a parent looking for a month
@@ -143,6 +156,9 @@ export function PaymentsScreen({
                 <span data-testid="covered-elsewhere">
                   {t(locale, 'billing.card.coveredElsewhere')}
                 </span>
+              ) : null}
+              {cashPendingChargeIds.has(row.charge.id) ? (
+                <StatusChip status="pending" label={t(locale, 'billing.cash.pendingChip')} />
               ) : null}
             </div>
           ))}
@@ -245,6 +261,40 @@ export function PaymentsScreen({
         <div data-testid="route-cash">
           <h3>{t(locale, 'billing.method.cash')}</h3>
           <p>{cashInstructions ?? t(locale, 'billing.cash.instructions')}</p>
+          {pendingCash ? (
+            // One live request at a time: while the manager holds one, the card reports
+            // it instead of offering a second.
+            <div data-testid="cash-pending">
+              <StatusChip status="pending" label={t(locale, 'billing.cash.pendingTitle')} />
+              <p>{t(locale, 'billing.cash.requested')}</p>
+              <MoneyDisplay agorot={pendingCash.total_agorot} tone="pending" />
+            </div>
+          ) : (
+            <>
+              {declinedCash ? (
+                <Alert tone="danger" live iconLabel={t(locale, 'billing.method.cash')}>
+                  {t(locale, 'billing.cash.declined')}
+                </Alert>
+              ) : null}
+              {onCashRequest && chosen.length > 0 ? (
+                <Button
+                  variant="secondary"
+                  data-testid="cash-request-button"
+                  disabled={cashInFlight}
+                  onClick={() => {
+                    if (cashInFlight) return
+                    setCashInFlight(true)
+                    setError(null)
+                    onCashRequest(chosen.map((charge) => charge.id))
+                      .catch(() => setError(t(locale, 'common.error.generic')))
+                      .finally(() => setCashInFlight(false))
+                  }}
+                >
+                  {t(locale, 'billing.cash.request')}
+                </Button>
+              ) : null}
+            </>
+          )}
         </div>
       </Card>
     </div>

@@ -432,13 +432,36 @@ def me(request: Request, session: SessionDep) -> MeResponse:
         [acting_as] if isinstance(acting_as, uuid.UUID) else [m.person_id for m in memberships]
     )
     access = app_access(session, subject_person_ids)
+
+    # The person whose name the shells show: the acting persona while one is active,
+    # else the membership in the ACTIVE studio, else the first membership. A name and
+    # nothing else -- the id is already on the response, and G15 keeps names out of
+    # everything that must survive anonymization.
+    active_studio_id = getattr(request.state, "studio_id", None)
+    named_person_id = (
+        acting_as
+        if isinstance(acting_as, uuid.UUID)
+        else next(
+            (m.person_id for m in memberships if m.studio_id == active_studio_id),
+            memberships[0].person_id if memberships else None,
+        )
+    )
+    display_name: str | None = None
+    if named_person_id is not None:
+        from app.models.person import Person
+
+        person = session.get(Person, named_person_id)
+        if person is not None:
+            display_name = f"{person.first_name} {person.last_name}"
+
     return MeResponse(
         identity_id=identity_id,
         access=AppAccessOut(staff=access.staff, parent=access.parent),
         studios=[_membership_out(m) for m in memberships],
-        active_studio_id=getattr(request.state, "studio_id", None),
+        active_studio_id=active_studio_id,
         dev_tools=bool(getattr(request.state, "is_developer", False)),
         acting_as_person_id=getattr(request.state, "acting_as_person_id", None),
+        display_name=display_name,
     )
 
 

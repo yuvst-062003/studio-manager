@@ -20,6 +20,9 @@ export type Session = {
   actingAsPersonId: string | null
   actingAsLabel: string | null
   activeStudioName: string | null
+  /** The signed-in person's name for the active studio (feature pass 2026-08-27) —
+   *  what the sidebar footer and the drawer header render. */
+  displayName: string | null
   reload: () => Promise<void>
   signOut: () => Promise<void>
 }
@@ -29,6 +32,7 @@ const NO_ACCESS: AppAccess = { staff: false, parent: false }
 export function useSession(): Session {
   const [status, setStatus] = useState<SessionStatus>('loading')
   const [state, setState] = useState<SessionState | null>(null)
+  const [displayName, setDisplayName] = useState<string | null>(null)
   const [dev, setDev] = useState<{ devTools: boolean; actingAs: string | null; label: string | null }>({
     devTools: false,
     actingAs: null,
@@ -65,6 +69,7 @@ export function useSession(): Session {
           actingAs: me.acting_as_person_id ?? null,
           label: response.headers.get('X-Acting-As'),
         })
+        setDisplayName(me.display_name ?? null)
       }
     } catch {
       // /auth/me failing leaves the refresh's own answer in place. It is the same data,
@@ -109,11 +114,13 @@ export function useSession(): Session {
     actingAsPersonId: dev.actingAs,
     actingAsLabel: dev.label,
     activeStudioName: active?.studio_name ?? null,
+    displayName,
     reload: load,
     signOut: async () => {
       await signOut()
       setState(null)
       setDev({ devTools: false, actingAs: null, label: null })
+      setDisplayName(null)
       setStatus('anonymous')
     },
   }

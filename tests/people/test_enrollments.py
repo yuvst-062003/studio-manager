@@ -439,3 +439,98 @@ def _student_via_api(client, caller) -> str:
     )
     assert response.status_code == 201, response.text
     return response.json()["student"]["id"]
+
+
+# -- 9c: the group move (feature pass 2026-08-27) ------------------------------
+def test_a_move_ends_the_old_enrollment_and_opens_one_in_the_target_group(
+    tenant_session, a_student_id, a_group, a_second_group, twice_weekly
+):
+    """End-plus-create in one decision, never an UPDATE of group_id: §5.14's reports read
+    where the student trained from enrollment history, and a silently regrouped row would
+    rewrite the year."""
+    old = EnrollmentService.create(
+        tenant_session,
+        student_id=a_student_id,
+        group_id=a_group,
+        started_on=TODAY,
+        attends_weekdays=[0],
+        at=T0,
+        actor_person_id=None,
+        schedule=twice_weekly,
+    )
+    moved = EnrollmentService.move(
+        tenant_session,
+        enrollment_id=old.id,
+        group_id=a_second_group,
+        moved_on=TODAY,
+        at=T0,
+        actor_person_id=None,
+        schedule=twice_weekly,
+    )
+    tenant_session.commit()
+
+    assert old.status == "ended"
+    assert old.ended_on == TODAY
+    assert moved.group_id == a_second_group
+    assert moved.status == "active"
+    assert moved.started_on == TODAY
+    # C12: the pattern names the OLD group's days and does not carry over.
+    assert moved.attends_weekdays is None
+
+
+def test_a_move_into_the_same_group_is_refused(tenant_session, a_student_id, a_group, twice_weekly):
+    row = EnrollmentService.create(
+        tenant_session,
+        student_id=a_student_id,
+        group_id=a_group,
+        started_on=TODAY,
+        attends_weekdays=None,
+        at=T0,
+        actor_person_id=None,
+        schedule=twice_weekly,
+    )
+    with pytest.raises(RefusedError):
+        EnrollmentService.move(
+            tenant_session,
+            enrollment_id=row.id,
+            group_id=a_group,
+            moved_on=TODAY,
+            at=T0,
+            actor_person_id=None,
+            schedule=twice_weekly,
+        )
+
+
+def test_a_move_of_an_ended_enrollment_is_refused(
+    tenant_session, a_student_id, a_group, a_second_group, twice_weekly
+):
+    row = EnrollmentService.create(
+        tenant_session,
+        student_id=a_student_id,
+        group_id=a_group,
+        started_on=TODAY,
+        attends_weekdays=None,
+        at=T0,
+        actor_person_id=None,
+        schedule=twice_weekly,
+    )
+    EnrollmentService.update(
+        tenant_session,
+        enrollment_id=row.id,
+        status="ended",
+        ended_on=TODAY,
+        attends_weekdays=None,
+        at=T0,
+        actor_person_id=None,
+        schedule=twice_weekly,
+    )
+    with pytest.raises(RefusedError):
+        EnrollmentService.move(
+            tenant_session,
+            enrollment_id=row.id,
+            group_id=a_second_group,
+            moved_on=TODAY,
+            at=T0,
+            actor_person_id=None,
+            schedule=twice_weekly,
+        )

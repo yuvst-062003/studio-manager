@@ -278,3 +278,91 @@ def student_attendance(
         next_cursor=next_cursor,
         has_more=next_cursor is not None,
     )
+
+
+# -- 2a: the family's attendance, read by a guardian (feature pass 2026-08-27) --------
+from datetime import UTC as _UTC  # noqa: E402 -- grouped with its one route below
+from datetime import date as _date  # noqa: E402
+from datetime import datetime as _datetime  # noqa: E402
+from datetime import time as _time  # noqa: E402
+from datetime import timedelta as _timedelta  # noqa: E402
+
+from pydantic import BaseModel as _BaseModel  # noqa: E402
+
+from app.models.attendance import Attendance  # noqa: E402
+from app.models.schedule import Session as SessionRow  # noqa: E402
+from app.models.structure import Group  # noqa: E402
+
+
+class FamilyAttendanceRow(_BaseModel):
+    student_id: uuid.UUID
+    session_id: uuid.UUID
+    starts_at: str
+    group_name: str
+    status: str
+
+
+class FamilyAttendanceOut(_BaseModel):
+    items: list[FamilyAttendanceRow]
+
+
+@router.get("/me/attendance", response_model=FamilyAttendanceOut)
+def my_family_attendance(
+    request: Request,
+    session: TenantSessionDep,
+    date_from: Annotated[_date, Query(alias="from")],
+    date_to: Annotated[_date, Query(alias="to")],
+) -> FamilyAttendanceOut:
+    """2a's day strip: what actually happened, per child, per session.
+
+    Statuses only, never a coach's note and never anything financial -- §5.5 gives a
+    guardian their own children's record, and the EXISTS-on-guardian filter is the same
+    §3.3 query every /me route stands on. No role dependency (§3.1). Capped to a 62-day
+    window: the strip reads weeks, and an unbounded range is a table scan someone will
+    eventually aim at January-to-December.
+    """
+    person_id = getattr(request.state, "person_id", None)
+    if not isinstance(person_id, uuid.UUID):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={"code": "unauthenticated", "message": "sign in first"},
+        )
+    if date_to < date_from or (date_to - date_from).days > 62:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={"code": "refused", "message": "the range must be 0-62 days"},
+        )
+    my_students = select(Guardian.student_id).where(Guardian.person_id == person_id)
+    rows = session.execute(
+        select(
+            Attendance.student_id,
+            Attendance.session_id,
+            SessionRow.starts_at,
+            Group.name,
+            Attendance.status,
+        )
+        .join(SessionRow, SessionRow.id == Attendance.session_id)
+        .join(Group, Group.id == SessionRow.group_id)
+        .where(
+            Attendance.student_id.in_(my_students),
+            # UTC bounds, padded a day each side: the client groups by the STUDIO day
+            # (G3), and a session near midnight must not fall off the strip's edge.
+            SessionRow.starts_at
+            >= _datetime.combine(date_from - _timedelta(days=1), _time.min, tzinfo=_UTC),
+            SessionRow.starts_at
+            < _datetime.combine(date_to + _timedelta(days=2), _time.min, tzinfo=_UTC),
+        )
+        .order_by(SessionRow.starts_at)
+    ).all()
+    return FamilyAttendanceOut(
+        items=[
+            FamilyAttendanceRow(
+                student_id=student_id,
+                session_id=session_id,
+                starts_at=starts_at.isoformat(),
+                group_name=group_name,
+                status=attendance_status,
+            )
+            for student_id, session_id, starts_at, group_name, attendance_status in rows
+        ]
+    )

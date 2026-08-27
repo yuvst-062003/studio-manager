@@ -17,10 +17,11 @@ from __future__ import annotations
 
 import uuid
 from enum import Enum
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 
-from app.core.auth_context import AnyStaff, ManagerOrOwner
+from app.core.auth_context import AnyStaff, ManagerOrOwner, require_roles
 from app.core.clock import now
 from app.core.tenancy import TenantSessionDep
 from app.models.people import Enrollment
@@ -28,6 +29,7 @@ from app.models.structure import Group
 from app.schemas._pagination import IdempotencyKey
 from app.schemas.people import (
     EnrollmentCreate,
+    EnrollmentMoveIn,
     EnrollmentOut,
     EnrollmentUpdate,
     EnrollmentWeekdayOptionsOut,
@@ -35,6 +37,10 @@ from app.schemas.people import (
 from app.services.people.enrollments import EnrollmentService
 from app.services.people.errors import ConflictError, NotFoundError, RefusedError
 from app.services.schedule import ScheduleService
+
+#: 9c -- מעבר כיתה is the lead coach's action, and §3.2 gives managers everything a
+#: lead coach has. An assistant coach is refused.
+LeadOrManager = Annotated[None, Depends(require_roles("owner", "manager", "lead_coach"))]
 
 router = APIRouter(tags=["people"])
 
@@ -183,6 +189,49 @@ def update_enrollment(
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail={"code": "not_a_training_day", "message": str(exc)},
+        ) from exc
+    except NotImplementedError as exc:
+        raise _schedule_unavailable() from exc
+    session.commit()
+    group = session.get(Group, row.group_id)
+    assert group is not None
+    return _out(row, group)
+
+
+@router.post("/enrollments/{enrollment_id}/move", response_model=EnrollmentOut)
+def move_enrollment(
+    _: LeadOrManager,
+    enrollment_id: uuid.UUID,
+    body: EnrollmentMoveIn,
+    request: Request,
+    session: TenantSessionDep,
+    idempotency_key: IdempotencyKey = None,
+) -> EnrollmentOut:
+    """Staff 9c's מעבר כיתה, one call (feature pass 2026-08-27): the old enrollment ends
+    on the move date and an active one starts in the target group, in one transaction.
+    Lead coach or manager -- 9c calls it "פעולה של המאמן הראשי בלבד", and §3.2 gives the
+    manager everything the lead coach has."""
+    try:
+        row = EnrollmentService.move(
+            session,
+            enrollment_id=enrollment_id,
+            group_id=body.group_id,
+            moved_on=body.moved_on or now().date(),
+            at=now(),
+            actor_person_id=getattr(request.state, "person_id", None),
+            schedule=ScheduleService(session),
+        )
+    except NotFoundError as exc:
+        raise _not_found("enrollment") from exc
+    except ConflictError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"code": "already_enrolled", "message": str(exc)},
+        ) from exc
+    except RefusedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={"code": "refused", "message": str(exc)},
         ) from exc
     except NotImplementedError as exc:
         raise _schedule_unavailable() from exc

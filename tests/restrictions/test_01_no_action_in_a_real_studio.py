@@ -117,6 +117,13 @@ SESSION_DEP_ALLOWLIST: dict[str, str] = {
         "before/around the studio's own scoped state exists, not inside a "
         "TenantSession that fails closed the moment no studio is in context."
     ),
+    "onboarding.py": (
+        "GET /public/onboarding/{token} and POST /onboarding/{token}/register begin "
+        "BEFORE a tenant exists in context: the token itself names the studio, so the "
+        "route resolves it with the unscoped session and then re-enters through "
+        "use_studio(link.studio_id) + TenantSession for every tenant-scoped read and "
+        "write -- the same public.py pattern restriction 1 already accepts."
+    ),
     "identity.py": (
         "SPEC 5.2's auth routes run BEFORE a studio exists -- there is no tenant in "
         "context between the redirect out and the callback back -- and 3.3 requires one "

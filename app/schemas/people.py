@@ -70,6 +70,9 @@ class StudentOut(BaseModel):
     birthdate: date | None
     status: str = Field(pattern=STUDENT_STATUS_PATTERN)
     health_status: str = Field(pattern=HEALTH_STATUS_PATTERN)
+    #: Where the student came from -- §5.4b's checklist chip renders when this reads
+    #: 'onboarding_link', the ניסיון-chip pattern applied to the migration cohort.
+    source: str | None = None
     joined_on: date | None
     left_on: date | None
     current_belt_id: uuid.UUID | None
@@ -204,6 +207,13 @@ class EnrollmentUpdate(BaseModel):
     status: str | None = Field(default=None, pattern=ENROLLMENT_STATUS_PATTERN)
     ended_on: date | None = None
     attends_weekdays: list[Weekday] | None = Field(default=None, min_length=1)
+
+
+class EnrollmentMoveIn(BaseModel):
+    """Staff 9c's move: the target group, and optionally the effective date."""
+
+    group_id: uuid.UUID
+    moved_on: date | None = None
 
 
 class TrialBookingOut(BaseModel):
@@ -363,6 +373,9 @@ class StudentSummaryOut(BaseModel):
     #: open-ended freeze, which is a real state a manager sets deliberately.
     frozen_until: date | None = None
     guardian_display_names: list[str] = Field(default_factory=list)
+    #: Where the student came from — 'onboarding_link' rows get 3b's chip so a manager
+    #: can spot self-registered families that still need a look (feature pass 2026-08-27).
+    source: str | None = None
 
 
 class StudentDetailOut(BaseModel):

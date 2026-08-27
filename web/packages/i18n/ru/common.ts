@@ -250,6 +250,7 @@ export const common: Bundle = {
   'home.noUpcoming': 'Занятия пока не запланированы.',
   'home.noUpcomingWeek': 'На ближайшую неделю занятия не запланированы.',
   'home.noAlerts': 'Ничего не требует вашего внимания.',
+  'home.dayStrip': 'Лента дней',
   'home.debt.title': 'Открытый долг',
   'home.debt.cta': 'Оплатить',
   'home.allChildren': 'Все',

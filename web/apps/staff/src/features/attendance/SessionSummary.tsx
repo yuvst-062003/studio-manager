@@ -55,16 +55,19 @@ export function SessionSummary({
 
       <ul data-testid="summary-counts">
         <li data-count="present">
-          {counts.present} · {t(locale, 'attendance.roster.present')}
+          <span className="count-number">{counts.present}</span>
+          <span className="count-label">{t(locale, 'attendance.roster.present')}</span>
         </li>
         <li data-count="absent">
-          {counts.absent} · {t(locale, 'attendance.roster.absent')}
+          <span className="count-number">{counts.absent}</span>
+          <span className="count-label">{t(locale, 'attendance.roster.absent')}</span>
         </li>
         {/* `9g` finding 3 — this state renders with no semantic colour here and `--pending`
             on `1c` and `9f`. One state, one role: the tile carries `data-count`, and the
             stylesheet gives all three their semantic token. */}
         <li data-count="pre-reported">
-          {counts.preReported} · {t(locale, 'attendance.source.preReported')}
+          <span className="count-number">{counts.preReported}</span>
+          <span className="count-label">{t(locale, 'attendance.source.preReported')}</span>
         </li>
       </ul>
 

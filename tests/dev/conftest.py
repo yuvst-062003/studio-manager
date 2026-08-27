@@ -68,6 +68,11 @@ RELOADABLE = (
     # `settings` binding like the routers above it. Frozen, a production-env test would
     # seed a platform operator the environment says it must not.
     "app.services.demo.personas",
+    # 5.4b (feature pass 2026-08-27) -- the onboarding link's URL and the landing URL are
+    # both app_origin(..., settings.ENV) reads off a module-scope binding, same rule as
+    # identity.py above: frozen, a staging regenerate would hand a manager a development
+    # host to paste into WhatsApp.
+    "app.routers.onboarding",
     "app.main",
     # Not part of app.main's import graph -- this harness never reaches it, and
     # tests/dev/test_demo_reset_worker.py monkeypatches settings.ENV on the live

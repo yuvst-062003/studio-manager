@@ -38,6 +38,7 @@ import { SettingsScreen } from './features/settings/SettingsScreen'
 import {
   AddStudentScreen,
   AlertCentre,
+  SharingCards,
   StudentDetailScreen,
   StudentsScreen,
   makeDashboardPeopleClient,
@@ -425,9 +426,13 @@ export default function App() {
                 icon: <Icon name="settings" />,
                 active: route === 'settings',
               }}
-              // No footer yet, deliberately: the canvas draws the signed-in person's
-              // name there and the session carries no display name — the dev bar already
-              // shows the acting persona, and a raw UUID in a footer is worse than none.
+              footer={
+                // The canvas's user footer, real since /auth/me carries display_name
+                // (feature pass 2026-08-27). No note line: the only candidate is the
+                // acting-as header, which is a person UUID — the dev bar already names
+                // the persona in words.
+                session.displayName ? { name: session.displayName } : undefined
+              }
             />
           }
           studios={session.studios.map((s) => ({
@@ -470,13 +475,17 @@ export default function App() {
             />
           ) : null}
           {route === 'students' && !studentRoute ? (
-            <StudentsScreen
-              locale={locale}
-              client={peopleClient}
-              onOpen={(id) => {
-                globalThis.location.hash = `#/students/${id}`
-              }}
-            />
+            <>
+              {/* §5.4b + §5.4a — the two links a club shares, where people are managed. */}
+              {canSeeMoney ? <SharingCards locale={locale} /> : null}
+              <StudentsScreen
+                locale={locale}
+                client={peopleClient}
+                onOpen={(id) => {
+                  globalThis.location.hash = `#/students/${id}`
+                }}
+              />
+            </>
           ) : null}
           {route === 'alerts' ? (
             <AlertCentre locale={locale} client={peopleClient} />
@@ -555,7 +564,14 @@ export default function App() {
           {route === 'documents' ? <DocumentsSection locale={locale} /> : null}
           {route === 'prices' ? <PricesSection locale={locale} /> : null}
           {route === 'reports' && session.activeStudioId ? (
-            <ReportsSection locale={locale} studioId={session.activeStudioId} />
+            <ReportsSection
+              locale={locale}
+              studioId={session.activeStudioId}
+              selfPersonId={
+                session.studios.find((s) => s.studio_id === session.activeStudioId)?.person_id ??
+                null
+              }
+            />
           ) : null}
         </AppShell>
       ) : null}

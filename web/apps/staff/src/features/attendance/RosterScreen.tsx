@@ -166,15 +166,20 @@ export function RosterScreen({
         ) : null}
 
         {/* `1c`'s three count tiles. */}
+        {/* 1c draws each tile as the number over its label, the number in the tile's
+            own semantic colour — the styling pass (2026-08-27) made the markup match. */}
         <ul data-testid="roster-counts">
           <li data-count="present">
-            {counts.present} · {t(locale, 'attendance.roster.present')}
+            <span className="count-number">{counts.present}</span>
+            <span className="count-label">{t(locale, 'attendance.roster.present')}</span>
           </li>
           <li data-count="absent">
-            {counts.absent} · {t(locale, 'attendance.roster.absent')}
+            <span className="count-number">{counts.absent}</span>
+            <span className="count-label">{t(locale, 'attendance.roster.absent')}</span>
           </li>
           <li data-count="unmarked">
-            {counts.unmarked} · {t(locale, 'attendance.roster.unmarked')}
+            <span className="count-number">{counts.unmarked}</span>
+            <span className="count-label">{t(locale, 'attendance.roster.unmarked')}</span>
           </li>
         </ul>
 

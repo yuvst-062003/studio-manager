@@ -104,3 +104,7 @@ class MeResponse(BaseModel):
     dev_tools: bool
     #: §19.4 -- the persona the API is resolving permissions from.
     acting_as_person_id: uuid.UUID | None
+    #: The signed-in person's name, resolved for the ACTIVE studio (or the acting
+    #: persona). Feature pass 2026-08-27: the sidebar footer and the drawer account
+    #: header (2e) both draw a name the session never carried.
+    display_name: str | None = None

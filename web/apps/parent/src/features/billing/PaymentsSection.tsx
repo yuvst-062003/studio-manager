@@ -16,6 +16,7 @@ import { PaymentsScreen } from './PaymentsScreen'
 import type { DebtRow } from './PaymentsScreen'
 import type {
   BillingClient,
+  CashRequestOut,
   ChargeOut,
   PayerBalanceOut,
   PaymentOrderOut,
@@ -47,6 +48,19 @@ export function makeParentBillingClient(fetcher: Fetcher): BillingClient {
     async openCharges() {
       const response = await fetcher('/api/v1/me/charges?status=open')
       return (await json<{ items: ChargeOut[] }>(response)).items
+    },
+    async cashRequests() {
+      const response = await fetcher('/api/v1/me/cash-requests')
+      return (await json<{ items: CashRequestOut[] }>(response)).items
+    },
+    async requestCash(chargeIds) {
+      return json<CashRequestOut>(
+        await fetcher('/api/v1/me/cash-requests', {
+          method: 'POST',
+          headers: JSON_HEADERS,
+          body: JSON.stringify({ charge_ids: chargeIds }),
+        }),
+      )
     },
     async balance() {
       return json<PayerBalanceOut>(await fetcher('/api/v1/me/balance'))
@@ -93,6 +107,7 @@ export function PaymentsSection({ locale }: { locale: Locale }) {
   const client = useMemo(() => makeParentBillingClient(apiFetch), [])
   const [debts, setDebts] = useState<readonly DebtRow[]>([])
   const [standingOrder, setStandingOrder] = useState(false)
+  const [cashRequests, setCashRequests] = useState<readonly CashRequestOut[]>([])
   const [loaded, setLoaded] = useState(false)
   // Bumped to re-read after an order opens. A counter rather than calling the loader
   // directly, so there is exactly one place that writes `debts` — `react-hooks`'
@@ -103,8 +118,12 @@ export function PaymentsSection({ locale }: { locale: Locale }) {
   useEffect(() => {
     let alive = true
     void (async () => {
-      const [charges, mandate, children] = await Promise.all([
+      const [charges, cash, mandate, children] = await Promise.all([
         client.openCharges(''),
+        // The payer's own cash requests, beside the charges: a pending one badges its
+        // rows and swaps the cash card's button for a status; a declined one is said
+        // out loud rather than left to be inferred from silence.
+        client.cashRequests().catch(() => [] as CashRequestOut[]),
         // §5.10's second guard, asked of the person it is a guard for. One request beside
         // the charges rather than after them: the warning has to be on screen the first
         // time the card route is, or it is a warning nobody sees before deciding.
@@ -127,6 +146,7 @@ export function PaymentsSection({ locale }: { locale: Locale }) {
       )
       if (!alive) return
       setStandingOrder(mandate.active)
+      setCashRequests(cash)
       setDebts(
         charges.map((charge) => ({
           charge,
@@ -164,6 +184,11 @@ export function PaymentsSection({ locale }: { locale: Locale }) {
       // payment, unlike the three reads that used to.
       standingOrderLink={null}
       cashInstructions={null}
+      cashRequests={cashRequests}
+      onCashRequest={async (chargeIds) => {
+        await client.requestCash(chargeIds)
+        refresh()
+      }}
       onOrderOpened={(form) => {
         if (form.action === DEMO_SIMULATOR.action) {
           // Nothing to submit: no live form exists here by design. The order is open and

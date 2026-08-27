@@ -240,6 +240,7 @@ export const common: Bundle = {
   'home.noUpcoming': 'No lessons are scheduled yet.',
   'home.noUpcomingWeek': 'No lessons are scheduled in the coming week.',
   'home.noAlerts': 'Nothing needs your attention.',
+  'home.dayStrip': 'Day strip',
   'home.debt.title': 'Open balance',
   'home.debt.cta': 'Pay now',
   'home.allChildren': 'All',

@@ -80,12 +80,45 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* 1c's tile anatomy: the count large and in the tile's own semantic colour, the label
+ * small and muted underneath. The colour rides `data-count`, same as the border. */
+[data-testid='roster-counts'] .count-number,
+[data-testid='summary-counts'] .count-number {
+  display: block;
+
+  /* 1c draws the count at 20px/600 — between --text-title and --text-display. */
+  font-size: 1.25rem;
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-tight);
+}
+
+[data-testid='roster-counts'] .count-label,
+[data-testid='summary-counts'] .count-label {
+  display: block;
+  margin-block-start: var(--space-1);
+  font-size: var(--text-caption);
+  color: var(--text-secondary);
+}
+
 [data-count='present'] {
   border-color: var(--paid);
 }
 
+[data-count='present'] .count-number {
+  color: var(--paid);
+}
+
 [data-count='absent'] {
   border-color: var(--danger);
+}
+
+[data-count='absent'] .count-number {
+  color: var(--danger);
+}
+
+[data-count='unmarked'] .count-number,
+[data-count='pre-reported'] .count-number {
+  color: var(--pending);
 }
 
 /* 9g finding 3 — "notified in advance" renders with no semantic colour on 9g and --pending

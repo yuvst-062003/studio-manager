@@ -54,6 +54,20 @@ export type DashboardBillingClient = {
     activeFrom: string
   }): Promise<PricePlanOut>
   products(): Promise<ProductOut[]>
+  cashRequests(status?: string): Promise<ManagerCashRequestOut[]>
+  confirmCash(requestId: string): Promise<void>
+  declineCash(requestId: string): Promise<void>
+}
+
+/** The manager's view of 'אני אשלם במזומן' — who, how much, since when. */
+export type ManagerCashRequestOut = {
+  id: string
+  status: 'pending' | 'received' | 'declined'
+  total_agorot: number
+  payer_person_id: string
+  payer_name: string
+  charge_count: number
+  created_at: string
 }
 
 export function makeDashboardBillingClient(fetcher: Fetcher): DashboardBillingClient {
@@ -120,6 +134,20 @@ export function makeDashboardBillingClient(fetcher: Fetcher): DashboardBillingCl
     },
     async pricePlans() {
       return (await json<{ items: PricePlanOut[] }>(await fetcher('/api/v1/price-plans'))).items
+    },
+    // The cash-request decisions (feature pass 2026-08-27): the payer said 'מזומן';
+    // these are the manager's ✓ and ✗.
+    async cashRequests(status?: string) {
+      const query = status ? `?status=${status}` : ''
+      return (
+        await json<{ items: ManagerCashRequestOut[] }>(await fetcher(`/api/v1/cash-requests${query}`))
+      ).items
+    },
+    async confirmCash(requestId: string) {
+      await json(await fetcher(`/api/v1/cash-requests/${requestId}/confirm`, { method: 'POST' }))
+    },
+    async declineCash(requestId: string) {
+      await json(await fetcher(`/api/v1/cash-requests/${requestId}/decline`, { method: 'POST' }))
     },
     async closePricePlan(planId, closesOn, amountAgorot) {
       return json<PricePlanOut>(

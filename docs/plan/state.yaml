@@ -807,9 +807,21 @@ holdbacks:
       a lane worktree, against CLAUDE.md's rule that main owns the migrations directory and
       that one revision per wave lands in the wave's contract commit. It costs this branch
       nothing now and will conflict at merge.
+
+      CLOSED 2026-08-27. Both halves are done and measured. The process half resolved at
+      the W5 merge: 0010 sits in main's chain (…0009 → 0010 → b943f8b4b4ee → 0011 → 0012)
+      and every fresh `alembic upgrade head` walks through it. The database half now holds
+      in the MAIN checkout too, not only in worktrees: `scripts/e2e-backend.sh` suffixes
+      the settings-named database with `_e2e`, creates and migrates it, and starts uvicorn
+      with both URLs overridden — so pytest (reading settings.DATABASE_URL) and the E2E
+      stack cannot share rows. Verified: a full 19/19 E2E run against the freshly created
+      `studio_manager_e2e` with pytest suites running against `studio_manager` beside it.
+      The one stated caveat lives in the script: Playwright reuses an already-running
+      backend on :8000, which keeps whatever database it was started with.
     blocks: W5 merge
-    status: open
+    status: closed
     opened: 2026-08-26
+    closed: 2026-08-27
     source: tests/conftest.py · alembic_version · CLAUDE.md §Layout
   - id: HB-w5-lane-fixtures
     kind: carried
@@ -836,9 +848,19 @@ holdbacks:
 
       What closes this: three conftests plus three fixture-build tests, on `main`, before the
       worktrees are created. It is the same work W4 did and the same size.
+
+      CLOSED 2026-08-27, overtaken by events, verified rather than assumed. The event this
+      blocked — W5 lane start — happened without it: the lanes wrote their own conftests,
+      and all three verticals now carry the full W4 shape (`tests/comms/`, `tests/reports/`
+      and `tests/privacy/` each hold a conftest plus a fixture-build test; 215 tests across
+      the three pass on main today). The disagreement risk the entry predicted either never
+      materialized or was resolved in the W5 merge — both lanes merged green and stayed
+      green through the ship audit's full-suite runs. Nothing is left for this entry to
+      demand.
     blocks: W5 lane start
-    status: open
+    status: closed
     opened: 2026-08-26
+    closed: 2026-08-27
   - id: HB-w3-e2e-harness
     kind: carried
     title: W3's E2E gate cannot be met by filling in the specs — the harness now runs, but the specs still address an app that was never built

@@ -29,6 +29,7 @@ import { ScheduleSection, isCalendarRoute } from './features/schedule/ScheduleSe
 import { makeParentScheduleClient } from './features/schedule/client'
 import { useToday } from './features/schedule/useToday'
 import { PublicLanding, makeLandingClient, matchLandingPath } from './features/landing'
+import { JoinFlow, matchJoinPath } from './features/onboarding/JoinFlow'
 import {
   EventInviteScreen,
   ParentEventsScreen,
@@ -37,9 +38,11 @@ import {
 import { BeltProgressScreen, makeParentBeltsClient } from './features/belts'
 import { InboxScreen, makeParentCommsClient } from './features/comms'
 import { AddSibling, ProfileSection, makePeopleClient } from './features/people'
+import { DirectionsScreen } from './features/people/DirectionsScreen'
 // §5.10's payments tab. Mounted here because nothing imported it: `PaymentsScreen` is
 // artboard `12f`, the subject of E2E-3 and E2E-4, and it was unreachable in a running app.
 import { PaymentsSection } from './features/billing/PaymentsSection'
+import { ShopSection } from './features/billing'
 // §6.1 step 6 — the BLOCKING declaration. Mounted here because nothing imported it
 // (HB-w6-health-gate-unmounted): the gate, the form and the pad were built and tested in
 // W3 and a guardian with an unsigned declaration still reached home.
@@ -61,6 +64,7 @@ const NAV = [
   // existed and was tested but was never imported by anything, so the whole screen was
   // unreachable in a running app. Same defect and same correction as `/payments`.
   { key: 'announcements', labelKey: 'common.nav.announcements', href: '#/announcements' },
+  { key: 'shop', labelKey: 'billing.shop.title', href: '#/shop' },
   { key: 'addChild', labelKey: 'people.sibling.title', href: '#/add-child' },
   // NO settings entry. `/settings` matched no route in either app, so the link fell
   // through the service worker's navigateFallback to index.html and put the user back
@@ -171,6 +175,9 @@ export default function App() {
   const onPayments = hash === '#/payments'
   // 12i — the profile tab's screen (ship-audit B4: built in W2, mounted by nothing).
   const onProfile = hash === '#/profile'
+  // 12e — the item shop (feature pass: built in W4, mounted by nothing).
+  const onShop = hash === '#/shop'
+  const onDirections = hash === '#/directions'
   // 12h's list, and 7d's invite behind `#/events/<eventId>/<studentId>`. Both ids are in
   // the hash because 12h is per CHILD per event: a family with two children on one
   // competition has two answers to give, and an event id alone cannot say which.
@@ -198,6 +205,19 @@ export default function App() {
   //
   // A real path and not a hash: the URL goes in a bio and on a printed QR, and Vite's PWA
   // config already sets `navigateFallback: 'index.html'` so the deep link resolves.
+  // §5.4b — the onboarding link, AHEAD of the install gate for the same reason the
+  // landing page is: it arrives from WhatsApp into whatever browser opens, and an
+  // install wall between the tap and the form is where a migration cohort evaporates.
+  const joinToken = matchJoinPath(globalThis.location?.pathname ?? '/')
+  if (joinToken) {
+    return (
+      <ThemeProvider>
+        <LanguagePicker locale={locale} onChoose={setLocale} />
+        <JoinFlow locale={locale} token={joinToken} />
+      </ThemeProvider>
+    )
+  }
+
   const landingRoute = matchLandingPath(globalThis.location?.pathname ?? '/')
   if (landingRoute) {
     return (
@@ -276,7 +296,7 @@ export default function App() {
               />
             ) : undefined
           }
-          drawerFooter={<AccountDrawerFooter locale={locale} onChooseLocale={setLocale} />}
+          drawerFooter={<AccountDrawerFooter locale={locale} onChooseLocale={setLocale} accountName={session.displayName} />}
           studios={session.studios.map((s) => ({
             studioId: s.studio_id,
             studioName: s.studio_name,
@@ -330,6 +350,10 @@ export default function App() {
             // screen resolve the payer from the session, so a person with no charges sees
             // an empty state rather than somebody else's money.
             <PaymentsSection locale={locale} />
+          ) : onShop ? (
+            <ShopSection locale={locale} />
+          ) : onDirections ? (
+            <DirectionsScreen locale={locale} />
           ) : onProfile ? (
             <ProfileSection locale={locale} />
           ) : addingChild ? (

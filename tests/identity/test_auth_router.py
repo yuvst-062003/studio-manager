@@ -183,6 +183,10 @@ def test_me_carries_no_field_that_leaks_the_other_app(client, fake_provider):
         "active_studio_id",
         "dev_tools",
         "acting_as_person_id",
+        # The signed-in person's own name for the ACTIVE studio (feature pass
+        # 2026-08-27). Nothing cross-app about it: it is null until a membership
+        # resolves, and it never counts or names anything in the other app.
+        "display_name",
     }
 
 

@@ -14,7 +14,9 @@ import type { CSSProperties } from 'react'
 import { Button, Card, EmptyState, MoneyDisplay } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
-import type { ProductOut } from './billingClient'
+/** What the screen renders — the payer-side catalogue read (`/me/products`) serves
+ *  exactly this, and the manager's fuller ProductOut satisfies it structurally. */
+export type OrderableProduct = { id: string; name: string; price_agorot: number }
 
 const columnStyle: CSSProperties = {
   display: 'flex',
@@ -32,7 +34,7 @@ const rowStyle: CSSProperties = {
 
 export type OrderItemsScreenProps = {
   locale: Locale
-  products: readonly ProductOut[]
+  products: readonly OrderableProduct[]
   onOrder: (productIds: string[]) => Promise<void>
 }
 

@@ -177,6 +177,14 @@ export function StudentsScreen({
                       status={chipToneFor(student.status)}
                       label={t(locale, `people.status.${student.status}`)}
                     />
+                    {student.source === 'onboarding_link' ? (
+                      // §5.4b's checklist chip — the ניסיון pattern on the migration
+                      // cohort: it marks who arrived through the link until the manager
+                      // has looked at them (price confirmed, duplicates merged).
+                      <span data-testid="onboarding-chip">
+                        <StatusChip status="pending" label={t(locale, 'people.join.chip')} />
+                      </span>
+                    ) : null}
                   </td>
                   <td data-testid="students-document">
                     {t(locale, documentLabelKey(student.health_status))}

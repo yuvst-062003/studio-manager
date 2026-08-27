@@ -32,14 +32,34 @@ MSG
   exit 1
 fi
 
-# The database this deployment is actually configured for, asked of the settings object
-# rather than parsed out of .env by hand — one reader, so the script and the app can never
-# disagree about which database the suite is asserting against.
-DB_NAME="$(.venv/bin/python -c '
+# The database this deployment is configured for, asked of the settings object rather
+# than parsed out of .env by hand — one reader, so the script and the app can never
+# disagree — and then suffixed `_e2e` (HB-e2e-shared-database): pytest reads
+# settings.DATABASE_URL directly, so without the suffix a backend test run truncates
+# tables underneath a live E2E run in the MAIN checkout, not only across worktrees. The
+# suffix is skipped when the settings already name an _e2e database (a worktree that
+# configured its own). One honest caveat, stated where it bites: Playwright reuses an
+# ALREADY-RUNNING backend on :8000 (`reuseExistingServer`), and a reused dev server
+# keeps whatever database it was started with — kill it first when isolation matters.
+BASE_DB="$(.venv/bin/python -c '
 from urllib.parse import urlparse
 from app.core.config import settings
 print(urlparse(settings.MIGRATION_DATABASE_URL.replace("+psycopg", "")).path.lstrip("/"))
 ')"
+case "$BASE_DB" in
+  *_e2e) DB_NAME="$BASE_DB" ;;
+  *)     DB_NAME="${BASE_DB}_e2e" ;;
+esac
+
+# The two URLs the app and alembic will actually use, rewritten to the suite database.
+E2E_DATABASE_URL="$(.venv/bin/python -c "
+from app.core.config import settings
+print(settings.DATABASE_URL.rsplit('/', 1)[0] + '/${DB_NAME}')
+")"
+E2E_MIGRATION_DATABASE_URL="$(.venv/bin/python -c "
+from app.core.config import settings
+print(settings.MIGRATION_DATABASE_URL.rsplit('/', 1)[0] + '/${DB_NAME}')
+")"
 
 # Created if absent, and this is what makes a per-worktree database practical.
 #
@@ -56,11 +76,21 @@ if ! docker compose -f docker-compose.yml exec -T db \
   docker compose -f docker-compose.yml exec -T db \
     createdb -U studio_migrator -O studio_migrator "${DB_NAME}"
   echo "▸ migrating ${DB_NAME} to head" >&2
-  .venv/bin/alembic upgrade head >&2
+  MIGRATION_DATABASE_URL="${E2E_MIGRATION_DATABASE_URL}" .venv/bin/alembic upgrade head >&2
+elif ! MIGRATION_DATABASE_URL="${E2E_MIGRATION_DATABASE_URL}" .venv/bin/alembic current 2>/dev/null | grep -q "(head)"; then
+  # The suite database exists but trails main's chain — a fresh revision landed since the
+  # last run. Migrating here is safe for exactly this database: nothing but the E2E stack
+  # writes it, so the "silently migrating harness" concern belongs to the shared database
+  # this script no longer serves.
+  echo "▸ migrating ${DB_NAME} to head" >&2
+  MIGRATION_DATABASE_URL="${E2E_MIGRATION_DATABASE_URL}" .venv/bin/alembic upgrade head >&2
 fi
 
 # 127.0.0.1, matching every app's vite.config.ts proxy target. uvicorn binds IPv4 only and
 # Node resolves `localhost` to ::1 first, so a proxy — or a readiness probe — aimed at
 # `localhost` would ECONNREFUSED against a running API. The apps' configs carry the same
 # note; this is the same trap on the other side of the connection.
-exec .venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
+exec env \
+  DATABASE_URL="${E2E_DATABASE_URL}" \
+  MIGRATION_DATABASE_URL="${E2E_MIGRATION_DATABASE_URL}" \
+  .venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000

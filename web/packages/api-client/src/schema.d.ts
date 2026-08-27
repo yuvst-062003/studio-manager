@@ -681,6 +681,62 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/cash-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Cash Requests */
+        get: operations["list_cash_requests_api_v1_cash_requests_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cash-requests/{request_id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm Cash Request
+         * @description ✓ -- the notes changed hands. Records the cash payment over what is still owed and
+         *     settles exactly the request's charges; see CashService.confirm for the partial-payment
+         *     rule.
+         */
+        post: operations["confirm_cash_request_api_v1_cash_requests__request_id__confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cash-requests/{request_id}/decline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Decline Cash Request */
+        post: operations["decline_cash_request_api_v1_cash_requests__request_id__decline_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/charges": {
         parameters: {
             query?: never;
@@ -922,6 +978,29 @@ export interface paths {
         head?: never;
         /** Update Enrollment */
         patch: operations["update_enrollment_api_v1_enrollments__enrollment_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/enrollments/{enrollment_id}/move": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Move Enrollment
+         * @description Staff 9c's מעבר כיתה, one call (feature pass 2026-08-27): the old enrollment ends
+         *     on the move date and an active one starts in the target group, in one transaction.
+         *     Lead coach or manager -- 9c calls it "פעולה של המאמן הראשי בלבד", and §3.2 gives the
+         *     manager everything the lead coach has.
+         */
+        post: operations["move_enrollment_api_v1_enrollments__enrollment_id__move_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/events": {
@@ -1315,9 +1394,12 @@ export interface paths {
          * List Health Templates
          * @description Conflict C3's read side, so M3 can find the trial template it must present.
          *
-         *     Manager and owner only: §3.2 gives 'Read full health declaration' to those two, and
-         *     §6.4 puts the template editor on the manager dashboard. A coach has no business here
-         *     -- they see `derived_flags` and nothing else (§5.5).
+         *     Managers, owners and GUARDIANS -- `require_template_reader`, shared with the
+         *     questions route it always leads to. It was manager-only until the ship audit mounted
+         *     §6.1's gate and the first family it stopped got a 403 for the form's own list; a
+         *     parent must find the template to fill it. A coach still has no business here -- they
+         *     see `derived_flags` and nothing else (§5.5) -- and this shape holds no question text
+         *     anyway (`id`, `kind`, `version`; the questions live behind the sibling route).
          */
         get: operations["list_health_templates_api_v1_health_templates_get"];
         put?: never;
@@ -1337,7 +1419,8 @@ export interface paths {
         };
         /**
          * Read Health Template
-         * @description One template **including its questions**, which the editor cannot work without.
+         * @description One template **including its questions**, which the editor cannot work without --
+         *     and, since the §6.1 gate is mounted, neither can the parent filling it in.
          *
          *     Additive rather than a change to the list route. `GET /health-templates` lives in
          *     app/routers/structure.py (M1, conflict C3) and its `HealthTemplateOut` carries `id`, `kind`
@@ -1345,7 +1428,8 @@ export interface paths {
          *     able to hold an answer. Widening it would be an OpenAPI-visible change to a generated,
          *     committed client for the benefit of one screen; a new route beside it is neither.
          *
-         *     Manager and owner only, matching the list route. A coach sees `derived_flags` (§5.5).
+         *     Managers, owners and guardians -- see `require_template_reader`. A coach still sees
+         *     `derived_flags` and nothing else (§5.5).
          */
         get: operations["read_health_template_api_v1_health_templates__template_id__get"];
         /**
@@ -1457,6 +1541,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/attendance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Family Attendance
+         * @description 2a's day strip: what actually happened, per child, per session.
+         *
+         *     Statuses only, never a coach's note and never anything financial -- §5.5 gives a
+         *     guardian their own children's record, and the EXISTS-on-guardian filter is the same
+         *     §3.3 query every /me route stands on. No role dependency (§3.1). Capped to a 62-day
+         *     window: the strip reads weeks, and an unbounded range is a table scan someone will
+         *     eventually aim at January-to-December.
+         */
+        get: operations["my_family_attendance_api_v1_me_attendance_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/balance": {
         parameters: {
             query?: never;
@@ -1472,6 +1582,29 @@ export interface paths {
         get: operations["my_balance_api_v1_me_balance_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/cash-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My Cash Requests */
+        get: operations["my_cash_requests_api_v1_me_cash_requests_get"];
+        put?: never;
+        /**
+         * Raise Cash Request
+         * @description 'אני אשלם במזומן' -- over these exact charges. The payer is the session, never the
+         *     body, for the same reason payment orders do it: a body-supplied payer would let anyone
+         *     volunteer anyone else's debt.
+         */
+        post: operations["raise_cash_request_api_v1_me_cash_requests_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1528,6 +1661,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/guardians": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Guardians
+         * @description Parent `12i`'s guardians section -- the FAMILY's guardians, read by one of them.
+         *
+         *     Ship-audit B4: `ProfileAndLeave` was built against `GET /students/{id}` -- a staff
+         *     route a parent gets 403 from -- which went unnoticed for as long as nothing mounted
+         *     the screen. This is the payer-side read it actually needed, shaped like every other
+         *     guardian list.
+         *
+         *     No role dependency, same reason as `/me/students`: §3.1 -- 'guardian is not a role'.
+         *     Deduplicated by person across the family's students (L8 -- one guardian view): two
+         *     children share their parents, and a screen that listed each parent once per child
+         *     would read as a bug in exactly the family it appears for.
+         */
+        get: operations["my_guardians_api_v1_me_guardians_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/orders/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Order Items
+         * @description One manual charge per line, priced SERVER-side from the catalogue -- the client
+         *     sends ids and quantities and never an amount, for the same reason payment orders
+         *     never take a payer from the body.
+         */
+        post: operations["order_items_api_v1_me_orders_items_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/payments": {
         parameters: {
             query?: never;
@@ -1540,6 +1725,23 @@ export interface paths {
          * @description `12f`'s history — what this person has already paid, by every route.
          */
         get: operations["my_payments_api_v1_me_payments_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/products": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My Products */
+        get: operations["my_products_api_v1_me_products_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1612,6 +1814,29 @@ export interface paths {
          *     route needs nothing more than an identity with a Person in this studio.
          */
         post: operations["request_a_sibling_api_v1_me_students_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/studio": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Studio
+         * @description The same public fields, for a GUARDIAN (feature pass 2026-08-27): the parent app's
+         *     הוראות הגעה screen needs the club's address and phone, and the only prior reads were
+         *     staff-gated or keyed by a slug the parent never holds. No role dependency, §3.1 --
+         *     'guardian is not a role'; the shape is the club's shop window, not a settings read.
+         */
+        get: operations["my_studio_api_v1_me_studio_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1725,6 +1950,47 @@ export interface paths {
          *     difference anyway.
          */
         post: operations["mark_notification_read_api_v1_notifications__notification_id__read_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/onboarding-link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Link Status */
+        get: operations["link_status_api_v1_onboarding_link_get"];
+        put?: never;
+        /** Regenerate Link */
+        post: operations["regenerate_link_api_v1_onboarding_link_post"];
+        /** Revoke Link */
+        delete: operations["revoke_link_api_v1_onboarding_link_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/onboarding/{token}/register": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Register
+         * @description The one-transaction creation. Signed-in identity required, membership NOT --
+         *     §5.4b's whole point is that this person has no membership yet. Idempotent per
+         *     identity: a resubmission answers with the existing family instead of a duplicate.
+         */
+        post: operations["register_api_v1_onboarding__token__register_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2210,6 +2476,28 @@ export interface paths {
          *     child.'
          */
         get: operations["trial_slots_api_v1_public_groups__group_id__trial_slots_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/onboarding/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Onboarding Info
+         * @description Validate the token and hand the form what it renders: the studio's name and its
+         *     groups with their weekly days -- exactly what §5.4a's landing page already publishes,
+         *     and nothing else. The form displays no existing data whatsoever.
+         */
+        get: operations["onboarding_info_api_v1_public_onboarding__token__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -4288,6 +4576,37 @@ export interface components {
              */
             student_id: string;
         };
+        /** CashRequestCreateIn */
+        CashRequestCreateIn: {
+            /** Charge Ids */
+            charge_ids: string[];
+        };
+        /** CashRequestListOut */
+        CashRequestListOut: {
+            /** Items */
+            items: components["schemas"]["CashRequestOut"][];
+        };
+        /** CashRequestOut */
+        CashRequestOut: {
+            /** Charge Ids */
+            charge_ids: string[];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Decided At */
+            decided_at: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Status */
+            status: string;
+            /** Total Agorot */
+            total_agorot: number;
+        };
         /**
          * ChargeAdjustmentIn
          * @description A correction, recorded as a new fact. §5.10 makes a credit a negative amount
@@ -4973,6 +5292,19 @@ export interface components {
             to_group_id: string;
         };
         /**
+         * EnrollmentMoveIn
+         * @description Staff 9c's move: the target group, and optionally the effective date.
+         */
+        EnrollmentMoveIn: {
+            /**
+             * Group Id
+             * Format: uuid
+             */
+            group_id: string;
+            /** Moved On */
+            moved_on?: string | null;
+        };
+        /**
          * EnrollmentOut
          * @description One group membership. **Carries no price** — C11 put that on the student, so a
          *     child in two groups has two of these and one tuition charge.
@@ -5339,6 +5671,30 @@ export interface components {
         ExamResultsIn: {
             /** Results */
             results: components["schemas"]["EventExamResultIn"][];
+        };
+        /** FamilyAttendanceOut */
+        FamilyAttendanceOut: {
+            /** Items */
+            items: components["schemas"]["FamilyAttendanceRow"][];
+        };
+        /** FamilyAttendanceRow */
+        FamilyAttendanceRow: {
+            /** Group Name */
+            group_name: string;
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
+            /** Starts At */
+            starts_at: string;
+            /** Status */
+            status: string;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
         };
         /**
          * GenerateSessionsOut
@@ -5889,6 +6245,31 @@ export interface components {
             /** Payment Id */
             payment_id?: string | null;
         };
+        /** ItemOrderIn */
+        ItemOrderIn: {
+            /** Items */
+            items: components["schemas"]["ItemOrderLineIn"][];
+        };
+        /** ItemOrderLineIn */
+        ItemOrderLineIn: {
+            /**
+             * Product Id
+             * Format: uuid
+             */
+            product_id: string;
+            /**
+             * Quantity
+             * @default 1
+             */
+            quantity: number;
+        };
+        /** ItemOrderOut */
+        ItemOrderOut: {
+            /** Charge Ids */
+            charge_ids: string[];
+            /** Total Agorot */
+            total_agorot: number;
+        };
         /**
          * LadderRankOut
          * @description One rung, plus the two facts a ladder screen cannot render without.
@@ -5951,6 +6332,37 @@ export interface components {
             name: string;
             /** Notes */
             notes: string | null;
+        };
+        /** ManagerCashRequestListOut */
+        ManagerCashRequestListOut: {
+            /** Items */
+            items: components["schemas"]["ManagerCashRequestOut"][];
+        };
+        /** ManagerCashRequestOut */
+        ManagerCashRequestOut: {
+            /** Charge Count */
+            charge_count: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Payer Name */
+            payer_name: string;
+            /**
+             * Payer Person Id
+             * Format: uuid
+             */
+            payer_person_id: string;
+            /** Status */
+            status: string;
+            /** Total Agorot */
+            total_agorot: number;
         };
         /**
          * ManualChargeIn
@@ -6070,6 +6482,8 @@ export interface components {
             active_studio_id: string | null;
             /** Dev Tools */
             dev_tools: boolean;
+            /** Display Name */
+            display_name?: string | null;
             /**
              * Identity Id
              * Format: uuid
@@ -6197,6 +6611,96 @@ export interface components {
         NotificationPreferencesOut: {
             /** Groups */
             groups: components["schemas"]["NotificationPreferenceOut"][];
+        };
+        /** OnboardingChildIn */
+        OnboardingChildIn: {
+            /** Birthdate */
+            birthdate?: string | null;
+            /** First Name */
+            first_name: string;
+            /** Group Ids */
+            group_ids: string[];
+            /** Last Name */
+            last_name: string;
+            /**
+             * Self Student
+             * @default false
+             */
+            self_student: boolean;
+        };
+        /** OnboardingGroupOut */
+        OnboardingGroupOut: {
+            /** Class Name */
+            class_name: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Weekdays */
+            weekdays: number[];
+        };
+        /** OnboardingInfoOut */
+        OnboardingInfoOut: {
+            /** Email */
+            email: string | null;
+            /** Groups */
+            groups: components["schemas"]["OnboardingGroupOut"][];
+            /** Studio Name */
+            studio_name: string;
+        };
+        /**
+         * OnboardingLinkCreatedOut
+         * @description The URL appears here and nowhere else, once.
+         */
+        OnboardingLinkCreatedOut: {
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /** Registered Count */
+            registered_count: number;
+            /** Url */
+            url: string;
+        };
+        /** OnboardingLinkStatusOut */
+        OnboardingLinkStatusOut: {
+            /** Active */
+            active: boolean;
+            /** Expires At */
+            expires_at: string | null;
+            /** Landing Url */
+            landing_url?: string | null;
+            /** Registered Count */
+            registered_count: number;
+        };
+        /** OnboardingRegisterIn */
+        OnboardingRegisterIn: {
+            /** Children */
+            children: components["schemas"]["OnboardingChildIn"][];
+            /** First Name */
+            first_name: string;
+            /** Last Name */
+            last_name: string;
+            /** Phone */
+            phone?: string | null;
+        };
+        /** OnboardingRegisterOut */
+        OnboardingRegisterOut: {
+            /** Already Registered */
+            already_registered: boolean;
+            /** Charges Created */
+            charges_created: number;
+            /**
+             * Person Id
+             * Format: uuid
+             */
+            person_id: string;
+            /** Student Ids */
+            student_ids: string[];
         };
         /**
          * ParentEventOut
@@ -7466,6 +7970,25 @@ export interface components {
              */
             status: "pending" | "done" | "skipped";
         };
+        /** ShopProductListOut */
+        ShopProductListOut: {
+            /** Items */
+            items: components["schemas"]["ShopProductOut"][];
+        };
+        /** ShopProductOut */
+        ShopProductOut: {
+            /** Description */
+            description: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Price Agorot */
+            price_agorot: number;
+        };
         /**
          * SiblingRequestIn
          * @description §5.4(c) — parent `12g`. `POST /me/students`.
@@ -7791,6 +8314,8 @@ export interface components {
             person_id: string;
             /** Price Plan Id */
             price_plan_id?: string | null;
+            /** Source */
+            source?: string | null;
             /** Status */
             status: string;
         };
@@ -7887,6 +8412,8 @@ export interface components {
              * Format: uuid
              */
             person_id: string;
+            /** Source */
+            source?: string | null;
             /** Status */
             status: string;
         };
@@ -9526,6 +10053,99 @@ export interface operations {
             };
         };
     };
+    list_cash_requests_api_v1_cash_requests_get: {
+        parameters: {
+            query?: {
+                status?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManagerCashRequestListOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_cash_request_api_v1_cash_requests__request_id__confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CashRequestOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    decline_cash_request_api_v1_cash_requests__request_id__decline_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CashRequestOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_charges_api_v1_charges_get: {
         parameters: {
             query?: {
@@ -10009,6 +10629,44 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["EnrollmentUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnrollmentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    move_enrollment_api_v1_enrollments__enrollment_id__move_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                enrollment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EnrollmentMoveIn"];
             };
         };
         responses: {
@@ -10993,6 +11651,38 @@ export interface operations {
             };
         };
     };
+    my_family_attendance_api_v1_me_attendance_get: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FamilyAttendanceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     my_balance_api_v1_me_balance_get: {
         parameters: {
             query?: never;
@@ -11009,6 +11699,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PayerBalanceOut"];
+                };
+            };
+        };
+    };
+    my_cash_requests_api_v1_me_cash_requests_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CashRequestListOut"];
+                };
+            };
+        };
+    };
+    raise_cash_request_api_v1_me_cash_requests_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CashRequestCreateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CashRequestOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -11078,6 +11821,59 @@ export interface operations {
             };
         };
     };
+    my_guardians_api_v1_me_guardians_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GuardianListResponse"];
+                };
+            };
+        };
+    };
+    order_items_api_v1_me_orders_items_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ItemOrderIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemOrderOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     my_payments_api_v1_me_payments_get: {
         parameters: {
             query?: {
@@ -11106,6 +11902,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_products_api_v1_me_products_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShopProductListOut"];
                 };
             };
         };
@@ -11182,6 +11998,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_studio_api_v1_me_studio_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["app__schemas__studio__StudioOut"];
                 };
             };
         };
@@ -11329,6 +12165,101 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NotificationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    link_status_api_v1_onboarding_link_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OnboardingLinkStatusOut"];
+                };
+            };
+        };
+    };
+    regenerate_link_api_v1_onboarding_link_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OnboardingLinkCreatedOut"];
+                };
+            };
+        };
+    };
+    revoke_link_api_v1_onboarding_link_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OnboardingLinkStatusOut"];
+                };
+            };
+        };
+    };
+    register_api_v1_onboarding__token__register_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OnboardingRegisterIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OnboardingRegisterOut"];
                 };
             };
             /** @description Validation Error */
@@ -12142,6 +13073,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TrialSlotListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    onboarding_info_api_v1_public_onboarding__token__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OnboardingInfoOut"];
                 };
             };
             /** @description Validation Error */

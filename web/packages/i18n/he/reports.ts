@@ -151,4 +151,13 @@ export const reports: Bundle = {
   'privacy.photo.allowed': 'מותר לפרסם תמונות',
   'privacy.photo.notAllowed': 'אין לפרסם תמונות',
   'privacy.photo.notRecorded': 'לא נרשמה הסכמה',
+
+  // Send-monthly (feature pass 2026-08-27) — emails the report, so a confirm stands
+  // between the button and real inboxes.
+  'send.button': 'שליחת דוח חודשי למייל',
+  'send.title': 'לשלוח את הדוח החודשי?',
+  'send.body': 'הדוח לתקופה {{month}} יישלח לכתובת המייל שלך.',
+  'send.confirm': 'שליחה',
+  'send.cancel': 'ביטול',
+  'send.done': 'הדוח נשלח למייל',
 }

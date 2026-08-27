@@ -79,6 +79,7 @@ class StudentRow:
     birthdate: date | None
     status: str
     health_status: str
+    source: str | None
     joined_on: date | None
     left_on: date | None
     current_belt_id: uuid.UUID | None
@@ -377,6 +378,7 @@ class StudentService:
             birthdate=person.birthdate,
             status=student.status,
             health_status=student.health_status,
+            source=student.source,
             joined_on=student.joined_on,
             left_on=student.left_on,
             current_belt_id=student.current_belt_id,

@@ -4,7 +4,7 @@
 // grouped by day, child filter chips. The tab bar moved to the App shell (1a draws it on
 // every screen), so its tests live beside the shell now. 2a (day strip, past attendance)
 // is still deliberately unbuilt — the last test keeps it from creeping in.
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import type { ReactElement } from 'react'
@@ -116,9 +116,34 @@ describe('ParentHome', () => {
     expect(document.documentElement).toHaveAttribute('data-theme', theme)
   })
 
-  it('does NOT build 2a — no day strip and no past attendance', () => {
-    render(<ParentHome locale="he" students={CHILDREN} />)
-    expect(screen.queryByTestId('parent-day-strip')).toBeNull()
-    expect(screen.queryByTestId('parent-past-attendance')).toBeNull()
+  it('builds 2a: a seven-day strip with today marked for a screen reader', () => {
+    // The guard that used to sit here kept 2a OUT; the feature pass built it
+    // deliberately, so the guard flips into a spec.
+    render(<ParentHome locale="he" students={CHILDREN} upcoming={[]} />)
+    const strip = screen.getByTestId('parent-day-strip')
+    const days = within(strip).getAllByRole('button')
+    expect(days).toHaveLength(7)
+    expect(days.filter((day) => day.getAttribute('aria-current') === 'date')).toHaveLength(1)
+  })
+
+  it("shows a past day's lessons with what actually happened, per child", async () => {
+    // 2a — "כולל נוכחות שהייתה". A lesson yesterday, one child present.
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000)
+    const lesson = { id: 'past1', startsAt: yesterday.toISOString(), groupName: 'מתחילים' }
+    render(
+      <ParentHome
+        locale="he"
+        students={CHILDREN}
+        upcoming={[lesson]}
+        attendance={[{ session_id: 'past1', student_id: 'st1', status: 'present' }]}
+      />,
+    )
+    const strip = screen.getByTestId('parent-day-strip')
+    const days = within(strip).getAllByRole('button')
+    const todayIndex = days.findIndex((day) => day.getAttribute('aria-current') === 'date')
+    await userEvent.click(days[todayIndex - 1]!)
+    const mark = screen.getByTestId('home-attendance-mark')
+    expect(mark).toHaveTextContent('נועה לוי')
+    expect(mark).toHaveTextContent(t('he', 'attendance.roster.present'))
   })
 })

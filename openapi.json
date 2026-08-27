@@ -1285,6 +1285,93 @@
         "title": "CandidateOut",
         "type": "object"
       },
+      "CashRequestCreateIn": {
+        "properties": {
+          "charge_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Charge Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "charge_ids"
+        ],
+        "title": "CashRequestCreateIn",
+        "type": "object"
+      },
+      "CashRequestListOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CashRequestOut"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "CashRequestListOut",
+        "type": "object"
+      },
+      "CashRequestOut": {
+        "properties": {
+          "charge_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Charge Ids",
+            "type": "array"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "decided_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided At"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "total_agorot": {
+            "title": "Total Agorot",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "total_agorot",
+          "charge_ids",
+          "created_at",
+          "decided_at"
+        ],
+        "title": "CashRequestOut",
+        "type": "object"
+      },
       "ChargeAdjustmentIn": {
         "description": "A correction, recorded as a new fact. §5.10 makes a credit a negative amount\nrather than an edit to the original charge, so the ledger stays append-only and last\nmonth's statement does not change after a parent has read it.",
         "properties": {
@@ -2860,6 +2947,33 @@
         "title": "EnrollmentMove",
         "type": "object"
       },
+      "EnrollmentMoveIn": {
+        "description": "Staff 9c's move: the target group, and optionally the effective date.",
+        "properties": {
+          "group_id": {
+            "format": "uuid",
+            "title": "Group Id",
+            "type": "string"
+          },
+          "moved_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Moved On"
+          }
+        },
+        "required": [
+          "group_id"
+        ],
+        "title": "EnrollmentMoveIn",
+        "type": "object"
+      },
       "EnrollmentOut": {
         "description": "One group membership. **Carries no price** — C11 put that on the student, so a\nchild in two groups has two of these and one tuition charge.",
         "properties": {
@@ -3806,6 +3920,57 @@
           "results"
         ],
         "title": "ExamResultsIn",
+        "type": "object"
+      },
+      "FamilyAttendanceOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/FamilyAttendanceRow"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "FamilyAttendanceOut",
+        "type": "object"
+      },
+      "FamilyAttendanceRow": {
+        "properties": {
+          "group_name": {
+            "title": "Group Name",
+            "type": "string"
+          },
+          "session_id": {
+            "format": "uuid",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "starts_at": {
+            "title": "Starts At",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "student_id",
+          "session_id",
+          "starts_at",
+          "group_name",
+          "status"
+        ],
+        "title": "FamilyAttendanceRow",
         "type": "object"
       },
       "GenerateSessionsOut": {
@@ -4867,6 +5032,67 @@
         "title": "IpnMatchIn",
         "type": "object"
       },
+      "ItemOrderIn": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ItemOrderLineIn"
+            },
+            "maxItems": 10,
+            "minItems": 1,
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "ItemOrderIn",
+        "type": "object"
+      },
+      "ItemOrderLineIn": {
+        "properties": {
+          "product_id": {
+            "format": "uuid",
+            "title": "Product Id",
+            "type": "string"
+          },
+          "quantity": {
+            "default": 1,
+            "maximum": 10.0,
+            "minimum": 1.0,
+            "title": "Quantity",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "product_id"
+        ],
+        "title": "ItemOrderLineIn",
+        "type": "object"
+      },
+      "ItemOrderOut": {
+        "properties": {
+          "charge_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Charge Ids",
+            "type": "array"
+          },
+          "total_agorot": {
+            "title": "Total Agorot",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "charge_ids",
+          "total_agorot"
+        ],
+        "title": "ItemOrderOut",
+        "type": "object"
+      },
       "LadderRankOut": {
         "description": "One rung, plus the two facts a ladder screen cannot render without.\n\nComposed rather than added to `BeltRankOut`, which is W4's contract and not this lane's\nto widen -- the same move `HealthTemplatePublishedOut` makes.\n\n`next_rank_id` is `events.belt.next` and `holders` is `5b`'s חניכים column, which is\nalso the data a delete refusal explains itself with.",
         "properties": {
@@ -5062,6 +5288,68 @@
           "notes"
         ],
         "title": "LocationOut",
+        "type": "object"
+      },
+      "ManagerCashRequestListOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ManagerCashRequestOut"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "ManagerCashRequestListOut",
+        "type": "object"
+      },
+      "ManagerCashRequestOut": {
+        "properties": {
+          "charge_count": {
+            "title": "Charge Count",
+            "type": "integer"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "payer_name": {
+            "title": "Payer Name",
+            "type": "string"
+          },
+          "payer_person_id": {
+            "format": "uuid",
+            "title": "Payer Person Id",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "total_agorot": {
+            "title": "Total Agorot",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "total_agorot",
+          "payer_person_id",
+          "payer_name",
+          "charge_count",
+          "created_at"
+        ],
+        "title": "ManagerCashRequestOut",
         "type": "object"
       },
       "ManualChargeIn": {
@@ -5324,6 +5612,17 @@
             "title": "Dev Tools",
             "type": "boolean"
           },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
           "identity_id": {
             "format": "uuid",
             "title": "Identity Id",
@@ -5559,6 +5858,272 @@
           "groups"
         ],
         "title": "NotificationPreferencesOut",
+        "type": "object"
+      },
+      "OnboardingChildIn": {
+        "properties": {
+          "birthdate": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Birthdate"
+          },
+          "first_name": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "First Name",
+            "type": "string"
+          },
+          "group_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 6,
+            "minItems": 1,
+            "title": "Group Ids",
+            "type": "array"
+          },
+          "last_name": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Last Name",
+            "type": "string"
+          },
+          "self_student": {
+            "default": false,
+            "title": "Self Student",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "first_name",
+          "last_name",
+          "group_ids"
+        ],
+        "title": "OnboardingChildIn",
+        "type": "object"
+      },
+      "OnboardingGroupOut": {
+        "properties": {
+          "class_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Class Name"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "weekdays": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Weekdays",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "class_name",
+          "weekdays"
+        ],
+        "title": "OnboardingGroupOut",
+        "type": "object"
+      },
+      "OnboardingInfoOut": {
+        "properties": {
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "groups": {
+            "items": {
+              "$ref": "#/components/schemas/OnboardingGroupOut"
+            },
+            "title": "Groups",
+            "type": "array"
+          },
+          "studio_name": {
+            "title": "Studio Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "studio_name",
+          "groups",
+          "email"
+        ],
+        "title": "OnboardingInfoOut",
+        "type": "object"
+      },
+      "OnboardingLinkCreatedOut": {
+        "description": "The URL appears here and nowhere else, once.",
+        "properties": {
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "registered_count": {
+            "title": "Registered Count",
+            "type": "integer"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url",
+          "expires_at",
+          "registered_count"
+        ],
+        "title": "OnboardingLinkCreatedOut",
+        "type": "object"
+      },
+      "OnboardingLinkStatusOut": {
+        "properties": {
+          "active": {
+            "title": "Active",
+            "type": "boolean"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "landing_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Landing Url"
+          },
+          "registered_count": {
+            "title": "Registered Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "active",
+          "expires_at",
+          "registered_count"
+        ],
+        "title": "OnboardingLinkStatusOut",
+        "type": "object"
+      },
+      "OnboardingRegisterIn": {
+        "properties": {
+          "children": {
+            "items": {
+              "$ref": "#/components/schemas/OnboardingChildIn"
+            },
+            "maxItems": 8,
+            "minItems": 1,
+            "title": "Children",
+            "type": "array"
+          },
+          "first_name": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "First Name",
+            "type": "string"
+          },
+          "last_name": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Last Name",
+            "type": "string"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          }
+        },
+        "required": [
+          "first_name",
+          "last_name",
+          "children"
+        ],
+        "title": "OnboardingRegisterIn",
+        "type": "object"
+      },
+      "OnboardingRegisterOut": {
+        "properties": {
+          "already_registered": {
+            "title": "Already Registered",
+            "type": "boolean"
+          },
+          "charges_created": {
+            "title": "Charges Created",
+            "type": "integer"
+          },
+          "person_id": {
+            "format": "uuid",
+            "title": "Person Id",
+            "type": "string"
+          },
+          "student_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Student Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "person_id",
+          "student_ids",
+          "charges_created",
+          "already_registered"
+        ],
+        "title": "OnboardingRegisterOut",
         "type": "object"
       },
       "ParentEventOut": {
@@ -8093,6 +8658,58 @@
         "title": "SetupStepOut",
         "type": "object"
       },
+      "ShopProductListOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ShopProductOut"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "ShopProductListOut",
+        "type": "object"
+      },
+      "ShopProductOut": {
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "price_agorot": {
+            "title": "Price Agorot",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "price_agorot"
+        ],
+        "title": "ShopProductOut",
+        "type": "object"
+      },
       "SiblingRequestIn": {
         "description": "§5.4(c) — parent `12g`. `POST /me/students`.\n\nThe group is a **preference**, not a choice: L6 makes enrolment a manager decision, and\nthe copy on `12g` promises review rather than a place.",
         "properties": {
@@ -8972,6 +9589,17 @@
             ],
             "title": "Price Plan Id"
           },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
           "status": {
             "pattern": "^(lead|trial|pending_approval|active|frozen|left|lost)$",
             "title": "Status",
@@ -9218,6 +9846,17 @@
             "format": "uuid",
             "title": "Person Id",
             "type": "string"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
           },
           "status": {
             "pattern": "^(lead|trial|pending_approval|active|frozen|left|lost)$",
@@ -12255,6 +12894,142 @@
         ]
       }
     },
+    "/api/v1/cash-requests": {
+      "get": {
+        "operationId": "list_cash_requests_api_v1_cash_requests_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagerCashRequestListOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Cash Requests",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/v1/cash-requests/{request_id}/confirm": {
+      "post": {
+        "description": "✓ -- the notes changed hands. Records the cash payment over what is still owed and\nsettles exactly the request's charges; see CashService.confirm for the partial-payment\nrule.",
+        "operationId": "confirm_cash_request_api_v1_cash_requests__request_id__confirm_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Request Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CashRequestOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Confirm Cash Request",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/v1/cash-requests/{request_id}/decline": {
+      "post": {
+        "operationId": "decline_cash_request_api_v1_cash_requests__request_id__decline_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Request Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CashRequestOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Decline Cash Request",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
     "/api/v1/charges": {
       "get": {
         "description": "§7's `GET /charges?payer_person_id&status`. `allocated_agorot` travels with each row\nbecause §4.3 settles a charge by summing allocations -- a client rendering\n`amount_agorot` alone would show a fully-paid charge as outstanding.",
@@ -13196,6 +13971,79 @@
           }
         },
         "summary": "Update Enrollment",
+        "tags": [
+          "people"
+        ]
+      }
+    },
+    "/api/v1/enrollments/{enrollment_id}/move": {
+      "post": {
+        "description": "Staff 9c's מעבר כיתה, one call (feature pass 2026-08-27): the old enrollment ends\non the move date and an active one starts in the target group, in one transaction.\nLead coach or manager -- 9c calls it \"פעולה של המאמן הראשי בלבד\", and §3.2 gives the\nmanager everything the lead coach has.",
+        "operationId": "move_enrollment_api_v1_enrollments__enrollment_id__move_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "enrollment_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Enrollment Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EnrollmentMoveIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnrollmentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Move Enrollment",
         "tags": [
           "people"
         ]
@@ -14425,7 +15273,7 @@
     },
     "/api/v1/health-templates": {
       "get": {
-        "description": "Conflict C3's read side, so M3 can find the trial template it must present.\n\nManager and owner only: §3.2 gives 'Read full health declaration' to those two, and\n§6.4 puts the template editor on the manager dashboard. A coach has no business here\n-- they see `derived_flags` and nothing else (§5.5).",
+        "description": "Conflict C3's read side, so M3 can find the trial template it must present.\n\nManagers, owners and GUARDIANS -- `require_template_reader`, shared with the\nquestions route it always leads to. It was manager-only until the ship audit mounted\n§6.1's gate and the first family it stopped got a 403 for the form's own list; a\nparent must find the template to fill it. A coach still has no business here -- they\nsee `derived_flags` and nothing else (§5.5) -- and this shape holds no question text\nanyway (`id`, `kind`, `version`; the questions live behind the sibling route).",
         "operationId": "list_health_templates_api_v1_health_templates_get",
         "parameters": [
           {
@@ -14475,7 +15323,7 @@
     },
     "/api/v1/health-templates/{template_id}": {
       "get": {
-        "description": "One template **including its questions**, which the editor cannot work without.\n\nAdditive rather than a change to the list route. `GET /health-templates` lives in\napp/routers/structure.py (M1, conflict C3) and its `HealthTemplateOut` carries `id`, `kind`\nand `version` and nothing else -- deliberately, because M1 owned a file that must never be\nable to hold an answer. Widening it would be an OpenAPI-visible change to a generated,\ncommitted client for the benefit of one screen; a new route beside it is neither.\n\nManager and owner only, matching the list route. A coach sees `derived_flags` (§5.5).",
+        "description": "One template **including its questions**, which the editor cannot work without --\nand, since the §6.1 gate is mounted, neither can the parent filling it in.\n\nAdditive rather than a change to the list route. `GET /health-templates` lives in\napp/routers/structure.py (M1, conflict C3) and its `HealthTemplateOut` carries `id`, `kind`\nand `version` and nothing else -- deliberately, because M1 owned a file that must never be\nable to hold an answer. Widening it would be an OpenAPI-visible change to a generated,\ncommitted client for the benefit of one screen; a new route beside it is neither.\n\nManagers, owners and guardians -- see `require_template_reader`. A coach still sees\n`derived_flags` and nothing else (§5.5).",
         "operationId": "read_health_template_api_v1_health_templates__template_id__get",
         "parameters": [
           {
@@ -14817,6 +15665,61 @@
         ]
       }
     },
+    "/api/v1/me/attendance": {
+      "get": {
+        "description": "2a's day strip: what actually happened, per child, per session.\n\nStatuses only, never a coach's note and never anything financial -- §5.5 gives a\nguardian their own children's record, and the EXISTS-on-guardian filter is the same\n§3.3 query every /me route stands on. No role dependency (§3.1). Capped to a 62-day\nwindow: the strip reads weeks, and an unbounded range is a table scan someone will\neventually aim at January-to-December.",
+        "operationId": "my_family_attendance_api_v1_me_attendance_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "from",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "title": "From",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "title": "To",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FamilyAttendanceOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "My Family Attendance",
+        "tags": [
+          "coach",
+          "attendance"
+        ]
+      }
+    },
     "/api/v1/me/balance": {
       "get": {
         "description": "`12f`'s summary card. Negative is a family in credit, and `MoneyDisplay` wraps the\namount in `<bdi>` precisely so that reads as a credit in a right-to-left sentence.",
@@ -14834,6 +15737,67 @@
           }
         },
         "summary": "My Balance",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/v1/me/cash-requests": {
+      "get": {
+        "operationId": "my_cash_requests_api_v1_me_cash_requests_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CashRequestListOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "My Cash Requests",
+        "tags": [
+          "billing"
+        ]
+      },
+      "post": {
+        "description": "'אני אשלם במזומן' -- over these exact charges. The payer is the session, never the\nbody, for the same reason payment orders do it: a body-supplied payer would let anyone\nvolunteer anyone else's debt.",
+        "operationId": "raise_cash_request_api_v1_me_cash_requests_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CashRequestCreateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CashRequestOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Raise Cash Request",
         "tags": [
           "billing"
         ]
@@ -14981,6 +15945,70 @@
         ]
       }
     },
+    "/api/v1/me/guardians": {
+      "get": {
+        "description": "Parent `12i`'s guardians section -- the FAMILY's guardians, read by one of them.\n\nShip-audit B4: `ProfileAndLeave` was built against `GET /students/{id}` -- a staff\nroute a parent gets 403 from -- which went unnoticed for as long as nothing mounted\nthe screen. This is the payer-side read it actually needed, shaped like every other\nguardian list.\n\nNo role dependency, same reason as `/me/students`: §3.1 -- 'guardian is not a role'.\nDeduplicated by person across the family's students (L8 -- one guardian view): two\nchildren share their parents, and a screen that listed each parent once per child\nwould read as a bug in exactly the family it appears for.",
+        "operationId": "my_guardians_api_v1_me_guardians_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GuardianListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "My Guardians",
+        "tags": [
+          "people"
+        ]
+      }
+    },
+    "/api/v1/me/orders/items": {
+      "post": {
+        "description": "One manual charge per line, priced SERVER-side from the catalogue -- the client\nsends ids and quantities and never an amount, for the same reason payment orders\nnever take a payer from the body.",
+        "operationId": "order_items_api_v1_me_orders_items_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ItemOrderIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemOrderOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Order Items",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
     "/api/v1/me/payments": {
       "get": {
         "description": "`12f`'s history — what this person has already paid, by every route.",
@@ -15039,6 +16067,27 @@
           }
         },
         "summary": "My Payments",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/v1/me/products": {
+      "get": {
+        "operationId": "my_products_api_v1_me_products_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShopProductListOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "My Products",
         "tags": [
           "billing"
         ]
@@ -15146,6 +16195,28 @@
         "summary": "Request A Sibling",
         "tags": [
           "people"
+        ]
+      }
+    },
+    "/api/v1/me/studio": {
+      "get": {
+        "description": "The same public fields, for a GUARDIAN (feature pass 2026-08-27): the parent app's\nהוראות הגעה screen needs the club's address and phone, and the only prior reads were\nstaff-gated or keyed by a slug the parent never holds. No role dependency, §3.1 --\n'guardian is not a role'; the shape is the club's shop window, not a settings read.",
+        "operationId": "my_studio_api_v1_me_studio_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/app__schemas__studio__StudioOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "My Studio",
+        "tags": [
+          "studio"
         ]
       }
     },
@@ -15439,6 +16510,118 @@
         "tags": [
           "coach",
           "comms"
+        ]
+      }
+    },
+    "/api/v1/onboarding-link": {
+      "delete": {
+        "operationId": "revoke_link_api_v1_onboarding_link_delete",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingLinkStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Revoke Link",
+        "tags": [
+          "people"
+        ]
+      },
+      "get": {
+        "operationId": "link_status_api_v1_onboarding_link_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingLinkStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Link Status",
+        "tags": [
+          "people"
+        ]
+      },
+      "post": {
+        "operationId": "regenerate_link_api_v1_onboarding_link_post",
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingLinkCreatedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Regenerate Link",
+        "tags": [
+          "people"
+        ]
+      }
+    },
+    "/api/v1/onboarding/{token}/register": {
+      "post": {
+        "description": "The one-transaction creation. Signed-in identity required, membership NOT --\n§5.4b's whole point is that this person has no membership yet. Idempotent per\nidentity: a resubmission answers with the existing family instead of a duplicate.",
+        "operationId": "register_api_v1_onboarding__token__register_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "title": "Token",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OnboardingRegisterIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingRegisterOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Register",
+        "tags": [
+          "people"
         ]
       }
     },
@@ -16789,6 +17972,49 @@
         "summary": "Trial Slots",
         "tags": [
           "public"
+        ]
+      }
+    },
+    "/api/v1/public/onboarding/{token}": {
+      "get": {
+        "description": "Validate the token and hand the form what it renders: the studio's name and its\ngroups with their weekly days -- exactly what §5.4a's landing page already publishes,\nand nothing else. The form displays no existing data whatsoever.",
+        "operationId": "onboarding_info_api_v1_public_onboarding__token__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "title": "Token",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingInfoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Onboarding Info",
+        "tags": [
+          "people"
         ]
       }
     },

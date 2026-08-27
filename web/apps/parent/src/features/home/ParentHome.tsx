@@ -8,8 +8,8 @@
 // attendance) remains unbuilt and recorded.
 import { useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { formatDateInStudioZone, formatTimeInStudioZone } from '@studio/core'
-import { Button, Card, EmptyState, Icon, MoneyDisplay } from '@studio/ui'
+import { formatDateInStudioZone, formatTimeInStudioZone, studioDayKey } from '@studio/core'
+import { Button, Card, EmptyState, Icon, MoneyDisplay, StatusChip } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 
@@ -24,6 +24,26 @@ export type HomeLesson = {
   /** UTC ISO — rendered in the studio zone here, per G3. */
   startsAt: string
   groupName: string
+}
+
+/** One child's answer for one session — 2a's "כולל נוכחות שהייתה". */
+export type HomeAttendanceRow = {
+  session_id: string
+  student_id: string
+  status: string
+}
+
+const ATTENDANCE_LABEL: Record<string, string> = {
+  present: 'attendance.roster.present',
+  absent_excused: 'attendance.roster.absentExcused',
+  absent_unexcused: 'attendance.roster.absentUnexcused',
+  unmarked: 'attendance.roster.unmarked',
+}
+
+/** YYYY-MM-DD ± days, in the studio zone's own keys. */
+function shiftDayKey(key: string, by: number): string {
+  const base = new Date(`${key}T12:00:00Z`)
+  return studioDayKey(new Date(base.getTime() + by * 24 * 60 * 60 * 1000).toISOString())
 }
 
 const pageStyle: CSSProperties = {
@@ -103,25 +123,46 @@ export function ParentHome({
   locale,
   students = null,
   upcoming = null,
+  attendance = [],
   debtAgorot = 0,
 }: {
   locale: Locale
   /** `null` while loading — the section stays quiet rather than flashing an empty state. */
   students?: readonly HomeStudent[] | null
-  /** The family's next lessons, already filtered and capped by the caller. `null` = loading. */
+  /** The family's lessons across 2a's strip window (past AND coming week). `null` = loading. */
   upcoming?: readonly HomeLesson[] | null
+  /** 2a — what actually happened, per child per session, for the strip's past days. */
+  attendance?: readonly HomeAttendanceRow[]
   /** The family's open balance — 1a's debt alert, fed from `/me/balance`. */
   debtAgorot?: number
 }) {
   const [childFilter, setChildFilter] = useState<string | null>(null)
+  const todayKey = studioDayKey(new Date().toISOString())
+  const [selectedDay, setSelectedDay] = useState(todayKey)
+  // 2a's strip: three days back, today, three forward — read either way with one thumb.
+  const strip = [-3, -2, -1, 0, 1, 2, 3].map((by) => shiftDayKey(todayKey, by))
 
   const filtered = useMemo(() => {
     if (upcoming === null) return null
-    if (childFilter === null || students === null) return upcoming
+    let rows = upcoming
+    // 2a: a selected day shows exactly that day; today keeps 1a's forward list.
+    rows =
+      selectedDay === todayKey
+        ? rows.filter((lesson) => studioDayKey(lesson.startsAt) >= todayKey)
+        : rows.filter((lesson) => studioDayKey(lesson.startsAt) === selectedDay)
+    if (childFilter === null || students === null) return rows
     const child = students.find((s) => s.id === childFilter)
-    if (!child) return upcoming
-    return upcoming.filter((lesson) => child.groupNames.includes(lesson.groupName))
-  }, [upcoming, childFilter, students])
+    if (!child) return rows
+    return rows.filter((lesson) => child.groupNames.includes(lesson.groupName))
+  }, [upcoming, childFilter, students, selectedDay, todayKey])
+
+  const marksOf = (lesson: HomeLesson) =>
+    attendance
+      .filter((row) => row.session_id === lesson.id)
+      .map((row) => ({
+        row,
+        name: (students ?? []).find((s) => s.id === row.student_id)?.displayName ?? '',
+      }))
 
   const byDay = useMemo(() => {
     if (filtered === null) return null
@@ -196,8 +237,38 @@ export function ParentHome({
 
       <section aria-labelledby="parent-home-upcoming-title">
         <h2 id="parent-home-upcoming-title" style={{ fontSize: 'var(--text-title)' }}>
-          {t(locale, 'common.home.upcoming')}
+          {selectedDay === todayKey
+            ? t(locale, 'common.home.upcoming')
+            : formatDateInStudioZone(`${selectedDay}T12:00:00Z`, locale)}
         </h2>
+        {/* 2a — the day strip: read back and forward, tap a day. Past days carry what
+            actually happened; the strip is the affordance that makes attendance a thing
+            a parent can SEE rather than ask about. */}
+        <div
+          role="group"
+          aria-label={t(locale, 'common.home.dayStrip')}
+          data-testid="parent-day-strip"
+          style={{ display: 'flex', gap: 'var(--space-2)', overflowX: 'auto', paddingBlockEnd: 'var(--space-2)' }}
+        >
+          {strip.map((day) => {
+            const selected = day === selectedDay
+            return (
+              <button
+                key={day}
+                type="button"
+                data-testid={`home-day-${day}`}
+                aria-current={selected ? 'date' : undefined}
+                style={selected ? { ...chipActiveStyle, minInlineSize: '44px' } : { ...chipStyle, minInlineSize: '44px' }}
+                onClick={() => setSelectedDay(day)}
+              >
+                <span style={{ display: 'block', fontSize: 'var(--text-caption)' }}>
+                  {t(locale, `schedule.weekday.${new Date(`${day}T12:00:00Z`).getUTCDay()}`)}
+                </span>
+                <span>{day.slice(8)}</span>
+              </button>
+            )
+          })}
+        </div>
         {byDay === null ? null : byDay.length === 0 ? (
           <EmptyState
             title={t(locale, 'common.home.noUpcoming')}
@@ -232,6 +303,24 @@ export function ParentHome({
                           >
                             {formatTimeInStudioZone(lesson.startsAt, locale)}
                           </span>
+                        </div>
+                        <div
+                          style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}
+                        >
+                          {marksOf(lesson).map(({ row, name }) => (
+                            <span key={row.student_id} data-testid="home-attendance-mark">
+                              <StatusChip
+                                status={
+                                  row.status === 'present'
+                                    ? 'paid'
+                                    : row.status === 'unmarked'
+                                      ? 'unmarked'
+                                      : 'cancelled'
+                                }
+                                label={`${name} · ${t(locale, ATTENDANCE_LABEL[row.status] ?? 'attendance.roster.unmarked')}`}
+                              />
+                            </span>
+                          ))}
                         </div>
                       </Card>
                     </li>
