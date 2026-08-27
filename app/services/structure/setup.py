@@ -45,9 +45,12 @@ from app.services.audit import AuditService
 #: system existed.
 WIZARD_STEPS: tuple[str, ...] = ("studio", "belts", "groups", "prices", "staff", "students")
 
-#: `pending` is the absence of a report, never something a caller sets. A step reports its
-#: own outcome, and "un-report it" is not one of the two outcomes §5.1 describes.
-SETTABLE_STATUSES: tuple[str, ...] = ("done", "skipped")
+#: `pending` is settable since F6 — the REVERSAL of the original decision, on the
+#: rollover wizard's precedent: "a one-way ratchet would send them back through the whole
+#: wizard to correct a single press." An owner who ticked a step by mistake reopens it;
+#: the audit row records the transition either way, so nothing is un-reported — the
+#: report now says "answered, then reopened", which is what actually happened.
+SETTABLE_STATUSES: tuple[str, ...] = ("done", "skipped", "pending")
 
 StepStatus = Literal["pending", "done", "skipped"]
 

@@ -23,7 +23,7 @@ async function json<T>(response: Response): Promise<T> {
 export function makeSetupClient(fetcher: Fetcher): SetupClient {
   return {
     read: () => fetcher('/api/v1/setup').then(json<SetupProgress>),
-    setStep: (stepId: WizardStepId, status: 'done' | 'skipped') =>
+    setStep: (stepId: WizardStepId, status: 'done' | 'skipped' | 'pending') =>
       fetcher(`/api/v1/setup/steps/${stepId}`, {
         method: 'PATCH',
         headers: JSON_HEADERS,

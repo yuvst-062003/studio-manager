@@ -222,6 +222,8 @@ export const schedule: Bundle = {
   // a second name that drifts.
   'rollover.nav': 'גלגול שנה',
   'rollover.title': 'גלגול שנת פעילות',
+  'rollover.reopenStep': 'פתיחת השלב מחדש',
+  'rollover.back': 'חזרה לשלב הקודם',
   'rollover.subtitle': 'שבעה שלבים לפתיחת השנה הבאה. אפשר לעצור באמצע ולחזור — ההתקדמות נשמרת.',
   'rollover.draftOnlyHint': 'כל עוד השנה בטיוטה, שום דבר כאן אינו מוצג להורים',
   'rollover.loading': 'טוען את מצב הגלגול…',

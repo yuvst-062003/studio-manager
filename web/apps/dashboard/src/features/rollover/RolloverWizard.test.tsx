@@ -622,3 +622,28 @@ describe('RolloverWizard · direction', () => {
     }
   })
 })
+
+describe('F6 — reopening a step', () => {
+  it('sends pending for an answered step and stays on it', async () => {
+    const client = stub({ closures: 'done', groups: 'done' })
+    await renderWizard(client)
+    await userEvent.click(screen.getByTestId('rollover-rail-closures'))
+    await userEvent.click(await screen.findByTestId('rollover-reopen'))
+    expect(client.setStep).toHaveBeenCalledWith('y1', 'closures', 'pending')
+  })
+
+  it('withholds the reopen control from derived steps', async () => {
+    await renderWizard(stub({ closures: 'done', groups: 'done' }))
+    await userEvent.click(screen.getByTestId('rollover-rail-year'))
+    await screen.findByTestId('rollover-step-year')
+    expect(screen.queryByTestId('rollover-reopen')).toBeNull()
+  })
+
+  it('offers Back beside Done and Skip', async () => {
+    await renderWizard(stub({ closures: 'done' }))
+    // Resumed on groups (first pending non-derived); Back returns to closures.
+    await screen.findByTestId('rollover-step-groups')
+    await userEvent.click(screen.getByTestId('rollover-back'))
+    expect(screen.getByTestId('rollover-rail-closures')).toHaveAttribute('aria-current', 'step')
+  })
+})

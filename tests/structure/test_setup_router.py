@@ -157,9 +157,16 @@ def test_an_unknown_step_id_is_404(client, as_owner) -> None:
     assert patch_step(client, as_owner, "belts-and-braces", "done").status_code == 404
 
 
-def test_pending_is_not_a_settable_status(client, as_owner) -> None:
-    """A step reports its own outcome. 'Un-report it' is not one of the two outcomes."""
-    assert patch_step(client, as_owner, "studio", "pending").status_code == 422
+def test_a_ticked_step_can_be_reopened(client, as_owner) -> None:
+    """F6 reversed the original refusal, on the rollover wizard's precedent: a one-way
+    ratchet would send an owner back through the whole wizard to correct one press."""
+    assert patch_step(client, as_owner, "studio", "done").status_code == 200
+    reopened = patch_step(client, as_owner, "studio", "pending")
+    assert reopened.status_code == 200
+    body = get_setup(client, as_owner).json()
+    step = next(s for s in body["steps"] if s["id"] == "studio")
+    assert step["status"] == "pending"
+    assert body["complete"] is False
 
 
 # -- §3.2 ---------------------------------------------------------------------

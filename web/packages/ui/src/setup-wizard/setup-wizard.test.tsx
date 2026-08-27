@@ -504,3 +504,30 @@ describe('step 6 · חניכים', () => {
     )
   })
 })
+
+describe('F6 — going back', () => {
+  it('reopens an answered step in place, and the rail says pending again', async () => {
+    registerM1Stubs()
+    const client = fakeClient(progress({ studio: 'done' }))
+    render(<SetupWizard client={client} locale="he" />)
+    // The wizard resumes on the first pending step; navigate back to the answered one.
+    await screen.findByTestId('setup-rail-studio')
+    await userEvent.click(screen.getByTestId('setup-rail-studio'))
+    await userEvent.click(await screen.findByTestId('setup-reopen'))
+    expect(client.calls).toContain('studio:pending')
+    expect(screen.getByTestId('setup-rail-studio-status')).toHaveTextContent(
+      t('he', 'common.setup.status.pending'),
+    )
+    // Reopening stays on the step — the point is editing the answer.
+    expect(screen.getByTestId('setup-rail-studio')).toHaveAttribute('aria-current', 'step')
+  })
+
+  it('offers an explicit Back beside the step body', async () => {
+    registerM1Stubs()
+    render(<SetupWizard client={fakeClient(progress({ studio: 'done' }))} locale="he" />)
+    // Resumed past the first step, so Back exists and returns to it.
+    await screen.findByTestId('setup-step-body')
+    await userEvent.click(await screen.findByTestId('setup-back'))
+    expect(screen.getByTestId('setup-rail-studio')).toHaveAttribute('aria-current', 'step')
+  })
+})

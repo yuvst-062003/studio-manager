@@ -142,6 +142,8 @@ export const common: Bundle = {
   'dev.noticeIcon': 'notice',
   // §5.1's setup wizard — artboards 5c and 5f.
   'setup.title': 'Setup wizard',
+  'setup.reopen': 'Reopen this step',
+  'setup.back': 'Back to the previous step',
   'setup.welcome': 'Welcome. We will set the club up in 6 steps.',
   'setup.nothingSentYet': 'Every step can be skipped and returned to. Nothing is sent to parents until you confirm at the end.',
   'setup.stepOfSix': 'Step {n} of 6',

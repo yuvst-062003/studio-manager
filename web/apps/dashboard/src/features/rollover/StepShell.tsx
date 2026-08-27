@@ -92,6 +92,8 @@ export function StepActions({
   status,
   onDone,
   onSkip,
+  onReopen,
+  onBack,
   skippable = true,
   doneLabel,
 }: {
@@ -100,6 +102,10 @@ export function StepActions({
   status: RolloverStepStatus
   onDone: () => void
   onSkip: () => void
+  /** F6 — un-answer a step ticked by mistake. Withheld from derived steps. */
+  onReopen?: () => void
+  /** F6 — the explicit Back beside Done/Skip. */
+  onBack?: () => void
   /** §5.15 makes step 7 optional in as many words; the rest are skippable for the same
       reason the server accepts `skipped` at all — a studio that changes nothing still has to
       get past the step. */
@@ -115,6 +121,16 @@ export function StepActions({
       {skippable && !derived ? (
         <Button variant="ghost" data-testid={`rollover-skip-${stepId}`} onClick={onSkip}>
           {t(locale, 'schedule.rollover.skipStep')}
+        </Button>
+      ) : null}
+      {onBack ? (
+        <Button variant="ghost" data-testid={`rollover-back-${stepId}`} onClick={onBack}>
+          {t(locale, 'schedule.rollover.back')}
+        </Button>
+      ) : null}
+      {onReopen && !derived && status !== 'pending' ? (
+        <Button variant="secondary" data-testid={`rollover-reopen-${stepId}`} onClick={onReopen}>
+          {t(locale, 'schedule.rollover.reopenStep')}
         </Button>
       ) : null}
       {derived ? (

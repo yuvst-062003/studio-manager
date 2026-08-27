@@ -151,6 +151,8 @@ export const common: Bundle = {
   // and the reassurance line is 5c verbatim: it is the sentence that makes skipping feel
   // safe, which is why every step carries it and not only the first.
   'setup.title': 'אשף הקמה',
+  'setup.reopen': 'פתיחת השלב מחדש',
+  'setup.back': 'חזרה לשלב הקודם',
   'setup.welcome': 'ברוכים הבאים. נקים את המועדון ב־6 שלבים.',
   'setup.nothingSentYet': 'אפשר לדלג על כל שלב ולחזור אליו אחר כך. שום דבר לא נשלח להורים עד שתאשרו בסוף.',
   'setup.stepOfSix': 'שלב {n} מתוך 6',

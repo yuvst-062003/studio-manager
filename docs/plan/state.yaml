@@ -473,7 +473,8 @@ waves:
         on: 2026-08-27
       - id: F6
         title: Dashboard — wizards can reopen steps
-        status: pending
+        status: shipped
+        on: 2026-08-27
       - id: F7
         title: Dashboard — reminders and exports backends
         status: shipped

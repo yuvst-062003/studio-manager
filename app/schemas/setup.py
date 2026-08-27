@@ -29,11 +29,12 @@ class SetupProgressOut(BaseModel):
 
 
 class SetupStepIn(BaseModel):
-    #: Deliberately not `pending`. A step reports its own outcome, and un-reporting is not
-    #: one of the two outcomes §5.1 describes -- a 422 here is more honest than a silent
-    #: no-op.
+    #: `pending` is accepted since F6 — the reversal of the original refusal, made for
+    #: the same reason the rollover wizard always accepted it: a one-way ratchet sends an
+    #: owner back through the whole wizard to correct a single press. The audit trail
+    #: keeps both facts (answered, then reopened), so nothing is silently un-reported.
     #:
     #: Spelled out rather than built from `SETTABLE_STATUSES`: a Literal wants literals,
     #: and the indirection would cost a type: ignore to buy nothing. A test asserts the
     #: two stay in step.
-    status: Literal["done", "skipped"]
+    status: Literal["done", "skipped", "pending"]

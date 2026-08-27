@@ -31,7 +31,7 @@
 // rather than hidden, so the shape of the flow is stable between visits.
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { Card, LoadFailed } from '@studio/ui'
+import { Button, Card, LoadFailed } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { fill } from './client'
@@ -175,6 +175,17 @@ export function RolloverWizard({ locale, client }: { locale: Locale; client: Rol
     setActiveId(after[0] ?? from)
   }, [])
 
+  const reopen = useCallback(
+    async (stepId: RolloverStepId) => {
+      // The server has accepted `pending` since W2 — its docstring says "or reopen one
+      // they answered by mistake" — and the frontend simply never sent it (F6).
+      if (!yearId || isDerivedStep(stepId)) return
+      const next = await client.setStep(yearId, stepId, 'pending')
+      setState(next)
+    },
+    [client, yearId],
+  )
+
   const report = useCallback(
     async (stepId: RolloverStepId, status: 'done' | 'skipped') => {
       // A derived step is answered by the data. Sending a PATCH for one is a guaranteed 409,
@@ -251,6 +262,14 @@ export function RolloverWizard({ locale, client }: { locale: Locale; client: Rol
     status: activeStatus,
     onDone: () => void report(current, 'done'),
     onSkip: () => void report(current, 'skipped'),
+    // F6 — derived steps (year, generate) keep refusing: the server 409s a manual
+    // mark on either, and StepActions withholds the control from them.
+    onReopen: () => void reopen(current),
+    onBack: () => {
+      const index = ROLLOVER_STEP_ORDER.indexOf(current)
+      const previous = ROLLOVER_STEP_ORDER[index - 1]
+      if (previous) setActiveId(previous)
+    },
   }
 
   return (
@@ -330,6 +349,33 @@ export function RolloverWizard({ locale, client }: { locale: Locale; client: Rol
           />
         </dl>
       </Card>
+
+      {/* F6 — Back and reopen live at the wizard level, beside every step body, so no
+          step component needs reopening to gain them. Derived steps refuse reopen —
+          the server 409s a manual mark on either. */}
+      <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+        {position > 1 ? (
+          <Button
+            data-testid="rollover-back"
+            onClick={() => {
+              const previous = ROLLOVER_STEP_ORDER[position - 2]
+              if (previous) setActiveId(previous)
+            }}
+            variant="ghost"
+          >
+            {t(locale, 'schedule.rollover.back')}
+          </Button>
+        ) : null}
+        {!isDerivedStep(current) && activeStatus !== 'pending' ? (
+          <Button
+            data-testid="rollover-reopen"
+            onClick={() => void reopen(current)}
+            variant="secondary"
+          >
+            {t(locale, 'schedule.rollover.reopenStep')}
+          </Button>
+        ) : null}
+      </div>
 
       <div data-testid="rollover-step-body">
         {current === 'year' ? (

@@ -184,6 +184,8 @@ export const schedule: Bundle = {
   // -- §5.15's rollover wizard ------------------------------------------------------
   'rollover.nav': 'Year rollover',
   'rollover.title': 'Training year rollover',
+  'rollover.reopenStep': 'Reopen this step',
+  'rollover.back': 'Back to the previous step',
   'rollover.subtitle':
     'Seven steps to open next year. You can stop halfway and come back — progress is saved.',
   'rollover.draftOnlyHint': 'While the year is a draft, nothing here is shown to parents',

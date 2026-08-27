@@ -271,6 +271,27 @@ is the single cheapest item in this spec.
 
 ## Log
 
+### 2026-08-27 · F6 — wizards that let you go back
+
+**Setup: the server's refusal is reversed.** `SetupStepIn` and `SETTABLE_STATUSES` accept
+`pending`, both comments now record the new reasoning (the rollover wizard's own: "a
+one-way ratchet would send them back through the whole wizard to correct a single
+press"), and the pinning test asserts the reversal instead of the refusal. Nothing is
+un-reported — the audit trail keeps both facts, answered then reopened.
+
+**Rollover: the frontend finally sends what the server always accepted.** The client's
+`setStep` was already typed to include `pending` (spec drift — the spec said it was
+narrowed); the missing piece was any control that sent it. Both wizards now carry
+wizard-level **Back** and **reopen** controls beside every step body — at the wizard
+level, so no step component needed reopening — and derived rollover steps (`year`,
+`generate`) withhold reopen exactly as the server 409s them.
+
+**Saved values.** The third requirement holds by existing design: every step body reads
+its saved state from the server on mount (StudioStep reads `/studio`, GroupsStep lists
+groups, and so on), so re-entering a finished step shows what was entered. Verified
+rather than rebuilt.
+
+
 ### 2026-08-27 · F4 — the schedule vertical gets its write half
 
 **What was wrong.** The backend was complete since M1/W2 and the UI called almost none of

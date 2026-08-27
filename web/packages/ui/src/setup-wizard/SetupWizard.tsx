@@ -26,7 +26,8 @@ import type { SetupProgress, WizardStep, WizardStepId, WizardStepProps } from '.
 /** Injected so the container has no opinion about how the app talks to the API. */
 export type SetupClient = {
   read: () => Promise<SetupProgress>
-  setStep: (stepId: WizardStepId, status: 'done' | 'skipped') => Promise<SetupProgress>
+  // `pending` reopens a step ticked by mistake — F6 reversed the server's refusal.
+  setStep: (stepId: WizardStepId, status: 'done' | 'skipped' | 'pending') => Promise<SetupProgress>
   dismiss: () => Promise<SetupProgress>
 }
 
@@ -126,6 +127,15 @@ export function SetupWizard({
 
   const current = activeId ?? resumeId
 
+  const reopen = useCallback(
+    async (stepId: WizardStepId) => {
+      // Reopening STAYS on the step — the whole point is editing what was answered.
+      const next = await client.setStep(stepId, 'pending')
+      setProgress(next)
+    },
+    [client],
+  )
+
   const report = useCallback(
     async (stepId: WizardStepId, status: 'done' | 'skipped') => {
       const next = await client.setStep(stepId, status)
@@ -212,6 +222,33 @@ export function SetupWizard({
       </ol>
 
       <div data-testid="setup-step-body">
+        {/* F6 — going back, both halves: navigate (Back) and un-answer (reopen). The rail
+            could always navigate; what did not exist was a way to change an answer. */}
+        {current && position > 1 ? (
+          <Button
+            data-testid="setup-back"
+            onClick={() => {
+              const order = WIZARD_STEP_ORDER.filter((id) =>
+                entries.some((entry) => entry.key === id),
+              )
+              const index = order.indexOf(current)
+              const previous = order[index - 1]
+              if (previous) setActiveId(previous)
+            }}
+            variant="ghost"
+          >
+            {t(locale, 'common.setup.back')}
+          </Button>
+        ) : null}
+        {current && activeStep && activeStep.status !== 'pending' ? (
+          <Button
+            data-testid="setup-reopen"
+            onClick={() => void reopen(current)}
+            variant="secondary"
+          >
+            {t(locale, 'common.setup.reopen')}
+          </Button>
+        ) : null}
         {StepBody && activeStep && current ? (
           <StepBody
             locale={locale}
