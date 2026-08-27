@@ -45,6 +45,7 @@ export {
 } from './datetime'
 export type { Locale } from './datetime'
 export { appendPage, hasNextPage, mergeCursorPages } from './pagination'
+export { downloadFile } from './download'
 export type { CursorPage } from './pagination'
 export { CAPABILITIES, MONEY_CAPABILITIES, can, isCoach } from './permissions'
 export type { Actor, Capability, Role, Scope } from './permissions'

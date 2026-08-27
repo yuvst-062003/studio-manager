@@ -172,6 +172,9 @@ export const billing: Bundle = {
   'debt.aging.0_30': '0–30 ימים',
   'debt.aging.31_60': '31–60 ימים',
   'debt.aging.60_plus': 'מעל 60 ימים',
+  // -- F7a's debt reminders ---------------------------------------------------------
+  'debt.reminderRecent': 'נשלחה תזכורת ב־24 השעות האחרונות',
+  'reminder.quietHours': 'אין שליחת הודעות בין 21:00 ל־08:00',
   'debt.sendReminder': 'שליחת תזכורת',
   'debt.reminderSent': 'התזכורת נשלחה',
   'debt.escalation.day3': 'תזכורת ראשונה',

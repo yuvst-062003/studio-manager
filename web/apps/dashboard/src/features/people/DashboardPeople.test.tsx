@@ -11,6 +11,7 @@ import { t } from '@studio/i18n'
 import { StudentsScreen, documentLabelKey } from './StudentsScreen'
 import { AddStudentScreen } from './AddStudentScreen'
 import { StudentDetailScreen } from './StudentDetailScreen'
+import { TrialsAwaitingDecisionAlert } from './sections/TrialsAwaitingDecisionAlert'
 import { AlertCentre } from './AlertCentre'
 import type { AlertSectionProps } from './AlertCentre'
 import { registerPeopleAlerts } from './register'
@@ -557,5 +558,82 @@ describe('the alerts this lane owns', () => {
     render(<AlertCentre locale="he" client={makeClient()} />)
     await screen.findByTestId('alert-pending-requests')
     expect(document.body.textContent ?? '').not.toContain('₪')
+  })
+})
+
+describe('F2 — the four buttons that used to do nothing', () => {
+  it('freeze expands, then fires POST /students/{id}/freeze with the dates', async () => {
+    const client = makeClient()
+    ;(client.freeze as ReturnType<typeof vi.fn>).mockResolvedValue(new Response('{}'))
+    render(<StudentDetailScreen studentId="st1" locale="he" client={client} />)
+    await userEvent.click(await screen.findByTestId('detail-freeze'))
+    // The second press is the confirmation step; the fields are the decision.
+    const from = screen.getByTestId('detail-freeze-from') as HTMLInputElement
+    expect(from.value).not.toBe('')
+    await userEvent.click(screen.getByTestId('detail-freeze-submit'))
+    expect(client.freeze).toHaveBeenCalledWith('st1', {
+      from_date: from.value,
+      to_date: null,
+    })
+  })
+
+  it('mark-lost expands, requires a reason, then fires with it', async () => {
+    const client = makeClient()
+    ;(client.markLost as ReturnType<typeof vi.fn>).mockResolvedValue(new Response('{}'))
+    render(<StudentDetailScreen studentId="st1" locale="he" client={client} />)
+    await userEvent.click(await screen.findByTestId('detail-mark-lost'))
+    expect(screen.getByTestId('detail-mark-lost-submit')).toBeDisabled()
+    await userEvent.type(screen.getByTestId('detail-lost-reason'), 'עברו לעיר אחרת')
+    await userEvent.click(screen.getByTestId('detail-mark-lost-submit'))
+    expect(client.markLost).toHaveBeenCalledWith('st1', 'עברו לעיר אחרת')
+  })
+
+  it('the alert converts with the chosen group — same route as the detail screen', async () => {
+    const client = makeClient({
+      trialBookings: vi.fn(async () => ({
+        items: [
+          {
+            id: 'b1',
+            student_id: 'st9',
+            student_display_name: 'דנה ניסיון',
+            booked_at: '2026-11-01T10:00:00Z',
+            attended: true,
+            outcome: 'pending',
+          } as never,
+        ],
+      })),
+    })
+    ;(client.convert as ReturnType<typeof vi.fn>).mockResolvedValue(new Response('{}'))
+    render(<TrialsAwaitingDecisionAlert locale="he" client={client} />)
+    await userEvent.click(await screen.findByTestId('alert-convert-st9'))
+    await userEvent.selectOptions(screen.getByTestId('alert-convert-group-st9'), 'g1')
+    await userEvent.click(screen.getByTestId('alert-convert-submit-st9'))
+    expect(client.convert).toHaveBeenCalledWith('st9', {
+      group_id: 'g1',
+      started_on: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) as unknown as string,
+    })
+  })
+
+  it('the alert marks lost with the typed reason', async () => {
+    const client = makeClient({
+      trialBookings: vi.fn(async () => ({
+        items: [
+          {
+            id: 'b1',
+            student_id: 'st9',
+            student_display_name: 'דנה ניסיון',
+            booked_at: '2026-11-01T10:00:00Z',
+            attended: true,
+            outcome: 'pending',
+          } as never,
+        ],
+      })),
+    })
+    ;(client.markLost as ReturnType<typeof vi.fn>).mockResolvedValue(new Response('{}'))
+    render(<TrialsAwaitingDecisionAlert locale="he" client={client} />)
+    await userEvent.click(await screen.findByTestId('alert-lost-st9'))
+    await userEvent.type(screen.getByTestId('alert-lost-reason-st9'), 'לא התאים')
+    await userEvent.click(screen.getByTestId('alert-lost-submit-st9'))
+    expect(client.markLost).toHaveBeenCalledWith('st9', 'לא התאים')
   })
 })

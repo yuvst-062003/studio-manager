@@ -456,7 +456,8 @@ waves:
         status: pending
       - id: F2
         title: Dashboard — wire the four inert controls with existing routes, plus the no-handler guard
-        status: pending
+        status: shipped
+        on: 2026-08-27
       - id: F3
         title: Dashboard — calendar session popover, QuickViewRoster, DELETE /sessions for ad-hoc
         status: shipped
@@ -472,7 +473,8 @@ waves:
         status: pending
       - id: F7
         title: Dashboard — reminders and exports backends
-        status: pending
+        status: shipped
+        on: 2026-08-27
       - id: F8
         title: Dashboard — replace stale comes-later promises with real data
         status: pending

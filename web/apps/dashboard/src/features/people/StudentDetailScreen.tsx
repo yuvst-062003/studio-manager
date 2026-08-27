@@ -49,6 +49,14 @@ export function StudentDetailScreen({
   const [groups, setGroups] = useState<GroupOption[]>([])
   const [converting, setConverting] = useState(false)
   const [convertGroup, setConvertGroup] = useState('')
+  // F2 — the two buttons on either side of convert, wired at last. Each expands into
+  // its own small form: the second press is the confirmation step, and the fields ARE
+  // the decision (§5.4's freeze keeps the spot; mark-lost wants the manager's reason).
+  const [freezing, setFreezing] = useState(false)
+  const [freezeFrom, setFreezeFrom] = useState(() => new Date().toISOString().slice(0, 10))
+  const [freezeTo, setFreezeTo] = useState('')
+  const [markingLost, setMarkingLost] = useState(false)
+  const [lostReason, setLostReason] = useState('')
   const [busy, setBusy] = useState(false)
   const [reloads, setReloads] = useState(0)
 
@@ -185,9 +193,52 @@ export function StudentDetailScreen({
       </Card>
 
       <div>
-        <Button variant="secondary" data-testid="detail-freeze">
-          {t(locale, 'people.freeze.title')}
-        </Button>
+        {freezing ? (
+          <>
+            <label>
+              {t(locale, 'people.freeze.from')}
+              <input
+                data-testid="detail-freeze-from"
+                onChange={(event) => setFreezeFrom(event.target.value)}
+                type="date"
+                value={freezeFrom}
+              />
+            </label>
+            <label>
+              {t(locale, 'people.freeze.to')}
+              <input
+                data-testid="detail-freeze-to"
+                onChange={(event) => setFreezeTo(event.target.value)}
+                type="date"
+                value={freezeTo}
+              />
+            </label>
+            <Button
+              data-testid="detail-freeze-submit"
+              disabled={!freezeFrom || busy}
+              onClick={() => {
+                setBusy(true)
+                void client
+                  .freeze(studentId, { from_date: freezeFrom, to_date: freezeTo || null })
+                  .then(() => {
+                    setFreezing(false)
+                    setReloads((n) => n + 1)
+                  })
+                  .finally(() => setBusy(false))
+              }}
+            >
+              {t(locale, 'people.freeze.submit')}
+            </Button>
+          </>
+        ) : (
+          <Button
+            variant="secondary"
+            data-testid="detail-freeze"
+            onClick={() => setFreezing(true)}
+          >
+            {t(locale, 'people.freeze.title')}
+          </Button>
+        )}
         {/* §5.4a step 5. The button opens the decision rather than converting in place,
             because the group is part of it — and it had no handler at all, so the one
             action that turns a trial into a member did nothing when pressed. */}
@@ -225,9 +276,44 @@ export function StudentDetailScreen({
             {t(locale, 'people.convert.title')}
           </Button>
         )}
-        <Button variant="ghost" data-testid="detail-mark-lost">
-          {t(locale, 'people.convert.markLost')}
-        </Button>
+        {markingLost ? (
+          <>
+            <label>
+              {t(locale, 'people.convert.markLostReason')}
+              <input
+                data-testid="detail-lost-reason"
+                onChange={(event) => setLostReason(event.target.value)}
+                value={lostReason}
+              />
+            </label>
+            <Button
+              data-testid="detail-mark-lost-submit"
+              disabled={!lostReason.trim() || busy}
+              onClick={() => {
+                setBusy(true)
+                void client
+                  .markLost(studentId, lostReason.trim())
+                  .then(() => {
+                    setMarkingLost(false)
+                    setLostReason('')
+                    setReloads((n) => n + 1)
+                  })
+                  .finally(() => setBusy(false))
+              }}
+              variant="destructive"
+            >
+              {t(locale, 'people.convert.markLost')}
+            </Button>
+          </>
+        ) : (
+          <Button
+            variant="ghost"
+            data-testid="detail-mark-lost"
+            onClick={() => setMarkingLost(true)}
+          >
+            {t(locale, 'people.convert.markLost')}
+          </Button>
+        )}
       </div>
     </section>
   )

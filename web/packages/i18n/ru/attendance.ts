@@ -88,6 +88,7 @@ export const attendance: Bundle = {
   'report.unmarkedNotAbsence': 'Неотмеченные занятия не считаются пропусками',
   'report.markNow': 'Отметить сейчас',
   'report.remindCoach': 'Напомнить тренеру',
+  'report.coachReminded': 'Тренеру отправлено напоминание',
   'report.byGroup': 'Посещаемость по группам',
   // -- 9g's injury report (S2): immediate, online-only, never queued -------------
   'summary.injury.title': 'Сообщение о травме',

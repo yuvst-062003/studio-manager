@@ -271,6 +271,38 @@ is the single cheapest item in this spec.
 
 ## Log
 
+### 2026-08-27 · F2 + F7 — every dead control acts, and the guard that keeps it so
+
+**What was wrong.** Ten controls rendered a `<Button>` with no handler — four whose
+backend shipped waves ago (freeze, mark-lost, and both trial-decision buttons), and six
+with no backend at all (two exports, four reminders).
+
+**F2.** Freeze and mark-lost expand into their own small forms on the detail screen — the
+second press is the confirmation step and the fields are the decision. The trials alert's
+two buttons expand per row: convert wants the group (§5.4a step 5's three-in-one
+decision), lost wants the reason. All four fire the routes that had been waiting since
+M3/M4, with tests asserting the exact bodies. The guard
+(`tools/__tests__/inert-buttons.test.ts`) fails the build on any `<Button>` in any app
+with no onClick, no href, no submit type and no spread props.
+
+**F7a.** `POST /reminders/debt` (one household or many — the bulk button is the same
+route with more ids), `/reminders/sessions/{id}/coach`, `/reminders/events/{id}/non-responders`.
+One service over the existing comms layer, three rules enforced: **quiet hours** (a 409
+between 21:00 and 08:00 Jerusalem — implemented for the first time anywhere in the
+product; the audit's `לא נשלחות הודעות אחרי 21:00` was a note about a composer that never
+shipped it), **24h rate limit** per person per subject (read back from the notifications
+table — "reminded 2 days ago" is a query, not a second table), and **one message per
+household** (debt addresses the payer, per §6.3). Every call audits counts, never names.
+The UI renders the outcome per row — sent, already-reminded, quiet-hours — because "we
+did not send that" must never look like "we sent that".
+
+**F7b.** `GET /exports/accountant?year&month` (payments received in the Jerusalem month,
+reversals included and marked — the export must agree with the bank statement beside it)
+and `GET /exports/attendance?from&to`. CSV, UTF-8 with a BOM, agorot→shekels by integer
+arithmetic at the boundary only. Downloads go through an authenticated fetch→blob helper
+(`downloadFile` in @studio/core) because a bare `<a href>` cannot carry the bearer header.
+
+
 ### 2026-08-27 · F3 — the calendar answers a click
 
 **What was wrong.** `WeekBoard`'s session blocks were inert — the only handlers on the

@@ -21,6 +21,7 @@
 // grid of divs looks identical and is unreadable.
 import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
+import { apiFetch } from '@studio/core'
 import { Button, Card, EmptyState, MoneyDisplay, StatusChip } from '@studio/ui'
 import type { ChipStatus } from '@studio/ui'
 import { t } from '@studio/i18n'
@@ -135,6 +136,7 @@ export function EventPage({
   /** §3.2's hard rule. Decides whether the payment column exists at all. */
   seesMoney: boolean
 }) {
+  const [remindOutcome, setRemindOutcome] = useState<'sent' | 'quiet' | 'failed' | null>(null)
   const [event, setEvent] = useState<EventOut | null>(null)
   const [roster, setRoster] = useState<EventRegistrationOut[]>([])
   const [loaded, setLoaded] = useState(false)
@@ -179,9 +181,34 @@ export function EventPage({
 
       {/* The same field the tile reads. See the module docstring. */}
       <p style={{ margin: 0 }}>
-        <Button variant="primary">
+        <Button
+          variant="primary"
+          data-testid="remind-non-responders"
+          disabled={counts.pending === 0}
+          onClick={() => {
+            void apiFetch(`/api/v1/reminders/events/${eventId}/non-responders`, {
+              method: 'POST',
+            }).then((response) =>
+              setRemindOutcome(
+                response.ok ? 'sent' : response.status === 409 ? 'quiet' : 'failed',
+              ),
+            )
+          }}
+        >
           {t(locale, 'events.remindNonResponders')} · {counts.pending}
         </Button>
+        {remindOutcome ? (
+          <span data-testid="remind-non-responders-outcome">
+            {t(
+              locale,
+              remindOutcome === 'sent'
+                ? 'events.nonRespondersReminded'
+                : remindOutcome === 'quiet'
+                  ? 'billing.reminder.quietHours'
+                  : 'common.loadFailed.body',
+            )}
+          </span>
+        ) : null}
       </p>
 
       {loaded && roster.length === 0 ? (

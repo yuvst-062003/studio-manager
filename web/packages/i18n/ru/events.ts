@@ -86,6 +86,7 @@ export const events: Bundle = {
   'counts.declined': 'Не придут',
   'counts.paid': 'Оплатили',
   'remindNonResponders': 'Напомнить не ответившим',
+  'nonRespondersReminded': 'Напоминание отправлено тем, кто не ответил',
   'reminderSent': 'Напоминание отправлено',
   'roster.empty': 'К мероприятию не привязан ни один ученик',
 

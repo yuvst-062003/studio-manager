@@ -86,6 +86,7 @@ export const attendance: Bundle = {
   'report.unmarkedNotAbsence': 'Unmarked sessions are not counted as absences',
   'report.markNow': 'Mark now',
   'report.remindCoach': 'Remind the coach',
+  'report.coachReminded': 'The coach was reminded',
   'report.byGroup': 'Attendance rate by group',
   // -- 9g's injury report (S2): immediate, online-only, never queued -------------
   'summary.injury.title': 'Injury report',

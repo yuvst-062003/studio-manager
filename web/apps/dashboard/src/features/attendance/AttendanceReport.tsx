@@ -19,7 +19,7 @@ import { useEffect, useState } from 'react'
 import { Button, EmptyState, ProgressBar } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
-import { formatDateInStudioZone, formatTimeInStudioZone } from '@studio/core'
+import { apiFetch, downloadFile, formatDateInStudioZone, formatTimeInStudioZone } from '@studio/core'
 import type { DashboardAttendanceClient, UnmarkedSession } from './client'
 
 export function AttendanceReport({
@@ -38,6 +38,19 @@ export function AttendanceReport({
   onMarkNow?: (sessionId: string) => void
 }) {
   const [unmarked, setUnmarked] = useState<UnmarkedSession[] | null>(null)
+  // F7a — which coach reminders went, per session, and F7b's export failure.
+  const [reminded, setReminded] = useState<Record<string, 'sent' | 'quiet' | 'failed'>>({})
+  const [exportFailed, setExportFailed] = useState(false)
+
+  async function remindCoach(sessionId: string) {
+    const response = await apiFetch(`/api/v1/reminders/sessions/${sessionId}/coach`, {
+      method: 'POST',
+    })
+    setReminded((current) => ({
+      ...current,
+      [sessionId]: response.ok ? 'sent' : response.status === 409 ? 'quiet' : 'failed',
+    }))
+  }
 
   useEffect(() => {
     let live = true
@@ -60,7 +73,22 @@ export function AttendanceReport({
     <section aria-labelledby="attendance-report-title" data-testid="attendance-report">
       <header>
         <h1 id="attendance-report-title">{t(locale, 'attendance.report.title')}</h1>
-        <Button variant="secondary">{t(locale, 'attendance.report.export')}</Button>
+        <Button
+          variant="secondary"
+          data-testid="attendance-export"
+          onClick={() => {
+            setExportFailed(false)
+            void downloadFile(
+              `/api/v1/exports/attendance?from=${window.from}&to=${window.to}`,
+              `attendance-${window.from}-${window.to}.csv`,
+            ).catch(() => setExportFailed(true))
+          }}
+        >
+          {t(locale, 'attendance.report.export')}
+        </Button>
+        {exportFailed ? (
+          <span data-testid="attendance-export-failed">{t(locale, 'common.loadFailed.body')}</span>
+        ) : null}
       </header>
 
       <section data-testid="unmarked-sessions">
@@ -84,7 +112,25 @@ export function AttendanceReport({
                 <span>{formatTimeInStudioZone(session.starts_at, locale)}</span>
                 <bdi>{session.group_name}</bdi>
                 <span>{formatDateInStudioZone(session.starts_at, locale)}</span>
-                <Button variant="secondary">{t(locale, 'attendance.report.remindCoach')}</Button>
+                <Button
+                  variant="secondary"
+                  data-testid={`remind-coach-${session.id}`}
+                  onClick={() => void remindCoach(session.id)}
+                >
+                  {t(locale, 'attendance.report.remindCoach')}
+                </Button>
+                {reminded[session.id] ? (
+                  <span data-testid={`remind-outcome-${session.id}`}>
+                    {t(
+                      locale,
+                      reminded[session.id] === 'sent'
+                        ? 'attendance.report.coachReminded'
+                        : reminded[session.id] === 'quiet'
+                          ? 'billing.reminder.quietHours'
+                          : 'common.loadFailed.body',
+                    )}
+                  </span>
+                ) : null}
                 <Button onClick={() => onMarkNow?.(session.id)} variant="primary">
                   {t(locale, 'attendance.report.markNow')}
                 </Button>

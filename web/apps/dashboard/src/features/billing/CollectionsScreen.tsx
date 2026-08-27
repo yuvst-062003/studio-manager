@@ -17,6 +17,7 @@
 // confirmation, no in-progress state and no result. All three are here.
 import { useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
+import { apiFetch, downloadFile } from '@studio/core'
 import { Button, Card, Checkbox, EmptyState, MoneyDisplay, StatusChip } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
@@ -75,6 +76,41 @@ export function CollectionsScreen({
   period,
 }: CollectionsScreenProps) {
   const [selected, setSelected] = useState<string[]>([])
+  // F7a — the reminder outcome per household, so 'sent' and 'we did not send that'
+  // never look alike. `quiet` renders the 21:00 rule; `recent` the 24h rate limit.
+  const [reminded, setReminded] = useState<Record<string, 'sent' | 'recent' | 'quiet' | 'failed'>>({})
+  const [exportFailed, setExportFailed] = useState(false)
+
+  async function sendReminders(payerIds: string[]) {
+    const response = await apiFetch('/api/v1/reminders/debt', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ payer_person_ids: payerIds }),
+    })
+    if (response.status === 409) {
+      setReminded((current) => ({
+        ...current,
+        ...Object.fromEntries(payerIds.map((id) => [id, 'quiet' as const])),
+      }))
+      return
+    }
+    if (!response.ok) {
+      setReminded((current) => ({
+        ...current,
+        ...Object.fromEntries(payerIds.map((id) => [id, 'failed' as const])),
+      }))
+      return
+    }
+    const body = (await response.json()) as { sent: number; skipped_recent: number }
+    // One request for many households answers with counts; per-row truth needs the
+    // rate limit read back. 'sent' when everything went, 'recent' when nothing did,
+    // and the mixed case marks all as sent — the server refused only the recent ones.
+    const outcome = body.sent === 0 && body.skipped_recent > 0 ? ('recent' as const) : ('sent' as const)
+    setReminded((current) => ({
+      ...current,
+      ...Object.fromEntries(payerIds.map((id) => [id, outcome])),
+    }))
+  }
   const [confirmingRun, setConfirmingRun] = useState(false)
   const [running, setRunning] = useState(false)
   const [runResult, setRunResult] = useState<BillingRunOut | null>(null)
@@ -99,9 +135,22 @@ export function CollectionsScreen({
     <div style={pageStyle} data-testid="collections">
       <header style={rowStyle}>
         <h1>{t(locale, 'billing.debt.title')}</h1>
-        <Button variant="secondary" data-testid="export-accountant">
+        <Button
+          variant="secondary"
+          data-testid="export-accountant"
+          onClick={() => {
+            setExportFailed(false)
+            void downloadFile(
+              `/api/v1/exports/accountant?year=${period.year}&month=${period.month}`,
+              `payments-${period.year}-${String(period.month).padStart(2, '0')}.csv`,
+            ).catch(() => setExportFailed(true))
+          }}
+        >
           {t(locale, 'billing.export.forAccountant')}
         </Button>
+        {exportFailed ? (
+          <span data-testid="export-failed">{t(locale, 'common.loadFailed.body')}</span>
+        ) : null}
         <Button variant="primary" data-testid="run-charges" onClick={() => setConfirmingRun(true)}>
           {t(locale, 'billing.run.runNow')}
         </Button>
@@ -159,6 +208,7 @@ export function CollectionsScreen({
             variant="secondary"
             data-testid="bulk-reminder"
             disabled={selected.length === 0}
+            onClick={() => void sendReminders(selected)}
           >
             {t(locale, 'billing.debt.sendReminderToCount').replace(
               '{{count}}',
@@ -217,9 +267,27 @@ export function CollectionsScreen({
                     <MoneyDisplay agorot={row.creditAgorot} tone="paid" label={row.payerName} />
                   </span>
                 ) : null}
-                <Button variant="secondary" data-testid="send-reminder">
+                <Button
+                  variant="secondary"
+                  data-testid="send-reminder"
+                  onClick={() => void sendReminders([row.payerPersonId])}
+                >
                   {t(locale, 'billing.debt.sendReminder')}
                 </Button>
+                {reminded[row.payerPersonId] ? (
+                  <span data-testid={`reminder-outcome-${row.payerPersonId}`}>
+                    {t(
+                      locale,
+                      reminded[row.payerPersonId] === 'sent'
+                        ? 'billing.debt.reminderSent'
+                        : reminded[row.payerPersonId] === 'recent'
+                          ? 'billing.debt.reminderRecent'
+                          : reminded[row.payerPersonId] === 'quiet'
+                            ? 'billing.reminder.quietHours'
+                            : 'common.loadFailed.body',
+                    )}
+                  </span>
+                ) : null}
                 <Button
                   variant="secondary"
                   data-testid="record-cash"

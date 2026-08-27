@@ -107,6 +107,7 @@ export const events: Bundle = {
   'counts.declined': 'לא מגיע',
   'counts.paid': 'שולם',
   'remindNonResponders': 'תזכורת למי שלא ענה',
+  'nonRespondersReminded': 'נשלחה תזכורת למי שטרם ענו',
   'reminderSent': 'התזכורת נשלחה',
   'roster.empty': 'אף חניך לא שויך לאירוע',
 

@@ -135,6 +135,9 @@ export const billing: Bundle = {
   'debt.aging.0_30': '0–30 days',
   'debt.aging.31_60': '31–60 days',
   'debt.aging.60_plus': 'Over 60 days',
+  // -- F7a's debt reminders ---------------------------------------------------------
+  'debt.reminderRecent': 'Reminded within the last 24 hours',
+  'reminder.quietHours': 'No messages are sent between 21:00 and 08:00',
   'debt.sendReminder': 'Send a reminder',
   'debt.reminderSent': 'Reminder sent',
   'debt.escalation.day3': 'First reminder',

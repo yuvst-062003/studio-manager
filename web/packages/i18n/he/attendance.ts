@@ -122,6 +122,7 @@ export const attendance: Bundle = {
   'report.unmarkedNotAbsence': 'שיעורים שלא סומנו אינם נספרים כהיעדרות',
   'report.markNow': 'סימון עכשיו',
   'report.remindCoach': 'תזכורת למאמן',
+  'report.coachReminded': 'נשלחה תזכורת למאמן',
   'report.byGroup': 'אחוז נוכחות לפי קבוצה',
   // -- 9g's injury report (S2): immediate, online-only, never queued -------------
   'summary.injury.title': 'דיווח פציעה',
