@@ -58,6 +58,7 @@ const EXAM: EventOut = {
   rsvp_yes_count: 0,
   rsvp_no_count: 0,
   rsvp_pending_count: 2,
+  consent_signed_count: 0,
 }
 
 const CANDIDATES: CandidateOut[] = [
@@ -202,6 +203,108 @@ describe('9i — the staff events list', () => {
     return client
   }
 
+  it('carries date, time and venue on every card (S9)', async () => {
+    renderList([EXAM])
+    const when = await screen.findByTestId('event-when')
+    // 15:00Z on 26 November is 17:00 in Jerusalem.
+    expect(when).toHaveTextContent('17:00')
+    expect(when).toHaveTextContent('אולם א׳')
+  })
+
+  it('counts the upcoming in the header (S9)', async () => {
+    renderList([
+      EXAM, // 26 Nov — ahead of the fixed now (12 Nov)
+      { ...EXAM, id: 'e0', starts_at: '2026-11-01T15:00:00Z', ends_at: '2026-11-01T17:00:00Z' },
+    ])
+    expect(await screen.findByTestId('events-upcoming')).toHaveTextContent(
+      `1 ${t('he', 'events.list.upcoming')}`,
+    )
+  })
+
+  it('states the consent position, and celebrates only a full set (S9)', async () => {
+    renderList([
+      {
+        ...EXAM,
+        requires_consent: true,
+        rsvp_yes_count: 2,
+        rsvp_pending_count: 1,
+        consent_signed_count: 2,
+      },
+    ])
+    const consents = await screen.findByTestId('event-consents')
+    expect(consents).toHaveTextContent('אישורים: 2/3')
+  })
+
+  it('says all consents are signed when they are (S9)', async () => {
+    renderList([
+      {
+        ...EXAM,
+        requires_consent: true,
+        rsvp_yes_count: 3,
+        rsvp_pending_count: 0,
+        consent_signed_count: 3,
+      },
+    ])
+    expect(await screen.findByTestId('event-consents')).toHaveTextContent(
+      t('he', 'events.consent.allSigned'),
+    )
+  })
+
+  it('names a draft s unsent invitations, and שליחה publishes (S9)', async () => {
+    const client = makeClient({
+      list: vi
+        .fn()
+        .mockResolvedValue({ items: [{ ...EXAM, status: 'draft' }], next_cursor: null, has_more: false }),
+      publish: vi.fn().mockResolvedValue(new Response('{}', { status: 200 })),
+    })
+    render(
+      <StaffEventsScreen
+        canPublish
+        client={client}
+        locale="he"
+        now="2026-11-12T09:00:00Z"
+        onOpen={vi.fn()}
+      />,
+    )
+    expect(await screen.findByTestId('event-draft')).toBeInTheDocument()
+    await userEvent.click(screen.getByTestId('event-send'))
+    expect(client.publish).toHaveBeenCalledWith('e1')
+  })
+
+  it('offers an assistant coach no send button the server would refuse (S9)', async () => {
+    renderList([{ ...EXAM, status: 'draft' }])
+    await screen.findByTestId('event-draft')
+    expect(screen.queryByTestId('event-send')).toBeNull()
+  })
+
+  it('routes a future event to the participants list, a held exam to the sheet (S9)', async () => {
+    const onOpen = vi.fn()
+    const onOpenRoster = vi.fn()
+    const client = makeClient({
+      list: vi.fn().mockResolvedValue({
+        items: [
+          EXAM,
+          { ...EXAM, id: 'e0', starts_at: '2026-11-01T15:00:00Z', ends_at: '2026-11-01T17:00:00Z' },
+        ],
+        next_cursor: null,
+        has_more: false,
+      }),
+    })
+    render(
+      <StaffEventsScreen
+        client={client}
+        locale="he"
+        now="2026-11-12T09:00:00Z"
+        onOpen={onOpen}
+        onOpenRoster={onOpenRoster}
+      />,
+    )
+    await userEvent.click(await screen.findByRole('button', { name: t('he', 'events.roster.title') }))
+    expect(onOpenRoster).toHaveBeenCalledWith('e1')
+    await userEvent.click(screen.getByRole('button', { name: t('he', 'events.exam.record') }))
+    expect(onOpen).toHaveBeenCalledWith('e0')
+  })
+
   it('keeps three state-appropriate RSVP renderings', async () => {
     // 9i finding 7 — unlike 12h's three, these are correct BECAUSE they differ. Recorded so
     // nobody unifies them into one bar that reads 0% before anyone has been asked.
@@ -232,5 +335,63 @@ describe('9i — the staff events list', () => {
   it('renders the empty state a coach with no events is in', async () => {
     renderList([])
     expect(await screen.findByText(t('he', 'events.list.empty'))).toBeInTheDocument()
+  })
+})
+
+
+describe('9i — the participants list', () => {
+  const ROWS = [
+    {
+      id: 'reg1',
+      event_id: 'e1',
+      student_id: 'st1',
+      student_display_name: 'דנה כהן',
+      rsvp: 'yes',
+      responded_by_person_id: null,
+      responded_at: '2026-11-10T10:00:00Z',
+      consent_signed_at: '2026-11-10T10:00:00Z',
+      charge_id: null,
+      attended: null,
+    },
+    {
+      id: 'reg2',
+      event_id: 'e1',
+      student_id: 'st2',
+      student_display_name: 'רון לוי',
+      rsvp: 'pending',
+      responded_by_person_id: null,
+      responded_at: null,
+      consent_signed_at: null,
+      charge_id: null,
+      attended: null,
+    },
+  ]
+
+  it('lists who answered what, and where each consent stands', async () => {
+    const { EventRosterScreen } = await import('./EventRosterScreen')
+    const client = makeClient({
+      read: vi.fn().mockResolvedValue({ ...EXAM, requires_consent: true }),
+      registrations: vi.fn().mockResolvedValue({ items: ROWS, next_cursor: null, has_more: false }),
+    })
+    render(<EventRosterScreen client={client} eventId="e1" locale="he" />)
+    const rows = await screen.findAllByTestId('event-roster-row')
+    expect(rows).toHaveLength(2)
+    expect(rows[0]).toHaveTextContent(t('he', 'events.rsvp.yes'))
+    expect(rows[0]).toHaveTextContent(t('he', 'events.consent.signed'))
+    expect(rows[1]).toHaveTextContent(t('he', 'events.rsvp.pending'))
+    expect(rows[1]).toHaveTextContent(t('he', 'events.consent.pending'))
+  })
+
+  it('shows no consent chip when the event asks for none', async () => {
+    const { EventRosterScreen } = await import('./EventRosterScreen')
+    const client = makeClient({
+      read: vi.fn().mockResolvedValue(EXAM),
+      registrations: vi
+        .fn()
+        .mockResolvedValue({ items: [ROWS[0]], next_cursor: null, has_more: false }),
+    })
+    render(<EventRosterScreen client={client} eventId="e1" locale="he" />)
+    const row = await screen.findByTestId('event-roster-row')
+    expect(row).not.toHaveTextContent(t('he', 'events.consent.signed'))
   })
 })

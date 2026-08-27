@@ -39,6 +39,7 @@ function row(over: Partial<ParentEventOut> = {}): ParentEventOut {
       rsvp_yes_count: 0,
       rsvp_no_count: 0,
       rsvp_pending_count: 1,
+      consent_signed_count: 0,
     },
     registration: {
       id: 'r1',

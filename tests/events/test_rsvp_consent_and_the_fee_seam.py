@@ -190,6 +190,24 @@ def test_signing_the_consent_completes_the_pair_and_raises_exactly_one_charge(
     assert call["payer_person_id"] == parent.person_id
 
 
+def test_the_event_carries_a_signed_consent_count(
+    client, as_guardian_of, a_student, an_event, a_registered_student, as_manager, billing
+):
+    """9i's consent state. The count is projected, never stored — a second copy of
+    `consent_signed_at` would drift the first time a registration is deleted."""
+    before = client.get(f"/api/v1/events/{an_event}", headers=as_manager.headers).json()
+    assert before["consent_signed_count"] == 0
+
+    parent = as_guardian_of(a_student)
+    client.post(
+        f"/api/v1/events/{an_event}/consent",
+        headers=parent.headers,
+        json={"student_id": str(a_student)},
+    )
+    after = client.get(f"/api/v1/events/{an_event}", headers=as_manager.headers).json()
+    assert after["consent_signed_count"] == 1
+
+
 def test_signing_first_and_answering_second_works_the_same_way(
     client, as_guardian_of, a_student, an_event, a_registered_student, billing
 ):

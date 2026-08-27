@@ -248,6 +248,25 @@ class EventService:
             tally[event_id][index[rsvp]] = count
         return {event_id: (row[0], row[1], row[2]) for event_id, row in tally.items()}
 
+    @staticmethod
+    def consent_counts(
+        session: TenantSession, event_ids: list[uuid.UUID]
+    ) -> dict[uuid.UUID, int]:
+        """Signed consents per event — 9i's `כל האישורים נחתמו` line."""
+        if not event_ids:
+            return {}
+        return {
+            event_id: count
+            for event_id, count in session.execute(
+                select(EventRegistration.event_id, func.count())
+                .where(
+                    EventRegistration.event_id.in_(event_ids),
+                    EventRegistration.consent_signed_at.is_not(None),
+                )
+                .group_by(EventRegistration.event_id)
+            )
+        }
+
     # -- serialisation ---------------------------------------------------------
     @staticmethod
     def to_out(session: TenantSession, events: list[Event], *, redact_fee: bool) -> list[EventOut]:
@@ -259,6 +278,7 @@ class EventService:
         event_ids = [row.id for row in events]
         targets = EventService.targets_of(session, event_ids)
         counts = EventService.rsvp_counts(session, event_ids)
+        consents = EventService.consent_counts(session, event_ids)
         out: list[EventOut] = []
         for row in events:
             yes, no, pending = counts.get(row.id, (0, 0, 0))
@@ -281,6 +301,7 @@ class EventService:
                     rsvp_yes_count=yes,
                     rsvp_no_count=no,
                     rsvp_pending_count=pending,
+                    consent_signed_count=consents.get(row.id, 0),
                 )
             )
         return out

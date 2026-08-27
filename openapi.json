@@ -3531,6 +3531,11 @@
       "EventOut": {
         "description": "One event, as `7a`/`7b` render it.\n\n`location_id` and `location_text` are both here because §5.12's events happen at\nplaces that are not the studio's own locations -- a competition is at someone else's\ndojo, and forcing it into the `location` table would fill that table with rows nobody\nschedules against.",
         "properties": {
+          "consent_signed_count": {
+            "default": 0,
+            "title": "Consent Signed Count",
+            "type": "integer"
+          },
           "consent_text": {
             "anyOf": [
               {

@@ -35,6 +35,12 @@ export function makeStaffEventsClient(fetcher: Fetcher) {
     registrations: async (eventId: string): Promise<Page<EventRegistrationOut>> =>
       json(await fetcher(`/api/v1/events/${eventId}/registrations`)),
 
+    /** 9i's `שליחה` — publish materialises the roster at `rsvp='pending'`. NOTHING is
+     *  sent by wire: publishing makes the event visible to guardians, which is what
+     *  "sending invitations" is in a product with no mailer. */
+    publish: async (eventId: string): Promise<Response> =>
+      fetcher(`/api/v1/events/${eventId}/publish`, { method: 'POST', headers: JSON_HEADERS }),
+
     /** 9d frame 2's candidate list, with each row already resolved to a current → next. */
     eligibility: async (eventId: string): Promise<Page<CandidateOut>> =>
       json(await fetcher(`/api/v1/events/${eventId}/eligibility`)),

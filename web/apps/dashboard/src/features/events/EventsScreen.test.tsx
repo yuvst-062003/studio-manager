@@ -41,6 +41,7 @@ function event(over: Partial<EventOut> = {}): EventOut {
     rsvp_yes_count: 14,
     rsvp_no_count: 3,
     rsvp_pending_count: 6,
+    consent_signed_count: 0,
     ...over,
   }
 }

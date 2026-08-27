@@ -70,6 +70,10 @@ export const events: Bundle = {
   // -- RSVP (parent 7d, dashboard 7c) ---------------------------------------------
   'rsvp.closesOn': 'Registration closes on',
   'rsvp.title': 'Confirm attendance',
+  'invites.notSent': 'Invitations not sent yet',
+  'invites.send': 'Send',
+  'consent.allSigned': 'All consents signed',
+  'consent.count': 'Consents: {{signed}}/{{total}}',
   'rsvp.yes': 'Attending',
   'rsvp.no': 'Not attending',
   'rsvp.pending': 'No answer yet',

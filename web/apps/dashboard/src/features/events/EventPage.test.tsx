@@ -41,6 +41,7 @@ const EVENT: EventOut = {
   rsvp_yes_count: 2,
   rsvp_no_count: 1,
   rsvp_pending_count: 2,
+  consent_signed_count: 0,
 }
 
 function registration(over: Partial<EventRegistrationOut> = {}): EventRegistrationOut {

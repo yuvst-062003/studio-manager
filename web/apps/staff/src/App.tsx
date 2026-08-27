@@ -38,6 +38,7 @@ import { makeStaffScheduleClient } from './features/schedule/client'
 import { useToday } from './features/schedule/useToday'
 import { StudentsSearch, makeStaffPeopleClient } from './features/people'
 import {
+  EventRosterScreen,
   ExamResultsScreen,
   StaffEventsScreen,
   makeStaffEventsClient,
@@ -213,7 +214,12 @@ export default function App() {
   // 9i's list, and 9d's result sheet behind `#/events/<id>`. Same shape as the roster
   // id above: the id is in the hash so the back button works and a link survives a reload.
   const onEvents = hash === '#/events'
-  const examEventId = hash.startsWith('#/events/') ? hash.slice('#/events/'.length) : null
+  // `#/events/<id>` is the exam sheet; `#/events/<id>/roster` the participants list (9i).
+  const eventParts = hash.startsWith('#/events/')
+    ? hash.slice('#/events/'.length).split('/')
+    : []
+  const rosterEventId = eventParts.length === 2 && eventParts[1] === 'roster' ? eventParts[0]! : null
+  const examEventId = eventParts.length === 1 && eventParts[0] ? eventParts[0] : null
 
   useEffect(() => {
     // Chromium fires this when it considers the app installable; iOS never does, which
@@ -436,6 +442,8 @@ export default function App() {
                 globalThis.location.hash = `#/students/${studentId}`
               }}
             />
+          ) : session.access.staff && rosterEventId ? (
+            <EventRosterScreen client={eventsClient} eventId={rosterEventId} locale={locale} />
           ) : session.access.staff && examEventId ? (
             <ExamResultsScreen client={eventsClient} eventId={examEventId} locale={locale} />
           ) : session.access.staff && onEvents ? (
@@ -443,8 +451,14 @@ export default function App() {
               client={eventsClient}
               locale={locale}
               now={today}
+              canPublish={
+                viewerIsManager || (membership?.roles.includes('lead_coach') ?? false)
+              }
               onOpen={(id) => {
                 globalThis.location.hash = `#/events/${id}`
+              }}
+              onOpenRoster={(id) => {
+                globalThis.location.hash = `#/events/${id}/roster`
               }}
             />
           ) : (

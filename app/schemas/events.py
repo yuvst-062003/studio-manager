@@ -81,6 +81,9 @@ class EventOut(BaseModel):
     rsvp_yes_count: int = 0
     rsvp_no_count: int = 0
     rsvp_pending_count: int = 0
+    #: 9i's consent state — how many registrations have a signed consent. Only meaningful
+    #: when `requires_consent`; zero otherwise.
+    consent_signed_count: int = 0
 
 
 class EventCreateIn(BaseModel):

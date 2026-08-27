@@ -5,6 +5,7 @@
 // artboard — does not apply to this lane, which has two.
 export { StaffEventsScreen, invited } from './StaffEventsScreen'
 export { ExamResultsScreen } from './ExamResultsScreen'
+export { EventRosterScreen } from './EventRosterScreen'
 export { ExamResultMark, nextResult } from './ExamResultMark'
 export type { ExamResult } from './ExamResultMark'
 export { BeltPair } from './BeltPair'

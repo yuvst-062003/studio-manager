@@ -74,6 +74,10 @@ export const events: Bundle = {
   // -- RSVP (parent 7d, dashboard 7c) ---------------------------------------------
   'rsvp.closesOn': 'Регистрация закрывается',
   'rsvp.title': 'Подтверждение участия',
+  'invites.notSent': 'Приглашения ещё не отправлены',
+  'invites.send': 'Отправить',
+  'consent.allSigned': 'Все согласия подписаны',
+  'consent.count': 'Согласия: {{signed}}/{{total}}',
   'rsvp.yes': 'Придёт',
   'rsvp.no': 'Не придёт',
   'rsvp.pending': 'Ответа пока нет',

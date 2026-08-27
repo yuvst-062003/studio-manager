@@ -230,6 +230,44 @@ link that must be signed `לפני עלייה למזרן`.
 
 ## Log
 
+### 2026-08-27 · S9 — 9i grew its cards, and the participants list stopped being an exam sheet
+
+**What the audit could not see.** 9i measured 2 lines against an EMPTY events table, so
+`SHELL` was unproven. The verdict is now answered with seeded data at both ends: pytest
+fixtures create real events, registrations and consents against the API, and the component
+tests seed typed `EventOut` rows. A browser re-measurement of the demo studio still waits
+on the M7 fixture layer (`PLANNED_LAYERS` in `app/services/demo/fixtures.py` — "one
+competition and one belt exam"), which is the demo vertical's, not this lane's.
+
+**Landed on 9i.** Date · time · venue on every card (the card had a title and a venue and
+no date — for an *events* list); the upcoming count in the header; the consent state from
+a new projected `consent_signed_count` on `EventOut` (counted, never stored — tested
+through the consent-signing flow); the draft state as outstanding work — `הזמנות טרם נשלחו`
+with `שליחה` for the `EventsWriter` set (owner/manager/lead_coach, mirrored client-side so
+an assistant coach is not offered a button the server refuses). Publishing IS the sending:
+there is no mailer; publish materialises the roster and makes the event visible to
+guardians, and the card's Alert says so.
+
+**`רשימת משתתפים` became its own screen.** `#/events/<id>` rendered `ExamResultsScreen`
+for every event, so a future seminar opened an exam sheet with an eligibility read that
+had nothing to say. `EventRosterScreen` now lives at `#/events/<id>/roster` — name, RSVP
+chip, consent chip (timestamp presence only, never contents, §14) — and the list's button
+routes a future event there and a held exam to the sheet.
+
+**9d#2's D7 ring** needed nothing: `BeltPair` composes `BeltBar`, whose ring is
+unconditional and tested in the primitive.
+
+**Raised, not decided — two columns that do not exist.** 9i's ownership markers
+(`אתה האחראי` / `אתה הבוחן`) and capacity (`42/54`) have no model support: `event` carries
+no owner/examiner/capacity column and `alembic/versions/**` is main's. Both need a
+migration in a wave contract commit; building them without one would mean deriving
+ownership from audit rows, which is a lie waiting to drift.
+
+**Deferred — `אירוע חדש` on the staff app.** Creation is a five-field form with targeting
+that the dashboard (7a) already ships; duplicating it at 390px for the one lead coach who
+creates events from a phone is scope the wave did not buy. The API accepts a lead coach's
+POST today, so nothing blocks a later lane from adding the form.
+
 ### 2026-08-27 · S8 — search became 9h: tabs, banner, and a row that says something
 
 **Search by parent name** landed server-side: `list_students`' `q` now matches the child's

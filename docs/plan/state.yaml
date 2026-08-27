@@ -589,7 +589,8 @@ waves:
         on: 2026-08-27
       - id: S9
         title: Staff — events and exam results
-        status: pending
+        status: shipped
+        on: 2026-08-27
       - id: S10
         title: Staff — permission boundaries are UI
         status: pending

@@ -16,7 +16,8 @@
 // cannot see.
 import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { Button, Card, EmptyState, LoadFailed, ProgressBar, StatusChip } from '@studio/ui'
+import { Alert, Button, Card, EmptyState, LoadFailed, ProgressBar, StatusChip } from '@studio/ui'
+import { formatDateInStudioZone, formatTimeInStudioZone } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import type { EventOut, StaffEventsClient } from './client'
@@ -47,11 +48,18 @@ export function StaffEventsScreen({
   locale,
   now,
   onOpen,
+  onOpenRoster,
+  canPublish = false,
 }: {
   client: StaffEventsClient
   locale: Locale
   now: string
   onOpen: (eventId: string) => void
+  /** 9i's `רשימת משתתפים` — a different screen from the exam sheet. */
+  onOpenRoster?: (eventId: string) => void
+  /** owner / manager / lead_coach — `EventsWriter`'s set, mirrored so an assistant coach
+   *  is not offered a button the server would refuse. */
+  canPublish?: boolean
 }) {
   const [events, setEvents] = useState<EventOut[]>([])
   const [loaded, setLoaded] = useState(false)
@@ -94,6 +102,11 @@ export function StaffEventsScreen({
   return (
     <div style={pageStyle}>
       <h2 style={{ margin: 0 }}>{t(locale, 'events.title')}</h2>
+      {/* 9i's header count — how many are still ahead. */}
+      <p data-testid="events-upcoming" style={hintStyle}>
+        {ordered.filter((event) => Date.parse(event.starts_at) >= cutoff).length}{' '}
+        {t(locale, 'events.list.upcoming')}
+      </p>
 
       {loaded && events.length === 0 ? (
         <EmptyState title={t(locale, 'events.list.empty')} />
@@ -112,7 +125,47 @@ export function StaffEventsScreen({
                 />
               </p>
               <h3 style={titleStyle}>{event.title}</h3>
-              <p style={hintStyle}>{event.location_text}</p>
+              {/* 9i — date · time · venue on every card. */}
+              <p style={hintStyle} data-testid="event-when">
+                {formatDateInStudioZone(event.starts_at, locale)} ·{' '}
+                {formatTimeInStudioZone(event.starts_at, locale)}
+                {event.location_text ? <> · <bdi>{event.location_text}</bdi></> : null}
+              </p>
+
+              {/* 9i's consent state. Signed consents against everyone invited — a family
+                  that declined still signed nothing, and the count says so honestly. */}
+              {event.requires_consent && total > 0 ? (
+                <p style={hintStyle} data-testid="event-consents">
+                  {event.consent_signed_count >= total
+                    ? t(locale, 'events.consent.allSigned')
+                    : t(locale, 'events.consent.count')
+                        .replace('{{signed}}', String(event.consent_signed_count))
+                        .replace('{{total}}', String(total))}
+                </p>
+              ) : null}
+
+              {/* 9i's outstanding work — a draft's roster does not exist yet, and saying
+                  so beats a zero that reads like apathy. `שליחה` publishes, which is what
+                  "sending invitations" IS here: nothing goes over a wire (no mailer);
+                  guardians see the event in their app. */}
+              {event.status === 'draft' ? (
+                <Alert iconLabel={t(locale, 'events.invites.notSent')} tone="pending">
+                  <span data-testid="event-draft">{t(locale, 'events.invites.notSent')}</span>
+                  {canPublish ? (
+                    <Button
+                      data-testid="event-send"
+                      onClick={() => {
+                        void client.publish(event.id).then((response) => {
+                          if (response.ok) setAttempt((n) => n + 1)
+                        })
+                      }}
+                      variant="secondary"
+                    >
+                      {t(locale, 'events.invites.send')}
+                    </Button>
+                  ) : null}
+                </Alert>
+              ) : null}
 
               {/* The three renderings. See the module docstring — they differ on purpose. */}
               {total === 0 ? (
@@ -136,11 +189,20 @@ export function StaffEventsScreen({
               )}
 
               <p style={{ margin: 0 }}>
-                <Button onClick={() => onOpen(event.id)} variant="secondary">
-                  {Date.parse(event.starts_at) >= cutoff
-                    ? t(locale, 'events.roster.title')
-                    : t(locale, 'events.exam.record')}
-                </Button>
+                {/* Two different destinations, said apart: the participants list for an
+                    event still ahead, the result sheet for an exam already held. */}
+                {Date.parse(event.starts_at) >= cutoff ? (
+                  <Button
+                    onClick={() => (onOpenRoster ?? onOpen)(event.id)}
+                    variant="secondary"
+                  >
+                    {t(locale, 'events.roster.title')}
+                  </Button>
+                ) : (
+                  <Button onClick={() => onOpen(event.id)} variant="secondary">
+                    {t(locale, 'events.exam.record')}
+                  </Button>
+                )}
               </p>
             </article>
           </Card>

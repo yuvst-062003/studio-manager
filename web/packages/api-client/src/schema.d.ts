@@ -6191,6 +6191,11 @@ export interface components {
          *     schedules against.
          */
         EventOut: {
+            /**
+             * Consent Signed Count
+             * @default 0
+             */
+            consent_signed_count: number;
             /** Consent Text */
             consent_text: string | null;
             /** Description */

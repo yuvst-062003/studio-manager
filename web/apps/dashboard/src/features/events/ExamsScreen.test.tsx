@@ -38,6 +38,7 @@ function exam(over: Partial<EventOut> = {}): EventOut {
     rsvp_yes_count: 9,
     rsvp_no_count: 0,
     rsvp_pending_count: 8,
+    consent_signed_count: 0,
     ...over,
   }
 }

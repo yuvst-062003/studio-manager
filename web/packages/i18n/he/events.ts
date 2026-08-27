@@ -94,6 +94,10 @@ export const events: Bundle = {
   // -- RSVP (parent 7d, dashboard 7c) ---------------------------------------------
   'rsvp.closesOn': 'ההרשמה נסגרת בתאריך',
   'rsvp.title': 'אישור השתתפות',
+  'invites.notSent': 'הזמנות טרם נשלחו',
+  'invites.send': 'שליחה',
+  'consent.allSigned': 'כל האישורים נחתמו',
+  'consent.count': 'אישורים: {{signed}}/{{total}}',
   'rsvp.yes': 'מגיע',
   'rsvp.no': 'לא מגיע',
   // §4.3 — `pending` is a real state: nobody answered, which is not the same as declining.

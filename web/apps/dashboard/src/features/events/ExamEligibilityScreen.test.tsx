@@ -40,6 +40,7 @@ const EXAM: EventOut = {
   rsvp_yes_count: 0,
   rsvp_no_count: 0,
   rsvp_pending_count: 3,
+  consent_signed_count: 0,
 }
 
 const WHITE = {
