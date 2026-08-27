@@ -10,6 +10,7 @@
 import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { EmptyState, LoadFailed, StatusChip } from '@studio/ui'
+import { useNetworkMode } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import type { EventRegistrationOut, StaffEventsClient } from './client'
@@ -46,6 +47,8 @@ export function EventRosterScreen({
   eventId: string
   locale: Locale
 }) {
+  // S11 — a failed read distinguishes offline from broken (S5's network state).
+  const networkMode = useNetworkMode()
   const [rows, setRows] = useState<EventRegistrationOut[] | null>(null)
   const [requiresConsent, setRequiresConsent] = useState(false)
   const [failed, setFailed] = useState(false)
@@ -68,6 +71,7 @@ export function EventRosterScreen({
   if (failed) {
     return (
       <LoadFailed
+        offline={networkMode !== 'online'}
         locale={locale}
         onRetry={() => {
           setFailed(false)

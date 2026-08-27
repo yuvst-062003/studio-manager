@@ -13,7 +13,8 @@
 // have to re-implement that rule to be right.
 import { useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { Alert, EmptyState, StudentRow, TextField } from '@studio/ui'
+import { Alert, EmptyState, LoadFailed, StudentRow, TextField } from '@studio/ui'
+import { useNetworkMode } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import type { GroupOut, StaffPeopleClient, StudentSummary } from './peopleClient'
@@ -128,6 +129,10 @@ export function StudentsSearch({
   const [groupTab, setGroupTab] = useState('')
   const [groups, setGroups] = useState<GroupOut[]>([])
   const [students, setStudents] = useState<StudentSummary[] | null>(null)
+  const [failed, setFailed] = useState(false)
+  const [attempt, setAttempt] = useState(0)
+  // S11 — a failed read distinguishes offline from broken (S5's network state).
+  const networkMode = useNetworkMode()
 
   useEffect(() => {
     let live = true
@@ -145,11 +150,13 @@ export function StudentsSearch({
     client
       .search(query, groupTab || undefined)
       .then((body) => live && setStudents(body.items))
-      .catch(() => live && setStudents([]))
+      // S11 — this used to render a failed read as an EMPTY list, which on a search
+      // screen claims "no such child". A refusal to answer is not an answer of none.
+      .catch(() => live && setFailed(true))
     return () => {
       live = false
     }
-  }, [client, groupTab, query])
+  }, [client, groupTab, query, attempt])
 
   // 9h's warning banner — `2 חניכים עם הצהרת בריאות חסרה`. STATUS ONLY, never contents:
   // `health_status` is the derived flag the summary already carries, and nothing here
@@ -247,7 +254,16 @@ export function StudentsSearch({
         </Alert>
       ) : null}
 
-      {students === null ? null : students.length === 0 ? (
+      {failed ? (
+        <LoadFailed
+          locale={locale}
+          offline={networkMode !== 'online'}
+          onRetry={() => {
+            setFailed(false)
+            setAttempt((n) => n + 1)
+          }}
+        />
+      ) : students === null ? null : students.length === 0 ? (
         // Two different situations, two different sentences: nothing matched what you
         // typed, versus the club has no students at all.
         <EmptyState

@@ -13,8 +13,8 @@
 // `packages/ui` is not this lane's to extend.
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { Button, DateRangePicker } from '@studio/ui'
-import { formatDateInStudioZone, studioDayKey } from '@studio/core'
+import { Button, DateRangePicker, LoadFailed } from '@studio/ui'
+import { formatDateInStudioZone, studioDayKey, useNetworkMode } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import type { SessionRow, StaffScheduleClient } from './client'
@@ -160,20 +160,26 @@ export function DatePickerScreen({
   const [selected, setSelected] = useState<string | null>(null)
   const [sessions, setSessions] = useState<SessionRow[]>([])
   const [range, setRange] = useState({ from: '', to: '' })
+  const [failed, setFailed] = useState(false)
+  const [attempt, setAttempt] = useState(0)
+  // S11 — a failed read distinguishes offline from broken (S5's network state).
+  const networkMode = useNetworkMode()
 
   const cells = useMemo(() => monthGrid(year, month), [year, month])
   const bounds = useMemo(() => monthBounds(year, month), [year, month])
 
   useEffect(() => {
     let live = true
-    void (async () => {
-      const loaded = await client.listSessions({ from: bounds.from, to: bounds.to })
-      if (live) setSessions(loaded)
-    })()
+    client
+      .listSessions({ from: bounds.from, to: bounds.to })
+      .then((loaded) => live && setSessions(loaded))
+      // S11 — a grid with no markings is a claim ("no lessons this month"), so a failed
+      // read must not render as one.
+      .catch(() => live && setFailed(true))
     return () => {
       live = false
     }
-  }, [bounds.from, bounds.to, client])
+  }, [bounds.from, bounds.to, client, attempt])
 
   const daysWithSessions = useMemo(
     () => new Set(sessions.map((session) => studioDayKey(session.starts_at))),
@@ -220,6 +226,19 @@ export function DatePickerScreen({
     if (!range.from || !range.to || range.to < range.from) return
     onSelect(range)
   }, [onSelect, range])
+
+  if (failed) {
+    return (
+      <LoadFailed
+        locale={locale}
+        offline={networkMode !== 'online'}
+        onRetry={() => {
+          setFailed(false)
+          setAttempt((n) => n + 1)
+        }}
+      />
+    )
+  }
 
   return (
     <section aria-labelledby="date-picker-title" style={pageStyle}>

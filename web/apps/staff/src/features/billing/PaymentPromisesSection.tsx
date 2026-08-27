@@ -8,8 +8,8 @@
 // in the staff app, and it stays exactly this narrow.
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { formatDateInStudioZone } from '@studio/core'
-import { Button, Card, EmptyState, MoneyDisplay } from '@studio/ui'
+import { formatDateInStudioZone, useNetworkMode } from '@studio/core'
+import { Button, Card, EmptyState, LoadFailed, MoneyDisplay } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { makePromiseClient } from './promiseClient'
@@ -32,6 +32,9 @@ export function PaymentPromisesSection({
 }) {
   const [promises, setPromises] = useState<StaffPromiseRow[] | null>(null)
   const [reloads, setReloads] = useState(0)
+  const [failed, setFailed] = useState(false)
+  // S11 — a failed read distinguishes offline from broken (S5's network state).
+  const networkMode = useNetworkMode()
   const [inFlight, setInFlight] = useState<string | null>(null)
 
   const client = useMemo(() => injected ?? makePromiseClient(), [injected])
@@ -41,7 +44,9 @@ export function PaymentPromisesSection({
     client
       .pending()
       .then((rows) => alive && setPromises(rows))
-      .catch(() => alive && setPromises([]))
+      // S11 — an empty promise list is a claim ("nothing to collect at the door"), so a
+      // failed read must not render as one.
+      .catch(() => alive && setFailed(true))
     return () => {
       alive = false
     }
@@ -60,6 +65,19 @@ export function PaymentPromisesSection({
   )
 
   if (promises === null) return null
+
+  if (failed) {
+    return (
+      <LoadFailed
+        locale={locale}
+        offline={networkMode !== 'online'}
+        onRetry={() => {
+          setFailed(false)
+          setReloads((n) => n + 1)
+        }}
+      />
+    )
+  }
 
   return (
     <section

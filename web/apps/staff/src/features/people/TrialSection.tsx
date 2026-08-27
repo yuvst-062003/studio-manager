@@ -3,6 +3,7 @@
 // coach to retype mid-class.
 import { useEffect, useState } from 'react'
 import { LoadFailed } from '@studio/ui'
+import { useNetworkMode } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { TrialInClass } from './TrialInClass'
@@ -22,6 +23,8 @@ export function TrialSection({
   attendanceClient: StaffAttendanceClient
   canGrantOverride?: boolean
 }) {
+  // S11 — a failed read distinguishes offline from broken (S5's network state).
+  const networkMode = useNetworkMode()
   const [groupId, setGroupId] = useState<string | null>(null)
   const [failed, setFailed] = useState(false)
   const [attempt, setAttempt] = useState(0)
@@ -40,6 +43,7 @@ export function TrialSection({
   if (failed) {
     return (
       <LoadFailed
+        offline={networkMode !== 'online'}
         locale={locale}
         onRetry={() => {
           setFailed(false)

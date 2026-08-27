@@ -3,7 +3,7 @@
 // wrapper loads the same roster read the register makes and hands it to the
 // presentational screen, which is also the app's only consumer of `usePendingCount`.
 import { useEffect, useState } from 'react'
-import { apiFetch } from '@studio/core'
+import { apiFetch, useNetworkMode } from '@studio/core'
 import { LoadFailed } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
@@ -22,6 +22,8 @@ export function SessionSummarySection({
   client: StaffAttendanceClient
   personId: string | null
 }) {
+  // S11 — a failed read distinguishes offline from broken (S5's network state).
+  const networkMode = useNetworkMode()
   const [roster, setRoster] = useState<RosterRowData[] | null>(null)
   const [failed, setFailed] = useState(false)
   const [attempt, setAttempt] = useState(0)
@@ -42,6 +44,7 @@ export function SessionSummarySection({
   if (failed) {
     return (
       <LoadFailed
+        offline={networkMode !== 'online'}
         locale={locale}
         onRetry={() => {
           setFailed(false)

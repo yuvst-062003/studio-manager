@@ -136,7 +136,7 @@ describe('S10 — 9e: the drawer teaches the role', () => {
     const fetchSpy = staffFetch(['lead_coach'])
     vi.stubGlobal(
       'fetch',
-      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      vi.fn(async (input: RequestInfo | URL) => {
         const url = String(input)
         if (url.includes('/groups?mine=true')) {
           return new Response(
@@ -149,7 +149,7 @@ describe('S10 — 9e: the drawer teaches the role', () => {
             { status: 200 },
           )
         }
-        return fetchSpy(input, init)
+        return fetchSpy(input)
       }),
     )
     render(<App />)

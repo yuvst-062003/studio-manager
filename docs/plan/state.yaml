@@ -597,7 +597,8 @@ waves:
         on: 2026-08-27
       - id: S11
         title: Staff — recovery and bars
-        status: pending
+        status: shipped
+        on: 2026-08-27
       - id: S12
         title: Staff — audit log and functional dimension
         status: pending

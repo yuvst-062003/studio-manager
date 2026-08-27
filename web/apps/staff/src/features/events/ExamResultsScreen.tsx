@@ -21,6 +21,7 @@
 import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { Alert, Button, Card, EmptyState, LoadFailed, useModalDialog } from '@studio/ui'
+import { useNetworkMode } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { BeltPair } from './BeltPair'
@@ -81,6 +82,8 @@ export function ExamResultsScreen({
   eventId: string
   locale: Locale
 }) {
+  // S11 — a failed read distinguishes offline from broken (S5's network state).
+  const networkMode = useNetworkMode()
   const [exam, setExam] = useState<EventOut | null>(null)
   const [candidates, setCandidates] = useState<CandidateOut[]>([])
   const [loaded, setLoaded] = useState(false)
@@ -146,6 +149,7 @@ export function ExamResultsScreen({
   if (loadFailed) {
     return (
       <LoadFailed
+        offline={networkMode !== 'online'}
         locale={locale}
         onRetry={() => {
           setLoadFailed(false)

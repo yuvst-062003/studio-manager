@@ -6,8 +6,9 @@
 // assistant should not have is one they will simply use.
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { t } from '@studio/i18n'
+import { setForcedMode } from '@studio/core'
 import type { Actor } from '@studio/core'
 import { StudentsSearch, chipToneFor } from './StudentsSearch'
 import { StaffStudentCard } from './StaffStudentCard'
@@ -442,6 +443,35 @@ describe('chipToneFor', () => {
   })
 })
 
+
+// -- S11: recovery, offline-aware -------------------------------------------------
+
+describe('StudentsSearch — S11 recovery', () => {
+  afterEach(() => setForcedMode(null))
+
+  it('renders a retry on a failed read, never an empty list', async () => {
+    const search = vi
+      .fn()
+      .mockRejectedValueOnce(new TypeError('boom'))
+      .mockResolvedValueOnce({ items: [summary()] })
+    render(<StudentsSearch locale="he" client={makeClient({ search })} />)
+    expect(await screen.findByTestId('load-failed')).toBeInTheDocument()
+    // A failed read must NOT masquerade as "the club has no students".
+    expect(screen.queryByText(t('he', 'people.student.empty'))).toBeNull()
+
+    await userEvent.click(screen.getByTestId('load-failed-retry'))
+    expect(await screen.findByText(/נועה לוי/)).toBeInTheDocument()
+  })
+
+  it('says offline rather than broken when the network is the reason', async () => {
+    setForcedMode('offline')
+    const search = vi.fn().mockRejectedValue(new TypeError('offline'))
+    render(<StudentsSearch locale="he" client={makeClient({ search })} />)
+    const failedBox = await screen.findByTestId('load-failed')
+    expect(failedBox).toHaveAttribute('data-offline', 'true')
+    expect(screen.getByText(t('he', 'common.loadFailed.offline'))).toBeInTheDocument()
+  })
+})
 
 // -- 9h completion (S8): tabs, banner, meta line --------------------------------
 

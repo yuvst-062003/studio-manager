@@ -13,8 +13,13 @@
 // exist yet, and the last test in the file keeps it out.
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { Button, Card, EmptyState, StatusChip } from '@studio/ui'
-import { formatDateInStudioZone, formatTimeInStudioZone, studioDayKey } from '@studio/core'
+import { Button, Card, EmptyState, LoadFailed, StatusChip } from '@studio/ui'
+import {
+  formatDateInStudioZone,
+  formatTimeInStudioZone,
+  studioDayKey,
+  useNetworkMode,
+} from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { cancelReasonLabel } from './client'
@@ -123,22 +128,28 @@ export function TodayScreen({
     viewerIsCoach && viewerPersonId ? viewerPersonId : '',
   )
   const [sessions, setSessions] = useState<SessionRow[]>([])
+  const [failed, setFailed] = useState(false)
+  const [attempt, setAttempt] = useState(0)
+  // S11 — a failed read distinguishes offline from broken (S5's network state).
+  const networkMode = useNetworkMode()
   const strip = useMemo(() => stripAround(initialDay ?? todayKey), [initialDay, todayKey])
 
   useEffect(() => {
     let live = true
-    void (async () => {
-      const loaded = await client.listSessions({
+    client
+      .listSessions({
         from: day,
         to: day,
         coachPersonId: coachFilter || undefined,
       })
-      if (live) setSessions(loaded)
-    })()
+      .then((loaded) => live && setSessions(loaded))
+      // S11 — the day's list used to reject unhandled and render as an empty day, which
+      // is the one lie this screen must never tell: "no sessions" reads as a day off.
+      .catch(() => live && setFailed(true))
     return () => {
       live = false
     }
-  }, [client, coachFilter, day])
+  }, [client, coachFilter, day, attempt])
 
   // The server already scoped the query to one day, but it answers in instants and the
   // screen groups by Jerusalem days. Re-filtering here is what keeps a 00:30 class off
@@ -154,6 +165,19 @@ export function TodayScreen({
     () => coaches.find((coach) => coach.person_id === coachFilter)?.display_name ?? null,
     [coachFilter, coaches],
   )
+
+  if (failed) {
+    return (
+      <LoadFailed
+        locale={locale}
+        offline={networkMode !== 'online'}
+        onRetry={() => {
+          setFailed(false)
+          setAttempt((n) => n + 1)
+        }}
+      />
+    )
+  }
 
   return (
     <section aria-labelledby="today-title" data-testid="staff-today" style={pageStyle}>

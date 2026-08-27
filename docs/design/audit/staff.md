@@ -230,6 +230,37 @@ link that must be signed `לפני עלייה למזרן`.
 
 ## Log
 
+### 2026-08-27 · S11 — every screen can retry, and offline is not "broken"
+
+**Recovery.** The audit counted 0 of 14 screens with a retry; the S-workstreams had
+already closed seven with `LoadFailed` (summary, student card route, trial, hand-over,
+exam sheet, events list, participants list). This entry closed the rest and unified all of
+them on S5's network state: every `LoadFailed` on this surface now carries
+`offline={mode !== 'online'}`, so a coach in a basement reads "you are offline" with the
+queue reassurance instead of "that failed" with a pointless retry. Tested: a forced-offline
+failure renders the offline copy and `data-offline`; a plain failure renders retry, and the
+retry re-fetches.
+
+**Three masquerades and a rejection died here.** `StudentsSearch` rendered a failed read
+as an EMPTY list — on a search screen, that claims "no such child". `PaymentPromisesSection`
+rendered one as "nothing to collect at the door". `TodayScreen`'s fetch had **no catch at
+all** — an unhandled rejection and a day that rendered as a day off — and
+`DatePickerScreen`'s grid rendered a failed month as "no lessons this month". All four now
+fail loudly and retry. Kept as-is, deliberately: `RosterScreen` (cached roster + the mode
+banner IS the failure handling — offline-first), the drawer/alert fills (render null when
+they have nothing to say), and the 2d strip's empty state (a card opened mid-lesson).
+
+**Bars.** The audit's "zero coloured bars" predates this session: 1d's three count tiles
+and roster bars shipped with S7/1c, 9i's ProgressBar with the events list, and `BeltBar`
+now renders on 9h rows (via `StudentRow`), 9c and 9d. The last gap was structural: the
+staff 2d strip drew its own `<ol>` of marks instead of composing the shared
+`AttendanceStrip` primitive (P10: built once in `@studio/ui`). It now composes it, so 2c
+and 2d render the same strip from the same file.
+
+Incidentally: unifying the lint pass surfaced that S4.1's fix set state synchronously in
+Resolve's effect; the non-owner answer is now DERIVED (`isOwner ? dismissedAt :
+NEVER_ROUTE`) rather than set, which is the cleaner shape anyway.
+
 ### 2026-08-27 · S10 — the boundary is said, and S4.4 closes with it
 
 **The silent fall-throughs are gone.** `#/cash` and `#/join-link` for a non-manager used

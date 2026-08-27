@@ -4,6 +4,7 @@
 // audit's orphans with one route.
 import { useEffect, useState } from 'react'
 import { LoadFailed } from '@studio/ui'
+import { useNetworkMode } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { StudentCardScreen } from '../attendance/StudentCardScreen'
@@ -21,6 +22,8 @@ export function StudentCardRoute({
   peopleClient: StaffPeopleClient
   attendanceClient: StaffAttendanceClient
 }) {
+  // S11 — a failed read distinguishes offline from broken (S5's network state).
+  const networkMode = useNetworkMode()
   const [student, setStudent] = useState<StudentDetail | null>(null)
   const [failed, setFailed] = useState(false)
   const [attempt, setAttempt] = useState(0)
@@ -39,6 +42,7 @@ export function StudentCardRoute({
   if (failed) {
     return (
       <LoadFailed
+        offline={networkMode !== 'online'}
         locale={locale}
         onRetry={() => {
           setFailed(false)

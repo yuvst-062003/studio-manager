@@ -17,7 +17,7 @@
 import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { Alert, Button, Card, EmptyState, LoadFailed, ProgressBar, StatusChip } from '@studio/ui'
-import { formatDateInStudioZone, formatTimeInStudioZone } from '@studio/core'
+import { formatDateInStudioZone, formatTimeInStudioZone, useNetworkMode } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import type { EventOut, StaffEventsClient } from './client'
@@ -61,6 +61,8 @@ export function StaffEventsScreen({
    *  is not offered a button the server would refuse. */
   canPublish?: boolean
 }) {
+  // S11 — a failed read distinguishes offline from broken (S5's network state).
+  const networkMode = useNetworkMode()
   const [events, setEvents] = useState<EventOut[]>([])
   const [loaded, setLoaded] = useState(false)
   const [loadFailed, setLoadFailed] = useState(false)
@@ -90,6 +92,7 @@ export function StaffEventsScreen({
   if (loadFailed) {
     return (
       <LoadFailed
+        offline={networkMode !== 'online'}
         locale={locale}
         onRetry={() => {
           setLoadFailed(false)

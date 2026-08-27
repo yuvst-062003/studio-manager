@@ -77,11 +77,7 @@ export function Resolve({
   const isOwner = activeMembership?.roles.includes('owner') ?? false
 
   useEffect(() => {
-    if (!session.access.staff) return
-    if (!isOwner) {
-      setDismissedAt(NEVER_ROUTE)
-      return
-    }
+    if (!session.access.staff || !isOwner) return
     let alive = true
     void (async () => {
       try {
@@ -106,7 +102,10 @@ export function Resolve({
     }
   }, [session.access.staff, isOwner])
 
-  const outcome = decideOutcome(session, dismissedAt)
+  // A non-owner never asked the question, so the answer is derived rather than set:
+  // any non-null value routes away from the wizard, which is the only thing decideOutcome
+  // does with it for a coach or a manager.
+  const outcome = decideOutcome(session, isOwner ? dismissedAt : NEVER_ROUTE)
 
   if (outcome === 'refused') {
     return (

@@ -9,7 +9,7 @@
 // and time in grade. Printing a threshold no model implements would tell a coach something
 // the product does not do — so the caption is the rate, and nothing more.
 import { useEffect, useState } from 'react'
-import { AttendanceMark } from '@studio/ui'
+import { AttendanceStrip as SharedAttendanceStrip } from '@studio/ui'
 import type { AttendanceState } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
@@ -66,18 +66,18 @@ export function AttendanceStrip({ student, locale, client, window = 8 }: Attenda
         <p data-testid="student-card-attendance-empty">{t(locale, 'attendance.report.empty')}</p>
       ) : (
         <>
-          {/* Oldest at the reading start — `4c`'s rule for the same strip. `dir` does it;
-              no reverse, no physical offset. */}
-          <ol data-testid="student-card-attendance-strip">
-            {[...records].reverse().map((record) => (
-              <li key={record.id}>
-                <AttendanceMark
-                  label={t(locale, LABEL[record.status])}
-                  state={GLYPH[record.status]}
-                />
-              </li>
-            ))}
-          </ol>
+          {/* S11 — the SHARED strip primitive (P10: built once in @studio/ui, composed by
+              2c and 2d alike). Oldest at the reading start; the primitive owns direction. */}
+          <span data-testid="student-card-attendance-strip">
+            <SharedAttendanceStrip
+              locale={locale}
+              items={[...records].reverse().map((record) => ({
+                id: record.id,
+                state: GLYPH[record.status],
+                label: t(locale, LABEL[record.status]),
+              }))}
+            />
+          </span>
           <p data-testid="student-card-attendance-rate">
             {t(locale, 'attendance.report.attendanceRate')}: {rate(records)}%
           </p>

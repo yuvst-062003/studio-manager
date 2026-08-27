@@ -4,7 +4,7 @@
 // register does and narrows it to the present marks. Ground rule 3 holds by data shape:
 // `HandoutOptionOut` carries no money field, so there is no price here to hide.
 import { useEffect, useState } from 'react'
-import { apiFetch } from '@studio/core'
+import { apiFetch, useNetworkMode } from '@studio/core'
 import { LoadFailed } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
@@ -25,6 +25,8 @@ export function HandOverSection({
   locale: Locale
   attendanceClient: StaffAttendanceClient
 }) {
+  // S11 — a failed read distinguishes offline from broken (S5's network state).
+  const networkMode = useNetworkMode()
   const [data, setData] = useState<{
     options: HandoutOption[]
     present: PresentStudent[]
@@ -53,6 +55,7 @@ export function HandOverSection({
   if (failed) {
     return (
       <LoadFailed
+        offline={networkMode !== 'online'}
         locale={locale}
         onRetry={() => {
           setFailed(false)
