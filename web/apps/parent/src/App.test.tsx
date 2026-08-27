@@ -70,3 +70,59 @@ describe('parent app', () => {
     expect(screen.queryByTestId('studio-dev-bar')).toBeNull()
   })
 })
+
+describe('the P1 routes — screens that were built and rendered by nothing', () => {
+  it('routes #/absence to the absence pre-report', async () => {
+    globalThis.location.hash = '#/absence'
+    render(<App />)
+    await waitFor(() => expect(screen.getByTestId('absence-screen')).toBeInTheDocument())
+  })
+
+  it('routes #/payments/history to the payment history screen', async () => {
+    globalThis.location.hash = '#/payments/history'
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) =>
+        String(input).includes('/me/balance')
+          ? new Response(
+              JSON.stringify({
+                payer_person_id: 'p1',
+                balance_agorot: 0,
+                charged_agorot: 0,
+                paid_agorot: 0,
+                credit_agorot: 0,
+                open_charge_count: 0,
+              }),
+              { status: 200 },
+            )
+          : new Response(JSON.stringify({ items: [] }), { status: 200 }),
+      ),
+    )
+    render(<App />)
+    // What this asserts is the ROUTE — the part that was missing while
+    // PaymentsSection linked here.
+    await waitFor(() => expect(screen.getByTestId('payment-history')).toBeInTheDocument())
+  })
+
+  it('routes the uPay return leg to the payment-complete screen', async () => {
+    globalThis.location.hash = '#/payment-complete/some-ref'
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) =>
+        String(input).includes('/payment-complete')
+          ? new Response(JSON.stringify({ status: 'pending', public_ref: null }), { status: 200 })
+          : new Response(JSON.stringify({ items: [] }), { status: 200 }),
+      ),
+    )
+    render(<App />)
+    await waitFor(() => expect(screen.getByTestId('payment-complete')).toBeInTheDocument())
+  })
+
+  it('routes #/student/<id> to the 2c card', async () => {
+    globalThis.location.hash = '#/student/s1'
+    render(<App />)
+    // items: [] means "not this family's child" — the honest refusal, never another
+    // family's card. The route resolving to the card's own screen is the assertion.
+    await waitFor(() => expect(screen.getByTestId('student-card-missing')).toBeInTheDocument())
+  })
+})

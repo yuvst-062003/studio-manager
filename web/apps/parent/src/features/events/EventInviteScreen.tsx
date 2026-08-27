@@ -26,6 +26,7 @@ import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { blocksConfirmation, deadlinePassed } from './client'
 import type { ParentEventOut, ParentEventsClient } from './client'
+import { EventCalendarButtons } from '../comms/EventCalendarButtons'
 
 const pageStyle: CSSProperties = { display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }
 
@@ -149,6 +150,9 @@ export function EventInviteScreen({
               ? t(locale, 'events.rsvp.youConfirmed')
               : t(locale, 'events.rsvp.youDeclined')}
           </p>
+          {/* §5.12's per-event add — the confirmed competition belongs in the family
+              calendar without subscribing to everything (P1). */}
+          {registration.rsvp === 'yes' ? <EventCalendarButtons eventId={eventId} locale={locale} /> : null}
           <Button onClick={() => setChanging(true)} variant="secondary">
             {t(locale, 'events.rsvp.change')}
           </Button>

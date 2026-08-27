@@ -495,7 +495,8 @@ waves:
         status: pending
       - id: P1
         title: Parent — route the seven unreachable screens, AbsenceScreen first
-        status: pending
+        status: shipped
+        on: 2026-08-27
       - id: P2
         title: Parent — student card's four missing sections
         status: pending

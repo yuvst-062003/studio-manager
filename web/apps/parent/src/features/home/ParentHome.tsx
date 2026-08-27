@@ -236,11 +236,21 @@ export function ParentHome({
       )}
 
       <section aria-labelledby="parent-home-upcoming-title">
-        <h2 id="parent-home-upcoming-title" style={{ fontSize: 'var(--text-title)' }}>
-          {selectedDay === todayKey
-            ? t(locale, 'common.home.upcoming')
-            : formatDateInStudioZone(`${selectedDay}T12:00:00Z`, locale)}
-        </h2>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--space-3)' }}>
+          <h2
+            id="parent-home-upcoming-title"
+            style={{ fontSize: 'var(--text-title)', marginInlineEnd: 'auto' }}
+          >
+            {selectedDay === todayKey
+              ? t(locale, 'common.home.upcoming')
+              : formatDateInStudioZone(`${selectedDay}T12:00:00Z`, locale)}
+          </h2>
+          {/* `12a`'s entry from home (P1): the pre-report belongs beside the lessons it
+              is about. A link, not a button — it navigates. */}
+          <a data-testid="parent-home-absence" href="#/absence">
+            {t(locale, 'attendance.absence.title')}
+          </a>
+        </div>
         {/* 2a — the day strip: read back and forward, tap a day. Past days carry what
             actually happened; the strip is the affordance that makes attendance a thing
             a parent can SEE rather than ask about. */}
@@ -356,6 +366,18 @@ export function ParentHome({
               >
                 <bdi>{student.displayName}</bdi>
               </button>
+              {/* 2c's entry (P1/P2): the chip filters, the link opens the card — two
+                  affordances because `1c`'s lesson holds for rows everywhere: one tap,
+                  one meaning. Named per child, or a screen reader hears three
+                  identical links. */}
+              <a
+                aria-label={`${t(locale, 'people.card.open')} · ${student.displayName}`}
+                data-testid={`parent-home-card-${student.id}`}
+                href={`#/student/${student.id}`}
+                style={{ marginInlineStart: 'var(--space-1)', fontSize: 'var(--text-caption)' }}
+              >
+                {t(locale, 'people.card.open')}
+              </a>
             </li>
           ))}
         </ul>

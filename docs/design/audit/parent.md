@@ -251,3 +251,41 @@ Build: belt with date and next exam; an **8-session attendance strip** with coun
    `people`, `health`, `schedule`, `events`) mirrored in `en/` and `ru/`. **Rubik covers base
    Cyrillic** (D6) so Russian renders in the same family — do not add a font.
 5. **Logical CSS only** (**D10**): `margin-inline-start`, never `margin-left`.
+
+## Log
+
+### 2026-08-27 · P1 — the seven screens nothing rendered, plus the container nobody counted
+
+**What was wrong.** Seven built, tested components were referenced only by their barrels.
+Worse than the audit knew: the `2c` StudentCard **container itself** was mounted by nothing
+(the audit assumed it rendered with three sections; in fact no route reached it, and — per
+the S1 guard finding — even its three sections were registered only by tests). And uPay's
+`returnurl` pointed the paying parent's browser at the JSON status endpoint — a parent who
+paid landed on raw JSON.
+
+**What was built.**
+- `#/absence` routes `AbsenceScreen`, entered from home (`דיווח היעדרות` beside the
+  lessons). Its refuse-offline behaviour is untouched. Nothing in the product could
+  produce an absence report until this line of routing; now the staff `הודיעו מראש` state
+  has a producer.
+- `#/payments/history` routes `12f` — the hash `PaymentsSection` has linked to since W8.
+  The per-row receipt email is **withheld**, not wired to a pretend send: no provider-side
+  resend exists (we hold only the uPay form and its IPN; the receipt lives in uPay's
+  dashboard). `onEmailReceipt` is optional and the affordance renders only when a real
+  handler exists.
+- `#/payment-complete/<ref>` is the uPay return leg; `orders.py` now sends the browser to
+  the parent app (via `app_origin`, falling back to the API URL while production hosts are
+  PENDING), and the screen polls the status endpoint — honest that only the IPN settles.
+- `#/student/<id>` routes the `2c` card, entered per child from home. M6's money rows
+  landed as `StudentCardBillingSection` rendering `PaymentStrip` — household balance per
+  §6.3, hidden at zero by the strip's own contract, and a failed read renders NOTHING
+  rather than a reassuring zero (P8's rule).
+- `CalendarSync` renders under `#/calendar` — the feed subscription lives where a parent
+  thinking about calendars already is.
+- `EventCalendarButtons` renders on `7d` once an RSVP is yes (§5.12's per-event add). `13b`
+  wiring stays with the landing spec's L5.
+- `FirstRegistration` renders in `JoinFlow`'s done state, showing the children `/me/students`
+  now holds.
+
+**Decided.** Receipt email withheld (above). The student-card entry is a per-child link
+beside the filter chip — the chip keeps 1c's one-tap-one-meaning rule.

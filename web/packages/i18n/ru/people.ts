@@ -5,6 +5,7 @@ import type { Bundle } from '../types'
  * native-speaker read lands (an M11 gate, `HB-ru-review`).
  */
 export const people: Bundle = {
+  'card.open': 'Карточка ученика',
   'student.one': 'Ученик',
   'student.plural': 'Ученики',
   'student.add': 'Добавить ученика',

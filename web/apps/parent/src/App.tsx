@@ -28,6 +28,12 @@ import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { Resolve } from './features/identity/Resolve'
 import { ScheduleSection, isCalendarRoute } from './features/schedule/ScheduleSection'
+// `12a` — the absence pre-report (P1). Every layer of this feature existed except a line
+// of routing, so nothing in the product could produce an absence report — the state the
+// staff roster, the dashboard count and `הודעתם מראש` are all built to read.
+import { AbsenceScreen, makeAbsenceClient } from './features/absence'
+// §5.12's subscription panel, rendered under the calendar it feeds (P1).
+import { CalendarSync } from './features/comms'
 import { makeParentScheduleClient } from './features/schedule/client'
 import { useToday } from './features/schedule/useToday'
 import { PublicLanding, makeLandingClient, matchLandingPath } from './features/landing'
@@ -40,10 +46,16 @@ import {
 import { BeltProgressScreen, makeParentBeltsClient } from './features/belts'
 import { InboxScreen, makeParentCommsClient } from './features/comms'
 import { AddSibling, ProfileSection, makePeopleClient, registerPeopleSections } from './features/people'
+// `2c` behind `#/student/<id>` — the composite card the slot system was built for (P2).
+import { StudentCardSection } from './features/people/StudentCardSection'
+import { registerBillingSections } from './features/billing/StudentCardBillingSection'
 import { DirectionsScreen } from './features/people/DirectionsScreen'
 // §5.10's payments tab. Mounted here because nothing imported it: `PaymentsScreen` is
 // artboard `12f`, the subject of E2E-3 and E2E-4, and it was unreachable in a running app.
 import { PaymentsSection } from './features/billing/PaymentsSection'
+// `12f` behind the hash PaymentsSection already links to, and §5.10's return leg (P1).
+import { PaymentHistorySection } from './features/billing/PaymentHistorySection'
+import { PaymentCompleteSection } from './features/billing/PaymentCompleteSection'
 // The training-plan screen, per child. `#/plan/<studentId>` for the same reason `#/belts/`
 // carries ids: a family with two children has two plans and two upgrade decisions, and a
 // screen that summed them could not mark anything — a booking names a student.
@@ -61,6 +73,8 @@ import type { GatedStudent } from './features/health'
 // Found by the S1 slot-wiring guard; registered at module load so the slot is populated
 // before anything renders.
 registerPeopleSections()
+// M6's money rows on the same card — the section every wave left for someone else (P2).
+registerBillingSections()
 
 const NAV = [
   { key: 'myChildren', labelKey: 'common.nav.myChildren', href: '/' },
@@ -134,6 +148,7 @@ export default function App() {
   const beltsClient = useMemo(() => makeParentBeltsClient(apiFetch), [])
   const commsClient = useMemo(() => makeParentCommsClient(apiFetch), [])
   const healthClient = useMemo(() => makeHealthClient(apiFetch), [])
+  const absenceClient = useMemo(() => makeAbsenceClient(apiFetch), [])
   // §6.1 step 6 — which children still owe a declaration. `null` until the answer
   // arrives, and the shell renders NOTHING gated until it does: a home screen that
   // flashes before the gate is a gate a fast finger gets past. On a fetch failure the
@@ -182,6 +197,15 @@ export default function App() {
   const addingChild = hash === '#/add-child'
   // §5.10's payments tab, and `12f`'s history one hash below it.
   const onPayments = hash === '#/payments'
+  const onPaymentsHistory = hash === '#/payments/history'
+  // §5.10 step 5 — the uPay return leg carries the order's public_ref in the hash.
+  const paymentCompleteRef = hash.startsWith('#/payment-complete/')
+    ? hash.slice('#/payment-complete/'.length)
+    : ''
+  // `12a` — the absence pre-report.
+  const onAbsence = hash === '#/absence'
+  // `2c` — the student card, per child.
+  const cardStudentId = hash.startsWith('#/student/') ? hash.slice('#/student/'.length) : ''
   // 12i — the profile tab's screen (ship-audit B4: built in W2, mounted by nothing).
   const onProfile = hash === '#/profile'
   // 12e — the item shop (feature pass: built in W4, mounted by nothing).
@@ -349,12 +373,32 @@ export default function App() {
             onSigned={() => setDeclarationsSigned((count) => count + 1)}
           >
           {session.access.parent && isCalendarRoute(hash) ? (
-            <ScheduleSection
+            <>
+              <ScheduleSection
+                locale={locale}
+                client={scheduleClient}
+                hash={hash}
+                today={today}
+              />
+              {/* §5.12 — the feed subscription lives under the calendar it feeds, which
+                  is where a parent thinking about calendars already is (P1). */}
+              <CalendarSync client={commsClient} locale={locale} />
+            </>
+          ) : onAbsence ? (
+            // `12a`. The children come from the same read §6.1's gate makes; inside the
+            // gate they are non-null. The screen itself refuses to work offline, on
+            // purpose (§10.2) — preserve that by never wrapping it in a cache.
+            <AbsenceScreen
+              client={absenceClient}
               locale={locale}
-              client={scheduleClient}
-              hash={hash}
-              today={today}
+              children={(gatedChildren ?? []).map(({ id, display_name }) => ({ id, display_name }))}
             />
+          ) : cardStudentId ? (
+            <StudentCardSection client={peopleClient} locale={locale} studentId={cardStudentId} />
+          ) : paymentCompleteRef ? (
+            <PaymentCompleteSection locale={locale} publicRef={paymentCompleteRef} />
+          ) : onPaymentsHistory ? (
+            <PaymentHistorySection locale={locale} />
           ) : onPayments ? (
             // No `access.parent` guard needed and none added: the routes behind this
             // screen resolve the payer from the session, so a person with no charges sees

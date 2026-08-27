@@ -16,6 +16,26 @@ import { apiFetch, useSession } from '@studio/core'
 import { Alert, Button, Card, Checkbox, EmptyState, SignIn, TextField } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
+import { FirstRegistration } from '../people/FirstRegistration'
+import type { StudentSummary } from '../people/peopleClient'
+
+/** `12j` after the registration lands: the children are on file, so show them. */
+function JoinDone({ locale }: { locale: Locale }) {
+  const [students, setStudents] = useState<StudentSummary[]>([])
+  useEffect(() => {
+    let live = true
+    void apiFetch('/api/v1/me/students')
+      .then(async (response) =>
+        response.ok ? ((await response.json()) as { items: StudentSummary[] }).items : [],
+      )
+      .then((items) => live && setStudents(items))
+      .catch(() => undefined)
+    return () => {
+      live = false
+    }
+  }, [])
+  return <FirstRegistration locale={locale} source="invitation" students={students} />
+}
 
 type JoinGroup = { id: string; name: string; weekdays: number[] }
 type JoinInfo = { studio_name: string; groups: JoinGroup[]; email: string | null }
@@ -116,6 +136,10 @@ export function JoinFlow({ locale, token }: { locale: Locale; token: string }) {
         <Alert tone="paid" iconLabel={t(locale, 'people.join.title')}>
           {t(locale, 'people.join.done')}
         </Alert>
+        {/* `12j` — what happens next (P1). The children are on file the moment the
+            registration lands, so the same `/me/students` read the shell makes shows
+            them here with the club's own status. */}
+        <JoinDone locale={locale} />
         <Button onClick={() => globalThis.location.assign('/')}>
           {t(locale, 'people.join.toApp')}
         </Button>

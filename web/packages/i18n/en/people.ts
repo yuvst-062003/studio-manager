@@ -2,6 +2,7 @@ import type { Bundle } from '../types'
 
 /** Mirrors `he/people.ts`. `en` is `strict` in the parity check — a missing key fails. */
 export const people: Bundle = {
+  'card.open': 'Student card',
   'student.one': 'Student',
   'student.plural': 'Students',
   'student.add': 'Add a student',

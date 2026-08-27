@@ -396,3 +396,10 @@ def test_the_form_is_fields_and_not_html(
     assert body["fields"]["paymentdetails"] == created["public_ref"]
     assert body["fields"]["amount"] == "250.00"
     assert body["fields"]["livesystem"] == "1"
+    # P1 — the browser goes back to the PARENT APP's return screen, never to the JSON
+    # status endpoint a paying parent cannot read. The IPN URL stays on the API.
+    assert (
+        body["fields"]["returnurl"]
+        == f"http://localhost:5174/#/payment-complete/{created['public_ref']}"
+    )
+    assert "/api/v1/webhooks/upay/" in body["fields"]["ipnurl"]

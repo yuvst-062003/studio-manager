@@ -44,7 +44,13 @@ export type PaymentHistoryScreenProps = {
   openCharges: readonly ChargeOut[]
   paidThisYearAgorot: number
   openBalanceAgorot: number
-  onEmailReceipt: (paymentId: string) => void
+  /**
+   * Optional because no provider-side resend exists yet: we hold only the uPay form
+   * and its IPN, and the receipt lives in uPay's dashboard (upay-integration.md).
+   * When absent the affordance is withheld — a button that pretends to email is the
+   * inert-control defect this product keeps having to remove.
+   */
+  onEmailReceipt?: (paymentId: string) => void
   onPay: () => void
 }
 
@@ -95,7 +101,7 @@ export function PaymentHistoryScreen({
               <MoneyDisplay agorot={payment.amount_agorot} tone="paid" />
               {/* ▲ D9.3's structural half. Card rows only, because those are the only
                   payments uPay issues a document for. */}
-              {payment.method === 'upay_card' ? (
+              {payment.method === 'upay_card' && onEmailReceipt ? (
                 <Button
                   variant="secondary"
                   data-testid="email-receipt"

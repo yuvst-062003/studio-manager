@@ -18,6 +18,7 @@ import type { Bundle } from '../types'
  */
 export const people: Bundle = {
   // -- students (dashboard 3b, staff 9h) ----------------------------------------
+  'card.open': 'כרטיס חניך',
   'student.one': 'חניך',
   'student.plural': 'חניכים',
   'student.add': 'הוספת חניך',

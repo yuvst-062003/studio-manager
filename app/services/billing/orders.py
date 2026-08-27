@@ -32,6 +32,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.cors import app_origin
 from app.integrations.upay.form import MAX_INSTALLMENTS, upay_form_fields
 from app.models.billing import Charge, PaymentOrder, PaymentOrderCharge, RecurringSubscription
 from app.models.studio import Studio
@@ -321,12 +322,25 @@ class OrderService:
                 "UPAY_MERCHANT_EMAIL is unset or blank, so there is no account to charge. "
                 "It lives in Railway variables and never in this repo."
             )
+        # The browser goes back to the PARENT APP, not to the API: `returnurl` is where
+        # uPay sends the paying parent, and until P1 it pointed at the JSON status
+        # endpoint, so a paying parent landed on raw JSON. The app's
+        # `#/payment-complete/<ref>` screen polls that same endpoint and stays honest
+        # that the IPN is the only settlement. Falls back to the API URL while the app
+        # host is unconfigured (domains.json's PENDING production entries) — a JSON page
+        # beats a redirect at a hostname that does not resolve.
+        parent_origin = app_origin("parent", settings.ENV)
+        return_url = (
+            f"{parent_origin}/#/payment-complete/{order.public_ref}"
+            if parent_origin
+            else f"{base_url.rstrip('/')}/api/v1/payment-complete?ref={order.public_ref}"
+        )
         return upay_form_fields(
             studio=studio,
             order_public_ref=order.public_ref,
             expected_amount_agorot=order.expected_amount_agorot,
             max_payments=order.max_payments,
             merchant_email=merchant_email,
-            return_url=f"{base_url.rstrip('/')}/api/v1/payment-complete?ref={order.public_ref}",
+            return_url=return_url,
             ipn_url=f"{base_url.rstrip('/')}/api/v1/webhooks/upay/{order.public_ref}",
         )
