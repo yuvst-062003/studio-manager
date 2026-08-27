@@ -9,7 +9,7 @@
 // installed — which is why the nudge names what installing buys, but it is a pitch now,
 // not a gate.
 import { useEffect, useMemo, useState } from 'react'
-import { apiFetch, useDisplayMode, useSession } from '@studio/core'
+import { apiFetch, useDisplayMode, useSession, switchStudio } from '@studio/core'
 import {
   AccountDrawerFooter,
   AppShell,
@@ -256,6 +256,7 @@ export default function App() {
             studioIsDemo: s.studio_is_demo,
           }))}
           activeStudioId={session.activeStudioId}
+          onSwitchStudio={(studioId) => void switchStudio(studioId)}
           tabBar={
             // 9a/1c/1d draw the four-tab bar on every staff screen; עוד opens the same
             // drawer 9e describes ("אותה מגירה"), through the shell's own control.

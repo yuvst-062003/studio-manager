@@ -6,7 +6,7 @@
 // second while the first is true is a flash of the wrong app on every cold start.
 import { useCallback, useEffect, useState } from 'react'
 import type { AppAccess, SessionState, StudioMembership } from './session'
-import { apiUrl, getAccessToken, refresh, signOut, startListeningForPersonaSwitch } from './session'
+import { STUDIO_SWITCHED_EVENT, apiUrl, getAccessToken, refresh, signOut, startListeningForPersonaSwitch } from './session'
 
 export type SessionStatus = 'loading' | 'anonymous' | 'signed-in'
 
@@ -98,6 +98,14 @@ export function useSession(): Session {
   // rather than at module load, so a production bundle carries no listener for an event
   // that can never fire in it.
   useEffect(() => startListeningForPersonaSwitch(), [])
+
+  // P9 — a studio switch re-reads the whole session, so every /me screen follows the
+  // new club without a reload.
+  useEffect(() => {
+    const handler = () => void load()
+    globalThis.addEventListener(STUDIO_SWITCHED_EVENT, handler)
+    return () => globalThis.removeEventListener(STUDIO_SWITCHED_EVENT, handler)
+  }, [load])
 
   // `?? []` and not `state?.studios.find(...)`: a response missing `studios` would make
   // that a `.find` on undefined INSIDE a render, which is a white screen rather than an

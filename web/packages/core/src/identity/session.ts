@@ -53,6 +53,11 @@ export function apiUrl(path: string): string {
  */
 export const ACT_AS_EVENT = 'studio:dev-act-as'
 
+//: Fired after a successful studio switch, so every mounted useSession re-reads. §19.4
+//: moves the active studio WITHOUT a reload; anything caching a studio id at mount is
+//: wrong the moment this fires.
+export const STUDIO_SWITCHED_EVENT = 'studio:switched'
+
 /**
  * How early a token is treated as expired. A request that leaves with four seconds of
  * validity can arrive with none, and the resulting 401 would be indistinguishable from a
@@ -189,6 +194,31 @@ export async function apiFetch(path: string, init: RequestInit = {}): Promise<Re
   const refreshed = await refresh()
   if (refreshed === null) return first
   return send(getAccessToken())
+}
+
+/**
+ * §5.2's switcher, from the client side (P9). POSTs the switch, adopts the rotated
+ * session, and tells every mounted `useSession` to re-read — the persona switcher's
+ * no-reload rule applies here too.
+ */
+export async function switchStudio(studioId: string): Promise<SessionState | null> {
+  try {
+    const response = await fetch(apiUrl(`${AUTH_BASE}/switch-studio`), {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${getAccessToken() ?? ''}`,
+      },
+      body: JSON.stringify({ studio_id: studioId }),
+    })
+    if (!response.ok) return null
+    const state = adopt(await response.json())
+    globalThis.dispatchEvent(new CustomEvent(STUDIO_SWITCHED_EVENT))
+    return state
+  } catch {
+    return null
+  }
 }
 
 export async function signOut(): Promise<void> {

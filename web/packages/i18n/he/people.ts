@@ -164,6 +164,11 @@ export const people: Bundle = {
   'request.newFamily': 'משפחה חדשה',
 
   // -- add a sibling (parent 12g) ------------------------------------------------
+  'sibling.steps.title': 'מה קורה אחרי השליחה',
+  'sibling.steps.approve': 'המועדון מאשר את הבקשה',
+  'sibling.steps.declaration': 'חותמים על הצהרת בריאות',
+  'sibling.steps.billing': 'החיוב מתחיל רק אחרי האישור — שום דבר לא חויב עדיין',
+  'sibling.ages': 'גילאי {min}–{max}',
   'sibling.title': 'הוספת ילד נוסף',
   'join.title': 'הצטרפות למועדון — הרשמת משפחה',
   'directions.title': 'הוראות הגעה',
@@ -307,6 +312,7 @@ export const people: Bundle = {
   // -- documents column (dashboard 3b). In `people` and not `health` — that namespace
   // belongs to M4, and a lane borrowing another's serializes both.
   'document.missing': 'חסרה הצהרה',
+  'document.missingCount': '{n} חסר',
   'document.trialSigned': 'הצהרת ניסיון',
   'document.signed': 'הצהרה מלאה',
 

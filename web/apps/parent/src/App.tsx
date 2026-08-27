@@ -8,7 +8,7 @@
 // and §5.11 permits no email or SMS fallback, so that parent is reachable only by
 // telephone."
 import { useEffect, useMemo, useState } from 'react'
-import { apiFetch, getAccessToken, useDisplayMode, useSession } from '@studio/core'
+import { apiFetch, getAccessToken, useDisplayMode, useSession, switchStudio } from '@studio/core'
 import {
   AccountDrawerFooter,
   AppShell,
@@ -357,13 +357,38 @@ function AuthedApp() {
               />
             ) : undefined
           }
-          drawerFooter={<AccountDrawerFooter locale={locale} onChooseLocale={setLocale} accountName={session.displayName} />}
+          drawerFooter={
+            <>
+              {/* 2e's counts (P9): the children and the missing declarations, above the
+                  shared language/theme footer. */}
+              {gatedChildren !== null && gatedChildren.length > 0 ? (
+                <div data-testid="drawer-counts">
+                  <p style={{ margin: 0 }}>
+                    {t(locale, 'common.nav.myChildren')} · {gatedChildren.length}
+                  </p>
+                  {gatedChildren.some((child) => child.health_status !== 'signed') ? (
+                    <p style={{ margin: 0 }}>
+                      {t(locale, 'health.declaration.title')} ·{' '}
+                      {t(locale, 'people.document.missingCount').replace(
+                        '{n}',
+                        String(
+                          gatedChildren.filter((child) => child.health_status !== 'signed').length,
+                        ),
+                      )}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+              <AccountDrawerFooter locale={locale} onChooseLocale={setLocale} accountName={session.displayName} />
+            </>
+          }
           studios={session.studios.map((s) => ({
             studioId: s.studio_id,
             studioName: s.studio_name,
             studioIsDemo: s.studio_is_demo,
           }))}
           activeStudioId={session.activeStudioId}
+          onSwitchStudio={(studioId) => void switchStudio(studioId)}
           devBar={
             <DevBar
               identity={

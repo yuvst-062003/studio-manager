@@ -521,28 +521,35 @@ waves:
         on: 2026-08-27
       - id: P4
         title: Parent — landing shell 401 fix and 13b wiring
-        status: pending
+        status: shipped
+        on: 2026-08-27
       - id: P5
         title: Parent — inbox and events list
-        status: pending
+        status: shipped
+        on: 2026-08-27
       - id: P6
         title: Parent — add-a-sibling group cards
-        status: pending
+        status: shipped
+        on: 2026-08-27
       - id: P7
         title: Parent — single-segment belt link resolves or refuses
-        status: pending
+        status: shipped
+        on: 2026-08-27
       - id: P8
         title: Parent — recovery on a phone network
         status: pending
       - id: P9
         title: Parent — two-club guardian
-        status: pending
+        status: shipped
+        on: 2026-08-27
       - id: P10
         title: Parent — bars and the comes-later strings
-        status: pending
+        status: shipped
+        on: 2026-08-27
       - id: P11
         title: Parent — health renewal vs the gate (investigation)
-        status: pending
+        status: shipped
+        on: 2026-08-27
       - id: P12
         title: Parent — audit log and functional dimension
         status: pending
@@ -605,7 +612,8 @@ waves:
         status: pending
       - id: L6
         title: Landing — anonymous page makes no authenticated call
-        status: pending
+        status: shipped
+        on: 2026-08-27
       - id: L7
         title: Landing — the states no artboard draws
         status: pending

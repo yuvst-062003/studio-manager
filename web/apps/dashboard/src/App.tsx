@@ -10,7 +10,7 @@
 // in a new tab, the lot — without adding a dependency, which
 // .claude/rules/ui-rtl-a11y.md says not to do without asking.
 import { useEffect, useMemo, useState } from 'react'
-import { apiFetch, useSession } from '@studio/core'
+import { apiFetch, useSession, switchStudio } from '@studio/core'
 import {
   AppShell,
   EmptyState,
@@ -505,6 +505,7 @@ export default function App() {
             studioIsDemo: s.studio_is_demo,
           }))}
           activeStudioId={session.activeStudioId}
+          onSwitchStudio={(studioId) => void switchStudio(studioId)}
           devBar={
             <DevBar
               identity={

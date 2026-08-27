@@ -4,6 +4,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   ACT_AS_EVENT,
+  STUDIO_SWITCHED_EVENT,
   apiFetch,
   clearSession,
   getAccessToken,
@@ -11,6 +12,7 @@ import {
   setAccessToken,
   signOut,
   startListeningForPersonaSwitch,
+  switchStudio,
 } from './session'
 
 const SESSION_BODY = {
@@ -226,5 +228,36 @@ describe('the persona switch', () => {
       }),
     )
     expect(getAccessToken()).toBeNull()
+  })
+})
+
+describe('switchStudio (P9)', () => {
+  it('POSTs the switch, adopts the rotated session, and announces it', async () => {
+    const events: string[] = []
+    const listener = () => events.push('switched')
+    globalThis.addEventListener(STUDIO_SWITCHED_EVENT, listener)
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        expect(String(input)).toContain('/auth/switch-studio')
+        expect(JSON.parse(String(init?.body))).toEqual({ studio_id: 's2' })
+        return new Response(
+          JSON.stringify({
+            access_token: 'tok2',
+            expires_in: 900,
+            access: { staff: false, parent: true },
+            studios: [],
+            active_studio_id: 's2',
+          }),
+          { status: 200 },
+        )
+      }),
+    )
+    const state = await switchStudio('s2')
+    expect(state?.activeStudioId).toBe('s2')
+    // Every mounted useSession re-reads on this — §19.4's no-reload rule.
+    expect(events).toEqual(['switched'])
+    globalThis.removeEventListener(STUDIO_SWITCHED_EVENT, listener)
+    vi.unstubAllGlobals()
   })
 })

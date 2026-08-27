@@ -136,6 +136,11 @@ export const people: Bundle = {
     'Matched on a verified phone or email. Confirm before linking',
   'request.newFamily': 'New family',
 
+  'sibling.steps.title': 'What happens after you send',
+  'sibling.steps.approve': 'The club approves the request',
+  'sibling.steps.declaration': 'You sign the health declaration',
+  'sibling.steps.billing': 'Billing starts only after approval — nothing is charged yet',
+  'sibling.ages': 'Ages {min}–{max}',
   'sibling.title': 'Add another child',
   'join.title': 'Join the club — family registration',
   'directions.title': 'Getting here',
@@ -273,6 +278,7 @@ export const people: Bundle = {
     'Only the lead coach can move a student between groups',
 
   'document.missing': 'Declaration missing',
+  'document.missingCount': '{n} missing',
   'document.trialSigned': 'Trial declaration',
   'document.signed': 'Full declaration',
 

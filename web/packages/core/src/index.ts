@@ -18,6 +18,8 @@ export {
   getAccessToken,
   refresh,
   setAccessToken,
+  switchStudio,
+  STUDIO_SWITCHED_EVENT,
   signOut,
   startListeningForPersonaSwitch,
 } from './identity/session'

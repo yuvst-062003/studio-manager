@@ -325,3 +325,34 @@ def test_a_student_with_neither_date_is_skipped_rather_than_crashing(tenant_sess
         id = uuid.uuid4()
 
     assert _days_since_joining(_Bare(), TODAY) is None
+
+
+def test_a_renewal_never_returns_a_signed_family_to_missing(
+    tenant_session, app_session, studio, a_family, a_full_template
+):
+    """P11's investigation, pinned as behaviour.
+
+    The fear: HealthGate blocks on anything but `signed` and wraps every parent route, so
+    if a routine annual renewal flipped `health_status` back to `missing`, a three-year
+    family would be locked out of the whole app by a reminder. The finding: it cannot —
+    `chase_renewals` writes nothing to any row, and `_advance_status` only ever moves the
+    status FORWARD (its own comment names this exact lockout as the reason). A renewal is
+    a warning in the inbox, never a closed door. This test is the tripwire if either half
+    changes.
+    """
+    from app.models.people import Student
+
+    student = a_family(days_ago=400, health_status="signed")
+    _declare(app_session, studio, student, a_full_template, signed_days_ago=330)
+    row = app_session.get(Studio, studio.id)
+    row.settings = dict(row.settings or {}, health_declaration_validity_months=12)
+    app_session.commit()
+
+    tally = Tally()
+    tenant_session.expire_all()
+    chase_renewals(tenant_session, tenant_session.get(Studio, studio.id), at=T0, tally=tally)
+    tenant_session.commit()
+    assert tally.renewals + tally.undeliverable == 1
+
+    app_session.expire_all()
+    assert app_session.get(Student, student.id).health_status == "signed"

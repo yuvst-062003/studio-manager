@@ -140,6 +140,11 @@ export const people: Bundle = {
     'Найдено совпадение по подтверждённому телефону или почте. Подтвердите перед привязкой',
   'request.newFamily': 'Новая семья',
 
+  'sibling.steps.title': 'Что будет после отправки',
+  'sibling.steps.approve': 'Клуб подтверждает заявку',
+  'sibling.steps.declaration': 'Вы подписываете медицинскую декларацию',
+  'sibling.steps.billing': 'Оплата начнётся только после подтверждения — пока ничего не списано',
+  'sibling.ages': 'Возраст {min}–{max}',
   'sibling.title': 'Добавить ещё одного ребёнка',
   'join.title': 'Вступление в клуб — регистрация семьи',
   'directions.title': 'Как добраться',
@@ -275,6 +280,7 @@ export const people: Bundle = {
     'Переводить между группами может только старший тренер',
 
   'document.missing': 'Нет декларации',
+  'document.missingCount': 'не хватает: {n}',
   'document.trialSigned': 'Пробная декларация',
   'document.signed': 'Полная декларация',
 

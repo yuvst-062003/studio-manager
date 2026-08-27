@@ -254,6 +254,65 @@ Build: belt with date and next exam; an **8-session attendance strip** with coun
 
 ## Log
 
+### 2026-08-27 · P4–P11 — the rest of the parent surface
+
+**P4/L6.** The public routes resolve BEFORE any session hook can mount — the old shape
+ran `useSession()` first, so every anonymous landing view fired `/auth/refresh` into a
+401. A test asserts `/t/<slug>` signed out issues only the public read. `signedIn` on the
+landing is now the in-memory token, never a request.
+
+**P5.** 2b's דורש פעולה card pins unread health notices above the feed (מילוי הצהרה
+routes home where the gate holds the form; אחר כך marks read, which clears the pin), and
+the events list gained its consent state and closing date. The chat tab stays cut (D9.1,
+pinned by the contract test — untouched). 12h's other elements were already built; the
+audit measured it with no events seeded.
+
+**P6.** Group CARDS with schedule days and age band, from the same public projection the
+landing shows (resolved through /me/studio's slug), plus the three-step explainer ending
+with "nothing is charged yet". **Two deliberate absences:** capacity/waitlist — the
+2026-08-27 decision cut group caps from the product, so the spec's מלאה state is stale —
+and the sibling-discount line, because NO automatic sibling discount exists in W4's
+pricing (a discount is a manager's manual negative charge); drawing a computed 10% would
+state a rule the product does not have.
+
+**P7.** A single-segment `#/belts/<student>` resolves through the child's own belt
+history (award rows now carry `class_id`) or refuses visibly; bare `#/belts/` refuses the
+same way. Found on the way: `GET /belt-ranks` was staff-only — the routed parent
+progression screen answered 403 for every guardian — and nothing anywhere linked to 12d.
+Both fixed (the guard is signed-in now; the card's belt section links to 12d).
+
+**P9.** `POST /auth/switch-studio` existed and `StudioSwitcher` existed — and no app
+passed `onSwitchStudio`, so no multi-studio person had a switcher at all. Wired in all
+three apps through a new core `switchStudio()` that adopts the rotated session and
+fires `STUDIO_SWITCHED_EVENT`; every mounted `useSession` re-reads, so every /me screen
+follows the new club without a reload. The drawer carries 2e's counts (children, missing
+declarations). **Decided limitation:** the per-club debt marker renders for the ACTIVE
+club only — a cross-club balance would need the cross-tenant read `TenantSession` exists
+to forbid, and the switch is one tap.
+
+**P10.** 12d already rendered `BeltBar` (the audit's "nothing imports it" was overtaken
+— drift, recorded); 2c now does too, plus the shared strip. The four strings resolved per
+the spec's own table: two deleted with their features (P2/P3), the landing's 503 copy
+kept (correct as written), and `common.home.childrenComeLater` kept — verified as
+guidance ("the manager links a child at registration"), not a promise.
+
+**P11 — the investigation, closed as CONFIRM.** The feared lockout cannot happen:
+`chase_renewals` writes nothing to any row (`valid_until` stays NULL; its docstring says
+so), and `_advance_status` moves `health_status` only FORWARD — its own comment names
+this exact lockout as the reason. A renewal is an always-on inbox warning
+(`health.declaration_renewal`, which P5's action card now pins), never a closed door. The
+current behaviour already IS the narrower rule the spec proposed, so nothing changed;
+`test_a_renewal_never_returns_a_signed_family_to_missing` is the tripwire if either half
+ever does.
+
+**P8, status.** Retry everywhere (the LoadFailed sweep), no failed money read renders as
+a number (PaymentsSection fails whole rather than zeroing), and §10.1's vocabulary stays
+AbsenceScreen's. **The iOS push-ladder walk is NOT done:** it requires installing the PWA
+on a physical iPhone, which this session cannot do. The ladder's states are modelled and
+unit-tested (`usePushRegistration`, `platformOf`, `PushDisabledBanner`); what remains is
+the on-device verification, reported rather than routed around.
+
+
 ### 2026-08-27 · P2 + P3 — the card's four quarters, and a calendar that answers its question
 
 **P2.** The four sections M4, M5, M6 and M7 each left for someone else are registered:
