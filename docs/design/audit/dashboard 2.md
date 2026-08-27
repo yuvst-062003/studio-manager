@@ -271,40 +271,6 @@ is the single cheapest item in this spec.
 
 ## Log
 
-### 2026-08-28 · The staging full pass — three creation blockers no test could see
-
-The owner's first real pass on staging read as "a manager cannot create anything". Three
-separate defects, none visible to the suite, all fixed and redeployed the same night:
-
-**1 · CORS blocked PUT (and HEAD).** `app/main.py`'s `allow_methods` lacked both. Four
-dashboard clients use PUT — a group's weekly schedule, belt eligibility, health templates,
-billing method — so the browser killed every one at preflight while the whole suite passed:
-CORS exists only in a real browser, and the tests speak to the API same-origin. The
-symptom that surfaced it: "create a group but can't set the dates and hours" — the exact
-save that makes sessions exist. HEAD was the staff app's §10.1 network probe, silently
-failing cross-origin. The class is closed, not just the instance:
-`tests/contracts/test_cors_methods.py` DERIVES the obligation list from the frontend
-sources, so a new client verb fails at the commit that introduces it.
-
-**2 · `#/students/new` had no inbound link.** The add-student screen (3c) shipped
-reachable only by typing the URL — the same unreachable-screen class the parent audit
-caught, on the surface whose guard didn't cover entry links. A visible `הוספת חניך`
-button now sits on the students screen, with a test naming the rule: a screen with no
-inbound link does not exist.
-
-**3 · `POST /sessions` had no UI at all.** The backend's ad-hoc create shipped in W2 and
-nothing ever called it — the popover's date/time fields are the MOVE control, which is
-easy to misread as create in a code review and impossible to misread as a user. The week
-board now carries `שיעור חדש`: group · date · hours · hall, with the training year
-RESOLVED to the active one rather than asked (§5.15 offers no choice), refusing visibly
-when no year is active.
-
-The lesson for the record: all three lived in the seams the audit could not measure — a
-browser-only protocol layer, a missing edge in the navigation graph, and an endpoint
-whose absence of a caller looks identical to intentional scope. The functional dimension
-(F13/S12) now has a third category to sweep for: verbs the backend offers that no screen
-speaks.
-
 ### 2026-08-27 · F0 + F13 — the re-verify, closed, and the record's functional dimension
 
 **F0's verdict on this file and the spec.** The same-day design pass moved the tree

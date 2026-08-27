@@ -265,14 +265,6 @@ link that must be signed `לפני עלייה למזרן`.
 
 ## Log
 
-### 2026-08-28 · Post-deploy: the network probe was CORS-blocked on staging
-
-S5 turned the §10.1 probe loop on; staging turned out to block it — `HEAD` was missing
-from the API's CORS `allow_methods`, so every cross-origin probe failed and the monitor
-would have called a healthy network offline. Found by the guard test written for the PUT
-gap (see the dashboard log, 2026-08-28), fixed in the same commit. No staff-app change:
-the fix is server-side.
-
 ### 2026-08-27 · S12 — the record closes over itself
 
 The log below now carries every workstream S1–S11, and the four deferred decisions are
