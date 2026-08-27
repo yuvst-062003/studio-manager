@@ -1083,3 +1083,122 @@ a {
   color: var(--text-muted);
   border: var(--border-width-hairline) solid var(--border);
 }
+
+.studio-load-failed {
+  display: flex;
+  flex-direction: column;
+  align-items: start;
+  gap: var(--space-3);
+}
+
+/* Table — F1b. The scroll container is the primitive's own; the page never scrolls
+   sideways because of a table. */
+.studio-table-scroll {
+  overflow-x: auto;
+  max-inline-size: 100%;
+}
+
+.studio-table {
+  inline-size: 100%;
+  border-collapse: collapse;
+}
+
+.studio-table caption {
+  text-align: start;
+  font-size: var(--text-caption);
+  color: var(--text-muted);
+  padding-block-end: var(--space-2);
+}
+
+.studio-table th,
+.studio-table td {
+  text-align: start;
+  vertical-align: top;
+  padding-block: var(--space-3);
+  padding-inline: var(--space-3);
+  border-block-end: var(--border-width-hairline) solid var(--border);
+}
+
+.studio-table thead th {
+  font-size: var(--text-caption);
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.studio-table tbody th[scope='row'] {
+  font-weight: 600;
+}
+
+/* Below stackBelow each row becomes a labelled card (F11). */
+.studio-table-cards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.studio-table-cards__card {
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  padding: var(--space-3);
+}
+
+.studio-table-cards__identity {
+  font-weight: 600;
+  padding-block-end: var(--space-2);
+}
+
+.studio-table-cards__values {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.studio-table-cards__pair {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.studio-table-cards__pair dt {
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+}
+
+.studio-table-cards__pair dd {
+  margin: 0;
+}
+
+/* AttendanceStrip — the shared 8-session strip (2c / 2d / 9c / 9h). */
+.studio-attendance-strip {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.studio-attendance-strip__marks {
+  display: flex;
+  gap: var(--space-1);
+  flex-wrap: wrap;
+}
+
+.studio-attendance-strip__legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  font-size: var(--text-caption);
+  color: var(--text-muted);
+}
+
+.studio-attendance-strip__legend li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}

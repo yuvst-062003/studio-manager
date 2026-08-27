@@ -17,6 +17,13 @@ export const common: Bundle = {
   'hello.fontProof.digits': '0123',
   'hello.direction': 'כיוון הכתיבה',
   'hello.theme': 'ערכת נושא',
+  // The LoadFailed primitive — the one recovery affordance every surface shares.
+  // The body is deliberately generic; a screen with its own error copy passes it
+  // through `detail` from the artboard's own spec.
+  'loadFailed.icon': 'שגיאה',
+  'loadFailed.body': 'לא הצלחנו לטעון את הנתונים.',
+  'loadFailed.offline': 'אין חיבור לרשת. הנתונים ייטענו כשהחיבור יחזור.',
+  'loadFailed.retry': 'נסו שוב',
   'theme.light': 'בהיר',
   'theme.dark': 'כהה',
   'theme.system': 'מערכת',

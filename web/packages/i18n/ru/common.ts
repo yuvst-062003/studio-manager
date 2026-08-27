@@ -25,6 +25,11 @@ export const common: Bundle = {
   'hello.fontProof.digits': '0123',
   'hello.direction': 'Направление письма',
   'hello.theme': 'Тема',
+  // The LoadFailed primitive — the one recovery affordance every surface shares.
+  'loadFailed.icon': 'ошибка',
+  'loadFailed.body': 'Не удалось загрузить данные.',
+  'loadFailed.offline': 'Нет подключения к сети. Данные загрузятся, когда связь восстановится.',
+  'loadFailed.retry': 'Повторить',
   'theme.light': 'Светлая',
   'theme.dark': 'Тёмная',
   'theme.system': 'Системная',
