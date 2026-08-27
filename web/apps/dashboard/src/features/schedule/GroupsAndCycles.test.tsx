@@ -145,18 +145,13 @@ describe('GroupsAndCycles (4b)', () => {
     }
   })
 
-  it('states that the belt range arrives with M7 rather than rendering an empty cell', async () => {
+  it('renders no capacity anywhere — the 2026-08-27 decision cut it from the product', async () => {
+    // A group has no cap; 7d's 42/54 is an EVENT cap, a different thing. The old
+    // "capacity comes later" promise is deleted rather than kept, because the thing it
+    // promised was decided against.
     renderTable()
-    expect(
-      (await screen.findAllByText(t('he', 'schedule.groups.beltRangeComesLater')))[0],
-    ).toBeInTheDocument()
-  })
-
-  it('states that capacity arrives with the roster rather than inventing a number', async () => {
-    renderTable()
-    expect(
-      (await screen.findAllByText(t('he', 'schedule.groups.capacityComesLater')))[0],
-    ).toBeInTheDocument()
+    await screen.findAllByRole('rowheader')
+    expect(document.body.textContent ?? '').not.toMatch(/תפוסה|מלאה/)
   })
 
   it('says there are no groups rather than showing an empty table', async () => {

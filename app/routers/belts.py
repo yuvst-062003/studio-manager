@@ -23,6 +23,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel
+from sqlalchemy import select
 
 from app.core.auth_context import AnyStaff, ManagerOrOwner, require_roles
 from app.core.clock import now
@@ -126,6 +127,52 @@ def _ladder_out(session: TenantSessionDep, rows: list[BeltRank]) -> list[LadderR
         )
         for index, row in enumerate(rows)
     ]
+
+
+class GroupBeltRangeOut(BaseModel):
+    group_id: uuid.UUID
+    min_name: str
+    min_color_hex: str
+    max_name: str
+    max_color_hex: str
+
+
+class GroupBeltRangesOut(BaseModel):
+    items: list[GroupBeltRangeOut]
+
+
+@router.get("/belt-ranges/by-group", response_model=GroupBeltRangesOut)
+def belt_ranges_by_group(
+    _: AnyStaff, session: TenantSessionDep
+) -> GroupBeltRangesOut:
+    """F8 — 4b's טווח חגורות, measured: the lowest and highest CURRENT belt among each
+    group's live enrollments. A group whose students hold no belt yet is simply absent —
+    an empty range is not a range."""
+    from app.models.people import Enrollment, Student
+
+    rows = session.execute(
+        select(Enrollment.group_id, BeltRank.name, BeltRank.color_hex, BeltRank.order_index)
+        .join(Student, Student.id == Enrollment.student_id)
+        .join(BeltRank, BeltRank.id == Student.current_belt_id)
+        .where(Enrollment.status == "active", Enrollment.ended_on.is_(None))
+    ).all()
+    spans: dict[uuid.UUID, tuple[tuple[int, str, str], tuple[int, str, str]]] = {}
+    for group_id, name, color_hex, order_index in rows:
+        entry = (order_index, name, color_hex)
+        low, high = spans.get(group_id, (entry, entry))
+        spans[group_id] = (min(low, entry), max(high, entry))
+    return GroupBeltRangesOut(
+        items=[
+            GroupBeltRangeOut(
+                group_id=group_id,
+                min_name=low[1],
+                min_color_hex=low[2],
+                max_name=high[1],
+                max_color_hex=high[2],
+            )
+            for group_id, (low, high) in sorted(spans.items(), key=lambda kv: str(kv[0]))
+        ]
+    )
 
 
 @router.get("/belt-ranks", response_model=LadderPage)

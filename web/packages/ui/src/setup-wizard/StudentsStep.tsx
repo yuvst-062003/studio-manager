@@ -81,9 +81,6 @@ export function makeStudentsStep(client: StudentsClient) {
           </ul>
         )}
 
-        <p data-testid="setup-students-acquisition-note">
-          {t(locale, 'common.setup.students.acquisitionLater')}
-        </p>
         <p>{t(locale, 'common.setup.students.changeableLater')}</p>
 
         <Button onClick={onDone}>{t(locale, 'common.setup.continue')}</Button>

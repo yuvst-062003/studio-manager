@@ -200,8 +200,6 @@ export const schedule: Bundle = {
   'groups.nextSession': 'השיעור הבא',
   'groups.noNextSession': 'אין שיעור מתוכנן',
   'groups.unscheduledStudents': 'תלמידים ללא יום',
-  'groups.beltRangeComesLater': 'טווח החגורות יוצג עם מערכת החגורות',
-  'groups.capacityComesLater': 'תפוסה תוצג עם רשימת החניכים',
   'groups.empty': 'לא הוגדרו קבוצות',
   'groups.caption': 'קבוצות המועדון והלו״ז שלהן',
 

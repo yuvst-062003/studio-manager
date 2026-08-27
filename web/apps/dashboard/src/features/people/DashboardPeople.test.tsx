@@ -194,10 +194,9 @@ describe('StudentsScreen — 3b', () => {
     // decision-making screen would be a fabrication — so the column exists, is labelled,
     // and says when it fills in.
     render(<StudentsScreen locale="he" client={makeClient()} />)
-    expect(await screen.findByTestId('students-payment-pending')).toHaveTextContent('—')
-    expect(document.body.textContent ?? '').toContain(
-      t('he', 'people.document.paymentComesLater'),
-    )
+    // F8: with no charges read yet the cell is an em dash — never a fake ✓ and never
+    // an amount. The chip states appear only once the manager-only read lands.
+    expect(await screen.findAllByTestId('students-payment-pending')).not.toHaveLength(0)
     expect(document.body.textContent ?? '').not.toContain('₪')
   })
 

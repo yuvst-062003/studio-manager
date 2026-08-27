@@ -169,8 +169,6 @@ export const schedule: Bundle = {
   'groups.nextSession': 'Next session',
   'groups.noNextSession': 'No session scheduled',
   'groups.unscheduledStudents': 'Students with no day',
-  'groups.beltRangeComesLater': 'Belt range appears with the belt system',
-  'groups.capacityComesLater': 'Capacity appears with the student roster',
   'groups.empty': 'No groups yet',
   'groups.caption': "The club's groups and their schedules",
 

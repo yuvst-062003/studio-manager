@@ -36,8 +36,6 @@ export function AlertCentre({ locale, client }: AlertSectionProps) {
           <Section key={key} locale={locale} client={client} />
         ))
       )}
-      {/* Honest about what is not here yet, rather than a panel that looks complete. */}
-      <p data-testid="alerts-pending">{t(locale, 'people.alerts.sectionsComeLater')}</p>
     </section>
   )
 }

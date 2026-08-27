@@ -193,7 +193,6 @@ export const common: Bundle = {
   'setup.groups.needClass': 'Сначала создайте занятие, потом группу',
   'setup.groups.locationName': 'Название зала',
   'setup.groups.addLocation': 'Добавить зал',
-  'setup.groups.scheduleLater': 'Недельное расписание появится на следующем этапе разработки.',
   'setup.staff.email': 'Эл. почта',
   'setup.staff.role': 'Роль',
   'setup.staff.role.lead_coach': 'Главный тренер',
@@ -208,7 +207,6 @@ export const common: Bundle = {
   'setup.students.groupCount': '{groups} групп · {classes} занятий',
   'setup.students.staffCount': 'Приглашено тренеров: {n}',
   'setup.students.studentCount': 'Учеников: {n}',
-  'setup.students.acquisitionLater': 'Импорт файла, ссылка для регистрации родителей и ручное добавление появятся позже.',
   'setup.students.changeableLater': 'Всё можно изменить позже в настройках — включая пояса и цены.',
   // Dashboard artboards 3d (персонал) and 3f (настройки). Machine-translated;
   // HB-ru-review is still open.

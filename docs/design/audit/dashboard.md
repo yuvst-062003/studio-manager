@@ -271,6 +271,30 @@ is the single cheapest item in this spec.
 
 ## Log
 
+### 2026-08-27 · F8 — the dashboard's promises become the things they promised
+
+- **Alert centre:** the self-contradicting `sectionsComeLater` line is gone — the billing
+  and comms sections register (the comms one only since S1's fix; the spec's claim that
+  it was registered was itself stale).
+- **Students payment column:** real chips from `GET /charges?status=open` (manager-only;
+  the coach-reachable `/students` list stays money-free per §13). Overdue → חוב, open →
+  פתוח, none → שולם; a failed or unfinished read stays an em dash, never a fake ✓.
+- **Groups belt range:** measured, via a new `GET /belt-ranges/by-group` — the span of
+  each group's enrolled students' CURRENT belts (`student.current_belt_id`), not the
+  class ladder.
+- **Groups capacity: deleted without being built.** The 2026-08-27 decision cut group
+  capacity from the product entirely (a group has no cap; `7d`'s 42/54 is an EVENT cap).
+  The spec's "capacity as 14/20 with a מלאה state" predates that decision and is stale —
+  the promise string is deleted because the thing it promised was decided against.
+- **Setup wizard:** the W2-schedule and M3-acquisition notes are gone; both features
+  shipped waves ago.
+- **Weekly hours and the session-level uncovered banner** landed with F5's commit.
+- **Guard:** `tools/__tests__/dead-promise-keys.test.ts` — a `*Later` key no component
+  references fails the build. The two parent-side promises (calendar attendance, card
+  sections) fall when P2/P3 land; the landing's `scheduleComeLater` is correct 503 copy
+  and stays referenced.
+
+
 ### 2026-08-27 · F6 — wizards that let you go back
 
 **Setup: the server's refusal is reversed.** `SetupStepIn` and `SETTABLE_STATUSES` accept

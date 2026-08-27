@@ -172,8 +172,6 @@ export const schedule: Bundle = {
   'groups.nextSession': 'Следующее занятие',
   'groups.noNextSession': 'Занятий не запланировано',
   'groups.unscheduledStudents': 'Ученики без дня',
-  'groups.beltRangeComesLater': 'Диапазон поясов появится вместе с системой поясов',
-  'groups.capacityComesLater': 'Заполненность появится вместе со списком учеников',
   'groups.empty': 'Группы не заданы',
   'groups.caption': 'Группы клуба и их расписание',
 

@@ -184,7 +184,6 @@ export const common: Bundle = {
   'setup.groups.needClass': 'Create a class before a group',
   'setup.groups.locationName': 'Location name',
   'setup.groups.addLocation': 'Add a location',
-  'setup.groups.scheduleLater': 'The weekly schedule arrives in a later step of the build.',
   'setup.staff.email': 'Email',
   'setup.staff.role': 'Role',
   'setup.staff.role.lead_coach': 'Lead coach',
@@ -199,7 +198,6 @@ export const common: Bundle = {
   'setup.students.groupCount': '{groups} groups · {classes} classes',
   'setup.students.staffCount': '{n} coaches invited',
   'setup.students.studentCount': '{n} students',
-  'setup.students.acquisitionLater': 'File import, the parent registration link and manual entry arrive later.',
   'setup.students.changeableLater': 'Everything can be changed later in Settings — belts and prices included.',
   // Dashboard artboards 3d (staff) and 3f (settings).
   'dash.home.title': 'Manager dashboard',

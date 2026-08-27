@@ -75,6 +75,28 @@ export function GroupsAndCycles({
   const [renaming, setRenaming] = useState<string | null>(null)
   const [renameTo, setRenameTo] = useState('')
   const [writeFailed, setWriteFailed] = useState(false)
+  // F8 — 4b's belt range, measured from enrolled students' current belts.
+  const [beltRanges, setBeltRanges] = useState<
+    Record<string, { min_name: string; max_name: string }>
+  >({})
+
+  useEffect(() => {
+    let alive = true
+    void apiFetch('/api/v1/belt-ranges/by-group')
+      .then(async (r) =>
+        r.ok
+          ? ((await r.json()) as { items: { group_id: string; min_name: string; max_name: string }[] })
+              .items
+          : [],
+      )
+      .then((rows) => {
+        if (alive) setBeltRanges(Object.fromEntries(rows.map((row) => [row.group_id, row])))
+      })
+      .catch(() => undefined)
+    return () => {
+      alive = false
+    }
+  }, [])
 
   useEffect(() => {
     if (!onChanged) return
@@ -291,13 +313,22 @@ export function GroupsAndCycles({
             id: 'session',
             header: t(locale, 'schedule.session.title'),
             width: '12rem',
-            cell: () => (
-              <>
-                {/* M7 and M3. Stated, not blank — see the module header. */}
-                <div style={laterStyle}>{t(locale, 'schedule.groups.beltRangeComesLater')}</div>
-                <div style={laterStyle}>{t(locale, 'schedule.groups.capacityComesLater')}</div>
-              </>
-            ),
+            cell: (group) => {
+              // F8 — the belt range is measured now. Capacity is DELIBERATELY absent:
+              // the 2026-08-27 decision cut group capacity from the product entirely
+              // (a group has no cap; 7d's 42/54 is an EVENT cap), so the promise is
+              // deleted rather than kept.
+              const range = beltRanges[group.id]
+              return range ? (
+                <span data-testid={`belt-range-${group.id}`}>
+                  {range.min_name === range.max_name
+                    ? range.min_name
+                    : `${range.min_name} – ${range.max_name}`}
+                </span>
+              ) : (
+                <span style={laterStyle}>—</span>
+              )
+            },
           },
           ...(onChanged
             ? [

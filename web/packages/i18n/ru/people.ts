@@ -6,6 +6,10 @@ import type { Bundle } from '../types'
  */
 export const people: Bundle = {
   'card.open': 'Карточка ученика',
+  'student.payment': 'Оплата',
+  'student.payment.overdue': 'Долг',
+  'student.payment.open': 'Открыт',
+  'student.payment.settled': 'Оплачено',
   'student.one': 'Ученик',
   'student.plural': 'Ученики',
   'student.add': 'Добавить ученика',
@@ -231,7 +235,6 @@ export const people: Bundle = {
   'card.enrollments': 'Группы',
   'alerts.title': 'Центр уведомлений',
   'alerts.empty': 'Ничего не требует внимания',
-  'alerts.sectionsComeLater': 'Уведомления об оплате и сверке появятся позже',
   'alerts.pendingRequests': 'Заявки на вступление',
   'alerts.upcomingTrials': 'Ближайшие пробные занятия',
   'alerts.trialsAwaitingDecision': 'Пробные занятия, ожидающие решения',
@@ -264,8 +267,6 @@ export const people: Bundle = {
   'document.missing': 'Нет декларации',
   'document.trialSigned': 'Пробная декларация',
   'document.signed': 'Полная декларация',
-  'document.paymentComesLater':
-    'Статус оплаты появится вместе с модулем биллинга',
 
   'error.scheduleUnavailable': 'Расписание клуба ещё не составлено',
   'error.notFound': 'Не найдено',

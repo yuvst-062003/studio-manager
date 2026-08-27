@@ -193,7 +193,6 @@ export const common: Bundle = {
   'setup.groups.needClass': 'צריך ליצור שיעור לפני קבוצה',
   'setup.groups.locationName': 'שם האולם',
   'setup.groups.addLocation': 'הוספת אולם',
-  'setup.groups.scheduleLater': 'הלו״ז השבועי ייקבע בשלב הבא של הפיתוח.',
   'setup.staff.email': 'אימייל',
   'setup.staff.role': 'תפקיד',
   'setup.staff.role.lead_coach': 'מאמן ראשי',
@@ -208,7 +207,6 @@ export const common: Bundle = {
   'setup.students.groupCount': '{groups} קבוצות · {classes} שיעורים',
   'setup.students.staffCount': '{n} מאמנים הוזמנו',
   'setup.students.studentCount': '{n} חניכים',
-  'setup.students.acquisitionLater': 'ייבוא מקובץ, קישור הרשמה להורים והוספה ידנית ייפתחו בהמשך.',
   'setup.students.changeableLater': 'אפשר לשנות הכול אחר כך בהגדרות — כולל חגורות ומחירים.',
   // Dashboard artboards 3d (צוות) and 3f (הגדרות). §6.4 — desktop-first, but the same
   // components render narrow: a manager checking cover on a phone is a normal case.

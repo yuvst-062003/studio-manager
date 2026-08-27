@@ -3,6 +3,10 @@ import type { Bundle } from '../types'
 /** Mirrors `he/people.ts`. `en` is `strict` in the parity check — a missing key fails. */
 export const people: Bundle = {
   'card.open': 'Student card',
+  'student.payment': 'Payment',
+  'student.payment.overdue': 'Debt',
+  'student.payment.open': 'Open',
+  'student.payment.settled': 'Settled',
   'student.one': 'Student',
   'student.plural': 'Students',
   'student.add': 'Add a student',
@@ -228,8 +232,6 @@ export const people: Bundle = {
   'card.enrollments': 'Groups',
   'alerts.title': 'Alert centre',
   'alerts.empty': 'Nothing needs your attention',
-  'alerts.sectionsComeLater':
-    'Payment and reconciliation alerts are added later',
   'alerts.pendingRequests': 'Join requests waiting',
   'alerts.upcomingTrials': 'Trial classes coming up',
   'alerts.trialsAwaitingDecision': 'Trial classes awaiting a decision',
@@ -263,8 +265,6 @@ export const people: Bundle = {
   'document.missing': 'Declaration missing',
   'document.trialSigned': 'Trial declaration',
   'document.signed': 'Full declaration',
-  'document.paymentComesLater':
-    'Payment status arrives with the billing module',
 
   'error.scheduleUnavailable': 'The club’s timetable has not been built yet',
   'error.notFound': 'Not found',

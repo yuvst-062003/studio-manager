@@ -153,12 +153,6 @@ export function makeGroupsStep(client: StructureClient) {
           ))}
         </ul>
 
-        {/* Named rather than hidden. An owner who reaches this step and finds no weekly
-            schedule should be told it is coming, not left to conclude it is missing. */}
-        <p data-testid="setup-groups-schedule-note">
-          {t(locale, 'common.setup.groups.scheduleLater')}
-        </p>
-
         <Button disabled={busy || groups.length === 0} onClick={onDone}>
           {t(locale, 'common.setup.continue')}
         </Button>

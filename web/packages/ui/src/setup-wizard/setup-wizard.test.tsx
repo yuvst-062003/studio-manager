@@ -411,14 +411,11 @@ describe('step 3 · קבוצות ולו״ז', () => {
     expect(await screen.findByText(t('he', 'common.setup.groups.needClass'))).toBeInTheDocument()
   })
 
-  it('names the W2 half instead of hiding it', async () => {
-    // The weekly schedule is group_schedule_rule, a W2 contract model. An owner who finds
-    // no schedule here should be told it is coming.
+  it('carries no stale schedule promise — the weekly schedule shipped in W2 (F8)', async () => {
     const Step = makeGroupsStep(structureClient())
     render(<Step locale="he" status="pending" onDone={vi.fn()} onSkip={vi.fn()} />)
-    expect(await screen.findByTestId('setup-groups-schedule-note')).toHaveTextContent(
-      t('he', 'common.setup.groups.scheduleLater'),
-    )
+    await screen.findByTestId('setup-groups')
+    expect(screen.queryByTestId('setup-groups-schedule-note')).toBeNull()
   })
 })
 
@@ -496,12 +493,11 @@ describe('step 6 · חניכים', () => {
     expect(await screen.findByTestId('setup-summary-students')).toHaveTextContent('0')
   })
 
-  it('names the three acquisition routes as M3 work rather than omitting them', async () => {
+  it('carries no stale acquisition promise — M3.4 shipped the three routes (F8)', async () => {
     const Step = makeStudentsStep(studentsClient())
     render(<Step locale="he" status="pending" onDone={vi.fn()} onSkip={vi.fn()} />)
-    expect(await screen.findByTestId('setup-students-acquisition-note')).toHaveTextContent(
-      t('he', 'common.setup.students.acquisitionLater'),
-    )
+    await screen.findByTestId('setup-summary-students')
+    expect(screen.queryByTestId('setup-students-acquisition-note')).toBeNull()
   })
 })
 

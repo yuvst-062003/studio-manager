@@ -10,7 +10,7 @@
 import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { Button, EmptyState, StatusChip, Table } from '@studio/ui'
-import { appendPage } from '@studio/core'
+import { apiFetch, appendPage } from '@studio/core'
 import type { CursorPage } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
@@ -65,6 +65,46 @@ export function StudentsScreen({
   // fresher copy, which is what stops a student renamed between two requests rendering
   // twice under two names.
   const [page, setPage] = useState<StudentPage>({ items: [], next_cursor: null, has_more: false })
+  // F8 — the payment column, from `charge` at last. Manager-only read; a failed read
+  // renders the em dash rather than a reassuring ✓.
+  const [openByStudent, setOpenByStudent] = useState<Record<string, 'overdue' | 'open'> | null>(
+    null,
+  )
+
+  useEffect(() => {
+    let alive = true
+    void (async () => {
+      const map: Record<string, 'overdue' | 'open'> = {}
+      let cursor: string | null = null
+      try {
+        do {
+          const params = new URLSearchParams({ status: 'open', limit: '200' })
+          if (cursor) params.set('cursor', cursor)
+          const response = await apiFetch(`/api/v1/charges?${params.toString()}`)
+          if (!response.ok) throw new Error(String(response.status))
+          const body = (await response.json()) as {
+            items: { student_id: string | null; due_date: string }[]
+            next_cursor: string | null
+          }
+          const today = new Date().toISOString().slice(0, 10)
+          for (const charge of body.items) {
+            if (!charge.student_id) continue
+            const overdue = charge.due_date < today
+            if (overdue || map[charge.student_id] !== 'overdue') {
+              map[charge.student_id] = overdue ? 'overdue' : 'open'
+            }
+          }
+          cursor = body.next_cursor
+        } while (cursor)
+        if (alive) setOpenByStudent(map)
+      } catch {
+        if (alive) setOpenByStudent(null)
+      }
+    })()
+    return () => {
+      alive = false
+    }
+  }, [])
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState('')
   // Which query the page in state answers. Derived rather than a `loading` flag set
@@ -201,11 +241,30 @@ export function StudentsScreen({
               },
               {
                 id: 'payment',
-                header: t(locale, 'people.document.paymentComesLater'),
+                header: t(locale, 'people.student.payment'),
                 width: '8rem',
-                // W4 owns `charge`. An invented number here would be a fabrication in
-                // the screen a manager makes decisions from.
-                cell: () => <span data-testid="students-payment-pending">—</span>,
+                cell: (student) => {
+                  if (openByStudent === null) {
+                    // A failed or still-loading read is an em dash, never a fake ✓.
+                    return <span data-testid="students-payment-pending">—</span>
+                  }
+                  const state = openByStudent[student.id]
+                  return (
+                    <span data-testid={`students-payment-${student.id}`}>
+                      <StatusChip
+                        status={state === 'overdue' ? 'debt' : state === 'open' ? 'pending' : 'paid'}
+                        label={t(
+                          locale,
+                          state === 'overdue'
+                            ? 'people.student.payment.overdue'
+                            : state === 'open'
+                              ? 'people.student.payment.open'
+                              : 'people.student.payment.settled',
+                        )}
+                      />
+                    </span>
+                  )
+                },
               },
             ]}
             rowKey={(student) => student.id}

@@ -19,6 +19,10 @@ import type { Bundle } from '../types'
 export const people: Bundle = {
   // -- students (dashboard 3b, staff 9h) ----------------------------------------
   'card.open': 'כרטיס חניך',
+  'student.payment': 'תשלום',
+  'student.payment.overdue': 'חוב',
+  'student.payment.open': 'פתוח',
+  'student.payment.settled': 'שולם',
   'student.one': 'חניך',
   'student.plural': 'חניכים',
   'student.add': 'הוספת חניך',
@@ -259,7 +263,6 @@ export const people: Bundle = {
   'card.enrollments': 'קבוצות',
   'alerts.title': 'מרכז התראות',
   'alerts.empty': 'אין התראות שדורשות טיפול',
-  'alerts.sectionsComeLater': 'התראות תשלום והתאמות יתווספו בהמשך',
   'alerts.pendingRequests': 'בקשות הצטרפות ממתינות',
   'alerts.upcomingTrials': 'שיעורי ניסיון קרובים',
   'alerts.trialsAwaitingDecision': 'שיעורי ניסיון שממתינים להחלטה',
@@ -295,7 +298,6 @@ export const people: Bundle = {
   'document.missing': 'חסרה הצהרה',
   'document.trialSigned': 'הצהרת ניסיון',
   'document.signed': 'הצהרה מלאה',
-  'document.paymentComesLater': 'מצב תשלום יתווסף עם מודול הגבייה',
 
   // -- errors and empty states ---------------------------------------------------
   'error.scheduleUnavailable': 'לוח השיעורים של המועדון עדיין לא נבנה',

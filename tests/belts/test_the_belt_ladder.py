@@ -19,6 +19,8 @@ wrong.
 
 from __future__ import annotations
 
+from datetime import date
+
 from app.models.belts import BeltRank, StudentBelt
 from tests.belts.conftest import TODAY
 
@@ -212,3 +214,44 @@ def test_a_rank_is_renamed_and_recoloured_in_place(client, as_manager, a_class, 
     assert response.status_code == 200, response.text
     assert response.json()["name"] == "צהובה בהירה"
     assert response.json()["color_hex"] == "#FFE066"
+
+
+# -- F8: 4b's belt range, measured ---------------------------------------------
+def test_belt_ranges_by_group_span_the_enrolled_students(
+    client, as_manager, app_session, studio, a_class, a_belt_ladder, a_student
+):
+    from app.models.people import Enrollment, Student
+    from app.models.person import Person
+    from app.models.structure import Group
+
+    group = Group(studio_id=studio.id, class_id=a_class, name="טווח", is_active=True)
+    app_session.add(group)
+    app_session.flush()
+
+    # a_student holds the FIRST rank; a second student holds the last.
+    first_rank, last_rank = a_belt_ladder[0], a_belt_ladder[-1]
+    app_session.get(Student, a_student).current_belt_id = first_rank
+    person = Person(studio_id=studio.id, first_name="בכיר", last_name="חגורה")
+    app_session.add(person)
+    app_session.flush()
+    senior = Student(
+        studio_id=studio.id, person_id=person.id, status="active", current_belt_id=last_rank
+    )
+    app_session.add(senior)
+    app_session.flush()
+    for student_id in (a_student, senior.id):
+        app_session.add(
+            Enrollment(
+                studio_id=studio.id,
+                student_id=student_id,
+                group_id=group.id,
+                status="active",
+                started_on=date(2026, 9, 1),
+            )
+        )
+    app_session.commit()
+
+    body = client.get("/api/v1/belt-ranges/by-group", headers=as_manager.headers).json()
+    row = next(item for item in body["items"] if item["group_id"] == str(group.id))
+    assert row["min_name"] != row["max_name"]
+    assert row["min_color_hex"].startswith("#")
