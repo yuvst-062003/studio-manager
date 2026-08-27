@@ -75,6 +75,18 @@ class ConflictError(Exception):
     """A state transition the studio's own data forbids."""
 
 
+class SessionDeleteRefusedError(Exception):
+    """Deleting this session is wrong, and the refusal belongs on the server (F3).
+
+    `reason` is machine-readable: `generated` (the next expansion would recreate it;
+    cancel is the answer) or `has_attendance` (a register happened in it).
+    """
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(reason)
+        self.reason = reason
+
+
 def _paged[Row](
     stmt: Select[tuple[Row]], *, cursor: uuid.UUID | None, limit: int
 ) -> Select[tuple[Row]]:
@@ -918,6 +930,29 @@ class ScheduleService:
         row.updated_at = at
         self.session.flush()
         return row
+
+    def delete_session(self, session_id: uuid.UUID) -> None:
+        """F3's decision, enforced on the server rather than only in the UI that hides
+        the button.
+
+        A GENERATED session (`generated_from_rule_id` non-null) is never deleted: the
+        next rule expansion would recreate it, and cancel is the product's answer there.
+        An ad-hoc session with attendance marks is refused too -- deleting it would take
+        a child's recorded presence with it, and no session is worth more than the
+        register that happened in it.
+        """
+        from app.models.attendance import Attendance
+
+        row = self.get_session(session_id)
+        if row.generated_from_rule_id is not None:
+            raise SessionDeleteRefusedError("generated")
+        marked = self.session.execute(
+            select(Attendance.id).where(Attendance.session_id == session_id).limit(1)
+        ).first()
+        if marked is not None:
+            raise SessionDeleteRefusedError("has_attendance")
+        self.session.delete(row)
+        self.session.flush()
 
     # -- notes ----------------------------------------------------------------------
     def list_notes(

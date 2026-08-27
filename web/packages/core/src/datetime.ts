@@ -111,3 +111,39 @@ export function studioDayKey(iso: string | Date): string {
 
   return `${field('year')}-${field('month')}-${field('day')}`
 }
+
+/** The Jerusalem wall-clock rendering of a UTC instant, as `YYYY-MM-DDTHH:mm`. */
+function studioWallClock(instantMs: number): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: STUDIO_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(new Date(instantMs))
+  const field = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value ?? ''
+  return `${field('year')}-${field('month')}-${field('day')}T${field('hour')}:${field('minute')}`
+}
+
+/**
+ * A Jerusalem wall time → the UTC instant it names, as an ISO string.
+ *
+ * The inverse of `formatTimeInStudioZone`, needed the moment a manager TYPES a time
+ * (moving a session, creating an ad-hoc one): the form field holds a wall clock and the
+ * API takes UTC. Iterative because a zone offset depends on the instant it is applied
+ * to: guess the offset, render the guess back through the zone, correct by the
+ * difference. Two rounds settle every DST case; a wall time that does not exist (the
+ * spring-forward gap) lands on the instant the clock actually showed next.
+ */
+export function studioWallTimeToUtc(dayKey: string, time: string): string {
+  const target = Date.parse(`${dayKey}T${time}:00Z`)
+  let guess = target
+  for (let round = 0; round < 2; round += 1) {
+    const shown = Date.parse(`${studioWallClock(guess)}:00Z`)
+    guess += target - shown
+  }
+  return new Date(guess).toISOString()
+}

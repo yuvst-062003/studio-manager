@@ -7,6 +7,23 @@ import { t } from '@studio/i18n'
 import { ScheduleSection, scheduleRoute } from './ScheduleSection'
 import type { ScheduleClient } from './client'
 
+const SESSION_ROW = {
+  id: 's1',
+  group_id: 'g1',
+  group_name: 'מתחילים',
+  training_year_id: 'y1',
+  starts_at: '2026-11-03T15:00:00Z',
+  ends_at: '2026-11-03T16:00:00Z',
+  location_id: null,
+  location_name: null,
+  status: 'scheduled' as const,
+  is_manually_edited: false,
+  is_ad_hoc: false,
+  cancel_reason: null,
+  staff: [],
+  attendance_taken: false,
+}
+
 function stub(overrides: Partial<ScheduleClient> = {}): ScheduleClient {
   return {
     listGroups: vi.fn(async () => [{ id: 'g1', name: 'מתחילים', className: "ג'ודו" }]),
@@ -35,6 +52,11 @@ function stub(overrides: Partial<ScheduleClient> = {}): ScheduleClient {
     listClosures: vi.fn(async () => []),
     createClosure: vi.fn(async () => ({ sessions_cancelled: 0 })),
     listHolidayPresets: vi.fn(async () => []),
+    patchSession: vi.fn(async () => SESSION_ROW),
+    cancelSession: vi.fn(async () => SESSION_ROW),
+    addSessionNote: vi.fn(async () => undefined),
+    deleteSession: vi.fn(async () => undefined),
+    listLocations: vi.fn(async () => []),
     ...overrides,
   }
 }

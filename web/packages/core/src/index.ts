@@ -41,6 +41,7 @@ export {
   formatDateInStudioZone,
   formatTimeInStudioZone,
   studioDayKey,
+  studioWallTimeToUtc,
 } from './datetime'
 export type { Locale } from './datetime'
 export { appendPage, hasNextPage, mergeCursorPages } from './pagination'

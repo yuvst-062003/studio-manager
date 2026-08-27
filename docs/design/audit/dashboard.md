@@ -267,3 +267,36 @@ is the single cheapest item in this spec.
    re-computed by `tokens.audit.test.ts` on every run.
 5. **i18n.** Every string goes in `web/packages/i18n/he/<namespace>.ts` and is mirrored in
    `en/` and `ru/`. Never inline a string; never edit `i18n/index.ts` from a lane.
+
+
+## Log
+
+### 2026-08-27 · F3 — the calendar answers a click
+
+**What was wrong.** `WeekBoard`'s session blocks were inert — the only handlers on the
+screen were the three week-navigation buttons — and `QuickViewRoster`, D5's "never leave
+the calendar to take a register", was built, tested, exported and imported by nothing.
+
+**What was built.** A session block is now a real `<button>` opening a focus-trapped
+popover (`useModalDialog`, like the dialogs W6 fixed) containing `1e`'s roster with inline
+marking and bulk-present, and §5.6's per-session actions: move (starts_at/ends_at as one
+pair — the schema 422s otherwise), cancel behind a confirm with the required reason, a
+session note, and room/coach change. A new `studioWallTimeToUtc` in @studio/core inverts
+the render-only zone helpers, because a manager TYPES a Jerusalem wall time and the API
+takes UTC — no such inverse existed, which is also why F4's ad-hoc form was never built.
+
+**Delete, decided as the spec decides it.** `DELETE /sessions/{id}` exists now and refuses
+two ways, on the server rather than only in the UI that hides the button: 409 `generated`
+for a rule-materialized session (the next expansion would recreate it; cancel is the
+answer), and 409 `has_attendance` for an ad-hoc session with marks — no session is worth
+more than the register that happened in it. The popover offers delete on `is_ad_hoc` only.
+
+### 2026-08-27 · Cross-surface — the S1 slot-wiring guard's dashboard findings
+
+The dashboard's `registerCommsAlerts` and `registerBillingDevTools` were exported and
+called by nothing, so the at-risk card had **never rendered** on this surface — F8's table
+says comms/register.ts registers it, which was true of the file and false of the running
+app. Both are wired from App.tsx now; the dead `registerBillingAlerts` (superseded by
+`BillingAlertSection`, whose props mismatch it could never survive) is deleted. The guard
+in `web/tools/__tests__/slot-wiring.test.ts` holds the class closed, and
+`unreachable-screens.test.ts` fails on any barrel-exported component nothing references.

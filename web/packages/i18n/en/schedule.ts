@@ -24,6 +24,12 @@ export const schedule: Bundle = {
   'datePicker.apply': 'Apply',
   'datePicker.clear': 'Clear',
 
+  // -- F3's session popover actions ------------------------------------------------
+  'session.actions': 'Session actions',
+  'session.delete': 'Delete session',
+  'session.deleteConfirm': 'Delete this one-off session? This cannot be undone.',
+  'session.changeRoom': 'Change hall',
+  'session.changeCoach': 'Change coach',
   'session.title': 'Class',
   'session.at': 'at',
   'session.location': 'Location',

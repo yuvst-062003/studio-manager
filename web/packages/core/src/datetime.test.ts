@@ -4,6 +4,7 @@ import {
   formatDateInStudioZone,
   formatTimeInStudioZone,
   studioDayKey,
+  studioWallTimeToUtc,
 } from './datetime'
 
 /**
@@ -104,5 +105,20 @@ describe('formatDateInStudioZone', () => {
 describe('STUDIO_TIMEZONE', () => {
   it('is Asia/Jerusalem and is exported so no call site writes the literal', () => {
     expect(STUDIO_TIMEZONE).toBe('Asia/Jerusalem')
+  })
+})
+
+describe('studioWallTimeToUtc', () => {
+  it('is the inverse of the studio day key + wall clock in winter (UTC+2)', () => {
+    expect(studioWallTimeToUtc('2026-12-15', '17:00')).toBe('2026-12-15T15:00:00.000Z')
+  })
+
+  it('handles summer time (UTC+3)', () => {
+    expect(studioWallTimeToUtc('2026-07-15', '17:00')).toBe('2026-07-15T14:00:00.000Z')
+  })
+
+  it('round-trips through studioDayKey and the wall clock', () => {
+    const iso = studioWallTimeToUtc('2026-03-14', '22:30')
+    expect(studioDayKey(iso)).toBe('2026-03-14')
   })
 })

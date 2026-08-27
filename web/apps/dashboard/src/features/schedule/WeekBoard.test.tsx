@@ -48,6 +48,15 @@ function stub(sessions: SessionRow[] = [TUESDAY_EVENING]): ScheduleClient {
     listClosures: vi.fn(async () => []),
     createClosure: vi.fn(),
     listHolidayPresets: vi.fn(async () => []),
+    patchSession: vi.fn(async () => {
+      throw new Error('not in this test')
+    }),
+    cancelSession: vi.fn(async () => {
+      throw new Error('not in this test')
+    }),
+    addSessionNote: vi.fn(async () => undefined),
+    deleteSession: vi.fn(async () => undefined),
+    listLocations: vi.fn(async () => []),
   } as unknown as ScheduleClient
 }
 
@@ -216,5 +225,96 @@ describe('WeekBoard (3a)', () => {
         /margin-(left|right)|padding-(left|right)|(^|;)\s*(left|right):/,
       )
     }
+  })
+})
+
+describe('F3 — the popover a session block opens', () => {
+  const rosterResponse = {
+    session: { id: 's1' },
+    roster: [
+      {
+        student_id: 'stu-1',
+        display_name: 'דנה לוי',
+        belt_color_hex: null,
+        belt_name: null,
+        health_status: 'signed',
+        derived_flags: {},
+        status: 'unmarked',
+        source: null,
+        has_absence_report: false,
+        absence_reason: null,
+      },
+    ],
+  }
+
+  function stubFetch() {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input)
+        if (url.includes('/attendance')) {
+          return new Response(JSON.stringify(rosterResponse), { status: 200 })
+        }
+        return new Response(JSON.stringify({ items: [] }), { status: 200 })
+      }),
+    )
+  }
+
+  it('clicking a block opens the popover with QuickViewRoster inside', async () => {
+    stubFetch()
+    render(<WeekBoard locale="he" client={stub()} today="2026-11-03T12:00:00Z" />)
+    await userEvent.click(await screen.findByTestId('session-block'))
+    expect(await screen.findByTestId('session-popover')).toBeInTheDocument()
+    expect(await screen.findByTestId('quickview-roster')).toBeInTheDocument()
+    expect(screen.getByTestId('quickview-row-stu-1')).toBeInTheDocument()
+    vi.unstubAllGlobals()
+  })
+
+  it('move sends starts_at and ends_at together, as one Jerusalem wall time', async () => {
+    stubFetch()
+    const client = stub()
+    ;(client.patchSession as ReturnType<typeof vi.fn>).mockResolvedValue(TUESDAY_EVENING)
+    render(<WeekBoard locale="he" client={client} today="2026-11-03T12:00:00Z" />)
+    await userEvent.click(await screen.findByTestId('session-block'))
+    await userEvent.click(await screen.findByTestId('popover-move'))
+    expect(client.patchSession).toHaveBeenCalledWith('s1', {
+      // 17:00 Jerusalem winter = 15:00Z — the prefilled values, round-tripped.
+      starts_at: '2026-11-03T15:00:00.000Z',
+      ends_at: '2026-11-03T17:00:00.000Z',
+    })
+    vi.unstubAllGlobals()
+  })
+
+  it('cancel is disabled until a reason exists — the constraint made visible', async () => {
+    stubFetch()
+    render(<WeekBoard locale="he" client={stub()} today="2026-11-03T12:00:00Z" />)
+    await userEvent.click(await screen.findByTestId('session-block'))
+    expect(await screen.findByTestId('popover-cancel')).toBeDisabled()
+    await userEvent.type(screen.getByLabelText(t('he', 'schedule.session.cancelReason')), 'אין חשמל')
+    expect(screen.getByTestId('popover-cancel')).toBeEnabled()
+    vi.unstubAllGlobals()
+  })
+
+  it('offers delete on an ad-hoc session only', async () => {
+    stubFetch()
+    render(
+      <WeekBoard
+        locale="he"
+        client={stub([{ ...TUESDAY_EVENING, is_ad_hoc: true }])}
+        today="2026-11-03T12:00:00Z"
+      />,
+    )
+    await userEvent.click(await screen.findByTestId('session-block'))
+    expect(await screen.findByTestId('popover-delete')).toBeInTheDocument()
+    vi.unstubAllGlobals()
+  })
+
+  it('never offers delete on a generated session — cancel is the answer there', async () => {
+    stubFetch()
+    render(<WeekBoard locale="he" client={stub()} today="2026-11-03T12:00:00Z" />)
+    await userEvent.click(await screen.findByTestId('session-block'))
+    await screen.findByTestId('session-popover')
+    expect(screen.queryByTestId('popover-delete')).toBeNull()
+    vi.unstubAllGlobals()
   })
 })

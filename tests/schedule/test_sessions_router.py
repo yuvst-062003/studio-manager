@@ -308,3 +308,86 @@ def test_a_session_in_another_studio_is_invisible(client, as_manager):
     assert (
         client.get(f"{API}/sessions/{uuid.uuid4()}", headers=as_manager.headers).status_code == 404
     )
+
+
+# -- delete (F3) --------------------------------------------------------------
+def test_deleting_a_generated_session_answers_409_with_cancel_as_the_answer(
+    client, as_manager, a_session
+):
+    """The refusal lives on the server, not only in the UI that hides the button: the
+    next expansion would recreate the row, and attendance may already point at it."""
+    response = client.delete(f"{API}/sessions/{a_session.id}", headers=as_manager.headers)
+    assert response.status_code == 409
+    assert response.json()["detail"]["code"] == "generated"
+
+
+def test_deleting_an_ad_hoc_session_succeeds(client, as_manager, a_group, an_active_year):
+    created = client.post(
+        f"{API}/sessions",
+        headers=as_manager.headers,
+        json={
+            "group_id": str(a_group),
+            "training_year_id": str(an_active_year),
+            "starts_at": "2026-12-11T08:00:00Z",
+            "ends_at": "2026-12-11T10:00:00Z",
+        },
+    ).json()
+    response = client.delete(f"{API}/sessions/{created['id']}", headers=as_manager.headers)
+    assert response.status_code == 204
+    assert (
+        client.get(f"{API}/sessions/{created['id']}", headers=as_manager.headers).status_code == 404
+    )
+
+
+def test_deleting_an_ad_hoc_session_with_marks_is_refused(
+    client, as_manager, a_group, an_active_year, app_session
+):
+    """A register happened in it. No session is worth more than a child's recorded
+    presence, so the delete answers 409 rather than taking the marks with it."""
+    from app.models.attendance import Attendance
+
+    created = client.post(
+        f"{API}/sessions",
+        headers=as_manager.headers,
+        json={
+            "group_id": str(a_group),
+            "training_year_id": str(an_active_year),
+            "starts_at": "2026-12-12T08:00:00Z",
+            "ends_at": "2026-12-12T10:00:00Z",
+        },
+    ).json()
+    studio_id = as_manager.studio_id
+    person = Person(studio_id=studio_id, first_name="ילד", last_name="נמחק")
+    app_session.add(person)
+    app_session.flush()
+    student = Student(
+        studio_id=studio_id, person_id=person.id, status="active", joined_on=date(2026, 9, 1)
+    )
+    app_session.add(student)
+    app_session.flush()
+    app_session.add(
+        Enrollment(
+            studio_id=studio_id,
+            student_id=student.id,
+            group_id=a_group,
+            status="active",
+            started_on=date(2026, 9, 1),
+        )
+    )
+    app_session.add(
+        Attendance(
+            studio_id=studio_id,
+            session_id=uuid.UUID(created["id"]),
+            student_id=student.id,
+            status="present",
+            source="coach",
+            marked_at=T0,
+            device_marked_at=T0,
+            client_mark_id=uuid.uuid4(),
+        )
+    )
+    app_session.commit()
+
+    response = client.delete(f"{API}/sessions/{created['id']}", headers=as_manager.headers)
+    assert response.status_code == 409
+    assert response.json()["detail"]["code"] == "has_attendance"

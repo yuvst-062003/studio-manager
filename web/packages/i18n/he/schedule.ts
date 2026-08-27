@@ -39,6 +39,12 @@ export const schedule: Bundle = {
   'datePicker.clear': 'נקה',
 
   // -- a session block ----------------------------------------------------------
+  // -- F3's session popover actions ------------------------------------------------
+  'session.actions': 'פעולות על השיעור',
+  'session.delete': 'מחיקת שיעור',
+  'session.deleteConfirm': 'למחוק את השיעור החד־פעמי? הפעולה אינה הפיכה.',
+  'session.changeRoom': 'שינוי אולם',
+  'session.changeCoach': 'שינוי מאמן',
   'session.title': 'שיעור',
   'session.at': 'בשעה',
   'session.location': 'מיקום',

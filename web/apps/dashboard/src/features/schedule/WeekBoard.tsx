@@ -17,9 +17,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { EmptyState } from '@studio/ui'
-import { formatTimeInStudioZone, studioDayKey } from '@studio/core'
+import { apiFetch, formatTimeInStudioZone, studioDayKey } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
+import { makeDashboardAttendanceClient } from '../attendance'
+import { SessionPopover } from './SessionPopover'
 import { cancelReasonLabel } from './client'
 import type { ScheduleClient, SessionRow } from './client'
 
@@ -109,13 +111,30 @@ const dayHeadingStyle: CSSProperties = {
   fontWeight: 'var(--weight-medium)' as CSSProperties['fontWeight'],
 }
 
-function SessionBlock({ locale, session }: { locale: Locale; session: SessionRow }) {
+function SessionBlock({
+  locale,
+  session,
+  onOpen,
+}: {
+  locale: Locale
+  session: SessionRow
+  onOpen: () => void
+}) {
   const lead = session.staff[0]
   return (
-    <article
+    <button
       data-testid="session-block"
       data-status={session.status}
-      style={session.status === 'cancelled' ? cancelledBlockStyle : blockStyle}
+      // F3 — D5: "clicking a session opens a popover with the roster and inline
+      // attendance marking". A button, not an article with onClick: this is now an
+      // interactive control and must be reachable by keyboard.
+      onClick={onOpen}
+      style={{
+        ...(session.status === 'cancelled' ? cancelledBlockStyle : blockStyle),
+        textAlign: 'start',
+        cursor: 'pointer',
+      }}
+      type="button"
     >
       <strong>{session.group_name}</strong>
       <span>
@@ -130,7 +149,7 @@ function SessionBlock({ locale, session }: { locale: Locale; session: SessionRow
       {session.cancel_reason ? (
         <span>{cancelReasonLabel(locale, session.cancel_reason)}</span>
       ) : null}
-    </article>
+    </button>
   )
 }
 
@@ -147,6 +166,9 @@ export function WeekBoard({
   const todayKey = useMemo(() => studioDayKey(today), [today])
   const [start, setStart] = useState(() => weekStart(today))
   const [sessions, setSessions] = useState<SessionRow[]>([])
+  const [openSessionId, setOpenSessionId] = useState<string | null>(null)
+  const [version, setVersion] = useState(0)
+  const attendanceClient = useMemo(() => makeDashboardAttendanceClient(apiFetch), [])
   const days = useMemo(() => weekDays(start), [start])
 
   useEffect(() => {
@@ -158,7 +180,9 @@ export function WeekBoard({
     return () => {
       live = false
     }
-  }, [client, days])
+  }, [client, days, version])
+
+  const openSession = sessions.find((row) => row.id === openSessionId) ?? null
 
   const byDay = useMemo(() => {
     const grouped = new Map<string, SessionRow[]>()
@@ -218,12 +242,29 @@ export function WeekBoard({
             >
               <h3 style={dayHeadingStyle}>{t(locale, `schedule.weekday.${index}`)}</h3>
               {(byDay.get(day) ?? []).map((session) => (
-                <SessionBlock key={session.id} locale={locale} session={session} />
+                <SessionBlock
+                  key={session.id}
+                  locale={locale}
+                  onOpen={() => setOpenSessionId(session.id)}
+                  session={session}
+                />
               ))}
             </div>
           )
         })}
       </div>
+
+      {openSession ? (
+        <SessionPopover
+          attendanceClient={attendanceClient}
+          client={client}
+          fetcher={apiFetch}
+          locale={locale}
+          onChanged={() => setVersion((n) => n + 1)}
+          onClose={() => setOpenSessionId(null)}
+          session={openSession}
+        />
+      ) : null}
     </section>
   )
 }

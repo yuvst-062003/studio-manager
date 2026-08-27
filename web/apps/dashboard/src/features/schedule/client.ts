@@ -113,6 +113,21 @@ export interface ScheduleClient {
     groupId: string,
     body: { rules: ScheduleRule[]; effective_from: string; apply: boolean },
   ): Promise<ImpactPreview>
+  /** F3 — the session actions D5 promised the calendar. Times move as a pair. */
+  patchSession(
+    sessionId: string,
+    body: {
+      starts_at?: string
+      ends_at?: string
+      location_id?: string | null
+      staff?: { person_id: string; role: 'lead_coach' | 'assistant_coach'; is_substitute: boolean }[]
+    },
+  ): Promise<SessionRow>
+  cancelSession(sessionId: string, reason: string): Promise<SessionRow>
+  addSessionNote(sessionId: string, body: string): Promise<void>
+  /** 409s on a generated session — the server owns that refusal, not the UI. */
+  deleteSession(sessionId: string): Promise<void>
+  listLocations(): Promise<{ id: string; name: string }[]>
   listTrainingYears(): Promise<TrainingYear[]>
   listClosures(trainingYearId: string): Promise<Closure[]>
   createClosure(body: Omit<Closure, 'id'>): Promise<{ sessions_cancelled: number }>
@@ -180,6 +195,41 @@ export function makeScheduleClient(fetcher: Fetcher): ScheduleClient {
           body: JSON.stringify(body),
         }),
       )
+    },
+    async patchSession(sessionId, body) {
+      return json<SessionRow>(
+        await fetcher(`${API}/sessions/${sessionId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        }),
+      )
+    },
+    async cancelSession(sessionId, reason) {
+      return json<SessionRow>(
+        await fetcher(`${API}/sessions/${sessionId}/cancel`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reason }),
+        }),
+      )
+    },
+    async addSessionNote(sessionId, body) {
+      const response = await fetcher(`${API}/sessions/${sessionId}/notes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ body }),
+      })
+      if (!response.ok) throw new Error(String(response.status))
+    },
+    async deleteSession(sessionId) {
+      const response = await fetcher(`${API}/sessions/${sessionId}`, { method: 'DELETE' })
+      if (!response.ok) throw new Error(String(response.status))
+    },
+    async listLocations() {
+      return (
+        await json<{ items: { id: string; name: string }[] }>(await fetcher(`${API}/locations`))
+      ).items
     },
     async listTrainingYears() {
       const body = await json<{ items: TrainingYear[] }>(await fetcher(`${API}/training-years`))

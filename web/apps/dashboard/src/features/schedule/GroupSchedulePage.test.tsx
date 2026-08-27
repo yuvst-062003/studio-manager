@@ -105,6 +105,15 @@ function stubClient(overrides: Partial<ScheduleClient> = {}): ScheduleClient {
     listClosures: vi.fn(async () => []),
     createClosure: vi.fn(async () => ({ sessions_cancelled: 0 })),
     listHolidayPresets: vi.fn(async () => []),
+    patchSession: vi.fn(async () => {
+      throw new Error('not in this test')
+    }),
+    cancelSession: vi.fn(async () => {
+      throw new Error('not in this test')
+    }),
+    addSessionNote: vi.fn(async () => undefined),
+    deleteSession: vi.fn(async () => undefined),
+    listLocations: vi.fn(async () => []),
     ...overrides,
   }
 }

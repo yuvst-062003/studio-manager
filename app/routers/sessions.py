@@ -38,7 +38,11 @@ from app.schemas.schedule import (
     SessionPage,
     SessionPatch,
 )
-from app.services.schedule.service import NotFoundError, ScheduleService
+from app.services.schedule.service import (
+    NotFoundError,
+    ScheduleService,
+    SessionDeleteRefusedError,
+)
 
 router = APIRouter(tags=["coach", "schedule"])
 
@@ -189,6 +193,31 @@ def cancel_session(
         raise _not_found() from exc
     session.commit()
     return service.project_sessions([row])[0]
+
+
+@router.delete("/sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_session(
+    _: ManagerOrLeadCoach,
+    session_id: uuid.UUID,
+    session: TenantSessionDep,
+) -> None:
+    """F3 -- delete exists for AD-HOC sessions only.
+
+    A generated session answers 409: the next rule expansion would recreate it, and
+    attendance rows may already point at it -- cancel is the product's answer there. The
+    refusal lives here, not only in the UI that hides the button.
+    """
+    service = ScheduleService(session)
+    try:
+        service.delete_session(session_id)
+    except NotFoundError as exc:
+        raise _not_found() from exc
+    except SessionDeleteRefusedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"code": exc.reason, "message": "cancel this session instead of deleting it"},
+        ) from exc
+    session.commit()
 
 
 @router.get("/sessions/{session_id}/notes", response_model=SessionNotePage)
