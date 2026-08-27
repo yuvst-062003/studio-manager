@@ -79,6 +79,13 @@ function jsonResponse(status: number, body: unknown) {
   })
 }
 
+/** The chip's real radio, addressed through the per-child wrapper and the option id —
+ *  the picker is L2's SlotChips now, and its inputs carry no per-slot testid. */
+function slotRadio(child: number, session: string): HTMLInputElement | null {
+  const wrapper = screen.queryByTestId(`booking-slot-child-${child}`)
+  return wrapper?.querySelector(`[data-option-id="${session}"] input`) ?? null
+}
+
 async function fillOneChild(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText(t('he', 'people.student.firstName')), 'נועה')
   await user.type(screen.getByLabelText(t('he', 'people.student.lastName')), 'לוי')
@@ -177,8 +184,9 @@ describe('BookingFlow — §5.4a steps 1-4', () => {
     await user.click(screen.getByLabelText(t('he', 'people.trialHealth.confirm')))
     await user.click(screen.getByTestId('booking-to-slot'))
 
-    expect(await screen.findByTestId('booking-slot-0-s1')).toBeEnabled()
-    expect(screen.getByTestId('booking-slot-0-s2')).toBeDisabled()
+    await screen.findByTestId('booking-slot-child-0')
+    expect(slotRadio(0, 's1')).toBeEnabled()
+    expect(slotRadio(0, 's2')).toBeDisabled()
   })
 
   it('submits every child and one declaration each, in order', async () => {
@@ -189,7 +197,8 @@ describe('BookingFlow — §5.4a steps 1-4', () => {
     await user.click(screen.getByTestId('booking-to-health'))
     await user.click(screen.getByLabelText(t('he', 'people.trialHealth.confirm')))
     await user.click(screen.getByTestId('booking-to-slot'))
-    await user.click(await screen.findByTestId('booking-slot-0-s1'))
+    await screen.findByTestId('booking-slot-child-0')
+    await user.click(slotRadio(0, 's1')!)
     await user.click(screen.getByTestId('booking-submit'))
 
     await waitFor(() => expect(client.book).toHaveBeenCalled())
@@ -227,10 +236,11 @@ describe('BookingFlow — §5.4a steps 1-4', () => {
     await user.click(screen.getByTestId('booking-to-slot'))
 
     // Each child is offered their own group's sessions and nobody else's.
-    await user.click(await screen.findByTestId('booking-slot-0-s1'))
-    await user.click(await screen.findByTestId('booking-slot-1-s9'))
-    expect(screen.queryByTestId('booking-slot-1-s1')).toBeNull()
-    expect(screen.queryByTestId('booking-slot-0-s9')).toBeNull()
+    await screen.findByTestId('booking-slot-child-0')
+    await user.click(slotRadio(0, 's1')!)
+    await user.click(slotRadio(1, 's9')!)
+    expect(slotRadio(1, 's1')).toBeNull()
+    expect(slotRadio(0, 's9')).toBeNull()
 
     await user.click(screen.getByTestId('booking-submit'))
     await waitFor(() => expect(client.book).toHaveBeenCalled())
@@ -259,9 +269,10 @@ describe('BookingFlow — §5.4a steps 1-4', () => {
     }
     await user.click(screen.getByTestId('booking-to-slot'))
 
-    await user.click(await screen.findByTestId('booking-slot-0-s1'))
+    await screen.findByTestId('booking-slot-child-0')
+    await user.click(slotRadio(0, 's1')!)
     expect(screen.getByTestId('booking-submit')).toBeDisabled()
-    await user.click(await screen.findByTestId('booking-slot-1-s9'))
+    await user.click(slotRadio(1, 's9')!)
     expect(screen.getByTestId('booking-submit')).toBeEnabled()
   })
 
@@ -277,13 +288,14 @@ describe('BookingFlow — §5.4a steps 1-4', () => {
     await user.click(screen.getByTestId('booking-to-health'))
     await user.click(screen.getByLabelText(t('he', 'people.trialHealth.confirm')))
     await user.click(screen.getByTestId('booking-to-slot'))
-    await user.click(await screen.findByTestId('booking-slot-0-s1'))
+    await screen.findByTestId('booking-slot-child-0')
+    await user.click(slotRadio(0, 's1')!)
     await user.click(screen.getByTestId('booking-submit'))
 
     expect(await screen.findByTestId('booking-error')).toHaveTextContent(t('he', key))
     // The chosen slot is still chosen — an error that resets the form makes somebody who
     // already hesitated start again.
-    expect(screen.getByTestId('booking-slot-0-s1')).toBeChecked()
+    expect(slotRadio(0, 's1')).toBeChecked()
   })
 
   it('renders the confirmation on success', async () => {
@@ -302,7 +314,8 @@ describe('BookingFlow — §5.4a steps 1-4', () => {
     await user.click(screen.getByTestId('booking-to-health'))
     await user.click(screen.getByLabelText(t('he', 'people.trialHealth.confirm')))
     await user.click(screen.getByTestId('booking-to-slot'))
-    await user.click(await screen.findByTestId('booking-slot-0-s1'))
+    await screen.findByTestId('booking-slot-child-0')
+    await user.click(slotRadio(0, 's1')!)
     await user.click(screen.getByTestId('booking-submit'))
 
     expect(await screen.findByTestId('booking-confirmed')).toBeInTheDocument()
@@ -360,5 +373,37 @@ describe('groupFitsAge', () => {
     expect(
       groupFitsAge({ ...beginners, age_min: null, age_max: null }, '2000-01-01', today),
     ).toBe(true)
+  })
+})
+
+
+describe('decision 3 (2026-08-27) — one-step chips alone, per-child frames with a sibling', () => {
+  it('renders bare chips for a single child, with no fieldset naming anybody', async () => {
+    const user = userEvent.setup()
+    render(<BookingFlow slug="judo" locale="he" client={makeClient()} groups={GROUPS} signedIn />)
+    await fillOneChild(user)
+    await user.click(screen.getByTestId('booking-to-health'))
+    await user.click(screen.getByLabelText(t('he', 'people.trialHealth.confirm')))
+    await user.click(screen.getByTestId('booking-to-slot'))
+    const wrapper = await screen.findByTestId('booking-slot-child-0')
+    expect(wrapper.closest('fieldset')).toBeNull()
+    expect(screen.getByTestId('slot-chips')).toBeInTheDocument()
+  })
+
+  it('frames each child once a sibling is added, because a name starts meaning something', async () => {
+    const user = userEvent.setup()
+    render(<BookingFlow slug="judo" locale="he" client={makeClient()} groups={GROUPS} signedIn />)
+    await fillOneChild(user)
+    await user.click(screen.getByTestId('booking-add-child'))
+    await user.type(screen.getAllByLabelText(t('he', 'people.student.firstName'))[1]!, 'יוסי')
+    await user.type(screen.getAllByLabelText(t('he', 'people.student.lastName'))[1]!, 'לוי')
+    await user.selectOptions(screen.getByTestId('booking-group-1'), 'g2')
+    await user.click(screen.getByTestId('booking-to-health'))
+    for (const box of screen.getAllByLabelText(t('he', 'people.trialHealth.confirm'))) {
+      await user.click(box)
+    }
+    await user.click(screen.getByTestId('booking-to-slot'))
+    const wrapper = await screen.findByTestId('booking-slot-child-0')
+    expect(wrapper.closest('fieldset')).not.toBeNull()
   })
 })

@@ -45,12 +45,17 @@ from contextlib import contextmanager
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from app.core.clock import now
 from app.core.db import SessionDep, get_engine
 from app.core.storage import ObjectNotFoundError, ObjectStore, build_object_store
 from app.core.tenancy import TenantSession, use_studio
+from app.models.belts import BeltRank
+from app.models.structure import Class
 from app.schemas.people import (
+    PublicBeltOut,
     PublicGroupListResponse,
     PublicGroupOut,
     PublicLandingOut,
@@ -126,6 +131,34 @@ def _group_out(group: PublicGroup) -> PublicGroupOut:
     )
 
 
+def _belt_ladder(session: Session, studio_id: Any) -> list[PublicBeltOut]:
+    """L4 region 1 — one ladder, deterministically: the first ACTIVE class by name.
+
+    A club with two classes has two grading systems; the hero draws one strip and its
+    caption says `מסלול החגורות במועדון`. The first class by name is stable and, for the
+    single-class club that is the common case, simply the ladder.
+    """
+    class_id = session.execute(
+        select(Class.id)
+        .where(Class.studio_id == studio_id, Class.is_active.is_(True))
+        .order_by(Class.name)
+        .limit(1)
+    ).scalar_one_or_none()
+    if class_id is None:
+        return []
+    rows = session.execute(
+        select(BeltRank).where(BeltRank.class_id == class_id).order_by(BeltRank.order_index)
+    ).scalars()
+    return [
+        PublicBeltOut(
+            name=rank.name,
+            color_hex=rank.color_hex,
+            secondary_color_hex=rank.secondary_color_hex,
+        )
+        for rank in rows
+    ]
+
+
 def _landing(slug: str, session: SessionDep) -> PublicLandingOut:
     """§5.4a ① -- 'Logo, photos, what the club does, where and when, and one offer.'
 
@@ -172,6 +205,10 @@ def _landing(slug: str, session: SessionDep) -> PublicLandingOut:
         # feature that exists only in a schema.
         photo_urls=[],
         groups=[_group_out(group) for group in groups],
+        belt_ladder=_belt_ladder(session, studio.id),
+        trial_steps=[
+            step for step in landing_blob.get("trial_steps") or [] if isinstance(step, str)
+        ],
     )
 
 

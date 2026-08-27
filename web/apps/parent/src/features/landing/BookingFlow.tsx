@@ -17,7 +17,7 @@
 // attend; the manager decides membership later (§5.4).
 import { useEffect, useState } from 'react'
 import type { CSSProperties, FormEvent } from 'react'
-import { Alert, Button, Checkbox, TextField } from '@studio/ui'
+import { Alert, Button, Checkbox, SlotChips, TextField } from '@studio/ui'
 import { formatDateInStudioZone, formatTimeInStudioZone } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
@@ -317,47 +317,40 @@ export function BookingFlow({
       <h3 id="booking-slot">{t(locale, 'people.landing.chooseSlot')}</h3>
       {children.map((child, index) => {
         const forChild = slotsByGroup[child.group_id] ?? []
+        // L2's SlotChips: a wrapping single-select chip group, one per child so the
+        // second child's pick cannot clear the first's. §5.4 — a cancelled slot is
+        // greyed, never hidden, and the chip label says why.
+        const chips =
+          forChild.length === 0 ? (
+            <p data-testid={`booking-no-slots-${index}`}>{t(locale, 'people.landing.noSlots')}</p>
+          ) : (
+            <span data-testid={`booking-slot-child-${index}`}>
+              <SlotChips
+                legend={`${t(locale, 'people.landing.chooseSlot')} — ${child.first_name} ${child.last_name}`}
+                options={forChild.map((slot) => ({
+                  id: slot.session_id,
+                  label: `${formatDateInStudioZone(slot.starts_at, locale)} ${formatTimeInStudioZone(slot.starts_at, locale)}${slot.is_bookable ? '' : ` — ${t(locale, 'people.landing.slotUnavailable')}`}`,
+                  disabled: !slot.is_bookable,
+                }))}
+                value={sessionIds[index] || null}
+                onValueChange={(id) =>
+                  setSessionIds((current) =>
+                    current.map((existing, i) => (i === index ? id : existing)),
+                  )
+                }
+              />
+            </span>
+          )
+        // Decision 3 (2026-08-27): ONE-STEP chips when there is exactly one child — no
+        // fieldset naming anybody, the chips are simply the picker. The per-child frame
+        // appears with the sibling, which is when a name starts meaning something.
+        if (children.length === 1) return <span key={index}>{chips}</span>
         return (
-          <fieldset key={index} data-testid={`booking-slot-child-${index}`}>
-            {/* Named, because with two lists on screen an unlabelled one belongs to
-                nobody — and picking the wrong child's slot is the bug this screen was
-                just rebuilt to make impossible. */}
+          <fieldset key={index}>
             <legend>
               <bdi>{`${child.first_name} ${child.last_name}`}</bdi>
             </legend>
-            {forChild.length === 0 ? (
-              <p data-testid={`booking-no-slots-${index}`}>{t(locale, 'people.landing.noSlots')}</p>
-            ) : (
-              <ul style={listStyle}>
-                {forChild.map((slot) => (
-                  <li key={slot.session_id}>
-                    <label>
-                      <input
-                        type="radio"
-                        // One radio GROUP per child, or the second child's pick would
-                        // clear the first's.
-                        name={`slot-${index}`}
-                        value={slot.session_id}
-                        checked={sessionIds[index] === slot.session_id}
-                        // §5.4 — 'the picker greys out a slot rather than hiding it, so a
-                        // parent can see the class exists and pick a different week
-                        // instead of concluding there is nothing.'
-                        disabled={!slot.is_bookable}
-                        onChange={() =>
-                          setSessionIds((current) =>
-                            current.map((id, i) => (i === index ? slot.session_id : id)),
-                          )
-                        }
-                        data-testid={`booking-slot-${index}-${slot.session_id}`}
-                      />
-                      {formatDateInStudioZone(slot.starts_at, locale)}{' '}
-                      {formatTimeInStudioZone(slot.starts_at, locale)}
-                      {slot.is_bookable ? '' : ` — ${t(locale, 'people.landing.slotUnavailable')}`}
-                    </label>
-                  </li>
-                ))}
-              </ul>
-            )}
+            {chips}
           </fieldset>
         )
       })}

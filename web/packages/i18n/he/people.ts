@@ -234,6 +234,11 @@ export const people: Bundle = {
 
   // -- the landing page's remaining copy (parent 13a, 13c) -----------------------
   'landing.aboutTitle': 'על המועדון',
+  'landing.stepsTitle': 'איך נראה שיעור ניסיון',
+  'landing.beltCaption': 'מסלול החגורות במועדון',
+  'landing.navigate': 'ניווט',
+  'landing.whatsapp': 'וואטסאפ',
+  'landing.footerOffer': 'שיעור הניסיון הראשון חינם',
   'landing.whereTitle': 'איפה מתאמנים',
   'landing.groupsTitle': 'הקבוצות שלנו',
   'landing.noGroups': 'המועדון עדיין לא פרסם קבוצות',

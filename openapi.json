@@ -7641,6 +7641,36 @@
         "title": "ProvisionStudioRequest",
         "type": "object"
       },
+      "PublicBeltOut": {
+        "description": "One rung of the hero's belt ladder — L2/L4 (2026-08-27). Name and colours only:\nthe ladder is the club's grading system, which is on every flyer, and nothing here\nreaches a person or a count.",
+        "properties": {
+          "color_hex": {
+            "title": "Color Hex",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "secondary_color_hex": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Secondary Color Hex"
+          }
+        },
+        "required": [
+          "name",
+          "color_hex"
+        ],
+        "title": "PublicBeltOut",
+        "type": "object"
+      },
       "PublicGroupListResponse": {
         "description": "Not a `CursorPage`: a club has a dozen groups, not a growing list somebody pages\nthrough, and the landing page renders all of them at once.",
         "properties": {
@@ -7731,7 +7761,7 @@
         "type": "object"
       },
       "PublicLandingOut": {
-        "description": "§5.4a ① — 'a public LANDING PAGE at /t/{studio-slug} — the club's shop window, not\na form.'",
+        "description": "§5.4a ① — 'a public LANDING PAGE at /t/{studio-slug} — the club's shop window, not\na form.'\n\nWidened for landing L4 (2026-08-27) by exactly two lists, both marketing material:\n`belt_ladder` (the grading system — L2 rules its colours must come from\n`belt_rank.color_hex`, never the canvas) and `trial_steps` (studio-owned copy from\n`settings.landing`, per the copy-ownership decision). Nothing else; the narrowness of\n`PublicGroupOut` above is untouched.",
         "properties": {
           "about": {
             "anyOf": [
@@ -7754,6 +7784,13 @@
               }
             ],
             "title": "Address"
+          },
+          "belt_ladder": {
+            "items": {
+              "$ref": "#/components/schemas/PublicBeltOut"
+            },
+            "title": "Belt Ladder",
+            "type": "array"
           },
           "default_locale": {
             "title": "Default Locale",
@@ -7813,6 +7850,13 @@
           "studio_name": {
             "title": "Studio Name",
             "type": "string"
+          },
+          "trial_steps": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Trial Steps",
+            "type": "array"
           }
         },
         "required": [

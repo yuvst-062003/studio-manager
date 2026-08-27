@@ -4,7 +4,6 @@
 // the product somebody reaches with no account, and §5.4a calls it "the club's shop window,
 // not a form".
 import { render, screen, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import type { ReactElement } from 'react'
 import { DIRECTION, t } from '@studio/i18n'
@@ -22,7 +21,13 @@ const LANDING: Landing = {
   headline: 'ג׳ודו לילדים מגיל 5',
   about: 'מתאמנים באולם מוארך',
   address: 'הרצל 12, תל אביב',
+  phone: '052-1234567',
   photo_urls: [],
+  belt_ladder: [
+    { name: 'לבנה', color_hex: '#fffefb', secondary_color_hex: null },
+    { name: 'צהובה', color_hex: '#f5d000', secondary_color_hex: null },
+  ],
+  trial_steps: ['מגיעים עשר דקות לפני', 'מתאמנים', 'מדברים עם המאמן'],
   groups: [
     {
       id: 'g1',
@@ -31,6 +36,7 @@ const LANDING: Landing = {
       age_min: 5,
       age_max: 8,
       training_weekdays: [0, 3],
+      training_times: ['16:00'],
     },
   ],
 }
@@ -135,11 +141,13 @@ describe('PublicLanding — 13a / 13c', () => {
     ).toBeInTheDocument()
   })
 
-  it('starts the booking flow behind the sign-in wall', async () => {
-    // §5.4a step 1 — the parent authenticates BEFORE entering child details.
+  it('opens the form ON LOAD, with the sign-in wall as its first step (L4)', async () => {
+    // In both artboards the open form is the page's centre of gravity — the button that
+    // used to hide it was the gap. §5.4a step 1 still holds: the wall is the form's first
+    // step, so nothing about a child is typed before authenticating.
     render(<PublicLanding slug="judo-tel-aviv" locale="he" client={clientReturning(LANDING)} />)
-    await userEvent.click(await screen.findByTestId('landing-start-booking'))
-    expect(screen.getByTestId('booking-sign-in')).toBeInTheDocument()
+    expect(await screen.findByTestId('booking-sign-in')).toBeInTheDocument()
+    expect(screen.queryByTestId('landing-start-booking')).toBeNull()
     expect(screen.queryByTestId('booking-children')).toBeNull()
   })
 
@@ -180,5 +188,107 @@ describe('PublicLanding — 13a / 13c', () => {
     render(<PublicLanding slug="judo-tel-aviv" locale="he" client={clientReturning(LANDING)} />)
     const page = await screen.findByTestId('public-landing')
     expect(page).toHaveStyle({ display: 'grid' })
+  })
+})
+
+
+describe('L4 — the seven regions', () => {
+  it('renders the hero band: brand row with the phone, the headline, the ladder and its caption', async () => {
+    render(<PublicLanding slug="judo-tel-aviv" locale="he" client={clientReturning(LANDING)} />)
+    const hero = await screen.findByTestId('landing-hero')
+    expect(screen.getByTestId('landing-phone')).toHaveAttribute('href', 'tel:0521234567')
+    expect(screen.getByTestId('landing-headline')).toHaveTextContent('ג׳ודו לילדים מגיל 5')
+    // The ladder comes from DATA — belt_rank colours — never from the canvas palette.
+    expect(hero.querySelectorAll('.studio-belt-ladder [role="img"]')).toHaveLength(2)
+    expect(screen.getByText(t('he', 'people.landing.beltCaption'))).toBeInTheDocument()
+  })
+
+  it('falls back to the chrome offer when the club wrote no headline', async () => {
+    render(
+      <PublicLanding
+        slug="x"
+        locale="he"
+        client={clientReturning({ ...LANDING, headline: null })}
+      />,
+    )
+    expect(await screen.findByTestId('landing-headline')).toHaveTextContent(
+      t('he', 'people.landing.title'),
+    )
+  })
+
+  it("renders the club's own trial steps under the chrome heading", async () => {
+    render(<PublicLanding slug="x" locale="he" client={clientReturning(LANDING)} />)
+    const steps = await screen.findByTestId('landing-steps')
+    expect(steps).toHaveTextContent(t('he', 'people.landing.stepsTitle'))
+    expect(steps.querySelectorAll('li')).toHaveLength(3)
+  })
+
+  it('hides the steps region for a club that wrote none — no shared sentence is right for every club', async () => {
+    render(
+      <PublicLanding
+        slug="x"
+        locale="he"
+        client={clientReturning({ ...LANDING, trial_steps: [] })}
+      />,
+    )
+    await screen.findByTestId('landing-hero')
+    expect(screen.queryByTestId('landing-steps')).toBeNull()
+  })
+
+  it('renders region 4 as ONE card of rows, each with days AND time', async () => {
+    render(<PublicLanding slug="x" locale="he" client={clientReturning(LANDING)} />)
+    const card = await screen.findByTestId('landing-group-card')
+    expect(card).toHaveTextContent('16:00')
+    expect(screen.getByTestId('landing-group-days')).toHaveTextContent(
+      `${t('he', 'people.weekdays.0')} · ${t('he', 'people.weekdays.3')} · 16:00`,
+    )
+  })
+
+  it('renders the location card with navigate and WhatsApp', async () => {
+    render(<PublicLanding slug="x" locale="he" client={clientReturning(LANDING)} />)
+    const location = await screen.findByTestId('landing-location')
+    expect(location).toHaveTextContent('הרצל 12, תל אביב')
+    expect(screen.getByTestId('landing-navigate')).toHaveAttribute(
+      'href',
+      expect.stringContaining('maps.google.com'),
+    )
+    expect(screen.getByTestId('landing-whatsapp')).toHaveAttribute(
+      'href',
+      'https://wa.me/972521234567',
+    )
+  })
+
+  it('offers no WhatsApp button when the club has no phone', async () => {
+    render(
+      <PublicLanding slug="x" locale="he" client={clientReturning({ ...LANDING, phone: null })} />,
+    )
+    await screen.findByTestId('landing-location')
+    expect(screen.queryByTestId('landing-whatsapp')).toBeNull()
+    expect(screen.queryByTestId('landing-phone')).toBeNull()
+  })
+
+  it('renders the footer band with the one-free-trial line', async () => {
+    render(<PublicLanding slug="x" locale="he" client={clientReturning(LANDING)} />)
+    const footer = await screen.findByTestId('landing-footer')
+    expect(footer).toHaveTextContent(t('he', 'people.landing.footerOffer'))
+    expect(footer).toHaveTextContent(LANDING.studio_name)
+  })
+
+  it('renders the photos the API already sends, and nothing when it sends none', async () => {
+    render(
+      <PublicLanding
+        slug="x"
+        locale="he"
+        client={clientReturning({ ...LANDING, photo_urls: ['/p/1.jpg', '/p/2.jpg'] })}
+      />,
+    )
+    const strip = await screen.findByTestId('landing-photos')
+    expect(strip.querySelectorAll('img')).toHaveLength(2)
+  })
+
+  it('renders no photo strip when the API sends an empty list', async () => {
+    render(<PublicLanding slug="x" locale="he" client={clientReturning(LANDING)} />)
+    await screen.findByTestId('landing-hero')
+    expect(screen.queryByTestId('landing-photos')).toBeNull()
   })
 })

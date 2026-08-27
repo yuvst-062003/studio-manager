@@ -502,9 +502,25 @@ class PublicGroupListResponse(BaseModel):
     items: list[PublicGroupOut]
 
 
+class PublicBeltOut(BaseModel):
+    """One rung of the hero's belt ladder — L2/L4 (2026-08-27). Name and colours only:
+    the ladder is the club's grading system, which is on every flyer, and nothing here
+    reaches a person or a count."""
+
+    name: str
+    color_hex: str
+    secondary_color_hex: str | None = None
+
+
 class PublicLandingOut(BaseModel):
     """§5.4a ① — 'a public LANDING PAGE at /t/{studio-slug} — the club's shop window, not
-    a form.'"""
+    a form.'
+
+    Widened for landing L4 (2026-08-27) by exactly two lists, both marketing material:
+    `belt_ladder` (the grading system — L2 rules its colours must come from
+    `belt_rank.color_hex`, never the canvas) and `trial_steps` (studio-owned copy from
+    `settings.landing`, per the copy-ownership decision). Nothing else; the narrowness of
+    `PublicGroupOut` above is untouched."""
 
     studio_name: str
     slug: str
@@ -521,6 +537,11 @@ class PublicLandingOut(BaseModel):
     phone: str | None = None
     photo_urls: list[str] = Field(default_factory=list)
     groups: list[PublicGroupOut] = Field(default_factory=list)
+    #: L4 region 1 — the hero's ladder. Empty until the club defines belt ranks.
+    belt_ladder: list[PublicBeltOut] = Field(default_factory=list)
+    #: L4 region 3 — "how a trial lesson looks", the club's own words from
+    #: `settings.landing.trial_steps`. Empty hides the region.
+    trial_steps: list[str] = Field(default_factory=list)
 
 
 class TrialSlotListResponse(BaseModel):

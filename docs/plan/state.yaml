@@ -621,7 +621,8 @@ waves:
         on: 2026-08-27
       - id: L4
         title: Landing — 13a/13c composition
-        status: pending
+        status: shipped
+        on: 2026-08-27
       - id: L5
         title: Landing — 13b confirmation
         status: pending

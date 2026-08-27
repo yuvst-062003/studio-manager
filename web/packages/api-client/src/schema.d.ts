@@ -8058,6 +8058,20 @@ export interface components {
             timezone: string;
         };
         /**
+         * PublicBeltOut
+         * @description One rung of the hero's belt ladder — L2/L4 (2026-08-27). Name and colours only:
+         *     the ladder is the club's grading system, which is on every flyer, and nothing here
+         *     reaches a person or a count.
+         */
+        PublicBeltOut: {
+            /** Color Hex */
+            color_hex: string;
+            /** Name */
+            name: string;
+            /** Secondary Color Hex */
+            secondary_color_hex?: string | null;
+        };
+        /**
          * PublicGroupListResponse
          * @description Not a `CursorPage`: a club has a dozen groups, not a growing list somebody pages
          *     through, and the landing page renders all of them at once.
@@ -8103,12 +8117,20 @@ export interface components {
          * PublicLandingOut
          * @description §5.4a ① — 'a public LANDING PAGE at /t/{studio-slug} — the club's shop window, not
          *     a form.'
+         *
+         *     Widened for landing L4 (2026-08-27) by exactly two lists, both marketing material:
+         *     `belt_ladder` (the grading system — L2 rules its colours must come from
+         *     `belt_rank.color_hex`, never the canvas) and `trial_steps` (studio-owned copy from
+         *     `settings.landing`, per the copy-ownership decision). Nothing else; the narrowness of
+         *     `PublicGroupOut` above is untouched.
          */
         PublicLandingOut: {
             /** About */
             about: string | null;
             /** Address */
             address: string | null;
+            /** Belt Ladder */
+            belt_ladder?: components["schemas"]["PublicBeltOut"][];
             /** Default Locale */
             default_locale: string;
             /** Groups */
@@ -8125,6 +8147,8 @@ export interface components {
             slug: string;
             /** Studio Name */
             studio_name: string;
+            /** Trial Steps */
+            trial_steps?: string[];
         };
         /**
          * PushTokenIn

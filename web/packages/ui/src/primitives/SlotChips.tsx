@@ -43,6 +43,7 @@ export function SlotChips({
             <span
               key={option.id}
               className="studio-slot-chips__chip"
+              data-option-id={option.id}
               data-selected={value === option.id ? 'true' : undefined}
               data-disabled={option.disabled ? 'true' : undefined}
             >

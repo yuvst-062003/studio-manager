@@ -129,6 +129,46 @@ def test_the_landing_carries_the_clubs_phone_from_settings(
     assert after["phone"] == "052-1234567"
 
 
+def test_the_landing_carries_the_belt_ladder_from_data_not_from_any_palette(
+    client, app_session, studio, a_class, with_slots
+):
+    """L2/L4 -- the hero's belt strip renders from `belt_rank.color_hex`: the canvas
+    carries two conflicting palettes and draws the black belt near-white, so data is the
+    only honest source. Ordered by the ladder's own order_index."""
+    from app.models.belts import BeltRank
+
+    for index, (name, hexcode) in enumerate([("לבנה", "#fffefb"), ("צהובה", "#f5d000")]):
+        app_session.add(
+            BeltRank(
+                studio_id=studio.id,
+                class_id=a_class,
+                name=name,
+                order_index=index,
+                color_hex=hexcode,
+            )
+        )
+    app_session.commit()
+
+    body = client.get(f"/api/v1/public/studios/{studio.slug}/landing").json()
+    assert [rank["name"] for rank in body["belt_ladder"]] == ["לבנה", "צהובה"]
+    assert body["belt_ladder"][0]["color_hex"] == "#fffefb"
+
+
+def test_the_landing_carries_the_clubs_own_trial_steps(client, app_session, studio, with_slots):
+    """L4 region 3 + the copy-ownership decision: the club writes its own pitch. Empty
+    until they do -- no shared Hebrew sentence is ever right for every club."""
+    assert client.get(f"/api/v1/public/studios/{studio.slug}/landing").json()["trial_steps"] == []
+
+    studio.settings = {
+        **(studio.settings or {}),
+        "landing": {"trial_steps": ["מגיעים עשר דקות לפני", "מתאמנים", "מדברים עם המאמן"]},
+    }
+    app_session.add(studio)
+    app_session.commit()
+    body = client.get(f"/api/v1/public/studios/{studio.slug}/landing").json()
+    assert len(body["trial_steps"]) == 3
+
+
 def test_the_studio_route_and_the_landing_route_agree(client, studio, with_slots):
     """§7 lists both. Two shapes to keep in step would be two chances to drift."""
     a = client.get(f"/api/v1/public/studios/{studio.slug}").json()

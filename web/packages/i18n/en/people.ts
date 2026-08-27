@@ -202,6 +202,11 @@ export const people: Bundle = {
   'funnel.conversionRate': 'Conversion rate',
 
   'landing.aboutTitle': 'About the club',
+  'landing.stepsTitle': 'What a trial lesson looks like',
+  'landing.beltCaption': 'The club’s belt ladder',
+  'landing.navigate': 'Navigate',
+  'landing.whatsapp': 'WhatsApp',
+  'landing.footerOffer': 'The first trial lesson is free',
   'landing.whereTitle': 'Where we train',
   'landing.groupsTitle': 'Our groups',
   'landing.noGroups': 'This club has not published its groups yet',
