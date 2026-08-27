@@ -52,6 +52,7 @@ export const common: Bundle = {
   'search.guardians': 'Родители',
   'search.noResults': 'Ничего не найдено',
   'dash.forbidden': 'Этот экран доступен только менеджерам',
+  'cancel': 'Отмена',
   'staff.role.owner': 'Владелец',
   'permission.locked': 'Недоступно в вашей роли',
   'permission.managerOnly': 'Этот экран доступен только менеджерам клуба',

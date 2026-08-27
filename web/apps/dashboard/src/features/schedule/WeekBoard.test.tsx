@@ -57,6 +57,8 @@ function stub(sessions: SessionRow[] = [TUESDAY_EVENING]): ScheduleClient {
     addSessionNote: vi.fn(async () => undefined),
     deleteSession: vi.fn(async () => undefined),
     listLocations: vi.fn(async () => []),
+    listGroups: vi.fn(async () => []),
+    createSession: vi.fn(async () => TUESDAY_EVENING),
   } as unknown as ScheduleClient
 }
 
@@ -316,5 +318,53 @@ describe('F3 — the popover a session block opens', () => {
     await screen.findByTestId('session-popover')
     expect(screen.queryByTestId('popover-delete')).toBeNull()
     vi.unstubAllGlobals()
+  })
+})
+
+
+describe('creating a session from the board (2026-08-28)', () => {
+  it('offers the verb at all — the backend endpoint shipped with no UI calling it', async () => {
+    render(<WeekBoard locale="he" client={stub()} today="2026-11-03T12:00:00Z" />)
+    expect(await screen.findByTestId('session-create-open')).toHaveTextContent(
+      t('he', 'schedule.session.create'),
+    )
+  })
+
+  it('creates an ad-hoc session in the ACTIVE year, in Jerusalem wall time', async () => {
+    const user = userEvent.setup()
+    const client = stub()
+    vi.mocked(client.listGroups).mockResolvedValue([
+      { id: 'g1', name: 'מתחילים', classId: 'c1', isActive: true },
+      { id: 'g9', name: 'ישן', classId: 'c1', isActive: false },
+    ] as never)
+    vi.mocked(client.listTrainingYears).mockResolvedValue([
+      { id: 'y-old', name: 'תשפ״ה', starts_on: '2025-09-01', ends_on: '2026-08-31', status: 'closed' },
+      { id: 'y1', name: 'תשפ״ו', starts_on: '2026-09-01', ends_on: '2027-08-31', status: 'active' },
+    ] as never)
+    render(<WeekBoard locale="he" client={client} today="2026-11-03T12:00:00Z" />)
+    await user.click(await screen.findByTestId('session-create-open'))
+
+    const groupSelect = await screen.findByTestId('session-create-group')
+    // The retired group is not offered.
+    expect(groupSelect.querySelectorAll('option')).toHaveLength(2)
+    await user.selectOptions(groupSelect, 'g1')
+    await user.click(screen.getByTestId('session-create-submit'))
+
+    await waitFor(() => expect(client.createSession).toHaveBeenCalled())
+    const body = vi.mocked(client.createSession).mock.calls[0]![0]
+    expect(body.group_id).toBe('g1')
+    // The year is RESOLVED, never asked: the active one, not the closed one.
+    expect(body.training_year_id).toBe('y1')
+    // 17:00 typed in Jerusalem is not 17:00Z.
+    expect(body.starts_at.endsWith('17:00:00.000Z')).toBe(false)
+  })
+
+  it('says why creation is unavailable when no training year is active', async () => {
+    const user = userEvent.setup()
+    render(<WeekBoard locale="he" client={stub()} today="2026-11-03T12:00:00Z" />)
+    await user.click(await screen.findByTestId('session-create-open'))
+    expect(await screen.findByTestId('session-create-no-year')).toHaveTextContent(
+      t('he', 'schedule.group.noActiveYear'),
+    )
   })
 })

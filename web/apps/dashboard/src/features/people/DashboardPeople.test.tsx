@@ -162,6 +162,15 @@ afterEach(() => clearSlot('alert-centre'))
 // -- 3b: the students table -----------------------------------------------------
 
 describe('StudentsScreen — 3b', () => {
+  it('links to the add-student screen — a screen with no inbound link does not exist', () => {
+    // #/students/new shipped reachable only by typing the URL; the staging full pass
+    // (2026-08-28) read that as "a manager cannot create anything".
+    render(<StudentsScreen locale="he" client={makeClient()} />)
+    const add = screen.getByTestId('students-add')
+    expect(add).toHaveAttribute('href', '#/students/new')
+    expect(add).toHaveTextContent(t('he', 'people.student.add'))
+  })
+
   it('renders a real table with a caption and column headers', async () => {
     // A grid of divs looks identical and is unreadable to a screen reader, and §6.4 puts
     // this in front of a manager who may be using one.

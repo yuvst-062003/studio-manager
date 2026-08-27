@@ -146,6 +146,8 @@ export const schedule: Bundle = {
   'session.adHocStart': 'Начало',
   'session.adHocEnd': 'Окончание',
   'session.adHocDate': 'Дата',
+  'session.create': 'Новое занятие',
+  'session.createGroup': 'Группа',
 
   'closure.preset.rosh_hashanah': 'Рош ха-Шана',
   'closure.preset.yom_kippur': 'Йом-Кипур',

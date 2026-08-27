@@ -130,6 +130,14 @@ export interface ScheduleClient {
   /** 409s on a generated session — the server owns that refusal, not the UI. */
   deleteSession(sessionId: string): Promise<void>
   listLocations(): Promise<{ id: string; name: string }[]>
+  /** §5.6 — 'They can also add an ad-hoc session that belongs to no rule.' */
+  createSession(body: {
+    group_id: string
+    training_year_id: string
+    starts_at: string
+    ends_at: string
+    location_id?: string | null
+  }): Promise<SessionRow>
   listTrainingYears(): Promise<TrainingYear[]>
   listClosures(trainingYearId: string): Promise<Closure[]>
   createClosure(body: Omit<Closure, 'id'>): Promise<{ sessions_cancelled: number }>
@@ -225,6 +233,15 @@ export function makeScheduleClient(fetcher: Fetcher): ScheduleClient {
         body: JSON.stringify({ body }),
       })
       if (!response.ok) throw new Error(String(response.status))
+    },
+    async createSession(body) {
+      return json<SessionRow>(
+        await fetcher(`${API}/sessions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        }),
+      )
     },
     async deleteSession(sessionId) {
       const response = await fetcher(`${API}/sessions/${sessionId}`, { method: 'DELETE' })

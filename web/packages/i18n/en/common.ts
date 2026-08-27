@@ -44,6 +44,7 @@ export const common: Bundle = {
   'search.guardians': 'Parents',
   'search.noResults': 'No results',
   'dash.forbidden': 'This screen is available to managers only',
+  'cancel': 'Cancel',
   'staff.role.owner': 'Owner',
   'permission.locked': 'Not available in your role',
   'permission.managerOnly': 'This screen is reserved for club managers',

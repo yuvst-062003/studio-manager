@@ -171,6 +171,8 @@ export const schedule: Bundle = {
   'session.adHocStart': 'שעת התחלה',
   'session.adHocEnd': 'שעת סיום',
   'session.adHocDate': 'תאריך',
+  'session.create': 'שיעור חדש',
+  'session.createGroup': 'קבוצה',
 
   // -- holiday presets, by key (D-M2-4) -------------------------------------------
   'closure.preset.rosh_hashanah': 'ראש השנה',

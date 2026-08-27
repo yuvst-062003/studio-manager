@@ -143,6 +143,8 @@ export const schedule: Bundle = {
   'session.adHocStart': 'Start time',
   'session.adHocEnd': 'End time',
   'session.adHocDate': 'Date',
+  'session.create': 'New session',
+  'session.createGroup': 'Group',
 
   'closure.preset.rosh_hashanah': 'Rosh Hashanah',
   'closure.preset.yom_kippur': 'Yom Kippur',

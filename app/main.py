@@ -77,7 +77,14 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins(settings.ENV),
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    # PUT was missing until 2026-08-28 and no test could catch it: CORS only exists in a
+    # real browser, so every PUT the dashboard makes (a group's weekly schedule, belt
+    # eligibility, health templates, billing method) passed the suite and died on staging.
+    # tests/contracts/test_cors_methods.py now derives this list's obligations from the
+    # frontend clients themselves.
+    # HEAD is the offline network probe (§10.1) — blocked at preflight, every probe
+    # fails and the staff app calls a healthy network offline.
+    allow_methods=["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=[
         "Authorization",
         "Content-Type",

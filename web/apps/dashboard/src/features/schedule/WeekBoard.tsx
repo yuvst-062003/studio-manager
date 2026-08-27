@@ -16,8 +16,8 @@
 // tested at a fixed date, and every assertion about this grid depends on which week it is.
 import { useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { EmptyState } from '@studio/ui'
-import { apiFetch, formatTimeInStudioZone, studioDayKey } from '@studio/core'
+import { Button, EmptyState, TextField } from '@studio/ui'
+import { apiFetch, formatTimeInStudioZone, studioDayKey, studioWallTimeToUtc } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { makeDashboardAttendanceClient } from '../attendance'
@@ -153,6 +153,160 @@ function SessionBlock({
   )
 }
 
+/**
+ * The board's missing verb (2026-08-28): `POST /sessions` shipped in the backend with no
+ * UI calling it, so a manager could not create a session at all — the popover's date
+ * fields are the MOVE control. One small form, opened in place: group · date · times ·
+ * hall. The training year is resolved, not asked — a session belongs to the ACTIVE year,
+ * and a picker would offer a choice §5.15 does not give.
+ */
+function CreateSessionForm({
+  locale,
+  client,
+  defaultDay,
+  onCreated,
+}: {
+  locale: Locale
+  client: ScheduleClient
+  defaultDay: string
+  onCreated: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [groups, setGroups] = useState<{ id: string; name: string }[]>([])
+  const [locations, setLocations] = useState<{ id: string; name: string }[]>([])
+  const [yearId, setYearId] = useState<string | null | undefined>(undefined)
+  const [groupId, setGroupId] = useState('')
+  const [day, setDay] = useState(defaultDay)
+  const [startTime, setStartTime] = useState('17:00')
+  const [endTime, setEndTime] = useState('18:00')
+  const [locationId, setLocationId] = useState('')
+  const [sending, setSending] = useState(false)
+  const [failed, setFailed] = useState(false)
+
+  useEffect(() => {
+    if (!open) return
+    let live = true
+    void Promise.all([client.listGroups(), client.listLocations(), client.listTrainingYears()])
+      .then(([groupRows, locationRows, years]) => {
+        if (!live) return
+        setGroups(groupRows.filter((row) => row.isActive))
+        setLocations(locationRows)
+        setYearId(years.find((year) => year.status === 'active')?.id ?? null)
+      })
+      .catch(() => live && setYearId(null))
+    return () => {
+      live = false
+    }
+  }, [client, open])
+
+  if (!open) {
+    return (
+      <Button data-testid="session-create-open" onClick={() => setOpen(true)}>
+        {t(locale, 'schedule.session.create')}
+      </Button>
+    )
+  }
+
+  // §5.15 — no active year, no sessions. Said, not greyed in silence.
+  if (yearId === null) {
+    return (
+      <p data-testid="session-create-no-year">
+        {t(locale, 'schedule.group.noActiveYear')} — {t(locale, 'schedule.group.noActiveYearHint')}
+      </p>
+    )
+  }
+
+  return (
+    <form
+      data-testid="session-create-form"
+      style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)', alignItems: 'end' }}
+      onSubmit={(event) => {
+        event.preventDefault()
+        if (!groupId || !yearId) return
+        setSending(true)
+        setFailed(false)
+        client
+          .createSession({
+            group_id: groupId,
+            training_year_id: yearId,
+            // G3 — typed in Jerusalem wall time, sent as UTC instants.
+            starts_at: studioWallTimeToUtc(day, startTime),
+            ends_at: studioWallTimeToUtc(day, endTime),
+            location_id: locationId || null,
+          })
+          .then(() => {
+            setOpen(false)
+            onCreated()
+          })
+          .catch(() => setFailed(true))
+          .finally(() => setSending(false))
+      }}
+    >
+      <label>
+        {t(locale, 'schedule.session.createGroup')}
+        <select
+          data-testid="session-create-group"
+          value={groupId}
+          onChange={(event) => setGroupId(event.target.value)}
+        >
+          <option value="">—</option>
+          {groups.map((group) => (
+            <option key={group.id} value={group.id}>
+              {group.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      <TextField
+        label={t(locale, 'schedule.session.adHocDate')}
+        type="date"
+        value={day}
+        onChange={(event) => setDay(event.target.value)}
+      />
+      <TextField
+        label={t(locale, 'schedule.session.adHocStart')}
+        type="time"
+        value={startTime}
+        onChange={(event) => setStartTime(event.target.value)}
+      />
+      <TextField
+        label={t(locale, 'schedule.session.adHocEnd')}
+        type="time"
+        value={endTime}
+        onChange={(event) => setEndTime(event.target.value)}
+      />
+      <label>
+        {t(locale, 'schedule.session.location')}
+        <select
+          data-testid="session-create-location"
+          value={locationId}
+          onChange={(event) => setLocationId(event.target.value)}
+        >
+          <option value="">—</option>
+          {locations.map((location) => (
+            <option key={location.id} value={location.id}>
+              {location.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      <Button
+        type="submit"
+        data-testid="session-create-submit"
+        disabled={!groupId || sending || endTime <= startTime}
+      >
+        {t(locale, 'schedule.session.create')}
+      </Button>
+      <Button variant="ghost" onClick={() => setOpen(false)}>
+        {t(locale, 'common.cancel')}
+      </Button>
+      {failed ? (
+        <p data-testid="session-create-failed">{t(locale, 'common.loadFailed.body')}</p>
+      ) : null}
+    </form>
+  )
+}
+
 export function WeekBoard({
   locale,
   client,
@@ -196,6 +350,13 @@ export function WeekBoard({
   return (
     <section aria-labelledby="week-board-title" style={boardStyle}>
       <h2 id="week-board-title">{t(locale, 'schedule.week.title')}</h2>
+
+      <CreateSessionForm
+        locale={locale}
+        client={client}
+        defaultDay={todayKey}
+        onCreated={() => setVersion((n) => n + 1)}
+      />
 
       <div style={toolbarStyle}>
         <button

@@ -47,6 +47,7 @@ export const common: Bundle = {
   'search.guardians': 'הורים',
   'search.noResults': 'לא נמצאו תוצאות',
   'dash.forbidden': 'המסך הזה זמין למנהלים בלבד',
+  'cancel': 'ביטול',
   'staff.role.owner': 'בעלים',
   'permission.locked': 'לא זמין בהרשאה שלך',
   'permission.managerOnly': 'המסך הזה שמור למנהלי המועדון',

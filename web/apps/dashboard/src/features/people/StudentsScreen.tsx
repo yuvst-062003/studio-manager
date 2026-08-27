@@ -217,6 +217,19 @@ export function StudentsScreen({
     <section aria-labelledby="students-title" data-testid="students-screen">
       <h1 id="students-title">{t(locale, 'people.student.plural')}</h1>
 
+      {/* 3c's entry point. The add-student screen shipped reachable only by TYPING
+          #/students/new — a screen with no inbound link is a screen that does not exist
+          to the person the audit calls "a human at 2am". */}
+      <a
+        className="studio-btn"
+        data-variant="primary"
+        href="#/students/new"
+        data-testid="students-add"
+        style={{ alignSelf: 'start' }}
+      >
+        {t(locale, 'people.student.add')}
+      </a>
+
       <div style={filterRowStyle}>
         <label>
           {t(locale, 'people.student.search')}
