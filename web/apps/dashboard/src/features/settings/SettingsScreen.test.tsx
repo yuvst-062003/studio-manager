@@ -130,3 +130,32 @@ describe('SettingsScreen', () => {
     expect(screen.queryByText(/חסימת השתתפות/)).toBeNull()
   })
 })
+
+
+describe('the landing-content panel (2026-08-28)', () => {
+  it('shows the current copy and autosaves a field through PATCH /studio', async () => {
+    // The shop window's writer: the public landing reads settings.landing.* and until
+    // this panel nothing could write it.
+    const patches: unknown[] = []
+    stub((body) => patches.push(body))
+    render(<SettingsScreen locale="he" />)
+    const headline = await screen.findByTestId('settings-landing-headline')
+
+    await userEvent.type(headline, 'ג׳ודו מגיל 4')
+    await userEvent.tab()
+    await waitFor(() => expect(patches.length).toBeGreaterThan(0))
+    expect(patches.at(-1)).toEqual({ landing: { headline: 'ג׳ודו מגיל 4' } })
+  })
+
+  it('sends the trial steps one per line', async () => {
+    const patches: { landing?: { trial_steps?: string[] } }[] = []
+    stub((body) => patches.push(body as never))
+    render(<SettingsScreen locale="he" />)
+    const steps = await screen.findByTestId('settings-landing-steps')
+    await userEvent.type(steps, 'מגיעים עשר דקות לפני\nמתאמנים')
+    await userEvent.tab()
+    await waitFor(() =>
+      expect(patches.at(-1)?.landing?.trial_steps).toEqual(['מגיעים עשר דקות לפני', 'מתאמנים']),
+    )
+  })
+})

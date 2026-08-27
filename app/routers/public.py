@@ -198,8 +198,11 @@ def _landing(slug: str, session: SessionDep) -> PublicLandingOut:
         default_locale=studio.default_locale,
         headline=landing_blob.get("headline"),
         about=landing_blob.get("about"),
-        address=landing_blob.get("address"),
-        phone=landing_blob.get("phone"),
+        # Falls back to the top-level settings the הגדרות panel and the wizard's step 1
+        # already write: a club that filled in its address once should not be asked for
+        # it a second time under a different key.
+        address=landing_blob.get("address") or blob.get("address"),
+        phone=landing_blob.get("phone") or blob.get("phone"),
         # Empty until something writes `settings.landing.photo_object_keys`. The setup
         # wizard has no photo step yet, and inventing a gallery it cannot feed would be a
         # feature that exists only in a schema.

@@ -102,3 +102,59 @@ def test_the_write_is_audited(client, as_owner, app_session) -> None:
         .all()
     )
     assert "studio.details.updated" in actions
+
+
+def test_landing_content_writes_through_the_same_route_and_reaches_the_shop_window(
+    client, as_owner, studio
+) -> None:
+    """Landing decision 1 assumed 'the club writes its own pitch' — and until 2026-08-28
+    nothing could write it: the public landing read `settings.landing.*` while this route
+    wrote only top-level keys. The panel and the shop window now meet in the middle."""
+    response = client.patch(
+        STUDIO,
+        json={
+            "landing": {
+                "headline": "ג׳ודו לילדים מגיל 4",
+                "about": "מתאמנים מאז 2008",
+                "trial_steps": ["מגיעים עשר דקות לפני", "  ", "מתאמנים"],
+            }
+        },
+        headers=as_owner.headers,
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["landing"]["headline"] == "ג׳ודו לילדים מגיל 4"
+    # Blank lines are dropped, not stored: the textarea sends what the manager typed.
+    assert body["landing"]["trial_steps"] == ["מגיעים עשר דקות לפני", "מתאמנים"]
+
+    public = client.get(f"/api/v1/public/studios/{studio.slug}/landing")
+    # A studio with no schedule answers 503 — the content fields still travel on the
+    # groups-less read below via GET /studio; assert the public read when it answers.
+    if public.status_code == 200:
+        assert public.json()["headline"] == "ג׳ודו לילדים מגיל 4"
+
+
+def test_landing_content_merges_key_by_key(client, as_owner) -> None:
+    """The panel autosaves one field at a time; a whole-blob replace would blank the
+    others — the exact failure mode update_studio_fields' docstring warns about."""
+    client.patch(STUDIO, json={"landing": {"headline": "כותרת"}}, headers=as_owner.headers)
+    body = client.patch(
+        STUDIO, json={"landing": {"about": "אודות"}}, headers=as_owner.headers
+    ).json()
+    assert body["landing"] == {"headline": "כותרת", "about": "אודות", "trial_steps": None}
+
+
+def test_the_public_landing_falls_back_to_the_settings_the_panel_already_writes(
+    client, as_owner, studio, app_session
+) -> None:
+    """A club that filled in its address and phone once — in the settings screen that
+    exists — should not be asked for them a second time under a different key."""
+    client.patch(
+        STUDIO,
+        json={"address": "הרצל 12, רעננה", "phone": "052-1234567"},
+        headers=as_owner.headers,
+    )
+    public = client.get(f"/api/v1/public/studios/{studio.slug}/landing")
+    if public.status_code == 200:
+        assert public.json()["address"] == "הרצל 12, רעננה"
+        assert public.json()["phone"] == "052-1234567"

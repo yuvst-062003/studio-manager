@@ -33,6 +33,12 @@ import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { PrepayTermsPanel, StandingOrderLinksPanel, makeDashboardBillingClient } from '../billing'
 
+type LandingContent = {
+  headline?: string | null
+  about?: string | null
+  trial_steps?: string[] | null
+}
+
 type StudioDetails = {
   name: string
   sport: string | null
@@ -41,6 +47,7 @@ type StudioDetails = {
   default_locale: string
   parent_locales: string[]
   logo_url: string | null
+  landing?: LandingContent
 }
 
 //: 3f's own left rail, in its own order. The five M1 does not own are listed rather than
@@ -261,6 +268,41 @@ export function SettingsScreen({ locale }: { locale: Locale }) {
                   />
                 )
               })}
+
+              {/* 2026-08-28 — the shop window's WRITER. The public landing read
+                  `settings.landing.*` and nothing could write it: decision 1 said "the
+                  club writes its own pitch" and shipped no pen. Address and phone are
+                  NOT repeated here — the landing falls back to the fields above. */}
+              <h3>{t(locale, 'common.settings.landing.title')}</h3>
+              <p>{t(locale, 'common.settings.landing.hint')}</p>
+              <TextField
+                label={t(locale, 'common.settings.landing.headline')}
+                defaultValue={details.landing?.headline ?? ''}
+                data-testid="settings-landing-headline"
+                onBlur={(event) => save({ landing: { headline: event.target.value } })}
+              />
+              <label>
+                {t(locale, 'common.settings.landing.about')}
+                <textarea
+                  rows={4}
+                  style={{ display: 'block', inlineSize: '100%' }}
+                  defaultValue={details.landing?.about ?? ''}
+                  data-testid="settings-landing-about"
+                  onBlur={(event) => save({ landing: { about: event.target.value } })}
+                />
+              </label>
+              <label>
+                {t(locale, 'common.settings.landing.steps')}
+                <textarea
+                  rows={4}
+                  style={{ display: 'block', inlineSize: '100%' }}
+                  defaultValue={(details.landing?.trial_steps ?? []).join('\n')}
+                  data-testid="settings-landing-steps"
+                  onBlur={(event) =>
+                    save({ landing: { trial_steps: event.target.value.split('\n') } })
+                  }
+                />
+              </label>
             </div>
           )}
         </Card>

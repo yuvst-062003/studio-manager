@@ -169,6 +169,29 @@ def test_the_landing_carries_the_clubs_own_trial_steps(client, app_session, stud
     assert len(body["trial_steps"]) == 3
 
 
+def test_the_landing_falls_back_to_the_top_level_settings_the_panel_writes(
+    client, app_session, studio, with_slots
+):
+    """2026-08-28 — the הגדרות panel writes `settings.address`/`settings.phone`; the
+    landing used to read only `settings.landing.*`, so a club that filled its details in
+    the one screen that exists still showed an empty shop window. Nested keys win when
+    both exist — the landing copy is the more deliberate statement."""
+    studio.settings = {**(studio.settings or {}), "address": "הרצל 12", "phone": "052-1111111"}
+    app_session.add(studio)
+    app_session.commit()
+
+    body = client.get(f"/api/v1/public/studios/{studio.slug}/landing").json()
+    assert body["address"] == "הרצל 12"
+    assert body["phone"] == "052-1111111"
+
+    studio.settings = {**studio.settings, "landing": {"phone": "052-2222222"}}
+    app_session.add(studio)
+    app_session.commit()
+    override = client.get(f"/api/v1/public/studios/{studio.slug}/landing").json()
+    assert override["phone"] == "052-2222222"
+    assert override["address"] == "הרצל 12"
+
+
 def test_the_studio_route_and_the_landing_route_agree(client, studio, with_slots):
     """§7 lists both. Two shapes to keep in step would be two chances to drift."""
     a = client.get(f"/api/v1/public/studios/{studio.slug}").json()

@@ -11170,6 +11170,52 @@
         "title": "StudentUpdate",
         "type": "object"
       },
+      "StudioLandingContent": {
+        "description": "The shop window's copy — landing decision 1 (2026-08-27): the club writes its own\npitch. This is the WRITER the decision assumed and nobody built: the public landing\nread `settings.landing.*` while `PATCH /studio` wrote only top-level settings, so the\ncontent was unreachable by any screen.",
+        "properties": {
+          "about": {
+            "anyOf": [
+              {
+                "maxLength": 4000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "About"
+          },
+          "headline": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Headline"
+          },
+          "trial_steps": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 6,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trial Steps"
+          }
+        },
+        "title": "StudioLandingContent",
+        "type": "object"
+      },
       "StudioListResponse": {
         "properties": {
           "items": {
@@ -11258,6 +11304,16 @@
               }
             ],
             "title": "Address"
+          },
+          "landing": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StudioLandingContent"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "name": {
             "anyOf": [
@@ -12493,6 +12549,9 @@
             "format": "uuid",
             "title": "Id",
             "type": "string"
+          },
+          "landing": {
+            "$ref": "#/components/schemas/StudioLandingContent"
           },
           "logo_url": {
             "anyOf": [

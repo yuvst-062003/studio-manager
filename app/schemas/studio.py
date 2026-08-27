@@ -28,6 +28,29 @@ class StudioLogoOut(BaseModel):
     logo_url: str = Field(description="The scoped read route, cache-busted by updated_at.")
 
 
+class StudioLandingContent(BaseModel):
+    """The shop window's copy — landing decision 1 (2026-08-27): the club writes its own
+    pitch. This is the WRITER the decision assumed and nobody built: the public landing
+    read `settings.landing.*` while `PATCH /studio` wrote only top-level settings, so the
+    content was unreachable by any screen."""
+
+    headline: str | None = Field(default=None, max_length=200)
+    about: str | None = Field(default=None, max_length=4000)
+    #: Region 3's numbered steps, the club's own words. Six is a pitch; more is a manual.
+    trial_steps: list[str] | None = Field(default=None, max_length=6)
+
+    @field_validator("trial_steps")
+    @classmethod
+    def _steps_are_short_lines(cls, value: list[str] | None) -> list[str] | None:
+        if value is None:
+            return None
+        cleaned = [step.strip() for step in value if step.strip()]
+        for step in cleaned:
+            if len(step) > 200:
+                raise ValueError("a trial step is one short line, not a paragraph")
+        return cleaned
+
+
 class StudioOut(BaseModel):
     """The merged column-and-settings view both the wizard's step 1 and the dashboard's
     הגדרות panel read."""
@@ -42,6 +65,7 @@ class StudioOut(BaseModel):
     address: str | None = None
     phone: str | None = None
     parent_locales: list[str]
+    landing: StudioLandingContent = Field(default_factory=StudioLandingContent)
 
 
 class StudioUpdate(BaseModel):
@@ -54,6 +78,8 @@ class StudioUpdate(BaseModel):
     address: str | None = Field(default=None, max_length=300)
     phone: str | None = Field(default=None, max_length=40)
     parent_locales: list[str] | None = None
+    #: Merged into `settings.landing`, key by key — never replacing the blob.
+    landing: StudioLandingContent | None = None
 
     @field_validator("name")
     @classmethod

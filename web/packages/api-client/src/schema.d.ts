@@ -9648,6 +9648,21 @@ export interface components {
             /** Phone */
             phone?: string | null;
         };
+        /**
+         * StudioLandingContent
+         * @description The shop window's copy — landing decision 1 (2026-08-27): the club writes its own
+         *     pitch. This is the WRITER the decision assumed and nobody built: the public landing
+         *     read `settings.landing.*` while `PATCH /studio` wrote only top-level settings, so the
+         *     content was unreachable by any screen.
+         */
+        StudioLandingContent: {
+            /** About */
+            about?: string | null;
+            /** Headline */
+            headline?: string | null;
+            /** Trial Steps */
+            trial_steps?: string[] | null;
+        };
         /** StudioListResponse */
         StudioListResponse: {
             /** Items */
@@ -9698,6 +9713,7 @@ export interface components {
         StudioUpdate: {
             /** Address */
             address?: string | null;
+            landing?: components["schemas"]["StudioLandingContent"] | null;
             /** Name */
             name?: string | null;
             /** Parent Locales */
@@ -10225,6 +10241,7 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            landing?: components["schemas"]["StudioLandingContent"];
             /** Logo Url */
             logo_url?: string | null;
             /** Name */

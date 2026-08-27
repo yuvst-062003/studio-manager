@@ -164,6 +164,9 @@ def studio_public_fields(studio: Studio) -> dict[str, Any]:
         "address": blob.get("address"),
         "phone": blob.get("phone"),
         "parent_locales": blob.get("parent_locales") or [studio.default_locale],
+        # The הגדרות panel reads current landing copy back; a writer whose reads come
+        # back empty looks like a save that failed.
+        "landing": blob.get("landing") if isinstance(blob.get("landing"), dict) else {},
     }
 
 
@@ -195,6 +198,17 @@ def update_studio_fields(
             if blob.get(key) != fields[key]:
                 changed.append(key)
             blob[key] = fields[key]
+
+    # The landing's copy, merged key by key inside its own nested blob — the panel
+    # autosaves one field at a time, and replacing the dict would blank the others.
+    if isinstance(fields.get("landing"), dict):
+        nested = dict(blob.get("landing") or {})
+        for key, value in fields["landing"].items():
+            if value is not None:
+                if nested.get(key) != value:
+                    changed.append(f"landing.{key}")
+                nested[key] = value
+        blob["landing"] = nested
 
     # §9's fallback chain resolves through the studio's default_locale, so dropping it
     # from the offered set would leave the fallback pointing at a language the studio
