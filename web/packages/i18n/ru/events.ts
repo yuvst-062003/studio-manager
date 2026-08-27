@@ -72,6 +72,7 @@ export const events: Bundle = {
   'consent.blocksConfirmation': 'Участие считается подтверждённым только после подписи родителя',
 
   // -- RSVP (parent 7d, dashboard 7c) ---------------------------------------------
+  'rsvp.closesOn': 'Регистрация закрывается',
   'rsvp.title': 'Подтверждение участия',
   'rsvp.yes': 'Придёт',
   'rsvp.no': 'Не придёт',
@@ -111,6 +112,9 @@ export const events: Bundle = {
   'exam.empty': 'Экзамены не запланированы',
 
   // -- the belt system (dashboard 5b, wizard 5d) ----------------------------------
+  'belt.progressLink': 'Полный прогресс',
+  'belt.noneYet': 'Истории поясов пока нет',
+  'belt.noneYetHint': 'Когда пояс будет присвоен, прогресс появится здесь',
   'belt.title': 'Система поясов',
   'belt.noClasses': 'Пока нет секций — лестница поясов открывается на секции.',
   'belt.openLadder': 'Открыть лестницу поясов',

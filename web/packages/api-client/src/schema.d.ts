@@ -466,6 +466,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/belt-ranges/by-group": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Belt Ranges By Group
+         * @description F8 — 4b's טווח חגורות, measured: the lowest and highest CURRENT belt among each
+         *     group's live enrollments. A group whose students hold no belt yet is simply absent —
+         *     an empty range is not a range.
+         */
+        get: operations["belt_ranges_by_group_api_v1_belt_ranges_by_group_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/belt-ranks": {
         parameters: {
             query?: never;
@@ -476,6 +498,11 @@ export interface paths {
         /**
          * List Belt Ranks
          * @description `5b`'s table, and the ladder every progression screen reads.
+         *
+         *     Signed-in, not staff-only (P7): parent `12d` renders the SAME ladder — it is what
+         *     makes a progression drawable — and the AnyStaff guard this carried meant the routed
+         *     parent screen answered 403 for every guardian. Belt names and colours carry nothing
+         *     §11 protects; the tenant filter still scopes the read.
          *
          *     `class_id` is required rather than optional: `events.belt.perClassHint` says the system
          *     is defined per class, and a studio-wide list of two disciplines' ranks interleaved by
@@ -1214,6 +1241,51 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/exports/accountant": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Accountant Export
+         * @description `ייצוא לרו"ח` -- every payment received in the Jerusalem month, one row each.
+         *
+         *     Received, not charged: a bookkeeper files income by when money arrived. Reversed
+         *     payments are included with their reversal marked -- an export that silently dropped
+         *     a reversed row would disagree with the bank statement it sits beside.
+         */
+        get: operations["accountant_export_api_v1_exports_accountant_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/exports/attendance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Attendance Export
+         * @description `ייצוא דוח נוכחות` -- one row per mark in the range. Statuses stay the product's
+         *     own vocabulary; no health data of any kind rides along.
+         */
+        get: operations["attendance_export_api_v1_exports_attendance_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/groups": {
         parameters: {
             query?: never;
@@ -1230,6 +1302,28 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/groups/{group_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Group
+         * @description F4 -- rename / retire / revive, outside the once-a-year rollover wizard. Rename
+         *     and retire used to exist ONLY inside `POST /rollover/{y}/groups`; a club opening a
+         *     Tuesday beginners group in November had nowhere to do this.
+         */
+        patch: operations["update_group_api_v1_groups__group_id__patch"];
         trace?: never;
     };
     "/api/v1/groups/{group_id}/eligibility": {
@@ -2988,6 +3082,60 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/reminders/debt": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Remind Debt
+         * @description One household or many -- the bulk button is this same route with more ids.
+         */
+        post: operations["remind_debt_api_v1_reminders_debt_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reminders/events/{event_id}/non-responders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Remind Event Non Responders */
+        post: operations["remind_event_non_responders_api_v1_reminders_events__event_id__non_responders_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reminders/sessions/{session_id}/coach": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Remind Coach */
+        post: operations["remind_coach_api_v1_reminders_sessions__session_id__coach_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/reports/{studio_id}/charges/{student_id}": {
         parameters: {
             query?: never;
@@ -3209,6 +3357,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Search */
+        get: operations["search_api_v1_search_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/session-bookings": {
         parameters: {
             query?: never;
@@ -3278,7 +3443,15 @@ export interface paths {
         get: operations["get_session_api_v1_sessions__session_id__get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Delete Session
+         * @description F3 -- delete exists for AD-HOC sessions only.
+         *
+         *     A generated session answers 409: the next rule expansion would recreate it, and
+         *     attendance rows may already point at it -- cancel is the product's answer there. The
+         *     refusal lives here, not only in the UI that hides the button.
+         */
+        delete: operations["delete_session_api_v1_sessions__session_id__delete"];
         options?: never;
         head?: never;
         /** Patch Session */
@@ -3365,6 +3538,30 @@ export interface paths {
         put?: never;
         /** Cancel Session */
         post: operations["cancel_session_api_v1_sessions__session_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sessions/{session_id}/injury-reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Report Injury
+         * @description `9g` (S2) -- the injury report that goes to the manager and the parents NOW.
+         *
+         *     Online-only on purpose, the mirror of the parent's absence pre-report: a report that
+         *     syncs after everyone has gone home is not a report. Not queued, not idempotent -- a
+         *     coach pressing twice sends twice, and two messages about a hurt child beat zero.
+         */
+        post: operations["report_injury_api_v1_sessions__session_id__injury_reports_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3460,6 +3657,101 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/staff/invitations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Staff Invitation
+         * @description F5 — הוספת איש צוות. The token comes back once and never again; the manager
+         *     shares the link, because no mailer exists anywhere in this product (the platform's
+         *     owner invite and §5.4b's onboarding link both work the same way).
+         */
+        post: operations["create_staff_invitation_api_v1_staff_invitations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/staff/invitations/{invitation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Revoke Staff Invitation */
+        delete: operations["revoke_staff_invitation_api_v1_staff_invitations__invitation_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/staff/invitations/{invitation_id}/resend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resend Staff Invitation */
+        post: operations["resend_staff_invitation_api_v1_staff_invitations__invitation_id__resend_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/staff/{person_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Change Staff Roles */
+        patch: operations["change_staff_roles_api_v1_staff__person_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/staff/{person_id}/deactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Deactivate Staff
+         * @description A status change, never a delete — the person holds audit rows, session
+         *     assignments and attendance marks. 409s when they are a group's only lead coach:
+         *     reassign first (F5's decision, recorded in the audit log).
+         */
+        post: operations["deactivate_staff_api_v1_staff__person_id__deactivate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/students": {
         parameters: {
             query?: never;
@@ -3486,6 +3778,28 @@ export interface paths {
          *     lead is.
          */
         post: operations["create_student_api_v1_students_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/students/bulk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Bulk Students Route
+         * @description F12. Same shape as the rollover's bulk steps -- per-row machine-readable refusals,
+         *     never one aggregate error -- but mid-season boundaries: a February move ends
+         *     yesterday and starts today rather than being back-dated to September.
+         */
+        post: operations["bulk_students_route_api_v1_students_bulk_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4883,6 +5197,35 @@ export interface components {
             /** Reason */
             reason: string;
         };
+        /** BulkRefusalOut */
+        BulkRefusalOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Reason */
+            reason: string;
+        };
+        /**
+         * BulkStudentsIn
+         * @description F12 -- selection plus a bulk action, outside the rollover wizard.
+         */
+        BulkStudentsIn: {
+            /** Moves */
+            moves?: components["schemas"]["app__routers__students__EnrollmentMoveIn"][];
+            /** Not Returning */
+            not_returning?: string[];
+            /** Student Moves */
+            student_moves?: components["schemas"]["StudentMoveIn"][];
+        };
+        /** BulkStudentsOut */
+        BulkStudentsOut: {
+            /** Applied */
+            applied: number;
+            /** Refused */
+            refused: components["schemas"]["BulkRefusalOut"][];
+        };
         /**
          * CalendarFeedOut
          * @description The subscription, not its contents.
@@ -5553,6 +5896,11 @@ export interface components {
             /** Status */
             status: string;
         };
+        /** DebtReminderIn */
+        DebtReminderIn: {
+            /** Payer Person Ids */
+            payer_person_ids: string[];
+        };
         /**
          * DeletionRequest
          * @description Request to delete a person's personal data.
@@ -5637,19 +5985,6 @@ export interface components {
              * Format: uuid
              */
             to_group_id: string;
-        };
-        /**
-         * EnrollmentMoveIn
-         * @description Staff 9c's move: the target group, and optionally the effective date.
-         */
-        EnrollmentMoveIn: {
-            /**
-             * Group Id
-             * Format: uuid
-             */
-            group_id: string;
-            /** Moved On */
-            moved_on?: string | null;
         };
         /**
          * EnrollmentOut
@@ -6059,6 +6394,27 @@ export interface components {
              */
             training_year_id: string;
         };
+        /** GroupBeltRangeOut */
+        GroupBeltRangeOut: {
+            /**
+             * Group Id
+             * Format: uuid
+             */
+            group_id: string;
+            /** Max Color Hex */
+            max_color_hex: string;
+            /** Max Name */
+            max_name: string;
+            /** Min Color Hex */
+            min_color_hex: string;
+            /** Min Name */
+            min_name: string;
+        };
+        /** GroupBeltRangesOut */
+        GroupBeltRangesOut: {
+            /** Items */
+            items: components["schemas"]["GroupBeltRangeOut"][];
+        };
         /**
          * GroupEligibilityIn
          * @description The base groups linked to one extra group. A full replace rather than add/remove:
@@ -6121,6 +6477,25 @@ export interface components {
             is_active: boolean;
             /** Name */
             name: string;
+        };
+        /**
+         * GroupPatch
+         * @description F4 -- rename / retire / revive outside the rollover wizard. Every field optional;
+         *     absence leaves the column alone (`model_fields_set` decides, like SessionPatch).
+         *     A club that opens a Tuesday beginners group in November should not have to run a
+         *     yearly wizard out of season to rename one.
+         */
+        GroupPatch: {
+            /** Age Max */
+            age_max?: number | null;
+            /** Age Min */
+            age_min?: number | null;
+            /** Description */
+            description?: string | null;
+            /** Is Active */
+            is_active?: boolean | null;
+            /** Name */
+            name?: string | null;
         };
         /** GroupRename */
         GroupRename: {
@@ -6545,6 +6920,26 @@ export interface components {
             key: string;
             /** Name */
             name: string;
+        };
+        /**
+         * InjuryReportIn
+         * @description `9g`'s injury report (S2) -- written by the coach, read by the manager and the
+         *     child's guardians. The description is the coach's own words FOR those readers; it is
+         *     not a health-declaration content and is never logged (G7 still applies to logs).
+         */
+        InjuryReportIn: {
+            /** Description */
+            description: string;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+        };
+        /** InjuryReportOut */
+        InjuryReportOut: {
+            /** Notified */
+            notified: number;
         };
         /**
          * InstallStateOut
@@ -7908,6 +8303,13 @@ export interface components {
              */
             submitted_at: string;
         };
+        /** ReminderOut */
+        ReminderOut: {
+            /** Sent */
+            sent: number;
+            /** Skipped Recent */
+            skipped_recent: number;
+        };
         /**
          * ReorderLadderIn
          * @description The finished order, whole.
@@ -8286,6 +8688,64 @@ export interface components {
             /** Rules */
             rules?: components["schemas"]["ScheduleRuleOut"][];
         };
+        /** SearchGroupOut */
+        SearchGroupOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+        };
+        /** SearchGuardianOut */
+        SearchGuardianOut: {
+            /** Name */
+            name: string;
+            /**
+             * Person Id
+             * Format: uuid
+             */
+            person_id: string;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+        };
+        /** SearchOut */
+        SearchOut: {
+            /** Groups */
+            groups: components["schemas"]["SearchGroupOut"][];
+            /** Guardians */
+            guardians: components["schemas"]["SearchGuardianOut"][];
+            /** Staff */
+            staff: components["schemas"]["SearchStaffOut"][];
+            /** Students */
+            students: components["schemas"]["SearchStudentOut"][];
+        };
+        /** SearchStaffOut */
+        SearchStaffOut: {
+            /** Name */
+            name: string;
+            /**
+             * Person Id
+             * Format: uuid
+             */
+            person_id: string;
+        };
+        /** SearchStudentOut */
+        SearchStudentOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Status */
+            status: string;
+        };
         /** SeedLadderIn */
         SeedLadderIn: {
             /**
@@ -8573,7 +9033,7 @@ export interface components {
              * Status
              * @enum {string}
              */
-            status: "done" | "skipped";
+            status: "done" | "skipped" | "pending";
         };
         /** SetupStepOut */
         SetupStepOut: {
@@ -8632,6 +9092,33 @@ export interface components {
             /** Name */
             name: string;
         };
+        /** StaffInvitationIn */
+        StaffInvitationIn: {
+            /** Email */
+            email: string;
+            /** First Name */
+            first_name?: string | null;
+            /** Last Name */
+            last_name?: string | null;
+            /** Roles */
+            roles: string[];
+        };
+        /**
+         * StaffInvitationOut
+         * @description The token, exactly once (F5, on the platform invite's pattern). Only its SHA-256
+         *     is stored, and there is no mailer in this product: the link is the manager's to
+         *     share, like §5.4b's onboarding link.
+         */
+        StaffInvitationOut: {
+            /** Email */
+            email: string;
+            /** Expires At */
+            expires_at: string;
+            /** Id */
+            id: string;
+            /** Token */
+            token: string;
+        };
         /** StaffListResponse */
         StaffListResponse: {
             /**
@@ -8641,6 +9128,11 @@ export interface components {
             groups_without_coach: components["schemas"]["StaffGroupOut"][];
             /** Items */
             items: components["schemas"]["StaffMemberOut"][];
+            /**
+             * Sessions Without Coach
+             * @default 0
+             */
+            sessions_without_coach: number;
         };
         /** StaffMemberOut */
         StaffMemberOut: {
@@ -8650,6 +9142,8 @@ export interface components {
             first_name?: string | null;
             /** Groups */
             groups: components["schemas"]["StaffGroupOut"][];
+            /** Invitation Id */
+            invitation_id?: string | null;
             /** Last Name */
             last_name?: string | null;
             /** Permissions */
@@ -8662,9 +9156,14 @@ export interface components {
             status: string;
             /**
              * Weekly Hours
-             * @description Always null in M1. Weekly load is group_schedule_rule × session, both W2 contract models. Zero would report an idle coach rather than a missing measurement.
+             * @description F8: measured from this week's staffed sessions. Null only on a pending invitation, which staffs nothing yet.
              */
             weekly_hours?: number | null;
+        };
+        /** StaffRolesIn */
+        StaffRolesIn: {
+            /** Roles */
+            roles: string[];
         };
         /**
          * StandingOrderLinkIn
@@ -8744,6 +9243,11 @@ export interface components {
             belt_rank_id: string;
             /** Belt Rank Name */
             belt_rank_name: string;
+            /**
+             * Class Id
+             * Format: uuid
+             */
+            class_id: string;
             /** Color Hex */
             color_hex: string;
             /** Event Id */
@@ -8926,6 +9430,19 @@ export interface components {
         StudentMarkLostIn: {
             /** Reason */
             reason: string;
+        };
+        /** StudentMoveIn */
+        StudentMoveIn: {
+            /**
+             * Group Id
+             * Format: uuid
+             */
+            group_id: string;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
         };
         /**
          * StudentOut
@@ -9549,6 +10066,19 @@ export interface components {
             /** Error Type */
             type: string;
         };
+        /** EnrollmentMoveIn */
+        app__routers__students__EnrollmentMoveIn: {
+            /**
+             * Enrollment Id
+             * Format: uuid
+             */
+            enrollment_id: string;
+            /**
+             * Group Id
+             * Format: uuid
+             */
+            group_id: string;
+        };
         /**
          * SessionRosterOut
          * @description `GET /sessions/{id}/attendance`.
@@ -9557,6 +10087,19 @@ export interface components {
             /** Roster */
             roster?: components["schemas"]["RosterEntry"][];
             session: components["schemas"]["SessionOut"];
+        };
+        /**
+         * EnrollmentMoveIn
+         * @description Staff 9c's move: the target group, and optionally the effective date.
+         */
+        app__schemas__people__EnrollmentMoveIn: {
+            /**
+             * Group Id
+             * Format: uuid
+             */
+            group_id: string;
+            /** Moved On */
+            moved_on?: string | null;
         };
         /** StudioOut */
         app__schemas__platform__StudioOut: {
@@ -10340,6 +10883,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CursorPage_BeltPresetOut_"];
+                };
+            };
+        };
+    };
+    belt_ranges_by_group_api_v1_belt_ranges_by_group_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroupBeltRangesOut"];
                 };
             };
         };
@@ -11270,7 +11833,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["EnrollmentMoveIn"];
+                "application/json": components["schemas"]["app__schemas__people__EnrollmentMoveIn"];
             };
         };
         responses: {
@@ -11743,6 +12306,70 @@ export interface operations {
             };
         };
     };
+    accountant_export_api_v1_exports_accountant_get: {
+        parameters: {
+            query: {
+                year: number;
+                month: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    attendance_export_api_v1_exports_attendance_get: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_groups_api_v1_groups_get: {
         parameters: {
             query?: {
@@ -11791,6 +12418,41 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroupOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_group_api_v1_groups__group_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                group_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GroupPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -14507,6 +15169,101 @@ export interface operations {
             };
         };
     };
+    remind_debt_api_v1_reminders_debt_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DebtReminderIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReminderOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remind_event_non_responders_api_v1_reminders_events__event_id__non_responders_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                event_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReminderOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remind_coach_api_v1_reminders_sessions__session_id__coach_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReminderOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_student_charges_api_v1_reports__studio_id__charges__student_id__get: {
         parameters: {
             query?: never;
@@ -14830,6 +15587,37 @@ export interface operations {
             };
         };
     };
+    search_api_v1_search_get: {
+        parameters: {
+            query: {
+                q: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     mark_session_api_v1_session_bookings_post: {
         parameters: {
             query?: never;
@@ -14985,6 +15773,35 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["SessionOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_session_api_v1_sessions__session_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -15173,6 +15990,41 @@ export interface operations {
             };
         };
     };
+    report_injury_api_v1_sessions__session_id__injury_reports_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InjuryReportIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InjuryReportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_notes_api_v1_sessions__session_id__notes_get: {
         parameters: {
             query?: {
@@ -15340,6 +16192,161 @@ export interface operations {
             };
         };
     };
+    create_staff_invitation_api_v1_staff_invitations_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StaffInvitationIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StaffInvitationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_staff_invitation_api_v1_staff_invitations__invitation_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                invitation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resend_staff_invitation_api_v1_staff_invitations__invitation_id__resend_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                invitation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StaffInvitationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    change_staff_roles_api_v1_staff__person_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                person_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StaffRolesIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    deactivate_staff_api_v1_staff__person_id__deactivate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                person_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_students_api_v1_students_get: {
         parameters: {
             query?: {
@@ -15399,6 +16406,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StudentCreateResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    bulk_students_route_api_v1_students_bulk_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkStudentsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkStudentsOut"];
                 };
             };
             /** @description Validation Error */

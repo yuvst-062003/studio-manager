@@ -19,6 +19,7 @@
 import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { Button, Card, EmptyState, LoadFailed, MoneyDisplay, StatusChip } from '@studio/ui'
+import { formatDateInStudioZone } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { deadlinePassed } from './client'
@@ -138,6 +139,25 @@ export function ParentEventsScreen({
 
             {/* One rendering per state, in words. */}
             <p style={hintStyle}>{rsvpLine(row, locale)}</p>
+            {row.event.requires_consent ? (
+              <p style={hintStyle}>
+                <StatusChip
+                  label={t(
+                    locale,
+                    row.registration.consent_signed_at
+                      ? 'events.consent.signed'
+                      : 'events.consent.required',
+                  )}
+                  status={row.registration.consent_signed_at ? 'paid' : 'pending'}
+                />
+              </p>
+            ) : null}
+            {row.event.rsvp_deadline ? (
+              <p style={hintStyle}>
+                {t(locale, 'events.rsvp.closesOn')}{' '}
+                {formatDateInStudioZone(row.event.rsvp_deadline, locale)}
+              </p>
+            ) : null}
             {deadlinePassed(row.event, now) ? (
               <p style={hintStyle}>{t(locale, 'events.rsvp.deadlinePassed')}</p>
             ) : null}

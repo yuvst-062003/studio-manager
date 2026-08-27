@@ -8,7 +8,7 @@
 // and §5.11 permits no email or SMS fallback, so that parent is reachable only by
 // telephone."
 import { useEffect, useMemo, useState } from 'react'
-import { apiFetch, useDisplayMode, useSession } from '@studio/core'
+import { apiFetch, getAccessToken, useDisplayMode, useSession } from '@studio/core'
 import {
   AccountDrawerFooter,
   AppShell,
@@ -45,6 +45,7 @@ import {
   makeParentEventsClient,
 } from './features/events'
 import { BeltProgressScreen, makeParentBeltsClient, registerBeltSections } from './features/belts'
+import { BeltRouteResolver } from './features/belts/BeltRouteResolver'
 import { InboxScreen, makeParentCommsClient } from './features/comms'
 import { AddSibling, ProfileSection, makePeopleClient, registerPeopleSections } from './features/people'
 // `2c` behind `#/student/<id>` — the composite card the slot system was built for (P2).
@@ -120,7 +121,56 @@ function useHash(): string {
   return hash
 }
 
+/**
+ * L6/P4 — the public routes resolve BEFORE any session hook can run. `useSession()`
+ * fires `/auth/refresh` on mount, so the old shape — one component, early returns after
+ * the hooks — meant every anonymous landing visit took a 401 on a page a stranger sees
+ * first. §5.4a's rule is in PublicLanding's own header: the sign-in wall stands in front
+ * of BOOKING, never in front of reading. The split is what keeps the hook out of the
+ * public paths entirely.
+ */
 export default function App() {
+  const path = globalThis.location?.pathname ?? '/'
+  const landingRoute = matchLandingPath(path)
+  const joinToken = matchJoinPath(path)
+  if (landingRoute) return <LandingShell slug={landingRoute.slug} />
+  if (joinToken) return <JoinShell token={joinToken} />
+  return <AuthedApp />
+}
+
+function LandingShell({ slug }: { slug: string }) {
+  const [locale, setLocale] = useState<Locale>('he')
+  useDocumentLocale(locale)
+  const landingClient = useMemo(() => makeLandingClient(apiFetch), [])
+  return (
+    <ThemeProvider>
+      {/* Language before login (§6.1): a Russian-speaking parent cannot read a Hebrew
+          offer any more than a Hebrew consent screen. */}
+      <LanguagePicker locale={locale} onChoose={setLocale} />
+      <PublicLanding
+        slug={slug}
+        locale={locale}
+        client={landingClient}
+        // Passive: the in-memory token, never a request. A cold anonymous load is
+        // simply not signed in, and the booking flow's own first step signs in.
+        signedIn={getAccessToken() !== null}
+      />
+    </ThemeProvider>
+  )
+}
+
+function JoinShell({ token }: { token: string }) {
+  const [locale, setLocale] = useState<Locale>('he')
+  useDocumentLocale(locale)
+  return (
+    <ThemeProvider>
+      <LanguagePicker locale={locale} onChoose={setLocale} />
+      <JoinFlow locale={locale} token={token} />
+    </ThemeProvider>
+  )
+}
+
+function AuthedApp() {
   const session = useSession()
   const displayMode = useDisplayMode()
   // M0 drew this line: core's isInstalled() is display-mode !== 'browser', so a
@@ -147,7 +197,6 @@ export default function App() {
   // keyed on the client, so a fresh object every render would re-fetch forever — the
   // month for 12b, the club for 13a.
   const scheduleClient = useMemo(() => makeParentScheduleClient(apiFetch), [])
-  const landingClient = useMemo(() => makeLandingClient(apiFetch), [])
   const peopleClient = useMemo(() => makePeopleClient(apiFetch), [])
   const eventsClient = useMemo(() => makeParentEventsClient(apiFetch), [])
   const beltsClient = useMemo(() => makeParentBeltsClient(apiFetch), [])
@@ -251,33 +300,6 @@ export default function App() {
   // §5.4b — the onboarding link, AHEAD of the install gate for the same reason the
   // landing page is: it arrives from WhatsApp into whatever browser opens, and an
   // install wall between the tap and the form is where a migration cohort evaporates.
-  const joinToken = matchJoinPath(globalThis.location?.pathname ?? '/')
-  if (joinToken) {
-    return (
-      <ThemeProvider>
-        <LanguagePicker locale={locale} onChoose={setLocale} />
-        <JoinFlow locale={locale} token={joinToken} />
-      </ThemeProvider>
-    )
-  }
-
-  const landingRoute = matchLandingPath(globalThis.location?.pathname ?? '/')
-  if (landingRoute) {
-    return (
-      <ThemeProvider>
-        {/* Language before login (§6.1): a Russian-speaking parent cannot read a Hebrew
-            offer any more than a Hebrew consent screen. */}
-        <LanguagePicker locale={locale} onChoose={setLocale} />
-        <PublicLanding
-          slug={landingRoute.slug}
-          locale={locale}
-          client={landingClient}
-          signedIn={session.status === 'signed-in'}
-        />
-      </ThemeProvider>
-    )
-  }
-
   return (
     <ThemeProvider>
       {/* New-build toast — floats over whatever is open, in every session state. */}
@@ -442,6 +464,10 @@ export default function App() {
               locale={locale}
               studentId={belts[0]!}
             />
+          ) : hash.startsWith('#/belts') ? (
+            // P7 — the single-segment form resolves through the child's belt history or
+            // refuses visibly. It used to fall through to home with no message.
+            <BeltRouteResolver locale={locale} studentId={belts[0] ?? ''} />
           ) : invite.length === 2 ? (
             <EventInviteScreen
               client={eventsClient}

@@ -7,6 +7,8 @@ import type { Bundle } from '../types'
  */
 export const comms: Bundle = {
   // -- the parent inbox (parent 2b ▲ D9.1 — inbox only) --------------------------
+  'inbox.fillDeclaration': 'Заполнить декларацию',
+  'inbox.later': 'Позже',
   'inbox.title': 'Новости клуба',
   'inbox.empty': 'Обновлений нет',
   'inbox.emptyHint': 'Сообщения от клуба появятся здесь',

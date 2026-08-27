@@ -92,6 +92,7 @@ export const events: Bundle = {
   'consent.blocksConfirmation': 'ההשתתפות תיחשב מאושרת רק לאחר חתימת ההורה',
 
   // -- RSVP (parent 7d, dashboard 7c) ---------------------------------------------
+  'rsvp.closesOn': 'ההרשמה נסגרת בתאריך',
   'rsvp.title': 'אישור השתתפות',
   'rsvp.yes': 'מגיע',
   'rsvp.no': 'לא מגיע',
@@ -133,6 +134,9 @@ export const events: Bundle = {
   'exam.empty': 'לא נקבעו מבחני חגורה',
 
   // -- the belt system (dashboard 5b, wizard 5d) ----------------------------------
+  'belt.progressLink': 'התקדמות מלאה',
+  'belt.noneYet': 'אין עדיין היסטוריית חגורות',
+  'belt.noneYetHint': 'כשתוענק חגורה, ההתקדמות תוצג כאן',
   'belt.title': 'מערכת חגורות',
   'belt.noClasses': 'עדיין אין חוגים — מסלול חגורות נפתח על חוג.',
   'belt.openLadder': 'פתיחת סולם החגורות',

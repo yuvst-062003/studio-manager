@@ -3,6 +3,8 @@ import type { Bundle } from '../types'
 /** Mirror of `he/comms.ts`. `en` is `strict` in the parity policy — a gap fails the build. */
 export const comms: Bundle = {
   // -- the parent inbox (parent 2b ▲ D9.1 — inbox only) --------------------------
+  'inbox.fillDeclaration': 'Fill the declaration',
+  'inbox.later': 'Later',
   'inbox.title': 'Club updates',
   'inbox.empty': 'No updates',
   'inbox.emptyHint': 'Messages from the club appear here',

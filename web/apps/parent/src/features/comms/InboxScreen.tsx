@@ -197,6 +197,32 @@ export function InboxScreen({
         />
       ) : null}
 
+      {/* 2b's דורש פעולה card (P5): an unread health notice pins above the feed until
+          acted on. מילוי הצהרה routes home, where §6.1's gate holds the form; אחר כך
+          marks it read, which is what clears the pin. */}
+      {rows
+        .filter((row) => row.kind.startsWith('health.') && row.read_at === null)
+        .map((row) => (
+          <Card key={`action-${row.id}`}>
+            <div data-testid={`inbox-action-${row.id}`} style={prePromptStyle}>
+              <p style={rowTitleStyle}>{row.title}</p>
+              <p style={bodyStyle}>{row.body}</p>
+              <div style={promptActionsStyle}>
+                <Button
+                  onClick={() => {
+                    globalThis.location.hash = '#/'
+                  }}
+                >
+                  {t(locale, 'comms.inbox.fillDeclaration')}
+                </Button>
+                <Button onClick={() => void open(row)} variant="secondary">
+                  {t(locale, 'comms.inbox.later')}
+                </Button>
+              </div>
+            </div>
+          </Card>
+        ))}
+
       {rows.map((row) => (
         <Card key={row.id}>
           {/* A button and not a div: the row is interactive, so it has to be reachable by

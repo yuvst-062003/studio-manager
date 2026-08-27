@@ -72,6 +72,9 @@ class StudentBeltOut(BaseModel):
     id: uuid.UUID
     student_id: uuid.UUID
     belt_rank_id: uuid.UUID
+    #: The class whose ladder this rank belongs to (P7) — what lets a parent's award row
+    #: link to `12d` without a staff-only /groups read.
+    class_id: uuid.UUID
     belt_rank_name: str
     color_hex: HexColour
     secondary_color_hex: HexColour | None

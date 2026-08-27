@@ -126,3 +126,78 @@ describe('the P1 routes — screens that were built and rendered by nothing', ()
     await waitFor(() => expect(screen.getByTestId('student-card-missing')).toBeInTheDocument())
   })
 })
+
+describe('L6 — the anonymous landing touches no session', () => {
+  it('loading /t/<slug> signed out issues zero authenticated requests', async () => {
+    globalThis.history.pushState({}, '', '/t/gladiator')
+    const calls: string[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        calls.push(String(input))
+        return new Response(
+          JSON.stringify({
+            studio_name: 'גלדיאטור',
+            slug: 'gladiator',
+            logo_url: null,
+            default_locale: 'he',
+            headline: null,
+            about: null,
+            address: null,
+            photo_urls: [],
+            groups: [],
+          }),
+          { status: 200 },
+        )
+      }),
+    )
+    render(<App />)
+    await waitFor(() => expect(calls.length).toBeGreaterThan(0))
+    // The wall stands in front of BOOKING, never in front of reading: no refresh, no
+    // me-reads, nothing carrying credentials — the public read only.
+    expect(calls.every((url) => url.includes('/public/'))).toBe(true)
+    expect(calls.some((url) => url.includes('/auth/refresh'))).toBe(false)
+    globalThis.history.pushState({}, '', '/')
+  })
+})
+
+describe('P7 — the belt link resolves or refuses, never silently home', () => {
+  it('completes a single-segment link from the child’s belt history', async () => {
+    globalThis.location.hash = '#/belts/st1'
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) =>
+        String(input).includes('/students/st1/belts')
+          ? new Response(
+              JSON.stringify({
+                items: [
+                  {
+                    id: 'a1',
+                    student_id: 'st1',
+                    belt_rank_id: 'r1',
+                    class_id: 'c9',
+                    belt_rank_name: 'צהובה',
+                    color_hex: '#f5d000',
+                    secondary_color_hex: null,
+                    awarded_on: '2026-05-01',
+                    awarded_by_person_id: null,
+                    event_id: null,
+                    note: null,
+                  },
+                ],
+              }),
+              { status: 200 },
+            )
+          : new Response(JSON.stringify({ items: [] }), { status: 200 }),
+      ),
+    )
+    render(<App />)
+    await waitFor(() => expect(globalThis.location.hash).toBe('#/belts/st1/c9'))
+  })
+
+  it('refuses a bare #/belts/ visibly, with a way forward', async () => {
+    globalThis.location.hash = '#/belts/'
+    render(<App />)
+    expect(await screen.findByText(t('he', 'events.belt.noneYet'))).toBeInTheDocument()
+  })
+})

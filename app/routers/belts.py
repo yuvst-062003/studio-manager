@@ -175,7 +175,7 @@ def belt_ranges_by_group(_: AnyStaff, session: TenantSessionDep) -> GroupBeltRan
 
 @router.get("/belt-ranks", response_model=LadderPage)
 def list_belt_ranks(
-    _: AnyStaff,
+    request: Request,
     class_id: uuid.UUID,
     session: TenantSessionDep,
     after: uuid.UUID | None = None,
@@ -183,10 +183,20 @@ def list_belt_ranks(
 ) -> LadderPage:
     """`5b`'s table, and the ladder every progression screen reads.
 
+    Signed-in, not staff-only (P7): parent `12d` renders the SAME ladder — it is what
+    makes a progression drawable — and the AnyStaff guard this carried meant the routed
+    parent screen answered 403 for every guardian. Belt names and colours carry nothing
+    §11 protects; the tenant filter still scopes the read.
+
     `class_id` is required rather than optional: `events.belt.perClassHint` says the system
     is defined per class, and a studio-wide list of two disciplines' ranks interleaved by
     `order_index` would be meaningless.
     """
+    if getattr(request.state, "identity_id", None) is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={"code": "unauthenticated", "message": "sign in first"},
+        )
     rows = BeltRankService.list_for_class(session, class_id)
     items = _ladder_out(session, rows)
     # `next_rank_id` is derived from the whole ladder, so the page is the ladder. A class
@@ -355,6 +365,7 @@ def _student_belt_out(row: StudentBelt, rank: BeltRank) -> StudentBeltOut:
         id=row.id,
         student_id=row.student_id,
         belt_rank_id=row.belt_rank_id,
+        class_id=rank.class_id,
         belt_rank_name=rank.name,
         color_hex=rank.color_hex,
         secondary_color_hex=rank.secondary_color_hex,

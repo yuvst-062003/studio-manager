@@ -39,6 +39,12 @@ export function StudentCardBeltSection({
       <BeltBar colorHex={current.color_hex} label={current.belt_rank_name} />
       <p>
         <bdi>{current.belt_rank_name}</bdi> · {formatDateInStudioZone(`${current.awarded_on}T12:00:00Z`, locale)}
+        {' · '}
+        {/* 12d's first real entry point — the progression screen was routed and linked
+            from nothing. */}
+        <a data-testid="belt-progress-link" href={`#/belts/${student.id}/${current.class_id}`}>
+          {t(locale, 'events.belt.progressLink')}
+        </a>
       </p>
       {awards.length > 1 ? (
         <ol data-testid="belt-history">

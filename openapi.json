@@ -1251,6 +1251,78 @@
         "title": "BulkRefusal",
         "type": "object"
       },
+      "BulkRefusalOut": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "reason"
+        ],
+        "title": "BulkRefusalOut",
+        "type": "object"
+      },
+      "BulkStudentsIn": {
+        "description": "F12 -- selection plus a bulk action, outside the rollover wizard.",
+        "properties": {
+          "moves": {
+            "items": {
+              "$ref": "#/components/schemas/app__routers__students__EnrollmentMoveIn"
+            },
+            "maxItems": 500,
+            "title": "Moves",
+            "type": "array"
+          },
+          "not_returning": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 500,
+            "title": "Not Returning",
+            "type": "array"
+          },
+          "student_moves": {
+            "items": {
+              "$ref": "#/components/schemas/StudentMoveIn"
+            },
+            "maxItems": 500,
+            "title": "Student Moves",
+            "type": "array"
+          }
+        },
+        "title": "BulkStudentsIn",
+        "type": "object"
+      },
+      "BulkStudentsOut": {
+        "properties": {
+          "applied": {
+            "title": "Applied",
+            "type": "integer"
+          },
+          "refused": {
+            "items": {
+              "$ref": "#/components/schemas/BulkRefusalOut"
+            },
+            "title": "Refused",
+            "type": "array"
+          }
+        },
+        "required": [
+          "applied",
+          "refused"
+        ],
+        "title": "BulkStudentsOut",
+        "type": "object"
+      },
       "CalendarFeedOut": {
         "description": "The subscription, not its contents.\n\n§5.12: \"The feed contains no medical and no financial data.\" This shape holds a URL and\na rotation timestamp and has nowhere to put either, which is the durable version of\nthat sentence — the URL is unauthenticated and, once subscribed, is fetched by Google's\nservers on their schedule and outside our control.",
         "properties": {
@@ -2829,6 +2901,25 @@
         "title": "DataExportResponse",
         "type": "object"
       },
+      "DebtReminderIn": {
+        "properties": {
+          "payer_person_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 500,
+            "minItems": 1,
+            "title": "Payer Person Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "payer_person_ids"
+        ],
+        "title": "DebtReminderIn",
+        "type": "object"
+      },
       "DeletionRequest": {
         "description": "Request to delete a person's personal data.",
         "properties": {
@@ -2975,33 +3066,6 @@
           "to_group_id"
         ],
         "title": "EnrollmentMove",
-        "type": "object"
-      },
-      "EnrollmentMoveIn": {
-        "description": "Staff 9c's move: the target group, and optionally the effective date.",
-        "properties": {
-          "group_id": {
-            "format": "uuid",
-            "title": "Group Id",
-            "type": "string"
-          },
-          "moved_on": {
-            "anyOf": [
-              {
-                "format": "date",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Moved On"
-          }
-        },
-        "required": [
-          "group_id"
-        ],
-        "title": "EnrollmentMoveIn",
         "type": "object"
       },
       "EnrollmentOut": {
@@ -4028,6 +4092,56 @@
         "title": "GenerateSessionsOut",
         "type": "object"
       },
+      "GroupBeltRangeOut": {
+        "properties": {
+          "group_id": {
+            "format": "uuid",
+            "title": "Group Id",
+            "type": "string"
+          },
+          "max_color_hex": {
+            "title": "Max Color Hex",
+            "type": "string"
+          },
+          "max_name": {
+            "title": "Max Name",
+            "type": "string"
+          },
+          "min_color_hex": {
+            "title": "Min Color Hex",
+            "type": "string"
+          },
+          "min_name": {
+            "title": "Min Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "group_id",
+          "min_name",
+          "min_color_hex",
+          "max_name",
+          "max_color_hex"
+        ],
+        "title": "GroupBeltRangeOut",
+        "type": "object"
+      },
+      "GroupBeltRangesOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/GroupBeltRangeOut"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "GroupBeltRangesOut",
+        "type": "object"
+      },
       "GroupEligibilityIn": {
         "description": "The base groups linked to one extra group. A full replace rather than add/remove:\nthe manager's mental model is a checklist (\"Groups 3, 4 and 5\"), and two verbs for one\nchecklist is how a half-applied edit happens.",
         "properties": {
@@ -4189,6 +4303,75 @@
           "is_active"
         ],
         "title": "GroupOut",
+        "type": "object"
+      },
+      "GroupPatch": {
+        "description": "F4 -- rename / retire / revive outside the rollover wizard. Every field optional;\nabsence leaves the column alone (`model_fields_set` decides, like SessionPatch).\nA club that opens a Tuesday beginners group in November should not have to run a\nyearly wizard out of season to rename one.",
+        "properties": {
+          "age_max": {
+            "anyOf": [
+              {
+                "maximum": 120.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age Max"
+          },
+          "age_min": {
+            "anyOf": [
+              {
+                "maximum": 120.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age Min"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Active"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          }
+        },
+        "title": "GroupPatch",
         "type": "object"
       },
       "GroupRename": {
@@ -4974,6 +5157,41 @@
           "date_to"
         ],
         "title": "HolidayPresetOut",
+        "type": "object"
+      },
+      "InjuryReportIn": {
+        "description": "`9g`'s injury report (S2) -- written by the coach, read by the manager and the\nchild's guardians. The description is the coach's own words FOR those readers; it is\nnot a health-declaration content and is never logged (G7 still applies to logs).",
+        "properties": {
+          "description": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Description",
+            "type": "string"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "student_id",
+          "description"
+        ],
+        "title": "InjuryReportIn",
+        "type": "object"
+      },
+      "InjuryReportOut": {
+        "properties": {
+          "notified": {
+            "title": "Notified",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "notified"
+        ],
+        "title": "InjuryReportOut",
         "type": "object"
       },
       "InstallStateOut": {
@@ -7963,6 +8181,24 @@
         "title": "RegistrationRequestOut",
         "type": "object"
       },
+      "ReminderOut": {
+        "properties": {
+          "sent": {
+            "title": "Sent",
+            "type": "integer"
+          },
+          "skipped_recent": {
+            "title": "Skipped Recent",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "sent",
+          "skipped_recent"
+        ],
+        "title": "ReminderOut",
+        "type": "object"
+      },
       "ReorderLadderIn": {
         "description": "The finished order, whole.\n\nA partial list would leave the omitted ranks at indices the named ones are about to\ntake, and a pairwise swap through `uq_belt_rank_class_order` has to pass through a\ncolliding intermediate state. `5b` reorders by drag; the API takes the result either\nway.",
         "properties": {
@@ -8656,6 +8892,133 @@
         "title": "ScheduleRulesOut",
         "type": "object"
       },
+      "SearchGroupOut": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "SearchGroupOut",
+        "type": "object"
+      },
+      "SearchGuardianOut": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "person_id": {
+            "format": "uuid",
+            "title": "Person Id",
+            "type": "string"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "person_id",
+          "name",
+          "student_id"
+        ],
+        "title": "SearchGuardianOut",
+        "type": "object"
+      },
+      "SearchOut": {
+        "properties": {
+          "groups": {
+            "items": {
+              "$ref": "#/components/schemas/SearchGroupOut"
+            },
+            "title": "Groups",
+            "type": "array"
+          },
+          "guardians": {
+            "items": {
+              "$ref": "#/components/schemas/SearchGuardianOut"
+            },
+            "title": "Guardians",
+            "type": "array"
+          },
+          "staff": {
+            "items": {
+              "$ref": "#/components/schemas/SearchStaffOut"
+            },
+            "title": "Staff",
+            "type": "array"
+          },
+          "students": {
+            "items": {
+              "$ref": "#/components/schemas/SearchStudentOut"
+            },
+            "title": "Students",
+            "type": "array"
+          }
+        },
+        "required": [
+          "students",
+          "guardians",
+          "groups",
+          "staff"
+        ],
+        "title": "SearchOut",
+        "type": "object"
+      },
+      "SearchStaffOut": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "person_id": {
+            "format": "uuid",
+            "title": "Person Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "person_id",
+          "name"
+        ],
+        "title": "SearchStaffOut",
+        "type": "object"
+      },
+      "SearchStudentOut": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "status"
+        ],
+        "title": "SearchStudentOut",
+        "type": "object"
+      },
       "SeedLadderIn": {
         "properties": {
           "class_id": {
@@ -9184,7 +9547,8 @@
           "status": {
             "enum": [
               "done",
-              "skipped"
+              "skipped",
+              "pending"
             ],
             "title": "Status",
             "type": "string"
@@ -9352,6 +9716,82 @@
         "title": "StaffGroupOut",
         "type": "object"
       },
+      "StaffInvitationIn": {
+        "properties": {
+          "email": {
+            "maxLength": 320,
+            "minLength": 3,
+            "title": "Email",
+            "type": "string"
+          },
+          "first_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Name"
+          },
+          "last_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Name"
+          },
+          "roles": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 3,
+            "minItems": 1,
+            "title": "Roles",
+            "type": "array"
+          }
+        },
+        "required": [
+          "email",
+          "roles"
+        ],
+        "title": "StaffInvitationIn",
+        "type": "object"
+      },
+      "StaffInvitationOut": {
+        "description": "The token, exactly once (F5, on the platform invite's pattern). Only its SHA-256\nis stored, and there is no mailer in this product: the link is the manager's to\nshare, like §5.4b's onboarding link.",
+        "properties": {
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "expires_at": {
+            "title": "Expires At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "token": {
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "expires_at",
+          "token"
+        ],
+        "title": "StaffInvitationOut",
+        "type": "object"
+      },
       "StaffListResponse": {
         "properties": {
           "groups_without_coach": {
@@ -9368,6 +9808,11 @@
             },
             "title": "Items",
             "type": "array"
+          },
+          "sessions_without_coach": {
+            "default": 0,
+            "title": "Sessions Without Coach",
+            "type": "integer"
           }
         },
         "required": [
@@ -9407,6 +9852,17 @@
             },
             "title": "Groups",
             "type": "array"
+          },
+          "invitation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invitation Id"
           },
           "last_name": {
             "anyOf": [
@@ -9457,7 +9913,7 @@
                 "type": "null"
               }
             ],
-            "description": "Always null in M1. Weekly load is group_schedule_rule × session, both W2 contract models. Zero would report an idle coach rather than a missing measurement.",
+            "description": "F8: measured from this week's staffed sessions. Null only on a pending invitation, which staffs nothing yet.",
             "title": "Weekly Hours"
           }
         },
@@ -9468,6 +9924,24 @@
           "status"
         ],
         "title": "StaffMemberOut",
+        "type": "object"
+      },
+      "StaffRolesIn": {
+        "properties": {
+          "roles": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 3,
+            "minItems": 1,
+            "title": "Roles",
+            "type": "array"
+          }
+        },
+        "required": [
+          "roles"
+        ],
+        "title": "StaffRolesIn",
         "type": "object"
       },
       "StandingOrderLinkIn": {
@@ -9607,6 +10081,11 @@
             "title": "Belt Rank Name",
             "type": "string"
           },
+          "class_id": {
+            "format": "uuid",
+            "title": "Class Id",
+            "type": "string"
+          },
           "color_hex": {
             "pattern": "^#[0-9a-fA-F]{6}$",
             "title": "Color Hex",
@@ -9662,6 +10141,7 @@
           "id",
           "student_id",
           "belt_rank_id",
+          "class_id",
           "belt_rank_name",
           "color_hex",
           "secondary_color_hex",
@@ -10113,6 +10593,26 @@
           "reason"
         ],
         "title": "StudentMarkLostIn",
+        "type": "object"
+      },
+      "StudentMoveIn": {
+        "properties": {
+          "group_id": {
+            "format": "uuid",
+            "title": "Group Id",
+            "type": "string"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "student_id",
+          "group_id"
+        ],
+        "title": "StudentMoveIn",
         "type": "object"
       },
       "StudentOut": {
@@ -11640,6 +12140,26 @@
         "title": "ValidationError",
         "type": "object"
       },
+      "app__routers__students__EnrollmentMoveIn": {
+        "properties": {
+          "enrollment_id": {
+            "format": "uuid",
+            "title": "Enrollment Id",
+            "type": "string"
+          },
+          "group_id": {
+            "format": "uuid",
+            "title": "Group Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "enrollment_id",
+          "group_id"
+        ],
+        "title": "EnrollmentMoveIn",
+        "type": "object"
+      },
       "app__schemas__attendance__SessionRosterOut": {
         "description": "`GET /sessions/{id}/attendance`.",
         "properties": {
@@ -11658,6 +12178,33 @@
           "session"
         ],
         "title": "SessionRosterOut",
+        "type": "object"
+      },
+      "app__schemas__people__EnrollmentMoveIn": {
+        "description": "Staff 9c's move: the target group, and optionally the effective date.",
+        "properties": {
+          "group_id": {
+            "format": "uuid",
+            "title": "Group Id",
+            "type": "string"
+          },
+          "moved_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Moved On"
+          }
+        },
+        "required": [
+          "group_id"
+        ],
+        "title": "EnrollmentMoveIn",
         "type": "object"
       },
       "app__schemas__platform__StudioOut": {
@@ -13025,9 +13572,31 @@
         ]
       }
     },
+    "/api/v1/belt-ranges/by-group": {
+      "get": {
+        "description": "F8 — 4b's טווח חגורות, measured: the lowest and highest CURRENT belt among each\ngroup's live enrollments. A group whose students hold no belt yet is simply absent —\nan empty range is not a range.",
+        "operationId": "belt_ranges_by_group_api_v1_belt_ranges_by_group_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupBeltRangesOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Belt Ranges By Group",
+        "tags": [
+          "belts"
+        ]
+      }
+    },
     "/api/v1/belt-ranks": {
       "get": {
-        "description": "`5b`'s table, and the ladder every progression screen reads.\n\n`class_id` is required rather than optional: `events.belt.perClassHint` says the system\nis defined per class, and a studio-wide list of two disciplines' ranks interleaved by\n`order_index` would be meaningless.",
+        "description": "`5b`'s table, and the ladder every progression screen reads.\n\nSigned-in, not staff-only (P7): parent `12d` renders the SAME ladder — it is what\nmakes a progression drawable — and the AnyStaff guard this carried meant the routed\nparent screen answered 403 for every guardian. Belt names and colours carry nothing\n§11 protects; the tenant filter still scopes the read.\n\n`class_id` is required rather than optional: `events.belt.perClassHint` says the system\nis defined per class, and a studio-wide list of two disciplines' ranks interleaved by\n`order_index` would be meaningless.",
         "operationId": "list_belt_ranks_api_v1_belt_ranks_get",
         "parameters": [
           {
@@ -14643,7 +15212,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/EnrollmentMoveIn"
+                "$ref": "#/components/schemas/app__schemas__people__EnrollmentMoveIn"
               }
             }
           },
@@ -15484,6 +16053,116 @@
         ]
       }
     },
+    "/api/v1/exports/accountant": {
+      "get": {
+        "description": "`ייצוא לרו\"ח` -- every payment received in the Jerusalem month, one row each.\n\nReceived, not charged: a bookkeeper files income by when money arrived. Reversed\npayments are included with their reversal marked -- an export that silently dropped\na reversed row would disagree with the bank statement it sits beside.",
+        "operationId": "accountant_export_api_v1_exports_accountant_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "year",
+            "required": true,
+            "schema": {
+              "maximum": 2100,
+              "minimum": 2000,
+              "title": "Year",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "month",
+            "required": true,
+            "schema": {
+              "maximum": 12,
+              "minimum": 1,
+              "title": "Month",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Accountant Export",
+        "tags": [
+          "billing",
+          "reports",
+          "exports"
+        ]
+      }
+    },
+    "/api/v1/exports/attendance": {
+      "get": {
+        "description": "`ייצוא דוח נוכחות` -- one row per mark in the range. Statuses stay the product's\nown vocabulary; no health data of any kind rides along.",
+        "operationId": "attendance_export_api_v1_exports_attendance_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "from",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "title": "From",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "title": "To",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Attendance Export",
+        "tags": [
+          "billing",
+          "reports",
+          "exports"
+        ]
+      }
+    },
     "/api/v1/groups": {
       "get": {
         "operationId": "list_groups_api_v1_groups_get",
@@ -15597,6 +16276,60 @@
           }
         },
         "summary": "Create Group",
+        "tags": [
+          "structure"
+        ]
+      }
+    },
+    "/api/v1/groups/{group_id}": {
+      "patch": {
+        "description": "F4 -- rename / retire / revive, outside the once-a-year rollover wizard. Rename\nand retire used to exist ONLY inside `POST /rollover/{y}/groups`; a club opening a\nTuesday beginners group in November had nowhere to do this.",
+        "operationId": "update_group_api_v1_groups__group_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "group_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Group Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GroupPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Group",
         "tags": [
           "structure"
         ]
@@ -19951,6 +20684,137 @@
         ]
       }
     },
+    "/api/v1/reminders/debt": {
+      "post": {
+        "description": "One household or many -- the bulk button is this same route with more ids.",
+        "operationId": "remind_debt_api_v1_reminders_debt_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DebtReminderIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReminderOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remind Debt",
+        "tags": [
+          "comms",
+          "reminders"
+        ]
+      }
+    },
+    "/api/v1/reminders/events/{event_id}/non-responders": {
+      "post": {
+        "operationId": "remind_event_non_responders_api_v1_reminders_events__event_id__non_responders_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "event_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Event Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReminderOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remind Event Non Responders",
+        "tags": [
+          "comms",
+          "reminders"
+        ]
+      }
+    },
+    "/api/v1/reminders/sessions/{session_id}/coach": {
+      "post": {
+        "operationId": "remind_coach_api_v1_reminders_sessions__session_id__coach_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReminderOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remind Coach",
+        "tags": [
+          "comms",
+          "reminders"
+        ]
+      }
+    },
     "/api/v1/reports/{studio_id}/charges/{student_id}": {
       "get": {
         "description": "Fetch all charges for a student for invoice generation.\n\nReturns charge details across all periods, sorted by period (newest first).\nOnly accessible to owner and manager roles.",
@@ -20543,6 +21407,51 @@
         ]
       }
     },
+    "/api/v1/search": {
+      "get": {
+        "operationId": "search_api_v1_search_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": true,
+            "schema": {
+              "maxLength": 100,
+              "minLength": 1,
+              "title": "Q",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Search",
+        "tags": [
+          "people",
+          "search"
+        ]
+      }
+    },
     "/api/v1/session-bookings": {
       "post": {
         "description": "\"I am coming to this one.\" Own children only; the four rules live in the service.",
@@ -20808,6 +21717,42 @@
       }
     },
     "/api/v1/sessions/{session_id}": {
+      "delete": {
+        "description": "F3 -- delete exists for AD-HOC sessions only.\n\nA generated session answers 409: the next rule expansion would recreate it, and\nattendance rows may already point at it -- cancel is the product's answer there. The\nrefusal lives here, not only in the UI that hides the button.",
+        "operationId": "delete_session_api_v1_sessions__session_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Session",
+        "tags": [
+          "coach",
+          "schedule"
+        ]
+      },
       "get": {
         "operationId": "get_session_api_v1_sessions__session_id__get",
         "parameters": [
@@ -21158,6 +22103,61 @@
         ]
       }
     },
+    "/api/v1/sessions/{session_id}/injury-reports": {
+      "post": {
+        "description": "`9g` (S2) -- the injury report that goes to the manager and the parents NOW.\n\nOnline-only on purpose, the mirror of the parent's absence pre-report: a report that\nsyncs after everyone has gone home is not a report. Not queued, not idempotent -- a\ncoach pressing twice sends twice, and two messages about a hurt child beat zero.",
+        "operationId": "report_injury_api_v1_sessions__session_id__injury_reports_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InjuryReportIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InjuryReportOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Report Injury",
+        "tags": [
+          "coach",
+          "attendance"
+        ]
+      }
+    },
     "/api/v1/sessions/{session_id}/notes": {
       "get": {
         "operationId": "list_notes_api_v1_sessions__session_id__notes_get",
@@ -21418,6 +22418,210 @@
         ]
       }
     },
+    "/api/v1/staff/invitations": {
+      "post": {
+        "description": "F5 — הוספת איש צוות. The token comes back once and never again; the manager\nshares the link, because no mailer exists anywhere in this product (the platform's\nowner invite and §5.4b's onboarding link both work the same way).",
+        "operationId": "create_staff_invitation_api_v1_staff_invitations_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StaffInvitationIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffInvitationOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Staff Invitation",
+        "tags": [
+          "staff"
+        ]
+      }
+    },
+    "/api/v1/staff/invitations/{invitation_id}": {
+      "delete": {
+        "operationId": "revoke_staff_invitation_api_v1_staff_invitations__invitation_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "invitation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Invitation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revoke Staff Invitation",
+        "tags": [
+          "staff"
+        ]
+      }
+    },
+    "/api/v1/staff/invitations/{invitation_id}/resend": {
+      "post": {
+        "operationId": "resend_staff_invitation_api_v1_staff_invitations__invitation_id__resend_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "invitation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Invitation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffInvitationOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Resend Staff Invitation",
+        "tags": [
+          "staff"
+        ]
+      }
+    },
+    "/api/v1/staff/{person_id}": {
+      "patch": {
+        "operationId": "change_staff_roles_api_v1_staff__person_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "person_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Person Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StaffRolesIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Change Staff Roles",
+        "tags": [
+          "staff"
+        ]
+      }
+    },
+    "/api/v1/staff/{person_id}/deactivate": {
+      "post": {
+        "description": "A status change, never a delete — the person holds audit rows, session\nassignments and attendance marks. 409s when they are a group's only lead coach:\nreassign first (F5's decision, recorded in the audit log).",
+        "operationId": "deactivate_staff_api_v1_staff__person_id__deactivate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "person_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Person Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Deactivate Staff",
+        "tags": [
+          "staff"
+        ]
+      }
+    },
     "/api/v1/students": {
       "get": {
         "description": "Dashboard `3b` and staff `9h`.",
@@ -21605,6 +22809,48 @@
           }
         },
         "summary": "Create Student",
+        "tags": [
+          "people"
+        ]
+      }
+    },
+    "/api/v1/students/bulk": {
+      "post": {
+        "description": "F12. Same shape as the rollover's bulk steps -- per-row machine-readable refusals,\nnever one aggregate error -- but mid-season boundaries: a February move ends\nyesterday and starts today rather than being back-dated to September.",
+        "operationId": "bulk_students_route_api_v1_students_bulk_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkStudentsIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkStudentsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Bulk Students Route",
         "tags": [
           "people"
         ]

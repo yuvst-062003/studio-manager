@@ -255,3 +255,16 @@ def test_belt_ranges_by_group_span_the_enrolled_students(
     row = next(item for item in body["items"] if item["group_id"] == str(group.id))
     assert row["min_name"] != row["max_name"]
     assert row["min_color_hex"].startswith("#")
+
+
+def test_a_guardian_reads_the_ladder_their_child_climbs(
+    client, as_guardian_of, a_class, a_belt_ladder, a_student
+):
+    """P7 — 12d renders the same ladder, and the staff-only guard this route carried
+    meant the routed parent screen answered 403 for every guardian."""
+    guardian = as_guardian_of(a_student)
+    response = client.get(
+        f"/api/v1/belt-ranks?class_id={a_class}", headers=guardian.headers
+    )
+    assert response.status_code == 200, response.text
+    assert len(response.json()["items"]) > 0

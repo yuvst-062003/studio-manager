@@ -23,6 +23,8 @@ import type { Bundle } from '../types'
  */
 export const comms: Bundle = {
   // -- the parent inbox (parent 2b ▲ D9.1 — inbox only) --------------------------
+  'inbox.fillDeclaration': 'מילוי הצהרה',
+  'inbox.later': 'אחר כך',
   'inbox.title': 'עדכוני מועדון',
   'inbox.empty': 'אין עדכונים',
   'inbox.emptyHint': 'הודעות מהמועדון יופיעו כאן',

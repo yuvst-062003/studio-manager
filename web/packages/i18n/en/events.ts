@@ -68,6 +68,7 @@ export const events: Bundle = {
   'consent.blocksConfirmation': 'Attendance counts as confirmed only once the parent signs',
 
   // -- RSVP (parent 7d, dashboard 7c) ---------------------------------------------
+  'rsvp.closesOn': 'Registration closes on',
   'rsvp.title': 'Confirm attendance',
   'rsvp.yes': 'Attending',
   'rsvp.no': 'Not attending',
@@ -107,6 +108,9 @@ export const events: Bundle = {
   'exam.empty': 'No belt exams scheduled',
 
   // -- the belt system (dashboard 5b, wizard 5d) ----------------------------------
+  'belt.progressLink': 'Full progression',
+  'belt.noneYet': 'No belt history yet',
+  'belt.noneYetHint': 'When a belt is awarded, the progression will appear here',
   'belt.title': 'Belt system',
   'belt.noClasses': 'No classes yet — a belt ladder lives on a class.',
   'belt.openLadder': 'Open the belt ladder',
