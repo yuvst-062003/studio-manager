@@ -14,6 +14,7 @@ import { PricePlansScreen } from './PricePlansScreen'
 import { PaymentPromisesPanel } from './PaymentPromisesPanel'
 import { StandingOrderLinksPanel } from './StandingOrderLinksPanel'
 import { PrepayTermsPanel } from './PrepayTermsPanel'
+import { PlanChangesPanel } from './PlanChangesPanel'
 import { PRICES_WIZARD_ORDER, PricesWizardStep } from './PricesWizardStep'
 import { DebtAlert } from './DebtAlert'
 import { DEBT_ALERT_ORDER } from './register'
@@ -58,6 +59,8 @@ function stub(overrides: Partial<DashboardBillingClient> = {}): DashboardBilling
       cash_instructions: null,
     }),
     saveBillingSettings: vi.fn().mockResolvedValue({}),
+    planChanges: vi.fn().mockResolvedValue([]),
+    settlePlanChange: vi.fn().mockResolvedValue(undefined),
     confirmPromise: vi.fn().mockResolvedValue(undefined),
     declinePromise: vi.fn().mockResolvedValue(undefined),
     ...overrides,
@@ -732,5 +735,55 @@ describe('prepayment, on the manager\'s side', () => {
       />,
     )
     expect(await screen.findByTestId('promise-forward-months')).toHaveTextContent('12')
+  })
+})
+
+describe('the plan-change settlement queue', () => {
+  // §11 — the parent's tap changes access; a person always closes the loop on money. Two
+  // of the club's three payment routes are prepaid, so a plan change cannot settle itself.
+  const CHANGE = {
+    id: 'c1',
+    student_id: 's1',
+    student_name: 'דנה כהן',
+    from_price_plan_id: 'p300',
+    to_price_plan_id: 'p400',
+    from_plan_name: '300',
+    to_plan_name: '400',
+    monthly_difference_agorot: 10_000,
+    effective_on: '2026-12-01',
+    status: 'applied',
+    settlement_status: 'pending',
+    requested_at: '2026-11-10T09:00:00Z',
+    applied_at: '2026-11-10T09:00:00Z',
+  }
+
+  it('shows the monthly difference a manager has to collect', async () => {
+    // "collect 100 ₪ × the remaining months" is the instruction. A queue that showed only
+    // the two plan names would make the manager look up two prices to compute it.
+    render(
+      <PlanChangesPanel
+        locale={LOCALE}
+        client={stub({ planChanges: vi.fn().mockResolvedValue([CHANGE]) })}
+      />,
+    )
+    const row = await screen.findByTestId('plan-change-row')
+    expect(within(row).getByTestId('plan-change-difference')).toHaveTextContent('100')
+    expect(row).toHaveTextContent('דנה כהן')
+  })
+
+  it('settles a change and drops it from the queue', async () => {
+    const settlePlanChange = vi.fn().mockResolvedValue(undefined)
+    const planChanges = vi.fn().mockResolvedValueOnce([CHANGE]).mockResolvedValue([])
+    render(<PlanChangesPanel locale={LOCALE} client={stub({ planChanges, settlePlanChange })} />)
+    await userEvent.click(await screen.findByTestId('plan-change-settle'))
+    expect(settlePlanChange).toHaveBeenCalledWith('c1')
+  })
+
+  it('renders nothing at all when the queue is empty', async () => {
+    // A heading over nothing is a row of noise on a dashboard that already has a
+    // collections list — the same rule the payment-promise queue follows.
+    const { container } = render(<PlanChangesPanel locale={LOCALE} client={stub()} />)
+    await screen.findByTestId('plan-changes-loaded')
+    expect(container.querySelector('[data-testid="plan-change-row"]')).toBeNull()
   })
 })

@@ -63,6 +63,9 @@ def is_expected(
     attends_weekdays: Sequence[int] | None,
     group_weekdays: Iterable[int],
     session_weekday: int,
+    *,
+    group_kind: str = "base",
+    has_booking: bool = False,
 ) -> bool:
     """Whether this enrollment puts the student on that session's roster.
 
@@ -72,7 +75,31 @@ def is_expected(
     be marked -- a child who turns up on an extra day is a real child -- but their row
     never counts toward `לא סומן`, is never touched by `סמן הכל נוכח`, and never enters a
     §5.14 denominator.
+
+    **The branch on `group_kind` is the training-plans seam** (that design's §8), and it is
+    a branch rather than a rewrite:
+
+    ==========  ==============================================================
+    `base`      from `enrollment` and `attends_weekdays`, exactly as before --
+                no code path changes, and Tuesday and Friday stay automatic
+    `extra`     the students holding a live `session_booking` for that session
+    `private`   the same
+    ==========  ==============================================================
+
+    A student who marked and did not come is absent, and enters §5.14's denominators like
+    any other expected student. A student who never marked is not on the roster and enters
+    no denominator -- which is correct: nobody asked them to be there.
+
+    **The pure-function, no-I/O contract is preserved.** `has_booking` is supplied by the
+    caller exactly the way `group_weekdays` already is; this module never opens a session,
+    which is what lets `weekly_volume` below and every §5.14 report share it.
+
+    Weekdays are ignored entirely for a booked kind, deliberately: a booking names a
+    SESSION, and a session is a row that exists whether or not it falls on a day the
+    group's rules cover -- an ad-hoc extra on a Thursday is still a session somebody marked.
     """
+    if group_kind in ("extra", "private"):
+        return has_booking
     return session_weekday in expected_weekdays(attends_weekdays, group_weekdays)
 
 

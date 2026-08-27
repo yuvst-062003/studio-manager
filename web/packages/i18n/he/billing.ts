@@ -279,4 +279,10 @@ export const billing: Bundle = {
   'product.colour': 'צבע',
   'product.handOutPolicy': 'מחיר הפריט אינו מוצג למאמן',
   'dialog.cancel': 'ביטול',
+  'planChange.queueTitle': 'שינויי מסלול לטיפול',
+  'planChange.queueEmpty': 'אין שינויי מסלול פתוחים.',
+  'planChange.difference': 'הפרש חודשי',
+  'planChange.effectiveOn': 'מתאריך',
+  'planChange.settle': 'טופל',
+  'planChange.hint': 'שני אמצעי תשלום משולמים מראש, ולכן שינוי מסלול לא נסגר מעצמו — יש לגבות את ההפרש או לעדכן את הוראת הקבע.',
 }

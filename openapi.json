@@ -553,6 +553,38 @@
         "title": "AudienceSizeOut",
         "type": "object"
       },
+      "BaseSessionOut": {
+        "description": "Tuesday and Friday. Included in every plan, never marked, shown so the parent can\nsee what \"always included\" actually means for their child.",
+        "properties": {
+          "ends_at": {
+            "format": "date-time",
+            "title": "Ends At",
+            "type": "string"
+          },
+          "group_name": {
+            "title": "Group Name",
+            "type": "string"
+          },
+          "session_id": {
+            "format": "uuid",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "starts_at": {
+            "format": "date-time",
+            "title": "Starts At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id",
+          "group_name",
+          "starts_at",
+          "ends_at"
+        ],
+        "title": "BaseSessionOut",
+        "type": "object"
+      },
       "BatchAttendanceIn": {
         "description": "`POST /attendance/batch` — §7 marks it **(idempotent)**.\n\nThe batch is the offline queue's flush. It is idempotent per *mark*, on\n`client_mark_id`, rather than per request: a queue that partially reached the server\nmust be safe to resend whole, and a request-level key would make the second attempt a\nno-op that silently dropped the marks the first attempt never delivered.",
         "properties": {
@@ -1032,6 +1064,78 @@
           "file"
         ],
         "title": "Body_upload_source_pdf_api_v1_health_templates__template_id__source_pdf_post",
+        "type": "object"
+      },
+      "BookableSessionOut": {
+        "description": "One session this week the student could mark, with why they cannot if they cannot.",
+        "properties": {
+          "booking_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Booking Id"
+          },
+          "ends_at": {
+            "format": "date-time",
+            "title": "Ends At",
+            "type": "string"
+          },
+          "group_id": {
+            "format": "uuid",
+            "title": "Group Id",
+            "type": "string"
+          },
+          "group_name": {
+            "title": "Group Name",
+            "type": "string"
+          },
+          "is_markable": {
+            "title": "Is Markable",
+            "type": "boolean"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "session_id": {
+            "format": "uuid",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "starts_at": {
+            "format": "date-time",
+            "title": "Starts At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id",
+          "group_id",
+          "group_name",
+          "kind",
+          "starts_at",
+          "ends_at",
+          "booking_id",
+          "is_markable"
+        ],
+        "title": "BookableSessionOut",
         "type": "object"
       },
       "BootstrapPayload": {
@@ -3924,6 +4028,75 @@
         "title": "GenerateSessionsOut",
         "type": "object"
       },
+      "GroupEligibilityIn": {
+        "description": "The base groups linked to one extra group. A full replace rather than add/remove:\nthe manager's mental model is a checklist (\"Groups 3, 4 and 5\"), and two verbs for one\nchecklist is how a half-applied edit happens.",
+        "properties": {
+          "base_group_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 50,
+            "title": "Base Group Ids",
+            "type": "array"
+          }
+        },
+        "title": "GroupEligibilityIn",
+        "type": "object"
+      },
+      "GroupEligibilityOut": {
+        "properties": {
+          "base_group_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Base Group Ids",
+            "type": "array"
+          },
+          "extra_group_id": {
+            "format": "uuid",
+            "title": "Extra Group Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "extra_group_id",
+          "base_group_ids"
+        ],
+        "title": "GroupEligibilityOut",
+        "type": "object"
+      },
+      "GroupKindIn": {
+        "description": "`PATCH /groups/{id}` — the manager's two switches.\n\nBoth optional: a partial write, so setting `kind` does not silently clear an invite\nlist somebody spent an evening building.",
+        "properties": {
+          "is_invite_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Invite Only"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "maxLength": 10,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind"
+          }
+        },
+        "title": "GroupKindIn",
+        "type": "object"
+      },
       "GroupListResponse": {
         "properties": {
           "items": {
@@ -5288,6 +5461,108 @@
         "title": "ManagerPaymentPromiseOut",
         "type": "object"
       },
+      "ManagerPlanChangeOut": {
+        "description": "§11's queue. The student and the plans by NAME, because \"who do I chase and about\nwhat\" is the whole question that screen answers.",
+        "properties": {
+          "applied_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Applied At"
+          },
+          "effective_on": {
+            "format": "date",
+            "title": "Effective On",
+            "type": "string"
+          },
+          "from_plan_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Plan Name"
+          },
+          "from_price_plan_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Price Plan Id"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "monthly_difference_agorot": {
+            "title": "Monthly Difference Agorot",
+            "type": "integer"
+          },
+          "requested_at": {
+            "format": "date-time",
+            "title": "Requested At",
+            "type": "string"
+          },
+          "settlement_status": {
+            "title": "Settlement Status",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          },
+          "student_name": {
+            "title": "Student Name",
+            "type": "string"
+          },
+          "to_plan_name": {
+            "title": "To Plan Name",
+            "type": "string"
+          },
+          "to_price_plan_id": {
+            "format": "uuid",
+            "title": "To Price Plan Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "student_id",
+          "from_price_plan_id",
+          "to_price_plan_id",
+          "effective_on",
+          "status",
+          "settlement_status",
+          "requested_at",
+          "applied_at",
+          "student_name",
+          "from_plan_name",
+          "to_plan_name",
+          "monthly_difference_agorot"
+        ],
+        "title": "ManagerPlanChangeOut",
+        "type": "object"
+      },
       "ManualChargeIn": {
         "description": "§5.10's manual charge. `kind` excludes `tuition` and `billing_run` provenance on\npurpose -- a hand-made tuition charge is how a month ends up billed twice.",
         "properties": {
@@ -6562,6 +6837,157 @@
           "reason"
         ],
         "title": "PaymentReversalIn",
+        "type": "object"
+      },
+      "PlanChangeIn": {
+        "properties": {
+          "to_price_plan_id": {
+            "format": "uuid",
+            "title": "To Price Plan Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "to_price_plan_id"
+        ],
+        "title": "PlanChangeIn",
+        "type": "object"
+      },
+      "PlanChangeListOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ManagerPlanChangeOut"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "PlanChangeListOut",
+        "type": "object"
+      },
+      "PlanChangeOut": {
+        "properties": {
+          "applied_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Applied At"
+          },
+          "effective_on": {
+            "format": "date",
+            "title": "Effective On",
+            "type": "string"
+          },
+          "from_price_plan_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Price Plan Id"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "requested_at": {
+            "format": "date-time",
+            "title": "Requested At",
+            "type": "string"
+          },
+          "settlement_status": {
+            "title": "Settlement Status",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          },
+          "to_price_plan_id": {
+            "format": "uuid",
+            "title": "To Price Plan Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "student_id",
+          "from_price_plan_id",
+          "to_price_plan_id",
+          "effective_on",
+          "status",
+          "settlement_status",
+          "requested_at",
+          "applied_at"
+        ],
+        "title": "PlanChangeOut",
+        "type": "object"
+      },
+      "PlanOptionOut": {
+        "description": "One of the club's plans, as the parent screen renders it.\n\n`is_offered` is §5.1's rule — offer a plan only if it raises the number of sessions\nthis student could attend in a week. A plan that is not offered is **shown with its\nreason, never hidden**: a Group 1 parent who hears \"400\" from another parent in the\nhall and finds nothing in the app phones the manager, and one line answers the question\nbefore it is asked. It turns itself on when the child moves up a group.",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_current": {
+            "title": "Is Current",
+            "type": "boolean"
+          },
+          "is_offered": {
+            "title": "Is Offered",
+            "type": "boolean"
+          },
+          "monthly_amount_agorot": {
+            "title": "Monthly Amount Agorot",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "weekly_extra_allowance": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weekly Extra Allowance"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "monthly_amount_agorot",
+          "weekly_extra_allowance",
+          "is_offered",
+          "is_current"
+        ],
+        "title": "PlanOptionOut",
         "type": "object"
       },
       "PlanRepricing": {
@@ -8249,6 +8675,65 @@
         "title": "SeedLadderIn",
         "type": "object"
       },
+      "SessionBookingIn": {
+        "properties": {
+          "session_id": {
+            "format": "uuid",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "student_id",
+          "session_id"
+        ],
+        "title": "SessionBookingIn",
+        "type": "object"
+      },
+      "SessionBookingOut": {
+        "properties": {
+          "cancelled_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancelled At"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "session_id": {
+            "format": "uuid",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "student_id",
+          "session_id",
+          "cancelled_at"
+        ],
+        "title": "SessionBookingOut",
+        "type": "object"
+      },
       "SessionCancelIn": {
         "description": "§5.6 — 'or cancel it with a reason'. The reason is required by the column's own\ncheck constraint, so a blank one is refused here rather than at the database.",
         "properties": {
@@ -8578,24 +9063,29 @@
         "title": "SessionResponse",
         "type": "object"
       },
-      "SessionRosterOut": {
-        "description": "`GET /sessions/{id}/attendance`.",
+      "SessionRosterEntryOut": {
         "properties": {
-          "roster": {
-            "items": {
-              "$ref": "#/components/schemas/RosterEntry"
-            },
-            "title": "Roster",
-            "type": "array"
+          "booking_id": {
+            "format": "uuid",
+            "title": "Booking Id",
+            "type": "string"
           },
-          "session": {
-            "$ref": "#/components/schemas/SessionOut"
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          },
+          "student_name": {
+            "title": "Student Name",
+            "type": "string"
           }
         },
         "required": [
-          "session"
+          "booking_id",
+          "student_id",
+          "student_name"
         ],
-        "title": "SessionRosterOut",
+        "title": "SessionRosterEntryOut",
         "type": "object"
       },
       "SessionStaffIn": {
@@ -10282,6 +10772,82 @@
         "title": "SwitchStudioRequest",
         "type": "object"
       },
+      "TrainingPlanOut": {
+        "properties": {
+          "base_sessions": {
+            "items": {
+              "$ref": "#/components/schemas/BaseSessionOut"
+            },
+            "title": "Base Sessions",
+            "type": "array"
+          },
+          "credits_remaining": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Credits Remaining"
+          },
+          "current_plan": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PlanOptionOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "plans": {
+            "items": {
+              "$ref": "#/components/schemas/PlanOptionOut"
+            },
+            "title": "Plans",
+            "type": "array"
+          },
+          "scheduled_change": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PlanChangeOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          },
+          "student_name": {
+            "title": "Student Name",
+            "type": "string"
+          },
+          "this_weeks_extras": {
+            "items": {
+              "$ref": "#/components/schemas/BookableSessionOut"
+            },
+            "title": "This Weeks Extras",
+            "type": "array"
+          }
+        },
+        "required": [
+          "student_id",
+          "student_name",
+          "current_plan",
+          "base_sessions",
+          "this_weeks_extras",
+          "credits_remaining",
+          "plans"
+        ],
+        "title": "TrainingPlanOut",
+        "type": "object"
+      },
       "TrainingYearCreate": {
         "properties": {
           "ends_on": {
@@ -11074,6 +11640,26 @@
         "title": "ValidationError",
         "type": "object"
       },
+      "app__schemas__attendance__SessionRosterOut": {
+        "description": "`GET /sessions/{id}/attendance`.",
+        "properties": {
+          "roster": {
+            "items": {
+              "$ref": "#/components/schemas/RosterEntry"
+            },
+            "title": "Roster",
+            "type": "array"
+          },
+          "session": {
+            "$ref": "#/components/schemas/SessionOut"
+          }
+        },
+        "required": [
+          "session"
+        ],
+        "title": "SessionRosterOut",
+        "type": "object"
+      },
       "app__schemas__platform__StudioOut": {
         "properties": {
           "created_at": {
@@ -11340,6 +11926,33 @@
           "parent_locales"
         ],
         "title": "StudioOut",
+        "type": "object"
+      },
+      "app__schemas__training_plan__SessionRosterOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SessionRosterEntryOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "marked_count": {
+            "title": "Marked Count",
+            "type": "integer"
+          },
+          "session_id": {
+            "format": "uuid",
+            "title": "Session Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id",
+          "marked_count",
+          "items"
+        ],
+        "title": "SessionRosterOut",
         "type": "object"
       }
     }
@@ -14989,6 +15602,60 @@
         ]
       }
     },
+    "/api/v1/groups/{group_id}/eligibility": {
+      "put": {
+        "description": "The base groups linked to one extra group. A full replace: the manager's mental\nmodel is a checklist, and two verbs for one checklist is how a half-applied edit\nhappens.",
+        "operationId": "set_eligibility_api_v1_groups__group_id__eligibility_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "group_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Group Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GroupEligibilityIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupEligibilityOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Eligibility",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
     "/api/v1/groups/{group_id}/schedule": {
       "get": {
         "operationId": "get_group_schedule_api_v1_groups__group_id__schedule_get",
@@ -15195,6 +15862,60 @@
         "summary": "Assign Group Staff",
         "tags": [
           "structure"
+        ]
+      }
+    },
+    "/api/v1/groups/{group_id}/training-kind": {
+      "patch": {
+        "description": "`kind` and `is_invite_only`, the two switches every rule in this feature reads.\n\nIts own route rather than a field on the structure lane's `PATCH /groups/{id}`: that\nshape belongs to another lane, and these two columns are read by this one. The path\nsays `training-kind` for the same reason.",
+        "operationId": "set_group_kind_api_v1_groups__group_id__training_kind_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "group_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Group Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GroupKindIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupKindIn"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Group Kind",
+        "tags": [
+          "billing"
         ]
       }
     },
@@ -17380,6 +18101,72 @@
           }
         },
         "summary": "Reverse Payment",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/v1/plan-changes": {
+      "get": {
+        "description": "§11's queue: every change whose money a human has not closed.\n\nThe difference in agorot travels with each row, because \"collect 100 ₪ × the remaining\nmonths\" is the instruction and a manager should not have to look up two prices to\ncompute it.",
+        "operationId": "plan_change_queue_api_v1_plan_changes_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanChangeListOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Plan Change Queue",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/v1/plan-changes/{change_id}/settle": {
+      "post": {
+        "description": "A manager saying the money is handled. The app never decides this: it cannot see a\ndrawer of cheques, and G8 means it cannot cancel a uPay mandate either.",
+        "operationId": "settle_plan_change_api_v1_plan_changes__change_id__settle_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "change_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Change Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanChangeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Settle Plan Change",
         "tags": [
           "billing"
         ]
@@ -19756,6 +20543,92 @@
         ]
       }
     },
+    "/api/v1/session-bookings": {
+      "post": {
+        "description": "\"I am coming to this one.\" Own children only; the four rules live in the service.",
+        "operationId": "mark_session_api_v1_session_bookings_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionBookingIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionBookingOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Mark Session",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/v1/session-bookings/{booking_id}": {
+      "delete": {
+        "description": "Give the credit back — free until the session starts, then spent.",
+        "operationId": "release_session_api_v1_session_bookings__booking_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "booking_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Booking Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionBookingOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Release Session",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
     "/api/v1/sessions": {
       "get": {
         "operationId": "list_sessions_api_v1_sessions_get",
@@ -20070,7 +20943,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SessionRosterOut"
+                  "$ref": "#/components/schemas/app__schemas__attendance__SessionRosterOut"
                 }
               }
             },
@@ -20165,6 +21038,50 @@
         "tags": [
           "coach",
           "attendance"
+        ]
+      }
+    },
+    "/api/v1/sessions/{session_id}/bookings": {
+      "get": {
+        "description": "Who has marked, with a live count.\n\nAn `extra` session's roster IS its live bookings (§8): a student who marked and did not\ncome is absent and enters §5.14's denominators like any other expected student, and a\nstudent who never marked is not on the roster and enters no denominator -- which is\ncorrect, because nobody asked them to be there.",
+        "operationId": "session_bookings_api_v1_sessions__session_id__bookings_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/app__schemas__training_plan__SessionRosterOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Session Bookings",
+        "tags": [
+          "coach"
         ]
       }
     },
@@ -21763,6 +22680,114 @@
         ]
       }
     },
+    "/api/v1/students/{student_id}/plan-changes": {
+      "post": {
+        "description": "Self-serve, both directions. An upgrade unlocks access at once and prices from the\nfirst; a downgrade waits for the first, so a family who paid for this month keeps it.",
+        "operationId": "request_plan_change_api_v1_students__student_id__plan_changes_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanChangeIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanChangeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Request Plan Change",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/v1/students/{student_id}/plan-changes/{change_id}": {
+      "delete": {
+        "description": "Before it applies — which is the whole reason a change is a row and not an edit.",
+        "operationId": "cancel_plan_change_api_v1_students__student_id__plan_changes__change_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "change_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Change Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanChangeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cancel Plan Change",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
     "/api/v1/students/{student_id}/price-plan": {
       "get": {
         "description": "C11's two numbers, for dashboard `4a`'s plan field.\n\nManager-only and deliberately **untagged**: `price_plan_id` is what invariant 3's\ndetector reads as a financial field, so this shape must never be reachable from a\ncoach route. `weekly_volume` is §5.10's suggestion beside the plan picker -- a count of\nsessions, never an amount. `price_plan` is W4's table and this lane never resolves it.",
@@ -21850,6 +22875,50 @@
           "people",
           "people",
           "coach"
+        ]
+      }
+    },
+    "/api/v1/students/{student_id}/training-plan": {
+      "get": {
+        "description": "Everything the parent's plan screen renders, in one read.\n\nOne request rather than five, because every part of it is a view of the same two\nquestions -- what does this child's plan buy, and what have they spent this week -- and\na screen assembled from five reads is a screen with five loading states and four ways\nto be inconsistent.",
+        "operationId": "training_plan_api_v1_students__student_id__training_plan_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrainingPlanOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Training Plan",
+        "tags": [
+          "billing"
         ]
       }
     },

@@ -14,6 +14,7 @@ export type RecurringSubscriptionOut = components['schemas']['RecurringSubscript
 export type PayerBalanceOut = components['schemas']['PayerBalanceOut']
 export type PaymentOut = components['schemas']['PaymentOut']
 export type BillingSettingsOut = components['schemas']['BillingSettingsOut']
+export type ManagerPlanChangeOut = components['schemas']['ManagerPlanChangeOut']
 
 /**
  * Credit per payer: **payments minus allocations**, the same subtraction
@@ -92,6 +93,8 @@ export type DashboardBillingClient = {
   }): Promise<PricePlanOut>
   products(): Promise<ProductOut[]>
   paymentPromises(status?: string, method?: PromiseMethod): Promise<ManagerPaymentPromiseOut[]>
+  planChanges(): Promise<ManagerPlanChangeOut[]>
+  settlePlanChange(changeId: string): Promise<void>
   confirmPromise(promiseId: string): Promise<void>
   declinePromise(promiseId: string): Promise<void>
 }
@@ -232,6 +235,20 @@ export function makeDashboardBillingClient(fetcher: Fetcher): DashboardBillingCl
           await fetcher(`/api/v1/payment-promises${query}`),
         )
       ).items
+    },
+    // §11's queue. Every change lands here and stays until a human closes the money loop:
+    // the prepayment design turns the cash and cheque cases into an ordinary open charge,
+    // and the standing-order case genuinely needs somebody to cancel the old uPay mandate
+    // and send the new link, because G8 says the provider cannot.
+    async planChanges() {
+      return (
+        await json<{ items: ManagerPlanChangeOut[] }>(await fetcher('/api/v1/plan-changes'))
+      ).items
+    },
+    async settlePlanChange(changeId: string) {
+      await json(
+        await fetcher(`/api/v1/plan-changes/${changeId}/settle`, { method: 'POST' }),
+      )
     },
     async confirmPromise(promiseId: string) {
       await json(

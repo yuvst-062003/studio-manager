@@ -392,4 +392,40 @@ export const schedule: Bundle = {
   'rollover.announce.activateFailed': 'לא הצלחנו להפעיל את השנה',
 
   'rollover.dialog.cancel': 'ביטול',
+
+  // -- training plans (2026-08-27 spec wave) -----------------------------------
+  // The club sells 300 / 400 / 550 ₪. Base training is included in every plan and is
+  // never marked; what a plan sells is access to the other days.
+  'plan.title': 'המסלול שלי',
+  'plan.monthly': 'לחודש',
+  'plan.alwaysIncluded': 'תמיד כלול',
+  'plan.thisWeeksExtra': 'האימון הנוסף שלי השבוע',
+  'plan.remaining': 'נותרו {{count}}',
+  'plan.unlimited': 'ללא הגבלה שבועית',
+  'plan.chooseOne': 'אפשר לבחור אימון אחד. מתאפס בכל יום ראשון.',
+  'plan.mark': 'סימון הגעה',
+  'plan.release': 'ביטול הסימון',
+  'plan.marked': 'סומן',
+  'plan.noExtras': 'אין אימונים נוספים פתוחים לקבוצה שלכם השבוע',
+  // Every refusal names its reason -- 'אי אפשר לסמן' בלי הסבר זו שיחת טלפון למנהל.
+  'plan.reason.started': 'האימון כבר התחיל',
+  'plan.reason.no_credits': 'האימון הנוסף השבוע כבר נוצל',
+  'plan.reason.needs_unlimited': 'נדרש מסלול ללא הגבלה שבועית',
+  'plan.reason.no_plan': 'לא הוגדר מסלול לחניך',
+  'plan.upgrade': 'שדרוג המסלול',
+  'plan.switch': 'מעבר למסלול',
+  'plan.current': 'המסלול הנוכחי',
+  // A plan that adds nothing is SHOWN with its reason, never hidden: הורה ששמע על 550
+  // ולא מוצא אותו באפליקציה מתקשר למנהל.
+  'plan.notOffered': 'המסלול הזה לא מוסיף אימונים בלו״ז הנוכחי של הקבוצה',
+  'plan.scheduledChange': 'שינוי מסלול מתוכנן',
+  'plan.effectiveOn': 'ייכנס לתוקף ב־{{date}}',
+  'plan.cancelChange': 'ביטול השינוי',
+  'plan.changeRequested': 'הבקשה נרשמה. המנהל ייצור קשר לגבי התשלום.',
+  'plan.group.kind': 'סוג הקבוצה',
+  'plan.group.kind.base': 'אימון בסיס',
+  'plan.group.kind.extra': 'אימון נוסף',
+  'plan.group.kind.private': 'אימון פרטני',
+  'plan.group.inviteOnly': 'הצטרפות בהזמנה בלבד',
+  'plan.group.eligibility': 'קבוצות בסיס שרשאיות להשתתף',
 }

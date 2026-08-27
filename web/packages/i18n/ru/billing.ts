@@ -237,4 +237,10 @@ export const billing: Bundle = {
   'plan.linkSaved': 'Ссылка сохранена',
   'plan.linksTitle': 'Ссылки на постоянное поручение',
   'plan.linksEmpty': 'Нет активных тарифов',
+  'planChange.queueTitle': 'Смены тарифа к обработке',
+  'planChange.queueEmpty': 'Открытых смен тарифа нет.',
+  'planChange.difference': 'Разница в месяц',
+  'planChange.effectiveOn': 'С даты',
+  'planChange.settle': 'Обработано',
+  'planChange.hint': 'Два способа оплаты вносятся вперёд, поэтому смена тарифа не закрывается сама — соберите разницу или обновите постоянное поручение.',
 }

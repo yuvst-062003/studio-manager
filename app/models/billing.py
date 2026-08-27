@@ -121,7 +121,24 @@ class PricePlan(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
 
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     #: C11 -- 'פעמיים בשבוע' is 2, 'כל יום' is 5. What the club actually charges by.
-    sessions_per_week: Mapped[int] = mapped_column(Integer, nullable=False)
+    #:
+    #: **Nullable, and still a LABEL rather than a rule.** NULL means open membership. The
+    #: docstring above says the run does not enforce this, and that stays true -- the
+    #: enforced rule is `weekly_extra_allowance` beside it. The existing
+    #: `sessions_per_week > 0` CHECK tolerates NULL unchanged: an SQL check is
+    #: true-or-unknown, and unknown does not fail a row.
+    sessions_per_week: Mapped[int | None] = mapped_column(Integer)
+    #: **The enforced rule.** Extra sessions a student on this plan may mark in one
+    #: Sunday-to-Saturday week: 300 → `0`, 400 → `1`, 550 → `NULL` = unlimited.
+    #:
+    #: NULL rather than a large number, because "no limit" is a third state and not a big
+    #: one: `app/services/schedule/booking.py` reads NULL as "always passes", and the
+    #: Saturday private lesson attaches its rule to exactly this being NULL.
+    #:
+    #: Deriving it as `sessions_per_week - 2` was considered and rejected: it hardcodes
+    #: "every base is two sessions", which is true this season and is precisely the
+    #: assumption §5.15's rollover breaks when the timetable moves.
+    weekly_extra_allowance: Mapped[int | None] = mapped_column(Integer)
     monthly_amount_agorot: Mapped[int] = mapped_column(Integer, nullable=False)
     #: §5.10 -- 'Registration fees are charged once, on the first billing run after
     #: enrollment.' Nullable: most plans have none.

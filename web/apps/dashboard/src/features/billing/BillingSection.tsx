@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { apiFetch } from '@studio/core'
 import type { Locale } from '@studio/i18n'
 import { PaymentPromisesPanel } from './PaymentPromisesPanel'
+import { PlanChangesPanel } from './PlanChangesPanel'
 import { CollectionsScreen } from './CollectionsScreen'
 import type { HouseholdRow } from './CollectionsScreen'
 import { ReconciliationQueue } from './ReconciliationQueue'
@@ -168,6 +169,9 @@ export function BillingSection({ locale, view }: { locale: Locale; view: 'collec
         news: the family already answered, and the board below still shows them in debt
         until the notes change hands. */}
     <PaymentPromisesPanel locale={locale} client={client} onChanged={refresh} />
+    {/* §11 — beside the promises queue, because both are the same sentence: money the
+        app cannot confirm on its own and a person has to close. */}
+    <PlanChangesPanel locale={locale} client={client} onChanged={refresh} />
     <CollectionsScreen
       locale={locale}
       client={client}

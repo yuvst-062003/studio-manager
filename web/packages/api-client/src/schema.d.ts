@@ -1232,6 +1232,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/groups/{group_id}/eligibility": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Eligibility
+         * @description The base groups linked to one extra group. A full replace: the manager's mental
+         *     model is a checklist, and two verbs for one checklist is how a half-applied edit
+         *     happens.
+         */
+        put: operations["set_eligibility_api_v1_groups__group_id__eligibility_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/groups/{group_id}/schedule": {
         parameters: {
             query?: never;
@@ -1277,6 +1299,30 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/groups/{group_id}/training-kind": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Set Group Kind
+         * @description `kind` and `is_invite_only`, the two switches every rule in this feature reads.
+         *
+         *     Its own route rather than a field on the structure lane's `PATCH /groups/{id}`: that
+         *     shape belongs to another lane, and these two columns are read by this one. The path
+         *     says `training-kind` for the same reason.
+         */
+        patch: operations["set_group_kind_api_v1_groups__group_id__training_kind_patch"];
         trace?: never;
     };
     "/api/v1/health": {
@@ -2257,6 +2303,51 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/plan-changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Plan Change Queue
+         * @description §11's queue: every change whose money a human has not closed.
+         *
+         *     The difference in agorot travels with each row, because "collect 100 ₪ × the remaining
+         *     months" is the instruction and a manager should not have to look up two prices to
+         *     compute it.
+         */
+        get: operations["plan_change_queue_api_v1_plan_changes_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/plan-changes/{change_id}/settle": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Settle Plan Change
+         * @description A manager saying the money is handled. The app never decides this: it cannot see a
+         *     drawer of cheques, and G8 means it cannot cancel a uPay mandate either.
+         */
+        post: operations["settle_plan_change_api_v1_plan_changes__change_id__settle_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/platform/studios": {
         parameters: {
             query?: never;
@@ -3118,6 +3209,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/session-bookings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark Session
+         * @description "I am coming to this one." Own children only; the four rules live in the service.
+         */
+        post: operations["mark_session_api_v1_session_bookings_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/session-bookings/{booking_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Release Session
+         * @description Give the credit back — free until the session starts, then spent.
+         */
+        delete: operations["release_session_api_v1_session_bookings__booking_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/sessions": {
         parameters: {
             query?: never;
@@ -3192,6 +3323,31 @@ export interface paths {
          *     and `attendance.source.preReportedHint` already ships the copy saying it does not.
          */
         post: operations["bulk_present_api_v1_sessions__session_id__attendance_bulk_present_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sessions/{session_id}/bookings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Session Bookings
+         * @description Who has marked, with a live count.
+         *
+         *     An `extra` session's roster IS its live bookings (§8): a student who marked and did not
+         *     come is absent and enters §5.14's denominators like any other expected student, and a
+         *     student who never marked is not on the roster and enters no denominator -- which is
+         *     correct, because nobody asked them to be there.
+         */
+        get: operations["session_bookings_api_v1_sessions__session_id__bookings_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -3672,6 +3828,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/students/{student_id}/plan-changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Request Plan Change
+         * @description Self-serve, both directions. An upgrade unlocks access at once and prices from the
+         *     first; a downgrade waits for the first, so a family who paid for this month keeps it.
+         */
+        post: operations["request_plan_change_api_v1_students__student_id__plan_changes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/students/{student_id}/plan-changes/{change_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Cancel Plan Change
+         * @description Before it applies — which is the whole reason a change is a row and not an edit.
+         */
+        delete: operations["cancel_plan_change_api_v1_students__student_id__plan_changes__change_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/students/{student_id}/price-plan": {
         parameters: {
             query?: never;
@@ -3710,6 +3907,31 @@ export interface paths {
          *     timeline. Task 6 fills in the service method.
          */
         get: operations["student_status_history_api_v1_students__student_id__status_history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/students/{student_id}/training-plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Training Plan
+         * @description Everything the parent's plan screen renders, in one read.
+         *
+         *     One request rather than five, because every part of it is a view of the same two
+         *     questions -- what does this child's plan buy, and what have they spent this week -- and
+         *     a screen assembled from five reads is a screen with five loading states and four ways
+         *     to be inconsistent.
+         */
+        get: operations["training_plan_api_v1_students__student_id__training_plan_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -4289,6 +4511,30 @@ export interface components {
             recipient_count: number;
         };
         /**
+         * BaseSessionOut
+         * @description Tuesday and Friday. Included in every plan, never marked, shown so the parent can
+         *     see what "always included" actually means for their child.
+         */
+        BaseSessionOut: {
+            /**
+             * Ends At
+             * Format: date-time
+             */
+            ends_at: string;
+            /** Group Name */
+            group_name: string;
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
+            /**
+             * Starts At
+             * Format: date-time
+             */
+            starts_at: string;
+        };
+        /**
          * BatchAttendanceIn
          * @description `POST /attendance/batch` — §7 marks it **(idempotent)**.
          *
@@ -4514,6 +4760,42 @@ export interface components {
              * @description The studio's own declaration, as a PDF.
              */
             file: string;
+        };
+        /**
+         * BookableSessionOut
+         * @description One session this week the student could mark, with why they cannot if they cannot.
+         */
+        BookableSessionOut: {
+            /** Booking Id */
+            booking_id: string | null;
+            /**
+             * Ends At
+             * Format: date-time
+             */
+            ends_at: string;
+            /**
+             * Group Id
+             * Format: uuid
+             */
+            group_id: string;
+            /** Group Name */
+            group_name: string;
+            /** Is Markable */
+            is_markable: boolean;
+            /** Kind */
+            kind: string;
+            /** Reason */
+            reason?: string | null;
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
+            /**
+             * Starts At
+             * Format: date-time
+             */
+            starts_at: string;
         };
         /**
          * BootstrapPayload
@@ -5777,6 +6059,39 @@ export interface components {
              */
             training_year_id: string;
         };
+        /**
+         * GroupEligibilityIn
+         * @description The base groups linked to one extra group. A full replace rather than add/remove:
+         *     the manager's mental model is a checklist ("Groups 3, 4 and 5"), and two verbs for one
+         *     checklist is how a half-applied edit happens.
+         */
+        GroupEligibilityIn: {
+            /** Base Group Ids */
+            base_group_ids?: string[];
+        };
+        /** GroupEligibilityOut */
+        GroupEligibilityOut: {
+            /** Base Group Ids */
+            base_group_ids: string[];
+            /**
+             * Extra Group Id
+             * Format: uuid
+             */
+            extra_group_id: string;
+        };
+        /**
+         * GroupKindIn
+         * @description `PATCH /groups/{id}` — the manager's two switches.
+         *
+         *     Both optional: a partial write, so setting `kind` does not silently clear an invite
+         *     list somebody spent an evening building.
+         */
+        GroupKindIn: {
+            /** Is Invite Only */
+            is_invite_only?: boolean | null;
+            /** Kind */
+            kind?: string | null;
+        };
         /** GroupListResponse */
         GroupListResponse: {
             /** Items */
@@ -6434,6 +6749,54 @@ export interface components {
             total_agorot: number;
         };
         /**
+         * ManagerPlanChangeOut
+         * @description §11's queue. The student and the plans by NAME, because "who do I chase and about
+         *     what" is the whole question that screen answers.
+         */
+        ManagerPlanChangeOut: {
+            /** Applied At */
+            applied_at: string | null;
+            /**
+             * Effective On
+             * Format: date
+             */
+            effective_on: string;
+            /** From Plan Name */
+            from_plan_name: string | null;
+            /** From Price Plan Id */
+            from_price_plan_id: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Monthly Difference Agorot */
+            monthly_difference_agorot: number;
+            /**
+             * Requested At
+             * Format: date-time
+             */
+            requested_at: string;
+            /** Settlement Status */
+            settlement_status: string;
+            /** Status */
+            status: string;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+            /** Student Name */
+            student_name: string;
+            /** To Plan Name */
+            to_plan_name: string;
+            /**
+             * To Price Plan Id
+             * Format: uuid
+             */
+            to_price_plan_id: string;
+        };
+        /**
          * ManualChargeIn
          * @description §5.10's manual charge. `kind` excludes `tuition` and `billing_run` provenance on
          *     purpose -- a hand-made tuition charge is how a month ends up billed twice.
@@ -7006,6 +7369,82 @@ export interface components {
         PaymentReversalIn: {
             /** Reason */
             reason: string;
+        };
+        /** PlanChangeIn */
+        PlanChangeIn: {
+            /**
+             * To Price Plan Id
+             * Format: uuid
+             */
+            to_price_plan_id: string;
+        };
+        /** PlanChangeListOut */
+        PlanChangeListOut: {
+            /** Items */
+            items: components["schemas"]["ManagerPlanChangeOut"][];
+        };
+        /** PlanChangeOut */
+        PlanChangeOut: {
+            /** Applied At */
+            applied_at: string | null;
+            /**
+             * Effective On
+             * Format: date
+             */
+            effective_on: string;
+            /** From Price Plan Id */
+            from_price_plan_id: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Requested At
+             * Format: date-time
+             */
+            requested_at: string;
+            /** Settlement Status */
+            settlement_status: string;
+            /** Status */
+            status: string;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+            /**
+             * To Price Plan Id
+             * Format: uuid
+             */
+            to_price_plan_id: string;
+        };
+        /**
+         * PlanOptionOut
+         * @description One of the club's plans, as the parent screen renders it.
+         *
+         *     `is_offered` is §5.1's rule — offer a plan only if it raises the number of sessions
+         *     this student could attend in a week. A plan that is not offered is **shown with its
+         *     reason, never hidden**: a Group 1 parent who hears "400" from another parent in the
+         *     hall and finds nothing in the app phones the manager, and one line answers the question
+         *     before it is asked. It turns itself on when the child moves up a group.
+         */
+        PlanOptionOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Current */
+            is_current: boolean;
+            /** Is Offered */
+            is_offered: boolean;
+            /** Monthly Amount Agorot */
+            monthly_amount_agorot: number;
+            /** Name */
+            name: string;
+            /** Weekly Extra Allowance */
+            weekly_extra_allowance: number | null;
         };
         /**
          * PlanRepricing
@@ -7857,6 +8296,39 @@ export interface components {
             /** Preset Key */
             preset_key: string;
         };
+        /** SessionBookingIn */
+        SessionBookingIn: {
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+        };
+        /** SessionBookingOut */
+        SessionBookingOut: {
+            /** Cancelled At */
+            cancelled_at: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+        };
         /**
          * SessionCancelIn
          * @description §5.6 — 'or cancel it with a reason'. The reason is required by the column's own
@@ -8025,14 +8497,20 @@ export interface components {
             /** Studios */
             studios: components["schemas"]["StudioMembershipOut"][];
         };
-        /**
-         * SessionRosterOut
-         * @description `GET /sessions/{id}/attendance`.
-         */
-        SessionRosterOut: {
-            /** Roster */
-            roster?: components["schemas"]["RosterEntry"][];
-            session: components["schemas"]["SessionOut"];
+        /** SessionRosterEntryOut */
+        SessionRosterEntryOut: {
+            /**
+             * Booking Id
+             * Format: uuid
+             */
+            booking_id: string;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+            /** Student Name */
+            student_name: string;
         };
         /**
          * SessionStaffIn
@@ -8702,6 +9180,26 @@ export interface components {
              */
             studio_id: string;
         };
+        /** TrainingPlanOut */
+        TrainingPlanOut: {
+            /** Base Sessions */
+            base_sessions: components["schemas"]["BaseSessionOut"][];
+            /** Credits Remaining */
+            credits_remaining: number | null;
+            current_plan: components["schemas"]["PlanOptionOut"] | null;
+            /** Plans */
+            plans: components["schemas"]["PlanOptionOut"][];
+            scheduled_change?: components["schemas"]["PlanChangeOut"] | null;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+            /** Student Name */
+            student_name: string;
+            /** This Weeks Extras */
+            this_weeks_extras: components["schemas"]["BookableSessionOut"][];
+        };
         /** TrainingYearCreate */
         TrainingYearCreate: {
             /**
@@ -9051,6 +9549,15 @@ export interface components {
             /** Error Type */
             type: string;
         };
+        /**
+         * SessionRosterOut
+         * @description `GET /sessions/{id}/attendance`.
+         */
+        app__schemas__attendance__SessionRosterOut: {
+            /** Roster */
+            roster?: components["schemas"]["RosterEntry"][];
+            session: components["schemas"]["SessionOut"];
+        };
         /** StudioOut */
         app__schemas__platform__StudioOut: {
             /**
@@ -9144,6 +9651,18 @@ export interface components {
             sport?: string | null;
             /** Timezone */
             timezone: string;
+        };
+        /** SessionRosterOut */
+        app__schemas__training_plan__SessionRosterOut: {
+            /** Items */
+            items: components["schemas"]["SessionRosterEntryOut"][];
+            /** Marked Count */
+            marked_count: number;
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
         };
     };
     responses: never;
@@ -11290,6 +11809,41 @@ export interface operations {
             };
         };
     };
+    set_eligibility_api_v1_groups__group_id__eligibility_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                group_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GroupEligibilityIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroupEligibilityOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_group_schedule_api_v1_groups__group_id__schedule_get: {
         parameters: {
             query?: never;
@@ -11412,6 +11966,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GroupStaffOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_group_kind_api_v1_groups__group_id__training_kind_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                group_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GroupKindIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroupKindIn"];
                 };
             };
             /** @description Validation Error */
@@ -12781,6 +13370,57 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PaymentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    plan_change_queue_api_v1_plan_changes_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanChangeListOut"];
+                };
+            };
+        };
+    };
+    settle_plan_change_api_v1_plan_changes__change_id__settle_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                change_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanChangeOut"];
                 };
             };
             /** @description Validation Error */
@@ -14190,6 +14830,70 @@ export interface operations {
             };
         };
     };
+    mark_session_api_v1_session_bookings_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SessionBookingIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionBookingOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    release_session_api_v1_session_bookings__booking_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                booking_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionBookingOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_sessions_api_v1_sessions_get: {
         parameters: {
             query: {
@@ -14348,7 +15052,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SessionRosterOut"];
+                    "application/json": components["schemas"]["app__schemas__attendance__SessionRosterOut"];
                 };
             };
             /** @description Validation Error */
@@ -14387,6 +15091,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BatchResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    session_bookings_api_v1_sessions__session_id__bookings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["app__schemas__training_plan__SessionRosterOut"];
                 };
             };
             /** @description Validation Error */
@@ -15298,6 +16033,73 @@ export interface operations {
             };
         };
     };
+    request_plan_change_api_v1_students__student_id__plan_changes_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlanChangeIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanChangeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_plan_change_api_v1_students__student_id__plan_changes__change_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+                change_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanChangeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     student_price_plan_api_v1_students__student_id__price_plan_get: {
         parameters: {
             query?: never;
@@ -15347,6 +16149,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StudentStatusHistoryListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    training_plan_api_v1_students__student_id__training_plan_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrainingPlanOut"];
                 };
             };
             /** @description Validation Error */

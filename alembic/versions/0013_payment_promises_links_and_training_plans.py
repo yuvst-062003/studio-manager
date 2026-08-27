@@ -33,6 +33,21 @@ promise, whole months bought forward beyond the charges it names. `payment_id` r
 which payment a confirmed promise produced, which is what lets a surplus be recognised as
 an expected prepayment rather than an anomaly. Both nullable-or-defaulted, because every
 promise that exists today declared no forward months and settled charges only.
+
+**Part 4 -- training plans.** The club sells 300 / 400 / 550 ₪: base training on Tuesday
+and Friday for everyone, one extra session a week on 400, and no weekly limit plus the
+Saturday private lesson on 550. None of that is expressible today, because the schema
+cannot tell a Tuesday judo class from a Monday CrossFit session from a Saturday private
+lesson -- they are all `group` rows. `group.kind` is that distinction and every rule
+depends on it. `price_plan.weekly_extra_allowance` is the enforced rule (0 / 1 / NULL for
+unlimited); `sessions_per_week` becomes nullable and stays what its docstring already
+calls it, a label rather than a rule. `group_eligibility` says which base groups may
+reach which extra; `session_booking` is a student marking one; `plan_change` is a change
+scheduled before it takes effect, so it can be recorded, applied and settled.
+
+Deriving the allowance as `sessions_per_week - 2` was considered and rejected: it hardcodes
+"every base is two sessions", which is true this season and is precisely the assumption
+§5.15's rollover breaks when the timetable moves.
 """
 
 from collections.abc import Sequence
@@ -163,8 +178,197 @@ def upgrade() -> None:
         ondelete="SET NULL",
     )
 
+    # -- Part 4: training plans --------------------------------------------------
+    # 'base' is the honest backfill: every group that exists is a group students are
+    # enrolled in and attend, which is exactly what base means.
+    op.add_column(
+        "group",
+        sa.Column("kind", sa.String(length=10), nullable=False, server_default="base"),
+    )
+    op.execute(
+        "ALTER TABLE \"group\" ADD CONSTRAINT ck_group_group_kind"
+        " CHECK (kind IN ('base', 'extra', 'private'))"
+    )
+    op.add_column(
+        "group",
+        sa.Column(
+            "is_invite_only", sa.Boolean(), nullable=False, server_default=sa.text("false")
+        ),
+    )
+
+    # NULL means unlimited, which is why it cannot be NOT NULL with a default: 0, 1 and
+    # "no limit" are three states and only two of them are numbers.
+    op.add_column("price_plan", sa.Column("weekly_extra_allowance", sa.Integer(), nullable=True))
+    # NULL means open membership. The existing `sessions_per_week > 0` CHECK tolerates NULL
+    # unchanged -- an SQL check is true-or-unknown, and unknown does not fail a row.
+    op.alter_column("price_plan", "sessions_per_week", nullable=True)
+
+    op.create_table(
+        "group_eligibility",
+        sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column("studio_id", postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column("extra_group_id", postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column("base_group_id", postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.PrimaryKeyConstraint("id", name="pk_group_eligibility"),
+        sa.ForeignKeyConstraint(
+            ["studio_id"], ["studio.id"], name="fk_group_eligibility_studio_id_studio",
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["extra_group_id"], ["group.id"],
+            name="fk_group_eligibility_extra_group_id_group", ondelete="CASCADE",
+        ),
+        sa.ForeignKeyConstraint(
+            ["base_group_id"], ["group.id"],
+            name="fk_group_eligibility_base_group_id_group", ondelete="CASCADE",
+        ),
+        sa.UniqueConstraint(
+            "extra_group_id", "base_group_id", name="uq_group_eligibility_extra_base"
+        ),
+    )
+    op.create_index(
+        "ix_group_eligibility_studio_id_id", "group_eligibility", ["studio_id", "id"]
+    )
+    op.create_index(
+        "ix_group_eligibility_base_group_id", "group_eligibility", ["base_group_id"]
+    )
+
+    op.create_table(
+        "session_booking",
+        sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column("studio_id", postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column("student_id", postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column("session_id", postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column("marked_by_person_id", postgresql.UUID(as_uuid=True), nullable=True),
+        sa.Column("cancelled_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.PrimaryKeyConstraint("id", name="pk_session_booking"),
+        sa.ForeignKeyConstraint(
+            ["studio_id"], ["studio.id"], name="fk_session_booking_studio_id_studio",
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["student_id"], ["student.id"], name="fk_session_booking_student_id_student",
+            ondelete="CASCADE",
+        ),
+        # CASCADE: §3's own reasoning for pointing at a session rather than at a week plus
+        # a group -- a cancelled or rescheduled session takes its bookings with it rather
+        # than leaving them pointing at a slot that no longer exists.
+        sa.ForeignKeyConstraint(
+            ["session_id"], ["session.id"], name="fk_session_booking_session_id_session",
+            ondelete="CASCADE",
+        ),
+        sa.ForeignKeyConstraint(
+            ["marked_by_person_id"], ["person.id"],
+            name="fk_session_booking_marked_by_person_id_person", ondelete="SET NULL",
+        ),
+    )
+    op.create_index("ix_session_booking_studio_id_id", "session_booking", ["studio_id", "id"])
+    # Partial, on the LIVE rows only: a released booking is a row that still exists, and a
+    # student who releases Monday and re-marks it must not hit a unique violation.
+    op.create_index(
+        "uq_session_booking_live",
+        "session_booking",
+        ["student_id", "session_id"],
+        unique=True,
+        postgresql_where=sa.text("cancelled_at IS NULL"),
+    )
+    op.create_index(
+        "ix_session_booking_live_session",
+        "session_booking",
+        ["studio_id", "session_id"],
+        postgresql_where=sa.text("cancelled_at IS NULL"),
+    )
+    op.create_index(
+        "ix_session_booking_live_student",
+        "session_booking",
+        ["studio_id", "student_id"],
+        postgresql_where=sa.text("cancelled_at IS NULL"),
+    )
+
+    op.create_table(
+        "plan_change",
+        sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column("studio_id", postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column("student_id", postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column("from_price_plan_id", postgresql.UUID(as_uuid=True), nullable=True),
+        sa.Column("to_price_plan_id", postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column("effective_on", sa.Date(), nullable=False),
+        sa.Column("requested_by_person_id", postgresql.UUID(as_uuid=True), nullable=True),
+        sa.Column("requested_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("status", sa.String(length=12), nullable=False, server_default="scheduled"),
+        sa.Column("applied_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column(
+            "settlement_status", sa.String(length=12), nullable=False, server_default="pending"
+        ),
+        sa.Column("settled_by_person_id", postgresql.UUID(as_uuid=True), nullable=True),
+        sa.Column("settled_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.PrimaryKeyConstraint("id", name="pk_plan_change"),
+        # Bare names: the metadata naming convention prefixes them `ck_<table>_`, so
+        # spelling the prefix here yields `ck_plan_change_ck_plan_change_...` and
+        # `alembic check` reports a drift that is entirely this line's fault.
+        sa.CheckConstraint(
+            "status IN ('scheduled', 'applied', 'cancelled')", name="plan_change_status"
+        ),
+        sa.CheckConstraint(
+            "settlement_status IN ('pending', 'settled')",
+            name="plan_change_settlement_status",
+        ),
+        sa.ForeignKeyConstraint(
+            ["studio_id"], ["studio.id"], name="fk_plan_change_studio_id_studio",
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["student_id"], ["student.id"], name="fk_plan_change_student_id_student",
+            ondelete="CASCADE",
+        ),
+        sa.ForeignKeyConstraint(
+            ["from_price_plan_id"], ["price_plan.id"],
+            name="fk_plan_change_from_price_plan_id_price_plan", ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["to_price_plan_id"], ["price_plan.id"],
+            name="fk_plan_change_to_price_plan_id_price_plan", ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["requested_by_person_id"], ["person.id"],
+            name="fk_plan_change_requested_by_person_id_person", ondelete="SET NULL",
+        ),
+        sa.ForeignKeyConstraint(
+            ["settled_by_person_id"], ["person.id"],
+            name="fk_plan_change_settled_by_person_id_person", ondelete="SET NULL",
+        ),
+    )
+    op.create_index("ix_plan_change_studio_id_id", "plan_change", ["studio_id", "id"])
+    # The worker's daily question: which changes are due today.
+    op.create_index(
+        "ix_plan_change_studio_id_status_effective_on",
+        "plan_change",
+        ["studio_id", "status", "effective_on"],
+    )
+    # §11's queue: which changes still need a human to close the money loop.
+    op.create_index(
+        "ix_plan_change_studio_id_settlement_status",
+        "plan_change",
+        ["studio_id", "settlement_status"],
+    )
+
 
 def downgrade() -> None:
+    op.drop_table("plan_change")
+    op.drop_table("session_booking")
+    op.drop_table("group_eligibility")
+    op.alter_column("price_plan", "sessions_per_week", nullable=False)
+    op.drop_column("price_plan", "weekly_extra_allowance")
+    op.drop_column("group", "is_invite_only")
+    op.execute('ALTER TABLE "group" DROP CONSTRAINT ck_group_group_kind')
+    op.drop_column("group", "kind")
+
     op.drop_constraint("fk_payment_promise_payment_id_payment", "payment_promise")
     op.drop_column("payment_promise", "payment_id")
     op.execute(

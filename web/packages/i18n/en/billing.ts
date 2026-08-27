@@ -233,4 +233,10 @@ export const billing: Bundle = {
   'product.colour': 'Colour',
   'product.handOutPolicy': 'The item price is not shown to coaches',
   'dialog.cancel': 'Cancel',
+  'planChange.queueTitle': 'Plan changes to handle',
+  'planChange.queueEmpty': 'No open plan changes.',
+  'planChange.difference': 'Monthly difference',
+  'planChange.effectiveOn': 'From',
+  'planChange.settle': 'Handled',
+  'planChange.hint': 'Two of the payment routes are prepaid, so a plan change cannot settle itself — collect the difference or update the standing order.',
 }
