@@ -78,6 +78,7 @@ const PLANS: PricePlanRow[] = [
     sessions_per_week: 2,
     active_from: '2026-09-01',
     active_to: null,
+    standing_order_link_url: null,
   },
 ]
 
@@ -410,6 +411,18 @@ describe('RolloverWizard · prices', () => {
     await screen.findByTestId('rollover-step-prices')
     expect(screen.getByTestId('rollover-prices-versioned')).toHaveTextContent(
       t('he', 'schedule.rollover.prices.intro'),
+    )
+  })
+
+  it('badges a plan whose standing-order link is missing, where prices are reviewed', async () => {
+    // This is the screen where §3.2 BITES. Repricing closes the plan and opens a successor
+    // with a deliberately NULL link, so the manager leaves this step with every link gone
+    // and no reason to suspect it. The badge is the prompt; without it the club spends the
+    // new year with parents who cannot find the link they were told to use.
+    await renderWizard(stub(atPrices))
+    await screen.findByTestId('rollover-step-prices')
+    expect(screen.getByTestId('rollover-plan-link-missing-p1')).toHaveTextContent(
+      t('he', 'billing.plan.linkMissing'),
     )
   })
 

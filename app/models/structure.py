@@ -41,6 +41,21 @@ from app.models.base import Base, TimestampColumns, UUIDPrimaryKey
 #: a manager is a studio-scoped role_assignment (§3.1).
 GROUP_STAFF_ROLES = ("lead_coach", "assistant_coach")
 
+#: What a group IS, for the purposes of a training plan.
+#:
+#: `base` -- one per student, assigned by the coach, included in every plan, never marked.
+#: `extra` -- spent from the plan's weekly allowance by marking.
+#: `private` -- requires a plan with an unlimited allowance.
+#:
+#: **Not derived from `class` and not from the printed colour.** Sunday's Judo 8-12 is a
+#: judo class in every other sense and is printed the same blue as the base groups, but
+#: functionally it is an extra. The manager sets this per group, explicitly.
+#:
+#: There is deliberately no `team` kind. An earlier draft had one, on the assumption that
+#: the coach selects the competition squad; the manager corrected it -- students put
+#: THEMSELVES on the competition teams, which is exactly an extra.
+GROUP_KINDS = ("base", "extra", "private")
+
 
 class Location(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
     """§4.3 -- `location  studio_id, name, address, notes`. M2's schedule rules point
@@ -75,6 +90,7 @@ class Group(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
         CheckConstraint(
             "age_min IS NULL OR age_max IS NULL OR age_min <= age_max", name="group_age_range"
         ),
+        CheckConstraint("kind IN ('base', 'extra', 'private')", name="group_kind"),
         # Unique inside the CLASS, not the studio: 'מתחילים' under both ג'ודו and קראטה
         # is two real groups, and a studio-wide unique would forbid the second.
         Index("uq_group_class_id_name", "class_id", "name", unique=True),
@@ -88,6 +104,20 @@ class Group(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
     age_min: Mapped[int | None] = mapped_column(Integer)
     age_max: Mapped[int | None] = mapped_column(Integer)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    #: `base` / `extra` / `private` -- see GROUP_KINDS. Every rule in the training-plans
+    #: design depends on this column and nothing else in that design is possible until it
+    #: exists.
+    kind: Mapped[str] = mapped_column(String(10), nullable=False, default="base")
+    #: Eligibility comes from an active `enrollment` the manager creates, not from
+    #: `group_eligibility`.
+    #:
+    #: **This is what the Girls Team uses, and why `person` gains no gender column.**
+    #: `person` carries first name, last name, birthdate, phone, email and locale -- and no
+    #: gender. Enforcing "girls only" in software would mean adding a personal-data field
+    #: about minors to a system built to be careful with exactly that, for the sake of one
+    #: group's filter. An invite list reuses machinery that already exists, adds no new
+    #: personal data, and leaves a path open if the manager ever wants to hand-pick a squad.
+    is_invite_only: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
 
 class GroupStaff(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):

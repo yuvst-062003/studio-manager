@@ -17,6 +17,7 @@ import { Button, Card, EmptyState, StatusChip } from '@studio/ui'
 import { formatDateInStudioZone, formatTimeInStudioZone } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
+import { GroupTrainingPanel } from '../training/GroupTrainingPanel'
 import { ImpactDialog } from './ImpactDialog'
 import { cancelReasonLabel } from './client'
 import type { ImpactPreview, ScheduleClient, ScheduleRule, SessionRow, TrainingYear } from './client'
@@ -190,6 +191,11 @@ export function GroupSchedulePage({
   return (
     <section aria-labelledby="group-schedule-title" style={pageStyle}>
       <h2 id="group-schedule-title">{groupName}</h2>
+
+      {/* What this group IS, for a training plan: base, extra or private, and whether it
+          is an invite list. Here rather than on the groups index because the manager is
+          already looking at ONE group, and the eligibility checklist is about this one. */}
+      <GroupTrainingPanel locale={locale} groupId={groupId} />
 
       <section aria-labelledby="rules-title">
         <h3 id="rules-title">{t(locale, 'schedule.rules.title')}</h3>

@@ -3,7 +3,7 @@
 // The tests that carry weight are the three findings with teeth: the cash affordance must
 // create a payment and allocate it (never flag a charge), the charge-generation button must
 // carry invariant 5 in words, and a match suggestion must never be applied without a human.
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { t } from '@studio/i18n'
@@ -11,12 +11,17 @@ import { CollectionsScreen } from './CollectionsScreen'
 import type { HouseholdRow } from './CollectionsScreen'
 import { ReconciliationQueue } from './ReconciliationQueue'
 import { PricePlansScreen } from './PricePlansScreen'
+import { PaymentPromisesPanel } from './PaymentPromisesPanel'
+import { StandingOrderLinksPanel } from './StandingOrderLinksPanel'
+import { PrepayTermsPanel } from './PrepayTermsPanel'
+import { PlanChangesPanel } from './PlanChangesPanel'
+import { PRICES_WIZARD_ORDER, PricesWizardStep } from './PricesWizardStep'
 import { DebtAlert } from './DebtAlert'
 import { DEBT_ALERT_ORDER } from './register'
 import { RUN_JOB_ORDER } from './RunJobTool'
-import { ageBucket, daysOverdue, escalationRung } from './billingClient'
+import { ageBucket, creditByPayer, daysOverdue, escalationRung } from './billingClient'
 import { agorotFromShekels } from './money'
-import type { DashboardBillingClient } from './billingClient'
+import type { DashboardBillingClient, ManagerPaymentPromiseOut } from './billingClient'
 
 const LOCALE = 'he' as const
 
@@ -26,6 +31,7 @@ function household(overrides: Partial<HouseholdRow> = {}): HouseholdRow {
     payerName: 'משפחת כהן',
     studentNames: ['דנה', 'יוסי'],
     balanceAgorot: 64_000,
+    creditAgorot: 0,
     monthsInDebt: 2,
     daysOverdue: 5,
     ...overrides,
@@ -44,8 +50,40 @@ function stub(overrides: Partial<DashboardBillingClient> = {}): DashboardBilling
     closePricePlan: vi.fn().mockResolvedValue({}),
     createPricePlan: vi.fn().mockResolvedValue({}),
     products: vi.fn().mockResolvedValue([]),
+    paymentPromises: vi.fn().mockResolvedValue([]),
+    setStandingOrderLink: vi.fn().mockResolvedValue({}),
+    billingSettings: vi.fn().mockResolvedValue({
+      cash_prepay_months: 3,
+      cheque_prepay_months: 12,
+      run_day: 1,
+      cash_instructions: null,
+    }),
+    saveBillingSettings: vi.fn().mockResolvedValue({}),
+    planChanges: vi.fn().mockResolvedValue([]),
+    settlePlanChange: vi.fn().mockResolvedValue(undefined),
+    confirmPromise: vi.fn().mockResolvedValue(undefined),
+    declinePromise: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   } as DashboardBillingClient
+}
+
+function managerPromise(
+  id: string,
+  method: 'cash' | 'cheque',
+  overrides: Record<string, unknown> = {},
+): ManagerPaymentPromiseOut {
+  return {
+    id,
+    status: 'pending',
+    method,
+    total_agorot: 90_000,
+    payer_person_id: 'payer-1',
+    payer_name: 'משפחת כהן',
+    charge_count: 3,
+    prepay_months: 0,
+    created_at: '2026-09-01T09:00:00Z',
+    ...overrides,
+  }
 }
 
 function renderCollections(props: Record<string, unknown> = {}) {
@@ -286,7 +324,50 @@ describe('5a — prices and plans', () => {
     registration_fee_agorot: 10_000,
     active_from: '2026-09-01',
     active_to: null,
+    standing_order_link_url: null,
   }
+
+  it('badges an active plan whose standing-order link is missing', () => {
+    // §3.2's visible half. A successor plan is born with a NULL link -- deliberately, so a
+    // 320 ₪ plan can never carry the 300 ₪ mandate -- and the badge is what turns that
+    // silence into a prompt. Without it the rollover's gift to the club is a year of
+    // parents who cannot find the link they were told to use.
+    render(<PricePlansScreen locale={LOCALE} client={stub()} plans={[PLAN]} onChanged={vi.fn()} />)
+    expect(screen.getByTestId('plan-link-missing')).toHaveTextContent(
+      t(LOCALE, 'billing.plan.linkMissing'),
+    )
+  })
+
+  it('shows the full URL rather than a "link set" tick', () => {
+    // §4 -- a typo in a payment URL has to be visible WITHOUT clicking it. A checkmark
+    // says a link exists; it cannot say the link is the right one.
+    const url = 'https://app.upay.co.il/recurring/300'
+    render(
+      <PricePlansScreen
+        locale={LOCALE}
+        client={stub()}
+        plans={[{ ...PLAN, standing_order_link_url: url }]}
+        onChanged={vi.fn()}
+      />,
+    )
+    expect(screen.getByTestId('plan-link')).toHaveTextContent(url)
+    expect(screen.queryByTestId('plan-link-missing')).not.toBeInTheDocument()
+  })
+
+  it('does not badge a CLOSED plan with no link', () => {
+    // A closed plan's link is dead by definition: its amount is not what anyone is billed
+    // any more. Badging it would put a permanent, unfixable warning on every plan the club
+    // has ever retired.
+    render(
+      <PricePlansScreen
+        locale={LOCALE}
+        client={stub()}
+        plans={[{ ...PLAN, active_to: '2026-12-31' }]}
+        onChanged={vi.fn()}
+      />,
+    )
+    expect(screen.queryByTestId('plan-link-missing')).not.toBeInTheDocument()
+  })
 
   it('offers to close and replace a plan, never to edit its amount', async () => {
     // §5.10 and §5.15: a price change CLOSES the current plan and opens a new one, because a
@@ -385,5 +466,324 @@ describe('the alert-centre section and the dev bar', () => {
     // belongs above a trial queue". `tools.ts` fixes runJob at 40.
     expect(DEBT_ALERT_ORDER).toBe(10)
     expect(RUN_JOB_ORDER).toBe(40)
+  })
+})
+
+describe('the payment-promise queue', () => {
+  // The manager's half of both hand-carried routes. Confirm and decline are unchanged from
+  // the cash queue this replaces — what is new is that the queue can no longer answer "how
+  // much of this is cheques" by looking at the screen's title.
+  function renderPanel(props: Record<string, unknown> = {}) {
+    return render(<PaymentPromisesPanel locale={LOCALE} client={stub()} {...props} />)
+  }
+
+  it('names the method on every row', async () => {
+    // §10 — the club's question is 'how much of this year is sitting in undeposited
+    // cheques'. A queue that renders both methods identically cannot be asked it, and the
+    // manager confirms twelve cheques thinking they are one month of cash.
+    renderPanel({
+      client: stub({
+        paymentPromises: vi
+          .fn()
+          .mockResolvedValue([managerPromise('r1', 'cash'), managerPromise('r2', 'cheque')]),
+      }),
+    })
+    const rows = await screen.findAllByTestId('payment-promise-row')
+    expect(within(rows[0]!).getByTestId('promise-method')).toHaveTextContent('מזומן')
+    expect(within(rows[1]!).getByTestId('promise-method')).toHaveTextContent('צ׳קים')
+  })
+
+  it('asks the server for one method when the filter is set, never filters in the browser', async () => {
+    // The list is paged by the server and the filter has to mean the same thing as
+    // `?method=` does — a client-side filter over one page would silently mean 'of the
+    // rows that happened to load', which is a different and wrong answer.
+    const paymentPromises = vi.fn().mockResolvedValue([managerPromise('r1', 'cheque')])
+    renderPanel({ client: stub({ paymentPromises }) })
+    await screen.findAllByTestId('payment-promise-row')
+    // Queried by role: the filter is a `SegmentedControl`, so it is a radiogroup, and a
+    // testid here would let it stop being one without a test noticing.
+    await userEvent.click(screen.getByRole('radio', { name: t(LOCALE, 'billing.method.cheque') }))
+    expect(paymentPromises).toHaveBeenLastCalledWith('pending', 'cheque')
+  })
+
+  it('confirms and declines through the promise routes', async () => {
+    const confirmPromise = vi.fn().mockResolvedValue(undefined)
+    const declinePromise = vi.fn().mockResolvedValue(undefined)
+    renderPanel({
+      client: stub({
+        paymentPromises: vi.fn().mockResolvedValue([managerPromise('r1', 'cheque')]),
+        confirmPromise,
+        declinePromise,
+      }),
+    })
+    await userEvent.click(await screen.findByTestId('promise-confirm'))
+    expect(confirmPromise).toHaveBeenCalledWith('r1')
+    await userEvent.click(await screen.findByTestId('promise-decline'))
+    expect(declinePromise).toHaveBeenCalledWith('r1')
+  })
+})
+
+describe('Settings → Payments — the standing-order links', () => {
+  // §5's canonical editor. Two surfaces, one field: the wizard's prices step sets it as a
+  // plan is created, and this is where it is fixed afterwards -- which is the whole reason
+  // the column is the one exception to `price_plan` never being edited in place.
+  const ACTIVE = {
+    id: 'plan-1',
+    name: 'פעמיים בשבוע',
+    sessions_per_week: 2,
+    monthly_amount_agorot: 30_000,
+    registration_fee_agorot: 0,
+    active_from: '2026-09-01',
+    active_to: null,
+    standing_order_link_url: null,
+  }
+  const CLOSED = { ...ACTIVE, id: 'plan-0', active_to: '2026-08-31' }
+
+  it('lists active plans only — a closed plan\'s link is dead by definition', async () => {
+    render(
+      <StandingOrderLinksPanel
+        locale={LOCALE}
+        client={stub({ pricePlans: vi.fn().mockResolvedValue([ACTIVE, CLOSED]) })}
+      />,
+    )
+    expect(await screen.findAllByTestId('link-editor-row')).toHaveLength(1)
+  })
+
+  it('saves a pasted link against the plan it sits beside', async () => {
+    const setStandingOrderLink = vi.fn().mockResolvedValue({})
+    render(
+      <StandingOrderLinksPanel
+        locale={LOCALE}
+        client={stub({
+          pricePlans: vi.fn().mockResolvedValue([ACTIVE]),
+          setStandingOrderLink,
+        })}
+      />,
+    )
+    const field = await screen.findByTestId('link-editor-input')
+    await userEvent.type(field, 'https://app.upay.co.il/recurring/300')
+    await userEvent.tab()
+    expect(setStandingOrderLink).toHaveBeenCalledWith(
+      'plan-1',
+      'https://app.upay.co.il/recurring/300',
+    )
+  })
+
+  it('says so when the server refuses the host, rather than looking saved', async () => {
+    // The server is the only thing that knows the allowlist, and a field that silently
+    // keeps the text a manager typed is a field they will walk away from believing worked.
+    render(
+      <StandingOrderLinksPanel
+        locale={LOCALE}
+        client={stub({
+          pricePlans: vi.fn().mockResolvedValue([ACTIVE]),
+          setStandingOrderLink: vi.fn().mockRejectedValue(new Error('422')),
+        })}
+      />,
+    )
+    const field = await screen.findByTestId('link-editor-input')
+    await userEvent.type(field, 'https://evil.example/recurring/300')
+    await userEvent.tab()
+    expect(await screen.findByTestId('link-editor-error')).toHaveTextContent(
+      t(LOCALE, 'billing.plan.linkRefused'),
+    )
+  })
+})
+
+describe('the wizard\'s prices step', () => {
+  // §5's other surface: the link sits beside the amount as a plan is CREATED, so a club
+  // that already has its uPay links never has to come back for them. `WIZARD_STEPS` in
+  // `app/services/structure/setup.py` is a contract this feature does not touch -- `prices`
+  // is already step 4 there, and it was the only one of the six with nothing registered
+  // into its slot.
+  function renderStep(props: Record<string, unknown> = {}) {
+    return render(
+      <PricesWizardStep
+        locale={LOCALE}
+        status="pending"
+        onDone={vi.fn()}
+        onSkip={vi.fn()}
+        client={stub()}
+        {...props}
+      />,
+    )
+  }
+
+  it('registers at the order WIZARD_STEP_ORDER gives prices', () => {
+    // studio · belts · groups · prices · staff · students. A step registered at the wrong
+    // order lands the owner on the wrong panel after they finish the previous one.
+    expect(PRICES_WIZARD_ORDER).toBe(4)
+  })
+
+  it('creates a plan with the link the manager pasted beside the amount', async () => {
+    const createPricePlan = vi.fn().mockResolvedValue({ id: 'plan-9' })
+    const setStandingOrderLink = vi.fn().mockResolvedValue({})
+    renderStep({ client: stub({ createPricePlan, setStandingOrderLink }) })
+    await userEvent.type(screen.getByTestId('wizard-plan-name'), 'פעמיים בשבוע')
+    await userEvent.type(screen.getByTestId('wizard-plan-amount'), '300')
+    await userEvent.type(
+      screen.getByTestId('wizard-plan-link'),
+      'https://app.upay.co.il/recurring/300',
+    )
+    await userEvent.click(screen.getByTestId('wizard-plan-save'))
+    await waitFor(() => expect(createPricePlan).toHaveBeenCalled())
+    expect(createPricePlan).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'פעמיים בשבוע', monthlyAmountAgorot: 30_000 }),
+    )
+    expect(setStandingOrderLink).toHaveBeenCalledWith(
+      'plan-9',
+      'https://app.upay.co.il/recurring/300',
+    )
+  })
+
+  it('creates the plan when the link is left blank, and asks for nothing more', async () => {
+    // §5 and open item 4 -- OPTIONAL. A club may not have its uPay links on the day it
+    // sets the app up, and stopping setup for one would be a wall in front of a club that
+    // cannot pass it yet. The plan is created and the link is simply never sent.
+    const createPricePlan = vi.fn().mockResolvedValue({ id: 'plan-9' })
+    const setStandingOrderLink = vi.fn().mockResolvedValue({})
+    renderStep({ client: stub({ createPricePlan, setStandingOrderLink }) })
+    await userEvent.type(screen.getByTestId('wizard-plan-name'), 'פעמיים בשבוע')
+    await userEvent.type(screen.getByTestId('wizard-plan-amount'), '300')
+    await userEvent.click(screen.getByTestId('wizard-plan-save'))
+    await waitFor(() => expect(createPricePlan).toHaveBeenCalled())
+    expect(setStandingOrderLink).not.toHaveBeenCalled()
+  })
+
+  it('reports itself finished rather than letting the container guess', async () => {
+    // The container never computes completeness -- `packages/ui/src/setup-wizard/types.ts`
+    // says so, and it is what keeps this seam one-directional.
+    const onDone = vi.fn()
+    renderStep({ client: stub({ pricePlans: vi.fn().mockResolvedValue([]) }), onDone })
+    await userEvent.click(screen.getByTestId('wizard-prices-done'))
+    expect(onDone).toHaveBeenCalled()
+  })
+})
+
+describe('prepayment, on the manager\'s side', () => {
+  it('derives credit per payer the way the server does — payments minus allocations', () => {
+    // The same formula as `BillingService.payer_credit`, over the payments list the
+    // collections screen already needs. A reversed payment is money recorded as never
+    // having arrived, so it is credit on neither side of the subtraction.
+    const payments = [
+      {
+        id: 'p1',
+        payer_person_id: 'payer-1',
+        amount_agorot: 90_000,
+        reversed_at: null,
+        allocations: [{ amount_agorot: 30_000 }],
+      },
+      {
+        id: 'p2',
+        payer_person_id: 'payer-1',
+        amount_agorot: 30_000,
+        reversed_at: '2026-09-05T00:00:00Z',
+        allocations: [],
+      },
+      {
+        id: 'p3',
+        payer_person_id: 'payer-2',
+        amount_agorot: 25_000,
+        reversed_at: null,
+        allocations: [{ amount_agorot: 25_000 }],
+      },
+    ]
+    const credit = creditByPayer(payments)
+    expect(credit.get('payer-1')).toBe(60_000)
+    // Fully allocated: money that settled charges is not credit.
+    expect(credit.get('payer-2') ?? 0).toBe(0)
+  })
+
+  it('shows a household\'s credit beside its balance, never merged into it', () => {
+    // §7 — a manager about to phone a family should see "owes 640 ₪, paid ahead 600 ₪"
+    // before dialling. One number that meant neither is what merging them produces.
+    renderCollections({
+      households: [household({ creditAgorot: 60_000 })],
+    })
+    const row = screen.getAllByTestId('household-row')[0]!
+    expect(within(row).getByTestId('household-credit')).toHaveTextContent('600')
+  })
+
+  it('says nothing about credit for a household that has none', () => {
+    renderCollections({ households: [household()] })
+    expect(screen.queryByTestId('household-credit')).not.toBeInTheDocument()
+  })
+
+  it('lets the manager set the club\'s own prepayment terms', async () => {
+    // §5 — cash three months forward, twelve cheques. Configuration rather than constants,
+    // on the one screen that answers "how may a family pay this club".
+    const saveBillingSettings = vi.fn().mockResolvedValue({})
+    render(<PrepayTermsPanel locale={LOCALE} client={stub({ saveBillingSettings })} />)
+    const cash = await screen.findByTestId('prepay-term-cash')
+    await userEvent.clear(cash)
+    await userEvent.type(cash, '6')
+    await userEvent.tab()
+    expect(saveBillingSettings).toHaveBeenCalledWith({ cash_prepay_months: 6 })
+  })
+
+  it('shows how many months forward a promise buys, beside its amount', async () => {
+    // 3,600 ₪ with no explanation is the number a manager phones the office about. Twelve
+    // months forward is why it is large, and it is what they are holding cheques for.
+    render(
+      <PaymentPromisesPanel
+        locale={LOCALE}
+        client={stub({
+          paymentPromises: vi
+            .fn()
+            .mockResolvedValue([managerPromise('r1', 'cheque', { prepay_months: 12 })]),
+        })}
+      />,
+    )
+    expect(await screen.findByTestId('promise-forward-months')).toHaveTextContent('12')
+  })
+})
+
+describe('the plan-change settlement queue', () => {
+  // §11 — the parent's tap changes access; a person always closes the loop on money. Two
+  // of the club's three payment routes are prepaid, so a plan change cannot settle itself.
+  const CHANGE = {
+    id: 'c1',
+    student_id: 's1',
+    student_name: 'דנה כהן',
+    from_price_plan_id: 'p300',
+    to_price_plan_id: 'p400',
+    from_plan_name: '300',
+    to_plan_name: '400',
+    monthly_difference_agorot: 10_000,
+    effective_on: '2026-12-01',
+    status: 'applied',
+    settlement_status: 'pending',
+    requested_at: '2026-11-10T09:00:00Z',
+    applied_at: '2026-11-10T09:00:00Z',
+  }
+
+  it('shows the monthly difference a manager has to collect', async () => {
+    // "collect 100 ₪ × the remaining months" is the instruction. A queue that showed only
+    // the two plan names would make the manager look up two prices to compute it.
+    render(
+      <PlanChangesPanel
+        locale={LOCALE}
+        client={stub({ planChanges: vi.fn().mockResolvedValue([CHANGE]) })}
+      />,
+    )
+    const row = await screen.findByTestId('plan-change-row')
+    expect(within(row).getByTestId('plan-change-difference')).toHaveTextContent('100')
+    expect(row).toHaveTextContent('דנה כהן')
+  })
+
+  it('settles a change and drops it from the queue', async () => {
+    const settlePlanChange = vi.fn().mockResolvedValue(undefined)
+    const planChanges = vi.fn().mockResolvedValueOnce([CHANGE]).mockResolvedValue([])
+    render(<PlanChangesPanel locale={LOCALE} client={stub({ planChanges, settlePlanChange })} />)
+    await userEvent.click(await screen.findByTestId('plan-change-settle'))
+    expect(settlePlanChange).toHaveBeenCalledWith('c1')
+  })
+
+  it('renders nothing at all when the queue is empty', async () => {
+    // A heading over nothing is a row of noise on a dashboard that already has a
+    // collections list — the same rule the payment-promise queue follows.
+    const { container } = render(<PlanChangesPanel locale={LOCALE} client={stub()} />)
+    await screen.findByTestId('plan-changes-loaded')
+    expect(container.querySelector('[data-testid="plan-change-row"]')).toBeNull()
   })
 })

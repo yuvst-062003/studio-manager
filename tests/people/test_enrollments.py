@@ -358,20 +358,59 @@ def test_there_is_exactly_one_implementation_of_expectation_in_the_lane():
     ]
 
 
-def test_the_contract_module_is_untouched_by_this_lane():
+def test_the_contract_module_keeps_its_pure_no_io_contract():
     """L1 -- `attendance_pattern.py` is CONTRACT code W3's roster and W4's billing run both
-    read. This lane extends the package around it and never edits it."""
-    import subprocess
+    read, and what makes it shareable is that it opens nothing.
+
+    **This used to assert the file had no diff at all since f499a8f**, which was the right
+    guard while W3's lane was the only thing near it: the hazard then was a lane quietly
+    rewriting a module two other lanes depended on. The 2026-08-27 training-plans design
+    §8 amends it deliberately -- `is_expected` gains a branch on group kind, "not
+    rewritten, and its pure-function, no-I/O contract is preserved" -- so a frozen-diff
+    assertion now forbids a change that was designed, reviewed and is the point of the
+    feature, while still permitting any rewrite that happened to land in the same commit.
+
+    So the guard asserts the property the module actually has to keep. A caller supplies
+    the booking the same way it already supplies the group's weekdays; the moment this
+    module imports a session or a model, the roster and the bill can disagree about which
+    children were expected, which is the whole thing L1 exists to prevent.
+    """
+    import ast
     from pathlib import Path
 
-    root = Path(__file__).resolve().parents[2]
-    changed = subprocess.run(
-        ["git", "diff", "--name-only", "f499a8f", "HEAD"],
-        cwd=root,
-        capture_output=True,
-        text=True,
-    ).stdout
-    assert "app/services/people/attendance_pattern.py" not in changed
+    source = (
+        Path(__file__).resolve().parents[2] / "app/services/people/attendance_pattern.py"
+    ).read_text(encoding="utf-8")
+    tree = ast.parse(source)
+
+    imported = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            imported.update(alias.name for alias in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            imported.add(node.module)
+    # Anything that could reach a database, a clock or a network is a dependency this
+    # module must not have. `collections.abc` and `__future__` are types, not I/O.
+    assert not any(
+        name.startswith(("app.models", "sqlalchemy", "app.core.db", "app.core.clock"))
+        for name in imported
+    ), f"attendance_pattern.py must stay pure; it imports {sorted(imported)}"
+
+    signatures = {
+        node.name: [arg.arg for arg in node.args.args]
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef)
+    }
+    # The three the roster and the billing run call, with their positional contract intact.
+    # `is_expected` gained keyword-only arguments (`group_kind`, `has_booking`); a caller
+    # that passed three positionals before still passes three.
+    assert signatures["expected_weekdays"] == ["attends_weekdays", "group_weekdays"]
+    assert signatures["is_expected"] == [
+        "attends_weekdays",
+        "group_weekdays",
+        "session_weekday",
+    ]
+    assert signatures["weekly_volume"] == ["patterns"]
 
 
 # -- the router ----------------------------------------------------------------

@@ -77,6 +77,11 @@ import { ReportsSection } from './features/reports/ReportsSection'
 import { BeltsIndex } from './features/belts/BeltsIndex'
 
 import { registerBillingAlertSection } from './features/billing/BillingAlertSection'
+// §5.1's step 4. `WIZARD_STEP_ORDER` has reserved `prices` since M1 and nothing had ever
+// registered into it — the one step of the six whose slot was empty, so an owner who
+// finished `groups` landed on a panel saying השלב הזה עדיין לא זמין.
+import { registerPricesWizardStep } from './features/billing/PricesWizardStep'
+import { makeDashboardBillingClient } from './features/billing'
 
 registerM1WizardSteps(apiFetch)
 // Seam 4 — `6c` composes sections from four milestones. This lane registers the three it
@@ -89,6 +94,10 @@ registerBillingAlertSection()
 // order WIZARD_STEP_ORDER gives `belts`. SetupWizard.tsx is not reopened, and neither is
 // packages/ui/src/setup-wizard/register.ts, which registers M1's own four steps.
 registerBeltsWizardStep(makeDashboardBeltsClient(apiFetch))
+// And M6's, at order 4. The הוראת קבע link sits beside the amount as each plan is created
+// (payment-routes §5) and is optional there — a club may not have its uPay links on day
+// one, and Settings → Payments is where a missing one is filled in later.
+registerPricesWizardStep(makeDashboardBillingClient(apiFetch))
 
 const NAV = [
   { key: 'schedule', labelKey: 'schedule.week.title', href: '#/schedule' },

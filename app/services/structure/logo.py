@@ -177,7 +177,7 @@ def update_studio_fields(
 ) -> Studio:
     """`name` to its column, the rest into `settings`. Merged, never replaced.
 
-    `settings` is shared JSONB -- setup_progress, standing_order_link, billing_day and
+    `settings` is shared JSONB -- setup_progress, cash_instructions, billing_day and
     retention_months all live there -- so a whole-column assignment would drop them
     silently, and the loss would surface somewhere else entirely.
     """

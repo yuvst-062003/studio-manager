@@ -17,12 +17,21 @@ import type { CSSProperties } from 'react'
 import { Alert, BeltBar, Button, Card, EmptyState, MoneyDisplay, SegmentedControl, StatusChip } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
-import type { BillingClient, CashRequestOut, ChargeOut } from './billingClient'
+import type {
+  BillingClient,
+  ChargeOut,
+  PaymentPromiseOut,
+  PromiseMethod,
+} from './billingClient'
 import { instalmentSplit, oldestMonths, selectionTotal } from './billingClient'
 
 //: §5.10's own chip groups: `[1] [2] [3] [6]` months, `[1] [2] [3]` instalments.
 const MONTH_OPTIONS = [1, 2, 3, 6]
 const INSTALMENT_OPTIONS = [1, 2, 3]
+
+//: The two routes a parent hands money over by. Mirrors `PROMISE_METHODS` in
+//: `app/models/payment_promise.py`, which is the constraint that actually refuses a third.
+const PROMISE_METHODS: readonly PromiseMethod[] = ['cash', 'cheque']
 
 const columnStyle: CSSProperties = {
   display: 'flex',
@@ -56,16 +65,56 @@ export type DebtRow = {
   coveredElsewhere: boolean
 }
 
+/**
+ * One הוראת קבע link, for one child. **A list, not a single link** (payment-routes §6): a
+ * uPay shared link charges a FIXED amount, so a payer with a child on 300 and a child on
+ * 550 needs both, labelled — one bare link has them sign one mandate and underpay for the
+ * other child every month. Only this payer's own children ever appear.
+ */
+export type PrepayTerms = {
+  cashMonths: number
+  chequeMonths: number
+  monthlyTotalAgorot: number
+}
+
+export type StandingOrderLink = {
+  studentName: string
+  planName: string
+  amountAgorot: number
+  url: string
+}
+
 export type PaymentsScreenProps = {
   locale: Locale
   client: BillingClient
   debts: readonly DebtRow[]
   hasActiveSubscription: boolean
-  standingOrderLink: string | null
+  standingOrderLinks: readonly StandingOrderLink[]
   cashInstructions: string | null
-  /** The payer's own requests — a pending one turns the cash card into a status. */
-  cashRequests?: readonly CashRequestOut[]
-  onCashRequest?: (chargeIds: string[]) => Promise<void>
+  /**
+   * The club's own prepayment rules and this payer's monthly price, from
+   * `GET /me/prepay-terms`. The screen does no arithmetic of its own beyond
+   * `months × monthly` — G2 is an integer rule, and two places that compute the same
+   * product are two places that can round differently.
+   *
+   * A term of 0, or a payer with no plan, means that route settles open charges only —
+   * which is how cash behaved before prepayment existed.
+   */
+  prepayTerms: PrepayTerms
+  /**
+   * What is left of money already handed over. **Derived into "paid ahead", never stored.**
+   * A stored `paid_through = 2026-11-30` becomes a lie the moment the family upgrades to
+   * 400 ₪, because 600 ₪ no longer reaches the end of November; credit ÷ the CURRENT
+   * monthly total is always true and recomputes itself after any plan change.
+   */
+  creditAgorot: number
+  /** The payer's own promises, both routes — a pending one turns its card into a status. */
+  promises?: readonly PaymentPromiseOut[]
+  onPaymentPromise?: (
+    chargeIds: string[],
+    method: PromiseMethod,
+    prepayMonths: number,
+  ) => Promise<void>
   onOrderOpened: (form: { action: string; fields: Record<string, string> }) => void
   onOpenHistory: () => void
 }
@@ -75,25 +124,25 @@ export function PaymentsScreen({
   client,
   debts,
   hasActiveSubscription,
-  standingOrderLink,
+  standingOrderLinks,
   cashInstructions,
-  cashRequests = [],
-  onCashRequest,
+  prepayTerms,
+  creditAgorot,
+  promises = [],
+  onPaymentPromise,
   onOrderOpened,
   onOpenHistory,
 }: PaymentsScreenProps) {
   const [months, setMonths] = useState(2)
   const [instalments, setInstalments] = useState(1)
   const [inFlight, setInFlight] = useState(false)
-  const [cashInFlight, setCashInFlight] = useState(false)
+  const [promiseInFlight, setPromiseInFlight] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const pendingCash = cashRequests.find((request) => request.status === 'pending') ?? null
-  const cashPendingChargeIds = new Set(pendingCash?.charge_ids ?? [])
-  // Say a decline out loud exactly until the family acts on it: the newest DECIDED
-  // request being a decline, with nothing pending, is the state that needs the sentence.
-  const latestDecided = cashRequests.find((request) => request.decided_at !== null) ?? null
-  const declinedCash = !pendingCash && latestDecided?.status === 'declined' ? latestDecided : null
+  // One live promise at a time across BOTH routes: the service refuses a second over the
+  // same charges, so a card that still offered its button would be offering a 409.
+  const pending = promises.find((row) => row.status === 'pending') ?? null
+  const pendingChargeIds = new Set(pending?.charge_ids ?? [])
 
   // Only charges nothing else already covers are selectable. §5.10's guard 1, and the
   // reason a covered row still RENDERS: hiding it would leave a parent looking for a month
@@ -157,8 +206,11 @@ export function PaymentsScreen({
                   {t(locale, 'billing.card.coveredElsewhere')}
                 </span>
               ) : null}
-              {cashPendingChargeIds.has(row.charge.id) ? (
-                <StatusChip status="pending" label={t(locale, 'billing.cash.pendingChip')} />
+              {pending && pendingChargeIds.has(row.charge.id) ? (
+                <StatusChip
+                  status="pending"
+                  label={t(locale, `billing.${pending.method}.pendingChip`)}
+                />
               ) : null}
             </div>
           ))}
@@ -172,6 +224,27 @@ export function PaymentsScreen({
           </div>
         </Card>
       </section>
+
+      {creditAgorot > 0 ? (
+        // §6 -- 'and the credit is what remembers'. Derived here from two live numbers,
+        // so a plan change re-answers it without anything being rewritten.
+        <Card>
+          <div data-testid="paid-ahead">
+            <h3>{t(locale, 'billing.prepay.paidAhead')}</h3>
+            <MoneyDisplay agorot={creditAgorot} tone="paid" />
+            <p>{coverageLabel(locale, creditAgorot, prepayTerms.monthlyTotalAgorot)}</p>
+            {remainderOf(creditAgorot, prepayTerms.monthlyTotalAgorot) > 0 ? (
+              <span data-testid="paid-ahead-part">
+                {t(locale, 'billing.prepay.andPartOfNext')}{' '}
+                <MoneyDisplay
+                  agorot={remainderOf(creditAgorot, prepayTerms.monthlyTotalAgorot)}
+                  tone="paid"
+                />
+              </span>
+            ) : null}
+          </div>
+        </Card>
+      ) : null}
 
       <h2>{t(locale, 'billing.howToPay.title')}</h2>
 
@@ -243,11 +316,30 @@ export function PaymentsScreen({
       <Card>
         <div data-testid="route-standing-order">
           <h3>{t(locale, 'billing.method.standingOrder')}</h3>
-          {standingOrderLink ? (
-            <a href={standingOrderLink} data-testid="standing-order-link">
-              {t(locale, 'billing.standingOrder.link')}
-            </a>
-          ) : null}
+          {/* An empty list renders exactly what this card rendered before there was a
+              source at all: the instructions, and no anchor. §3.2's degradation is
+              therefore not a special case — it is the same code path. */}
+          {standingOrderLinks.map((link) => (
+            <div key={link.url} style={rowStyle} data-testid="standing-order-row">
+              <span>{link.studentName}</span>
+              <span>{link.planName}</span>
+              {/* The amount the mandate will charge every month. A uPay shared link is
+                  fixed at one amount and the page it opens does not say which. */}
+              <MoneyDisplay agorot={link.amountAgorot} label={link.studentName} />
+              <a
+                href={link.url}
+                data-testid="standing-order-link"
+                // Two anchors reading 'קישור להקמת הוראת קבע' are two links a screen
+                // reader cannot tell apart, and telling them apart is the whole point.
+                aria-label={t(locale, 'billing.standingOrder.linkFor').replace(
+                  '{{name}}',
+                  link.studentName,
+                )}
+              >
+                {t(locale, 'billing.standingOrder.link')}
+              </a>
+            </div>
+          ))}
           <p>{t(locale, 'billing.standingOrder.instructions')}</p>
           {/* G8 on the screen: the app cannot confirm these, so the charges stay open
               until a manager reconciles them. Saying so is what stops a parent thinking
@@ -256,49 +348,183 @@ export function PaymentsScreen({
         </div>
       </Card>
 
-      {/* -- מזומן ------------------------------------------------------------ */}
-      <Card>
-        <div data-testid="route-cash">
-          <h3>{t(locale, 'billing.method.cash')}</h3>
-          <p>{cashInstructions ?? t(locale, 'billing.cash.instructions')}</p>
-          {pendingCash ? (
-            // One live request at a time: while the manager holds one, the card reports
-            // it instead of offering a second.
-            <div data-testid="cash-pending">
-              <StatusChip status="pending" label={t(locale, 'billing.cash.pendingTitle')} />
-              <p>{t(locale, 'billing.cash.requested')}</p>
-              <MoneyDisplay agorot={pendingCash.total_agorot} tone="pending" />
-            </div>
-          ) : (
-            <>
-              {declinedCash ? (
-                <Alert tone="danger" live iconLabel={t(locale, 'billing.method.cash')}>
-                  {t(locale, 'billing.cash.declined')}
-                </Alert>
-              ) : null}
-              {onCashRequest && chosen.length > 0 ? (
-                <Button
-                  variant="secondary"
-                  data-testid="cash-request-button"
-                  disabled={cashInFlight}
-                  onClick={() => {
-                    if (cashInFlight) return
-                    setCashInFlight(true)
-                    setError(null)
-                    onCashRequest(chosen.map((charge) => charge.id))
-                      .catch(() => setError(t(locale, 'common.error.generic')))
-                      .finally(() => setCashInFlight(false))
-                  }}
-                >
-                  {t(locale, 'billing.cash.request')}
-                </Button>
-              ) : null}
-            </>
-          )}
-        </div>
-      </Card>
+      {/* -- מזומן וצ׳קים ------------------------------------------------------
+          Two cards, one mechanism. The payment-routes spec §8: cheques are cash with a
+          different word on the payment — same promise row, same two endings, same manager
+          confirming by hand — so the difference between these cards is a `method` string
+          and the copy it selects, and nothing else. */}
+      {PROMISE_METHODS.map((method) => (
+        <PromiseCard
+          key={method}
+          locale={locale}
+          method={method}
+          instructions={method === 'cash' ? cashInstructions : null}
+          promises={promises}
+          pending={pending}
+          chosen={chosen}
+          inFlight={promiseInFlight}
+          // `months x monthly` is the ONE product this screen computes, and it is integer
+          // arithmetic on two integers the server sent (G2). A term of 0, or a payer with
+          // no plan, makes it 0 and the card falls back to settling open charges.
+          forwardMonths={method === 'cash' ? prepayTerms.cashMonths : prepayTerms.chequeMonths}
+          monthlyTotalAgorot={prepayTerms.monthlyTotalAgorot}
+          onPaymentPromise={
+            onPaymentPromise
+              ? (chargeIds, prepayMonths) => {
+                  if (promiseInFlight) return
+                  setPromiseInFlight(true)
+                  setError(null)
+                  onPaymentPromise(chargeIds, method, prepayMonths)
+                    .catch(() => setError(t(locale, 'common.error.generic')))
+                    .finally(() => setPromiseInFlight(false))
+                }
+              : undefined
+          }
+        />
+      ))}
     </div>
   )
+}
+
+/**
+ * One of the two hand-carried routes. Rendered twice, and everything that differs between
+ * the two renders is reached through `method` — the i18n keys mirror each other key for
+ * key (`billing.cash.request` / `billing.cheque.request`), so a rule fixed here is fixed
+ * for both rather than for whichever one the reporter happened to be using.
+ */
+function PromiseCard({
+  locale,
+  method,
+  instructions,
+  promises,
+  pending,
+  chosen,
+  inFlight,
+  forwardMonths,
+  monthlyTotalAgorot,
+  onPaymentPromise,
+}: {
+  locale: Locale
+  method: PromiseMethod
+  instructions: string | null
+  promises: readonly PaymentPromiseOut[]
+  pending: PaymentPromiseOut | null
+  chosen: readonly ChargeOut[]
+  inFlight: boolean
+  forwardMonths: number
+  monthlyTotalAgorot: number
+  onPaymentPromise?: (chargeIds: string[], prepayMonths: number) => void
+}) {
+  // Say a decline out loud exactly until the family acts on it, and say it on the card it
+  // belongs to: the newest DECIDED promise OF THIS METHOD being a decline, with nothing
+  // pending anywhere, is the state that needs the sentence. A declined cheque promise must
+  // not make the cash card look broken.
+  const latestDecided =
+    promises.find((row) => row.method === method && row.decided_at !== null) ?? null
+  const declined = !pending && latestDecided?.status === 'declined' ? latestDecided : null
+
+  // The club's rule for THIS route. Zero months, or a payer with no plan, buys nothing —
+  // and a card offering to sell a year of a subscription the family does not have is worse
+  // than a card that simply settles what is owed.
+  const forwardAgorot = forwardMonths * monthlyTotalAgorot
+  const openAgorot = selectionTotal(chosen)
+
+  return (
+    <Card>
+      <div data-testid={`route-${method}`}>
+        <h3>{t(locale, `billing.method.${method}`)}</h3>
+        <p>{instructions ?? t(locale, `billing.${method}.instructions`)}</p>
+        {pending?.method === method ? (
+          // While the manager holds this one, the card reports it instead of offering a
+          // second.
+          <div data-testid={`promise-pending-${method}`}>
+            <StatusChip status="pending" label={t(locale, `billing.${method}.pendingTitle`)} />
+            <p>{t(locale, `billing.${method}.requested`)}</p>
+            <MoneyDisplay agorot={pending.total_agorot} tone="pending" />
+          </div>
+        ) : pending ? (
+          // The OTHER route is holding the live promise. Said rather than left as a card
+          // with a missing button, which reads as a bug.
+          <p data-testid={`promise-blocked-${method}`}>{t(locale, 'billing.promise.blocked')}</p>
+        ) : (
+          <>
+            {declined ? (
+              <Alert
+                tone="danger"
+                live
+                iconLabel={t(locale, `billing.method.${method}`)}
+              >
+                <span data-testid={`promise-declined-${method}`}>
+                  {t(locale, `billing.${method}.declined`)}
+                </span>
+              </Alert>
+            ) : null}
+            {forwardAgorot > 0 ? (
+              // §6's breakdown. Shown rather than one figure, because 900 ₪ with no
+              // explanation is the number a parent phones the office about.
+              <div data-testid={`promise-breakdown-${method}`}>
+                <p>
+                  <span data-testid="promise-term-months">{forwardMonths}</span>{' '}
+                  {t(locale, 'billing.prepay.termMonths')}
+                </p>
+                <div style={totalRowStyle}>
+                  <span>{t(locale, 'billing.prepay.openCharges')}</span>
+                  <MoneyDisplay agorot={openAgorot} tone="debt" />
+                </div>
+                <div style={totalRowStyle}>
+                  <span>{t(locale, 'billing.prepay.forward')}</span>
+                  <span data-testid="promise-forward-total">
+                    <MoneyDisplay agorot={forwardAgorot} tone="debt" />
+                  </span>
+                </div>
+                <div style={totalRowStyle}>
+                  <span>{t(locale, 'billing.prepay.total')}</span>
+                  <span data-testid="promise-grand-total">
+                    <MoneyDisplay agorot={openAgorot + forwardAgorot} tone="debt" />
+                  </span>
+                </div>
+                <p>{t(locale, 'billing.prepay.note')}</p>
+              </div>
+            ) : null}
+            {onPaymentPromise && (chosen.length > 0 || forwardAgorot > 0) ? (
+              <Button
+                variant="secondary"
+                data-testid={`promise-button-${method}`}
+                disabled={inFlight}
+                onClick={() =>
+                  onPaymentPromise(
+                    chosen.map((charge) => charge.id),
+                    forwardAgorot > 0 ? forwardMonths : 0,
+                  )
+                }
+              >
+                {t(locale, `billing.${method}.request`)}
+              </Button>
+            ) : null}
+          </>
+        )}
+      </div>
+    </Card>
+  )
+}
+
+/**
+ * §6's honest degradation. Whole months first, then what is left over — a credit rounded
+ * UP to the next month would tell a family they owe nothing in a month they partly do.
+ *
+ * A monthly total of 0 (a payer with no plan) covers no months at all rather than
+ * dividing by zero: the money is real, but there is no subscription to measure it in.
+ */
+function coverageLabel(locale: Locale, creditAgorot: number, monthlyAgorot: number): string {
+  const months = monthlyAgorot > 0 ? Math.floor(creditAgorot / monthlyAgorot) : 0
+  if (months === 1) return t(locale, 'billing.prepay.coversOneMonth')
+  return t(locale, 'billing.prepay.coversMonths').replace('{{count}}', String(months))
+}
+
+/** What the credit covers beyond whole months. Integer arithmetic (G2). */
+function remainderOf(creditAgorot: number, monthlyAgorot: number): number {
+  if (monthlyAgorot <= 0) return creditAgorot
+  return creditAgorot % monthlyAgorot
 }
 
 /** `2026-09` from the charge's own period. Data, not copy — `1b`'s strings table says the

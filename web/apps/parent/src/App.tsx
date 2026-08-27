@@ -44,6 +44,10 @@ import { DirectionsScreen } from './features/people/DirectionsScreen'
 // §5.10's payments tab. Mounted here because nothing imported it: `PaymentsScreen` is
 // artboard `12f`, the subject of E2E-3 and E2E-4, and it was unreachable in a running app.
 import { PaymentsSection } from './features/billing/PaymentsSection'
+// The training-plan screen, per child. `#/plan/<studentId>` for the same reason `#/belts/`
+// carries ids: a family with two children has two plans and two upgrade decisions, and a
+// screen that summed them could not mark anything — a booking names a student.
+import { TrainingPlanSection } from './features/billing/TrainingPlanSection'
 import { ShopSection } from './features/billing'
 // §6.1 step 6 — the BLOCKING declaration. Mounted here because nothing imported it
 // (HB-w6-health-gate-unmounted): the gate, the form and the pad were built and tested in
@@ -188,6 +192,9 @@ export default function App() {
   // 12d, per child per class: a ladder belongs to a class (§5.9), so a child who trains
   // in two disciplines has two progressions to look at.
   const belts = hash.startsWith('#/belts/') ? hash.slice('#/belts/'.length).split('/') : []
+  // The training plan, per child: what 300 / 400 / 550 ₪ buys, this week's extras, and the
+  // upgrade offer §5.1 computes.
+  const planStudentId = hash.startsWith('#/plan/') ? hash.slice('#/plan/'.length) : ''
 
   useEffect(() => {
     const onPrompt = (event: Event): void => {
@@ -346,6 +353,11 @@ export default function App() {
             // screen resolve the payer from the session, so a person with no charges sees
             // an empty state rather than somebody else's money.
             <PaymentsSection locale={locale} />
+          ) : planStudentId ? (
+            // Same reasoning as the payments screen above: the route resolves the family
+            // from the session, so a student id that is not this caller's child answers
+            // 404 and the section renders nothing rather than another family's plan.
+            <TrainingPlanSection locale={locale} studentId={planStudentId} />
           ) : onShop ? (
             <ShopSection locale={locale} />
           ) : onDirections ? (

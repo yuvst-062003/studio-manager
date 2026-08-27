@@ -21,11 +21,28 @@ export type Fetcher = (path: string, init?: RequestInit) => Promise<Response>
 /** The uPay form as data: an action and hidden fields the client posts. */
 export type UpayForm = { action: string; fields: Record<string, string> }
 
-/** 'אני אשלם במזומן' over specific charges — raised here, decided by a manager. */
-export type CashRequestOut = {
+/**
+ * 'אני אשלם במזומן' / 'אביא צ׳קים' over specific charges — raised here, decided by a
+ * manager. One shape for both routes, because they are one row with a `method` on it:
+ * the payment-routes spec §8's point is that cheques are cash with a different word on
+ * the payment, and a second type here would be the place the two drift apart.
+ *
+ * Hand-written rather than taken from `@studio/api-client` for the same reason `UpayForm`
+ * is: this file is imported by `PaymentsScreen`, which a test renders without a server
+ * shape. `PaymentPromiseOut` in the generated client is the wire contract and this is
+ * structurally identical to it — `web/scripts/…` regenerates that one, and a drift shows
+ * up as a type error at `makeParentBillingClient`, which is where it should.
+ */
+export type PromiseMethod = 'cash' | 'cheque'
+
+export type PaymentPromiseOut = {
   id: string
   status: 'pending' | 'received' | 'declined'
+  method: PromiseMethod
   total_agorot: number
+  /** Whole months bought forward beyond the charges named below. 0 is the ordinary
+   *  settle-what-is-owed promise. */
+  prepay_months: number
   charge_ids: string[]
   created_at: string
   decided_at: string | null
@@ -33,8 +50,12 @@ export type CashRequestOut = {
 
 export type BillingClient = {
   openCharges(payerPersonId: string): Promise<ChargeOut[]>
-  cashRequests(): Promise<CashRequestOut[]>
-  requestCash(chargeIds: string[]): Promise<CashRequestOut>
+  promises(): Promise<PaymentPromiseOut[]>
+  createPromise(
+    chargeIds: string[],
+    method: PromiseMethod,
+    prepayMonths: number,
+  ): Promise<PaymentPromiseOut>
   balance(payerPersonId: string): Promise<PayerBalanceOut>
   payments(payerPersonId: string): Promise<PaymentOut[]>
   products(): Promise<ProductOut[]>

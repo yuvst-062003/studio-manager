@@ -22,12 +22,52 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, timedelta
+from urllib.parse import urlsplit
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
+from app.integrations.upay.form import UPAY_ENDPOINT
 from app.models.billing import PricePlan, Product
 from app.services.billing.errors import ConflictError, NotFoundError, RefusedError
+
+
+def validate_standing_order_link(url: str) -> str:
+    """The two rules from the payment-routes spec §4, in one place.
+
+    This URL is shown to parents as the club's official payment page, so a bad value here
+    is a phishing page with the club's name on it. Hence: **https only**, and **the host
+    must be on `settings.STANDING_ORDER_LINK_HOSTS`**, which defaults to uPay's domains. A
+    club whose provider is someone else asks for a configuration change -- deliberately a
+    higher bar than a text field, and deliberately not a code change.
+
+    The host match is EXACT rather than a suffix: `upay.co.il.evil.example` ends with the
+    right string and is a different site entirely, which is the whole trick.
+
+    An unset allowlist means **our own payment provider**, taken from `UPAY_ENDPOINT` --
+    the host we already post payment forms to is by definition the one whose recurring
+    links are ours. §19.6 restriction 5 gives that host exactly one home in `app/`, so it
+    is read from there rather than copied into a settings default.
+
+    Read from `settings` at call time rather than captured at import, so a test (and a
+    deployed environment reloading configuration) sees the value it actually set.
+    """
+    parts = urlsplit(url.strip())
+    if parts.scheme != "https":
+        raise RefusedError(
+            "a standing-order link must be https -- a plaintext link to a payment form "
+            "is a credential leak with the club's name on it"
+        )
+    host = (parts.hostname or "").lower()
+    configured = tuple(h.lower() for h in settings.STANDING_ORDER_LINK_HOSTS)
+    allowed = configured or ((urlsplit(UPAY_ENDPOINT).hostname or "").lower(),)
+    if host not in allowed:
+        raise RefusedError(
+            f"{host or 'that host'} is not a configured payment host; "
+            "add it to STANDING_ORDER_LINK_HOSTS to allow it"
+        )
+    return url.strip()
 
 
 class CatalogueService:
@@ -142,10 +182,60 @@ class CatalogueService:
             registration_fee_agorot=fee,
             active_from=closes_on + timedelta(days=1),
             active_to=None,
+            # **Never inherited, and written explicitly so nobody adds it to the list
+            # above by symmetry.** A uPay shared link charges a FIXED amount: carrying the
+            # 300 ₪ link onto a 320 ₪ successor sends every family to sign a mandate at the
+            # old price, and the club under-collects all year with no error anywhere. NULL
+            # degrades visibly -- the parent's card loses its anchor and the dashboard
+            # badges the gap -- which is the failure this feature can survive.
+            standing_order_link_url=None,
         )
         self._session.add(successor)
         self._session.flush()
         return successor
+
+    def set_standing_order_link(self, plan_id: uuid.UUID, url: str | None) -> PricePlan:
+        """The one in-place edit this table allows. `None` clears the link.
+
+        Refused on a CLOSED plan: its amount is not what anyone is billed any more, so its
+        link is dead by definition and editing one is a no-op a manager would read as
+        having worked. The dashboard's editor lists active plans only for the same reason.
+
+        The audit entry is written by the caller (`app/routers/billing.py`), which is
+        where the actor is known -- the history of this column lives in `audit_log` rather
+        than in extra plan rows, and that is what makes the exception to versioning safe.
+        """
+        plan = self.get_price_plan(plan_id)
+        if plan.active_to is not None:
+            raise RefusedError(
+                f"price plan {plan_id} closed on {plan.active_to}; its standing-order link "
+                "charges an amount nobody is billed any more"
+            )
+        plan.standing_order_link_url = None if url is None else validate_standing_order_link(url)
+        self._session.flush()
+        return plan
+
+    def links_for_students(self, student_ids: list[uuid.UUID]) -> list[tuple[uuid.UUID, PricePlan]]:
+        """(student_id, plan) for each of these students whose ACTIVE plan carries a link.
+
+        Closed plans are excluded, and that is §3.2 seen from the parent's end: a student
+        still pointing at last year's plan would otherwise be handed a link that signs a
+        mandate at last year's amount.
+        """
+        if not student_ids:
+            return []
+        from app.models.people import Student
+
+        rows = self._session.execute(
+            select(Student.id, PricePlan)
+            .join(PricePlan, Student.price_plan_id == PricePlan.id)
+            .where(
+                Student.id.in_(student_ids),
+                PricePlan.active_to.is_(None),
+                PricePlan.standing_order_link_url.is_not(None),
+            )
+        ).all()
+        return [(student_id, plan) for student_id, plan in rows]
 
     # -- products -------------------------------------------------------------
     def list_products(

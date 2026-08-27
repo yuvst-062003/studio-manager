@@ -24,6 +24,14 @@
       "command": "python -m app.workers.notify",
       "spec": "SPEC §5.11",
       "why": "Two passes over the same tables and the same clock, so one entry rather than two: scheduled announcements whose moment has arrived, and the queued-push drain that turns an enqueued notification into a sent one. Every 15 minutes rather than daily, because what this carries is a cancellation — §5.11's own example is ביטול שיעור, היום 17:00, and a message that goes out tomorrow morning is a message that did not go out. §5.12 explicitly rules the calendar feed out as the channel for it ('the feed is for where do I need to be next Tuesday, never for tonight is cancelled'), which leaves this job as the only thing standing between a manager pressing שליחה and a parent's phone buzzing. It is also why the drain is in the same job rather than a slower one: a push that sits queued for a day is §5.11's silent failure with extra steps."
+    },
+    {
+      "name": "plan-changes",
+      "environment": "production",
+      "schedule": "30 2 * * *",
+      "command": "python -m app.workers.plan_changes",
+      "spec": "SPEC §5.10 (training plans, 2026-08-27 §9)",
+      "why": "A plan change is scheduled, not immediate: a downgrade takes effect on the first of the month, and something has to move student.price_plan_id and release the future bookings the smaller allowance no longer covers. Upgrades never reach this job -- they apply the moment the parent asks, because withholding access somebody volunteered to pay more for is the worse failure. 02:30 Asia/Jerusalem, after the demo reset and before anybody opens the app: a family whose downgrade lands mid-morning would watch sessions disappear from a screen they were looking at. Daily rather than monthly because `effective_on <= today` is the query -- a day the job does not run must not strand a family on a plan they cancelled."
     }
   ]
 }

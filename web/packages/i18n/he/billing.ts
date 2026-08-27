@@ -33,6 +33,7 @@ export const billing: Bundle = {
   'method.card': 'כרטיס אשראי',
   'method.standingOrder': 'הוראת קבע',
   'method.cash': 'מזומן',
+  'method.cheque': 'צ׳קים',
   'method.bankTransfer': 'העברה בנקאית',
   'method.creditAdjustment': 'זיכוי',
 
@@ -45,6 +46,9 @@ export const billing: Bundle = {
   'card.oldestFirst': 'נבחרים החיובים הוותיקים ביותר, לכל הילדים שאתם משלמים עבורם',
 
   'standingOrder.link': 'קישור להקמת הוראת קבע',
+  // One link per child, so the anchor text repeats — this is the accessible name that
+  // tells two otherwise identical links apart (SC 2.4.4).
+  'standingOrder.linkFor': 'הקמת הוראת קבע עבור {{name}}',
   'standingOrder.instructions': 'הקמת ההוראה מתבצעת באתר חברת הסליקה',
   'standingOrder.activeWarning': 'רשומה הוראת קבע פעילה — ודא שאינך משלם פעמיים',
   'standingOrder.notConfirmable': 'תשלום בהוראת קבע נרשם על ידי המועדון לאחר קבלתו',
@@ -55,11 +59,50 @@ export const billing: Bundle = {
   'cash.pendingChip': 'מזומן בהמתנה',
   'cash.pendingTitle': 'ממתין לאישור המנהל',
   'cash.declined': 'בקשת המזומן נדחתה — אפשר לשלם בדרך אחרת או לדבר עם המנהל.',
-  'cash.manager.title': 'בקשות תשלום במזומן',
-  'cash.manager.empty': 'אין בקשות מזומן פתוחות.',
-  'cash.manager.confirm': 'המזומן התקבל',
-  'cash.manager.decline': 'לא התקבל',
-  'cash.manager.charges': 'חיובים',
+
+  // Cheques are cash with a different word on the payment, so the copy mirrors the cash
+  // set key for key. Every sentence stays true with the word swapped, which is the same
+  // reason the service behind them is one service and not two.
+  'cheque.instructions': 'מסרו את הצ׳קים למאמן, לפקודת העמותה',
+  'cheque.request': 'אביא צ׳קים',
+  'cheque.requested': 'הבקשה נשלחה למנהל — החיובים ייסגרו כשהצ׳קים יתקבלו.',
+  'cheque.pendingChip': 'צ׳קים בהמתנה',
+  'cheque.pendingTitle': 'ממתין לאישור המנהל',
+  'cheque.declined': 'בקשת התשלום בצ׳קים נדחתה — אפשר לשלם בדרך אחרת או לדבר עם המנהל.',
+
+  // One live promise at a time, across both routes — the service refuses a second, so the
+  // other card says why rather than offering a button that answers 409.
+  // Prepayment -- the club collects three months of cash or twelve cheques at a time.
+  // The breakdown is shown rather than one figure, because 900 ₪ with no explanation is
+  // the number a parent phones the office about.
+  'prepay.termMonths': 'חודשים מראש',
+  'prepay.openCharges': 'חיובים פתוחים',
+  'prepay.forward': 'תשלום מראש',
+  'prepay.total': 'סה״כ לתשלום',
+  'prepay.note': 'המועדון ירשום את התשלום כשהכסף יתקבל.',
+  // Derived from the credit and the CURRENT monthly price, never stored: שולם עד תאריך X
+  // הופך לשקר ברגע שהמשפחה משדרגת מסלול.
+  'prepay.termsTitle': 'תשלום מראש',
+  'prepay.termsHint': 'כמה חודשים מראש המועדון גובה בכל מסלול תשלום',
+  'prepay.termsZeroHint': '0 מבטל את ההצעה לתשלום מראש במסלול הזה',
+  'prepay.forwardMonths': 'חודשים מראש',
+  'prepay.credit': 'בזכות',
+  'prepay.paidAhead': 'שולם מראש',
+  'prepay.coversOneMonth': 'מכסה חודש אימון אחד',
+  'prepay.coversMonths': 'מכסה {{count}} חודשי אימון',
+  'prepay.andPartOfNext': 'ובנוסף, מהחודש שאחריו:',
+
+  'promise.blocked': 'קיימת בקשת תשלום שממתינה למנהל — אפשר לשלוח בקשה נוספת לאחר שיטופל בה.',
+
+  // The manager's queue answers 'who is bringing money', not 'who is bringing cash' —
+  // the method is a column in it now rather than the name of the screen.
+  'promise.manager.title': 'בקשות תשלום',
+  'promise.manager.empty': 'אין בקשות תשלום פתוחות.',
+  'promise.manager.confirm': 'התשלום התקבל',
+  'promise.manager.decline': 'לא התקבל',
+  'promise.manager.charges': 'חיובים',
+  'promise.manager.method': 'אמצעי תשלום',
+  'promise.manager.filterAll': 'הכול',
   'shop.title': 'חנות המועדון',
   'shop.empty': 'אין פריטים למכירה כרגע.',
   'shop.order': 'הזמנה',
@@ -188,6 +231,20 @@ export const billing: Bundle = {
   'plan.versionedHint': 'שינוי מחיר סוגר את המסלול הקיים ופותח חדש. חיובים קודמים נשמרים',
   'plan.closeCurrent': 'סגירת המסלול הנוכחי',
 
+  // Part A of the payment-routes spec -- the הוראת קבע link, one per plan.
+  //
+  // `plan.linkNeverInherited` is the sentence that protects the club's revenue: a uPay
+  // link charges a FIXED amount, so a successor plan is deliberately born without one.
+  // It is said on the screen because the manager is the only one who can fix it.
+  'plan.standingOrderLink': 'קישור להוראת קבע',
+  'plan.linkMissing': 'חסר קישור',
+  'plan.linkHint': 'הקישור שנוצר באתר חברת הסליקה עבור הסכום של המסלול הזה',
+  'plan.linkNeverInherited': 'מסלול חדש נפתח תמיד ללא קישור — קישור סליקה גובה סכום קבוע, והעתקתו הייתה גובה את המחיר הישן',
+  'plan.linkRefused': 'הקישור נדחה — נדרשת כתובת https של חברת הסליקה',
+  'plan.linkSaved': 'הקישור נשמר',
+  'plan.linksTitle': 'קישורי הוראת קבע',
+  'plan.linksEmpty': 'אין מסלולים פעילים',
+
   // -- the product catalog and handing an item over (12e, 11a) -------------------
   'product.title': 'פריטים למכירה',
   'product.add': 'פריט חדש',
@@ -222,4 +279,10 @@ export const billing: Bundle = {
   'product.colour': 'צבע',
   'product.handOutPolicy': 'מחיר הפריט אינו מוצג למאמן',
   'dialog.cancel': 'ביטול',
+  'planChange.queueTitle': 'שינויי מסלול לטיפול',
+  'planChange.queueEmpty': 'אין שינויי מסלול פתוחים.',
+  'planChange.difference': 'הפרש חודשי',
+  'planChange.effectiveOn': 'מתאריך',
+  'planChange.settle': 'טופל',
+  'planChange.hint': 'שני אמצעי תשלום משולמים מראש, ולכן שינוי מסלול לא נסגר מעצמו — יש לגבות את ההפרש או לעדכן את הוראת הקבע.',
 }

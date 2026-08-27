@@ -8,3 +8,6 @@ export { registerBillingAlerts, registerBillingDevTools, DEBT_ALERT_ORDER } from
 export { makeDashboardBillingClient, ageBucket, escalationRung, daysOverdue } from './billingClient'
 export type { DashboardBillingClient, MatchSuggestion } from './billingClient'
 export { agorotFromShekels } from './money'
+export { StandingOrderLinksPanel } from './StandingOrderLinksPanel'
+export { PrepayTermsPanel } from './PrepayTermsPanel'
+export { PlanChangesPanel } from './PlanChangesPanel'

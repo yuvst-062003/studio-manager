@@ -174,6 +174,10 @@ export interface PricePlanRow {
   sessions_per_week: number
   active_from: string
   active_to: string | null
+  /** The plan's הוראת קבע link, or null. A successor opened by `applyPrices` is ALWAYS
+   *  null -- a payment link charges a fixed amount, so inheriting it would sign every
+   *  family up at last year's price -- which is why this step badges the gap. */
+  standing_order_link_url: string | null
 }
 
 export interface RolloverClient {

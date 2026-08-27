@@ -136,6 +136,12 @@ function filterLabel(locale: Locale, filter: Filter): string {
   return t(locale, `billing.charge.kind.${filter}`)
 }
 
+/**
+ * A payment method to the i18n key that names it. The final arm is `cash` rather than a
+ * throw, which is why every method has to be listed here explicitly: an unlisted one
+ * renders as מזומן and says nothing about how it actually arrived, which is exactly the
+ * fact §10 added `cheque` to stop losing.
+ */
 function methodKey(method: PaymentOut['method']): string {
   return method === 'upay_card'
     ? 'card'
@@ -143,7 +149,9 @@ function methodKey(method: PaymentOut['method']): string {
       ? 'standingOrder'
       : method === 'bank_transfer'
         ? 'bankTransfer'
-        : method === 'credit_adjustment'
-          ? 'creditAdjustment'
-          : 'cash'
+        : method === 'cheque'
+          ? 'cheque'
+          : method === 'credit_adjustment'
+            ? 'creditAdjustment'
+            : 'cash'
 }

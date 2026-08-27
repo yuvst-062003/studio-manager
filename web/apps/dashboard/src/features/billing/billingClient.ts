@@ -12,6 +12,40 @@ export type BillingRunOut = components['schemas']['BillingRunOut']
 export type UpayIpnRecordOut = components['schemas']['UpayIpnRecordOut']
 export type RecurringSubscriptionOut = components['schemas']['RecurringSubscriptionOut']
 export type PayerBalanceOut = components['schemas']['PayerBalanceOut']
+export type PaymentOut = components['schemas']['PaymentOut']
+export type BillingSettingsOut = components['schemas']['BillingSettingsOut']
+export type ManagerPlanChangeOut = components['schemas']['ManagerPlanChangeOut']
+
+/**
+ * Credit per payer: **payments minus allocations**, the same subtraction
+ * `BillingService.payer_credit` makes on the server.
+ *
+ * Derived here from the payments list the collections screen already reads, rather than
+ * asking for one balance per household — a club has tens of families and that would be
+ * tens of requests to render one column.
+ *
+ * A reversed payment is money recorded as never having arrived: its allocations are gone
+ * and its amount must not count either, or a bounced cheque reads as credit.
+ */
+export function creditByPayer(
+  payments: readonly {
+    payer_person_id: string
+    amount_agorot: number
+    reversed_at: string | null
+    allocations?: readonly { amount_agorot: number }[]
+  }[],
+): Map<string, number> {
+  const credit = new Map<string, number>()
+  for (const payment of payments) {
+    if (payment.reversed_at !== null) continue
+    const allocated = (payment.allocations ?? []).reduce((sum, a) => sum + a.amount_agorot, 0)
+    credit.set(
+      payment.payer_person_id,
+      (credit.get(payment.payer_person_id) ?? 0) + payment.amount_agorot - allocated,
+    )
+  }
+  return credit
+}
 
 export type Fetcher = (path: string, init?: RequestInit) => Promise<Response>
 
@@ -45,6 +79,10 @@ export type DashboardBillingClient = {
   confirmMatch(ipnId: string, payerPersonId: string): Promise<void>
   ignoreIpn(ipnId: string): Promise<void>
   pricePlans(): Promise<PricePlanOut[]>
+  payments(): Promise<PaymentOut[]>
+  billingSettings(): Promise<BillingSettingsOut>
+  saveBillingSettings(patch: Partial<BillingSettingsOut>): Promise<BillingSettingsOut>
+  setStandingOrderLink(planId: string, url: string | null): Promise<PricePlanOut>
   closePricePlan(planId: string, closesOn: string, amountAgorot: number): Promise<PricePlanOut>
   createPricePlan(input: {
     name: string
@@ -54,16 +92,28 @@ export type DashboardBillingClient = {
     activeFrom: string
   }): Promise<PricePlanOut>
   products(): Promise<ProductOut[]>
-  cashRequests(status?: string): Promise<ManagerCashRequestOut[]>
-  confirmCash(requestId: string): Promise<void>
-  declineCash(requestId: string): Promise<void>
+  paymentPromises(status?: string, method?: PromiseMethod): Promise<ManagerPaymentPromiseOut[]>
+  planChanges(): Promise<ManagerPlanChangeOut[]>
+  settlePlanChange(changeId: string): Promise<void>
+  confirmPromise(promiseId: string): Promise<void>
+  declinePromise(promiseId: string): Promise<void>
 }
 
-/** The manager's view of 'אני אשלם במזומן' — who, how much, since when. */
-export type ManagerCashRequestOut = {
+/** The two routes a family hands money over by. Mirrors `PROMISE_METHODS` on the server. */
+export type PromiseMethod = 'cash' | 'cheque'
+
+/**
+ * The manager's view of 'אני אשלם במזומן' / 'אביא צ׳קים' — who, how much, by which route,
+ * since when. `method` is a column here rather than two queues, because the two endings
+ * are identical: ✓ records the payment over what the charges still owe, ✗ leaves them open.
+ */
+export type ManagerPaymentPromiseOut = {
   id: string
   status: 'pending' | 'received' | 'declined'
+  method: PromiseMethod
   total_agorot: number
+  /** Whole months bought forward. Why a 3,600 ₪ promise is 3,600 ₪. */
+  prepay_months: number
   payer_person_id: string
   payer_name: string
   charge_count: number
@@ -135,19 +185,80 @@ export function makeDashboardBillingClient(fetcher: Fetcher): DashboardBillingCl
     async pricePlans() {
       return (await json<{ items: PricePlanOut[] }>(await fetcher('/api/v1/price-plans'))).items
     },
-    // The cash-request decisions (feature pass 2026-08-27): the payer said 'מזומן';
-    // these are the manager's ✓ and ✗.
-    async cashRequests(status?: string) {
-      const query = status ? `?status=${status}` : ''
+    async payments() {
+      return (await json<{ items: PaymentOut[] }>(await fetcher('/api/v1/payments'))).items
+    },
+    async billingSettings() {
+      return json<BillingSettingsOut>(await fetcher('/api/v1/billing/settings'))
+    },
+    // A PARTIAL write. `exclude_unset` on the server is what stops the הגדרות panel's
+    // one-field autosave blanking the other settings, and sending a whole object here
+    // would defeat it from the client side.
+    async saveBillingSettings(patch: Partial<BillingSettingsOut>) {
+      return json<BillingSettingsOut>(
+        await fetcher('/api/v1/billing/settings', {
+          method: 'PATCH',
+          headers: JSON_HEADERS,
+          body: JSON.stringify(patch),
+        }),
+      )
+    },
+    // The ONE in-place edit `price_plan` allows, and it has its own route for that reason:
+    // a general `PATCH /price-plans/{id}` would be an invitation to put the amount in it,
+    // which is the edit `closePricePlan` exists to prevent. `null` clears the link.
+    //
+    // The server holds the rules -- https, and a host on the configured allowlist -- so a
+    // rejection here is a real answer to render, not a validation this file should
+    // duplicate and then disagree with.
+    async setStandingOrderLink(planId: string, url: string | null) {
+      return json<PricePlanOut>(
+        await fetcher(`/api/v1/price-plans/${planId}/standing-order-link`, {
+          method: 'PUT',
+          headers: JSON_HEADERS,
+          body: JSON.stringify({ url }),
+        }),
+      )
+    },
+    // The payment-promise decisions (feature pass 2026-08-27): the payer said מזומן or
+    // צ׳קים; these are the manager's ✓ and ✗.
+    //
+    // Both filters go to the SERVER. A `method` filter applied in the browser would mean
+    // 'of the rows that happened to load', which is a different answer from the one the
+    // manager thinks they asked for.
+    async paymentPromises(status?: string, method?: PromiseMethod) {
+      const params = new URLSearchParams()
+      if (status) params.set('status', status)
+      if (method) params.set('method', method)
+      const query = params.size > 0 ? `?${params.toString()}` : ''
       return (
-        await json<{ items: ManagerCashRequestOut[] }>(await fetcher(`/api/v1/cash-requests${query}`))
+        await json<{ items: ManagerPaymentPromiseOut[] }>(
+          await fetcher(`/api/v1/payment-promises${query}`),
+        )
       ).items
     },
-    async confirmCash(requestId: string) {
-      await json(await fetcher(`/api/v1/cash-requests/${requestId}/confirm`, { method: 'POST' }))
+    // §11's queue. Every change lands here and stays until a human closes the money loop:
+    // the prepayment design turns the cash and cheque cases into an ordinary open charge,
+    // and the standing-order case genuinely needs somebody to cancel the old uPay mandate
+    // and send the new link, because G8 says the provider cannot.
+    async planChanges() {
+      return (
+        await json<{ items: ManagerPlanChangeOut[] }>(await fetcher('/api/v1/plan-changes'))
+      ).items
     },
-    async declineCash(requestId: string) {
-      await json(await fetcher(`/api/v1/cash-requests/${requestId}/decline`, { method: 'POST' }))
+    async settlePlanChange(changeId: string) {
+      await json(
+        await fetcher(`/api/v1/plan-changes/${changeId}/settle`, { method: 'POST' }),
+      )
+    },
+    async confirmPromise(promiseId: string) {
+      await json(
+        await fetcher(`/api/v1/payment-promises/${promiseId}/confirm`, { method: 'POST' }),
+      )
+    },
+    async declinePromise(promiseId: string) {
+      await json(
+        await fetcher(`/api/v1/payment-promises/${promiseId}/decline`, { method: 'POST' }),
+      )
     },
     async closePricePlan(planId, closesOn, amountAgorot) {
       return json<PricePlanOut>(

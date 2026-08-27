@@ -681,62 +681,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/cash-requests": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Cash Requests */
-        get: operations["list_cash_requests_api_v1_cash_requests_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/cash-requests/{request_id}/confirm": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Confirm Cash Request
-         * @description ✓ -- the notes changed hands. Records the cash payment over what is still owed and
-         *     settles exactly the request's charges; see CashService.confirm for the partial-payment
-         *     rule.
-         */
-        post: operations["confirm_cash_request_api_v1_cash_requests__request_id__confirm_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/cash-requests/{request_id}/decline": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Decline Cash Request */
-        post: operations["decline_cash_request_api_v1_cash_requests__request_id__decline_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/charges": {
         parameters: {
             query?: never;
@@ -1288,6 +1232,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/groups/{group_id}/eligibility": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Eligibility
+         * @description The base groups linked to one extra group. A full replace: the manager's mental
+         *     model is a checklist, and two verbs for one checklist is how a half-applied edit
+         *     happens.
+         */
+        put: operations["set_eligibility_api_v1_groups__group_id__eligibility_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/groups/{group_id}/schedule": {
         parameters: {
             query?: never;
@@ -1333,6 +1299,30 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/groups/{group_id}/training-kind": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Set Group Kind
+         * @description `kind` and `is_invite_only`, the two switches every rule in this feature reads.
+         *
+         *     Its own route rather than a field on the structure lane's `PATCH /groups/{id}`: that
+         *     shape belongs to another lane, and these two columns are read by this one. The path
+         *     says `training-kind` for the same reason.
+         */
+        patch: operations["set_group_kind_api_v1_groups__group_id__training_kind_patch"];
         trace?: never;
     };
     "/api/v1/health": {
@@ -1588,29 +1578,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/me/cash-requests": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** My Cash Requests */
-        get: operations["my_cash_requests_api_v1_me_cash_requests_get"];
-        put?: never;
-        /**
-         * Raise Cash Request
-         * @description 'אני אשלם במזומן' -- over these exact charges. The payer is the session, never the
-         *     body, for the same reason payment orders do it: a body-supplied payer would let anyone
-         *     volunteer anyone else's debt.
-         */
-        post: operations["raise_cash_request_api_v1_me_cash_requests_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/me/charges": {
         parameters: {
             query?: never;
@@ -1713,6 +1680,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/payment-promises": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My Payment Promises */
+        get: operations["my_payment_promises_api_v1_me_payment_promises_get"];
+        put?: never;
+        /**
+         * Raise Payment Promise
+         * @description 'אני אשלם במזומן' / 'אני אביא צ'קים' -- over these exact charges. The payer is the
+         *     session, never the body, for the same reason payment orders do it: a body-supplied
+         *     payer would let anyone volunteer anyone else's debt.
+         */
+        post: operations["raise_payment_promise_api_v1_me_payment_promises_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/payments": {
         parameters: {
             query?: never;
@@ -1725,6 +1715,30 @@ export interface paths {
          * @description `12f`'s history — what this person has already paid, by every route.
          */
         get: operations["my_payments_api_v1_me_payments_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/prepay-terms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Prepay Terms
+         * @description Prepayment spec §9. No role dependency, like every other `/me/*` read (§3.1 --
+         *     "guardian is not a role").
+         *
+         *     The monthly total is this payer's OWN, summed across their active children: a parent
+         *     with two children thinks in "three months for both", and credit is payer-level anyway.
+         */
+        get: operations["my_prepay_terms_api_v1_me_prepay_terms_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1771,6 +1785,39 @@ export interface paths {
          *     money, and a family's mandate details are the reconciliation queue's business.
          */
         get: operations["my_standing_order_api_v1_me_standing_order_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/standing-order-links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Standing Order Links
+         * @description Payment-routes spec §6 -- **this payer's own children only.**
+         *
+         *     The full catalogue is never exposed here: a 300 ₪ payer who could see the 550 ₪ link
+         *     could sign the 550 ₪ mandate by accident, and the club would collect from a family
+         *     that never agreed to it. Closed plans are excluded by `links_for_students`, because a
+         *     student still pointing at last year's plan would otherwise be handed a link at last
+         *     year's amount.
+         *
+         *     No role dependency, like every other `/me/*` read -- §3.1: "guardian is not a role".
+         *
+         *     **Read live, never precached.** The parent app is an installed PWA and the rest of
+         *     this screen is cache-friendly; a stale payment link is not a stale roster, it sends a
+         *     family to sign a mandate at the wrong amount and neither they nor the manager finds
+         *     out until the reconciliation queue disagrees months later.
+         */
+        get: operations["my_standing_order_links_api_v1_me_standing_order_links_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2148,6 +2195,62 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/payment-promises": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Payment Promises */
+        get: operations["list_payment_promises_api_v1_payment_promises_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payment-promises/{promise_id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm Payment Promise
+         * @description ✓ -- the money changed hands. Records the payment over what is still owed and
+         *     settles exactly the promise's charges; see PaymentPromiseService.confirm for the
+         *     partial-payment rule.
+         */
+        post: operations["confirm_payment_promise_api_v1_payment_promises__promise_id__confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payment-promises/{promise_id}/decline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Decline Payment Promise */
+        post: operations["decline_payment_promise_api_v1_payment_promises__promise_id__decline_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/payments": {
         parameters: {
             query?: never;
@@ -2194,6 +2297,51 @@ export interface paths {
          *     show a month as paid that it was never paid for, invisible in every debt report.
          */
         post: operations["reverse_payment_api_v1_payments__payment_id__reverse_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/plan-changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Plan Change Queue
+         * @description §11's queue: every change whose money a human has not closed.
+         *
+         *     The difference in agorot travels with each row, because "collect 100 ₪ × the remaining
+         *     months" is the instruction and a manager should not have to look up two prices to
+         *     compute it.
+         */
+        get: operations["plan_change_queue_api_v1_plan_changes_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/plan-changes/{change_id}/settle": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Settle Plan Change
+         * @description A manager saying the money is handled. The app never decides this: it cannot see a
+         *     drawer of cheques, and G8 means it cannot cancel a uPay mandate either.
+         */
+        post: operations["settle_plan_change_api_v1_plan_changes__change_id__settle_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2305,6 +2453,28 @@ export interface paths {
          *     SUCCESSOR, which is the row `5a` then renders as current.
          */
         post: operations["close_price_plan_api_v1_price_plans__plan_id__close_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/price-plans/{plan_id}/standing-order-link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Standing Order Link
+         * @description Payment-routes spec §5 -- Dashboard → Settings → Payments, and the wizard's prices
+         *     step. Audited on every write, because that is what makes an in-place edit safe on a
+         *     versioned table: the history lives in `audit_log` rather than in extra plan rows.
+         */
+        put: operations["set_standing_order_link_api_v1_price_plans__plan_id__standing_order_link_put"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -3039,6 +3209,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/session-bookings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark Session
+         * @description "I am coming to this one." Own children only; the four rules live in the service.
+         */
+        post: operations["mark_session_api_v1_session_bookings_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/session-bookings/{booking_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Release Session
+         * @description Give the credit back — free until the session starts, then spent.
+         */
+        delete: operations["release_session_api_v1_session_bookings__booking_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/sessions": {
         parameters: {
             query?: never;
@@ -3113,6 +3323,31 @@ export interface paths {
          *     and `attendance.source.preReportedHint` already ships the copy saying it does not.
          */
         post: operations["bulk_present_api_v1_sessions__session_id__attendance_bulk_present_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sessions/{session_id}/bookings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Session Bookings
+         * @description Who has marked, with a live count.
+         *
+         *     An `extra` session's roster IS its live bookings (§8): a student who marked and did not
+         *     come is absent and enters §5.14's denominators like any other expected student, and a
+         *     student who never marked is not on the roster and enters no denominator -- which is
+         *     correct, because nobody asked them to be there.
+         */
+        get: operations["session_bookings_api_v1_sessions__session_id__bookings_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -3593,6 +3828,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/students/{student_id}/plan-changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Request Plan Change
+         * @description Self-serve, both directions. An upgrade unlocks access at once and prices from the
+         *     first; a downgrade waits for the first, so a family who paid for this month keeps it.
+         */
+        post: operations["request_plan_change_api_v1_students__student_id__plan_changes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/students/{student_id}/plan-changes/{change_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Cancel Plan Change
+         * @description Before it applies — which is the whole reason a change is a row and not an edit.
+         */
+        delete: operations["cancel_plan_change_api_v1_students__student_id__plan_changes__change_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/students/{student_id}/price-plan": {
         parameters: {
             query?: never;
@@ -3631,6 +3907,31 @@ export interface paths {
          *     timeline. Task 6 fills in the service method.
          */
         get: operations["student_status_history_api_v1_students__student_id__status_history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/students/{student_id}/training-plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Training Plan
+         * @description Everything the parent's plan screen renders, in one read.
+         *
+         *     One request rather than five, because every part of it is a view of the same two
+         *     questions -- what does this child's plan buy, and what have they spent this week -- and
+         *     a screen assembled from five reads is a screen with five loading states and four ways
+         *     to be inconsistent.
+         */
+        get: operations["training_plan_api_v1_students__student_id__training_plan_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -4210,6 +4511,30 @@ export interface components {
             recipient_count: number;
         };
         /**
+         * BaseSessionOut
+         * @description Tuesday and Friday. Included in every plan, never marked, shown so the parent can
+         *     see what "always included" actually means for their child.
+         */
+        BaseSessionOut: {
+            /**
+             * Ends At
+             * Format: date-time
+             */
+            ends_at: string;
+            /** Group Name */
+            group_name: string;
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
+            /**
+             * Starts At
+             * Format: date-time
+             */
+            starts_at: string;
+        };
+        /**
          * BatchAttendanceIn
          * @description `POST /attendance/batch` — §7 marks it **(idempotent)**.
          *
@@ -4377,31 +4702,48 @@ export interface components {
         };
         /**
          * BillingSettingsOut
-         * @description §5.10's three studio-level settings.
+         * @description The studio-level billing settings.
          *
-         *     `standing_order_link` is the shared recurring link the manager created once in the uPay
-         *     dashboard and pasted here -- G8: we cannot create one, cannot vary its amount per payer,
-         *     and cannot tell from its callbacks who paid.
+         *     **There is deliberately no `standing_order_link` here.** There used to be -- one link
+         *     for the whole club -- and the payment-routes spec §13 removed it: a single link is a
+         *     link at ONE amount, and a uPay shared link cannot vary per payer (G8). A club with a
+         *     300, a 400 and a 550 plan pointed at one link collects 300 from everyone. The link
+         *     belongs to the plan (`price_plan.standing_order_link_url`), one per amount, which is
+         *     what the club's own letter already describes when it says "links", plural.
+         *
+         *     It is also why nothing ever rendered the old field: `PaymentsSection` hardcoded the
+         *     parent screen's link to null for as long as it existed. A settings key a manager can
+         *     fill in and no parent can ever see is worse than no key at all.
          */
         BillingSettingsOut: {
             /** Cash Instructions */
             cash_instructions?: string | null;
             /**
+             * Cash Prepay Months
+             * @default 3
+             */
+            cash_prepay_months: number;
+            /**
+             * Cheque Prepay Months
+             * @default 12
+             */
+            cheque_prepay_months: number;
+            /**
              * Run Day
              * @default 1
              */
             run_day: number;
-            /** Standing Order Link */
-            standing_order_link?: string | null;
         };
         /** BillingSettingsPatch */
         BillingSettingsPatch: {
             /** Cash Instructions */
             cash_instructions?: string | null;
+            /** Cash Prepay Months */
+            cash_prepay_months?: number | null;
+            /** Cheque Prepay Months */
+            cheque_prepay_months?: number | null;
             /** Run Day */
             run_day?: number | null;
-            /** Standing Order Link */
-            standing_order_link?: string | null;
         };
         /** Body_upload_logo_api_v1_studio_logo_post */
         Body_upload_logo_api_v1_studio_logo_post: {
@@ -4418,6 +4760,42 @@ export interface components {
              * @description The studio's own declaration, as a PDF.
              */
             file: string;
+        };
+        /**
+         * BookableSessionOut
+         * @description One session this week the student could mark, with why they cannot if they cannot.
+         */
+        BookableSessionOut: {
+            /** Booking Id */
+            booking_id: string | null;
+            /**
+             * Ends At
+             * Format: date-time
+             */
+            ends_at: string;
+            /**
+             * Group Id
+             * Format: uuid
+             */
+            group_id: string;
+            /** Group Name */
+            group_name: string;
+            /** Is Markable */
+            is_markable: boolean;
+            /** Kind */
+            kind: string;
+            /** Reason */
+            reason?: string | null;
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
+            /**
+             * Starts At
+             * Format: date-time
+             */
+            starts_at: string;
         };
         /**
          * BootstrapPayload
@@ -4575,37 +4953,6 @@ export interface components {
              * Format: uuid
              */
             student_id: string;
-        };
-        /** CashRequestCreateIn */
-        CashRequestCreateIn: {
-            /** Charge Ids */
-            charge_ids: string[];
-        };
-        /** CashRequestListOut */
-        CashRequestListOut: {
-            /** Items */
-            items: components["schemas"]["CashRequestOut"][];
-        };
-        /** CashRequestOut */
-        CashRequestOut: {
-            /** Charge Ids */
-            charge_ids: string[];
-            /**
-             * Created At
-             * Format: date-time
-             */
-            created_at: string;
-            /** Decided At */
-            decided_at: string | null;
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-            /** Status */
-            status: string;
-            /** Total Agorot */
-            total_agorot: number;
         };
         /**
          * ChargeAdjustmentIn
@@ -5712,6 +6059,39 @@ export interface components {
              */
             training_year_id: string;
         };
+        /**
+         * GroupEligibilityIn
+         * @description The base groups linked to one extra group. A full replace rather than add/remove:
+         *     the manager's mental model is a checklist ("Groups 3, 4 and 5"), and two verbs for one
+         *     checklist is how a half-applied edit happens.
+         */
+        GroupEligibilityIn: {
+            /** Base Group Ids */
+            base_group_ids?: string[];
+        };
+        /** GroupEligibilityOut */
+        GroupEligibilityOut: {
+            /** Base Group Ids */
+            base_group_ids: string[];
+            /**
+             * Extra Group Id
+             * Format: uuid
+             */
+            extra_group_id: string;
+        };
+        /**
+         * GroupKindIn
+         * @description `PATCH /groups/{id}` — the manager's two switches.
+         *
+         *     Both optional: a partial write, so setting `kind` does not silently clear an invite
+         *     list somebody spent an evening building.
+         */
+        GroupKindIn: {
+            /** Is Invite Only */
+            is_invite_only?: boolean | null;
+            /** Kind */
+            kind?: string | null;
+        };
         /** GroupListResponse */
         GroupListResponse: {
             /** Items */
@@ -6333,13 +6713,13 @@ export interface components {
             /** Notes */
             notes: string | null;
         };
-        /** ManagerCashRequestListOut */
-        ManagerCashRequestListOut: {
+        /** ManagerPaymentPromiseListOut */
+        ManagerPaymentPromiseListOut: {
             /** Items */
-            items: components["schemas"]["ManagerCashRequestOut"][];
+            items: components["schemas"]["ManagerPaymentPromiseOut"][];
         };
-        /** ManagerCashRequestOut */
-        ManagerCashRequestOut: {
+        /** ManagerPaymentPromiseOut */
+        ManagerPaymentPromiseOut: {
             /** Charge Count */
             charge_count: number;
             /**
@@ -6352,6 +6732,8 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /** Method */
+            method: string;
             /** Payer Name */
             payer_name: string;
             /**
@@ -6359,10 +6741,60 @@ export interface components {
              * Format: uuid
              */
             payer_person_id: string;
+            /** Prepay Months */
+            prepay_months: number;
             /** Status */
             status: string;
             /** Total Agorot */
             total_agorot: number;
+        };
+        /**
+         * ManagerPlanChangeOut
+         * @description §11's queue. The student and the plans by NAME, because "who do I chase and about
+         *     what" is the whole question that screen answers.
+         */
+        ManagerPlanChangeOut: {
+            /** Applied At */
+            applied_at: string | null;
+            /**
+             * Effective On
+             * Format: date
+             */
+            effective_on: string;
+            /** From Plan Name */
+            from_plan_name: string | null;
+            /** From Price Plan Id */
+            from_price_plan_id: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Monthly Difference Agorot */
+            monthly_difference_agorot: number;
+            /**
+             * Requested At
+             * Format: date-time
+             */
+            requested_at: string;
+            /** Settlement Status */
+            settlement_status: string;
+            /** Status */
+            status: string;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+            /** Student Name */
+            student_name: string;
+            /** To Plan Name */
+            to_plan_name: string;
+            /**
+             * To Price Plan Id
+             * Format: uuid
+             */
+            to_price_plan_id: string;
         };
         /**
          * ManualChargeIn
@@ -6410,7 +6842,7 @@ export interface components {
              * Method
              * @enum {string}
              */
-            method: "standing_order" | "bank_transfer" | "cash" | "credit_adjustment";
+            method: "standing_order" | "bank_transfer" | "cash" | "cheque" | "credit_adjustment";
             /** Note */
             note?: string | null;
             /**
@@ -6729,6 +7161,11 @@ export interface components {
             balance_agorot: number;
             /** Charged Agorot */
             charged_agorot: number;
+            /**
+             * Credit Agorot
+             * @default 0
+             */
+            credit_agorot: number;
             /** Open Charge Count */
             open_charge_count: number;
             /** Paid Agorot */
@@ -6860,7 +7297,7 @@ export interface components {
              * Method
              * @enum {string}
              */
-            method: "upay_card" | "standing_order" | "bank_transfer" | "cash" | "credit_adjustment";
+            method: "upay_card" | "standing_order" | "bank_transfer" | "cash" | "cheque" | "credit_adjustment";
             /** Note */
             note: string | null;
             /**
@@ -6882,10 +7319,132 @@ export interface components {
             /** Reversed At */
             reversed_at: string | null;
         };
+        /** PaymentPromiseCreateIn */
+        PaymentPromiseCreateIn: {
+            /** Charge Ids */
+            charge_ids?: string[];
+            /**
+             * Method
+             * @default cash
+             * @enum {string}
+             */
+            method: "cash" | "cheque";
+            /**
+             * Prepay Months
+             * @default 0
+             */
+            prepay_months: number;
+        };
+        /** PaymentPromiseListOut */
+        PaymentPromiseListOut: {
+            /** Items */
+            items: components["schemas"]["PaymentPromiseOut"][];
+        };
+        /** PaymentPromiseOut */
+        PaymentPromiseOut: {
+            /** Charge Ids */
+            charge_ids: string[];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Decided At */
+            decided_at: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Method */
+            method: string;
+            /** Prepay Months */
+            prepay_months: number;
+            /** Status */
+            status: string;
+            /** Total Agorot */
+            total_agorot: number;
+        };
         /** PaymentReversalIn */
         PaymentReversalIn: {
             /** Reason */
             reason: string;
+        };
+        /** PlanChangeIn */
+        PlanChangeIn: {
+            /**
+             * To Price Plan Id
+             * Format: uuid
+             */
+            to_price_plan_id: string;
+        };
+        /** PlanChangeListOut */
+        PlanChangeListOut: {
+            /** Items */
+            items: components["schemas"]["ManagerPlanChangeOut"][];
+        };
+        /** PlanChangeOut */
+        PlanChangeOut: {
+            /** Applied At */
+            applied_at: string | null;
+            /**
+             * Effective On
+             * Format: date
+             */
+            effective_on: string;
+            /** From Price Plan Id */
+            from_price_plan_id: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Requested At
+             * Format: date-time
+             */
+            requested_at: string;
+            /** Settlement Status */
+            settlement_status: string;
+            /** Status */
+            status: string;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+            /**
+             * To Price Plan Id
+             * Format: uuid
+             */
+            to_price_plan_id: string;
+        };
+        /**
+         * PlanOptionOut
+         * @description One of the club's plans, as the parent screen renders it.
+         *
+         *     `is_offered` is §5.1's rule — offer a plan only if it raises the number of sessions
+         *     this student could attend in a week. A plan that is not offered is **shown with its
+         *     reason, never hidden**: a Group 1 parent who hears "400" from another parent in the
+         *     hall and finds nothing in the app phones the manager, and one line answers the question
+         *     before it is asked. It turns itself on when the child moves up a group.
+         */
+        PlanOptionOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Current */
+            is_current: boolean;
+            /** Is Offered */
+            is_offered: boolean;
+            /** Monthly Amount Agorot */
+            monthly_amount_agorot: number;
+            /** Name */
+            name: string;
+            /** Weekly Extra Allowance */
+            weekly_extra_allowance: number | null;
         };
         /**
          * PlanRepricing
@@ -6905,6 +7464,25 @@ export interface components {
             plan_id: string;
             /** Registration Fee Agorot */
             registration_fee_agorot?: number | null;
+        };
+        /**
+         * PrepayTermsOut
+         * @description What the parent's cash and cheque cards need to draw their breakdown.
+         *
+         *     The payer's monthly total travels with the terms so the screen renders from server
+         *     numbers rather than computing the same product twice -- G2 is an integer rule, and two
+         *     places that multiply months by a price are two places that can round differently.
+         *
+         *     `0` on a route means the club does not offer months forward that way; the card falls
+         *     back to settling open charges, which is how cash behaved before this existed.
+         */
+        PrepayTermsOut: {
+            /** Cash Prepay Months */
+            cash_prepay_months: number;
+            /** Cheque Prepay Months */
+            cheque_prepay_months: number;
+            /** Monthly Total Agorot */
+            monthly_total_agorot: number;
         };
         /**
          * PricePlanCloseIn
@@ -6974,6 +7552,8 @@ export interface components {
             registration_fee_agorot: number;
             /** Sessions Per Week */
             sessions_per_week: number;
+            /** Standing Order Link Url */
+            standing_order_link_url?: string | null;
         };
         /** ProductIn */
         ProductIn: {
@@ -7716,6 +8296,39 @@ export interface components {
             /** Preset Key */
             preset_key: string;
         };
+        /** SessionBookingIn */
+        SessionBookingIn: {
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+        };
+        /** SessionBookingOut */
+        SessionBookingOut: {
+            /** Cancelled At */
+            cancelled_at: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+        };
         /**
          * SessionCancelIn
          * @description §5.6 — 'or cancel it with a reason'. The reason is required by the column's own
@@ -7884,14 +8497,20 @@ export interface components {
             /** Studios */
             studios: components["schemas"]["StudioMembershipOut"][];
         };
-        /**
-         * SessionRosterOut
-         * @description `GET /sessions/{id}/attendance`.
-         */
-        SessionRosterOut: {
-            /** Roster */
-            roster?: components["schemas"]["RosterEntry"][];
-            session: components["schemas"]["SessionOut"];
+        /** SessionRosterEntryOut */
+        SessionRosterEntryOut: {
+            /**
+             * Booking Id
+             * Format: uuid
+             */
+            booking_id: string;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+            /** Student Name */
+            student_name: string;
         };
         /**
          * SessionStaffIn
@@ -8046,6 +8665,43 @@ export interface components {
              * @description Always null in M1. Weekly load is group_schedule_rule × session, both W2 contract models. Zero would report an idle coach rather than a missing measurement.
              */
             weekly_hours?: number | null;
+        };
+        /**
+         * StandingOrderLinkIn
+         * @description The one in-place edit `price_plan` allows. `null` clears the link.
+         *
+         *     Its own route rather than a general `PATCH /price-plans/{id}`: this table is versioned
+         *     and never edited in place, and a generic patch shape would be an invitation to add
+         *     `monthly_amount_agorot` to it -- which is the edit `close_price_plan` exists to
+         *     prevent. A route named after the one legal field cannot grow that way by accident.
+         */
+        StandingOrderLinkIn: {
+            /** Url */
+            url?: string | null;
+        };
+        /** StandingOrderLinkListOut */
+        StandingOrderLinkListOut: {
+            /** Items */
+            items: components["schemas"]["StandingOrderLinkOut"][];
+        };
+        /**
+         * StandingOrderLinkOut
+         * @description One row per child whose ACTIVE plan carries a link.
+         *
+         *     Labelled with the child and the plan because a payer may have two children on two
+         *     plans: one bare link would have them sign one mandate and underpay for the other child
+         *     every month. `amount_agorot` travels with it so the parent can see WHICH mandate they
+         *     are about to sign -- a uPay shared link charges a fixed amount and does not say so.
+         */
+        StandingOrderLinkOut: {
+            /** Amount Agorot */
+            amount_agorot: number;
+            /** Plan Name */
+            plan_name: string;
+            /** Student Name */
+            student_name: string;
+            /** Url */
+            url: string;
         };
         /** StudentBeltIn */
         StudentBeltIn: {
@@ -8524,6 +9180,26 @@ export interface components {
              */
             studio_id: string;
         };
+        /** TrainingPlanOut */
+        TrainingPlanOut: {
+            /** Base Sessions */
+            base_sessions: components["schemas"]["BaseSessionOut"][];
+            /** Credits Remaining */
+            credits_remaining: number | null;
+            current_plan: components["schemas"]["PlanOptionOut"] | null;
+            /** Plans */
+            plans: components["schemas"]["PlanOptionOut"][];
+            scheduled_change?: components["schemas"]["PlanChangeOut"] | null;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+            /** Student Name */
+            student_name: string;
+            /** This Weeks Extras */
+            this_weeks_extras: components["schemas"]["BookableSessionOut"][];
+        };
         /** TrainingYearCreate */
         TrainingYearCreate: {
             /**
@@ -8873,6 +9549,15 @@ export interface components {
             /** Error Type */
             type: string;
         };
+        /**
+         * SessionRosterOut
+         * @description `GET /sessions/{id}/attendance`.
+         */
+        app__schemas__attendance__SessionRosterOut: {
+            /** Roster */
+            roster?: components["schemas"]["RosterEntry"][];
+            session: components["schemas"]["SessionOut"];
+        };
         /** StudioOut */
         app__schemas__platform__StudioOut: {
             /**
@@ -8966,6 +9651,18 @@ export interface components {
             sport?: string | null;
             /** Timezone */
             timezone: string;
+        };
+        /** SessionRosterOut */
+        app__schemas__training_plan__SessionRosterOut: {
+            /** Items */
+            items: components["schemas"]["SessionRosterEntryOut"][];
+            /** Marked Count */
+            marked_count: number;
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
         };
     };
     responses: never;
@@ -10053,99 +10750,6 @@ export interface operations {
             };
         };
     };
-    list_cash_requests_api_v1_cash_requests_get: {
-        parameters: {
-            query?: {
-                status?: string | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ManagerCashRequestListOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    confirm_cash_request_api_v1_cash_requests__request_id__confirm_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                request_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CashRequestOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    decline_cash_request_api_v1_cash_requests__request_id__decline_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                request_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CashRequestOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     list_charges_api_v1_charges_get: {
         parameters: {
             query?: {
@@ -11205,6 +11809,41 @@ export interface operations {
             };
         };
     };
+    set_eligibility_api_v1_groups__group_id__eligibility_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                group_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GroupEligibilityIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroupEligibilityOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_group_schedule_api_v1_groups__group_id__schedule_get: {
         parameters: {
             query?: never;
@@ -11327,6 +11966,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GroupStaffOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_group_kind_api_v1_groups__group_id__training_kind_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                group_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GroupKindIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroupKindIn"];
                 };
             };
             /** @description Validation Error */
@@ -11703,59 +12377,6 @@ export interface operations {
             };
         };
     };
-    my_cash_requests_api_v1_me_cash_requests_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CashRequestListOut"];
-                };
-            };
-        };
-    };
-    raise_cash_request_api_v1_me_cash_requests_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CashRequestCreateIn"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CashRequestOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     my_charges_api_v1_me_charges_get: {
         parameters: {
             query?: {
@@ -11874,6 +12495,59 @@ export interface operations {
             };
         };
     };
+    my_payment_promises_api_v1_me_payment_promises_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentPromiseListOut"];
+                };
+            };
+        };
+    };
+    raise_payment_promise_api_v1_me_payment_promises_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PaymentPromiseCreateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentPromiseOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     my_payments_api_v1_me_payments_get: {
         parameters: {
             query?: {
@@ -11902,6 +12576,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_prepay_terms_api_v1_me_prepay_terms_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrepayTermsOut"];
                 };
             };
         };
@@ -11942,6 +12636,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MyStandingOrderOut"];
+                };
+            };
+        };
+    };
+    my_standing_order_links_api_v1_me_standing_order_links_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StandingOrderLinkListOut"];
                 };
             };
         };
@@ -12468,6 +13182,100 @@ export interface operations {
             };
         };
     };
+    list_payment_promises_api_v1_payment_promises_get: {
+        parameters: {
+            query?: {
+                status?: string | null;
+                method?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManagerPaymentPromiseListOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_payment_promise_api_v1_payment_promises__promise_id__confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                promise_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentPromiseOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    decline_payment_promise_api_v1_payment_promises__promise_id__decline_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                promise_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentPromiseOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_payments_api_v1_payments_get: {
         parameters: {
             query?: {
@@ -12562,6 +13370,57 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PaymentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    plan_change_queue_api_v1_plan_changes_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanChangeListOut"];
+                };
+            };
+        };
+    };
+    settle_plan_change_api_v1_plan_changes__change_id__settle_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                change_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanChangeOut"];
                 };
             };
             /** @description Validation Error */
@@ -12782,6 +13641,44 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PricePlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_standing_order_link_api_v1_price_plans__plan_id__standing_order_link_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                plan_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StandingOrderLinkIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -13933,6 +14830,70 @@ export interface operations {
             };
         };
     };
+    mark_session_api_v1_session_bookings_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SessionBookingIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionBookingOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    release_session_api_v1_session_bookings__booking_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                booking_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionBookingOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_sessions_api_v1_sessions_get: {
         parameters: {
             query: {
@@ -14091,7 +15052,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SessionRosterOut"];
+                    "application/json": components["schemas"]["app__schemas__attendance__SessionRosterOut"];
                 };
             };
             /** @description Validation Error */
@@ -14130,6 +15091,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BatchResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    session_bookings_api_v1_sessions__session_id__bookings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["app__schemas__training_plan__SessionRosterOut"];
                 };
             };
             /** @description Validation Error */
@@ -15041,6 +16033,73 @@ export interface operations {
             };
         };
     };
+    request_plan_change_api_v1_students__student_id__plan_changes_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlanChangeIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanChangeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_plan_change_api_v1_students__student_id__plan_changes__change_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+                change_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanChangeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     student_price_plan_api_v1_students__student_id__price_plan_get: {
         parameters: {
             query?: never;
@@ -15090,6 +16149,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StudentStatusHistoryListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    training_plan_api_v1_students__student_id__training_plan_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrainingPlanOut"];
                 };
             };
             /** @description Validation Error */

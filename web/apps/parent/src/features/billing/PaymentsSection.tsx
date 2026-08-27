@@ -13,11 +13,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { apiFetch } from '@studio/core'
 import type { Locale } from '@studio/i18n'
 import { PaymentsScreen } from './PaymentsScreen'
-import type { DebtRow } from './PaymentsScreen'
+import type { DebtRow, PrepayTerms, StandingOrderLink } from './PaymentsScreen'
 import type {
   BillingClient,
-  CashRequestOut,
   ChargeOut,
+  PaymentPromiseOut,
   PayerBalanceOut,
   PaymentOrderOut,
   PaymentOut,
@@ -25,6 +25,24 @@ import type {
 } from './billingClient'
 
 type Fetcher = (path: string, init?: RequestInit) => Promise<Response>
+
+/** `GET /me/standing-order-links` on the wire. Snake case here, camel at the screen. */
+type WireLink = { student_name: string; plan_name: string; amount_agorot: number; url: string }
+
+/** `GET /me/prepay-terms`. Zeroes when the read fails, which is the settle-open-charges
+ *  behaviour cash had before prepayment existed — a card that cannot price a forward term
+ *  must not offer one. */
+type WireTerms = {
+  cash_prepay_months: number
+  cheque_prepay_months: number
+  monthly_total_agorot: number
+}
+
+const NO_TERMS: WireTerms = {
+  cash_prepay_months: 0,
+  cheque_prepay_months: 0,
+  monthly_total_agorot: 0,
+}
 
 const JSON_HEADERS = { 'Content-Type': 'application/json' }
 
@@ -49,16 +67,23 @@ export function makeParentBillingClient(fetcher: Fetcher): BillingClient {
       const response = await fetcher('/api/v1/me/charges?status=open')
       return (await json<{ items: ChargeOut[] }>(response)).items
     },
-    async cashRequests() {
-      const response = await fetcher('/api/v1/me/cash-requests')
-      return (await json<{ items: CashRequestOut[] }>(response)).items
+    async promises() {
+      const response = await fetcher('/api/v1/me/payment-promises')
+      return (await json<{ items: PaymentPromiseOut[] }>(response)).items
     },
-    async requestCash(chargeIds) {
-      return json<CashRequestOut>(
-        await fetcher('/api/v1/me/cash-requests', {
+    async createPromise(chargeIds, promiseMethod, prepayMonths) {
+      // `method` in the body, not in the path: the two routes are one row and one
+      // endpoint, so the server's `PROMISE_METHODS` check is the only place a third
+      // method could ever be refused.
+      return json<PaymentPromiseOut>(
+        await fetcher('/api/v1/me/payment-promises', {
           method: 'POST',
           headers: JSON_HEADERS,
-          body: JSON.stringify({ charge_ids: chargeIds }),
+          body: JSON.stringify({
+            charge_ids: chargeIds,
+            method: promiseMethod,
+            prepay_months: prepayMonths,
+          }),
         }),
       )
     },
@@ -107,7 +132,14 @@ export function PaymentsSection({ locale }: { locale: Locale }) {
   const client = useMemo(() => makeParentBillingClient(apiFetch), [])
   const [debts, setDebts] = useState<readonly DebtRow[]>([])
   const [standingOrder, setStandingOrder] = useState(false)
-  const [cashRequests, setCashRequests] = useState<readonly CashRequestOut[]>([])
+  const [promises, setPromises] = useState<readonly PaymentPromiseOut[]>([])
+  const [standingOrderLinks, setStandingOrderLinks] = useState<readonly StandingOrderLink[]>([])
+  const [prepayTerms, setPrepayTerms] = useState<PrepayTerms>({
+    cashMonths: 0,
+    chequeMonths: 0,
+    monthlyTotalAgorot: 0,
+  })
+  const [creditAgorot, setCreditAgorot] = useState(0)
   const [loaded, setLoaded] = useState(false)
   // Bumped to re-read after an order opens. A counter rather than calling the loader
   // directly, so there is exactly one place that writes `debts` — `react-hooks`'
@@ -118,12 +150,12 @@ export function PaymentsSection({ locale }: { locale: Locale }) {
   useEffect(() => {
     let alive = true
     void (async () => {
-      const [charges, cash, mandate, children] = await Promise.all([
+      const [charges, promiseRows, mandate, children, links, terms, balance] = await Promise.all([
         client.openCharges(''),
-        // The payer's own cash requests, beside the charges: a pending one badges its
-        // rows and swaps the cash card's button for a status; a declined one is said
-        // out loud rather than left to be inferred from silence.
-        client.cashRequests().catch(() => [] as CashRequestOut[]),
+        // The payer's own promises, both routes, beside the charges: a pending one badges
+        // its rows and swaps its card's button for a status; a declined one is said out
+        // loud rather than left to be inferred from silence.
+        client.promises().catch(() => [] as PaymentPromiseOut[]),
         // §5.10's second guard, asked of the person it is a guard for. One request beside
         // the charges rather than after them: the warning has to be on screen the first
         // time the card route is, or it is a warning nobody sees before deciding.
@@ -140,13 +172,46 @@ export function PaymentsSection({ locale }: { locale: Locale }) {
               : { items: [] },
           )
           .catch(() => ({ items: [] as { id: string; first_name: string; last_name: string }[] })),
+        // Payment-routes §6/§7 -- the הוראת קבע links for THIS payer's own children, read
+        // LIVE on every visit to the screen. Deliberately not part of any precache or
+        // offline bootstrap: a stale roster is an inconvenience, a stale payment link
+        // sends a family to sign a mandate at the wrong amount and nobody finds out until
+        // the reconciliation queue disagrees months later. `vite.config.ts` declares no
+        // `runtimeCaching`, and ParentBilling.test.tsx asserts that at the source.
+        apiFetch('/api/v1/me/standing-order-links')
+          .then((r) => (r.ok ? (r.json() as Promise<{ items: WireLink[] }>) : { items: [] }))
+          .catch(() => ({ items: [] as WireLink[] })),
+        // The club's own prepayment rules and this payer's monthly price. Read here rather
+        // than computed in the screen: `months x monthly` is integer arithmetic on money
+        // (G2), and the server is the one place that knows both numbers.
+        apiFetch('/api/v1/me/prepay-terms')
+          .then((r) => (r.ok ? (r.json() as Promise<WireTerms>) : NO_TERMS))
+          .catch(() => NO_TERMS),
+        // `credit_agorot` beside `balance_agorot`, never merged: the "paid ahead" line is
+        // derived from it and the monthly price, so a plan change re-answers it with
+        // nothing stored to become wrong.
+        client.balance('').catch(() => null),
       ])
       const nameOf = new Map(
         children.items.map((child) => [child.id, `${child.first_name} ${child.last_name}`]),
       )
       if (!alive) return
       setStandingOrder(mandate.active)
-      setCashRequests(cash)
+      setPromises(promiseRows)
+      setPrepayTerms({
+        cashMonths: terms.cash_prepay_months,
+        chequeMonths: terms.cheque_prepay_months,
+        monthlyTotalAgorot: terms.monthly_total_agorot,
+      })
+      setCreditAgorot(balance?.credit_agorot ?? 0)
+      setStandingOrderLinks(
+        links.items.map((link) => ({
+          studentName: link.student_name,
+          planName: link.plan_name,
+          amountAgorot: link.amount_agorot,
+          url: link.url,
+        })),
+      )
       setDebts(
         charges.map((charge) => ({
           charge,
@@ -178,15 +243,18 @@ export function PaymentsSection({ locale }: { locale: Locale }) {
       client={client}
       debts={debts}
       hasActiveSubscription={standingOrder}
-      // `GET /billing/settings` is manager-only, so the shared uPay mandate link and the
-      // studio's own cash instructions have no payer-facing source yet. The screen falls
-      // back to the default copy rather than showing a parent a 403; neither blocks a
-      // payment, unlike the three reads that used to.
-      standingOrderLink={null}
+      standingOrderLinks={standingOrderLinks}
+      prepayTerms={prepayTerms}
+      creditAgorot={creditAgorot}
+      // `GET /billing/settings` is manager-only, so the studio's own cash instructions
+      // still have no payer-facing source. The screen falls back to the default copy
+      // rather than showing a parent a 403. The standing-order link no longer falls back
+      // to anything: it has a source of its own now, one per plan, per §13's refusal to
+      // have a single studio-wide link at one amount.
       cashInstructions={null}
-      cashRequests={cashRequests}
-      onCashRequest={async (chargeIds) => {
-        await client.requestCash(chargeIds)
+      promises={promises}
+      onPaymentPromise={async (chargeIds, promiseMethod, prepayMonths) => {
+        await client.createPromise(chargeIds, promiseMethod, prepayMonths)
         refresh()
       }}
       onOrderOpened={(form) => {

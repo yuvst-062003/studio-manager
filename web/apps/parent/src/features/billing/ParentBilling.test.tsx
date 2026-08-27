@@ -16,7 +16,7 @@ import { PaymentCompleteScreen } from './PaymentCompleteScreen'
 import { OrderItemsScreen } from './OrderItemsScreen'
 import { PaymentStrip } from './PaymentStrip'
 import { instalmentSplit, oldestMonths, selectionTotal } from './billingClient'
-import type { BillingClient, ChargeOut, PaymentOut } from './billingClient'
+import type { BillingClient, ChargeOut, PaymentOut, PaymentPromiseOut } from './billingClient'
 
 const LOCALE = 'he' as const
 
@@ -61,6 +61,8 @@ function debt(id: string, month: number, overrides: Partial<DebtRow> = {}): Debt
 function stubClient(overrides: Partial<BillingClient> = {}): BillingClient {
   return {
     openCharges: vi.fn().mockResolvedValue([]),
+    promises: vi.fn().mockResolvedValue([]),
+    createPromise: vi.fn(),
     balance: vi.fn(),
     payments: vi.fn().mockResolvedValue([]),
     products: vi.fn().mockResolvedValue([]),
@@ -78,8 +80,17 @@ function renderPay(props: Partial<Parameters<typeof PaymentsScreen>[0]> = {}) {
       client={stubClient()}
       debts={[debt('c1', 9), debt('c2', 10)]}
       hasActiveSubscription={false}
-      standingOrderLink="https://app.upay.co.il/recurring/abc"
+      standingOrderLinks={[
+        {
+          studentName: 'דנה',
+          planName: 'פעמיים בשבוע',
+          amountAgorot: 30_000,
+          url: 'https://app.upay.co.il/recurring/300',
+        },
+      ]}
       cashInstructions={null}
+      prepayTerms={{ cashMonths: 0, chequeMonths: 0, monthlyTotalAgorot: 0 }}
+      creditAgorot={0}
       onOrderOpened={vi.fn()}
       onOpenHistory={vi.fn()}
       {...props}
@@ -155,8 +166,9 @@ describe('1b — the pay screen', () => {
     // a boundary between two perfectly correct amounts.
     const { container } = renderPay()
     const amounts = [...container.querySelectorAll('.studio-money')]
-    // Two debt rows, the open-debts total, and the card route's selection total.
-    expect(amounts.length).toBe(4)
+    // Two debt rows, the open-debts total, the card route's selection total, and the one
+    // standing-order link's monthly amount.
+    expect(amounts.length).toBe(5)
     for (const amount of amounts) {
       expect(amount.textContent).not.toMatch(/₪\d/)
       expect(amount.querySelector('bdi')).not.toBeNull()
@@ -177,6 +189,257 @@ describe('1b — the pay screen', () => {
     // white belt with no ring is invisible on a light ground at 1.08:1.
     const { container } = renderPay()
     expect(container.querySelectorAll('.studio-belt-bar').length).toBe(2)
+  })
+})
+
+function promise(
+  id: string,
+  method: 'cash' | 'cheque',
+  overrides: Partial<PaymentPromiseOut> = {},
+): PaymentPromiseOut {
+  return {
+    id,
+    status: 'pending',
+    method,
+    total_agorot: 50_000,
+    prepay_months: 0,
+    charge_ids: ['c1'],
+    created_at: '2026-09-01T09:00:00Z',
+    decided_at: null,
+    ...overrides,
+  }
+}
+
+describe('1b — the standing-order links', () => {
+  // Part A of the payment-routes spec. The card and the string existed since W4 and the
+  // section hardcoded the prop to null, so no parent has ever seen a link — this is the
+  // missing SOURCE, and its shape is a LIST because a uPay link carries a fixed amount.
+  const TWO = [
+    {
+      studentName: 'דנה',
+      planName: 'פעמיים בשבוע',
+      amountAgorot: 30_000,
+      url: 'https://app.upay.co.il/recurring/300',
+    },
+    {
+      studentName: 'יוסי',
+      planName: 'כל יום',
+      amountAgorot: 55_000,
+      url: 'https://app.upay.co.il/recurring/550',
+    },
+  ]
+
+  it('gives a payer one labelled link per child, never one bare link', () => {
+    // §6 — a parent with a child on 300 and a child on 550 needs BOTH, labelled. One link
+    // has them sign one mandate and underpay for the other child every month, and nothing
+    // reports it until the reconciliation queue disagrees months later.
+    renderPay({ standingOrderLinks: TWO })
+    const links = screen.getAllByTestId('standing-order-link')
+    expect(links).toHaveLength(2)
+    expect(links[0]).toHaveAttribute('href', 'https://app.upay.co.il/recurring/300')
+    expect(links[1]).toHaveAttribute('href', 'https://app.upay.co.il/recurring/550')
+  })
+
+  it('names the child in each link, because the link text alone repeats', () => {
+    // SC 2.4.4: two anchors reading 'קישור להקמת הוראת קבע' are two links a screen-reader
+    // user cannot tell apart — and telling them apart is the entire point of the list.
+    renderPay({ standingOrderLinks: TWO })
+    const links = screen.getAllByTestId('standing-order-link')
+    expect(links[0]).toHaveAccessibleName(expect.stringContaining('דנה'))
+    expect(links[1]).toHaveAccessibleName(expect.stringContaining('יוסי'))
+  })
+
+  it('shows the amount each mandate will charge', () => {
+    // A uPay shared link charges a FIXED amount and never says which. A parent signing
+    // one is committing to a monthly figure the page they land on may not show them.
+    renderPay({ standingOrderLinks: TWO })
+    const card = screen.getByTestId('route-standing-order')
+    expect(within(card).getAllByText('דנה')).toHaveLength(1)
+    expect(card.querySelectorAll('.studio-money')).toHaveLength(2)
+  })
+
+  it('is never served from the service worker cache', async () => {
+    // §7 — the link is read live on every visit. This app is an installed PWA and the rest
+    // of the screen is cache-friendly, but a stale payment link is not a stale roster: it
+    // sends a family to sign a mandate at the wrong amount, and neither they nor the
+    // manager finds out until the reconciliation queue disagrees months later.
+    //
+    // Read from the SOURCE, the way `packages/core/src/offline/cache.test.ts` reads its
+    // own: the rule is 'no runtimeCaching rule exists for the API', and that is a fact
+    // about the config file rather than about anything a render can observe.
+    const config = (await import('../../../vite.config.ts?raw')).default as string
+    expect(config).not.toContain('runtimeCaching')
+    // And the precache glob is built assets only -- no JSON, so no API response.
+    expect(config).toMatch(/globPatterns:\s*\['\*\*\/\*\.\{js,css,html,woff2,png,svg,webmanifest\}'\]/)
+  })
+
+  it('renders the card with no anchor when no plan has a link', () => {
+    // §3.2's degradation, and the reason NULL is safe: the card keeps its instructions and
+    // loses its anchor. Exactly what the screen has always done, so the empty case is not
+    // a special case.
+    renderPay({ standingOrderLinks: [] })
+    expect(screen.getByTestId('route-standing-order')).toBeInTheDocument()
+    expect(screen.queryByTestId('standing-order-link')).not.toBeInTheDocument()
+    expect(screen.getByTestId('route-standing-order')).toHaveTextContent(
+      t(LOCALE, 'billing.standingOrder.instructions'),
+    )
+  })
+})
+
+describe('1b — the two hand-carried routes', () => {
+  // The payment-routes spec §8: cheques are cash with a different word on the payment.
+  // Both end at a manager confirming by hand, so the screen offers them as two cards over
+  // one mechanism rather than two mechanisms — which is what makes every rule below hold
+  // for either method without being written twice.
+  it('offers cheques beside cash, so all four routes are visible', () => {
+    // §5.10 — nothing is ever hidden from the payments screen. The manager's own letter
+    // lists three ways to pay and the app served two of them.
+    renderPay()
+    expect(screen.getByTestId('route-card')).toBeInTheDocument()
+    expect(screen.getByTestId('route-standing-order')).toBeInTheDocument()
+    expect(screen.getByTestId('route-cash')).toBeInTheDocument()
+    expect(screen.getByTestId('route-cheque')).toBeInTheDocument()
+  })
+
+  it('raises a promise carrying the method the parent tapped', async () => {
+    // The method is the ONE thing that separates these two cards, and it is what the
+    // manager's queue filters on. A cheque promise raised as `cash` is a cheque the club
+    // cannot count later — §10's whole reason for existing.
+    const onPaymentPromise = vi.fn().mockResolvedValue(undefined)
+    renderPay({ onPaymentPromise })
+    // The third argument is the forward term, 0 here because `renderPay`'s default terms
+    // offer no months — a route with no term is the settle-what-is-owed promise this
+    // object has always been.
+    await userEvent.click(screen.getByTestId('promise-button-cheque'))
+    expect(onPaymentPromise).toHaveBeenCalledWith(['c1', 'c2'], 'cheque', 0)
+    await userEvent.click(screen.getByTestId('promise-button-cash'))
+    expect(onPaymentPromise).toHaveBeenLastCalledWith(['c1', 'c2'], 'cash', 0)
+  })
+
+  it('reports a pending cheque promise on the cheque card', () => {
+    renderPay({ promises: [promise('r1', 'cheque')], onPaymentPromise: vi.fn() })
+    expect(screen.getByTestId('promise-pending-cheque')).toHaveTextContent('ממתין לאישור המנהל')
+    expect(screen.queryByTestId('promise-button-cheque')).not.toBeInTheDocument()
+  })
+
+  it('lets no second promise be raised while one of EITHER method is pending', () => {
+    // One live promise at a time, across both routes. Two pending promises over the same
+    // months would show the manager the same money twice, and the service refuses the
+    // second anyway — a card that still offered the button would be offering a 409.
+    renderPay({ promises: [promise('r1', 'cash')], onPaymentPromise: vi.fn() })
+    expect(screen.getByTestId('promise-pending-cash')).toBeInTheDocument()
+    expect(screen.queryByTestId('promise-button-cheque')).not.toBeInTheDocument()
+    // And it says why, rather than rendering a card with nothing in it.
+    expect(screen.getByTestId('promise-blocked-cheque')).toBeInTheDocument()
+  })
+
+  it('badges the charge rows a pending cheque promise covers, in its own words', () => {
+    renderPay({ promises: [promise('r1', 'cheque', { charge_ids: ['c1'] })], onPaymentPromise: vi.fn() })
+    expect(screen.getByText('צ׳קים בהמתנה')).toBeInTheDocument()
+    expect(screen.queryByText('מזומן בהמתנה')).not.toBeInTheDocument()
+  })
+
+  it('says a decline out loud, on the card it was declined on', () => {
+    // A decline the parent is never told about is silence they have to infer from a
+    // charge that stayed open. It belongs to the method that was declined: a declined
+    // cheque promise must not make the cash card look broken.
+    renderPay({
+      promises: [
+        promise('r1', 'cheque', { status: 'declined', decided_at: '2026-09-02T09:00:00Z' }),
+      ],
+      onPaymentPromise: vi.fn(),
+    })
+    expect(screen.getByTestId('promise-declined-cheque')).toBeInTheDocument()
+    expect(screen.queryByTestId('promise-declined-cash')).not.toBeInTheDocument()
+    // And the route is open again — a decline is not a ban.
+    expect(screen.getByTestId('promise-button-cheque')).toBeInTheDocument()
+  })
+})
+
+describe('1b — prepayment and credit', () => {
+  // The club sells a monthly subscription and collects it in lumps: 900 ₪ of cash for three
+  // months, twelve cheques for a year. The ledger holds that as an ordinary payment with a
+  // short allocation list — the surplus IS the credit — and this screen is where a parent
+  // declares one and later sees what is left of it.
+  const TERMS = { cashMonths: 3, chequeMonths: 12, monthlyTotalAgorot: 30_000 }
+
+  it('offers the club\'s own term on each route, with the breakdown', () => {
+    // §6 — the breakdown is shown rather than a single figure, because 900 ₪ with no
+    // explanation is the kind of number a parent phones the office about.
+    renderPay({ prepayTerms: TERMS, onPaymentPromise: vi.fn() })
+    const cash = screen.getByTestId('route-cash')
+    expect(within(cash).getByTestId('promise-term-months')).toHaveTextContent('3')
+    // Two debt rows at 250 each are selected by the default 2-month picker, plus three
+    // months forward at 300.
+    expect(within(cash).getByTestId('promise-forward-total')).toHaveTextContent('900')
+    expect(within(cash).getByTestId('promise-grand-total')).toHaveTextContent('1,400')
+  })
+
+  it('prices each route at its own term', () => {
+    // Cash three months forward, twelve cheques. The club's two rules are different
+    // numbers, and a card that showed one of them on both would collect the wrong amount
+    // for whichever route it got wrong.
+    renderPay({ prepayTerms: TERMS, onPaymentPromise: vi.fn() })
+    expect(
+      within(screen.getByTestId('route-cheque')).getByTestId('promise-term-months'),
+    ).toHaveTextContent('12')
+  })
+
+  it('sends the term with the promise, so the manager knows what was bought', async () => {
+    const onPaymentPromise = vi.fn().mockResolvedValue(undefined)
+    renderPay({ prepayTerms: TERMS, onPaymentPromise })
+    await userEvent.click(screen.getByTestId('promise-button-cheque'))
+    expect(onPaymentPromise).toHaveBeenCalledWith(['c1', 'c2'], 'cheque', 12)
+  })
+
+  it('a term of 0 returns the route to settling open charges only', () => {
+    // §5 — how cash behaved before prepayment existed, and how a club that does not
+    // collect forward still works.
+    renderPay({
+      prepayTerms: { cashMonths: 0, chequeMonths: 12, monthlyTotalAgorot: 30_000 },
+      onPaymentPromise: vi.fn(),
+    })
+    const cash = screen.getByTestId('route-cash')
+    expect(within(cash).queryByTestId('promise-forward-total')).not.toBeInTheDocument()
+    expect(within(cash).getByTestId('promise-button-cash')).toBeInTheDocument()
+  })
+
+  it('offers no forward months to a family with no plan', () => {
+    // `monthly_total_agorot` is 0 for a payer whose children have no price plan, and
+    // `months × 0` is a term that buys nothing. Offering it would be a card promising to
+    // sell a year of a subscription the family does not have.
+    renderPay({
+      prepayTerms: { cashMonths: 3, chequeMonths: 12, monthlyTotalAgorot: 0 },
+      onPaymentPromise: vi.fn(),
+    })
+    expect(
+      within(screen.getByTestId('route-cash')).queryByTestId('promise-forward-total'),
+    ).not.toBeInTheDocument()
+  })
+
+  it('says what the credit covers, derived and never stored', () => {
+    // §6 — a stored `paid_through` becomes a lie the moment the family upgrades, because
+    // 600 ₪ no longer reaches the end of November. Credit ÷ the CURRENT monthly total is
+    // always true and recomputes itself after any plan change.
+    renderPay({ prepayTerms: TERMS, creditAgorot: 60_000 })
+    const ahead = screen.getByTestId('paid-ahead')
+    expect(ahead).toBeInTheDocument()
+    expect(ahead).toHaveTextContent(t(LOCALE, 'billing.prepay.coversMonths').replace('{{count}}', '2'))
+    expect(within(ahead).queryByTestId('paid-ahead-part')).not.toBeInTheDocument()
+  })
+
+  it('degrades honestly when the credit does not reach a whole month', () => {
+    // 'covers October, and 200 ₪ of November' — the sentence the spec writes out, because
+    // rounding it up to two months would tell a family they owe nothing when they do.
+    renderPay({ prepayTerms: TERMS, creditAgorot: 50_000 })
+    const ahead = screen.getByTestId('paid-ahead')
+    expect(ahead).toHaveTextContent(t(LOCALE, 'billing.prepay.coversOneMonth'))
+    expect(within(ahead).getByTestId('paid-ahead-part')).toBeInTheDocument()
+  })
+
+  it('says nothing at all when there is no credit', () => {
+    renderPay({ prepayTerms: TERMS, creditAgorot: 0 })
+    expect(screen.queryByTestId('paid-ahead')).not.toBeInTheDocument()
   })
 })
 
@@ -253,6 +516,14 @@ describe('12f — payment history', () => {
     const rows = screen.getAllByTestId('payment-row')
     expect(within(rows[0]!).getByTestId('email-receipt')).toBeInTheDocument()
     expect(within(rows[1]!).queryByTestId('email-receipt')).not.toBeInTheDocument()
+  })
+
+  it('names a cheque payment rather than folding it into cash', () => {
+    // §10 — the club's question is 'how much of this year is sitting in undeposited
+    // cheques', and a history row that says מזומן cannot answer it. `methodKey`'s final
+    // `: 'cash'` is a fallback, so this failure is silent by construction.
+    renderHistory({ payments: [payment('p1', 'cheque')] })
+    expect(screen.getByTestId('payment-row')).toHaveTextContent('צ׳קים')
   })
 
   it('has no global email-the-receipts button', () => {
