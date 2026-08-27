@@ -3,6 +3,7 @@ import type { Bundle } from '../types'
 /** Mirrors `he/attendance.ts`. `ru` is `report` in the parity check until §15 item 9 lands. */
 export const attendance: Bundle = {
   'roster.title': 'Посещаемость',
+  'roster.dayLabel': '{{weekday}}',
   'roster.empty': 'В этой группе нет учеников',
   'roster.present': 'Присутствует',
   'roster.absent': 'Отсутствует',

@@ -86,6 +86,17 @@ describe('artboards 1c and 9f — the roster screen', () => {
     expect(await screen.findByText('דנה כהן')).toBeInTheDocument()
   })
 
+  it('names the weekday, the hour and the hall in the header (S6)', async () => {
+    // A coach covering for someone needs the hall. 2026-11-03T15:00Z is Tuesday 17:00 in
+    // Jerusalem — the weekday comes from the studio's calendar day, not the UTC date.
+    renderScreen()
+    const header = await screen.findByTestId('roster-session')
+    expect(header).toHaveTextContent('יום שלישי')
+    expect(header).toHaveTextContent('17:00')
+    expect(header).toHaveTextContent('אולם א׳')
+    expect(header).toHaveTextContent('מתחילים')
+  })
+
   it('counts present, absent and unmarked over the EXPECTED section only', async () => {
     // §5.7 — the not-expected section's "rows never count toward `לא סומן`". A twice-weekly
     // student who is not due today has not missed anything, and counting them would make

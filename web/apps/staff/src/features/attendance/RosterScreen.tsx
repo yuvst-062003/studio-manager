@@ -24,6 +24,7 @@ import {
   usePendingCount,
   useNetworkMode,
   useStaleQueueWarning,
+  studioDayKey,
 } from '@studio/core'
 import type { RosterRow as RosterRowData } from '@studio/core'
 import { RosterRow } from './RosterRow'
@@ -63,7 +64,11 @@ export function RosterScreen({
   notExpectedIds?: string[]
 }) {
   const [roster, setRoster] = useState<RosterRowData[]>([])
-  const [header, setHeader] = useState<{ groupName: string; startsAt: string } | null>(null)
+  const [header, setHeader] = useState<{
+    groupName: string
+    startsAt: string
+    locationName: string | null
+  } | null>(null)
   const mode = useNetworkMode()
   const pending = usePendingCount()
   const stale = useStaleQueueWarning(clock)
@@ -75,7 +80,11 @@ export function RosterScreen({
       .then((body) => {
         if (!live) return
         setRoster(body.roster)
-        setHeader({ groupName: body.session.group_name, startsAt: body.session.starts_at })
+        setHeader({
+          groupName: body.session.group_name,
+          startsAt: body.session.starts_at,
+          locationName: body.session.location_name,
+        })
       })
       .catch(() => {
         // Offline is not an error state on this screen. The cached roster is what renders,
@@ -161,7 +170,15 @@ export function RosterScreen({
         <h1 id="roster-title">{t(locale, 'attendance.roster.title')}</h1>
         {header ? (
           <p data-testid="roster-session">
-            <bdi>{header.groupName}</bdi> · {formatTimeInStudioZone(header.startsAt, locale)}
+            {/* S6 — `יום א׳ · 17:00 · אולם א׳`. The weekday and the hall are for the coach
+                covering for someone: the day comes from the studio's calendar day, never
+                the device's UTC date, and the hall renders only when the session has one. */}
+            {t(locale, 'attendance.roster.dayLabel').replace(
+              '{{weekday}}',
+              t(locale, `schedule.weekday.${sessionWeekday(header.startsAt)}`),
+            )}{' '}
+            · {formatTimeInStudioZone(header.startsAt, locale)} · <bdi>{header.groupName}</bdi>
+            {header.locationName ? <> · <bdi>{header.locationName}</bdi></> : null}
           </p>
         ) : null}
 
@@ -348,6 +365,13 @@ function markId(sessionId: string, studentId: string): string {
     flat.slice(16, 20),
     flat.slice(20, 32),
   ].join('-')
+}
+
+/** The session's weekday in the STUDIO's calendar, Sunday-first to match
+ *  `schedule.weekday.*`. An evening class near midnight UTC is already the next day in
+ *  Jerusalem, which is exactly what `studioDayKey` exists to get right. */
+function sessionWeekday(startsAt: string): number {
+  return new Date(`${studioDayKey(startsAt)}T12:00:00Z`).getUTCDay()
 }
 
 /** §10.1's four modes to the four keys `attendance.network.*` carries. `api-down` renders as

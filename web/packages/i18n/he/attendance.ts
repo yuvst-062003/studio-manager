@@ -18,6 +18,7 @@ import type { Bundle } from '../types'
 export const attendance: Bundle = {
   // -- the roster (staff 1c, 9f) -------------------------------------------------
   'roster.title': 'נוכחות',
+  'roster.dayLabel': 'יום {{weekday}}',
   'roster.empty': 'אין חניכים בקבוצה הזו',
   'roster.present': 'נוכח',
   'roster.absent': 'נעדר',

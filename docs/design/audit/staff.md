@@ -230,6 +230,22 @@ link that must be signed `לפני עלייה למזרן`.
 
 ## Log
 
+### 2026-08-27 · S6 — the register was already the best screen; it now names its room
+
+Three of S6's four items were already done by the time this entry was written: the
+`הודיעו מראש` state and the bulk button that refuses to overwrite it were built and tested
+(`RosterScreen.test.tsx` — "does NOT overwrite a parent's advance notice"), the parent's
+`AbsenceScreen` that produces the state shipped in P1, the health badge landed with S1, and
+the offline indicators with S5. The one gap was the header: `מתחילים · 17:00` with no
+weekday and no hall, and a coach covering for someone needs the hall.
+
+The header now reads `יום שלישי · 17:00 · מתחילים · אולם א׳`. The weekday comes from
+`studioDayKey` — the STUDIO's calendar day, Sunday-first to match `schedule.weekday.*` —
+because an evening class near midnight UTC is already tomorrow in Jerusalem. The hall
+renders only when the session has one; `location_name` was already on the wire in
+`SessionRosterOut`, fetched and dropped. One new key per locale (`roster.dayLabel`)
+composes `יום {{weekday}}` from the schedule namespace's existing weekday names.
+
 ### 2026-08-27 · S5 — the offline machinery, made visible
 
 **What was wrong.** The machinery was complete and invisible: `usePendingCount` had one

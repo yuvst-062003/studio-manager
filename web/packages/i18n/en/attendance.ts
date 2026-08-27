@@ -3,6 +3,7 @@ import type { Bundle } from '../types'
 /** Mirrors `he/attendance.ts`. `en` is `strict` in the parity check — a missing key fails. */
 export const attendance: Bundle = {
   'roster.title': 'Attendance',
+  'roster.dayLabel': '{{weekday}}',
   'roster.empty': 'No students in this group',
   'roster.present': 'Present',
   'roster.absent': 'Absent',
