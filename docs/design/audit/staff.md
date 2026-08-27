@@ -230,6 +230,35 @@ link that must be signed `לפני עלייה למזרן`.
 
 ## Log
 
+### 2026-08-27 · S10 — the boundary is said, and S4.4 closes with it
+
+**The silent fall-throughs are gone.** `#/cash` and `#/join-link` for a non-manager used
+to render the date-picker screen — the app looking broken rather than reserved. They now
+answer `לא זמין בהרשאה שלך · המסך הזה שמור למנהלי המועדון`. The role matrix is the test:
+assistant coach refused at cash, lead coach refused at join-link (the reservation is
+managerial, not senior), manager gets the real screen with no refusal in sight.
+
+**9e's drawer blocks.** `DrawerIdentity` — name · role labels · `הכיתות שלי N` with the
+group names, fed by a new `GET /groups?mine=true` that answers from `group_staff` (tested:
+a coach leading one of two groups gets exactly one). `PermissionBoundaries` lists the
+locked capabilities greyed with the footnote — and the list ADAPTS: a lead coach does not
+see `מעבר חניך בין כיתות` as locked, because 9c gives it to them. That is S10.4's
+reconciliation applied: 9c already chose show-and-name (`StaffStudentCard` tells an
+assistant coach who can move a student), and the drawer follows the same choice rather
+than inventing a second one. The footnote names both holders (managers, lead coach) since
+the three rows split between them — 9e's drawn footnote named only the lead coach, which
+was wrong for two of its own three rows.
+
+**Deferred from S10.3** — the work counters (`היסטוריית נוכחות 1`) and `בקשת החלפה`: the
+first has no defined semantics anywhere in the specs, and the second needs a substitution-
+request model and a comms flow that do not exist (`SessionStaff.is_substitute` records an
+outcome, not a request). Both raised rather than invented.
+
+**S4.4 closes here.** The four screens the tour pointed at are no longer empty: `#/` ends
+the tour at `#/schedule` which S7 filled with the day's cards; `#/attendance` redirects
+(S4.3); `#/cash` and `#/join-link` refuse visibly (this entry). The tour never renders
+over an empty screen again.
+
 ### 2026-08-27 · S9 — 9i grew its cards, and the participants list stopped being an exam sheet
 
 **What the audit could not see.** 9i measured 2 lines against an EMPTY events table, so

@@ -593,7 +593,8 @@ waves:
         on: 2026-08-27
       - id: S10
         title: Staff — permission boundaries are UI
-        status: pending
+        status: shipped
+        on: 2026-08-27
       - id: S11
         title: Staff — recovery and bars
         status: pending

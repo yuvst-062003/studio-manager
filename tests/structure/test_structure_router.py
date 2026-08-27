@@ -267,3 +267,33 @@ def test_group_patch_is_manager_only(client, as_lead_coach, a_group):
         f"/api/v1/groups/{a_group}", json={"name": "x"}, headers=as_lead_coach.headers
     )
     assert refused.status_code == 403
+
+
+def test_mine_lists_only_the_groups_the_caller_coaches(
+    client, app_session, studio, as_lead_coach, a_group, a_class
+):
+    """9e's identity block — `הכיתות שלי`. The plain list is the studio's; `mine=true`
+    narrows to `group_staff`, so a coach who leads one of two groups gets exactly one."""
+    from datetime import date
+
+    from app.models.structure import Group, GroupStaff
+
+    other = Group(studio_id=studio.id, class_id=a_class, name="נבחרת בדיקה")
+    app_session.add(other)
+    app_session.flush()
+    app_session.add(
+        GroupStaff(
+            studio_id=studio.id,
+            group_id=a_group,
+            person_id=as_lead_coach.person_id,
+            role="lead_coach",
+            from_date=date(2026, 9, 1),
+        )
+    )
+    app_session.commit()
+
+    everything = client.get("/api/v1/groups", headers=as_lead_coach.headers).json()["items"]
+    assert {row["name"] for row in everything} >= {"נבחרת בדיקה"}
+
+    mine = client.get("/api/v1/groups?mine=true", headers=as_lead_coach.headers).json()["items"]
+    assert [row["id"] for row in mine] == [str(a_group)]

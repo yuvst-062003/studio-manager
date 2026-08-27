@@ -100,12 +100,21 @@ class StructureService:
         session: Session,
         *,
         class_id: uuid.UUID | None = None,
+        staff_person_id: uuid.UUID | None = None,
         cursor: uuid.UUID | None = None,
         limit: int = 50,
     ) -> tuple[list[Group], uuid.UUID | None]:
         stmt = select(Group).order_by(Group.id)
         if class_id is not None:
             stmt = stmt.where(Group.class_id == class_id)
+        if staff_person_id is not None:
+            # 9e's `הכיתות שלי` — the groups this person currently coaches. A live
+            # assignment is one whose `to_date` has not passed being open-ended or future.
+            stmt = stmt.where(
+                Group.id.in_(
+                    select(GroupStaff.group_id).where(GroupStaff.person_id == staff_person_id)
+                )
+            )
         return _page_out(
             list(session.execute(_paged(stmt, cursor=cursor, limit=limit)).scalars().all()), limit
         )

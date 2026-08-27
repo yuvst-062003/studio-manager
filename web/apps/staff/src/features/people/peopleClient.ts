@@ -30,6 +30,10 @@ export function makeStaffPeopleClient(fetcher: Fetcher) {
     groups: (): Promise<{ items: GroupOut[] }> =>
       fetcher('/api/v1/groups').then(json<{ items: GroupOut[] }>),
 
+    /** 9e's identity block — the groups the CALLER coaches, from `group_staff`. */
+    myGroups: (): Promise<{ items: GroupOut[] }> =>
+      fetcher('/api/v1/groups?mine=true').then(json<{ items: GroupOut[] }>),
+
     student: (id: string): Promise<StudentDetail> =>
       fetcher(`/api/v1/students/${id}`).then(json<StudentDetail>),
 

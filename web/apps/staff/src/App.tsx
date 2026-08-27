@@ -13,6 +13,7 @@ import { apiFetch, useDisplayMode, useSession, switchStudio } from '@studio/core
 import {
   AccountDrawerFooter,
   AppShell,
+  EmptyState,
   Icon,
   InstallBanner,
   InstallWalkthrough,
@@ -66,6 +67,7 @@ import {
   registerCommsSections,
 } from './features/comms'
 import { StaffAlerts } from './StaffAlerts'
+import { DrawerIdentity, PermissionBoundaries } from './features/identity/DrawerIdentity'
 import { NetworkStatus } from './NetworkStatus'
 import './features/attendance/attendance.css'
 
@@ -264,8 +266,24 @@ export default function App() {
             // calendar feed live in the drawer they were designed for (S2), above the
             // language/theme footer everyone shares.
             <>
+              {session.access.staff ? (
+                <DrawerIdentity
+                  client={peopleClient}
+                  displayName={session.displayName}
+                  locale={locale}
+                  roles={membership?.roles ?? []}
+                />
+              ) : null}
               <NotificationPreferences client={commsClient} locale={locale} />
               <CoachCalendarFeed client={commsClient} locale={locale} />
+              {/* 9e — the locked capabilities, shown. A manager sees none: nothing on
+                  this list is locked for them. */}
+              {session.access.staff && !viewerIsManager ? (
+                <PermissionBoundaries
+                  locale={locale}
+                  canMoveStudents={membership?.roles.includes('lead_coach') ?? false}
+                />
+              ) : null}
               <AccountDrawerFooter locale={locale} onChooseLocale={setLocale} accountName={session.displayName} />
             </>
           }
@@ -427,6 +445,14 @@ export default function App() {
               today={today}
               viewerPersonId={membership?.person_id}
               viewerIsCoach={viewerIsCoach}
+            />
+          ) : session.access.staff && !viewerIsManager && (onCash || onJoinLink) ? (
+            // S10 — restricted, said out loud. The gate used to fall through to the
+            // date-picker screen, which made the app look broken rather than reserved.
+            <EmptyState
+              data-testid="staff-forbidden"
+              title={t(locale, 'common.permission.locked')}
+              description={t(locale, 'common.permission.managerOnly')}
             />
           ) : session.access.staff && viewerIsManager && onCash ? (
             <PaymentPromisesSection locale={locale} />

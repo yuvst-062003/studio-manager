@@ -95,13 +95,21 @@ def create_class(_: ManagerOrOwner, body: ClassCreate, session: TenantSessionDep
 @router.get("/groups", response_model=GroupListResponse)
 def list_groups(
     _: AnyStaff,
+    request: Request,
     session: TenantSessionDep,
     class_id: uuid.UUID | None = None,
+    mine: bool = False,
     cursor: uuid.UUID | None = None,
     limit: int = Query(default=DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
 ) -> GroupListResponse:
     rows, next_cursor = StructureService.list_groups(
-        session, class_id=class_id, cursor=cursor, limit=limit
+        session,
+        class_id=class_id,
+        # `mine` asks "which groups do I coach" — 9e's identity block. Answered from
+        # `group_staff`, so a manager with no assignment gets an honest empty list.
+        staff_person_id=getattr(request.state, "person_id", None) if mine else None,
+        cursor=cursor,
+        limit=limit,
     )
     return GroupListResponse(
         items=[GroupOut.model_validate(r, from_attributes=True) for r in rows],
