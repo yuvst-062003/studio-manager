@@ -32,7 +32,7 @@ column, below the card. The footer is a sibling of the content column, not part 
 | **Default (the only one the canvas draws)** | Everything above, populated. |
 | **Loading** | **Not drawn.** The screen is reached after a completed POST, so it has no loading state of its own. If the lane arrives here by client-side route with the booking not yet confirmed, that is a new state and needs a decision. |
 | **Empty** | Not applicable — there is no list. |
-| **Error** | **Not drawn, and this is a real gap.** `13a`'s submit can fail; the canvas has no failure counterpart to this screen. The lane should keep the failure on `13a` (inline, next to the submit button) rather than invent a sad-path `13b`. |
+| **Error** | **Resolved as drawn-elsewhere (L7, 2026-08-27):** the failure lives on `13a`, inline next to the submit button, without clearing the form. This screen renders only after a 201 and has no sad path of its own. |
 | **Already booked** | Not drawn. `people.trial.override` / `people.trial.overrideHint` exist for a second free trial, but that decision is a manager's and does not surface here. |
 
 ## Tokens by role

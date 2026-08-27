@@ -68,9 +68,12 @@ built. G4 forbids inlining, so the choice cannot be deferred to the component.
 
 ## States
 
-Same as `13a`, with the same gaps: no loading, no field validation, no submit-in-flight, no error,
-no "no slots" state. The chip group draws selected · unselected — **no waitlist**, and the schedule
-cards carry **no availability line at all**. See `13a`'s capacity decision.
+Same as `13a`, and BUILT with it (L7, 2026-08-27) — one component serves both widths, so
+`13a`'s States table above is this artboard's too: loading, 404-vs-503, no-slots,
+submit-in-flight, disabled-until-complete validation, and the inline submit failure that
+never clears the form. The chip group draws selected · unselected · disabled (a cancelled
+slot is greyed, never hidden) — **no waitlist**, and the schedule cards carry **no
+availability line at all**. See `13a`'s capacity decision.
 
 The **WhatsApp contact row carries no pointer affordance** in the markup, unlike mobile's WhatsApp
 button. Whether it is clickable here is undecided.

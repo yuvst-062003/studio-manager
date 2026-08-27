@@ -41,13 +41,17 @@ styled as unselected. **There is no waitlist state** — see the capacity decisi
 
 ## States
 
+Recorded as BUILT (L7, 2026-08-27) — the artboard drew a happy path only; what ships is:
+
 | State | What renders |
 |---|---|
-| **No slots in this group** | **Not drawn.** `people.landing.noSlots` and `landing.noSlotsHint` exist for it. |
-| **Loading** | **Not drawn.** |
-| **Submitting** | **Not drawn** on the button. `people.landing.submitting` exists. |
-| **Validation error** | **Not drawn** on any field. |
-| **Submit failure** | **Not drawn**, and `13b` has no sad-path twin — so the failure has to live here, inline. |
+| **Page loading** | `landing-loading` — a single line while the payload arrives. |
+| **404 / 503** | Told apart, deliberately: `not-found` ("no such club") vs `no-schedule` ("the schedule is still being built"). One message for both would send somebody to the wrong club looking for a typo. |
+| **No slots in this group** | `people.landing.noSlots` renders in place of the chips; the booking may still be sent — the manager places the child by hand. |
+| **Loading (slots)** | The chips arrive with the step; a failed fetch is a `schedule_unavailable` error inline. |
+| **Submitting** | The submit button relabels to `people.landing.submitting` and disables. |
+| **Validation** | Continue/submit are DISABLED until the step is complete, with the missing thing visible (empty field, unchecked declaration, unpicked slot). No red-text field errors: nothing can be submitted wrong, so there is nothing to scold. |
+| **Submit failure** | Inline `Alert` naming the case — 409 already-used, 429 rate-limited, 503 schedule, generic — **without clearing the form**. The chosen slot stays chosen; `13b` has no sad-path twin, so the failure lives here. |
 | **Group full** | **Does not exist.** A group has no cap — see the capacity decision below. |
 
 **There is no sign-in affordance anywhere on this artboard.** No login, no "already registered".
