@@ -246,6 +246,7 @@ export const TOKEN_ROLES: Record<string, TokenRole> = {
   '--text-body': { tier: 'structural', group: 'type', obligation: NO_COLOUR, note: '14px — buttons, inputs, toast, prose.' },
   '--text-title': { tier: 'structural', group: 'type', obligation: NO_COLOUR, note: '15px — list-row names, section titles.' },
   '--text-display': { tier: 'structural', group: 'type', obligation: NO_COLOUR, note: '24px — page titles.' },
+  '--text-hero': { tier: 'structural', group: 'type', obligation: NO_COLOUR, note: 'L2 — landing hero headline. Fluid 36px→52px (13a at 390, 13c at 1440), clamp so one component serves both.' },
   '--leading-tight': { tier: 'structural', group: 'type', obligation: NO_COLOUR, note: '1 — single-line controls.' },
   '--leading-snug': { tier: 'structural', group: 'type', obligation: NO_COLOUR, note: '1.2 — list-row names.' },
   '--leading-normal': { tier: 'structural', group: 'type', obligation: NO_COLOUR, note: '1.4 — alert body.' },

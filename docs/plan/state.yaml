@@ -605,13 +605,16 @@ waves:
         on: 2026-08-27
       - id: L0
         title: Landing — re-verify; SHELL was the 503 empty state
-        status: pending
+        status: shipped
+        on: 2026-08-27
       - id: L1
         title: Landing — phone and time-of-day API fields
-        status: pending
+        status: shipped
+        on: 2026-08-27
       - id: L2
         title: Landing — display token, SlotChips, BeltBar ladder variant
-        status: pending
+        status: shipped
+        on: 2026-08-27
       - id: L3
         title: Landing — cut the stats strip from the canvas
         status: pending

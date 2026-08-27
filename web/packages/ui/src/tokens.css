@@ -67,6 +67,9 @@
   --text-body: 0.875rem;
   --text-title: 0.9375rem;
   --text-display: 1.5rem;
+  /* L2 — the landing hero. Fluid between 13a's 36px (390px) and 13c's 52px (1440px),
+   * so one component serves both artboards with no media query. */
+  --text-hero: clamp(2.25rem, 5vw, 3.25rem);
   --leading-tight: 1;
   --leading-snug: 1.2;
   --leading-normal: 1.4;

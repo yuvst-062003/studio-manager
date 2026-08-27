@@ -66,6 +66,28 @@ def studio_weekday(moment: datetime) -> int:
     return (moment.astimezone(STUDIO_ZONE).weekday() + 1) % 7
 
 
+def training_start_times(
+    group_id: uuid.UUID,
+    *,
+    since: date,
+    schedule: ScheduleReader,
+    weeks: int = OBSERVATION_WEEKS,
+) -> frozenset[str]:
+    """The wall-clock times this group trains, as `HH:MM` in Asia/Jerusalem.
+
+    Landing L1 — region 4 renders `ראשון וחמישי · 16:00`, and a set is the honest shape:
+    a group that trains 16:00 on Sunday and 17:00 on Thursday has two times, and picking
+    one would print a wrong one. Same seam, same window and same statuses as
+    `training_weekdays`, for the same reasons.
+    """
+    sessions = schedule.materialize_sessions(group_id, since, since + timedelta(weeks=weeks))
+    return frozenset(
+        session.starts_at.astimezone(STUDIO_ZONE).strftime("%H:%M")
+        for session in sessions
+        if session.status in _TRAINING_STATUSES
+    )
+
+
 def training_weekdays(
     group_id: uuid.UUID,
     *,

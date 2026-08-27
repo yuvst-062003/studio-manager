@@ -1,8 +1,8 @@
-import { screen } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { contrastRatio } from '../contrast'
 import { DIRECTIONS, THEMES, renderIn } from '../testing'
-import { BeltBar } from './BeltBar'
+import { BeltBar, BeltLadder } from './BeltBar'
 
 /** The belts the contrast audit measured. Per-studio data, never tokens (D3, §5.9). */
 const BELTS = {
@@ -94,5 +94,34 @@ describe('why the ring is unconditional — the numbers, recomputed', () => {
   it('and loses brown and green on dark, which the canvas review never measured', () => {
     expect(contrastRatio(BELTS.brown, '#141311')).toBeLessThan(3)
     expect(contrastRatio(BELTS.green, '#141311')).toBeLessThan(3)
+  })
+})
+
+
+describe('BeltLadder (L2)', () => {
+  const LADDER = [
+    { colorHex: '#fffefb', label: 'לבנה' },
+    { colorHex: '#f5d000', label: 'צהובה' },
+    { colorHex: '#e07020', label: 'כתומה', secondaryColorHex: '#1f6b3f' },
+    { colorHex: '#17150f', label: 'שחורה' },
+  ]
+
+  it('renders the whole ladder, each belt with its ring, no current marker', () => {
+    render(<BeltLadder items={LADDER} />)
+    const bars = screen.getAllByRole('img')
+    expect(bars).toHaveLength(4)
+    for (const bar of bars) {
+      // D7 through composition: the ladder is BeltBars, so the ring is unconditional —
+      // the white belt at 1.08:1 on the light ground is the first belt on every ladder.
+      expect(bar).toHaveStyle({
+        boxShadow: 'inset 0 0 0 var(--belt-ring-width) var(--belt-ring)',
+      })
+    }
+    expect(screen.queryByText(/נוכחית|current/)).toBeNull()
+  })
+
+  it('renders colours from the DATA, not from any palette of its own', () => {
+    render(<BeltLadder items={[{ colorHex: '#123456', label: 'בדיקה' }]} />)
+    expect(screen.getByRole('img', { name: 'בדיקה' })).toHaveStyle({ background: '#123456' })
   })
 })

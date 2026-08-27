@@ -122,6 +122,7 @@ def _group_out(group: PublicGroup) -> PublicGroupOut:
         age_min=group.age_min,
         age_max=group.age_max,
         training_weekdays=group.training_weekdays,
+        training_times=group.training_times,
     )
 
 
@@ -165,6 +166,7 @@ def _landing(slug: str, session: SessionDep) -> PublicLandingOut:
         headline=landing_blob.get("headline"),
         about=landing_blob.get("about"),
         address=landing_blob.get("address"),
+        phone=landing_blob.get("phone"),
         # Empty until something writes `settings.landing.photo_object_keys`. The setup
         # wizard has no photo step yet, and inventing a gallery it cannot feed would be a
         # feature that exists only in a schema.

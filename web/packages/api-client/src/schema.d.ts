@@ -8074,6 +8074,11 @@ export interface components {
          *     shop window on the open internet. No class id, no staff, no enrollment count.
          *     `training_weekdays` is here because parent `13a` shows "מתאמנים בימים" beside each
          *     group, and because §5.4a filters groups by the child's age where a range is set.
+         *
+         *     `training_times` was added for landing L1 (2026-08-27): region 4 and `13c`'s schedule
+         *     cards draw `days · HH:MM`, and a class's hour is already public information — it is on
+         *     the flyer. It comes through the schedule seam like `training_weekdays`. Nothing else
+         *     has been added, and nothing else should be: the narrowness is the contract.
          */
         PublicGroupOut: {
             /** Age Max */
@@ -8089,6 +8094,8 @@ export interface components {
             id: string;
             /** Name */
             name: string;
+            /** Training Times */
+            training_times?: string[];
             /** Training Weekdays */
             training_weekdays?: number[];
         };
@@ -8110,6 +8117,8 @@ export interface components {
             headline: string | null;
             /** Logo Url */
             logo_url: string | null;
+            /** Phone */
+            phone?: string | null;
             /** Photo Urls */
             photo_urls?: string[];
             /** Slug */
@@ -12386,6 +12395,7 @@ export interface operations {
         parameters: {
             query?: {
                 class_id?: string | null;
+                mine?: boolean;
                 cursor?: string | null;
                 limit?: number;
             };

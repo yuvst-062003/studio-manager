@@ -104,6 +104,31 @@ def test_a_group_carries_the_days_it_trains(client, studio, a_group, with_slots)
     assert group["training_weekdays"] == [0, 3]
 
 
+def test_a_group_carries_the_times_it_trains(client, studio, a_group, with_slots):
+    """L1 -- region 4 and 13c's schedule cards draw `days · HH:MM`. 14:00 UTC in September
+    is 17:00 in Jerusalem; both fixture sessions start then, so the set has one member."""
+    groups = client.get(f"/api/v1/public/studios/{studio.slug}/groups").json()["items"]
+    group = next(g for g in groups if uuid.UUID(g["id"]) == a_group)
+    assert group["training_times"] == ["17:00"]
+
+
+def test_the_landing_carries_the_clubs_phone_from_settings(
+    client, app_session, studio, with_slots
+):
+    """L1 -- the hero brand row, 13c's top bar, both WhatsApp affordances and the footer.
+    Read from `studio.settings.landing` beside headline/about/address; a club that has not
+    filled it in gets null, never a placeholder."""
+    before = client.get(f"/api/v1/public/studios/{studio.slug}/landing").json()
+    assert before["phone"] is None
+
+    studio.settings = {**(studio.settings or {}), "landing": {"phone": "052-1234567"}}
+    app_session.add(studio)
+    app_session.commit()
+
+    after = client.get(f"/api/v1/public/studios/{studio.slug}/landing").json()
+    assert after["phone"] == "052-1234567"
+
+
 def test_the_studio_route_and_the_landing_route_agree(client, studio, with_slots):
     """§7 lists both. Two shapes to keep in step would be two chances to drift."""
     a = client.get(f"/api/v1/public/studios/{studio.slug}").json()

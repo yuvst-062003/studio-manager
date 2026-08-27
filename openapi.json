@@ -7659,7 +7659,7 @@
         "type": "object"
       },
       "PublicGroupOut": {
-        "description": "§7 — `GET /public/studios/{slug}/groups`, unauthenticated.\n\nA deliberately narrow projection, for the same reason `TrialSlotOut` is one: this is a\nshop window on the open internet. No class id, no staff, no enrollment count.\n`training_weekdays` is here because parent `13a` shows \"מתאמנים בימים\" beside each\ngroup, and because §5.4a filters groups by the child's age where a range is set.",
+        "description": "§7 — `GET /public/studios/{slug}/groups`, unauthenticated.\n\nA deliberately narrow projection, for the same reason `TrialSlotOut` is one: this is a\nshop window on the open internet. No class id, no staff, no enrollment count.\n`training_weekdays` is here because parent `13a` shows \"מתאמנים בימים\" beside each\ngroup, and because §5.4a filters groups by the child's age where a range is set.\n\n`training_times` was added for landing L1 (2026-08-27): region 4 and `13c`'s schedule\ncards draw `days · HH:MM`, and a class's hour is already public information — it is on\nthe flyer. It comes through the schedule seam like `training_weekdays`. Nothing else\nhas been added, and nothing else should be: the narrowness is the contract.",
         "properties": {
           "age_max": {
             "anyOf": [
@@ -7702,6 +7702,13 @@
           "name": {
             "title": "Name",
             "type": "string"
+          },
+          "training_times": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Training Times",
+            "type": "array"
           },
           "training_weekdays": {
             "items": {
@@ -7780,6 +7787,17 @@
               }
             ],
             "title": "Logo Url"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
           },
           "photo_urls": {
             "items": {
@@ -16203,6 +16221,16 @@
                 }
               ],
               "title": "Class Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "mine",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Mine",
+              "type": "boolean"
             }
           },
           {

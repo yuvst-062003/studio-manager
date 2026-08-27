@@ -478,6 +478,11 @@ class PublicGroupOut(BaseModel):
     shop window on the open internet. No class id, no staff, no enrollment count.
     `training_weekdays` is here because parent `13a` shows "מתאמנים בימים" beside each
     group, and because §5.4a filters groups by the child's age where a range is set.
+
+    `training_times` was added for landing L1 (2026-08-27): region 4 and `13c`'s schedule
+    cards draw `days · HH:MM`, and a class's hour is already public information — it is on
+    the flyer. It comes through the schedule seam like `training_weekdays`. Nothing else
+    has been added, and nothing else should be: the narrowness is the contract.
     """
 
     id: uuid.UUID
@@ -486,6 +491,8 @@ class PublicGroupOut(BaseModel):
     age_min: int | None
     age_max: int | None
     training_weekdays: list[Weekday] = Field(default_factory=list)
+    #: Distinct wall-clock start times, `HH:MM`, Asia/Jerusalem, sorted.
+    training_times: list[str] = Field(default_factory=list)
 
 
 class PublicGroupListResponse(BaseModel):
@@ -508,6 +515,10 @@ class PublicLandingOut(BaseModel):
     headline: str | None
     about: str | None
     address: str | None
+    #: L1 (2026-08-27) — the hero brand row, `13c`'s top bar, both WhatsApp affordances
+    #: and the footer all need it. Read from `studio.settings.landing` beside the three
+    #: above; a club that has not filled it in gets null and the affordances stay off.
+    phone: str | None = None
     photo_urls: list[str] = Field(default_factory=list)
     groups: list[PublicGroupOut] = Field(default_factory=list)
 

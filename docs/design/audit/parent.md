@@ -254,6 +254,22 @@ Build: belt with date and next exam; an **8-session attendance strip** with coun
 
 ## Log
 
+### 2026-08-27 · L0 — the landing's SHELL verdict was a 503 empty state
+
+The audit measured `/t/<slug>` at "10 lines, 157 characters — byte-identical at 390px and
+1440px" and filed it SHELL. **The page is not a shell.** `PublicLanding.tsx` renders logo,
+name, headline, about, address and group cards; the captured studio had no active training
+year, `public.py` answered `schedule_unavailable` (503), and the page rendered its
+`no-schedule` empty state — which is byte-identical at both widths for the obvious reason.
+This is the measurement trap the audit README itself warns about (a second `buildScenario`
+closes the first training year). Two downstream claims fall with it: "groups must be
+published to the landing" describes a feature that neither exists nor is needed
+(`landing.py` filters on `is_active` alone), and "shipped renders the mobile layout at
+every width" is wrong — the auto-fit grid collapses. Verified this pass against seeded
+data through the API tests (`tests/people/test_public.py` — 200 with groups, days and
+now times) and the component tests rendering the full payload. Do not re-file the 503
+state as SHELL at the next capture.
+
 ### 2026-08-27 · P0 + P12 — the re-verify closed, and this file's functional dimension
 
 **P0's four corrections held, and the drift continued as predicted.** The three "404

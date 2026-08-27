@@ -454,6 +454,82 @@
   outline-offset: 2px;
 }
 
+.studio-belt-ladder {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* L2 — the landing slot picker. Wraps where the segmented track clips. */
+.studio-slot-chips {
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.studio-slot-chips__legend {
+  block-size: 1px;
+  clip-path: inset(50%);
+  inline-size: 1px;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+}
+
+.studio-slot-chips__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.studio-slot-chips__chip {
+  display: inline-flex;
+}
+
+.studio-slot-chips__label {
+  border: var(--border-width-hairline) solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  color: var(--fg);
+  cursor: pointer;
+  font-size: var(--text-label);
+  /* §6.2's thumb rule — a chip is a tap target. */
+  min-block-size: 44px;
+  display: inline-flex;
+  align-items: center;
+  padding-block: 7px;
+  padding-inline: var(--space-4);
+}
+
+.studio-slot-chips__chip[data-selected="true"] .studio-slot-chips__label {
+  background: var(--fg);
+  border-color: var(--fg);
+  color: var(--on-fg);
+  font-weight: var(--weight-medium);
+}
+
+/* Greyed, never hidden — §5.4's rule about cancelled slots. */
+.studio-slot-chips__chip[data-disabled="true"] .studio-slot-chips__label {
+  background: var(--disabled-surface);
+  border-color: var(--border);
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+.studio-slot-chips__input {
+  block-size: 1px;
+  clip-path: inset(50%);
+  inline-size: 1px;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+}
+
+.studio-slot-chips__chip:has(.studio-slot-chips__input:focus-visible) {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-pill);
+}
+
 .studio-empty {
   align-items: center;
   border: var(--border-width-hairline) dashed var(--border-strong);

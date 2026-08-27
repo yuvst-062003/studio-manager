@@ -31,7 +31,7 @@ from app.models.schedule import Session as SessionRow
 from app.models.structure import Class, Group
 from app.models.studio import Studio
 from app.services.people.errors import NotFoundError
-from app.services.people.group_days import ScheduleReader, training_weekdays
+from app.services.people.group_days import ScheduleReader, training_start_times, training_weekdays
 
 #: §5.4a step 4 -- 'the next N upcoming sessions of each chosen group'. Six weeks is long
 #: enough that a group training once a week still offers a real choice, and short enough
@@ -50,6 +50,7 @@ class PublicGroup:
     age_min: int | None
     age_max: int | None
     training_weekdays: list[int]
+    training_times: list[str]
 
 
 class LandingService:
@@ -121,6 +122,9 @@ class LandingService:
                 age_max=group.age_max,
                 training_weekdays=sorted(
                     training_weekdays(group.id, since=since, schedule=schedule)
+                ),
+                training_times=sorted(
+                    training_start_times(group.id, since=since, schedule=schedule)
                 ),
             )
             for group in rows

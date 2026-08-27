@@ -54,3 +54,32 @@ export function BeltBar({
     />
   )
 }
+
+/**
+ * L2 — the landing hero's belt strip: the WHOLE ladder, no "current" marker.
+ *
+ * Colours come from `belt_rank.color_hex` — per-studio data, like `BeltBar`'s fill — and
+ * never from the canvas: the design file carries two conflicting belt palettes and draws
+ * the black belt near-white, which is a bug in the drawing. Composing `BeltBar` is what
+ * keeps D7's ring unconditional here too; a white belt with no ring sits at 1.08:1 on the
+ * light ground, and the first belt on the ladder is always white.
+ */
+export function BeltLadder({
+  items,
+}: {
+  items: readonly { colorHex: string; label: string; secondaryColorHex?: string | null }[]
+}) {
+  return (
+    <span className="studio-belt-ladder" data-testid="belt-ladder" role="list">
+      {items.map((item) => (
+        <span key={item.label} role="listitem">
+          <BeltBar
+            colorHex={item.colorHex}
+            label={item.label}
+            secondaryColorHex={item.secondaryColorHex ?? undefined}
+          />
+        </span>
+      ))}
+    </span>
+  )
+}
