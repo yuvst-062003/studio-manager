@@ -153,9 +153,21 @@ export default function App() {
   // §6.1 step 6 — "offline prime: today's and tomorrow's sessions + rosters are fetched and
   // written to IndexedDB BEFORE the coach reaches Today", and "the first launch BLOCKS on
   // this fetch". The gate below renders instead of the app while it runs.
-  const priming = useOfflinePriming(attendanceClient)
+  const priming = useOfflinePriming(
+    attendanceClient,
+    undefined,
+    // S4.2 — one bootstrap call, AFTER the session resolves.
+    session.status === 'signed-in',
+  )
   const hash = useHash()
   const today = useToday()
+
+  // S4.3 — the bare hash redirects EXPLICITLY rather than falling through in silence:
+  // the date picker (9b, on the schedule screen) is where a coach picks the session to
+  // mark, and now the URL says so too.
+  useEffect(() => {
+    if (hash === '#/attendance') globalThis.location.hash = '#/schedule'
+  }, [hash])
   // 9a's filter defaults from who is looking: a coach opening the app wants their own day,
   // a manager wants the club's. Both facts come off the ACTIVE membership — the same place
   // features/identity/Resolve.tsx reads `owner` from — because `Session` itself is

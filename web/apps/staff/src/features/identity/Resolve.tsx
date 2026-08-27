@@ -70,16 +70,24 @@ export function Resolve({
 }) {
   const [dismissedAt, setDismissedAt] = useState<string | null | undefined>(undefined)
 
+  // S4.1 — §3.2 keeps /setup at owner and manager, and decideOutcome routes only an
+  // OWNER into the wizard. Asking anyway meant every coach took a 403 on every screen,
+  // on every launch. A question whose answer cannot change the outcome is not asked.
+  const activeMembership = session.studios.find((s) => s.studio_id === session.activeStudioId)
+  const isOwner = activeMembership?.roles.includes('owner') ?? false
+
   useEffect(() => {
     if (!session.access.staff) return
+    if (!isOwner) {
+      setDismissedAt(NEVER_ROUTE)
+      return
+    }
     let alive = true
     void (async () => {
       try {
         const response = await apiFetch('/api/v1/setup')
         if (!alive) return
         if (!response.ok) {
-          // 403 is the ordinary answer for a coach: §3.2 keeps setup at owner and
-          // manager. Treated as "not my business" rather than as an error.
           setDismissedAt(NEVER_ROUTE)
           return
         }
@@ -96,7 +104,7 @@ export function Resolve({
     return () => {
       alive = false
     }
-  }, [session.access.staff])
+  }, [session.access.staff, isOwner])
 
   const outcome = decideOutcome(session, dismissedAt)
 

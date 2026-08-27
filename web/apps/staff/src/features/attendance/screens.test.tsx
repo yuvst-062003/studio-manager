@@ -265,6 +265,24 @@ describe('§6.1 — offline priming blocks the first launch', () => {
     expect(await screen.findByTestId('today')).toBeInTheDocument()
   })
 
+  it('waits for the session to resolve before its first bootstrap call (S4.2)', async () => {
+    // The prime used to fire on mount, racing /auth/refresh — four 401'd bootstrap calls
+    // per cold start. `enabled` is the session gate: nothing until the session resolves,
+    // then exactly one call.
+    function GatedHarness({ client, enabled }: { client: StaffAttendanceClient; enabled: boolean }) {
+      const { state } = useOfflinePriming(client, () => NOW, enabled)
+      return state === 'ready' ? <span data-testid="today" /> : null
+    }
+    const bootstrap = vi.fn().mockResolvedValue(payload)
+    const { rerender } = render(<GatedHarness client={client(bootstrap)} enabled={false} />)
+    await new Promise((r) => setTimeout(r, 20))
+    expect(bootstrap).not.toHaveBeenCalled()
+
+    rerender(<GatedHarness client={client(bootstrap)} enabled={true} />)
+    await screen.findByTestId('today')
+    expect(bootstrap).toHaveBeenCalledOnce()
+  })
+
   it('does not block a second launch on the same day', async () => {
     // §6.1's gate is about the FIRST launch. A coach opening the app for the fourth time
     // today has the rosters and should not watch a spinner for them.

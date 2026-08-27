@@ -230,6 +230,33 @@ link that must be signed `לפני עלייה למזרן`.
 
 ## Log
 
+### 2026-08-27 · S4 — three of the four defects closed, the fourth sequenced
+
+**The coach 403.** The spec pointed at the ungated `<SetupWizard>` mount at `App.tsx:366`,
+but that element is a prop — `Resolve` renders it only on the owner-only `'wizard'` outcome,
+so its effect never ran for a coach. The actual per-launch 403 was `Resolve`'s **own**
+`GET /setup` read, which fired for every staff identity even though `decideOutcome` can only
+route an OWNER into the wizard — the answer could not change the outcome for anyone else.
+`Resolve` now asks `/setup` only when the active membership includes `owner`; everyone else
+resolves straight to the tour. Decision recorded: a coach never sees the setup wizard —
+§3.2 keeps setup at owner/manager, and §5.1's wizard is the owner's first-accept flow
+specifically. A manager configures from Settings. Test: a coach session renders `Resolve`
+with a fetch spy and the spy is never called at all.
+
+**The 401 race.** `useOfflinePriming` fired on mount, racing `/auth/refresh` — four 401'd
+bootstrap calls per cold start. The hook now takes an `enabled` flag and the staff app
+passes `session.status === 'signed-in'`, so the first bootstrap call happens after the
+session resolves, exactly once — asserted by a gated-harness test (nothing while disabled,
+one call after the flip).
+
+**The bare hash.** `#/attendance` fell through in silence to whatever `Resolve` rendered.
+It now redirects explicitly to `#/schedule`, where the date picker (9b) is — the screen
+where a coach picks the session to mark. Test asserts the redirect.
+
+**The tour over empty screens (S4.4)** is sequenced last per the spec's own advice: S4.3
+just filled `#/attendance`, S7 fills `#/` with Today content, and S10 gives `#/cash` and
+`#/join-link` visible refusals. Re-verified after those land — see the S7/S10 entries.
+
 ### 2026-08-27 · S2 + S3 — the post-lesson surface exists, and the card has two doors
 
 **What was wrong.** Seven built, tested components were referenced only by their barrels —

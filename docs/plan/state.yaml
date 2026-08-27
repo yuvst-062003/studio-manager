@@ -569,7 +569,8 @@ waves:
         on: 2026-08-27
       - id: S4
         title: Staff — four defects (403, 401 race, bare attendance hash, tour)
-        status: pending
+        status: shipped
+        on: 2026-08-27
       - id: S5
         title: Staff — offline made visible
         status: pending

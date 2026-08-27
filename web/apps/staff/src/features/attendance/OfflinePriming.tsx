@@ -23,6 +23,10 @@ import type { StaffAttendanceClient } from './client'
 export function useOfflinePriming(
   client: StaffAttendanceClient,
   clock: () => string = () => new Date().toISOString(),
+  /** S4.2 — the prime WAITS for a resolved session. It used to race `/auth/refresh`,
+   *  firing bootstrap four times into 401s on every cold start — self-healing, but four
+   *  logged auth failures and a slower first paint on the app that most needs one. */
+  enabled = true,
 ): { state: PrimeState; retry: () => void } {
   const [state, setState] = useState<PrimeState>('idle')
 
@@ -54,6 +58,7 @@ export function useOfflinePriming(
     // than saying so here. The rule's own guidance — "subscribe for updates from some
     // external system, calling setState in a callback" — is exactly what this is; the
     // external system is the network and IndexedDB.
+    if (!enabled) return
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void prime()
     // §6.1 — "it re-runs on every foreground resume". `visibilitychange` rather than
@@ -64,7 +69,7 @@ export function useOfflinePriming(
     }
     document.addEventListener('visibilitychange', onVisible)
     return () => document.removeEventListener('visibilitychange', onVisible)
-  }, [prime])
+  }, [prime, enabled])
 
   return { state, retry: () => void prime() }
 }

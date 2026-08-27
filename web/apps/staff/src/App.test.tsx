@@ -59,6 +59,15 @@ describe('staff app', () => {
     await waitFor(() => expect(screen.getByTestId('sign-in')).toBeInTheDocument())
   })
 
+  it('redirects a bare #/attendance to the schedule rather than falling through (S4.3)', async () => {
+    // S4.3 — the deep-link prefix with no session id used to fall through in silence to
+    // whatever Resolve rendered. The date picker on the schedule screen is where a coach
+    // picks a session, so that is where the bare hash now lands, explicitly.
+    globalThis.location.hash = '#/attendance'
+    render(<App />)
+    await waitFor(() => expect(globalThis.location.hash).toBe('#/schedule'))
+  })
+
   it('renders no dev bar without a developer identity', () => {
     // §19.4 — 'Rendered only when the authenticated identity has is_developer.'
     render(<App />)

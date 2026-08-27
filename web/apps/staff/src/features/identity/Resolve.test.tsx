@@ -107,6 +107,22 @@ describe('decideOutcome', () => {
 })
 
 describe('Resolve', () => {
+  it('never asks /setup on behalf of a coach (S4.1)', async () => {
+    // §3.2 keeps /setup at owner+manager and decideOutcome routes only an OWNER into the
+    // wizard — so asking for anyone else bought a guaranteed 403 on every launch.
+    const fetchSpy = vi.fn(async () => new Response('', { status: 403 }))
+    vi.stubGlobal('fetch', fetchSpy)
+    render(
+      <Resolve
+        session={session({ studios: [{ ...BASE_STUDIO, roles: ['coach'] }] })}
+        locale="he"
+        wizard={<p data-testid="wizard-stub" />}
+      />,
+    )
+    await waitFor(() => expect(screen.getByTestId('staff-tour')).toBeInTheDocument())
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
   it('shows the refusal to an identity with no role assignment', async () => {
     render(
       <Resolve
