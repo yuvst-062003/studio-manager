@@ -266,6 +266,13 @@ export function RosterScreen({
 
       <footer>
         <p data-testid="roster-edit-anytime">{t(locale, 'attendance.roster.editAnytime')}</p>
+        {/* S2 — the register's exits. `9g` is the step after taking a register; `11a`
+            and `11b` are in-lesson actions and belong on the session, not on `#/cash`. */}
+        <nav aria-label={t(locale, 'attendance.summary.whatNext')} data-testid="roster-actions">
+          <a href={`#/attendance/${sessionId}/summary`}>{t(locale, 'attendance.summary.title')}</a>
+          <a href={`#/attendance/${sessionId}/handover`}>{t(locale, 'billing.product.handOut')}</a>
+          <a href={`#/attendance/${sessionId}/trial`}>{t(locale, 'people.trial.addDuringClass')}</a>
+        </nav>
       </footer>
     </section>
   )

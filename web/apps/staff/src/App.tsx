@@ -49,9 +49,21 @@ import {
   registerAttendanceSections,
   useOfflinePriming,
 } from './features/attendance'
+// S2 — the in-session screens (9g, 11a, 11b) and the student card (9c/2d), each behind
+// a hash a coach can actually reach.
+import { SessionSummarySection } from './features/attendance/SessionSummarySection'
+import { HandOverSection } from './features/billing/HandOverSection'
+import { TrialSection } from './features/people/TrialSection'
+import { StudentCardRoute } from './features/people/StudentCardRoute'
 import { useQueueFlusher } from './features/attendance/useQueueFlusher'
 import { registerHealthSections } from './features/health'
-import { AtRiskAlert, makeStaffCommsClient, registerCommsSections } from './features/comms'
+import {
+  AtRiskAlert,
+  CoachCalendarFeed,
+  NotificationPreferences,
+  makeStaffCommsClient,
+  registerCommsSections,
+} from './features/comms'
 import { StaffAlerts } from './StaffAlerts'
 import './features/attendance/attendance.css'
 
@@ -176,8 +188,15 @@ export default function App() {
   const onJoinLink = hash === '#/join-link'
   // §5.7's register, opened from a session. The id is in the hash so the back button works
   // and a link survives a reload — the same shape both W2 lanes settled on, and the reason
-  // NAV's `/attendance` entry became a hash below.
-  const rosterSessionId = hash.startsWith('#/attendance/') ? hash.slice('#/attendance/'.length) : null
+  // NAV's `/attendance` entry became a hash below. A second segment picks the in-session
+  // screen (S2): `summary` (9g), `handover` (11a), `trial` (11b); none means the register.
+  const attendanceParts = hash.startsWith('#/attendance/')
+    ? hash.slice('#/attendance/'.length).split('/')
+    : []
+  const rosterSessionId = attendanceParts[0] || null
+  const sessionView = attendanceParts[1] ?? null
+  // `9c`/`2d` — the student card, from a roster row or the student list (S2/S3).
+  const cardStudentId = hash.startsWith('#/students/') ? hash.slice('#/students/'.length) : null
   // 9i's list, and 9d's result sheet behind `#/events/<id>`. Same shape as the roster
   // id above: the id is in the hash so the back button works and a link survives a reload.
   const onEvents = hash === '#/events'
@@ -221,7 +240,16 @@ export default function App() {
               : NAV
           }
           locale={locale}
-          drawerFooter={<AccountDrawerFooter locale={locale} onChooseLocale={setLocale} accountName={session.displayName} />}
+          drawerFooter={
+            // 9e — "אותה מגירה": M8's notification preferences and the coach's §5.12
+            // calendar feed live in the drawer they were designed for (S2), above the
+            // language/theme footer everyone shares.
+            <>
+              <NotificationPreferences client={commsClient} locale={locale} />
+              <CoachCalendarFeed client={commsClient} locale={locale} />
+              <AccountDrawerFooter locale={locale} onChooseLocale={setLocale} accountName={session.displayName} />
+            </>
+          }
           studios={session.studios.map((s) => ({
             studioId: s.studio_id,
             studioName: s.studio_name,
@@ -331,6 +359,27 @@ export default function App() {
             // without reopening anything here.
             priming.state !== 'ready' ? (
               <OfflinePrimingGate locale={locale} onRetry={priming.retry} state={priming.state} />
+            ) : sessionView === 'summary' ? (
+              <SessionSummarySection
+                client={attendanceClient}
+                locale={locale}
+                personId={membership?.person_id ?? null}
+                sessionId={rosterSessionId}
+              />
+            ) : sessionView === 'handover' ? (
+              <HandOverSection
+                attendanceClient={attendanceClient}
+                locale={locale}
+                sessionId={rosterSessionId}
+              />
+            ) : sessionView === 'trial' ? (
+              <TrialSection
+                attendanceClient={attendanceClient}
+                canGrantOverride={viewerIsManager}
+                client={peopleClient}
+                locale={locale}
+                sessionId={rosterSessionId}
+              />
             ) : (
               <RosterScreen
                 client={attendanceClient}
@@ -339,6 +388,13 @@ export default function App() {
                 sessionId={rosterSessionId}
               />
             )
+          ) : session.access.staff && cardStudentId ? (
+            <StudentCardRoute
+              attendanceClient={attendanceClient}
+              locale={locale}
+              peopleClient={peopleClient}
+              studentId={cardStudentId}
+            />
           ) : session.access.staff && hash.startsWith('#/schedule') ? (
             <ScheduleSection
               locale={locale}
@@ -353,7 +409,13 @@ export default function App() {
           ) : session.access.staff && viewerIsManager && onJoinLink ? (
             <JoinLinkSection locale={locale} />
           ) : session.access.staff && onStudents ? (
-            <StudentsSearch locale={locale} client={peopleClient} />
+            <StudentsSearch
+              locale={locale}
+              client={peopleClient}
+              onOpen={(studentId) => {
+                globalThis.location.hash = `#/students/${studentId}`
+              }}
+            />
           ) : session.access.staff && examEventId ? (
             <ExamResultsScreen client={eventsClient} eventId={examEventId} locale={locale} />
           ) : session.access.staff && onEvents ? (

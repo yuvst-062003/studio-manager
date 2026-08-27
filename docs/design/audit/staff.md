@@ -230,6 +230,39 @@ link that must be signed `לפני עלייה למזרן`.
 
 ## Log
 
+### 2026-08-27 · S2 + S3 — the post-lesson surface exists, and the card has two doors
+
+**What was wrong.** Seven built, tested components were referenced only by their barrels —
+the entire post-lesson and student-card surface. A coach finishing a class had nowhere to
+go; the register simply stayed open. Neither entry point to the student card existed, and
+`RosterRow`'s comment claimed `1c` wants the row to open the card while `1c`'s own spec says
+the whole row cycles the mark.
+
+**What was built (S2).**
+- `#/attendance/<id>/summary` routes `9g`, entered from the register's footer. Its
+  injury-report card — deferred by `9g` finding 1 "to whichever wave gives it a model" —
+  ships: `POST /sessions/{id}/injury-reports` notifies every guardian and every
+  manager/owner immediately under kind `health.injury` (the `health.` prefix is §5.11
+  always-on, so no switch can mute a hurt child), and the audit row carries the recipient
+  count and never the description. Online-only, mirroring the absence pre-report: a report
+  that syncs after everyone has gone home is not a report. The card renders only when a
+  real handler exists, and the submit disables offline.
+- `#/attendance/<id>/handover` routes `11a` from the session (not `#/cash`), narrowing the
+  roster to present marks. `#/attendance/<id>/trial` routes `11b`, taking the group off the
+  session. `#/students/<id>` routes `9c`, which renders `2d`'s slot sections.
+- `NotificationPreferences` and `CoachCalendarFeed` mount in the 9e drawer, above the
+  shared account footer — the drawer they were designed for.
+
+**What was built (S3).** The roster row grew a shell: the row's tap stays the mark cycle
+(`1c` line 41 — "the whole row cycles them on tap"), and a named per-child link at the
+inline end opens the card. `StudentsSearch` rows already supported `onOpen`; the app now
+passes it. Both doors lead to the same `#/students/<id>`.
+
+**Stale claims.** `SessionSummary`'s header said the injury report "cannot be built from a
+card" for want of a model — the model existed (notifications + audit); rewritten.
+`register.ts`'s "M5's container is not merged yet" was two waves stale; rewritten in S1.
+
+
 ### 2026-08-27 · S1 — the registrations that never ran, and the guard that keeps them running
 
 **What was wrong.** The app called one of its three slot-registration functions.

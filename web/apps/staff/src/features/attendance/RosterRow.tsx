@@ -19,7 +19,7 @@
 // chip, and this row is mark → flag + name + note → belt with no chip. The mismatch is
 // precisely why `roster-row` is a slot rather than a prop. `AttendanceMark` and `BeltBar`
 // are reused; the composite is built here.
-import { AttendanceMark, useSlot } from '@studio/ui'
+import { AttendanceMark, Icon, useSlot } from '@studio/ui'
 import type { AttendanceState } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
@@ -97,48 +97,64 @@ export function RosterRow({
   // protected from a stray tap. Both halves are needed: the server rule cannot see a thumb.
   const preReported = row.has_absence_report && row.status === 'absent_excused'
 
+  // S3 resolved `1c`'s two-jobs comment: the row's TAP is the mark cycle — `1c` line 41,
+  // "the whole row cycles them on tap" — and the card opens from a dedicated control at
+  // the inline end. A shell div holds the two, because a control inside a control is
+  // invalid HTML and unreachable to assistive tech.
   return (
-    <button
-      className="roster-row"
-      data-pre-reported={preReported ? 'true' : undefined}
-      data-status={row.status}
-      data-testid={`roster-row-${row.student_id}`}
-      // A <button>, never a div with onClick. `1c` says the row opens a student card and
-      // cycles a mark; a div is unreachable by keyboard and invisible to assistive tech,
-      // and this is the single most-used control in the product.
-      onClick={() => {
-        if (preReported) {
-          onOverride?.()
-          return
-        }
-        onCycle(nextStatus(row.status))
-      }}
-      type="button"
-    >
-      <AttendanceMark label={t(locale, MARK_LABEL[row.status])} state={GLYPH[row.status]} />
+    <div className="roster-row-shell">
+      <button
+        className="roster-row"
+        data-pre-reported={preReported ? 'true' : undefined}
+        data-status={row.status}
+        data-testid={`roster-row-${row.student_id}`}
+        // A <button>, never a div with onClick: a div is unreachable by keyboard and
+        // invisible to assistive tech, and this is the single most-used control in the
+        // product.
+        onClick={() => {
+          if (preReported) {
+            onOverride?.()
+            return
+          }
+          onCycle(nextStatus(row.status))
+        }}
+        type="button"
+      >
+        <AttendanceMark label={t(locale, MARK_LABEL[row.status])} state={GLYPH[row.status]} />
 
-      <span className="roster-row__text">
-        {/* <bdi>, as StudentRow already does: this row is Hebrew on 1c, and M3 fills it
-            with Latin names too. Mixed-direction text reorders without isolation (§9). */}
-        <bdi className="roster-row__name">{row.display_name}</bdi>
-        {/* `9f`'s per-row note line, whose text depends on state. The health flag is NOT
-            here — it arrives through the slot below, from M4's own file. */}
-        {preReported ? (
-          <span className="roster-row__note" data-note="pre-reported">
-            {t(locale, 'attendance.source.preReported')}
-          </span>
-        ) : null}
-        {row.status === 'unmarked' && !preReported ? (
-          <span className="roster-row__note" data-note="unmarked">
-            {t(locale, 'attendance.roster.unmarked')}
-          </span>
-        ) : null}
-      </span>
+        <span className="roster-row__text">
+          {/* <bdi>, as StudentRow already does: this row is Hebrew on 1c, and M3 fills it
+              with Latin names too. Mixed-direction text reorders without isolation (§9). */}
+          <bdi className="roster-row__name">{row.display_name}</bdi>
+          {/* `9f`'s per-row note line, whose text depends on state. The health flag is NOT
+              here — it arrives through the slot below, from M4's own file. */}
+          {preReported ? (
+            <span className="roster-row__note" data-note="pre-reported">
+              {t(locale, 'attendance.source.preReported')}
+            </span>
+          ) : null}
+          {row.status === 'unmarked' && !preReported ? (
+            <span className="roster-row__note" data-note="unmarked">
+              {t(locale, 'attendance.roster.unmarked')}
+            </span>
+          ) : null}
+        </span>
 
-      {/* Every section this wave and later waves register. Named nowhere. */}
-      {sections.map(({ key, render: Section }) => (
-        <Section key={key} locale={locale} row={row} />
-      ))}
-    </button>
+        {/* Every section this wave and later waves register. Named nowhere. */}
+        {sections.map(({ key, render: Section }) => (
+          <Section key={key} locale={locale} row={row} />
+        ))}
+      </button>
+      {/* Named per child — three identical "כרטיס חניך" links are indistinguishable to a
+          screen reader, the exact class `1c`'s a11y finding flags for icon-only controls. */}
+      <a
+        aria-label={`${t(locale, 'people.card.open')} · ${row.display_name}`}
+        className="roster-row__open-card"
+        data-testid={`roster-open-card-${row.student_id}`}
+        href={`#/students/${row.student_id}`}
+      >
+        <Icon name="students" size={18} />
+      </a>
+    </div>
   )
 }

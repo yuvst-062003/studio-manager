@@ -180,3 +180,26 @@
   flex-direction: column;
   gap: var(--space-3);
 }
+
+/* S3 — the shell that lets the mark cycle and the card-open control coexist without a
+   control inside a control. The button keeps the row's full hit area. */
+.roster-row-shell {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-1);
+}
+
+.roster-row-shell .roster-row {
+  flex: 1;
+  min-inline-size: 0;
+}
+
+.roster-row__open-card {
+  display: inline-flex;
+  align-items: center;
+  padding-inline: var(--space-2);
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  min-inline-size: 44px;
+  justify-content: center;
+}

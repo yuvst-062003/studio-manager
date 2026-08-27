@@ -22,11 +22,15 @@ from __future__ import annotations
 import uuid
 from collections.abc import Sequence
 from datetime import datetime
+from typing import cast
 
 from sqlalchemy import Select, select
 from sqlalchemy.orm import Session as OrmSession
 
+from app.core.tenancy import TenantSession
 from app.models.attendance import AbsenceReport, Attendance
+from app.models.people import Student
+from app.models.person import Guardian, Person, RoleAssignment
 from app.models.schedule import Session as SessionRow
 from app.schemas.attendance import (
     AbsenceReportIn,
@@ -48,6 +52,7 @@ from app.services.attendance.resolve import (
 from app.services.attendance.roster import RosterRowRaw, build_roster, require_session
 from app.services.attendance.schemas import AttendanceConflictOut, BatchResult
 from app.services.audit import AuditService
+from app.services.comms import NotificationService
 from app.services.schedule.service import ScheduleService
 
 #: §5.7 — "סמן הכל נוכח sets every `unmarked` row to `present`."
@@ -88,6 +93,76 @@ class AttendanceService:
             session=self._project_session(session_row, rows),
             roster=[self._project_row(row) for row in rows],
         )
+
+    def report_injury(
+        self,
+        session_id: uuid.UUID,
+        *,
+        student_id: uuid.UUID,
+        description: str,
+        actor_person_id: uuid.UUID | None,
+    ) -> int:
+        """`9g`'s injury report (S2) -- to the manager and the guardians IMMEDIATELY.
+
+        Online-only by design, like the parent's absence pre-report: an injury report
+        that syncs after everyone has gone home is not a report. The kind's `health.`
+        prefix makes it transactional under §5.11 -- no preference switch can mute a
+        child being hurt. The description travels in the notification, which is FOR the
+        manager and the guardians; the audit diff carries none of it, and neither does
+        any log line.
+        """
+        session_row = require_session(self.session, session_id)
+        student = self.session.get(Student, student_id)
+        if student is None:
+            raise NotFoundError(f"no student {student_id}")
+        person = self.session.get(Person, student.person_id)
+        display_name = f"{person.first_name} {person.last_name}" if person else ""
+
+        guardian_ids = set(
+            self.session.execute(
+                select(Guardian.person_id).where(Guardian.student_id == student_id)
+            ).scalars()
+        )
+        manager_ids = set(
+            self.session.execute(
+                select(RoleAssignment.person_id).where(
+                    RoleAssignment.role.in_(("owner", "manager")),
+                    RoleAssignment.scope_type == "studio",
+                    RoleAssignment.revoked_at.is_(None),
+                )
+            ).scalars()
+        )
+        recipients = (guardian_ids | manager_ids) - {actor_person_id}
+
+        # The router hands this service a TenantSession (TenantSessionDep); the class
+        # annotation is the broader OrmSession because every other method needs no more.
+        # The cast states the runtime fact rather than widening NotificationService.
+        notifier = NotificationService(cast(TenantSession, self.session))
+        for person_id in sorted(recipients, key=str):
+            notifier.enqueue(
+                person_id=person_id,
+                kind="health.injury",
+                title="דיווח פציעה בשיעור",
+                body=f"{display_name} — {description}",
+                payload={
+                    "student_id": str(student_id),
+                    "session_id": str(session_id),
+                    "description": description,
+                },
+            )
+
+        AuditService.record(
+            self.session,
+            action="attendance.injury_reported",
+            entity_type="student",
+            entity_id=student_id,
+            studio_id=session_row.studio_id,
+            actor_person_id=actor_person_id,
+            # The session and the recipient count -- never the description. An audit
+            # entry is read by a wider audience than the notification is.
+            diff={"session_id": str(session_id), "notified": len(recipients)},
+        )
+        return len(recipients)
 
     def student_history(
         self, student_id: uuid.UUID, *, cursor: uuid.UUID | None, limit: int

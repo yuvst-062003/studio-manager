@@ -536,10 +536,12 @@ waves:
         on: 2026-08-27
       - id: S2
         title: Staff — route the seven unreachable screens, SessionSummary first
-        status: pending
+        status: shipped
+        on: 2026-08-27
       - id: S3
         title: Staff — student card entry points
-        status: pending
+        status: shipped
+        on: 2026-08-27
       - id: S4
         title: Staff — four defects (403, 401 race, bare attendance hash, tour)
         status: pending

@@ -185,5 +185,21 @@ class BootstrapPayload(BaseModel):
     rosters: dict[uuid.UUID, list[RosterEntry]] = Field(default_factory=dict)
 
 
+class InjuryReportIn(BaseModel):
+    """`9g`'s injury report (S2) -- written by the coach, read by the manager and the
+    child's guardians. The description is the coach's own words FOR those readers; it is
+    not a health-declaration content and is never logged (G7 still applies to logs)."""
+
+    student_id: uuid.UUID
+    description: str = Field(min_length=1, max_length=500)
+
+
+class InjuryReportOut(BaseModel):
+    #: How many people were actually told. Zero is a fact worth surfacing -- a student
+    #: with no guardian on file and a studio with no manager would otherwise "send" a
+    #: report nobody receives.
+    notified: int
+
+
 AttendancePage = CursorPage[AttendanceOut]
 AbsenceReportPage = CursorPage[AbsenceReportOut]

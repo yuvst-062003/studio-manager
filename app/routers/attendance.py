@@ -44,6 +44,8 @@ from app.schemas.attendance import (
     AttendancePage,
     BatchAttendanceIn,
     BulkPresentIn,
+    InjuryReportIn,
+    InjuryReportOut,
     SessionRosterOut,
 )
 from app.services.attendance.errors import ForbiddenError, NotFoundError, PreconditionError
@@ -226,6 +228,37 @@ def report_absence(
         raise _precondition(exc) from exc
     session.commit()
     return AbsenceReportOut.model_validate(report, from_attributes=True)
+
+
+@router.post(
+    "/sessions/{session_id}/injury-reports",
+    response_model=InjuryReportOut,
+    status_code=status.HTTP_201_CREATED,
+)
+def report_injury(
+    _: AnyStaff,
+    session_id: uuid.UUID,
+    body: InjuryReportIn,
+    request: Request,
+    session: TenantSessionDep,
+) -> InjuryReportOut:
+    """`9g` (S2) -- the injury report that goes to the manager and the parents NOW.
+
+    Online-only on purpose, the mirror of the parent's absence pre-report: a report that
+    syncs after everyone has gone home is not a report. Not queued, not idempotent -- a
+    coach pressing twice sends twice, and two messages about a hurt child beat zero.
+    """
+    try:
+        notified = AttendanceService(session).report_injury(
+            session_id,
+            student_id=body.student_id,
+            description=body.description,
+            actor_person_id=_require_person(request),
+        )
+    except NotFoundError as exc:
+        raise _not_found() from exc
+    session.commit()
+    return InjuryReportOut(notified=notified)
 
 
 @router.delete("/absence-reports/{session_id}/{student_id}", status_code=status.HTTP_204_NO_CONTENT)

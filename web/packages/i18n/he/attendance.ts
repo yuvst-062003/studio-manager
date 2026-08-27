@@ -123,6 +123,14 @@ export const attendance: Bundle = {
   'report.markNow': 'סימון עכשיו',
   'report.remindCoach': 'תזכורת למאמן',
   'report.byGroup': 'אחוז נוכחות לפי קבוצה',
+  // -- 9g's injury report (S2): immediate, online-only, never queued -------------
+  'summary.injury.title': 'דיווח פציעה',
+  'summary.injury.who': 'מי נפצע?',
+  'summary.injury.what': 'מה קרה?',
+  'summary.injury.send': 'שליחה למנהל ולהורים',
+  'summary.injury.sent': 'הדיווח נשלח למנהל ולהורים',
+  'summary.injury.failed': 'השליחה נכשלה. נסו שוב.',
+  'summary.injury.needsConnection': 'דיווח פציעה נשלח מיד, ולכן דורש חיבור לרשת.',
   'summary.title': 'סיכום מפגש',
   // §5.13 — 'Visible to coaches of that student's groups and to all managers. NEVER
   // visible to guardians.' `9g` finding 2: the note card is the only one of three on that

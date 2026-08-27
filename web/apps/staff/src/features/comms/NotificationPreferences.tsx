@@ -68,7 +68,9 @@ export function NotificationPreferences({
     let live = true
     client
       .preferences()
-      .then((page) => live && setRows(page.groups))
+      // `?? []` — the drawer must survive a malformed answer; a crash here takes the
+      // whole shell down with it, not just this section.
+      .then((page) => live && setRows(page.groups ?? []))
       .catch(() => undefined)
     return () => {
       live = false

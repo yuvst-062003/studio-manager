@@ -5,22 +5,24 @@
 // calculation from rank and time in grade, not a coach's impression at the end of a lesson.
 // Recorded here so a later reader does not "complete" the screen by adding one.
 //
-// **The injury-report card is not built** — `9g` finding 1. The artboard promises it reaches
-// a manager and a parent *immediately*, which is a notification kind with no
-// `comms.preferences.kind.*` member, an audit-relevant record with no table, and almost
-// certainly health-adjacent data about a minor (G7). It cannot be built from a card, and
-// building three-quarters of it would ship a button that silently does nothing with an
-// injury. Deferred to whichever wave gives it a model.
+// **The injury-report card ships (S2).** `9g` finding 1 deferred it "to whichever wave
+// gives it a model"; the model turned out to already exist — `health.injury` rides the
+// notification table with an always-on §5.11 prefix, and the audit row carries the
+// recipient count and never the description (G7's discipline, applied to a record that
+// is not itself a declaration). It is ONLINE-ONLY, the mirror of the parent's absence
+// pre-report: an injury report that syncs after everyone has gone home is not a report —
+// so the card renders only when the container supplies a real `onReportInjury`, and the
+// submit disables offline rather than queueing into the void.
 //
 // **The note card states its audience**, which `9g` finding 2 says the artboard does not —
 // on a screen where both its neighbours do. §5.13: session notes are "visible to coaches of
 // that student's groups and to all managers. **Never visible to guardians.**" A coach
 // writing about a child should know who reads it.
 import { useState } from 'react'
-import { Button, Card, TextField } from '@studio/ui'
+import { Button, Card, Radio, TextField } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
-import { queueMark, usePendingCount } from '@studio/core'
+import { queueMark, useNetworkMode, usePendingCount } from '@studio/core'
 import type { RosterRow as RosterRowData } from '@studio/core'
 
 export function SessionSummary({
@@ -30,6 +32,7 @@ export function SessionSummary({
   personId,
   clock = () => new Date().toISOString(),
   onBackToRoster,
+  onReportInjury,
 }: {
   sessionId: string
   roster: RosterRowData[]
@@ -38,8 +41,14 @@ export function SessionSummary({
   /** One clock per device — see `RosterScreen`'s own `clock` for why this is a function. */
   clock?: () => string
   onBackToRoster?: () => void
+  /** Online-only, immediate. When absent the injury card is withheld, never inert. */
+  onReportInjury?: (studentId: string, description: string) => Promise<void>
 }) {
   const [note, setNote] = useState('')
+  const [injuryStudentId, setInjuryStudentId] = useState('')
+  const [injuryText, setInjuryText] = useState('')
+  const [injuryState, setInjuryState] = useState<'idle' | 'sending' | 'sent' | 'failed'>('idle')
+  const mode = useNetworkMode()
   const pending = usePendingCount()
 
   // `9g`'s three read-only tiles: present · absent · notified in advance.
@@ -109,6 +118,60 @@ export function SessionSummary({
           {t(locale, 'attendance.roster.addNote')}
         </Button>
       </Card>
+
+      {onReportInjury ? (
+        <Card caption={t(locale, 'attendance.summary.injury.title')}>
+          {injuryState === 'sent' ? (
+            <p data-testid="injury-sent">{t(locale, 'attendance.summary.injury.sent')}</p>
+          ) : (
+            <>
+              <fieldset data-testid="injury-children">
+                <legend>{t(locale, 'attendance.summary.injury.who')}</legend>
+                {roster.map((row) => (
+                  <Radio
+                    checked={injuryStudentId === row.student_id}
+                    key={row.student_id}
+                    label={row.display_name}
+                    name="injury-student"
+                    onChange={() => setInjuryStudentId(row.student_id)}
+                    value={row.student_id}
+                  />
+                ))}
+              </fieldset>
+              <TextField
+                label={t(locale, 'attendance.summary.injury.what')}
+                onChange={(event) => setInjuryText(event.target.value)}
+                value={injuryText}
+              />
+              {/* Immediate or not at all — §10.2's absence-report reasoning, mirrored. */}
+              {mode !== 'online' ? (
+                <p data-testid="injury-offline">{t(locale, 'attendance.summary.injury.needsConnection')}</p>
+              ) : null}
+              {injuryState === 'failed' ? (
+                <p data-testid="injury-failed">{t(locale, 'attendance.summary.injury.failed')}</p>
+              ) : null}
+              <Button
+                data-testid="injury-send"
+                disabled={
+                  mode !== 'online' ||
+                  injuryState === 'sending' ||
+                  injuryStudentId === '' ||
+                  injuryText.trim() === ''
+                }
+                onClick={() => {
+                  setInjuryState('sending')
+                  onReportInjury(injuryStudentId, injuryText.trim())
+                    .then(() => setInjuryState('sent'))
+                    .catch(() => setInjuryState('failed'))
+                }}
+                variant="destructive"
+              >
+                {t(locale, 'attendance.summary.injury.send')}
+              </Button>
+            </>
+          )}
+        </Card>
+      ) : null}
 
       <Button onClick={onBackToRoster} variant="secondary">
         {t(locale, 'attendance.summary.backToRoster')}

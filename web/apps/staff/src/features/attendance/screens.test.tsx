@@ -278,3 +278,50 @@ describe('§6.1 — offline priming blocks the first launch', () => {
     expect(bootstrap).toHaveBeenCalledOnce()
   })
 })
+
+describe('9g — the injury report card (S2)', () => {
+  const renderWithInjury = (onReportInjury: (s: string, d: string) => Promise<void>) =>
+    render(
+      <SessionSummary
+        clock={() => NOW}
+        locale="he"
+        onReportInjury={onReportInjury}
+        personId="person-1"
+        roster={[row({ student_id: 'a', status: 'present' })]}
+        sessionId="session-1"
+      />,
+    )
+
+  it('is withheld entirely when no handler exists — never inert', () => {
+    render(
+      <SessionSummary
+        clock={() => NOW}
+        locale="he"
+        personId="person-1"
+        roster={[row({ student_id: 'a', status: 'present' })]}
+        sessionId="session-1"
+      />,
+    )
+    expect(screen.queryByTestId('injury-send')).toBeNull()
+  })
+
+  it('sends the chosen child and the description, immediately', async () => {
+    const onReportInjury = vi.fn().mockResolvedValue(undefined)
+    renderWithInjury(onReportInjury)
+    await userEvent.click(screen.getByRole('radio'))
+    await userEvent.type(screen.getByLabelText('מה קרה?'), 'נחבל בכתף')
+    await userEvent.click(screen.getByTestId('injury-send'))
+    expect(onReportInjury).toHaveBeenCalledWith('a', 'נחבל בכתף')
+    expect(await screen.findByTestId('injury-sent')).toBeInTheDocument()
+  })
+
+  it('says try-again on failure rather than pretending it sent', async () => {
+    const onReportInjury = vi.fn().mockRejectedValue(new Error('500'))
+    renderWithInjury(onReportInjury)
+    await userEvent.click(screen.getByRole('radio'))
+    await userEvent.type(screen.getByLabelText('מה קרה?'), 'x')
+    await userEvent.click(screen.getByTestId('injury-send'))
+    expect(await screen.findByTestId('injury-failed')).toBeInTheDocument()
+    expect(screen.queryByTestId('injury-sent')).toBeNull()
+  })
+})
