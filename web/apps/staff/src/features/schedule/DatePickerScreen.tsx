@@ -100,7 +100,47 @@ const hasSessionsStyle: CSSProperties = {
   borderWidth: 'var(--border-width-strong)',
 }
 
+const unmarkedStyle: CSSProperties = {
+  ...dayStyle,
+  borderColor: 'var(--pending)',
+  borderWidth: 'var(--border-width-strong)',
+}
+
 const padStyle: CSSProperties = { minBlockSize: '44px' }
+
+const legendStyle: CSSProperties = {
+  display: 'flex',
+  gap: 'var(--space-4)',
+  fontSize: 'var(--text-caption)',
+  color: 'var(--text-secondary)',
+}
+
+const swatchStyle = (color: string): CSSProperties => ({
+  display: 'inline-block',
+  inlineSize: '0.75rem',
+  blockSize: '0.75rem',
+  borderRadius: 'var(--radius-sm)',
+  border: `var(--border-width-strong) solid ${color}`,
+  marginInlineEnd: 'var(--space-1)',
+  verticalAlign: 'middle',
+})
+
+const jumpsStyle: CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: 'var(--space-2)',
+}
+
+/** Sunday-first week bounds for the week containing `key`. */
+function weekBounds(key: string): { from: string; to: string } {
+  const weekday = new Date(`${key}T12:00:00Z`).getUTCDay()
+  const from = shift(key, -weekday)
+  return { from, to: shift(from, 6) }
+}
+
+function shift(key: string, days: number): string {
+  return studioDayKey(new Date(new Date(`${key}T12:00:00Z`).getTime() + days * 86_400_000))
+}
 
 export function DatePickerScreen({
   locale,
@@ -139,6 +179,20 @@ export function DatePickerScreen({
     () => new Set(sessions.map((session) => studioDayKey(session.starts_at))),
     [sessions],
   )
+
+  // 9b's second legend entry — a PAST day that held a session whose register was never
+  // signed. §5.14's sessions-held-versus-planned report counts exactly these, and the
+  // grid is where a manager spots the hole before the month-end report does.
+  const daysWithUnmarked = useMemo(() => {
+    const keys = new Set<string>()
+    for (const session of sessions) {
+      const key = studioDayKey(session.starts_at)
+      if (key < todayKey && session.status !== 'cancelled' && !session.attendance_taken) {
+        keys.add(key)
+      }
+    }
+    return keys
+  }, [sessions, todayKey])
 
   const step = useCallback((delta: number) => {
     setMonth((currentMonth) => {
@@ -202,6 +256,7 @@ export function DatePickerScreen({
               // buttons ARE the days, asked of the accessibility tree.
               data-testid={`day-${cell}`}
               data-has-sessions={daysWithSessions.has(cell) ? 'true' : 'false'}
+              data-attendance-unmarked={daysWithUnmarked.has(cell) ? 'true' : undefined}
               aria-current={selected === cell ? 'date' : undefined}
               // The full date, not the number: a screen reader hearing "17" cannot tell
               // which month.
@@ -209,9 +264,11 @@ export function DatePickerScreen({
               style={
                 selected === cell
                   ? selectedDayStyle
-                  : daysWithSessions.has(cell)
-                    ? hasSessionsStyle
-                    : dayStyle
+                  : daysWithUnmarked.has(cell)
+                    ? unmarkedStyle
+                    : daysWithSessions.has(cell)
+                      ? hasSessionsStyle
+                      : dayStyle
               }
               onClick={() => {
                 setSelected(cell)
@@ -222,6 +279,53 @@ export function DatePickerScreen({
             </button>
           ),
         )}
+      </div>
+
+      {/* 9b's legend — the two ring colours, named. */}
+      <p style={legendStyle} data-testid="picker-legend">
+        <span>
+          <span aria-hidden="true" style={swatchStyle('var(--accent)')} />
+          {t(locale, 'schedule.datePicker.legendHasSessions')}
+        </span>
+        <span>
+          <span aria-hidden="true" style={swatchStyle('var(--pending)')} />
+          {t(locale, 'schedule.datePicker.legendUnmarked')}
+        </span>
+      </p>
+
+      {/* 9b's quick jumps. Each one IS a selection — a range handed straight back — so
+          "week view" needs no second screen: it is this screen answering faster. */}
+      <div style={jumpsStyle} role="group" aria-label={t(locale, 'schedule.datePicker.title')}>
+        <Button
+          variant="secondary"
+          data-testid="jump-this-week"
+          onClick={() => onSelect(weekBounds(todayKey))}
+        >
+          {t(locale, 'schedule.datePicker.thisWeek')}
+        </Button>
+        <Button
+          variant="secondary"
+          data-testid="jump-next-week"
+          onClick={() => onSelect(weekBounds(shift(todayKey, 7)))}
+        >
+          {t(locale, 'schedule.datePicker.nextWeek')}
+        </Button>
+        <Button
+          variant="secondary"
+          data-testid="jump-this-month"
+          onClick={() =>
+            onSelect(monthBounds(Number(todayKey.slice(0, 4)), Number(todayKey.slice(5, 7))))
+          }
+        >
+          {t(locale, 'schedule.datePicker.thisMonth')}
+        </Button>
+        <Button
+          variant="secondary"
+          data-testid="jump-last-30"
+          onClick={() => onSelect({ from: shift(todayKey, -29), to: todayKey })}
+        >
+          {t(locale, 'schedule.datePicker.last30')}
+        </Button>
       </div>
 
       <section aria-labelledby="range-title">

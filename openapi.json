@@ -9249,6 +9249,11 @@
             "title": "Group Name",
             "type": "string"
           },
+          "headcount": {
+            "default": 0,
+            "title": "Headcount",
+            "type": "integer"
+          },
           "id": {
             "format": "uuid",
             "title": "Id",

@@ -13,8 +13,8 @@
 // exist yet, and the last test in the file keeps it out.
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { Card, EmptyState, StatusChip } from '@studio/ui'
-import { formatTimeInStudioZone, studioDayKey } from '@studio/core'
+import { Button, Card, EmptyState, StatusChip } from '@studio/ui'
+import { formatDateInStudioZone, formatTimeInStudioZone, studioDayKey } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { cancelReasonLabel } from './client'
@@ -96,6 +96,7 @@ export function TodayScreen({
   locale,
   client,
   today,
+  initialDay = null,
   coaches = [],
   viewerPersonId,
   viewerIsCoach = false,
@@ -104,6 +105,9 @@ export function TodayScreen({
   client: StaffScheduleClient
   /** An ISO instant. A prop, not `new Date()` — every assertion here fixes the day. */
   today: string
+  /** A day picked in 9b. The strip anchors here and the screen opens on it; `חזרה להיום`
+   *  is what walks back. */
+  initialDay?: string | null
   coaches?: CoachOption[]
   viewerPersonId?: string
   /**
@@ -114,12 +118,12 @@ export function TodayScreen({
   viewerIsCoach?: boolean
 }) {
   const todayKey = useMemo(() => studioDayKey(today), [today])
-  const [day, setDay] = useState(todayKey)
+  const [day, setDay] = useState(initialDay ?? todayKey)
   const [coachFilter, setCoachFilter] = useState<string>(
     viewerIsCoach && viewerPersonId ? viewerPersonId : '',
   )
   const [sessions, setSessions] = useState<SessionRow[]>([])
-  const strip = useMemo(() => stripAround(todayKey), [todayKey])
+  const strip = useMemo(() => stripAround(initialDay ?? todayKey), [initialDay, todayKey])
 
   useEffect(() => {
     let live = true
@@ -146,9 +150,35 @@ export function TodayScreen({
 
   const chooseDay = useCallback((key: string) => setDay(key), [])
 
+  const coachName = useMemo(
+    () => coaches.find((coach) => coach.person_id === coachFilter)?.display_name ?? null,
+    [coachFilter, coaches],
+  )
+
   return (
     <section aria-labelledby="today-title" data-testid="staff-today" style={pageStyle}>
-      <h1 id="today-title">{t(locale, 'schedule.today.title')}</h1>
+      <h1 id="today-title">
+        {/* S7 — `היום`, or the day being looked at: `יום שלישי · 3 בנובמבר`. */}
+        {day === todayKey
+          ? t(locale, 'schedule.today.title')
+          : `${t(locale, 'attendance.roster.dayLabel').replace(
+              '{{weekday}}',
+              t(locale, `schedule.weekday.${new Date(`${day}T12:00:00Z`).getUTCDay()}`),
+            )} · ${formatDateInStudioZone(`${day}T12:00:00Z`, locale)}`}
+      </h1>
+
+      {/* S7 — `5 שיעורים · אלון מזרחי`. The coach half renders only when the filter has
+          chosen one, which for a coach opening their own day is the default. */}
+      <p data-testid="today-summary" style={noteStyle}>
+        {t(locale, 'schedule.today.sessionCount').replace('{{count}}', String(onThisDay.length))}
+        {coachName ? <> · <bdi>{coachName}</bdi></> : null}
+      </p>
+
+      {day !== todayKey ? (
+        <Button variant="secondary" data-testid="back-to-today" onClick={() => setDay(todayKey)}>
+          {t(locale, 'schedule.today.backToToday')}
+        </Button>
+      ) : null}
 
       <div style={stripStyle} role="group" aria-label={t(locale, 'schedule.datePicker.title')}>
         {strip.map((key) => {
@@ -219,14 +249,38 @@ export function TodayScreen({
                 {'–'}
                 {formatTimeInStudioZone(session.ends_at, locale)}
               </span>
+              {/* 1d — `45 דק׳`, derived: two instants are already on the wire. */}
+              <span style={noteStyle} data-testid="session-duration">
+                {t(locale, 'schedule.session.durationMinutes').replace(
+                  '{{minutes}}',
+                  String(
+                    Math.round(
+                      (Date.parse(session.ends_at) - Date.parse(session.starts_at)) / 60_000,
+                    ),
+                  ),
+                )}
+              </span>
               <strong>{session.group_name}</strong>
-              {session.location_name ? (
-                <span style={noteStyle}>{session.location_name}</span>
-              ) : null}
+              {/* 1d — `אולם א׳ · 14 חניכים`. */}
+              <span style={noteStyle} data-testid="session-headcount">
+                {session.location_name ? <>{session.location_name} · </> : null}
+                {t(locale, 'schedule.session.headcount').replace(
+                  '{{count}}',
+                  String(session.headcount),
+                )}
+              </span>
               <StatusChip
                 status={session.status === 'cancelled' ? 'cancelled' : 'planned'}
                 label={t(locale, `schedule.session.status.${session.status}`)}
               />
+              {/* 1d — `נוכחות נרשמה`: the register-state marker, the difference between
+                  "done" and "still owed" at a glance down the day. */}
+              {session.attendance_taken ? (
+                <StatusChip
+                  status="paid"
+                  label={t(locale, 'schedule.session.attendanceTaken')}
+                />
+              ) : null}
               {session.staff[0] ? (
                 <span style={noteStyle}>{session.staff[0].display_name}</span>
               ) : (

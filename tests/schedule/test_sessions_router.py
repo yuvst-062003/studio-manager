@@ -83,6 +83,39 @@ def test_a_session_carries_the_group_and_location_names_it_needs_to_be_drawn(
     assert item["attendance_taken"] is False
 
 
+def test_a_session_carries_its_headcount_and_counts_only_live_enrollments(
+    client, as_lead_coach, app_session, studio, a_group, a_session
+):
+    """1d's `14 חניכים` — the roster a coach should expect. An ENDED enrollment is a child
+    who left; counting them would tell a covering coach to wait for someone who is not
+    coming."""
+    people = [
+        Person(studio_id=studio.id, first_name=f"חניך {i}", last_name="בדיקה") for i in range(3)
+    ]
+    app_session.add_all(people)
+    app_session.flush()
+    students = [
+        Student(studio_id=studio.id, person_id=person.id, status="active") for person in people
+    ]
+    app_session.add_all(students)
+    app_session.flush()
+    for index, student in enumerate(students):
+        app_session.add(
+            Enrollment(
+                studio_id=studio.id,
+                student_id=student.id,
+                group_id=a_group,
+                status="ended" if index == 2 else "active",
+                started_on=date(2026, 9, 1),
+                ended_on=date(2026, 10, 1) if index == 2 else None,
+            )
+        )
+    app_session.commit()
+
+    item = client.get(f"{API}/sessions/{a_session.id}", headers=as_lead_coach.headers).json()
+    assert item["headcount"] == 2
+
+
 def test_the_coach_filter_replaces_a_split_screen(client, as_manager, as_lead_coach, a_session):
     """Artboard 9a — 'מסנן מאמן במקום פיצול מסכים'. Assigning the coach to this one session
     is `session_staff`, not `group_staff`: who actually coached THIS session."""

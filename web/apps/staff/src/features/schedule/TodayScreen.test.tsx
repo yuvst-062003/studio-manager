@@ -24,6 +24,7 @@ const base = {
   is_manually_edited: false,
   is_ad_hoc: false,
   attendance_taken: false,
+  headcount: 14,
   staff: [],
 }
 
@@ -152,6 +153,39 @@ describe('TodayScreen (9a / 1d)', () => {
         expect.objectContaining({ coachPersonId: undefined }),
       ),
     )
+  })
+
+  it("renders 1d's card: duration, headcount, and the register-state marker (S7)", async () => {
+    renderIn(
+      screenFor({ client: stub([{ ...TODAY_SESSION, attendance_taken: true }]) }),
+    )
+    expect(await screen.findByTestId('session-duration')).toHaveTextContent('120 דק׳')
+    expect(screen.getByTestId('session-headcount')).toHaveTextContent('אולם א׳ · 14 חניכים')
+    expect(screen.getByText(t('he', 'schedule.session.attendanceTaken'))).toBeInTheDocument()
+  })
+
+  it('shows no register marker while the register is still owed (S7)', async () => {
+    renderIn(screenFor())
+    await screen.findByTestId('session-row')
+    expect(screen.queryByText(t('he', 'schedule.session.attendanceTaken'))).toBeNull()
+  })
+
+  it('sums the day in the header and names the filtered coach (S7)', async () => {
+    renderIn(screenFor({ viewerIsCoach: true, viewerPersonId: 'p1' }))
+    await screen.findByTestId('session-row')
+    const summary = screen.getByTestId('today-summary')
+    expect(summary).toHaveTextContent('1 שיעורים')
+    expect(summary).toHaveTextContent('רון מאמן')
+  })
+
+  it('walks back to today from a picked day, and titles the day it shows (S7)', async () => {
+    renderIn(screenFor({ initialDay: '2026-11-10' }))
+    // 10 November 2026 is a Tuesday; the title names the day being looked at, not היום.
+    expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent('יום שלישי')
+    expect(screen.queryByRole('heading', { level: 1, name: 'היום' })).toBeNull()
+    await userEvent.click(screen.getByTestId('back-to-today'))
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('היום')
+    expect(screen.queryByTestId('back-to-today')).toBeNull()
   })
 
   it('says there are no sessions today, and why', async () => {

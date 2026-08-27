@@ -57,6 +57,10 @@ class SessionOut(BaseModel):
     #: cancelled, has attendance been taken — *not* registration counts." Children are
     #: enrolled, not booking (§5.4), so capacity is near-irrelevant to us.
     attendance_taken: bool = False
+    #: 1d's `14 חניכים` — the group's LIVE ENROLLMENT, i.e. the roster a coach should
+    #: expect. Not a booking count and not capacity, so it does not contradict the note
+    #: above: children are enrolled, and this is how many.
+    headcount: int = 0
 
 
 class TrialSlotOut(BaseModel):

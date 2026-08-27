@@ -8888,6 +8888,11 @@ export interface components {
             /** Group Name */
             group_name: string;
             /**
+             * Headcount
+             * @default 0
+             */
+            headcount: number;
+            /**
              * Id
              * Format: uuid
              */

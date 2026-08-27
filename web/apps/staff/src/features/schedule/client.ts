@@ -36,6 +36,8 @@ export interface SessionRow {
   cancel_reason: string | null
   staff: SessionStaff[]
   attendance_taken: boolean
+  /** 1d — the group's live enrollment: the roster a coach should expect. */
+  headcount: number
 }
 
 export interface StaffScheduleClient {

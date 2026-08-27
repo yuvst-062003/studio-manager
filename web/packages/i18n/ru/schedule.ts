@@ -6,6 +6,8 @@ import type { Bundle } from '../types'
  */
 export const schedule: Bundle = {
   'today.title': 'Сегодня',
+  'today.sessionCount': '{{count}} занятий',
+  'today.backToToday': 'Вернуться к сегодня',
   'today.openRoster': 'Открыть перекличку',
   'today.empty': 'Сегодня занятий нет',
   'today.emptyHint': 'Дни занятий задаются в недельном расписании группы',
@@ -20,6 +22,13 @@ export const schedule: Bundle = {
   'view.month': 'Месяц',
 
   'datePicker.title': 'Выбор даты',
+  'datePicker.legend': 'Легенда',
+  'datePicker.legendHasSessions': 'Есть занятия',
+  'datePicker.legendUnmarked': 'Посещаемость не отмечена',
+  'datePicker.thisWeek': 'Эта неделя',
+  'datePicker.nextWeek': 'Следующая неделя',
+  'datePicker.thisMonth': 'Этот месяц',
+  'datePicker.last30': 'Последние 30 дней',
   'datePicker.jumpToToday': 'Перейти к сегодня',
   'datePicker.range': 'Диапазон дат',
   'datePicker.from': 'С',
@@ -41,6 +50,8 @@ export const schedule: Bundle = {
   'session.substitute': 'Замена',
   'session.noCoach': 'Тренер не назначен',
   'session.attendanceTaken': 'Посещаемость отмечена',
+  'session.durationMinutes': '{{minutes}} мин',
+  'session.headcount': '{{count}} учеников',
   'session.attendanceMissing': 'Посещаемость ещё не отмечена',
   'session.status.scheduled': 'Запланировано',
   'session.status.cancelled': 'Отменено',

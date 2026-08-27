@@ -3,6 +3,8 @@ import type { Bundle } from '../types'
 /** Mirrors `he/schedule.ts`. `en` is `strict` in the parity check — a missing key fails. */
 export const schedule: Bundle = {
   'today.title': 'Today',
+  'today.sessionCount': '{{count}} sessions',
+  'today.backToToday': 'Back to today',
   'today.openRoster': 'Open the register',
   'today.empty': 'No classes today',
   'today.emptyHint': 'Activity days are set in the group’s weekly schedule',
@@ -17,6 +19,13 @@ export const schedule: Bundle = {
   'view.month': 'Month',
 
   'datePicker.title': 'Pick a date',
+  'datePicker.legend': 'Legend',
+  'datePicker.legendHasSessions': 'Has sessions',
+  'datePicker.legendUnmarked': 'Attendance not taken',
+  'datePicker.thisWeek': 'This week',
+  'datePicker.nextWeek': 'Next week',
+  'datePicker.thisMonth': 'This month',
+  'datePicker.last30': 'Last 30 days',
   'datePicker.jumpToToday': 'Jump to today',
   'datePicker.range': 'Date range',
   'datePicker.from': 'From',
@@ -38,6 +47,8 @@ export const schedule: Bundle = {
   'session.substitute': 'Substitute',
   'session.noCoach': 'No coach assigned',
   'session.attendanceTaken': 'Attendance taken',
+  'session.durationMinutes': '{{minutes}} min',
+  'session.headcount': '{{count}} students',
   'session.attendanceMissing': 'Attendance not taken yet',
   'session.status.scheduled': 'Scheduled',
   'session.status.cancelled': 'Cancelled',

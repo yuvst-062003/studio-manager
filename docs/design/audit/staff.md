@@ -230,6 +230,32 @@ link that must be signed `לפני עלייה למזרן`.
 
 ## Log
 
+### 2026-08-27 · S7 — the day became cards, and the picker learned to answer
+
+**Today (9a/1d).** The screen had the right bones — the strip, the coach filter, the
+roster link — and 20 of 1d's 64 lines. Landed: per-card duration (derived from the two
+instants already on the wire), `אולם א׳ · 14 חניכים`, and the `נוכחות נרשמה` chip that is
+the difference between "done" and "still owed" at a glance down the day. The header now
+sums the day (`5 שיעורים · רון מאמן` when the filter names a coach) and titles the day
+being looked at — `היום`, or `יום שלישי · 3 בנובמבר` — with `חזרה להיום` appearing exactly
+when the title stops saying היום.
+
+**Headcount came from the server.** `SessionOut` gained `headcount` — the group's LIVE
+enrollment, one grouped query per page in `project_sessions`, ended enrollments excluded
+(a covering coach must not wait for a child who left — tested). This does not contradict
+the schema's no-capacity note: children are enrolled, not booking, and this is how many.
+
+**The picker (9b).** The month grid and the range picker existed; landed on top: the
+legend naming both ring colours, the `נוכחות לא סומנה` marking (a PAST day holding an
+uncancelled session whose register was never signed — §5.14's report counts exactly
+these), and the four quick jumps, each handing back a real range.
+
+**Decision — the "day / week / month / range switcher" is selection modes, not a mode
+toggle.** Tapping a day is day; השבוע/שבוע הבא are week; החודש is month; the range picker
+is range. Every mode the artboard names is an affordance on one screen; a toggle would add
+state at 390px without adding a capability. A multi-day jump lands Today on the range's
+first day with the strip anchored there.
+
 ### 2026-08-27 · S6 — the register was already the best screen; it now names its room
 
 Three of S6's four items were already done by the time this entry was written: the

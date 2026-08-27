@@ -581,7 +581,8 @@ waves:
         on: 2026-08-27
       - id: S7
         title: Staff — today and the date picker
-        status: pending
+        status: shipped
+        on: 2026-08-27
       - id: S8
         title: Staff — student search
         status: pending

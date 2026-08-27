@@ -16,6 +16,8 @@ import type { Bundle } from '../types'
 export const schedule: Bundle = {
   // -- the day / week views (staff 9a, 1d; dashboard 3a) ------------------------
   'today.title': 'היום',
+  'today.sessionCount': '{{count}} שיעורים',
+  'today.backToToday': 'חזרה להיום',
   'today.openRoster': 'פתיחת נוכחות',
   'today.empty': 'אין שיעורים היום',
   'today.emptyHint': 'ימי פעילות נקבעים בלו״ז השבועי של הקבוצה',
@@ -31,6 +33,13 @@ export const schedule: Bundle = {
 
   // -- date picking (staff 9b) --------------------------------------------------
   'datePicker.title': 'בחירת תאריך',
+  'datePicker.legend': 'מקרא',
+  'datePicker.legendHasSessions': 'יש שיעורים',
+  'datePicker.legendUnmarked': 'נוכחות לא סומנה',
+  'datePicker.thisWeek': 'השבוע',
+  'datePicker.nextWeek': 'שבוע הבא',
+  'datePicker.thisMonth': 'החודש',
+  'datePicker.last30': '30 יום אחרונים',
   'datePicker.jumpToToday': 'קפיצה להיום',
   'datePicker.range': 'טווח תאריכים',
   'datePicker.from': 'מתאריך',
@@ -54,6 +63,8 @@ export const schedule: Bundle = {
   // D5 — a session block surfaces coverage and completion, not registration counts.
   'session.noCoach': 'לא שובץ מאמן',
   'session.attendanceTaken': 'נוכחות נרשמה',
+  'session.durationMinutes': '{{minutes}} דק׳',
+  'session.headcount': '{{count}} חניכים',
   'session.attendanceMissing': 'נוכחות טרם נרשמה',
   'session.status.scheduled': 'מתוכנן',
   'session.status.cancelled': 'בוטל',

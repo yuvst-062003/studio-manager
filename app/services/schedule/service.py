@@ -21,7 +21,7 @@ import uuid
 from collections.abc import Sequence
 from datetime import UTC, date, datetime, timedelta
 
-from sqlalchemy import Select, select
+from sqlalchemy import Select, func, select
 from sqlalchemy.orm import Session as OrmSession
 
 from app.models.people import Enrollment
@@ -740,6 +740,22 @@ class ScheduleService:
             .all()
         )
 
+        # 1d's headcount — `אולם א׳ · 14 חניכים`. Live enrollment per group, one grouped
+        # query for the whole page. This is the roster a coach should EXPECT, not a booking
+        # count — children are enrolled, not booking (§5.4), which is why the field is safe
+        # to carry on every session without contradicting the no-capacity rule above.
+        headcounts: dict[uuid.UUID, int] = {
+            group_id: count
+            for group_id, count in self.session.execute(
+                select(Enrollment.group_id, func.count())
+                .where(
+                    Enrollment.group_id.in_({r.group_id for r in rows}),
+                    Enrollment.ended_on.is_(None),
+                )
+                .group_by(Enrollment.group_id)
+            ).all()
+        }
+
         staff_rows = self.session.execute(
             select(SessionStaff, Person.first_name, Person.last_name)
             .join(Person, Person.id == SessionStaff.person_id)
@@ -772,6 +788,7 @@ class ScheduleService:
                 cancel_reason=row.cancel_reason,
                 staff=staff_by_session.get(row.id, []),
                 attendance_taken=row.id in marked,
+                headcount=headcounts.get(row.group_id, 0),
             )
             for row in rows
         ]

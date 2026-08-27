@@ -72,11 +72,14 @@ export function ScheduleSection({
         {t(locale, 'schedule.datePicker.title')}
       </a>
       <TodayScreen
+        // Remounts when the pick changes, so the day state re-seeds from it.
+        key={picked ?? 'today'}
         locale={locale}
         client={client}
-        // A day chosen in 9b wins over the clock until the coach navigates away, which is
-        // what "קפיצה" on that screen is for.
-        today={picked ? `${picked}T12:00:00Z` : today}
+        today={today}
+        // A day chosen in 9b wins over the clock until the coach navigates away — and
+        // `חזרה להיום` on the screen itself walks back, because `today` stays honest.
+        initialDay={picked}
         coaches={coaches}
         viewerPersonId={viewerPersonId}
         viewerIsCoach={viewerIsCoach}

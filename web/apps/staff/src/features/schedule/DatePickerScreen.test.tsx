@@ -25,6 +25,7 @@ const SESSION: SessionRow = {
   cancel_reason: null,
   staff: [],
   attendance_taken: false,
+  headcount: 5,
 }
 
 function stub(sessions: SessionRow[] = [SESSION]): StaffScheduleClient {
@@ -103,6 +104,41 @@ describe('DatePickerScreen (9b)', () => {
     const { onSelect } = renderPicker()
     await userEvent.click(await screen.findByTestId('day-2026-11-17'))
     expect(onSelect).toHaveBeenCalledWith({ from: '2026-11-17', to: '2026-11-17' })
+  })
+
+  it('names both ring colours in a legend (S7)', async () => {
+    renderPicker()
+    const legend = await screen.findByTestId('picker-legend')
+    expect(legend).toHaveTextContent(t('he', 'schedule.datePicker.legendHasSessions'))
+    expect(legend).toHaveTextContent(t('he', 'schedule.datePicker.legendUnmarked'))
+  })
+
+  it('marks a past day whose register was never signed (S7)', async () => {
+    // 2026-11-01 is before the fixed today (11-03) and its register is unsigned; the
+    // fixture SESSION on 11-17 is in the future and must NOT be flagged.
+    renderPicker({
+      client: stub([
+        SESSION,
+        { ...SESSION, id: 's2', starts_at: '2026-11-01T16:30:00Z', ends_at: '2026-11-01T18:00:00Z' },
+      ]),
+    })
+    await waitFor(() =>
+      expect(screen.getByTestId('day-2026-11-01')).toHaveAttribute('data-attendance-unmarked', 'true'),
+    )
+    expect(screen.getByTestId('day-2026-11-17')).not.toHaveAttribute('data-attendance-unmarked')
+  })
+
+  it('hands back the week, the month and the trailing month as ranges (S7)', async () => {
+    const { onSelect } = renderPicker()
+    // Today is Tuesday 2026-11-03; the Sunday-first week is 11-01 through 11-07.
+    await userEvent.click(screen.getByTestId('jump-this-week'))
+    expect(onSelect).toHaveBeenLastCalledWith({ from: '2026-11-01', to: '2026-11-07' })
+    await userEvent.click(screen.getByTestId('jump-next-week'))
+    expect(onSelect).toHaveBeenLastCalledWith({ from: '2026-11-08', to: '2026-11-14' })
+    await userEvent.click(screen.getByTestId('jump-this-month'))
+    expect(onSelect).toHaveBeenLastCalledWith({ from: '2026-11-01', to: '2026-11-30' })
+    await userEvent.click(screen.getByTestId('jump-last-30'))
+    expect(onSelect).toHaveBeenLastCalledWith({ from: '2026-10-05', to: '2026-11-03' })
   })
 
   it('jumps to today', async () => {
