@@ -42,9 +42,9 @@ unreachable** — including the entire post-lesson flow.
 |---|---|---|
 | `#/schedule` | correct — this *is* the screen | — |
 | `#/` | correct — home is the schedule | — |
-| `#/attendance` (bare) | **no branch exists**; only `#/attendance/<sessionId>` is handled (`App.tsx:171`) | add an index screen or redirect |
-| `#/cash` | gated on `viewerIsManager` (`App.tsx:338`) — a coach never sees it | intended for `11a`, see below |
-| `#/join-link` | gated on `viewerIsManager` | correct as designed |
+| `#/attendance` (bare) | **no branch exists**; only `#/attendance/<sessionId>` is handled (`App.tsx:171`) | ~~add an index screen or redirect~~ **fixed** — redirects to `#/schedule` (Log · S4) |
+| `#/cash` | gated on `viewerIsManager` (`App.tsx:338`) — a coach never sees it | **fixed** — a coach now gets a visible refusal, not a fall-through (Log · S10) |
+| `#/join-link` | gated on `viewerIsManager` | gate kept; the fall-through became a visible refusal (Log · S10) |
 
 ---
 
@@ -77,6 +77,12 @@ Build:
    in a basement; [`OfflinePriming.tsx`](../../../web/apps/staff/src/features/attendance/OfflinePriming.tsx)
    and the offline queue in `web/packages/core/` already exist.
 
+**Functional (2026-08-27):** all four landed — header (S6), הודיעו מראש with the bulk-skip
+test (S6/P1), health badge via the roster-row slot (S1), shell indicators (S5). The failure
+path is deliberate: a failed roster read renders the CACHE with the mode banner, not a
+retry screen — offline-first, and the one screen exempt from S11's LoadFailed rule. The
+strip composes the shared primitive (S11).
+
 ### `#/` and `#/schedule` — today and date picker
 - **Reference:** `#9a` (43 / 41, light + dark), `#1d` (36 / **64**, 3 bars), `#9b` (55 / 14)
 - **Source:** [`features/schedule/TodayScreen.tsx`](../../../web/apps/staff/src/features/schedule/TodayScreen.tsx), [`DatePickerScreen.tsx`](../../../web/apps/staff/src/features/schedule/DatePickerScreen.tsx), [`ScheduleSection.tsx`](../../../web/apps/staff/src/features/schedule/ScheduleSection.tsx)
@@ -96,6 +102,12 @@ Build:
    (`השבוע` / `שבוע הבא` / `החודש` / `30 יום אחרונים`).
 5. **`חזרה להיום`.**
 
+**Functional (2026-08-27):** all five landed (S7; headcount via `SessionOut.headcount`).
+What the screenshot could not see and this pass fixed: TodayScreen's fetch had **no catch**
+(a failed day rendered as a day off) and the picker's failed month as "no lessons" — both
+now fail loudly with an offline-aware retry (S11). The tour no longer points at an empty
+`#/` (S4.4).
+
 ### `#/students` — student search
 - **Reference:** `#9h` (36 lines / **99** controls / 6 accents)
 - **Source:** [`features/people/StudentsSearch.tsx`](../../../web/apps/staff/src/features/people/StudentsSearch.tsx)
@@ -113,6 +125,11 @@ Build:
    (D7 ring) and the percentage coloured against the exam threshold.
 5. Search by student **or parent** name (`חיפוש לפי שם חניך או הורה`).
 
+**Functional (2026-08-27):** rows open the card (S3), tabs/banner/meta landed (S8; the rate
+renders neutrally — no exam threshold exists to colour against, see Log · S8), parent-name
+search is server-side. The invisible defect died in S11: a failed search rendered as an
+EMPTY list — "no such child" — and now retries.
+
 ### `#/events` — staff events
 - **Reference:** `#9i` (31 / 4, 1 bar) · **Source:** [`features/events/StaffEventsScreen.tsx`](../../../web/apps/staff/src/features/events/StaffEventsScreen.tsx)
 - **Measured:** 2 lines · 0 controls · **Status:** SHELL (no events existed when measured)
@@ -123,12 +140,22 @@ date, time, venue; **ownership markers** `אתה האחראי` and `אתה הב�
 (`כל האישורים נחתמו`); outstanding work (`הזמנות טרם נשלחו` + `שליחה`); `רשימת משתתפים`;
 `אירוע חדש`.
 
+**Functional (2026-08-27):** cards carry date/time/venue, consent state
+(`consent_signed_count`, projected), draft-as-outstanding-work with שליחה, upcoming count;
+`רשימת משתתפים` is its own screen at `#/events/<id>/roster` (S9). Ownership markers and
+capacity **need columns that do not exist** — raised for a wave contract commit, not built.
+`אירוע חדש` deferred to the dashboard's form (Log · S9). SHELL verdict answered by seeded
+tests; a browser re-measure waits on the demo M7 fixture layer.
+
 ### `#/cash` — payment promises *(manager-only)*
 - **Source:** [`features/billing/PaymentPromisesSection.tsx`](../../../web/apps/staff/src/features/billing/PaymentPromisesSection.tsx)
 - **Measured (as `manager`):** 2 lines — `בקשות תשלום`, `אין בקשות תשלום פתוחות.`
 
 **This is not artboard `11a`.** `#/cash` is the cheque / cash payment-promise queue; `11a` is
 in-lesson item handover, a different feature with no route. See *Unreachable code*.
+
+**Functional (2026-08-27):** a coach now gets a visible refusal here (S10); a failed
+promise read no longer renders as "nothing to collect" (S11).
 
 ### `#/join-link` — club join link *(manager-only)*
 - **Source:** [`features/people/JoinLinkSection.tsx`](../../../web/apps/staff/src/features/people/JoinLinkSection.tsx)
@@ -138,6 +165,10 @@ in-lesson item handover, a different feature with no route. See *Unreachable cod
 - **Reference:** `#9d` variant 2 · **Source:** [`features/events/ExamResultsScreen.tsx`](../../../web/apps/staff/src/features/events/ExamResultsScreen.tsx), [`ExamResultMark.tsx`](../../../web/apps/staff/src/features/events/ExamResultMark.tsx), [`BeltPair.tsx`](../../../web/apps/staff/src/features/events/BeltPair.tsx)
 - Not measured — no exam existed. `BeltPair` is the before/after belt display and should carry
   the **D7 ring**; `9d#2` has 7 accent colours.
+
+**Functional (2026-08-27):** the ring was already unconditional — `BeltPair` composes
+`BeltBar`, tested in the primitive (S9). The route now serves ONLY held exams; future
+events go to the participants list. Failure gets an offline-aware retry (S11).
 
 ### `#/install`
 - **Source:** shared [`web/packages/ui/src/first-run/InstallWalkthrough.tsx`](../../../web/packages/ui/src/first-run/InstallWalkthrough.tsx) · 2 lines. No artboard. Works.
@@ -152,6 +183,10 @@ permission-boundary list**, which explicitly shows `מסמכים של חניכי
 `מעבר חניך בין כיתות` greyed out with `לא זמין בהרשאה שלך` and the footnote
 *"פעולות אלה שמורות למאמן הראשי של הכיתה"*. Showing a locked capability is a deliberate design
 choice — it teaches the role rather than hiding it.
+
+**Functional (2026-08-27):** identity block and the adaptive locked list landed
+(`DrawerIdentity`, `PermissionBoundaries`; `GET /groups?mine=true` — S10). Work counters
+and `בקשת החלפה` raised, not invented: no semantics and no model respectively (Log · S10).
 
 ---
 
@@ -229,6 +264,20 @@ link that must be signed `לפני עלייה למזרן`.
    mirrored in `en/` and `ru/`.
 
 ## Log
+
+### 2026-08-27 · S12 — the record closes over itself
+
+The log below now carries every workstream S1–S11, and the four deferred decisions are
+each written down where they were made: the staff `AtRiskAlert` kept and retargeted to
+`staff-alerts` (S1 entry), 9c's stated rule chosen over 2d's omission — show the boundary,
+name who holds it (S2+S3 entry, applied again in S10), a coach never sees the setup wizard
+(S4 entry), and conflicts surface in the STAFF app because the coach's queue produced them
+(S5 entry). Each screen entry above gained a **Functional (2026-08-27)** line — the
+dimension a screenshot cannot see: the catch-less fetch, the failure that masqueraded as
+an empty list, the route that served the wrong screen, the registration nothing mounted.
+The audit's own headline numbers (0 retries, 0 bars, 0 controls on search) are now
+historical; the log entries are the current claim, and the fall-through table rows point
+at them.
 
 ### 2026-08-27 · S11 — every screen can retry, and offline is not "broken"
 
