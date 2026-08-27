@@ -12,6 +12,7 @@ import type { CSSProperties } from 'react'
 import { Button, EmptyState, StatusChip, Table } from '@studio/ui'
 import { apiFetch, appendPage } from '@studio/core'
 import type { CursorPage } from '@studio/core'
+import { ConfirmDialog } from '../rollover/ConfirmDialog'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import type { DashboardPeopleClient, StudentSummary } from './peopleClient'
@@ -105,6 +106,71 @@ export function StudentsScreen({
       alive = false
     }
   }, [])
+
+  // F12 — selection and the bulk bar. Outcomes render PER ROW, the rollover's refusal
+  // shape: a half-succeeded batch must say which rows failed and why.
+  const [selected, setSelected] = useState<string[]>([])
+  const [bulkGroup, setBulkGroup] = useState('')
+  const [bulkGroups, setBulkGroups] = useState<{ id: string; name: string }[]>([])
+  const [confirmingBulk, setConfirmingBulk] = useState<'move' | 'leave' | null>(null)
+  const [bulkOutcome, setBulkOutcome] = useState<{
+    applied: number
+    refused: { id: string; reason: string }[]
+  } | null>(null)
+
+  useEffect(() => {
+    let alive = true
+    void apiFetch('/api/v1/groups')
+      .then(async (r) =>
+        r.ok
+          ? ((await r.json()) as { items: { id: string; name: string; is_active: boolean }[] })
+              .items
+          : [],
+      )
+      .then((rows) => alive && setBulkGroups(rows.filter((row) => row.is_active)))
+      .catch(() => undefined)
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  async function bulkMove() {
+    setConfirmingBulk(null)
+    const response = await apiFetch('/api/v1/students/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        student_moves: selected.map((studentId) => ({ student_id: studentId, group_id: bulkGroup })),
+      }),
+    })
+    if (!response.ok) {
+      setBulkOutcome({ applied: 0, refused: selected.map((id) => ({ id, reason: 'failed' })) })
+      return
+    }
+    const body = (await response.json()) as {
+      applied: number
+      refused: { id: string; reason: string }[]
+    }
+    setBulkOutcome(body)
+    setSelected([])
+    reload()
+  }
+
+  async function bulkLeave() {
+    setConfirmingBulk(null)
+    // Reuses the existing per-student leave route rather than a second implementation;
+    // the aggregation keeps the per-row answer.
+    const refused: { id: string; reason: string }[] = []
+    let applied = 0
+    for (const studentId of selected) {
+      const response = await apiFetch(`/api/v1/students/${studentId}/leave`, { method: 'POST' })
+      if (response.ok) applied += 1
+      else refused.push({ id: studentId, reason: 'failed' })
+    }
+    setBulkOutcome({ applied, refused })
+    setSelected([])
+    reload()
+  }
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState('')
   // Which query the page in state answers. Derived rather than a `loading` flag set
@@ -112,12 +178,14 @@ export function StudentsScreen({
   // `react-hooks/set-state-in-effect` is right to refuse it. Comparing the answered query
   // to the current one says the same thing without the extra render.
   const [answered, setAnswered] = useState<string | null>(null)
-  const asked = `${query}\u0000${status}`
+  const [version, setVersion] = useState(0)
+  const asked = `${query}\u0000${status}\u0000${version}`
   const loaded = answered === asked
+  const reload = () => setVersion((n) => n + 1)
 
   useEffect(() => {
     let live = true
-    const key = `${query}\u0000${status}`
+    const key = `${query}\u0000${status}\u0000${version}`
     client
       .students({ q: query, status })
       .then((fresh) => {
@@ -129,7 +197,12 @@ export function StudentsScreen({
     return () => {
       live = false
     }
-  }, [client, query, status])
+  }, [client, query, status, version])
+
+  const nameOfStudent = (id: string) => {
+    const row = page.items.find((student) => student.id === id)
+    return row ? `${row.first_name} ${row.last_name}` : id
+  }
 
   const loadMore = () => {
     if (!page.next_cursor) return
@@ -179,6 +252,77 @@ export function StudentsScreen({
           )}
         />
       ) : (
+        <>
+        {selected.length > 0 ? (
+          <div data-testid="students-bulk-bar" style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'end', flexWrap: 'wrap' }}>
+            <span>{t(locale, 'people.bulk.selected').replace('{n}', String(selected.length))}</span>
+            <label>
+              {t(locale, 'people.bulk.move')}
+              <select
+                data-testid="bulk-group"
+                onChange={(event) => setBulkGroup(event.target.value)}
+                value={bulkGroup}
+              >
+                <option value="">—</option>
+                {bulkGroups.map((group) => (
+                  <option key={group.id} value={group.id}>
+                    {group.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <Button
+              data-testid="bulk-move"
+              disabled={!bulkGroup}
+              onClick={() => setConfirmingBulk('move')}
+            >
+              {t(locale, 'people.bulk.move')}
+            </Button>
+            <Button
+              data-testid="bulk-leave"
+              onClick={() => setConfirmingBulk('leave')}
+              variant="destructive"
+            >
+              {t(locale, 'people.bulk.leave')}
+            </Button>
+          </div>
+        ) : null}
+        {confirmingBulk ? (
+          <ConfirmDialog
+            body={t(
+              locale,
+              confirmingBulk === 'move' ? 'people.bulk.moveConfirm' : 'people.bulk.leaveConfirm',
+            )}
+            confirmLabel={t(
+              locale,
+              confirmingBulk === 'move' ? 'people.bulk.move' : 'people.bulk.leave',
+            )}
+            locale={locale}
+            onCancel={() => setConfirmingBulk(null)}
+            onConfirm={() => void (confirmingBulk === 'move' ? bulkMove() : bulkLeave())}
+            testId="confirm-bulk"
+            title={t(
+              locale,
+              confirmingBulk === 'move' ? 'people.bulk.move' : 'people.bulk.leave',
+            )}
+            titleId="confirm-bulk-title"
+          />
+        ) : null}
+        {bulkOutcome ? (
+          <div data-testid="bulk-outcome">
+            <p>{t(locale, 'people.bulk.applied').replace('{n}', String(bulkOutcome.applied))}</p>
+            {bulkOutcome.refused.length > 0 ? (
+              <ul>
+                {bulkOutcome.refused.map((row) => (
+                  <li data-testid={`bulk-refused-${row.id}`} key={row.id}>
+                    {nameOfStudent(row.id)} ·{' '}
+                    {t(locale, `people.bulk.refused.${row.reason}`)}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        ) : null}
         <span data-testid="students-table">
           {/* F1b — explicit widths through the primitive, which is what un-collapses the
               header the audit measured as "one run-on string", plus F11's card fallback
@@ -186,6 +330,26 @@ export function StudentsScreen({
           <Table
             caption={t(locale, 'people.student.plural')}
             columns={[
+              {
+                id: 'select',
+                header: t(locale, 'people.bulk.move'),
+                width: '3rem',
+                cell: (student) => (
+                  <input
+                    aria-label={`${student.first_name} ${student.last_name}`}
+                    checked={selected.includes(student.id)}
+                    data-testid={`select-${student.id}`}
+                    onChange={() =>
+                      setSelected((current) =>
+                        current.includes(student.id)
+                          ? current.filter((id) => id !== student.id)
+                          : [...current, student.id],
+                      )
+                    }
+                    type="checkbox"
+                  />
+                ),
+              },
               {
                 id: 'student',
                 header: t(locale, 'people.student.one'),
@@ -271,6 +435,7 @@ export function StudentsScreen({
             rows={page.items}
           />
         </span>
+        </>
       )}
 
       {page.has_more ? (

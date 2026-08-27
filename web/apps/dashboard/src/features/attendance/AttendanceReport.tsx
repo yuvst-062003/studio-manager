@@ -40,6 +40,7 @@ export function AttendanceReport({
   const [unmarked, setUnmarked] = useState<UnmarkedSession[] | null>(null)
   // F7a — which coach reminders went, per session, and F7b's export failure.
   const [reminded, setReminded] = useState<Record<string, 'sent' | 'quiet' | 'failed'>>({})
+  const [selectedSessions, setSelectedSessions] = useState<string[]>([])
   const [exportFailed, setExportFailed] = useState(false)
 
   async function remindCoach(sessionId: string) {
@@ -106,9 +107,37 @@ export function AttendanceReport({
           // nothing there looks broken instead.
           <EmptyState title={t(locale, 'attendance.report.empty')} />
         ) : (
+          <>
+          {/* F12 — selection plus a bulk action: one press reminds every selected
+              coach, and each row keeps its own outcome. */}
+          {selectedSessions.length > 0 ? (
+            <Button
+              data-testid="bulk-remind-coaches"
+              onClick={() => {
+                for (const sessionId of selectedSessions) void remindCoach(sessionId)
+                setSelectedSessions([])
+              }}
+              variant="secondary"
+            >
+              {t(locale, 'attendance.report.remindCoach')} · {selectedSessions.length}
+            </Button>
+          ) : null}
           <ul data-testid="unmarked-list">
             {unmarked.map((session) => (
               <li data-testid={`unmarked-${session.id}`} key={session.id}>
+                <input
+                  aria-label={session.group_name}
+                  checked={selectedSessions.includes(session.id)}
+                  data-testid={`select-session-${session.id}`}
+                  onChange={() =>
+                    setSelectedSessions((current) =>
+                      current.includes(session.id)
+                        ? current.filter((id) => id !== session.id)
+                        : [...current, session.id],
+                    )
+                  }
+                  type="checkbox"
+                />
                 <span>{formatTimeInStudioZone(session.starts_at, locale)}</span>
                 <bdi>{session.group_name}</bdi>
                 <span>{formatDateInStudioZone(session.starts_at, locale)}</span>
@@ -137,6 +166,7 @@ export function AttendanceReport({
               </li>
             ))}
           </ul>
+          </>
         )}
       </section>
 

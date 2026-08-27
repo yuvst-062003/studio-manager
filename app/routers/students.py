@@ -31,6 +31,7 @@ from enum import Enum
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from pydantic import BaseModel, Field
 
 from app.core.auth_context import AnyStaff, ManagerOrOwner
 from app.core.clock import now
@@ -363,6 +364,69 @@ def update_student(
         raise _not_found() from exc
     session.commit()
     return _out(session, student, person)
+
+
+class BulkStudentsIn(BaseModel):
+    """F12 -- selection plus a bulk action, outside the rollover wizard."""
+
+    moves: list[EnrollmentMoveIn] = Field(default_factory=list, max_length=500)
+    #: The students-screen form: the SCREEN knows students, not enrollments.
+    student_moves: list[StudentMoveIn] = Field(default_factory=list, max_length=500)
+    not_returning: list[uuid.UUID] = Field(default_factory=list, max_length=500)
+
+
+class EnrollmentMoveIn(BaseModel):
+    enrollment_id: uuid.UUID
+    group_id: uuid.UUID
+
+
+class StudentMoveIn(BaseModel):
+    student_id: uuid.UUID
+    group_id: uuid.UUID
+
+
+class BulkRefusalOut(BaseModel):
+    id: uuid.UUID
+    reason: str
+
+
+class BulkStudentsOut(BaseModel):
+    applied: int
+    refused: list[BulkRefusalOut]
+
+
+@router.post("/students/bulk", response_model=BulkStudentsOut)
+def bulk_students_route(
+    _: ManagerOrOwner,
+    body: BulkStudentsIn,
+    request: Request,
+    session: TenantSessionDep,
+) -> BulkStudentsOut:
+    """F12. Same shape as the rollover's bulk steps -- per-row machine-readable refusals,
+    never one aggregate error -- but mid-season boundaries: a February move ends
+    yesterday and starts today rather than being back-dated to September."""
+    from app.core.tenancy import get_current_studio_id
+    from app.services.people.bulk import bulk_students
+
+    studio_id = get_current_studio_id()
+    if studio_id is None:  # pragma: no cover -- TenantSessionDep fails closed first
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail={"code": "no_studio"})
+    outcome = bulk_students(
+        session,
+        moves=[(move.enrollment_id, move.group_id) for move in body.moves],
+        student_moves=[(move.student_id, move.group_id) for move in body.student_moves],
+        not_returning=body.not_returning,
+        at=now(),
+        actor_person_id=getattr(request.state, "person_id", None),
+        studio_id=studio_id,
+    )
+    session.commit()
+    return BulkStudentsOut(
+        applied=outcome.applied,
+        refused=[
+            BulkRefusalOut(id=uuid.UUID(row["id"]), reason=row["reason"]) for row in outcome.refused
+        ],
+    )
 
 
 @router.post("/students/{student_id}/freeze", response_model=StudentOut)

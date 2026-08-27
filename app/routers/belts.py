@@ -142,9 +142,7 @@ class GroupBeltRangesOut(BaseModel):
 
 
 @router.get("/belt-ranges/by-group", response_model=GroupBeltRangesOut)
-def belt_ranges_by_group(
-    _: AnyStaff, session: TenantSessionDep
-) -> GroupBeltRangesOut:
+def belt_ranges_by_group(_: AnyStaff, session: TenantSessionDep) -> GroupBeltRangesOut:
     """F8 — 4b's טווח חגורות, measured: the lowest and highest CURRENT belt among each
     group's live enrollments. A group whose students hold no belt yet is simply absent —
     an empty range is not a range."""

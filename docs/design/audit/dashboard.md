@@ -271,6 +271,25 @@ is the single cheapest item in this spec.
 
 ## Log
 
+### 2026-08-27 · F12 — bulk actions outside the rollover wizard
+
+`POST /students/bulk` reuses the rollover's bulk SHAPE — `BulkOutcome`, per-row
+machine-readable refusals the i18n layer translates, the end-plus-start move that never
+rewrites `group_id` in place — but not its date boundary: the rollover anchors both verbs
+to the new year's start, correct in September and wrong in February, so the mid-season
+variant ends yesterday and starts today. The screen speaks student ids
+(`student_moves`); a student with several live enrollments refuses per row
+(`multiple_enrollments` — C11 makes that normal and a bulk gesture must not guess), and
+moving into a group the student already trains in refuses `already_in_destination`
+instead of a 500 on row N.
+
+The students screen grew a checkbox column and a bulk bar (move behind a confirm, mark-
+as-left behind a confirm and looping the existing per-student leave route rather than a
+second implementation), the attendance report grew select-and-remind over F7's coach
+reminder, and collections had its selection wired to the bulk debt reminder in F7's
+commit. Outcomes render per row, `BulkOutcomePanel`-style.
+
+
 ### 2026-08-27 · F9 + F10 — one search box, and doors that match the role
 
 **F9.** `GET /api/v1/search` (ManagerOrOwner) answers students by their own name, by a

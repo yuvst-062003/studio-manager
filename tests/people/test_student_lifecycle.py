@@ -543,3 +543,80 @@ def test_the_status_history_route_is_readable_by_a_coach(
     )
     assert response.status_code == 200
     assert response.json()["items"] == []
+
+
+# -- F12: bulk actions outside the rollover -----------------------------------
+def test_bulk_move_is_an_end_plus_a_start_with_midseason_dates(
+    client, as_manager, app_session, studio
+):
+    from datetime import date
+
+    from app.models.people import Enrollment
+    from app.models.person import Person
+    from app.models.structure import Class, Group
+
+    klass = Class(studio_id=studio.id, name="ג'ודו בולק")
+    app_session.add(klass)
+    app_session.flush()
+    source = Group(studio_id=studio.id, class_id=klass.id, name="מקור", is_active=True)
+    target = Group(studio_id=studio.id, class_id=klass.id, name="יעד", is_active=True)
+    retired = Group(studio_id=studio.id, class_id=klass.id, name="ארכיון", is_active=False)
+    app_session.add_all([source, target, retired])
+    app_session.flush()
+    person = Person(studio_id=studio.id, first_name="נייד", last_name="בולק")
+    app_session.add(person)
+    app_session.flush()
+    from app.models.people import Student
+
+    student = Student(studio_id=studio.id, person_id=person.id, status="active")
+    app_session.add(student)
+    app_session.flush()
+    enrollment = Enrollment(
+        studio_id=studio.id,
+        student_id=student.id,
+        group_id=source.id,
+        status="active",
+        started_on=date(2026, 6, 1),
+    )
+    second_source = Group(studio_id=studio.id, class_id=klass.id, name="מקור ב", is_active=True)
+    app_session.add(second_source)
+    app_session.flush()
+    bad = Enrollment(
+        studio_id=studio.id,
+        student_id=student.id,
+        group_id=second_source.id,
+        status="active",
+        started_on=date(2026, 6, 1),
+    )
+    app_session.add_all([enrollment, bad])
+    app_session.commit()
+
+    response = client.post(
+        "/api/v1/students/bulk",
+        json={
+            "moves": [
+                {"enrollment_id": str(enrollment.id), "group_id": str(target.id)},
+                {"enrollment_id": str(bad.id), "group_id": str(retired.id)},
+            ]
+        },
+        headers=as_manager.headers,
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    # One applied, one refused BY ROW with a machine-readable reason — never one
+    # aggregate error.
+    assert body["applied"] == 1
+    assert body["refused"] == [{"id": str(bad.id), "reason": "destination_retired"}]
+
+    app_session.expire_all()
+    moved = app_session.get(Enrollment, enrollment.id)
+    assert moved.ended_on is not None
+    # Mid-season: the end is yesterday-or-later, never last September.
+    assert moved.ended_on >= date(2026, 6, 1)
+
+
+def test_bulk_is_manager_only(client, as_lead_coach):
+    refused = client.post(
+        "/api/v1/students/bulk", json={"moves": []}, headers=as_lead_coach.headers
+    )
+    assert refused.status_code == 403

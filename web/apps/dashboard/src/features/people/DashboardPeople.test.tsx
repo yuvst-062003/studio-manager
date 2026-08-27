@@ -638,3 +638,46 @@ describe('F2 — the four buttons that used to do nothing', () => {
     expect(client.markLost).toHaveBeenCalledWith('st9', 'לא התאים')
   })
 })
+
+describe('F12 — bulk actions on the students screen', () => {
+  it('selects rows and fires one bulk move with per-row outcomes', async () => {
+    const bodies: unknown[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input)
+        if (url.includes('/students/bulk')) {
+          bodies.push(JSON.parse(String(init?.body)))
+          return new Response(
+            JSON.stringify({
+              applied: 1,
+              refused: [{ id: 'st1', reason: 'multiple_enrollments' }],
+            }),
+            { status: 200 },
+          )
+        }
+        if (url.includes('/groups')) {
+          return new Response(
+            JSON.stringify({ items: [{ id: 'g9', name: 'יעד', is_active: true }] }),
+            { status: 200 },
+          )
+        }
+        return new Response(JSON.stringify({ items: [] }), { status: 200 })
+      }),
+    )
+    render(<StudentsScreen locale="he" client={makeClient()} />)
+    await userEvent.click(await screen.findByTestId('select-st1'))
+    await userEvent.selectOptions(await screen.findByTestId('bulk-group'), 'g9')
+    await userEvent.click(screen.getByTestId('bulk-move'))
+    // Destructive-adjacent: the confirm dialog gates the press.
+    await userEvent.click(await screen.findByTestId('confirm-bulk-confirm'))
+    expect(bodies[0]).toMatchObject({
+      student_moves: [{ student_id: 'st1', group_id: 'g9' }],
+    })
+    // The half-succeeded batch says WHICH row failed and why, translated.
+    expect(await screen.findByTestId('bulk-refused-st1')).toHaveTextContent(
+      t('he', 'people.bulk.refused.multiple_enrollments'),
+    )
+    vi.unstubAllGlobals()
+  })
+})
