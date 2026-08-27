@@ -159,6 +159,34 @@ class StructureService:
         return _page_out(list(session.execute(stmt).scalars().all()), limit)
 
     @staticmethod
+    def update_group(
+        session: Session,
+        group_id: uuid.UUID,
+        *,
+        fields: dict[str, object],
+        at: datetime,
+    ) -> Group:
+        """F4's rename/retire/revive. `fields` carries only what the caller SET --
+        renaming to the same name is legal, renaming onto a sibling's name is not."""
+        row = StructureService.get_group(session, group_id)
+        if "name" in fields and fields["name"] != row.name:
+            duplicate = session.execute(
+                select(Group.id).where(
+                    Group.class_id == row.class_id,
+                    Group.name == fields["name"],
+                    Group.id != group_id,
+                )
+            ).first()
+            if duplicate is not None:
+                raise DuplicateNameError(str(fields["name"]))
+        for column in ("name", "description", "age_min", "age_max", "is_active"):
+            if column in fields:
+                setattr(row, column, fields[column])
+        row.updated_at = at
+        session.flush()
+        return row
+
+    @staticmethod
     def create_location(
         session: Session, *, name: str, address: str | None, notes: str | None, at: datetime
     ) -> Location:

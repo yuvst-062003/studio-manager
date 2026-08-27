@@ -30,6 +30,7 @@ from app.schemas.structure import (
     GroupCreate,
     GroupListResponse,
     GroupOut,
+    GroupPatch,
     GroupStaffCreate,
     GroupStaffListResponse,
     GroupStaffOut,
@@ -124,6 +125,28 @@ def create_group(_: ManagerOrOwner, body: GroupCreate, session: TenantSessionDep
         raise _not_found() from exc
     except DuplicateNameError as exc:
         raise _conflict(body.name) from exc
+    session.commit()
+    return GroupOut.model_validate(row, from_attributes=True)
+
+
+@router.patch("/groups/{group_id}", response_model=GroupOut)
+def update_group(
+    _: ManagerOrOwner, group_id: uuid.UUID, body: GroupPatch, session: TenantSessionDep
+) -> GroupOut:
+    """F4 -- rename / retire / revive, outside the once-a-year rollover wizard. Rename
+    and retire used to exist ONLY inside `POST /rollover/{y}/groups`; a club opening a
+    Tuesday beginners group in November had nowhere to do this."""
+    try:
+        row = StructureService.update_group(
+            session,
+            group_id,
+            fields={k: v for k, v in body.model_dump().items() if k in body.model_fields_set},
+            at=now(),
+        )
+    except NotFoundError as exc:
+        raise _not_found() from exc
+    except DuplicateNameError as exc:
+        raise _conflict(body.name or "") from exc
     session.commit()
     return GroupOut.model_validate(row, from_attributes=True)
 

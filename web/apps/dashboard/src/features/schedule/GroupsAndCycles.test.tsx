@@ -10,8 +10,8 @@ import { GroupsAndCycles } from './GroupsAndCycles'
 import type { GroupSummary, ScheduleClient } from './client'
 
 const GROUPS: GroupSummary[] = [
-  { id: 'g1', name: 'מתחילים', className: "ג'ודו" },
-  { id: 'g2', name: 'נבחרת', className: "ג'ודו" },
+  { id: 'g1', name: 'מתחילים', className: "ג'ודו", classId: 'c1', isActive: true },
+  { id: 'g2', name: 'נבחרת', className: "ג'ודו", classId: 'c1', isActive: true },
 ]
 
 const RULES = [

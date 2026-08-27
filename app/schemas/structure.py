@@ -52,6 +52,19 @@ class ClassListResponse(BaseModel):
     next_cursor: uuid.UUID | None = None
 
 
+class GroupPatch(BaseModel):
+    """F4 -- rename / retire / revive outside the rollover wizard. Every field optional;
+    absence leaves the column alone (`model_fields_set` decides, like SessionPatch).
+    A club that opens a Tuesday beginners group in November should not have to run a
+    yearly wizard out of season to rename one."""
+
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    description: str | None = Field(default=None, max_length=2000)
+    age_min: int | None = Field(default=None, ge=0, le=120)
+    age_max: int | None = Field(default=None, ge=0, le=120)
+    is_active: bool | None = None
+
+
 class GroupCreate(BaseModel):
     class_id: uuid.UUID
     name: str = Field(min_length=1, max_length=120)

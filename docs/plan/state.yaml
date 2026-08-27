@@ -465,7 +465,8 @@ waves:
         on: 2026-08-27
       - id: F4
         title: Dashboard — schedule vertical write half (coach assignment, groups, classes, locations)
-        status: pending
+        status: shipped
+        on: 2026-08-27
       - id: F5
         title: Dashboard — staff lifecycle (invitations, roles, deactivate)
         status: shipped

@@ -271,6 +271,30 @@ is the single cheapest item in this spec.
 
 ## Log
 
+### 2026-08-27 · F4 — the schedule vertical gets its write half
+
+**What was wrong.** The backend was complete since M1/W2 and the UI called almost none of
+it: `GroupsAndCycles` had no interactive element, the staff screen's red alert named a
+problem no screen could solve, and `POST /classes` / `POST /locations` had no screen — a
+studio that opened a second hall could not record it.
+
+**What was built.**
+- **Coach assignment** (`GroupCoachPanel` on the group page): reads
+  `GET /groups/{id}/staff`, assigns via the M1.4 route with a lead/assistant choice. The
+  staff screen's uncovered alert now links each named group straight to its page, so the
+  alert leads to the fix and the count drops on the next read.
+- **Group create / rename / retire / revive** on `GroupsAndCycles`, via `POST /groups`
+  and a NEW `PATCH /groups/{id}` (name, description, ages, is_active — with the
+  duplicate-sibling-name refusal the create path already had). Rename and retire used to
+  exist only inside the yearly rollover wizard; a club opening a Tuesday beginners group
+  in November now has somewhere to do it.
+- **Classes and halls** in `#/settings` under a new כיתות ואולמות section. **Decision
+  (F4.3):** settings, not beside groups — a class or hall changes a few times in a club's
+  life (settings cadence), while `#/groups` is the weekly working screen; parking rare
+  structure edits there would clutter the working screen to save a click a year.
+- Session-level actions were delivered by F3's popover.
+
+
 ### 2026-08-27 · F5 — staff, from a table into a lifecycle (+ F8's hours and banner)
 
 **What was wrong.** `app/routers/staff.py` was one GET; `features/staff/` issued zero

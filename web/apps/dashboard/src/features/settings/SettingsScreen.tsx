@@ -28,6 +28,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import { apiFetch } from '@studio/core'
 import { Card, Switch, TextField } from '@studio/ui'
+import { StructurePanel } from './StructurePanel'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { PrepayTermsPanel, StandingOrderLinksPanel, makeDashboardBillingClient } from '../billing'
@@ -46,6 +47,9 @@ type StudioDetails = {
 //: hidden: a manager who cannot find מחירים concludes it is missing, not that it is next.
 const SECTIONS = [
   { key: 'studio', owned: true },
+  // F4.3 — classes and halls. Settings-cadence edits live here; #/groups stays the
+  // weekly working screen.
+  { key: 'structure', owned: true },
   { key: 'prices', owned: false },
   // Owned since the 2026-08-27 payment-routes pass: this is where the הוראת קבע link per
   // price plan is set. One screen answers "how may a family pay this club".
@@ -181,7 +185,9 @@ export function SettingsScreen({ locale }: { locale: Locale }) {
           </ul>
         </nav>
 
-        {section === 'payments' ? (
+        {section === 'structure' ? (
+          <StructurePanel locale={locale} />
+        ) : section === 'payments' ? (
           <div data-testid="settings-panel-payments">
             {/* One screen answers "how may a family pay this club": the link per plan for
                 the הוראת קבע route, and how many months forward the other two collect. */}

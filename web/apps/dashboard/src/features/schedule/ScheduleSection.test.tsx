@@ -26,7 +26,7 @@ const SESSION_ROW = {
 
 function stub(overrides: Partial<ScheduleClient> = {}): ScheduleClient {
   return {
-    listGroups: vi.fn(async () => [{ id: 'g1', name: 'מתחילים', className: "ג'ודו" }]),
+    listGroups: vi.fn(async () => [{ id: 'g1', name: 'מתחילים', className: "ג'ודו", classId: 'c1', isActive: true }]),
     listSessions: vi.fn(async () => []),
     getSchedule: vi.fn(async () => []),
     putSchedule: vi.fn(async () => ({

@@ -18,6 +18,7 @@ import { formatDateInStudioZone, formatTimeInStudioZone } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { GroupTrainingPanel } from '../training/GroupTrainingPanel'
+import { GroupCoachPanel } from './GroupCoachPanel'
 import { ImpactDialog } from './ImpactDialog'
 import { cancelReasonLabel } from './client'
 import type { ImpactPreview, ScheduleClient, ScheduleRule, SessionRow, TrainingYear } from './client'
@@ -196,6 +197,10 @@ export function GroupSchedulePage({
           is an invite list. Here rather than on the groups index because the manager is
           already looking at ONE group, and the eligibility checklist is about this one. */}
       <GroupTrainingPanel locale={locale} groupId={groupId} />
+
+      {/* F4.1 — coach assignment lives on the group page; the staff screen's uncovered
+          alert links here. */}
+      <GroupCoachPanel groupId={groupId} locale={locale} />
 
       <section aria-labelledby="rules-title">
         <h3 id="rules-title">{t(locale, 'schedule.rules.title')}</h3>

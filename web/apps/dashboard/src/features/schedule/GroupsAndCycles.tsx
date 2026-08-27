@@ -15,8 +15,8 @@
 // that writes is the worst possible bug on a read-only screen.
 import { useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { EmptyState, Table } from '@studio/ui'
-import { formatDateInStudioZone, formatTimeInStudioZone } from '@studio/core'
+import { Button, EmptyState, Table, TextField } from '@studio/ui'
+import { apiFetch, formatDateInStudioZone, formatTimeInStudioZone } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import type { GroupSummary, ScheduleClient, ScheduleRule, SessionRow } from './client'
@@ -49,10 +49,14 @@ export function GroupsAndCycles({
   groups,
   today,
   hrefForGroup,
+  onChanged,
 }: {
   locale: Locale
   client: ScheduleClient
   groups: GroupSummary[]
+  /** F4 — the write half. Called after a create / rename / retire so the owner of the
+   *  groups list re-fetches it. Absent in a purely read-only mount. */
+  onChanged?: () => void
   /** An ISO instant. A prop, not `new Date()` — the "next session" cell depends on it. */
   today: string
   /**
@@ -63,6 +67,42 @@ export function GroupsAndCycles({
   hrefForGroup?: (groupId: string) => string
 }) {
   const [facts, setFacts] = useState<Record<string, GroupFacts>>({})
+  // F4 — the write half's own state.
+  const [creating, setCreating] = useState(false)
+  const [newName, setNewName] = useState('')
+  const [newClassId, setNewClassId] = useState('')
+  const [classes, setClasses] = useState<{ id: string; name: string }[]>([])
+  const [renaming, setRenaming] = useState<string | null>(null)
+  const [renameTo, setRenameTo] = useState('')
+  const [writeFailed, setWriteFailed] = useState(false)
+
+  useEffect(() => {
+    if (!onChanged) return
+    let alive = true
+    void apiFetch('/api/v1/classes')
+      .then(async (r) => (r.ok ? ((await r.json()) as { items: { id: string; name: string }[] }).items : []))
+      .then((rows) => alive && setClasses(rows))
+      .catch(() => undefined)
+    return () => {
+      alive = false
+    }
+  }, [onChanged])
+
+  const patchGroup = (groupId: string, body: Record<string, unknown>) => {
+    setWriteFailed(false)
+    void apiFetch(`/api/v1/groups/${groupId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }).then((response) => {
+      if (!response.ok) {
+        setWriteFailed(true)
+        return
+      }
+      setRenaming(null)
+      onChanged?.()
+    })
+  }
   const groupIds = useMemo(() => groups.map((group) => group.id).join(','), [groups])
 
   useEffect(() => {
@@ -110,13 +150,76 @@ export function GroupsAndCycles({
     // the mitigation; it was not, and the effect re-ran on every parent render.
   }, [client, groupIds, groups, today])
 
+  const createForm = onChanged ? (
+    creating ? (
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)', alignItems: 'end' }}>
+        <TextField
+          label={t(locale, 'schedule.groups.form.name')}
+          onChange={(event) => setNewName(event.target.value)}
+          value={newName}
+        />
+        <label>
+          {t(locale, 'schedule.groups.form.class')}
+          <select
+            data-testid="new-group-class"
+            onChange={(event) => setNewClassId(event.target.value)}
+            value={newClassId}
+          >
+            <option value="">—</option>
+            {classes.map((klass) => (
+              <option key={klass.id} value={klass.id}>
+                {klass.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <Button
+          data-testid="new-group-submit"
+          disabled={!newName.trim() || !newClassId}
+          onClick={() => {
+            setWriteFailed(false)
+            void apiFetch('/api/v1/groups', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ class_id: newClassId, name: newName.trim() }),
+            }).then((response) => {
+              if (!response.ok) {
+                setWriteFailed(true)
+                return
+              }
+              setCreating(false)
+              setNewName('')
+              onChanged()
+            })
+          }}
+        >
+          {t(locale, 'schedule.groups.form.submit')}
+        </Button>
+      </div>
+    ) : (
+      <Button data-testid="new-group-open" onClick={() => setCreating(true)} variant="secondary">
+        {t(locale, 'schedule.groups.create')}
+      </Button>
+    )
+  ) : null
+
   if (groups.length === 0) {
-    return <EmptyState title={t(locale, 'schedule.groups.empty')} />
+    return (
+      <section aria-labelledby="groups-title">
+        <h2 id="groups-title">{t(locale, 'schedule.groups.title')}</h2>
+        {createForm}
+        <EmptyState title={t(locale, 'schedule.groups.empty')} />
+      </section>
+    )
   }
 
   return (
     <section aria-labelledby="groups-title">
       <h2 id="groups-title">{t(locale, 'schedule.groups.title')}</h2>
+      {createForm}
+      {writeFailed ? (
+        <p data-testid="groups-write-failed">{t(locale, 'common.loadFailed.body')}</p>
+      ) : null}
       {/* F1b — widths, caption, scroll container and the card fallback come from the
           primitive. */}
       <Table
@@ -196,7 +299,62 @@ export function GroupsAndCycles({
               </>
             ),
           },
-        ]}
+          ...(onChanged
+            ? [
+                {
+                  id: 'actions',
+                  header: t(locale, 'schedule.groups.create'),
+                  width: '14rem',
+                  cell: (group: GroupSummary) =>
+                    renaming === group.id ? (
+                      <span style={{ display: 'flex', gap: 'var(--space-1)', alignItems: 'end' }}>
+                        <TextField
+                          label={t(locale, 'schedule.groups.form.name')}
+                          onChange={(event) => setRenameTo(event.target.value)}
+                          value={renameTo}
+                        />
+                        <Button
+                          data-testid={`rename-save-${group.id}`}
+                          disabled={!renameTo.trim()}
+                          onClick={() => patchGroup(group.id, { name: renameTo.trim() })}
+                        >
+                          {t(locale, 'schedule.groups.renameSave')}
+                        </Button>
+                      </span>
+                    ) : (
+                      <span style={{ display: 'flex', gap: 'var(--space-1)', flexWrap: 'wrap' }}>
+                        <Button
+                          data-testid={`rename-${group.id}`}
+                          onClick={() => {
+                            setRenaming(group.id)
+                            setRenameTo(group.name)
+                          }}
+                          variant="ghost"
+                        >
+                          {t(locale, 'schedule.groups.rename')}
+                        </Button>
+                        {group.isActive ? (
+                          <Button
+                            data-testid={`retire-${group.id}`}
+                            onClick={() => patchGroup(group.id, { is_active: false })}
+                            variant="ghost"
+                          >
+                            {t(locale, 'schedule.groups.retire')}
+                          </Button>
+                        ) : (
+                          <Button
+                            data-testid={`revive-${group.id}`}
+                            onClick={() => patchGroup(group.id, { is_active: true })}
+                            variant="ghost"
+                          >
+                            {t(locale, 'schedule.groups.revive')}
+                          </Button>
+                        )}
+                      </span>
+                    ),
+                },
+              ]
+            : [])]}
         rowKey={(group) => group.id}
         rows={groups}
       />

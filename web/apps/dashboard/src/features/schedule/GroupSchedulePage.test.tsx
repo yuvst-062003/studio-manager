@@ -89,7 +89,7 @@ const PREVIEW: ImpactPreview = {
 
 function stubClient(overrides: Partial<ScheduleClient> = {}): ScheduleClient {
   return {
-    listGroups: vi.fn(async () => [{ id: 'g1', name: 'מתחילים', className: "ג'ודו" }]),
+    listGroups: vi.fn(async () => [{ id: 'g1', name: 'מתחילים', className: "ג'ודו", classId: 'c1', isActive: true }]),
     listSessions: vi.fn(async () => SESSIONS),
     getSchedule: vi.fn(async () => RULES),
     putSchedule: vi.fn(async () => PREVIEW),

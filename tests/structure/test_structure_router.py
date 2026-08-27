@@ -222,3 +222,48 @@ def test_no_structure_endpoint_returns_a_money_field(client):
         if "/classes" in path or "/groups" in path or "/locations" in path
     }
     assert "agorot" not in str(structure)
+
+
+# -- F4: PATCH /groups/{id} ---------------------------------------------------
+def test_rename_and_retire_a_group_outside_the_rollover(client, as_manager, a_group):
+    renamed = client.patch(
+        f"/api/v1/groups/{a_group}",
+        json={"name": "מתקדמים ב"},
+        headers=as_manager.headers,
+    )
+    assert renamed.status_code == 200, renamed.text
+    assert renamed.json()["name"] == "מתקדמים ב"
+
+    retired = client.patch(
+        f"/api/v1/groups/{a_group}", json={"is_active": False}, headers=as_manager.headers
+    )
+    assert retired.status_code == 200
+    assert retired.json()["is_active"] is False
+
+    revived = client.patch(
+        f"/api/v1/groups/{a_group}", json={"is_active": True}, headers=as_manager.headers
+    )
+    assert revived.json()["is_active"] is True
+
+
+def test_renaming_onto_a_sibling_is_refused(client, as_manager, app_session, studio, a_class):
+    from app.models.structure import Group
+
+    sibling = Group(studio_id=studio.id, class_id=a_class, name="נבחרת", is_active=True)
+    app_session.add(sibling)
+    app_session.commit()
+    other = Group(studio_id=studio.id, class_id=a_class, name="עתודה", is_active=True)
+    app_session.add(other)
+    app_session.commit()
+
+    refused = client.patch(
+        f"/api/v1/groups/{other.id}", json={"name": "נבחרת"}, headers=as_manager.headers
+    )
+    assert refused.status_code == 409
+
+
+def test_group_patch_is_manager_only(client, as_lead_coach, a_group):
+    refused = client.patch(
+        f"/api/v1/groups/{a_group}", json={"name": "x"}, headers=as_lead_coach.headers
+    )
+    assert refused.status_code == 403

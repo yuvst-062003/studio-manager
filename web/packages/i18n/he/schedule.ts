@@ -184,6 +184,18 @@ export const schedule: Bundle = {
 
   // -- groups and cycles (4b) ------------------------------------------------------
   'groups.title': 'קבוצות ומחזורים',
+  'group.coaches.title': 'מאמני הקבוצה',
+  'group.coaches.empty': 'לא שובץ מאמן לקבוצה',
+  'group.coaches.person': 'איש צוות',
+  'groups.create': 'קבוצה חדשה',
+  'groups.form.name': 'שם הקבוצה',
+  'groups.form.class': 'כיתה',
+  'groups.form.submit': 'יצירה',
+  'groups.rename': 'שינוי שם',
+  'groups.renameSave': 'שמירה',
+  'groups.retire': 'העברה לארכיון',
+  'groups.revive': 'החזרה מהארכיון',
+  'groups.archived': 'בארכיון',
   'groups.weeklySchedule': 'לו״ז שבועי',
   'groups.nextSession': 'השיעור הבא',
   'groups.noNextSession': 'אין שיעור מתוכנן',

@@ -98,6 +98,8 @@ export interface GroupSummary {
   id: string
   name: string
   className: string
+  classId: string
+  isActive: boolean
 }
 
 export interface ScheduleClient {
@@ -147,7 +149,7 @@ export function makeScheduleClient(fetcher: Fetcher): ScheduleClient {
       // Two reads rather than one, because `/groups` carries `class_id` and 4b shows the
       // class name. Both are M1's endpoints and neither is written from this lane.
       const [groups, classes] = await Promise.all([
-        json<{ items: { id: string; name: string; class_id: string }[] }>(
+        json<{ items: { id: string; name: string; class_id: string; is_active: boolean }[] }>(
           await fetcher(`${API}/groups`),
         ),
         json<{ items: { id: string; name: string }[] }>(await fetcher(`${API}/classes`)),
@@ -157,6 +159,8 @@ export function makeScheduleClient(fetcher: Fetcher): ScheduleClient {
         id: group.id,
         name: group.name,
         className: classNames.get(group.class_id) ?? '',
+        classId: group.class_id,
+        isActive: group.is_active,
       }))
     },
     async listSessions({ from, to, groupId, coachPersonId }) {

@@ -56,6 +56,7 @@ export function ScheduleSection({
   const needsYear = route.view === 'closures'
 
   const [groups, setGroups] = useState<GroupSummary[] | null>(null)
+  const [groupsVersion, setGroupsVersion] = useState(0)
   // `groups ?? []` inline would mint a fresh array on every render while the fetch is in
   // flight, and `GroupsAndCycles` has `groups` in an effect's dependency list — so the
   // table would re-fetch itself for as long as this component re-rendered.
@@ -75,7 +76,7 @@ export function ScheduleSection({
     return () => {
       live = false
     }
-  }, [client, needsGroups])
+  }, [client, needsGroups, groupsVersion])
 
   useEffect(() => {
     if (!needsYear) return
@@ -140,6 +141,7 @@ export function ScheduleSection({
         groups={groupList}
         today={today}
         hrefForGroup={(groupId) => `#/groups/${groupId}`}
+        onChanged={() => setGroupsVersion((n) => n + 1)}
       />
     )
   }
