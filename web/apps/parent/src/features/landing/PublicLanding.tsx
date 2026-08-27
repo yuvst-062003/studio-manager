@@ -419,6 +419,8 @@ export function PublicLanding({
             client={client}
             groups={groups}
             signedIn={signedIn}
+            address={landing.address}
+            phone={landing.phone}
           />
         </Card>
       </section>

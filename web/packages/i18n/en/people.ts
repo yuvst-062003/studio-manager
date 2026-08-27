@@ -82,6 +82,9 @@ export const people: Bundle = {
   'landing.weeklySchedule': 'Training days',
 
   'submitted.title': 'You’re booked for a trial class',
+  'submitted.titleNamed': 'A spot is saved for {{names}}',
+  'submitted.healthSigned': 'The health declaration is signed',
+  'submitted.changeTime': 'Need to change the time? Message us',
   'submitted.subtitle': 'We’ll send you a reminder before the class',
   'submitted.whatNext': 'What now?',
   'submitted.bringHint': 'Arrive ten minutes early, in comfortable clothes',

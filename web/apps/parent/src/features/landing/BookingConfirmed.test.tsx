@@ -48,11 +48,11 @@ const SIBLINGS: BookingResult = {
 } as unknown as BookingResult
 
 describe('BookingConfirmed — 13b', () => {
-  it('confirms the booking', () => {
+  it('confirms the booking with the child in the HEADLINE (L5)', () => {
+    // 13b — `נשמר מקום לאורי`, not the generic sentence with the name in a card below.
     render(<BookingConfirmed result={RESULT} locale="he" />)
-    expect(
-      screen.getByRole('heading', { name: t('he', 'people.submitted.title') }),
-    ).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('נשמר מקום לנועה לוי')
+    expect(screen.getByTestId('booked-badge')).toBeInTheDocument()
   })
 
   it('renders the group and the time', () => {
@@ -71,22 +71,51 @@ describe('BookingConfirmed — 13b', () => {
     expect(screen.getByTestId('booked-when-0').textContent).not.toEqual(
       screen.getByTestId('booked-when-1').textContent,
     )
-    expect(screen.getByText(/נועה לוי/)).toBeInTheDocument()
-    expect(screen.getByText(/יוסי לוי/)).toBeInTheDocument()
+    // Both names, and both in the headline too — siblings share the celebration.
+    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('נועה לוי · יוסי לוי')
+    expect(screen.getAllByText(/יוסי לוי/).length).toBeGreaterThan(0)
   })
 
   it('names each child who was booked', () => {
     render(<BookingConfirmed result={RESULT} locale="he" />)
-    expect(screen.getByText(/נועה לוי/)).toBeInTheDocument()
+    expect(screen.getAllByText(/נועה לוי/).length).toBeGreaterThan(0)
   })
 
-  it('offers add-to-calendar with an accessible name', () => {
-    // §5.4a step 5 — '[ הוסף ליומן ] · .ics'. An icon-only control with no name is
-    // unreachable to a screen reader (.claude/rules/ui-rtl-a11y.md).
+  it('offers add-to-calendar as the SHARED calendar control, styled as a button (L5)', () => {
+    // §5.4a step 5 — '[ הוסף ליומן ] · .ics'. It is `EventCalendarButtons` — the event
+    // pages' control — fed the in-browser `.ics`, not a second renderer or a bare link.
     render(<BookingConfirmed result={RESULT} locale="he" />)
-    const link = screen.getByTestId('booked-add-to-calendar')
-    expect(link).toHaveAccessibleName(t('he', 'people.trialHome.addToCalendar'))
-    expect(link).toHaveAttribute('download', 'trial.ics')
+    const link = screen
+      .getByTestId('booked-add-to-calendar')
+      .querySelector('a') as HTMLAnchorElement
+    expect(link).toHaveAccessibleName(t('he', 'comms.calendar.addSingleEvent'))
+    expect(link.className).toContain('studio-btn')
+    expect(link.getAttribute('href') ?? '').toContain('data:text/calendar')
+  })
+
+  it('claims no WhatsApp was sent, because nothing sends one (L5)', () => {
+    // The artboard draws a "WhatsApp sent" row; the product has no WhatsApp integration
+    // and a confirmation must not claim a message went out. The declaration row states
+    // the fact that IS true — signed at step 3.
+    render(<BookingConfirmed result={RESULT} locale="he" />)
+    expect(screen.getByTestId('booked-health-signed')).toHaveTextContent(
+      t('he', 'people.submitted.healthSigned'),
+    )
+    expect(document.body.textContent ?? '').not.toContain('וואטסאפ נשלח')
+  })
+
+  it('renders the address on the when-line and the change-time footer (L5)', () => {
+    render(
+      <BookingConfirmed result={RESULT} locale="he" address="הרצל 12" phone="052-1234567" />,
+    )
+    expect(screen.getByTestId('booked-when-0')).toHaveTextContent('הרצל 12')
+    expect(screen.getByTestId('booked-footer')).toHaveTextContent(
+      t('he', 'people.submitted.changeTime'),
+    )
+    expect(screen.getByTestId('booked-whatsapp')).toHaveAttribute(
+      'href',
+      'https://wa.me/972521234567',
+    )
   })
 
   it('tells the parent what to bring', () => {

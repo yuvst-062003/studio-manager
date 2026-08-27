@@ -80,6 +80,8 @@ export function BookingFlow({
   groups,
   signedIn = false,
   today = new Date(),
+  address = null,
+  phone = null,
 }: {
   slug: string
   locale: Locale
@@ -87,6 +89,9 @@ export function BookingFlow({
   groups: PublicGroup[]
   signedIn?: boolean
   today?: Date
+  /** 13b's when-line address and change-the-time WhatsApp — from the landing payload. */
+  address?: string | null
+  phone?: string | null
 }) {
   const [step, setStep] = useState<Step>(signedIn ? 'children' : 'sign-in')
   const [children, setChildren] = useState<Child[]>([blankChild()])
@@ -121,7 +126,9 @@ export function BookingFlow({
     }
   }, [client, groupKey, step])
 
-  if (result) return <BookingConfirmed result={result} locale={locale} />
+  if (result) {
+    return <BookingConfirmed result={result} locale={locale} address={address} phone={phone} />
+  }
 
   // -- step 1: sign in, before anything is typed ------------------------------
   if (step === 'sign-in') {

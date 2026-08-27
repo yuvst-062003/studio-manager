@@ -625,7 +625,8 @@ waves:
         on: 2026-08-27
       - id: L5
         title: Landing — 13b confirmation
-        status: pending
+        status: shipped
+        on: 2026-08-27
       - id: L6
         title: Landing — anonymous page makes no authenticated call
         status: shipped

@@ -104,6 +104,9 @@ export const people: Bundle = {
 
   // -- after submitting (parent 13b) --------------------------------------------
   'submitted.title': 'נרשמתם לשיעור ניסיון',
+  'submitted.titleNamed': 'נשמר מקום ל{{names}}',
+  'submitted.healthSigned': 'הצהרת הבריאות נחתמה',
+  'submitted.changeTime': 'צריכים לשנות את המועד? שלחו לנו הודעה',
   'submitted.subtitle': 'נשלח אליכם תזכורת לפני השיעור',
   'submitted.whatNext': 'מה עכשיו?',
   'submitted.bringHint': 'הגיעו עשר דקות לפני, בבגדים נוחים',

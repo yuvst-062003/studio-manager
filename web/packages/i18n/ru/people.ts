@@ -86,6 +86,9 @@ export const people: Bundle = {
   'landing.weeklySchedule': 'Дни занятий',
 
   'submitted.title': 'Вы записаны на пробное занятие',
+  'submitted.titleNamed': 'Место сохранено для {{names}}',
+  'submitted.healthSigned': 'Декларация здоровья подписана',
+  'submitted.changeTime': 'Нужно изменить время? Напишите нам',
   'submitted.subtitle': 'Мы пришлём напоминание перед занятием',
   'submitted.whatNext': 'Что дальше?',
   'submitted.bringHint': 'Приходите за десять минут, в удобной одежде',
