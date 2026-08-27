@@ -41,11 +41,13 @@ export function registerAttendanceSections(): void {
     order: 40,
     render: AttendanceStrip,
   })
-  registerSlot<{ locale: Locale }>('alert-centre', {
+  registerSlot<{ locale: Locale }>('staff-alerts', {
     key: 'attendance-conflicts',
-    // Ahead of M3's pending requests and trials. §10.5's cards are unsynced work a human
-    // has to decide about; a trial booking can wait an hour and a coach's lost register
-    // cannot.
+    // Ahead of the comms at-risk card (12). §10.5's cards are unsynced work a human
+    // has to decide about; nothing else in this container is being lost while it waits.
+    // `staff-alerts`, not `alert-centre`: conflicts are produced by the coach's own
+    // queue and are the coach's to resolve — a card on the manager's dashboard is the
+    // wrong end of the wire, and the staff bundle mounts no `alert-centre` container.
     order: 5,
     render: ConflictSection,
   })

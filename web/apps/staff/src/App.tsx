@@ -50,6 +50,9 @@ import {
   useOfflinePriming,
 } from './features/attendance'
 import { useQueueFlusher } from './features/attendance/useQueueFlusher'
+import { registerHealthSections } from './features/health'
+import { AtRiskAlert, makeStaffCommsClient, registerCommsSections } from './features/comms'
+import { StaffAlerts } from './StaffAlerts'
 import './features/attendance/attendance.css'
 
 // §5.1 — 'the staff app and dashboard route them into a resumable wizard'. Both mount the
@@ -59,10 +62,15 @@ import './features/attendance/attendance.css'
 registerM1WizardSteps(apiFetch)
 
 // §19.4's `📴 offline` and `🐌 slow` toggles, plus the `student-card` attendance strip and
-// the `alert-centre` conflict cards. Registered at module load for the same reason the
+// the `staff-alerts` conflict cards. Registered at module load for the same reason the
 // wizard steps are: the slots must be populated before anything renders. The containers
 // themselves are never reopened — that is what seam 4 buys.
 registerAttendanceSections()
+// The two registrations nothing called (S1). Without the first, a coach taking a register
+// saw no health flag on any row — §5.5's coach-facing safety surface, absent from the
+// running app because the function that connects fill to container was never invoked.
+registerHealthSections()
+registerCommsSections(AtRiskAlert)
 
 const NAV = [
   { key: 'today', labelKey: 'common.nav.today', href: '/' },
@@ -129,6 +137,7 @@ export default function App() {
   const peopleClient = useMemo(() => makeStaffPeopleClient(apiFetch), [])
   const eventsClient = useMemo(() => makeStaffEventsClient(apiFetch), [])
   const attendanceClient = useMemo(() => makeStaffAttendanceClient(apiFetch), [])
+  const commsClient = useMemo(() => makeStaffCommsClient(apiFetch), [])
   // §6.1 step 6 — "offline prime: today's and tomorrow's sessions + rosters are fetched and
   // written to IndexedDB BEFORE the coach reaches Today", and "the first launch BLOCKS on
   // this fetch". The gate below renders instead of the app while it runs.
@@ -276,6 +285,11 @@ export default function App() {
             />
           }
         >
+          {/* The alert container, above whatever screen is open: a sync conflict or an
+              at-risk child must be visible from Today and from the roster, not behind a
+              navigation the coach has no reason to make. Every fill renders null when it
+              has nothing to say. */}
+          {session.access.staff ? <StaffAlerts client={commsClient} locale={locale} /> : null}
           {/* §6.1's first-run routing still owns the DEFAULT screen: `Resolve` decides
               between the setup wizard, the tour and the refusal. Both W2 lanes hang a
               screen off a hash in front of it, and neither claims the fallback — an

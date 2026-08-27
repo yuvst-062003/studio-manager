@@ -39,7 +39,7 @@ import {
 } from './features/events'
 import { BeltProgressScreen, makeParentBeltsClient } from './features/belts'
 import { InboxScreen, makeParentCommsClient } from './features/comms'
-import { AddSibling, ProfileSection, makePeopleClient } from './features/people'
+import { AddSibling, ProfileSection, makePeopleClient, registerPeopleSections } from './features/people'
 import { DirectionsScreen } from './features/people/DirectionsScreen'
 // §5.10's payments tab. Mounted here because nothing imported it: `PaymentsScreen` is
 // artboard `12f`, the subject of E2E-3 and E2E-4, and it was unreachable in a running app.
@@ -54,6 +54,13 @@ import { ShopSection } from './features/billing'
 // W3 and a guardian with an unsigned declaration still reached home.
 import { HealthGate, firstStudentNeedingDeclaration, makeHealthClient } from './features/health'
 import type { GatedStudent } from './features/health'
+
+// Seam 4 — the student card is a container and knows no section by name. This call was
+// written for "the app's own entry" and the entry never made it: only tests called it,
+// so a real guardian's student card rendered NO sections at all — not even M3's three.
+// Found by the S1 slot-wiring guard; registered at module load so the slot is populated
+// before anything renders.
+registerPeopleSections()
 
 const NAV = [
   { key: 'myChildren', labelKey: 'common.nav.myChildren', href: '/' },

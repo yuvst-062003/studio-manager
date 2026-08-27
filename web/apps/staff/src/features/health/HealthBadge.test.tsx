@@ -14,7 +14,6 @@ import { clearSlot, useSlot } from '@studio/ui'
 import { t } from '@studio/i18n'
 import { HealthBadge, badgeStatusFor, labelledFlags } from './HealthBadge'
 import { registerHealthSections } from './register'
-import type { HealthBadgeProps } from './HealthBadge'
 
 const NO_FLAGS: Record<string, boolean> = {}
 
@@ -121,30 +120,45 @@ describe('HealthBadge', () => {
 
 describe('the roster-row registration', () => {
   it('registers exactly one section, and registering twice does not duplicate it', () => {
-    // M5 owns the container and it is not merged yet, so this asserts the registration rather
-    // than the render inside it. The integration test belongs on the container.
     clearSlot('roster-row')
     registerHealthSections()
     registerHealthSections()
 
     function Probe() {
-      const sections = useSlot<HealthBadgeProps>('roster-row')
+      const sections = useSlot('roster-row')
       return <span data-testid="count">{sections.length}</span>
     }
     render(<Probe />)
     expect(screen.getByTestId('count')).toHaveTextContent('1')
   })
 
-  it('the registered component is the badge itself, taking the contract prop shape', () => {
+  it('the registered component takes the contract shape the container supplies', () => {
+    // The slot passes `{ row, locale }` — registering a component wanting
+    // `HealthBadgeProps` directly is the wiring bug S1 closed, so this renders the
+    // section exactly the way `RosterRow` does. The end-to-end proof lives in
+    // rosterBadge.test.tsx.
     clearSlot('roster-row')
     registerHealthSections()
 
+    const row = {
+      student_id: 'st9',
+      display_name: 'x',
+      belt_color_hex: null,
+      belt_name: null,
+      health_status: 'signed' as const,
+      derived_flags: { asthma: true },
+      status: 'unmarked' as const,
+      source: null,
+      has_absence_report: false,
+      absence_reason: null,
+    }
+
     function Container() {
-      const sections = useSlot<HealthBadgeProps>('roster-row')
+      const sections = useSlot<{ row: typeof row; locale: 'he' }>('roster-row')
       return (
         <>
           {sections.map(({ key, render: Section }) => (
-            <Section flags={{ asthma: true }} key={key} locale="he" status="signed" studentId="st9" />
+            <Section key={key} locale="he" row={row} />
           ))}
         </>
       )

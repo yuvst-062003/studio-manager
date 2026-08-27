@@ -5,8 +5,7 @@
 // barrel, which is what seam 4 buys. Called from the app's entry and never at module import of
 // a component file, per `features/people/register.ts`.
 import { registerSlot } from '@studio/ui'
-import type { ComponentType } from 'react'
-import { AtRiskAlert } from './AtRiskAlert'
+import { AtRiskAlert, makeAtRiskSection } from './AtRiskAlert'
 import type { DashboardCommsClient } from './dashboardCommsClient'
 import type { Locale } from '@studio/i18n'
 
@@ -21,11 +20,19 @@ export type DashboardAtRiskProps = { client: DashboardCommsClient; locale: Local
  */
 export const AT_RISK_ORDER = 15
 
-export function registerCommsAlerts(render: ComponentType<DashboardAtRiskProps>): void {
-  registerSlot<DashboardAtRiskProps>('alert-centre', {
+/**
+ * Takes the comms client rather than a render prop: the slot's renderer receives
+ * `AlertSectionProps` — `{ locale, client: DashboardPeopleClient }` — so a component
+ * wanting the COMMS client can never be mounted directly. The section closes over its
+ * own client instead, the same correction `BillingAlertSection` already made for M6.
+ * (The old render-prop signature was exported and called by nothing — the S1 guard
+ * test found it, and the at-risk card had never rendered on the dashboard.)
+ */
+export function registerCommsAlerts(client: DashboardCommsClient): void {
+  registerSlot<{ locale: Locale }>('alert-centre', {
     key: 'comms-at-risk',
     order: AT_RISK_ORDER,
-    render,
+    render: makeAtRiskSection(client),
   })
 }
 

@@ -21,17 +21,17 @@ beforeEach(() => {
 
 afterEach(() => {
   clearSlot('student-card')
-  clearSlot('alert-centre')
+  clearSlot('staff-alerts')
   clearSlot('dev-bar')
   setOfflineStore(null)
   setForcedMode(null)
 })
 
 describe('the slots this lane fills', () => {
-  it('registers into student-card, alert-centre and dev-bar and into nothing else', () => {
+  it('registers into student-card, staff-alerts and dev-bar and into nothing else', () => {
     registerAttendanceSections()
     expect(useSlot('student-card').map((e) => e.key)).toEqual(['attendance-strip'])
-    expect(useSlot('alert-centre').map((e) => e.key)).toEqual(['attendance-conflicts'])
+    expect(useSlot('staff-alerts').map((e) => e.key)).toEqual(['attendance-conflicts'])
     expect(useSlot('dev-bar').map((e) => e.key)).toEqual(['offline', 'slow'])
     // The one container this lane BUILDS. Registering into it here would mean the roster
     // renders a section of its own through the same door M4 uses, which is a claim on a
@@ -59,11 +59,11 @@ describe('the slots this lane fills', () => {
     expect(useSlot('dev-bar')).toHaveLength(2)
   })
 
-  it('puts the conflict cards ahead of M3 s alerts', () => {
+  it('puts the conflict cards ahead of the comms at-risk card', () => {
     // §10.5's cards are unsynced work a human has to decide about. A trial booking can wait
     // an hour; a coach's lost register cannot.
     registerAttendanceSections()
-    expect(useSlot('alert-centre')[0]?.order).toBeLessThan(10)
+    expect(useSlot('staff-alerts')[0]?.order).toBeLessThan(12)
   })
 })
 
@@ -89,10 +89,10 @@ describe('the dev-bar toggles', () => {
   })
 })
 
-describe('the alert-centre conflict cards', () => {
+describe('the staff-alerts conflict cards', () => {
   it('renders nothing when there is no conflict', () => {
     registerAttendanceSections()
-    const Section = useSlot<{ locale: 'he' }>('alert-centre')[0]?.render
+    const Section = useSlot<{ locale: 'he' }>('staff-alerts')[0]?.render
     if (Section === undefined) throw new Error('the conflict section did not register')
     const { container } = render(<Section locale="he" />)
     expect(container).toBeEmptyDOMElement()
@@ -124,7 +124,7 @@ describe('the alert-centre conflict cards', () => {
     queueChanged()
 
     registerAttendanceSections()
-    const Section = useSlot<{ locale: 'he' }>('alert-centre')[0]?.render
+    const Section = useSlot<{ locale: 'he' }>('staff-alerts')[0]?.render
     if (Section === undefined) throw new Error('the conflict section did not register')
     render(<Section locale="he" />)
 

@@ -71,6 +71,8 @@ import { AttendanceSection } from './features/attendance/AttendanceSection'
 // in its wave and imported by nothing — plus 4g reports, which never had a screen at
 // all, and 5b's missing index for a bare `#/belts`.
 import { CommsSection } from './features/comms/CommsSection'
+import { registerCommsAlerts } from './features/comms'
+import { makeDashboardCommsClient } from './features/comms/dashboardCommsClient'
 import { DocumentsSection } from './features/health/DocumentsSection'
 import { PricesSection } from './features/billing/PricesSection'
 import { ReportsSection } from './features/reports/ReportsSection'
@@ -81,7 +83,7 @@ import { registerBillingAlertSection } from './features/billing/BillingAlertSect
 // registered into it — the one step of the six whose slot was empty, so an owner who
 // finished `groups` landed on a panel saying השלב הזה עדיין לא זמין.
 import { registerPricesWizardStep } from './features/billing/PricesWizardStep'
-import { makeDashboardBillingClient } from './features/billing'
+import { makeDashboardBillingClient, registerBillingDevTools } from './features/billing'
 
 registerM1WizardSteps(apiFetch)
 // Seam 4 — `6c` composes sections from four milestones. This lane registers the three it
@@ -98,6 +100,11 @@ registerBeltsWizardStep(makeDashboardBeltsClient(apiFetch))
 // (payment-routes §5) and is optional there — a club may not have its uPay links on day
 // one, and Settings → Payments is where a missing one is filled in later.
 registerPricesWizardStep(makeDashboardBillingClient(apiFetch))
+// M8's at-risk card and M6's billing dev tool — both exported since their waves and
+// called by nothing, so the at-risk card had never once rendered on the dashboard.
+// The S1 slot-wiring guard now fails the build on any register* export no app calls.
+registerCommsAlerts(makeDashboardCommsClient(apiFetch))
+registerBillingDevTools(makeDashboardBillingClient(apiFetch))
 
 const NAV = [
   { key: 'schedule', labelKey: 'schedule.week.title', href: '#/schedule' },

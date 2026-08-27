@@ -1,4 +1,9 @@
-// §10.5's conflict cards, registered into M3's `alert-centre` container (dashboard `6c`).
+// §10.5's conflict cards, registered into the staff app's own `staff-alerts` container.
+//
+// They used to target `alert-centre` — a container only the dashboard mounts — and slots
+// register inside the bundle that imports the barrel, so the cards could render in no app
+// at all. Conflicts are produced by the coach's queue and are the coach's to resolve; the
+// staff shell now mounts the container on every screen (S1/S5).
 //
 // "Rejected operations become dismissible conflict cards; **nothing is silently dropped**."
 //

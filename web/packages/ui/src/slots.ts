@@ -20,10 +20,16 @@ import type { ComponentType } from 'react'
 // the row could only arrive as a REPORTS-lane edit to a PEOPLE-lane file, which is the exact
 // cross-lane edit seam 4 exists to prevent. Adding the id on `main`, before the worktrees,
 // is the mechanism working as designed rather than an exception to it.
+// `staff-alerts` was added by the completion run (S1). The staff app registered its
+// conflict cards and at-risk alert into `alert-centre` — a container only the DASHBOARD
+// mounts — and slots register inside the bundle that imports the barrel, so both fills
+// could render in no app at all. The staff app now has its own alert container; the
+// dashboard keeps `alert-centre`.
 export type SlotId =
   | 'student-card'
   | 'roster-row'
   | 'alert-centre'
+  | 'staff-alerts'
   | 'parent-profile'
   | 'setup-wizard'
   | 'dev-bar'

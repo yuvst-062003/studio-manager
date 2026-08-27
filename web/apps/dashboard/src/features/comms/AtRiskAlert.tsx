@@ -134,3 +134,15 @@ export function AtRiskAlert({ client, locale }: { client: DashboardCommsClient; 
     </section>
   )
 }
+
+/**
+ * Adapter for the `alert-centre` slot, whose renderer receives the PEOPLE client — a
+ * section wanting the comms client closes over its own, the way `BillingAlertSection`
+ * does. A named factory rather than an inline arrow so the component identity is
+ * stable across renders of the container.
+ */
+export function makeAtRiskSection(client: DashboardCommsClient) {
+  return function AtRiskSection({ locale }: { locale: Locale }) {
+    return <AtRiskAlert client={client} locale={locale} />
+  }
+}

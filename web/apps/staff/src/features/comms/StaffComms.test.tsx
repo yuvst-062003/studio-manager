@@ -52,7 +52,7 @@ function makeClient(over: Partial<StaffCommsClient> = {}): StaffCommsClient {
 }
 
 afterEach(() => {
-  clearSlot('alert-centre')
+  clearSlot('staff-alerts')
   vi.restoreAllMocks()
 })
 
@@ -125,10 +125,13 @@ describe('the at-risk alert', () => {
 })
 
 // -- the slot ------------------------------------------------------------------
-describe('the alert-centre registration', () => {
-  it('registers into alert-centre and into nothing else', () => {
+describe('the staff-alerts registration', () => {
+  it('registers into staff-alerts and into nothing else', () => {
+    // `staff-alerts`, not `alert-centre` — that container exists only in the DASHBOARD
+    // bundle, so the old target could render nowhere in this app (S1).
     registerCommsSections(AtRiskAlert as never)
-    expect(useSlot('alert-centre').map((entry) => entry.key)).toEqual(['comms-at-risk'])
+    expect(useSlot('staff-alerts').map((entry) => entry.key)).toEqual(['comms-at-risk'])
+    expect(useSlot('alert-centre')).toHaveLength(0)
     expect(useSlot('student-card')).toHaveLength(0)
     expect(useSlot('roster-row')).toHaveLength(0)
   })

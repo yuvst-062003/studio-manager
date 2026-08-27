@@ -8,22 +8,18 @@
 // "M6's debt alert belongs above a trial queue". Its own orders start at 20 and leave the
 // gap deliberately, so this lane renumbers nothing.
 import { registerSlot } from '@studio/ui'
-import type { ComponentType } from 'react'
 import type { Locale } from '@studio/i18n'
 import { DebtAlert } from './DebtAlert'
-import type { DebtAlertProps } from './DebtAlert'
 import { RUN_JOB_ORDER, makeRunJobTool } from './RunJobTool'
 import type { DashboardBillingClient } from './billingClient'
 
 export const DEBT_ALERT_ORDER = 10
 
-export function registerBillingAlerts(render: ComponentType<DebtAlertProps>): void {
-  registerSlot<DebtAlertProps>('alert-centre', {
-    key: 'billing-debt',
-    order: DEBT_ALERT_ORDER,
-    render,
-  })
-}
+// `registerBillingAlerts` is gone. It declared the slot's renderer as `DebtAlertProps`,
+// which the container never supplies, so nothing satisfying it could be mounted —
+// `BillingAlertSection.tsx` explains the mismatch and registers the working section
+// under the same key and order. The S1 guard test now fails on any register* export
+// that no app calls, which is what caught the dead half surviving here.
 
 export function registerBillingDevTools(client: DashboardBillingClient): void {
   registerSlot<{ locale: Locale }>('dev-bar', {

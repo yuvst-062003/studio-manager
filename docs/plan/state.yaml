@@ -531,7 +531,8 @@ waves:
         status: pending
       - id: S1
         title: Staff — call the registration functions; slot guard tests
-        status: pending
+        status: shipped
+        on: 2026-08-27
       - id: S2
         title: Staff — route the seven unreachable screens, SessionSummary first
         status: pending

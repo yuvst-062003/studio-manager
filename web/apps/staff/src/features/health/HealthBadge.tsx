@@ -26,6 +26,7 @@ import { Button, StatusChip } from '@studio/ui'
 import type { ChipStatus } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
+import type { RosterRow as CoreRosterRow } from '@studio/core'
 
 /**
  * The eight flag ids §5.5's badge can label, and the whole set `health.flag.*` ships.
@@ -132,5 +133,23 @@ export function HealthBadge({
         </>
       ) : null}
     </div>
+  )
+}
+
+/**
+ * The `roster-row` slot fill. The container passes the contract's own shape —
+ * `{ row: RosterRow, locale }` — and this adapter narrows it to what the badge needs:
+ * `health_status` and `derived_flags`, never anything a declaration actually says
+ * (§5.5). Registering `HealthBadge` directly was the wiring bug S1 closed: its props
+ * do not match what the slot supplies, so it could never have rendered.
+ */
+export function RosterHealthBadge({ row, locale }: { row: CoreRosterRow; locale: Locale }) {
+  return (
+    <HealthBadge
+      flags={row.derived_flags}
+      locale={locale}
+      status={row.health_status}
+      studentId={row.student_id}
+    />
   )
 }

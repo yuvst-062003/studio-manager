@@ -23,7 +23,11 @@ export type AtRiskAlertProps = { client: StaffCommsClient; locale: Locale }
 export const AT_RISK_ORDER = 12
 
 export function registerCommsSections(render: ComponentType<AtRiskAlertProps>): void {
-  registerSlot<AtRiskAlertProps>('alert-centre', {
+  // `staff-alerts`, not `alert-centre`: that container exists only in the DASHBOARD
+  // bundle, and slots register inside the bundle that imports the barrel — so an
+  // `alert-centre` registration from this app could render nowhere. The dashboard
+  // ships its own at-risk card; this one is the coach's, with the one-tap dial.
+  registerSlot<AtRiskAlertProps>('staff-alerts', {
     key: 'comms-at-risk',
     order: AT_RISK_ORDER,
     render,

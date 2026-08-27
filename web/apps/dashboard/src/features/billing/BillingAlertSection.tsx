@@ -80,9 +80,10 @@ export function BillingAlertSection({ locale }: AlertSectionProps) {
 }
 
 /**
- * Registered here rather than through `register.ts`'s `registerBillingAlerts`.
+ * Registered here rather than through `register.ts`'s late `registerBillingAlerts`
+ * (deleted by the completion run once the S1 guard proved nothing called it).
  *
- * That helper declares `registerSlot<DebtAlertProps>('alert-centre', ...)`, but the slot's
+ * That helper declared `registerSlot<DebtAlertProps>('alert-centre', ...)`, but the slot's
  * renderer is called with `AlertSectionProps` — `AlertCentre` does
  * `useSlot<AlertSectionProps>` and passes `{ locale, client }`. So the helper's type
  * argument describes what `DebtAlert` needs rather than what the slot supplies, and

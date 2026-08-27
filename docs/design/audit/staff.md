@@ -227,3 +227,40 @@ link that must be signed `לפני עלייה למזרן`.
    `#/cash` and `#/join-link` currently look like broken routes to a coach.
 5. **Logical CSS only** (**D10**) and **i18n** in `web/packages/i18n/he/<namespace>.ts`,
    mirrored in `en/` and `ru/`.
+
+## Log
+
+### 2026-08-27 · S1 — the registrations that never ran, and the guard that keeps them running
+
+**What was wrong.** The app called one of its three slot-registration functions.
+`registerHealthSections` and `registerCommsSections` were exported and invoked by nothing, so
+a coach taking a register saw no health flag on any row — §5.5's coach-facing safety surface,
+absent from the running app. Worse, both `ConflictSection` and `AtRiskAlert` targeted
+`alert-centre`, a container only the *dashboard* bundle mounts, and slots register inside the
+bundle that imports the barrel — so even a called registration could render nowhere. And the
+registered `HealthBadge` declared props (`status`/`flags`/`studentId`) the `roster-row` slot
+never supplies (`{ row, locale }`), so it would have crashed had it ever been mounted.
+
+**What was built.** `App.tsx` now calls both functions at module load, beside the existing
+call. A new `staff-alerts` slot id plus a `StaffAlerts` container mounted in the shell —
+visible from Today and the roster, which is where §6.1's basement flow needs a conflict to
+surface. `ConflictSection` and the staff `AtRiskAlert` both retarget it.
+`RosterHealthBadge` adapts the contract's `{ row, locale }` to the badge. Integration test:
+a flagged child's row renders the badge through the slot, and a missing declaration warns
+without blocking the mark (C10).
+
+**What was decided.** The staff `AtRiskAlert` is **kept**, not deleted: it reads the coach's
+own notification inbox and carries the one-tap dial — the dashboard's copy serves the manager,
+a different reader. Its home is the new `staff-alerts` container.
+
+**Guards.** `web/tools/__tests__/slot-wiring.test.ts` fails on (a) any `register*` function a
+feature barrel exports that no code in that app calls, and (b) any `registerSlot` target with
+no `useSlot` container in the same bundle — across all three apps.
+
+**Stale claims found elsewhere by the guard.** The same class existed on both other surfaces:
+the parent app's `registerPeopleSections` was called only by tests (so a real guardian's
+student card rendered *no* sections — worse than the parent audit's claim that M3's three are
+registered), and the dashboard's `registerCommsAlerts` + `registerBillingDevTools` were never
+called (so its at-risk card had never rendered, contradicting the dashboard spec F8's claim
+that comms/register.ts:25 registers it). `registerBillingAlerts` was dead code superseded by
+`BillingAlertSection` and is deleted. All fixed in this commit.
