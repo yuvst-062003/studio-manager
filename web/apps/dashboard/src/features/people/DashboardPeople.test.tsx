@@ -225,14 +225,16 @@ describe('StudentsScreen — 3b', () => {
     })
     render(<StudentsScreen locale="he" client={client} />)
     await user.click(await screen.findByTestId('students-load-more'))
-    await waitFor(() => expect(screen.getAllByTestId('students-row')).toHaveLength(2))
+    // The Table primitive renders each student as the row header (its identity cell).
+    await waitFor(() => expect(screen.getAllByRole('rowheader')).toHaveLength(2))
     expect(client.students).toHaveBeenLastCalledWith(expect.objectContaining({ after: 'st1' }))
   })
 
   it('scrolls the table inside its own container, not the page sideways', async () => {
+    // F1b — the scroll container is the Table primitive's own.
     render(<StudentsScreen locale="he" client={makeClient()} />)
-    const table = await screen.findByTestId('students-table')
-    expect(table.parentElement).toHaveStyle({ overflowX: 'auto' })
+    await screen.findByTestId('students-table')
+    expect(screen.getByRole('table').parentElement).toHaveClass('studio-table-scroll')
   })
 
   it('renders no physical CSS', async () => {

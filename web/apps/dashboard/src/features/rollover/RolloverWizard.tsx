@@ -31,7 +31,7 @@
 // rather than hidden, so the shape of the flow is stable between visits.
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { Card } from '@studio/ui'
+import { Card, LoadFailed } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { fill } from './client'
@@ -121,6 +121,7 @@ export function RolloverWizard({ locale, client }: { locale: Locale; client: Rol
   const [state, setState] = useState<RolloverState | null>(null)
   const [activeId, setActiveId] = useState<RolloverStepId | null>(null)
   const [failed, setFailed] = useState(false)
+  const [attempt, setAttempt] = useState(0)
 
   // The draft year is the resume token — §5.15 puts partial progress on it rather than in a
   // table, so finding it is how the wizard finds itself.
@@ -140,7 +141,7 @@ export function RolloverWizard({ locale, client }: { locale: Locale; client: Rol
     return () => {
       live = false
     }
-  }, [client])
+  }, [client, attempt])
 
   const yearId = year?.id ?? null
 
@@ -195,7 +196,14 @@ export function RolloverWizard({ locale, client }: { locale: Locale; client: Rol
     return (
       <section aria-labelledby="rollover-title" data-testid="rollover-wizard">
         <h1 id="rollover-title">{t(locale, 'schedule.rollover.title')}</h1>
-        <p role="alert">{t(locale, 'schedule.rollover.loadFailed')}</p>
+        <LoadFailed
+          detail={t(locale, 'schedule.rollover.loadFailed')}
+          locale={locale}
+          onRetry={() => {
+            setFailed(false)
+            setAttempt((n) => n + 1)
+          }}
+        />
       </section>
     )
   }

@@ -8,7 +8,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { apiFetch } from '@studio/core'
-import { Alert, Button, Card, EmptyState, MoneyDisplay, ProgressBar, useModalDialog } from '@studio/ui'
+import { Alert, Button, Card, EmptyState, LoadFailed, MoneyDisplay, ProgressBar, useModalDialog } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 
@@ -118,6 +118,7 @@ export function ReportsSection({
   const [period, setPeriod] = useState({ year: now.getFullYear(), month: now.getMonth() + 1 })
   const [summary, setSummary] = useState<MonthlySummary | null>(null)
   const [failed, setFailed] = useState(false)
+  const [attempt, setAttempt] = useState(0)
   const [confirming, setConfirming] = useState(false)
   const [sendState, setSendState] = useState<'idle' | 'sending' | 'sent' | 'failed'>('idle')
 
@@ -143,7 +144,7 @@ export function ReportsSection({
     return () => {
       alive = false
     }
-  }, [studioId, period])
+  }, [studioId, period, attempt])
 
   const monthLabel = new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric' }).format(
     new Date(Date.UTC(period.year, period.month - 1, 15)),
@@ -215,7 +216,18 @@ export function ReportsSection({
         </Alert>
       ) : null}
 
-      {failed || (summary && summary.total_agorot === 0 && summary.total_students === 0) ? (
+      {/* F1a and P8's money rule in one: a FAILED read must never wear the empty
+          state — 'no revenue this month' and 'we could not load this' are different
+          facts, and the first is a statement about money. */}
+      {failed ? (
+        <LoadFailed
+          locale={locale}
+          onRetry={() => {
+            setFailed(false)
+            setAttempt((n) => n + 1)
+          }}
+        />
+      ) : summary && summary.total_agorot === 0 && summary.total_students === 0 ? (
         <EmptyState title={t(locale, 'reports.empty')} />
       ) : summary ? (
         <>

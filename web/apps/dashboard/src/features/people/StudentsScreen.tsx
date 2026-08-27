@@ -9,18 +9,12 @@
 // fabrication — so the column exists, is labelled, and says when it fills in.
 import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { Button, EmptyState, StatusChip } from '@studio/ui'
+import { Button, EmptyState, StatusChip, Table } from '@studio/ui'
 import { appendPage } from '@studio/core'
 import type { CursorPage } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import type { DashboardPeopleClient, StudentSummary } from './peopleClient'
-
-const scrollerStyle: CSSProperties = {
-  // The table scrolls inside its own container; the page never scrolls sideways.
-  overflowX: 'auto',
-  inlineSize: '100%',
-}
 
 const filterRowStyle: CSSProperties = {
   display: 'flex',
@@ -145,34 +139,41 @@ export function StudentsScreen({
           )}
         />
       ) : (
-        <div style={scrollerStyle}>
-          <table data-testid="students-table">
-            <caption>{t(locale, 'people.student.plural')}</caption>
-            <thead>
-              <tr>
-                <th scope="col">{t(locale, 'people.student.one')}</th>
-                <th scope="col">{t(locale, 'people.student.groups')}</th>
-                <th scope="col">{t(locale, 'people.status.label')}</th>
-                <th scope="col">{t(locale, 'people.document.signed')}</th>
-                <th scope="col">{t(locale, 'people.document.paymentComesLater')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {page.items.map((student) => (
-                <tr key={student.id} data-testid="students-row">
-                  <td>
-                    <button type="button" onClick={() => onOpen?.(student.id)}>
-                      <bdi>{`${student.first_name} ${student.last_name}`}</bdi>
-                    </button>
-                  </td>
-                  <td>
-                    <bdi>
-                      {student.group_names && student.group_names.length > 0
-                        ? student.group_names.join(' · ')
-                        : t(locale, 'people.student.noGroup')}
-                    </bdi>
-                  </td>
-                  <td>
+        <span data-testid="students-table">
+          {/* F1b — explicit widths through the primitive, which is what un-collapses the
+              header the audit measured as "one run-on string", plus F11's card fallback
+              below 768px. */}
+          <Table
+            caption={t(locale, 'people.student.plural')}
+            columns={[
+              {
+                id: 'student',
+                header: t(locale, 'people.student.one'),
+                width: '12rem',
+                cell: (student) => (
+                  <button type="button" onClick={() => onOpen?.(student.id)}>
+                    <bdi>{`${student.first_name} ${student.last_name}`}</bdi>
+                  </button>
+                ),
+              },
+              {
+                id: 'groups',
+                header: t(locale, 'people.student.groups'),
+                width: '14rem',
+                cell: (student) => (
+                  <bdi>
+                    {student.group_names && student.group_names.length > 0
+                      ? student.group_names.join(' · ')
+                      : t(locale, 'people.student.noGroup')}
+                  </bdi>
+                ),
+              },
+              {
+                id: 'status',
+                header: t(locale, 'people.status.label'),
+                width: '10rem',
+                cell: (student) => (
+                  <>
                     <StatusChip
                       status={chipToneFor(student.status)}
                       label={t(locale, `people.status.${student.status}`)}
@@ -185,18 +186,32 @@ export function StudentsScreen({
                         <StatusChip status="pending" label={t(locale, 'people.join.chip')} />
                       </span>
                     ) : null}
-                  </td>
-                  <td data-testid="students-document">
+                  </>
+                ),
+              },
+              {
+                id: 'document',
+                header: t(locale, 'people.document.signed'),
+                width: '9rem',
+                cell: (student) => (
+                  <span data-testid="students-document">
                     {t(locale, documentLabelKey(student.health_status))}
-                  </td>
-                  {/* W4 owns `charge`. An invented number here would be a fabrication in
-                      the screen a manager makes decisions from. */}
-                  <td data-testid="students-payment-pending">—</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                  </span>
+                ),
+              },
+              {
+                id: 'payment',
+                header: t(locale, 'people.document.paymentComesLater'),
+                width: '8rem',
+                // W4 owns `charge`. An invented number here would be a fabrication in
+                // the screen a manager makes decisions from.
+                cell: () => <span data-testid="students-payment-pending">—</span>,
+              },
+            ]}
+            rowKey={(student) => student.id}
+            rows={page.items}
+          />
+        </span>
       )}
 
       {page.has_more ? (

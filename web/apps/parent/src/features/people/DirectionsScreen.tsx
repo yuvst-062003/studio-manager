@@ -6,7 +6,7 @@
 import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { apiFetch } from '@studio/core'
-import { Card, EmptyState, Icon } from '@studio/ui'
+import { Card, Icon, LoadFailed } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 
@@ -24,6 +24,7 @@ const pageStyle: CSSProperties = {
 export function DirectionsScreen({ locale }: { locale: Locale }) {
   const [studio, setStudio] = useState<StudioInfo | null>(null)
   const [failed, setFailed] = useState(false)
+  const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
     let alive = true
@@ -40,9 +41,19 @@ export function DirectionsScreen({ locale }: { locale: Locale }) {
     return () => {
       alive = false
     }
-  }, [])
+  }, [attempt])
 
-  if (failed) return <EmptyState title={t(locale, 'common.error.generic')} />
+  if (failed) {
+    return (
+      <LoadFailed
+        locale={locale}
+        onRetry={() => {
+          setFailed(false)
+          setAttempt((n) => n + 1)
+        }}
+      />
+    )
+  }
   if (studio === null) return null
 
   return (

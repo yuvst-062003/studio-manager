@@ -21,7 +21,7 @@
 // mistyped exam would be a screen full of candidates and no way to grade them.
 import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { Button, Card, EmptyState, TextField } from '@studio/ui'
+import { Button, Card, EmptyState, LoadFailed, TextField } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { EventDateBadge } from './EventDateBadge'
@@ -76,6 +76,8 @@ export function ExamsScreen({
 }) {
   const [exams, setExams] = useState<EventOut[]>([])
   const [loaded, setLoaded] = useState(false)
+  const [loadFailed, setLoadFailed] = useState(false)
+  const [attempt, setAttempt] = useState(0)
   const [drafting, setDrafting] = useState(false)
   const [title, setTitle] = useState('')
   const [startsAt, setStartsAt] = useState('')
@@ -90,11 +92,12 @@ export function ExamsScreen({
         setExams(page.items)
         setLoaded(true)
       })
-      .catch(() => live && setLoaded(true))
+      // F1a — a failed load must not masquerade as loaded-and-empty.
+      .catch(() => live && setLoadFailed(true))
     return () => {
       live = false
     }
-  }, [client, reloadKey])
+  }, [client, reloadKey, attempt])
 
   const create = async () => {
     if (!title.trim() || !startsAt) return
@@ -158,6 +161,18 @@ export function ExamsScreen({
         ))}
       </section>
     )
+
+  if (loadFailed) {
+    return (
+      <LoadFailed
+        locale={locale}
+        onRetry={() => {
+          setLoadFailed(false)
+          setAttempt((n) => n + 1)
+        }}
+      />
+    )
+  }
 
   return (
     <div style={pageStyle}>

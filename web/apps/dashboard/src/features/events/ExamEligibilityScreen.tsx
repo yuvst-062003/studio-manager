@@ -22,7 +22,7 @@
 // the dialog needs to say.
 import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { Alert, Button, Checkbox, EmptyState, StatusChip, useModalDialog } from '@studio/ui'
+import { Alert, Button, Checkbox, EmptyState, LoadFailed, StatusChip, useModalDialog } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { BeltTransition } from './BeltTransition'
@@ -96,6 +96,8 @@ export function ExamEligibilityScreen({
   const dialogRef = useModalDialog(confirming, () => setConfirming(false))
   const [promoted, setPromoted] = useState(false)
   const [failed, setFailed] = useState(false)
+  const [loadFailed, setLoadFailed] = useState(false)
+  const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
     let live = true
@@ -106,11 +108,13 @@ export function ExamEligibilityScreen({
         setCandidates(page.items)
         setLoaded(true)
       })
-      .catch(() => live && setLoaded(true))
+      // F1a — a failed load used to set `loaded` and render the loading line forever:
+      // a dead end wearing a spinner. It says so and retries now.
+      .catch(() => live && setLoadFailed(true))
     return () => {
       live = false
     }
-  }, [client, eventId])
+  }, [client, eventId, attempt])
 
   const toggle = (studentId: string) =>
     setSelected((current) => {
@@ -145,6 +149,17 @@ export function ExamEligibilityScreen({
     }
   }
 
+  if (loadFailed) {
+    return (
+      <LoadFailed
+        locale={locale}
+        onRetry={() => {
+          setLoadFailed(false)
+          setAttempt((n) => n + 1)
+        }}
+      />
+    )
+  }
   if (!exam) return <p style={hintStyle}>{t(locale, 'events.list.loading')}</p>
 
   return (

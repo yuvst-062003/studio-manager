@@ -6,7 +6,7 @@
 // one with the double-payment guard in it.
 import { useEffect, useMemo, useState } from 'react'
 import { apiFetch } from '@studio/core'
-import { Alert, Button } from '@studio/ui'
+import { Alert, Button, LoadFailed } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { OrderItemsScreen } from './OrderItemsScreen'
@@ -16,6 +16,8 @@ export function ShopSection({ locale }: { locale: Locale }) {
   const [products, setProducts] = useState<readonly OrderableProduct[] | null>(null)
   const [ordered, setOrdered] = useState(false)
   const [failed, setFailed] = useState(false)
+  const [loadFailed, setLoadFailed] = useState(false)
+  const [attempt, setAttempt] = useState(0)
   const client = useMemo(
     () => ({
       async list(): Promise<OrderableProduct[]> {
@@ -40,12 +42,25 @@ export function ShopSection({ locale }: { locale: Locale }) {
     client
       .list()
       .then((rows) => alive && setProducts(rows))
-      .catch(() => alive && setProducts([]))
+      // A failed read is not an empty shop — "there is nothing to buy" is the club's
+      // statement, not the network's. Separate from `failed`, which is the ORDER's.
+      .catch(() => alive && setLoadFailed(true))
     return () => {
       alive = false
     }
-  }, [client])
+  }, [client, attempt])
 
+  if (loadFailed) {
+    return (
+      <LoadFailed
+        locale={locale}
+        onRetry={() => {
+          setLoadFailed(false)
+          setAttempt((n) => n + 1)
+        }}
+      />
+    )
+  }
   if (products === null) return null
   if (ordered) {
     return (

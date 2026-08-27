@@ -22,7 +22,7 @@
 import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { apiFetch } from '@studio/core'
-import { Button, Card, EmptyState, MoneyDisplay, StatusChip } from '@studio/ui'
+import { Button, Card, EmptyState, LoadFailed, MoneyDisplay, StatusChip } from '@studio/ui'
 import type { ChipStatus } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
@@ -140,6 +140,8 @@ export function EventPage({
   const [event, setEvent] = useState<EventOut | null>(null)
   const [roster, setRoster] = useState<EventRegistrationOut[]>([])
   const [loaded, setLoaded] = useState(false)
+  const [loadFailed, setLoadFailed] = useState(false)
+  const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
     let live = true
@@ -150,11 +152,24 @@ export function EventPage({
         setRoster(page.items)
         setLoaded(true)
       })
-      .catch(() => live && setLoaded(true))
+      // F1a — a failed load must not masquerade as loaded-and-empty.
+      .catch(() => live && setLoadFailed(true))
     return () => {
       live = false
     }
-  }, [client, eventId])
+  }, [client, eventId, attempt])
+
+  if (loadFailed) {
+    return (
+      <LoadFailed
+        locale={locale}
+        onRetry={() => {
+          setLoadFailed(false)
+          setAttempt((n) => n + 1)
+        }}
+      />
+    )
+  }
 
   if (!event) {
     return <p style={tileLabelStyle}>{t(locale, 'events.list.loading')}</p>

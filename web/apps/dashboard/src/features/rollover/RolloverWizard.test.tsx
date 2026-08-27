@@ -594,9 +594,10 @@ describe('RolloverWizard · failure', () => {
       throw new Error('500')
     })
     render(<RolloverWizard locale="he" client={client} />)
-    expect(await screen.findByRole('alert')).toHaveTextContent(
+    expect(await screen.findByTestId('load-failed')).toHaveTextContent(
       t('he', 'schedule.rollover.loadFailed'),
     )
+    expect(screen.getByTestId('load-failed-retry')).toBeInTheDocument()
   })
 })
 

@@ -12,7 +12,7 @@
 import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { apiFetch } from '@studio/core'
-import { Alert, Card, StatusChip } from '@studio/ui'
+import { Alert, Card, LoadFailed, StatusChip, Table } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 
@@ -32,23 +32,7 @@ type StaffMember = {
 
 type StaffPayload = { items: StaffMember[]; groups_without_coach: StaffGroup[] }
 
-const tableStyle: CSSProperties = {
-  inlineSize: '100%',
-  borderCollapse: 'collapse',
-  // §6.4 is desktop-first, but a manager checking cover on a phone is a normal case: the
-  // table scrolls inside its own box rather than widening the page.
-  minInlineSize: '48rem',
-}
 
-const scrollStyle: CSSProperties = { overflowX: 'auto', maxInlineSize: '100%' }
-
-const cellStyle: CSSProperties = {
-  paddingBlock: 'var(--space-3)',
-  paddingInline: 'var(--space-3)',
-  borderBlockEnd: 'var(--border-width-hairline) solid var(--border)',
-  textAlign: 'start',
-  verticalAlign: 'top',
-}
 
 const chipRowStyle: CSSProperties = {
   display: 'flex',
@@ -77,6 +61,7 @@ function displayName(member: StaffMember, locale: Locale): string {
 export function StaffScreen({ locale }: { locale: Locale }) {
   const [payload, setPayload] = useState<StaffPayload | null>(null)
   const [failed, setFailed] = useState(false)
+  const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
     let alive = true
@@ -94,15 +79,21 @@ export function StaffScreen({ locale }: { locale: Locale }) {
     return () => {
       alive = false
     }
-  }, [])
+  }, [attempt])
 
   if (failed) {
     return (
       <section aria-labelledby="staff-title">
         <h2 id="staff-title">{t(locale, 'common.staff.title')}</h2>
-        <Alert tone="danger" iconLabel={t(locale, 'common.dev.noticeIcon')}>
-          {t(locale, 'common.setup.loadFailed')}
-        </Alert>
+        {/* F1a — a real re-fetch, never location.reload(): the service worker may
+            serve the same failure from cache. */}
+        <LoadFailed
+          locale={locale}
+          onRetry={() => {
+            setFailed(false)
+            setAttempt((n) => n + 1)
+          }}
+        />
       </section>
     )
   }
@@ -133,81 +124,87 @@ export function StaffScreen({ locale }: { locale: Locale }) {
           otherwise read the group-level banner as a regression. */}
       <p data-testid="staff-sessions-note">{t(locale, 'common.staff.uncovered.sessionsLater')}</p>
 
-      {payload.items.length === 0 ? (
-        <Card>
-          <p>{t(locale, 'common.staff.empty')}</p>
-        </Card>
-      ) : (
-        <div style={scrollStyle}>
-          <table style={tableStyle}>
-            <caption>{t(locale, 'common.staff.title')}</caption>
-            <thead>
-              <tr>
-                <th scope="col" style={cellStyle}>
-                  {t(locale, 'common.staff.col.person')}
-                </th>
-                <th scope="col" style={cellStyle}>
-                  {t(locale, 'common.staff.col.role')}
-                </th>
-                <th scope="col" style={cellStyle}>
-                  {t(locale, 'common.staff.col.groups')}
-                </th>
-                <th scope="col" style={cellStyle}>
-                  {t(locale, 'common.staff.col.hours')}
-                  {/* The reason lives beside the column it explains, not in a footnote. */}
-                  <span data-testid="staff-hours-note"> · {t(locale, 'common.staff.hoursUnknown')}</span>
-                </th>
-                <th scope="col" style={cellStyle}>
-                  {t(locale, 'common.staff.col.permissions')}
-                </th>
-                <th scope="col" style={cellStyle}>
-                  {t(locale, 'common.staff.col.status')}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {payload.items.map((member) => (
-                <tr key={member.person_id ?? `invited-${member.email}`}>
-                  <th scope="row" style={cellStyle}>
-                    {displayName(member, locale)}
-                  </th>
-                  <td style={cellStyle}>
-                    {member.roles
-                      .map((role) => t(locale, `common.setup.staff.role.${role}`))
-                      .join(' · ')}
-                  </td>
-                  <td style={cellStyle}>
-                    {member.groups.length === 0
-                      ? t(locale, 'common.staff.noGroups')
-                      : member.groups.map((group) => group.name).join(' · ')}
-                  </td>
-                  <td style={cellStyle} data-testid="staff-hours-cell">
-                    {member.weekly_hours ?? t(locale, 'common.staff.noHours')}
-                  </td>
-                  <td style={cellStyle}>
-                    <ul style={chipRowStyle}>
-                      {member.permissions.map((permission) => (
-                        <li key={permission} style={chipStyle}>
-                          {t(locale, `common.staff.perm.${permission}`)}
-                        </li>
-                      ))}
-                    </ul>
-                  </td>
-                  <td style={cellStyle}>
-                    {/* 4h's six statuses are the product's own vocabulary; `paid` and
-                        `pending` are the two that mean settled and awaiting-someone-else,
-                        which is exactly active vs invited. */}
-                    <StatusChip
-                      status={member.status === 'active' ? 'paid' : 'pending'}
-                      label={t(locale, `common.staff.status.${member.status}`)}
-                    />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      {/* F1b — the primitive owns the widths, the caption, the scroll container and
+          the sub-768px card fallback, so "a manager checking cover on a phone" stops
+          being a sideways scroller (F11). */}
+      <Table
+        caption={t(locale, 'common.staff.title')}
+        columns={[
+          {
+            id: 'person',
+            header: t(locale, 'common.staff.col.person'),
+            width: '12rem',
+            cell: (member) => displayName(member, locale),
+          },
+          {
+            id: 'role',
+            header: t(locale, 'common.staff.col.role'),
+            width: '10rem',
+            cell: (member) =>
+              member.roles.map((role) => t(locale, `common.setup.staff.role.${role}`)).join(' · '),
+          },
+          {
+            id: 'groups',
+            header: t(locale, 'common.staff.col.groups'),
+            width: '14rem',
+            cell: (member) =>
+              member.groups.length === 0
+                ? t(locale, 'common.staff.noGroups')
+                : member.groups.map((group) => group.name).join(' · '),
+          },
+          {
+            id: 'hours',
+            header: (
+              <>
+                {t(locale, 'common.staff.col.hours')}
+                {/* The reason lives beside the column it explains, not in a footnote. */}
+                <span data-testid="staff-hours-note"> · {t(locale, 'common.staff.hoursUnknown')}</span>
+              </>
+            ),
+            width: '10rem',
+            cell: (member) => (
+              <span data-testid="staff-hours-cell">
+                {member.weekly_hours ?? t(locale, 'common.staff.noHours')}
+              </span>
+            ),
+          },
+          {
+            id: 'permissions',
+            header: t(locale, 'common.staff.col.permissions'),
+            width: '16rem',
+            cell: (member) => (
+              <ul style={chipRowStyle}>
+                {member.permissions.map((permission) => (
+                  <li key={permission} style={chipStyle}>
+                    {t(locale, `common.staff.perm.${permission}`)}
+                  </li>
+                ))}
+              </ul>
+            ),
+          },
+          {
+            id: 'status',
+            header: t(locale, 'common.staff.col.status'),
+            width: '8rem',
+            cell: (member) => (
+              // 4h's six statuses are the product's own vocabulary; `paid` and `pending`
+              // are the two that mean settled and awaiting-someone-else, which is
+              // exactly active vs invited.
+              <StatusChip
+                status={member.status === 'active' ? 'paid' : 'pending'}
+                label={t(locale, `common.staff.status.${member.status}`)}
+              />
+            ),
+          },
+        ]}
+        empty={
+          <Card>
+            <p>{t(locale, 'common.staff.empty')}</p>
+          </Card>
+        }
+        rowKey={(member) => member.person_id ?? `invited-${member.email}`}
+        rows={payload.items}
+      />
     </section>
   )
 }

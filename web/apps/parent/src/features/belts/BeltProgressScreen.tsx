@@ -25,7 +25,7 @@
 // Three artboards describe that flow and none of them has a model or a notification kind.
 import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { BeltBar, Card, EmptyState } from '@studio/ui'
+import { BeltBar, Card, EmptyState, LoadFailed } from '@studio/ui'
 import { formatDateInStudioZone } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
@@ -78,6 +78,8 @@ export function BeltProgressScreen({
   const [ladder, setLadder] = useState<LadderRankOut[]>([])
   const [awards, setAwards] = useState<StudentBeltOut[]>([])
   const [loaded, setLoaded] = useState(false)
+  const [attempt, setAttempt] = useState(0)
+  const [failed, setFailed] = useState(false)
 
   useEffect(() => {
     let live = true
@@ -88,13 +90,25 @@ export function BeltProgressScreen({
         setAwards(awardPage.items)
         setLoaded(true)
       })
-      .catch(() => live && setLoaded(true))
+      .catch(() => live && setFailed(true))
     return () => {
       live = false
     }
-  }, [classId, client, studentId])
+  }, [classId, client, studentId, attempt])
 
   const states = segmentStates(ladder, awards)
+
+  if (failed) {
+    return (
+      <LoadFailed
+        locale={locale}
+        onRetry={() => {
+          setFailed(false)
+          setAttempt((n) => n + 1)
+        }}
+      />
+    )
+  }
 
   return (
     <div style={pageStyle}>

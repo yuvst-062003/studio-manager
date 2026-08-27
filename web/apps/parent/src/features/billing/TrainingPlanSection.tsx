@@ -7,6 +7,7 @@
 // student.
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { apiFetch } from '@studio/core'
+import { LoadFailed } from '@studio/ui'
 import type { Locale } from '@studio/i18n'
 import { TrainingPlanScreen } from './TrainingPlanScreen'
 import { makeTrainingPlanClient } from './trainingPlanClient'
@@ -24,13 +25,15 @@ export function TrainingPlanSection({
   // Bumped after every write. A counter rather than calling the loader directly, so there
   // is exactly one place that writes `view` — the same reason `PaymentsSection` does it.
   const [reloads, setReloads] = useState(0)
+  const [failed, setFailed] = useState(false)
 
   useEffect(() => {
     let alive = true
     client
       .read(studentId)
       .then((next) => alive && setView(next))
-      .catch(() => alive && setView(null))
+      // A blank screen forever was the old failure mode — a dead end with no words.
+      .catch(() => alive && setFailed(true))
     return () => {
       alive = false
     }
@@ -38,6 +41,17 @@ export function TrainingPlanSection({
 
   const refresh = useCallback(() => setReloads((n) => n + 1), [])
 
+  if (failed) {
+    return (
+      <LoadFailed
+        locale={locale}
+        onRetry={() => {
+          setFailed(false)
+          refresh()
+        }}
+      />
+    )
+  }
   if (view === null) return null
 
   return (

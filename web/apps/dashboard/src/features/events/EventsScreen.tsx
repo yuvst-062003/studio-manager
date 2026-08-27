@@ -11,7 +11,7 @@
 // manager their season had vanished.
 import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { Alert, Button, EmptyState } from '@studio/ui'
+import { Button, EmptyState, LoadFailed } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { EventCard } from './EventCard'
@@ -116,6 +116,7 @@ export function EventsScreen({
   // `react-hooks/set-state-in-effect` is right to refuse it. Same shape as
   // features/people/StudentsScreen.tsx, which met the rule first.
   const [answered, setAnswered] = useState<string | null>(null)
+  const [attempt, setAttempt] = useState(0)
   const asked = type ?? ''
   const loaded = answered === asked
 
@@ -141,7 +142,7 @@ export function EventsScreen({
     return () => {
       live = false
     }
-  }, [client, type])
+  }, [client, type, attempt])
 
   const { upcoming, past } = splitByTime(events, now)
 
@@ -182,9 +183,15 @@ export function EventsScreen({
           A static banner marked live makes a screen reader interrupt itself on every
           render, and people learn to ignore an alert that always fires. */}
       {failed ? (
-        <Alert iconLabel={t(locale, 'events.form.errorTitle')} live tone="danger">
-          {t(locale, 'events.form.errorTitle')}
-        </Alert>
+        <LoadFailed
+          detail={t(locale, 'events.form.errorTitle')}
+          locale={locale}
+          onRetry={() => {
+            setFailed(false)
+            setAnswered(null)
+            setAttempt((n) => n + 1)
+          }}
+        />
       ) : null}
 
       {!loaded && !failed ? (

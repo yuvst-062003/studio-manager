@@ -14,7 +14,7 @@
 // needs to know their doorbell is switched off.
 import { useCallback, useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { Button, Card, EmptyState } from '@studio/ui'
+import { Button, Card, EmptyState, LoadFailed } from '@studio/ui'
 import { formatDateInStudioZone, formatTimeInStudioZone } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
@@ -95,6 +95,8 @@ export function InboxScreen({
 }) {
   const [rows, setRows] = useState<NotificationOut[]>([])
   const [loaded, setLoaded] = useState(false)
+  const [failed, setFailed] = useState(false)
+  const [attempt, setAttempt] = useState(0)
   const push = usePushRegistration(client, userAgent === undefined ? {} : { userAgent })
 
   useEffect(() => {
@@ -106,11 +108,11 @@ export function InboxScreen({
         setRows(page.items)
         setLoaded(true)
       })
-      .catch(() => live && setLoaded(true))
+      .catch(() => live && setFailed(true))
     return () => {
       live = false
     }
-  }, [client])
+  }, [client, attempt])
 
   const open = useCallback(
     async (row: NotificationOut) => {
@@ -135,6 +137,20 @@ export function InboxScreen({
   }, [client])
 
   const unread = rows.filter((row) => row.read_at === null).length
+
+  if (failed) {
+    // A failed inbox read must never wear the empty state — "no messages" is a claim
+    // about the club's communication, not about the network.
+    return (
+      <LoadFailed
+        locale={locale}
+        onRetry={() => {
+          setFailed(false)
+          setAttempt((n) => n + 1)
+        }}
+      />
+    )
+  }
 
   return (
     <section style={pageStyle} aria-labelledby="inbox-title" data-testid="parent-inbox">

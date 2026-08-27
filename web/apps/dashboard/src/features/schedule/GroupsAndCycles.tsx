@@ -15,7 +15,7 @@
 // that writes is the worst possible bug on a read-only screen.
 import { useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { EmptyState } from '@studio/ui'
+import { EmptyState, Table } from '@studio/ui'
 import { formatDateInStudioZone, formatTimeInStudioZone } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
@@ -27,21 +27,7 @@ interface GroupFacts {
   unscheduled: number
 }
 
-const tableStyle: CSSProperties = { inlineSize: '100%', borderCollapse: 'collapse' }
 
-const cellStyle: CSSProperties = {
-  textAlign: 'start',
-  paddingBlock: 'var(--space-2)',
-  paddingInline: 'var(--space-3)',
-  borderBlockEnd: 'var(--border-width-hairline) solid var(--border)',
-  verticalAlign: 'top',
-}
-
-const headStyle: CSSProperties = {
-  ...cellStyle,
-  fontWeight: 'var(--weight-semibold)' as CSSProperties['fontWeight'],
-  borderBlockEnd: 'var(--border-width-strong) solid var(--border-strong)',
-}
 
 const laterStyle: CSSProperties = {
   color: 'var(--text-muted)',
@@ -131,71 +117,89 @@ export function GroupsAndCycles({
   return (
     <section aria-labelledby="groups-title">
       <h2 id="groups-title">{t(locale, 'schedule.groups.title')}</h2>
-      <table style={tableStyle}>
-        <caption>{t(locale, 'schedule.groups.caption')}</caption>
-        <thead>
-          <tr>
-            <th scope="col" style={headStyle}>
-              {t(locale, 'schedule.groups.title')}
-            </th>
-            <th scope="col" style={headStyle}>
-              {t(locale, 'schedule.groups.weeklySchedule')}
-            </th>
-            <th scope="col" style={headStyle}>
-              {t(locale, 'schedule.groups.nextSession')}
-            </th>
-            <th scope="col" style={headStyle}>
-              {t(locale, 'schedule.groups.unscheduledStudents')}
-            </th>
-            <th scope="col" style={headStyle}>
-              {t(locale, 'schedule.session.title')}
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {groups.map((group) => {
-            const fact = facts[group.id]
-            return (
-              <tr key={group.id} data-testid="group-row">
-                <th scope="row" style={cellStyle}>
-                  {hrefForGroup ? (
-                    <a href={hrefForGroup(group.id)}>{group.name}</a>
-                  ) : (
-                    group.name
-                  )}
-                  <div style={laterStyle}>{group.className}</div>
-                </th>
-                <td style={cellStyle} data-testid={`schedule-${group.id}`}>
+      {/* F1b — widths, caption, scroll container and the card fallback come from the
+          primitive. */}
+      <Table
+        caption={t(locale, 'schedule.groups.caption')}
+        columns={[
+          {
+            id: 'group',
+            header: t(locale, 'schedule.groups.title'),
+            width: '12rem',
+            cell: (group) => (
+              <>
+                {hrefForGroup ? <a href={hrefForGroup(group.id)}>{group.name}</a> : group.name}
+                <div style={laterStyle}>{group.className}</div>
+              </>
+            ),
+          },
+          {
+            id: 'schedule',
+            header: t(locale, 'schedule.groups.weeklySchedule'),
+            width: '14rem',
+            cell: (group) => {
+              const fact = facts[group.id]
+              return (
+                <span data-testid={`schedule-${group.id}`}>
                   {fact && fact.rules.length > 0
                     ? fact.rules.map((rule) => (
                         <div key={rule.id ?? ruleLabel(rule, locale)}>{ruleLabel(rule, locale)}</div>
                       ))
                     : t(locale, 'schedule.rules.empty')}
-                </td>
-                <td style={cellStyle} data-testid={`next-${group.id}`}>
+                </span>
+              )
+            },
+          },
+          {
+            id: 'next',
+            header: t(locale, 'schedule.groups.nextSession'),
+            width: '12rem',
+            cell: (group) => {
+              const fact = facts[group.id]
+              return (
+                <span data-testid={`next-${group.id}`}>
                   {fact?.next
                     ? `${formatDateInStudioZone(fact.next.starts_at, locale)} · ${formatTimeInStudioZone(
                         fact.next.starts_at,
                         locale,
                       )}`
                     : t(locale, 'schedule.groups.noNextSession')}
-                </td>
-                <td
-                  style={fact && fact.unscheduled > 0 ? { ...cellStyle, ...warnStyle } : cellStyle}
+                </span>
+              )
+            },
+          },
+          {
+            id: 'unscheduled',
+            header: t(locale, 'schedule.groups.unscheduledStudents'),
+            width: '8rem',
+            cell: (group) => {
+              const fact = facts[group.id]
+              return (
+                <span
                   data-testid={`unscheduled-${group.id}`}
+                  style={fact && fact.unscheduled > 0 ? warnStyle : undefined}
                 >
                   {fact?.unscheduled ?? 0}
-                </td>
-                <td style={cellStyle}>
-                  {/* M7 and M3. Stated, not blank — see the module header. */}
-                  <div style={laterStyle}>{t(locale, 'schedule.groups.beltRangeComesLater')}</div>
-                  <div style={laterStyle}>{t(locale, 'schedule.groups.capacityComesLater')}</div>
-                </td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
+                </span>
+              )
+            },
+          },
+          {
+            id: 'session',
+            header: t(locale, 'schedule.session.title'),
+            width: '12rem',
+            cell: () => (
+              <>
+                {/* M7 and M3. Stated, not blank — see the module header. */}
+                <div style={laterStyle}>{t(locale, 'schedule.groups.beltRangeComesLater')}</div>
+                <div style={laterStyle}>{t(locale, 'schedule.groups.capacityComesLater')}</div>
+              </>
+            ),
+          },
+        ]}
+        rowKey={(group) => group.id}
+        rows={groups}
+      />
     </section>
   )
 }

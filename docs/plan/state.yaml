@@ -453,7 +453,8 @@ waves:
         status: pending
       - id: F1
         title: Dashboard — LoadFailed and Table primitives
-        status: pending
+        status: shipped
+        on: 2026-08-27
       - id: F2
         title: Dashboard — wire the four inert controls with existing routes, plus the no-handler guard
         status: shipped
@@ -486,7 +487,8 @@ waves:
         status: pending
       - id: F11
         title: Dashboard — phone layout via Table card fallback
-        status: pending
+        status: shipped
+        on: 2026-08-27
       - id: F12
         title: Dashboard — bulk actions outside the rollover wizard
         status: pending

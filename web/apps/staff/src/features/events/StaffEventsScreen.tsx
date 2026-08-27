@@ -16,7 +16,7 @@
 // cannot see.
 import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { Button, Card, EmptyState, ProgressBar, StatusChip } from '@studio/ui'
+import { Button, Card, EmptyState, LoadFailed, ProgressBar, StatusChip } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import type { EventOut, StaffEventsClient } from './client'
@@ -55,6 +55,8 @@ export function StaffEventsScreen({
 }) {
   const [events, setEvents] = useState<EventOut[]>([])
   const [loaded, setLoaded] = useState(false)
+  const [loadFailed, setLoadFailed] = useState(false)
+  const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
     let live = true
@@ -65,16 +67,29 @@ export function StaffEventsScreen({
         setEvents(page.items)
         setLoaded(true)
       })
-      .catch(() => live && setLoaded(true))
+      // F1a — a failed load must not masquerade as loaded-and-empty.
+      .catch(() => live && setLoadFailed(true))
     return () => {
       live = false
     }
-  }, [client])
+  }, [client, attempt])
 
   const cutoff = Date.parse(now)
   const ordered = [...events].sort(
     (a, b) => Date.parse(a.starts_at) - Date.parse(b.starts_at),
   )
+
+  if (loadFailed) {
+    return (
+      <LoadFailed
+        locale={locale}
+        onRetry={() => {
+          setLoadFailed(false)
+          setAttempt((n) => n + 1)
+        }}
+      />
+    )
+  }
 
   return (
     <div style={pageStyle}>

@@ -18,7 +18,7 @@
 // rather than relying on it.
 import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { Button, Card, EmptyState, MoneyDisplay, StatusChip } from '@studio/ui'
+import { Button, Card, EmptyState, LoadFailed, MoneyDisplay, StatusChip } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { deadlinePassed } from './client'
@@ -67,6 +67,8 @@ export function ParentEventsScreen({
 }) {
   const [rows, setRows] = useState<ParentEventOut[]>([])
   const [loaded, setLoaded] = useState(false)
+  const [failed, setFailed] = useState(false)
+  const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
     let live = true
@@ -77,13 +79,25 @@ export function ParentEventsScreen({
         setRows(page.items)
         setLoaded(true)
       })
-      .catch(() => live && setLoaded(true))
+      .catch(() => live && setFailed(true))
     return () => {
       live = false
     }
-  }, [client])
+  }, [client, attempt])
 
   const awaiting = rows.filter((row) => row.registration.rsvp === 'pending').length
+
+  if (failed) {
+    return (
+      <LoadFailed
+        locale={locale}
+        onRetry={() => {
+          setFailed(false)
+          setAttempt((n) => n + 1)
+        }}
+      />
+    )
+  }
 
   return (
     <div style={pageStyle}>

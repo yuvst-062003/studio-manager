@@ -110,11 +110,10 @@ describe('StaffScreen', () => {
     expect(await screen.findByText(t('he', 'common.staff.empty'))).toBeInTheDocument()
   })
 
-  it('says so when the screen cannot load', async () => {
+  it('says so when the screen cannot load — and offers a real retry', async () => {
     stub({}, false)
     render(<StaffScreen locale="he" />)
-    await waitFor(() =>
-      expect(screen.getByText(t('he', 'common.setup.loadFailed'))).toBeInTheDocument(),
-    )
+    await waitFor(() => expect(screen.getByTestId('load-failed')).toBeInTheDocument())
+    expect(screen.getByTestId('load-failed-retry')).toBeInTheDocument()
   })
 })

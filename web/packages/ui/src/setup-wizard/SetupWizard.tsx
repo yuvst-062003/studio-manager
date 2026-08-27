@@ -16,6 +16,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { t } from '@studio/i18n'
+import { LoadFailed } from '../primitives/LoadFailed'
 import type { Locale } from '@studio/i18n'
 import { useSlot } from '../slots'
 import { Button } from '../primitives/Button'
@@ -90,6 +91,7 @@ export function SetupWizard({
   const [progress, setProgress] = useState<SetupProgress | null>(null)
   const [activeId, setActiveId] = useState<WizardStepId | null>(null)
   const [failed, setFailed] = useState(false)
+  const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
     let alive = true
@@ -104,7 +106,7 @@ export function SetupWizard({
     return () => {
       alive = false
     }
-  }, [client])
+  }, [client, attempt])
 
   const steps = useMemo(() => progress?.steps ?? [], [progress])
 
@@ -146,7 +148,14 @@ export function SetupWizard({
     return (
       <section aria-labelledby="setup-title" data-testid="setup-wizard">
         <h2 id="setup-title">{t(locale, 'common.setup.title')}</h2>
-        <p role="alert">{t(locale, 'common.setup.loadFailed')}</p>
+        <LoadFailed
+          detail={t(locale, 'common.setup.loadFailed')}
+          locale={locale}
+          onRetry={() => {
+            setFailed(false)
+            setAttempt((n) => n + 1)
+          }}
+        />
       </section>
     )
   }

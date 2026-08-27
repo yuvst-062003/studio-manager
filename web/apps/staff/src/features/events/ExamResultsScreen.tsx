@@ -20,7 +20,7 @@
 // says nothing about notifying — which the audit noticed about the drawn caption too.
 import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { Alert, Button, Card, EmptyState, useModalDialog } from '@studio/ui'
+import { Alert, Button, Card, EmptyState, LoadFailed, useModalDialog } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { BeltPair } from './BeltPair'
@@ -84,6 +84,8 @@ export function ExamResultsScreen({
   const [exam, setExam] = useState<EventOut | null>(null)
   const [candidates, setCandidates] = useState<CandidateOut[]>([])
   const [loaded, setLoaded] = useState(false)
+  const [loadFailed, setLoadFailed] = useState(false)
+  const [attempt, setAttempt] = useState(0)
   const [marks, setMarks] = useState<Record<string, ExamResult>>({})
   const [confirming, setConfirming] = useState(false)
   // Moves focus in on open, traps Tab, closes on Escape, and restores focus to the button
@@ -101,11 +103,12 @@ export function ExamResultsScreen({
         setCandidates(page.items)
         setLoaded(true)
       })
-      .catch(() => live && setLoaded(true))
+      // F1a — a failed load must not masquerade as loaded-and-empty.
+      .catch(() => live && setLoadFailed(true))
     return () => {
       live = false
     }
-  }, [client, eventId])
+  }, [client, eventId, attempt])
 
   const resultFor = (studentId: string): ExamResult => marks[studentId] ?? 'pending'
 
@@ -139,6 +142,18 @@ export function ExamResultsScreen({
 
   const passed = decided.filter((row) => resultFor(row.student_id) === 'pass').length
   const failedCount = decided.filter((row) => resultFor(row.student_id) === 'fail').length
+
+  if (loadFailed) {
+    return (
+      <LoadFailed
+        locale={locale}
+        onRetry={() => {
+          setLoadFailed(false)
+          setAttempt((n) => n + 1)
+        }}
+      />
+    )
+  }
 
   return (
     <div style={pageStyle}>

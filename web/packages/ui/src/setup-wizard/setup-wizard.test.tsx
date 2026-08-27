@@ -224,7 +224,12 @@ describe('SetupWizard container', () => {
     registerM1Stubs()
     const broken = { ...fakeClient(), read: () => Promise.reject(new Error('offline')) }
     render(<SetupWizard client={broken} locale="he" />)
-    expect(await screen.findByRole('alert')).toHaveTextContent(t('he', 'common.setup.loadFailed'))
+    // F1a — the failure now arrives through LoadFailed, whose retry is the point: a
+    // refresh may serve the same failure from the service worker's cache.
+    expect(await screen.findByTestId('load-failed')).toHaveTextContent(
+      t('he', 'common.setup.loadFailed'),
+    )
+    expect(screen.getByTestId('load-failed-retry')).toBeInTheDocument()
   })
 
   it('carries the reassurance line from artboard 5c on every step', async () => {

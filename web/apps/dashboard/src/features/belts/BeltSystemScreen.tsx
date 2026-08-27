@@ -21,7 +21,7 @@
 // and the time held in it. A per-rank threshold is a model change, not a UI one.
 import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { BeltBar, Button, Card, EmptyState, Radio, TextField } from '@studio/ui'
+import { BeltBar, Button, Card, EmptyState, LoadFailed, Radio, TextField } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { BELT_PALETTE } from './client'
@@ -101,6 +101,8 @@ export function BeltSystemScreen({
 }) {
   const [ladder, setLadder] = useState<LadderRankOut[]>([])
   const [loaded, setLoaded] = useState(false)
+  const [loadFailed, setLoadFailed] = useState(false)
+  const [attempt, setAttempt] = useState(0)
   const [draft, setDraft] = useState<Draft | null>(null)
   const [refusal, setRefusal] = useState<string | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
@@ -114,11 +116,12 @@ export function BeltSystemScreen({
         setLadder(page.items)
         setLoaded(true)
       })
-      .catch(() => live && setLoaded(true))
+      // F1a — a failed load must not masquerade as loaded-and-empty.
+      .catch(() => live && setLoadFailed(true))
     return () => {
       live = false
     }
-  }, [client, classId, reloadKey])
+  }, [client, classId, reloadKey, attempt])
 
   const reload = () => setReloadKey((key) => key + 1)
 
@@ -162,6 +165,18 @@ export function BeltSystemScreen({
     await client.createRank(body)
     setDraft(null)
     reload()
+  }
+
+  if (loadFailed) {
+    return (
+      <LoadFailed
+        locale={locale}
+        onRetry={() => {
+          setLoadFailed(false)
+          setAttempt((n) => n + 1)
+        }}
+      />
+    )
   }
 
   return (

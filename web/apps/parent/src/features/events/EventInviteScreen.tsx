@@ -21,7 +21,7 @@
 // times. §5.8's event has a column for neither.
 import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { Alert, Button, Card, MoneyDisplay, StatusChip } from '@studio/ui'
+import { Alert, Button, Card, LoadFailed, MoneyDisplay, StatusChip } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { blocksConfirmation, deadlinePassed } from './client'
@@ -64,6 +64,8 @@ export function EventInviteScreen({
 }) {
   const [row, setRow] = useState<ParentEventOut | null>(null)
   const [loaded, setLoaded] = useState(false)
+  const [failed, setFailed] = useState(false)
+  const [attempt, setAttempt] = useState(0)
   const [changing, setChanging] = useState(false)
 
   useEffect(() => {
@@ -79,12 +81,23 @@ export function EventInviteScreen({
         )
         setLoaded(true)
       })
-      .catch(() => live && setLoaded(true))
+      .catch(() => live && setFailed(true))
     return () => {
       live = false
     }
-  }, [client, eventId, studentId])
+  }, [client, eventId, studentId, attempt])
 
+  if (failed) {
+    return (
+      <LoadFailed
+        locale={locale}
+        onRetry={() => {
+          setFailed(false)
+          setAttempt((n) => n + 1)
+        }}
+      />
+    )
+  }
   if (!row) return <p style={hintStyle}>{loaded ? '' : t(locale, 'events.list.loading')}</p>
 
   const { event, registration } = row

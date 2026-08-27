@@ -271,6 +271,37 @@ is the single cheapest item in this spec.
 
 ## Log
 
+### 2026-08-27 · F1 adoption + F11 — recovery everywhere, tables from one primitive
+
+**Stale claims, first.** The spec's counts — "43 screens catch an API error, 40 render a
+dead end", "zero @media queries", "no table primitive" — described the tree before the
+same-day design pass restructured most screens. Measured now: ~21 dashboard files carry a
+failure state, and most already either recovered or rendered honestly. What actually
+survived were two classes: **6 dead-end failure renders** (StaffScreen, TemplateEditor,
+EventsScreen, ReportsSection, RolloverWizard, SetupWizard — the last shared by both apps)
+and **6 fail-as-loaded catches** (`.catch(() => setLoaded(true))`) that made a failed
+load wear the EMPTY state — "no events", "no messages", an empty belt ladder — a lie
+about the club told by the network (BeltSystemScreen, AnnouncementsScreen, ExamsScreen,
+EventPage, staff ExamResultsScreen, staff StaffEventsScreen). ReportsSection was the
+worst: a failed read rendered as "no revenue this month".
+
+**Built.** All twelve now render `LoadFailed` with a real re-fetch (an `attempt` counter
+re-arms the effect — never `location.reload()`, which the service worker can answer from
+cache). The parent sweep (P8) fixed the same classes there: PaymentsSection now fails the
+whole money screen rather than zeroing prepay terms and credit, and BeltProgress, Inbox,
+Events, EventInvite, Shop, TrainingPlan, Directions and DeclarationForm all retry.
+Guard: `tools/__tests__/load-failed-recovery.test.ts` — a `*.loadFailed` string may only
+render through the primitive, and `.catch(…setLoaded(true))` fails the build.
+
+**F1b/F11.** Students, staff and groups — the three hand-built `<table>`s in the tree
+(the audit's collections and exams tables had already shipped as card/flex layouts; drift,
+not a gap) — now render through the `Table` primitive: explicit widths (the fix for the
+run-on students header), required caption, its own scroll container, and one card
+fallback below 768px defined once, tested at both layouts in the primitive. jsdom has no
+layout engine, so the 390px behaviour is asserted where it is defined rather than
+re-asserted per screen.
+
+
 ### 2026-08-27 · F2 + F7 — every dead control acts, and the guard that keeps it so
 
 **What was wrong.** Ten controls rendered a `<Button>` with no handler — four whose

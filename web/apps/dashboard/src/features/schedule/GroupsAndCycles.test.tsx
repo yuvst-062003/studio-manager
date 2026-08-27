@@ -97,7 +97,7 @@ function renderTable(client = stub(), groups = GROUPS) {
 describe('GroupsAndCycles (4b)', () => {
   it('lists one row per group, with its class', async () => {
     renderTable()
-    await waitFor(() => expect(screen.getAllByTestId('group-row')).toHaveLength(2))
+    await waitFor(() => expect(screen.getAllByRole('rowheader')).toHaveLength(2))
     expect(screen.getByText('מתחילים')).toBeInTheDocument()
     expect(screen.getAllByText("ג'ודו")).toHaveLength(2)
   })
@@ -166,7 +166,7 @@ describe('GroupsAndCycles (4b)', () => {
 
   it('is a table with a caption and column headers', async () => {
     renderTable()
-    await waitFor(() => expect(screen.getAllByTestId('group-row')).toHaveLength(2))
+    await waitFor(() => expect(screen.getAllByRole('rowheader')).toHaveLength(2))
     expect(screen.getByRole('table')).toHaveAccessibleName(t('he', 'schedule.groups.caption'))
     expect(screen.getAllByRole('columnheader').length).toBeGreaterThanOrEqual(5)
   })
@@ -181,7 +181,7 @@ describe('GroupsAndCycles (4b)', () => {
         today="2026-11-03T12:00:00Z"
       />,
     )
-    await waitFor(() => expect(screen.getAllByTestId('group-row').length).toBe(2))
+    await waitFor(() => expect(screen.getAllByRole('rowheader').length).toBe(2))
     for (const node of container.querySelectorAll<HTMLElement>('[style]')) {
       expect(node.getAttribute('style') ?? '').not.toMatch(
         /margin-(left|right)|padding-(left|right)|(^|;)\s*(left|right):/,

@@ -16,7 +16,7 @@
 // API will refuse is a 403 the manager discovers after writing the message.
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { Button, Card, EmptyState, SegmentedControl, TextField } from '@studio/ui'
+import { Button, Card, EmptyState, LoadFailed, SegmentedControl, TextField } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { DeliveryReport } from './DeliveryReport'
@@ -93,6 +93,8 @@ export function AnnouncementsScreen({
 }) {
   const [rows, setRows] = useState<AnnouncementOut[]>([])
   const [loaded, setLoaded] = useState(false)
+  const [loadFailed, setLoadFailed] = useState(false)
+  const [attempt, setAttempt] = useState(0)
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   const [scopeType, setScopeType] = useState<AnnouncementScope>(
@@ -120,11 +122,12 @@ export function AnnouncementsScreen({
         setRows(page.items)
         setLoaded(true)
       })
-      .catch(() => live && setLoaded(true))
+      // F1a — a failed load must not masquerade as loaded-and-empty.
+      .catch(() => live && setLoadFailed(true))
     return () => {
       live = false
     }
-  }, [client])
+  }, [client, attempt])
 
   const audienceChosen = scopeType === 'studio' || scopeId !== null
   const scopeKey = `${scopeType}:${scopeId ?? ''}`
@@ -173,6 +176,18 @@ export function AnnouncementsScreen({
     // report that appears after every send is one people learn to dismiss without reading,
     // which costs exactly the case it exists for.
   }, [client, title, body, scopeType, scopeId, refresh])
+
+  if (loadFailed) {
+    return (
+      <LoadFailed
+        locale={locale}
+        onRetry={() => {
+          setLoadFailed(false)
+          setAttempt((n) => n + 1)
+        }}
+      />
+    )
+  }
 
   return (
     <div style={pageStyle} data-testid="dashboard-announcements">

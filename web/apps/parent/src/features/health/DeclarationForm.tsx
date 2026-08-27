@@ -22,7 +22,7 @@
 // **G7.** No answer is logged, and nothing here is put anywhere but the request body.
 import { useEffect, useMemo, useState } from 'react'
 import type { CSSProperties, FormEvent } from 'react'
-import { Alert, Button, Card, SegmentedControl } from '@studio/ui'
+import { Alert, Button, Card, LoadFailed, SegmentedControl } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { SignaturePad } from './SignaturePad'
@@ -91,6 +91,7 @@ export function DeclarationForm({
   const [answers, setAnswers] = useState<Record<string, AnswerValue>>({})
   const [signature, setSignature] = useState<string | null>(null)
   const [loadFailed, setLoadFailed] = useState(false)
+  const [attempt, setAttempt] = useState(0)
   const [sending, setSending] = useState(false)
   const [failed, setFailed] = useState(false)
   const [submitted, setSubmitted] = useState(false)
@@ -111,7 +112,7 @@ export function DeclarationForm({
     return () => {
       live = false
     }
-  }, [client])
+  }, [client, attempt])
 
   const missing = useMemo(() => (schema ? unansweredRequired(schema, answers) : []), [schema, answers])
   const complete = missing.length === 0 && signature !== null
@@ -156,10 +157,17 @@ export function DeclarationForm({
   }
 
   if (loadFailed) {
+    // F1a/P8 — this is §6.1's BLOCKING gate: a dead end here locks the family out of
+    // the whole app, which is the one place retry matters most.
     return (
-      <Alert iconLabel={t(locale, 'health.declaration.error')} live tone="danger">
-        {t(locale, 'health.declaration.error')}
-      </Alert>
+      <LoadFailed
+        detail={t(locale, 'health.declaration.error')}
+        locale={locale}
+        onRetry={() => {
+          setLoadFailed(false)
+          setAttempt((n) => n + 1)
+        }}
+      />
     )
   }
   if (!schema) return <p>{t(locale, 'health.declaration.loading')}</p>

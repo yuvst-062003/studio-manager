@@ -11,6 +11,7 @@
 // warning rather than a block. Both live in the screen; this file only feeds it.
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { apiFetch } from '@studio/core'
+import { LoadFailed } from '@studio/ui'
 import type { Locale } from '@studio/i18n'
 import { PaymentsScreen } from './PaymentsScreen'
 import type { DebtRow, PrepayTerms, StandingOrderLink } from './PaymentsScreen'
@@ -36,12 +37,6 @@ type WireTerms = {
   cash_prepay_months: number
   cheque_prepay_months: number
   monthly_total_agorot: number
-}
-
-const NO_TERMS: WireTerms = {
-  cash_prepay_months: 0,
-  cheque_prepay_months: 0,
-  monthly_total_agorot: 0,
 }
 
 const JSON_HEADERS = { 'Content-Type': 'application/json' }
@@ -146,10 +141,12 @@ export function PaymentsSection({ locale }: { locale: Locale }) {
   // set-state-in-effect rule is pointing at a real hazard here, since a second writer
   // racing the first would leave the screen showing a list nobody asked for.
   const [reloads, setReloads] = useState(0)
+  const [failed, setFailed] = useState(false)
 
   useEffect(() => {
     let alive = true
     void (async () => {
+      try {
       const [charges, promiseRows, mandate, children, links, terms, balance] = await Promise.all([
         client.openCharges(''),
         // The payer's own promises, both routes, beside the charges: a pending one badges
@@ -184,13 +181,19 @@ export function PaymentsSection({ locale }: { locale: Locale }) {
         // The club's own prepayment rules and this payer's monthly price. Read here rather
         // than computed in the screen: `months x monthly` is integer arithmetic on money
         // (G2), and the server is the one place that knows both numbers.
-        apiFetch('/api/v1/me/prepay-terms')
-          .then((r) => (r.ok ? (r.json() as Promise<WireTerms>) : NO_TERMS))
-          .catch(() => NO_TERMS),
+        // P8's named silent degradation, closed: a failed terms read used to become
+        // NO_TERMS, so the "paid ahead" line computed against a real-looking zero. A
+        // wrong number about money is worse than an error — the read now fails the
+        // screen into LoadFailed instead of into data.
+        apiFetch('/api/v1/me/prepay-terms').then((r) => {
+          if (!r.ok) throw new Error(String(r.status))
+          return r.json() as Promise<WireTerms>
+        }),
         // `credit_agorot` beside `balance_agorot`, never merged: the "paid ahead" line is
         // derived from it and the monthly price, so a plan change re-answers it with
         // nothing stored to become wrong.
-        client.balance('').catch(() => null),
+        // Same rule: credit is money, and 0-on-failure is a lie about it.
+        client.balance(''),
       ])
       const nameOf = new Map(
         children.items.map((child) => [child.id, `${child.first_name} ${child.last_name}`]),
@@ -203,7 +206,7 @@ export function PaymentsSection({ locale }: { locale: Locale }) {
         chequeMonths: terms.cheque_prepay_months,
         monthlyTotalAgorot: terms.monthly_total_agorot,
       })
-      setCreditAgorot(balance?.credit_agorot ?? 0)
+      setCreditAgorot(balance.credit_agorot)
       setStandingOrderLinks(
         links.items.map((link) => ({
           studentName: link.student_name,
@@ -227,6 +230,9 @@ export function PaymentsSection({ locale }: { locale: Locale }) {
         })),
       )
       setLoaded(true)
+      } catch {
+        if (alive) setFailed(true)
+      }
     })()
     return () => {
       alive = false
@@ -235,6 +241,17 @@ export function PaymentsSection({ locale }: { locale: Locale }) {
 
   const refresh = useCallback(() => setReloads((n) => n + 1), [])
 
+  if (failed) {
+    return (
+      <LoadFailed
+        locale={locale}
+        onRetry={() => {
+          setFailed(false)
+          refresh()
+        }}
+      />
+    )
+  }
   if (!loaded) return null
 
   return (

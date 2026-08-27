@@ -16,7 +16,7 @@
 // signature records which questions were actually asked.
 import { useCallback, useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { Alert, Button, Card, TextField } from '@studio/ui'
+import { Alert, Button, Card, LoadFailed, TextField } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import type { DashboardHealthClient, EditableQuestion, EditableSchema } from './healthClient'
@@ -152,9 +152,14 @@ export function TemplateEditor({ locale, client }: TemplateEditorProps) {
 
   if (failed) {
     return (
-      <Alert iconLabel={t(locale, 'health.documents.error')} live tone="danger">
-        {t(locale, 'health.documents.error')}
-      </Alert>
+      <LoadFailed
+        detail={t(locale, 'health.documents.error')}
+        locale={locale}
+        onRetry={() => {
+          setFailed(false)
+          load()
+        }}
+      />
     )
   }
   if (!schema) return <p>{t(locale, 'health.documents.loading')}</p>
