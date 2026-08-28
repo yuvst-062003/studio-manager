@@ -59,6 +59,7 @@ export const billing: Bundle = {
   'cash.pendingChip': 'מזומן בהמתנה',
   'cash.pendingTitle': 'ממתין לאישור המנהל',
   'cash.declined': 'בקשת המזומן נדחתה — אפשר לשלם בדרך אחרת או לדבר עם המנהל.',
+  'cash.manager.title': 'גביית מזומן',
 
   // Cheques are cash with a different word on the payment, so the copy mirrors the cash
   // set key for key. Every sentence stays true with the word swapped, which is the same

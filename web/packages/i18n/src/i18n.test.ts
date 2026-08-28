@@ -66,6 +66,16 @@ describe('REFERENCE_LOCALE', () => {
   it('is he', () => expect(REFERENCE_LOCALE).toBe('he'))
 })
 
+describe('referenced nav labels resolve (regression 2026-08-29)', () => {
+  // The manager-only cash item in the staff nav (App.tsx) referenced
+  // `billing.cash.manager.title`, which existed in no locale, so the drawer showed the
+  // raw key. Parity checks locale-vs-locale; it cannot see a key a component references
+  // but nobody defines. This pins the labels the staff manager nav actually uses.
+  it.each(LOCALES)('%s translates the manager cash nav item', (locale) => {
+    expect(t(locale, 'billing.cash.manager.title')).not.toBe('billing.cash.manager.title')
+  })
+})
+
 describe('translation completeness (SPEC §9 — reported, not silently tolerated)', () => {
   // Not a parity check — web/scripts/i18n-parity.mjs is that, and it runs in CI and in
   // every lane check. This records the shape the fallback relies on: a locale may be

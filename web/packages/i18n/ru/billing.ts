@@ -41,6 +41,7 @@ export const billing: Bundle = {
   'cash.pendingChip': 'Наличные — ожидание',
   'cash.pendingTitle': 'Ожидает подтверждения менеджера',
   'cash.declined': 'Запрос на наличные отклонён — оплатите иначе или свяжитесь с менеджером.',
+  'cash.manager.title': 'Приём наличных',
 
   'cheque.instructions': 'Передайте чеки тренеру, на имя ассоциации',
   'cheque.request': 'Принесу чеки',

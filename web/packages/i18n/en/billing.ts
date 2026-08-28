@@ -37,6 +37,7 @@ export const billing: Bundle = {
   'cash.pendingChip': 'Cash pending',
   'cash.pendingTitle': 'Waiting for the manager',
   'cash.declined': 'The cash request was declined — pay another way or talk to the manager.',
+  'cash.manager.title': 'Cash collection',
 
   'cheque.instructions': 'Hand the cheques to the coach, made out to the association',
   'cheque.request': 'I will bring cheques',
