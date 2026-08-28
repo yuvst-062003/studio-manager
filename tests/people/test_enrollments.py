@@ -430,6 +430,58 @@ def test_a_coach_may_not_create_an_enrollment(client, as_lead_coach, a_group):
     assert response.status_code == 403
 
 
+def test_a_guardian_reads_their_own_childs_enrollments_and_nobody_elses(
+    client,
+    app_session,
+    fake_provider,
+    studio,
+    tenant_session,
+    a_student_id,
+    a_group,
+    twice_weekly,
+):
+    """2c's קבוצות section is the parent's own view of their child's groups. An AnyStaff
+    dependency left the card's read answering 403 to the very person the card is for —
+    the same staff-or-guardian-of-this-child rule the belts read already applies."""
+    from app.models.person import Guardian
+    from tests.people.conftest import _make_caller
+
+    EnrollmentService.create(
+        tenant_session,
+        student_id=a_student_id,
+        group_id=a_group,
+        started_on=TODAY,
+        attends_weekdays=None,
+        at=T0,
+        actor_person_id=None,
+        schedule=twice_weekly,
+    )
+    tenant_session.commit()
+
+    parent = _make_caller(client, fake_provider, app_session, studio, role=None)
+    # A second, non-primary guardian: §4.3 gives every guardian the same permissions,
+    # and the student's create already made its own primary.
+    app_session.add(
+        Guardian(
+            studio_id=studio.id,
+            student_id=a_student_id,
+            person_id=parent.person_id,
+            is_primary=False,
+            relation="parent",
+        )
+    )
+    app_session.commit()
+
+    own = client.get(f"/api/v1/enrollments?student_id={a_student_id}", headers=parent.headers)
+    assert own.status_code == 200
+    assert [row["group_id"] for row in own.json()] == [str(a_group)]
+
+    stranger = _student(tenant_session)
+    tenant_session.commit()
+    refused = client.get(f"/api/v1/enrollments?student_id={stranger.id}", headers=parent.headers)
+    assert refused.status_code == 403
+
+
 def test_a_coach_may_read_the_weekday_options():
     """Staff `9c`'s מעבר כיתה is drawn as a lead-coach action, so the read is
     coach-reachable and therefore tagged -- and `EnrollmentWeekdayOptionsOut` carries no

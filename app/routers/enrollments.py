@@ -34,6 +34,7 @@ from app.schemas.people import (
     EnrollmentUpdate,
     EnrollmentWeekdayOptionsOut,
 )
+from app.services.events.rsvp import RsvpService
 from app.services.people.enrollments import EnrollmentService
 from app.services.people.errors import ConflictError, NotFoundError, RefusedError
 from app.services.schedule import ScheduleService
@@ -105,15 +106,45 @@ def weekday_options(
     )
 
 
+def _may_read_this_student(
+    request: Request, session: TenantSessionDep, student_id: uuid.UUID
+) -> None:
+    """Staff, or a guardian of this particular child — the same rule the belts read
+    applies. §3.2: guardianship "is not a role — it is the permission set that applies to
+    a person for the specific students they are a guardian of, resolved per-record", so
+    it cannot be a dependency over roles alone. 2c's קבוצות section reads through here,
+    and an AnyStaff dependency answered 403 to the very parent the card is for."""
+    if getattr(request.state, "identity_id", None) is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={"code": "unauthenticated", "message": "sign in first"},
+        )
+    roles = set(getattr(request.state, "roles", ()) or ())
+    if roles & {"owner", "manager", "lead_coach", "assistant_coach"}:
+        return
+    person_id = getattr(request.state, "person_id", None)
+    if isinstance(person_id, uuid.UUID) and student_id in RsvpService.students_of_guardian(
+        session, person_id
+    ):
+        return
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail={"code": "not_your_student", "message": "this action is not yours"},
+    )
+
+
 @router.get("/enrollments", response_model=list[EnrollmentOut], tags=COACH)
 def list_enrollments(
-    _: AnyStaff,
+    request: Request,
     student_id: uuid.UUID,
     session: TenantSessionDep,
     include_ended: bool = Query(default=False),
 ) -> list[EnrollmentOut]:
     """Always scoped to one student. C11 makes several live rows normal, so this is a
-    small bounded list rather than a page -- G16's rule is about lists that grow."""
+    small bounded list rather than a page -- G16's rule is about lists that grow.
+
+    Staff, or a guardian of this student: the parent card's קבוצות section is this read."""
+    _may_read_this_student(request, session, student_id)
     return [
         _out(enrollment, group)
         for enrollment, group in EnrollmentService.list_for_student(
