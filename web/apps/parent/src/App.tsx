@@ -8,7 +8,7 @@
 // and §5.11 permits no email or SMS fallback, so that parent is reachable only by
 // telephone."
 import { useEffect, useMemo, useState } from 'react'
-import { apiFetch, getAccessToken, useDisplayMode, useSession, switchStudio } from '@studio/core'
+import { apiFetch, getAccessToken, refresh, useDisplayMode, useSession, switchStudio } from '@studio/core'
 import {
   AccountDrawerFooter,
   AppShell,
@@ -142,6 +142,24 @@ function LandingShell({ slug }: { slug: string }) {
   const [locale, setLocale] = useState<Locale>('he')
   useDocumentLocale(locale)
   const landingClient = useMemo(() => makeLandingClient(apiFetch), [])
+  // §5.4a step 1 → step 2. The OAuth callback appends `signed_in=1` to its redirect, and
+  // that marker is the ONE case where the landing knows a refresh is worth firing — a
+  // full-page return is a fresh JS context with an empty in-memory token, so without it
+  // the booking flow greets the freshly-signed-in parent with its sign-in step again.
+  // Anonymous visits stay refresh-free (L6). The render is held while restoring because
+  // BookingFlow picks its first step once, at mount.
+  const [restoring, setRestoring] = useState(
+    () => new URLSearchParams(globalThis.location?.search ?? '').has('signed_in'),
+  )
+  useEffect(() => {
+    if (!restoring) return
+    // One-shot: stripped before the refresh so a copied URL or reload cannot refire it.
+    const url = new URL(globalThis.location.href)
+    url.searchParams.delete('signed_in')
+    globalThis.history.replaceState({}, '', url)
+    void refresh().finally(() => setRestoring(false))
+  }, [restoring])
+  if (restoring) return null
   return (
     <ThemeProvider>
       {/* Language before login (§6.1): a Russian-speaking parent cannot read a Hebrew

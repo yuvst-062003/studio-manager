@@ -395,8 +395,14 @@ def callback_redirect(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail={"code": "app_host_unconfigured", "message": f"no host for {transaction.app}"},
         )
+    # `signed_in=1` — the landing never fires /auth/refresh for anonymous visitors, and a
+    # full-page OAuth return is a fresh JS context with an empty in-memory token. Without
+    # this marker the booking flow's sign-in step greets the freshly-signed-in parent
+    # again, forever. The marker is only a hint: faking it costs one refresh that 401s.
+    separator = "&" if "?" in transaction.return_path else "?"
     redirect = RedirectResponse(
-        f"{origin}{transaction.return_path}", status_code=status.HTTP_307_TEMPORARY_REDIRECT
+        f"{origin}{transaction.return_path}{separator}signed_in=1",
+        status_code=status.HTTP_307_TEMPORARY_REDIRECT,
     )
     # The cookie was set on `response`, which FastAPI discards when a handler returns a
     # Response of its own. Carrying the headers across is what makes the redirect carry

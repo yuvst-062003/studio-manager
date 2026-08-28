@@ -159,6 +159,56 @@ describe('L6 — the anonymous landing touches no session', () => {
     expect(calls.some((url) => url.includes('/auth/refresh'))).toBe(false)
     globalThis.history.pushState({}, '', '/')
   })
+
+  it('returning from the OAuth callback with signed_in=1 restores the session and opens the child form', async () => {
+    // A full-page OAuth return is a fresh JS context: the in-memory token is empty, and
+    // the landing never refreshes for anonymous visitors. The callback's marker is the
+    // one case where a refresh is known to be worth it — without acting on it the booking
+    // flow greets the freshly-signed-in parent with its sign-in step again, forever.
+    globalThis.history.pushState({}, '', '/t/gladiator?signed_in=1')
+    const calls: string[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input)
+        calls.push(url)
+        if (url.includes('/auth/refresh')) {
+          return new Response(
+            JSON.stringify({
+              access_token: 't-landing',
+              expires_in: 900,
+              access: { parent: false, staff: false },
+              studios: [],
+              active_studio_id: null,
+            }),
+            { status: 200 },
+          )
+        }
+        return new Response(
+          JSON.stringify({
+            studio_name: 'גלדיאטור',
+            slug: 'gladiator',
+            logo_url: null,
+            default_locale: 'he',
+            headline: null,
+            about: null,
+            address: null,
+            photo_urls: [],
+            groups: [],
+          }),
+          { status: 200 },
+        )
+      }),
+    )
+    render(<App />)
+    await waitFor(() => expect(calls.some((url) => url.includes('/auth/refresh'))).toBe(true))
+    await waitFor(() =>
+      expect(screen.getByText(t('he', 'people.landing.step.children'))).toBeInTheDocument(),
+    )
+    // The marker is one-shot: stripped, so a copied URL or a later reload does not refire it.
+    expect(globalThis.location.search).toBe('')
+    globalThis.history.pushState({}, '', '/')
+  })
 })
 
 describe('P7 — the belt link resolves or refuses, never silently home', () => {

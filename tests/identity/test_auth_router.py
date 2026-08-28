@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import uuid
 from http.cookies import SimpleCookie
+from urllib.parse import parse_qs, urlparse
 
 from app.core.config import settings
 from app.routers.identity import REFRESH_COOKIE_NAME, REFRESH_COOKIE_PATH
@@ -382,7 +383,27 @@ def test_the_browser_callback_lands_back_in_the_app_that_started_the_flow(client
         f"/api/v1/auth/fake/callback?code=c-get2&state={state}&", follow_redirects=False
     )
     assert response.status_code == 307
-    assert response.headers["location"].endswith("/")
+    assert response.headers["location"].endswith("/?signed_in=1")
+
+
+def test_the_browser_callback_marks_the_return_url_as_signed_in(client, fake_provider):
+    """The landing renders its booking flow from the in-memory token alone and never fires
+    /auth/refresh for an anonymous visitor. A full-page OAuth return is a fresh JS context
+    with an empty memory, so without a marker the flow bounces back to its sign-in step
+    forever. The marker is the callback telling the landing that ONE refresh is worth it
+    (§5.4a step 1 → step 2)."""
+    fake_provider.register(
+        code="c-get-marker", subject=f"s-{uuid.uuid4()}", email="marker@example.invalid"
+    )
+    response = client.get(
+        "/api/v1/auth/fake/start?app=parent&return_path=/t/gladiator", follow_redirects=False
+    )
+    state = parse_qs(urlparse(response.headers["location"]).query)["state"][0]
+    response = client.get(
+        f"/api/v1/auth/fake/callback?code=c-get-marker&state={state}", follow_redirects=False
+    )
+    assert response.status_code == 307
+    assert response.headers["location"].endswith("/t/gladiator?signed_in=1")
 
 
 def test_the_browser_callback_sets_the_refresh_cookie(client, fake_provider, monkeypatch):
