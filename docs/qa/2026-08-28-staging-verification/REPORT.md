@@ -4,23 +4,21 @@ Studio: **gladiator** on staging · Owner/platform-admin: yuvalstolin@gmail.com
 Evidence: every row links to a file in this folder. Fixes keep **both** the failing proof
 and the passing-after-redeploy proof.
 
-## Counts (60 items across a/l/s/p/e)
+## Counts (60 items across a/l/s/p/e) — updated 2026-08-29 after the live staff walk
 
-- **Passed with a saved artifact:** 37
-- **Fixed → redeployed → re-proven on staging:** 2 bugs shown in the table (a20, p4); **4
-  bugs total** shipped this run (those two + the parent health form and the auth
-  booking-loop), plus a 5th pre-existing lint error fixed in passing.
-- **Behaviour proven by suite/API, live screenshot pending a login:** 19 — the staff-app
-  walk (s2–s9, s11–s14), the booking flow (l8–l10), p3, p6, e3 (dark-mode contrast), e4.
-  See `component-suite-proofs.md` and `server-side-suite-proofs.md`.
-- **⏸ BLOCKED — genuinely needs eyes on the authenticated screen:** 2 — **s1** (the staff
-  setup-nudge's exact banner) and **s10** (the drawer's contents).
+- **Passed with a saved artifact:** 47
+- **Fixed → redeployed → re-proven on staging:** 3 shown in the table (a20, s10, p4); **5
+  bugs total** shipped across the run (those three + the parent health form and the auth
+  booking-loop), plus a pre-existing lint error fixed in passing.
+- **Behaviour proven by suite/API, live screenshot pending:** 10 — s11–s14 (offline/coach,
+  no throttle or coach account to hand), the booking flow l8–l10, p3, p6, e4. See
+  `component-suite-proofs.md` and `server-side-suite-proofs.md`.
+- **⏸ BLOCKED:** 0.
 
-So of the 21 items that can't be screenshotted while logged out, **19 have their behaviour
-proven by a test** and only 2 have nothing behind them yet. The remaining screenshots need
-**two Google sign-ins** (owner → staff app; a second account → parent app) — the apps share
-one refresh cookie on `api.staging`, one identity at a time, so it's two sittings, not a
-per-item credential. Nothing has failed.
+The full staff walk (s1–s10) was completed live on 2026-08-29 in dark mode (also covering
+e3). The remaining 10 suite items convert to live PASS with the **parent sign-in** (l8–l10
+booking, p3, p6) and, for s11–s14, a coach Google account / network throttle. Nothing has
+failed.
 
 ---
 
@@ -73,16 +71,16 @@ per-item credential. Nothing has failed.
 
 | id | item | verdict | evidence | note |
 |----|------|---------|----------|------|
-| s1 | setup nudge opens the wizard in-app | ⏸ BLOCKED | — | nudge mechanism proven by the staff App test + banner proven live at a1; the staff setup variant itself needs a screenshot |
-| s2 | Today cards: time/duration/group/hall/headcount; day-strip; back-to-today | ⏸/✅ suite | component-suite-proofs | TodayScreen suite green |
-| s3 | date picker: month grid, legend, rings, quick jumps | ⏸/✅ suite | component-suite-proofs | DatePickerScreen suite green |
-| s4 | register marks + counters; bulk-present skips advance notice | ⏸/✅ suite | component-suite-proofs, server-side-suite-proofs | RosterScreen suite + backend pre-report protection |
-| s5 | "attendance taken" flows back | ⏸/✅ suite | component-suite-proofs | Today shows נוכחות נרשמה (attendance suite); cross-app dashboard-agrees needs both apps live |
-| s6 | injury report notifies guardian | ⏸/✅ suite | server-side-suite-proofs | `test_injury_reports.py` green |
-| s7 | student search: tabs, meta, parent-name, opens card | ⏸/✅ suite | component-suite-proofs | StaffPeople suite green |
-| s8 | health banner counts; no medical content coach-visible | ⏸/✅ suite | server-side-suite-proofs, component-suite-proofs | backend privacy + HealthBadge suites green |
-| s9 | events: cards, participants, results sheet | ⏸/✅ suite | component-suite-proofs | StaffEvents suite green |
-| s10 | drawer: name·role·my-classes·notif prefs·calendar feed | ⏸ BLOCKED | — | no component test; needs the live drawer |
+| s1 | setup nudge opens the wizard in-app | ✅ | s1-setup-nudge-on-today, s1-wizard-opens-in-app-no-nudge | nudge on the staff Today; המשך בהקמה opens #/setup in-app, absent on the wizard |
+| s2 | Today cards: time/duration/group/hall/headcount; day-strip; back-to-today | ✅ | s2-today-card-full, s2-off-today-back-to-today | 17:30–18:30 · 60 דק׳ · QA · אולם ראשי · 1 חניכים |
+| s3 | date picker: month grid, legend, rings, quick jumps | ✅ | s3-datepicker-grid-legend, s3-datepicker-quickjumps-range | four quick jumps + Sept lesson-day green rings |
+| s4 | register marks + counters; bulk-present skips advance notice | ✅ | s4-register-header-counters-before, s4-mark-cycled-counters-updated | tap cycled to נוכח, counters → 1/0/0; backend pre-report protection |
+| s5 | "attendance taken" flows back | ✅ | s5-attendance-recorded-badge, s5-dashboard-board-agrees | Today card shows נוכחות נרשמה; dashboard board shows the session |
+| s6 | injury report notifies guardian | ✅ | s6-session-summary-injury-report | summary (coach-only) + injury "שליחה למנהל ולהורים"; backend suite green |
+| s7 | student search: tabs, meta, parent-name, opens card | ✅ | s7-search-by-parent-name-tabs, s7-s8-coach-card-no-medical-content | class tabs, 100% meta, search "שרה" finds the child, row opens card |
+| s8 | health banner counts; no medical content coach-visible | ✅ | s7-s8-coach-card-no-medical-content, server-side-suite-proofs | coach card carries NO medical content; banner-count logic by suite |
+| s9 | events: cards, participants, results sheet | ✅ | s9-events-card-participants | card with type badge, date·time, consent status, participants list |
+| s10 | drawer: name·role·my-classes·notif prefs·calendar feed | ❌→✅ | s10-drawer-raw-key-FAIL-before, s10-cash-label-fixed-PASS-after, s10-drawer-full | **BUG FIXED** (cash nav raw key) — see Fixes; drawer shows name·role·my-classes·prefs |
 | s11 | invited coach: no ₪ anywhere; locked actions | ⏸/✅ suite | component-suite-proofs, s-refusal-parent-account-no-staff-access | permissionBoundaries suite proves coach-no-money; live screenshot needs the coach signed in |
 | s12 | airplane mode: לא מקוון; roster from cache | ⏸/✅ suite | component-suite-proofs | offlineVisible suite green |
 | s13 | offline marks queue with count, flush on reconnect | ⏸/✅ suite | component-suite-proofs | core offline queue+flush suite green |
@@ -139,6 +137,13 @@ per-item credential. Nothing has failed.
    worth a refresh, strips it, and holds render until the session is in memory. Deployed
    api+parent. Verified by tests; the live re-walk of l8–l10 is part of the blocked booking
    flow. *(commit 347a365)*
+
+5. **s10 — the staff drawer's cash item showed a raw i18n key.** `billing.cash.manager.title`
+   (referenced in the staff nav) was defined in no locale, so managers saw the literal key in
+   the drawer. i18n parity only compares locale-to-locale and can't see a key a component
+   references but nobody defines. Added it to he/en/ru (גביית מזומן / Cash collection / Приём
+   наличных) with an i18n test pinning the staff manager nav labels. Deployed staff →
+   re-verified live: the drawer now reads "גביית מזומן". *(commit 80f2b58)*
 
 4. **p4 — a parent could not read their own child's enrolments.** `GET /enrollments?student_id=`
    required AnyStaff, so the parent card's קבוצות section got a 403 for the very parent the
