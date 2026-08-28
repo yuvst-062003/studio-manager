@@ -1,6 +1,6 @@
 // The shell, the drawer and the studio switcher. SPEC §5.2, §6.2, §9, and
 // .claude/rules/ui-rtl-a11y.md.
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { t } from '@studio/i18n'
@@ -101,6 +101,64 @@ describe('NavDrawer', () => {
     // G4 — no user-facing string is ever inlined in a component.
     render(<NavDrawer open items={ITEMS} onClose={vi.fn()} locale="he" />)
     expect(screen.getByRole('link', { name: t('he', 'common.nav.today') })).toBeInTheDocument()
+  })
+
+  it('closes when an item is chosen, so the screen behind is what the finger meets', async () => {
+    // Owner request 2026-08-28: hash navigation swaps the screen BEHIND the scrim, and a
+    // drawer that stayed open over it read as "the menu is stuck".
+    const onClose = vi.fn()
+    render(<NavDrawer open items={ITEMS} onClose={onClose} locale="he" />)
+    await userEvent.click(screen.getByRole('link', { name: t('he', 'common.nav.today') }))
+    expect(onClose).toHaveBeenCalled()
+  })
+
+  it('slides closed when dragged past a third of its width', async () => {
+    vi.useFakeTimers()
+    try {
+      const onClose = vi.fn()
+      render(<NavDrawer open items={ITEMS} onClose={onClose} locale="he" />)
+      const panel = screen.getByRole('dialog')
+      // jsdom reports LTR here, so the drawer exits toward −x. Width falls back to 320,
+      // making the dismissal threshold 112px.
+      fireEvent.pointerDown(panel, { pointerId: 1, clientX: 300 })
+      fireEvent.pointerMove(panel, { pointerId: 1, clientX: 260 })
+      fireEvent.pointerMove(panel, { pointerId: 1, clientX: 140 })
+      fireEvent.pointerUp(panel, { pointerId: 1, clientX: 140 })
+      expect(onClose).not.toHaveBeenCalled() // the exit still travelling
+      vi.advanceTimersByTime(200)
+      expect(onClose).toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('snaps back from a short drag rather than closing', () => {
+    vi.useFakeTimers()
+    try {
+      const onClose = vi.fn()
+      render(<NavDrawer open items={ITEMS} onClose={onClose} locale="he" />)
+      const panel = screen.getByRole('dialog')
+      fireEvent.pointerDown(panel, { pointerId: 1, clientX: 300 })
+      fireEvent.pointerMove(panel, { pointerId: 1, clientX: 250 })
+      fireEvent.pointerUp(panel, { pointerId: 1, clientX: 250 })
+      vi.advanceTimersByTime(400)
+      expect(onClose).not.toHaveBeenCalled()
+      expect(panel.style.transform).toBe('translateX(0)')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('never mistakes a tap for a drag — movement under the slop gate is a click', () => {
+    const onClose = vi.fn()
+    render(<NavDrawer open items={ITEMS} onClose={onClose} locale="he" />)
+    const panel = screen.getByRole('dialog')
+    fireEvent.pointerDown(panel, { pointerId: 1, clientX: 300 })
+    fireEvent.pointerMove(panel, { pointerId: 1, clientX: 295 })
+    fireEvent.pointerUp(panel, { pointerId: 1, clientX: 295 })
+    // No transform was ever applied: the panel never entered drag mode.
+    expect(panel.style.transform).toBe('')
+    expect(onClose).not.toHaveBeenCalled()
   })
 
   it('uses no physical CSS property', () => {

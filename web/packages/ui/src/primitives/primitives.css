@@ -454,6 +454,53 @@
   outline-offset: 2px;
 }
 
+/* The nav drawer's motion (2026-08-28). `transform` has no logical variant, so the two
+ * directions are scoped by dir — the sanctioned physical exception, mirrored in both.
+ * Reduced-motion users get the drawer in place with no travel. */
+@media (prefers-reduced-motion: no-preference) {
+  .studio-drawer {
+    animation: studio-drawer-in-ltr var(--motion-base) var(--ease-standard);
+  }
+
+  [dir="rtl"] .studio-drawer {
+    animation-name: studio-drawer-in-rtl;
+  }
+
+  .studio-drawer-backdrop {
+    animation: studio-fade-in var(--motion-fast) var(--ease-standard);
+  }
+}
+
+@keyframes studio-drawer-in-ltr {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes studio-drawer-in-rtl {
+  from {
+    transform: translateX(100%);
+  }
+
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes studio-fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
 .studio-belt-ladder {
   display: inline-flex;
   flex-wrap: wrap;
