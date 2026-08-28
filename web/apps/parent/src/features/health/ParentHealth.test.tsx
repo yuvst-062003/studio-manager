@@ -218,11 +218,22 @@ describe('DeclarationForm', () => {
     HTMLCanvasElement.prototype.toDataURL = vi.fn(() => 'data:image/png;base64,AAAA')
   })
 
+  it('a sighted parent can see each boolean question, not only assistive tech', async () => {
+    // The SegmentedControl's legend is visually hidden by design (sr-only). If a question's
+    // label lives ONLY there, the row renders as a bare כן/לא with no visible question text.
+    render(<DeclarationForm client={makeClient()} locale="he" studentId="st1" studentName="נועה לוי" />)
+    await screen.findAllByText('האם יש אסתמה?')
+    const visible = screen
+      .getAllByText('האם יש אסתמה?')
+      .filter((el) => !el.closest('.studio-segmented__legend'))
+    expect(visible.length).toBeGreaterThan(0)
+  })
+
   it('every question starts unanswered — neither כן nor לא is selected', async () => {
     // 12c finding 5, the most consequential gap on the artboard: "a declaration that defaults
     // every question to no and gets signed is a health record nobody actually answered".
     render(<DeclarationForm client={makeClient()} locale="he" studentId="st1" studentName="נועה לוי" />)
-    await screen.findByText('האם יש אסתמה?')
+    await screen.findAllByText('האם יש אסתמה?')
     for (const radio of screen.getAllByRole('radio')) {
       expect(radio).not.toBeChecked()
     }
@@ -231,7 +242,7 @@ describe('DeclarationForm', () => {
   it('refuses to submit while a question is unanswered, and says which state it is in', async () => {
     const client = makeClient()
     render(<DeclarationForm client={client} locale="he" studentId="st1" studentName="נועה לוי" />)
-    await screen.findByText('האם יש אסתמה?')
+    await screen.findAllByText('האם יש אסתמה?')
     await userEvent.click(
       screen.getByRole('button', {
         name: t('he', 'health.declaration.submit'),
@@ -246,7 +257,7 @@ describe('DeclarationForm', () => {
   it('refuses to submit an answered form with no signature', async () => {
     const client = makeClient()
     render(<DeclarationForm client={client} locale="he" studentId="st1" studentName="נועה לוי" />)
-    await screen.findByText('האם יש אסתמה?')
+    await screen.findAllByText('האם יש אסתמה?')
     const radios = screen.getAllByRole('radio')
     // Two questions, two "לא" options.
     await userEvent.click(radios[1]!)
@@ -262,7 +273,7 @@ describe('DeclarationForm', () => {
 
   it('answering yes reveals the detail field, and answering no again clears it', async () => {
     render(<DeclarationForm client={makeClient()} locale="he" studentId="st1" studentName="נועה לוי" />)
-    await screen.findByText('אלרגיה ידועה')
+    await screen.findAllByText('אלרגיה ידועה')
     const radios = screen.getAllByRole('radio')
     await userEvent.click(radios[2]!) // allergy · כן
     const detail = await screen.findByLabelText('פירוט האלרגיה')
@@ -290,7 +301,7 @@ describe('DeclarationForm', () => {
     // SPEC §13 renders every component in both directions. 12c finding 4: the QUESTIONS are
     // manager-editable data and are shown as typed; only the app's own copy is translated.
     render(<DeclarationForm client={makeClient()} locale="en" studentId="st1" studentName="Noa Levi" />)
-    expect(await screen.findByText('האם יש אסתמה?')).toBeInTheDocument()
+    expect((await screen.findAllByText('האם יש אסתמה?')).length).toBeGreaterThan(0)
     expect(
       screen.getByRole('button', {
         name: t('en', 'health.declaration.submit'),

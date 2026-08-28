@@ -222,6 +222,10 @@ export function DeclarationForm({
                 if (question.type === 'boolean') {
                   return (
                     <div key={question.id} style={rowStyle}>
+                      {/* The SegmentedControl's legend is sr-only; without this span a
+                          sighted parent sees a bare כן/לא row with no question. aria-hidden
+                          because the legend already names the group for assistive tech. */}
+                      <span aria-hidden="true">{question.label}</span>
                       <SegmentedControl
                         legend={question.label}
                         onValueChange={(next) => answer(question, next === 'yes')}
