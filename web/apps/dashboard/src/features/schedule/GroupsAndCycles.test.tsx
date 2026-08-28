@@ -4,7 +4,8 @@
 // roster is M3. They ship as stated gaps, not as invented numbers — the discipline
 // ParentHome.tsx set for artboard 1a.
 import { render, screen, waitFor } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import userEvent from '@testing-library/user-event'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { t } from '@studio/i18n'
 import { GroupsAndCycles } from './GroupsAndCycles'
 import type { GroupSummary, ScheduleClient } from './client'
@@ -182,5 +183,66 @@ describe('GroupsAndCycles (4b)', () => {
         /margin-(left|right)|padding-(left|right)|(^|;)\s*(left|right):/,
       )
     }
+  })
+})
+
+
+describe('the door to the schedule editor (2026-08-28)', () => {
+  afterEach(() => {
+    globalThis.location.hash = ''
+    vi.unstubAllGlobals()
+  })
+
+  it('lands the manager inside the new group\u2019s schedule page after create', async () => {
+    // The form used to just close; the only way to the weekly days-and-hours editor was
+    // the group\u2019s NAME in the table, and the owner\u2019s staging pass read that as
+    // \u201ccannot set the schedule at all\u201d.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        if (init?.method === 'POST') {
+          return new Response(JSON.stringify({ id: 'g-new', name: 'קבוצה 1' }), { status: 201 })
+        }
+        if (String(input).includes('/classes')) {
+          return new Response(JSON.stringify({ items: [{ id: 'c1', name: "ג'ודו" }] }), {
+            status: 200,
+          })
+        }
+        return new Response(JSON.stringify({ items: [] }), { status: 200 })
+      }),
+    )
+    render(
+      <GroupsAndCycles
+        locale="he"
+        client={stub()}
+        groups={GROUPS}
+        today="2026-11-03T12:00:00Z"
+        hrefForGroup={(id) => `#/groups/${id}`}
+        onChanged={() => undefined}
+      />,
+    )
+    await userEvent.click(screen.getByTestId('new-group-open'))
+    await userEvent.type(screen.getAllByRole('textbox')[0] as HTMLElement, 'קבוצה 1')
+    await waitFor(() =>
+      expect(screen.getByRole('combobox').querySelectorAll('option').length).toBeGreaterThan(1),
+    )
+    await userEvent.selectOptions(screen.getByRole('combobox'), 'c1')
+    await userEvent.click(screen.getByTestId('new-group-submit'))
+    await waitFor(() => expect(globalThis.location.hash).toBe('#/groups/g-new'))
+  })
+
+  it('offers an explicit weekly-schedule link on every row', async () => {
+    render(
+      <GroupsAndCycles
+        locale="he"
+        client={stub()}
+        groups={GROUPS}
+        today="2026-11-03T12:00:00Z"
+        hrefForGroup={(id) => `#/groups/${id}`}
+      />,
+    )
+    const links = await screen.findAllByText(t('he', 'schedule.groups.openSchedule'))
+    // At least one per row — the Table primitive may render its card fallback too.
+    expect(links.length).toBeGreaterThanOrEqual(GROUPS.length)
   })
 })

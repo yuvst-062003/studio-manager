@@ -65,7 +65,14 @@ export function ClosuresStep({
   const [busy, setBusy] = useState(false)
 
   const showPresets = useCallback(async () => {
-    setPresets(await client.listHolidayPresets(presetYear))
+    const loaded = await client.listHolidayPresets(presetYear)
+    setPresets(loaded)
+    // Pre-ticked since 2026-08-28 (owner decision, superseding the arrive-unticked
+    // default): no club trains on יום כיפור, and asking for seven ticks that are always
+    // the same is the friction the owner named. The חופש הגדול stays UNTICKED — clubs
+    // genuinely differ there — and §5.6 still holds where it matters: these are
+    // proposals, and NOTHING is written until the apply button is pressed.
+    setTicked(new Set(loaded.filter((preset) => preset.key !== 'summer_break').map((p) => p.key)))
   }, [client, presetYear])
 
   const applyPresets = useCallback(async () => {

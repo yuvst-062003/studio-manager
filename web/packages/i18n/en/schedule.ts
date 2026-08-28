@@ -178,6 +178,7 @@ export const schedule: Bundle = {
   'group.coaches.empty': 'No coach is assigned to this group',
   'group.coaches.person': 'Team member',
   'groups.create': 'New group',
+  'groups.openSchedule': 'Weekly schedule',
   'groups.form.name': 'Group name',
   'groups.form.class': 'Class',
   'groups.form.submit': 'Create',
@@ -346,6 +347,16 @@ export const schedule: Bundle = {
   'rollover.students.failed': 'We could not save the student changes',
 
   'rollover.prices.title': 'Prices for next year',
+  'rollover.prices.newTitle': 'Open a new plan',
+  'rollover.prices.newHint': 'For a club in its first year — open your plans here. Full editing on the prices screen',
+  'rollover.prices.newName': 'Plan name',
+  'rollover.prices.newVolume': 'Sessions per week',
+  'rollover.prices.newMonthly': 'Monthly price (₪)',
+  'rollover.prices.newFee': 'Registration fee (₪, optional)',
+  'rollover.prices.newSubmit': 'Open the plan',
+  'rollover.prices.newCreated': 'The plan is open',
+  'rollover.prices.newFailed': 'Opening the plan failed. Try again',
+  'rollover.prices.fullScreen': 'Full management — the prices screen',
   'rollover.prices.intro':
     'A plan is never edited in place. The current plan closes the day before the year opens, and a successor opens on the day it does.',
   'rollover.prices.keepsHistory':

@@ -29,6 +29,22 @@ export type YearStepProps = RolloverStepProps & {
   year: TrainingYear | null
   /** Handed the freshly created draft so the container can start reading its state. */
   onYearCreated: (year: TrainingYear) => void
+  /** The app clock, for the pre-filled season. Optional so tests can pin a date. */
+  today?: string
+}
+
+/** The Israeli season is September to August. From August onward the season being set up
+ *  is the one about to start; before that, the one already running. The manager edits
+ *  freely — these are defaults, not decisions (owner request, 2026-08-28: "why do I need
+ *  to type a year"). */
+export function defaultSeason(todayIso: string): { name: string; starts: string; ends: string } {
+  const today = new Date(todayIso)
+  const startYear = today.getMonth() + 1 >= 8 ? today.getFullYear() : today.getFullYear() - 1
+  return {
+    name: `${startYear}–${startYear + 1}`,
+    starts: `${startYear}-09-01`,
+    ends: `${startYear + 1}-08-31`,
+  }
 }
 
 export function YearStep({
@@ -39,10 +55,12 @@ export function YearStep({
   client,
   year,
   onYearCreated,
+  today,
 }: YearStepProps) {
-  const [name, setName] = useState('')
-  const [startsOn, setStartsOn] = useState('')
-  const [endsOn, setEndsOn] = useState('')
+  const season = defaultSeason(today ?? new Date().toISOString())
+  const [name, setName] = useState(season.name)
+  const [startsOn, setStartsOn] = useState(season.starts)
+  const [endsOn, setEndsOn] = useState(season.ends)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   // Only the press that created the year announces it. A manager resuming into step 1

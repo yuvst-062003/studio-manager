@@ -204,7 +204,7 @@ export function GroupsAndCycles({
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ class_id: newClassId, name: newName.trim() }),
-            }).then((response) => {
+            }).then(async (response) => {
               if (!response.ok) {
                 setWriteFailed(true)
                 return
@@ -212,6 +212,13 @@ export function GroupsAndCycles({
               setCreating(false)
               setNewName('')
               onChanged()
+              // Fix 3 (2026-08-28): land the manager INSIDE the new group's schedule
+              // page, where the weekly days-and-hours editor lives. The form used to
+              // just close, and the only way in was clicking the group's name in the
+              // table — an affordance nobody has a reason to try, so "create a group"
+              // read as "you cannot set its schedule".
+              const created = (await response.json()) as { id: string }
+              if (hrefForGroup) globalThis.location.hash = hrefForGroup(created.id)
             })
           }}
         >
@@ -253,7 +260,23 @@ export function GroupsAndCycles({
             width: '12rem',
             cell: (group) => (
               <>
-                {hrefForGroup ? <a href={hrefForGroup(group.id)}>{group.name}</a> : group.name}
+                {hrefForGroup ? (
+                  <>
+                    <a href={hrefForGroup(group.id)}>{group.name}</a>{' '}
+                    {/* The name-link exists but does not LOOK like the door to the
+                        schedule editor; this says it in words. */}
+                    <a
+                      className="studio-btn"
+                      data-variant="ghost"
+                      data-testid={`group-schedule-link-${group.id}`}
+                      href={hrefForGroup(group.id)}
+                    >
+                      {t(locale, 'schedule.groups.openSchedule')}
+                    </a>
+                  </>
+                ) : (
+                  group.name
+                )}
                 <div style={laterStyle}>{group.className}</div>
               </>
             ),

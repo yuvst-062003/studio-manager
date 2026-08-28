@@ -205,6 +205,15 @@ export interface RolloverClient {
   listClasses(): Promise<ClassRow[]>
   listEnrollments(): Promise<EnrollmentRow[]>
   listPricePlans(): Promise<PricePlanRow[]>
+  /** Fix 2 (2026-08-28): a first-year club reaches the prices step with nothing to
+   *  reprice and must be able to OPEN a plan here, not just adjust one. */
+  createPricePlan(body: {
+    name: string
+    sessions_per_week: number
+    monthly_amount_agorot: number
+    registration_fee_agorot: number | null
+    active_from: string
+  }): Promise<PricePlanRow>
 }
 
 const API = '/api/v1'
@@ -348,6 +357,15 @@ export function makeRolloverClient(fetcher: Fetcher): RolloverClient {
       // §5.15 step 5 reprices the plans that are still in force. A closed plan is history
       // and offering a new amount for it would be offering to rewrite last year.
       return all.filter((plan) => plan.active_to === null)
+    },
+    async createPricePlan(body) {
+      return json<PricePlanRow>(
+        await fetcher(`${API}/price-plans`, {
+          method: 'POST',
+          headers: JSON_HEADERS,
+          body: JSON.stringify(body),
+        }),
+      )
     },
   }
 }

@@ -44,6 +44,8 @@ import {
 export type PricesStepProps = RolloverStepProps & {
   client: RolloverClient
   trainingYearId: string
+  /** The new year's first day — a plan opened here is priced FOR that year. */
+  yearStartsOn: string
   onChanged: () => void
 }
 
@@ -64,6 +66,7 @@ export function PricesStep({
   onSkip,
   client,
   trainingYearId,
+  yearStartsOn,
   onChanged,
 }: PricesStepProps) {
   const [plans, setPlans] = useState<PricePlanRow[] | null>(null)
@@ -73,6 +76,14 @@ export function PricesStep({
   const [outcome, setOutcome] = useState<BulkOutcome | null>(null)
   const [confirming, setConfirming] = useState(false)
   const [busy, setBusy] = useState(false)
+  // Fix 2 (2026-08-28) — the create half. This step could only REPRICE, so a first-year
+  // club arrived to `אין מסלולים פתוחים` and a dead end.
+  const [newName, setNewName] = useState('')
+  const [newVolume, setNewVolume] = useState('2')
+  const [newMonthly, setNewMonthly] = useState('')
+  const [newFee, setNewFee] = useState('')
+  const [createState, setCreateState] = useState<'idle' | 'busy' | 'created' | 'failed'>('idle')
+  const [plansVersion, setPlansVersion] = useState(0)
 
   useEffect(() => {
     let live = true
@@ -83,7 +94,30 @@ export function PricesStep({
     return () => {
       live = false
     }
-  }, [client])
+  }, [client, plansVersion])
+
+  async function createPlan() {
+    const monthly = agorotOrNull(newMonthly)
+    if (!newName.trim() || monthly === null) return
+    setCreateState('busy')
+    try {
+      await client.createPricePlan({
+        name: newName.trim(),
+        sessions_per_week: Number(newVolume) || 1,
+        monthly_amount_agorot: monthly,
+        registration_fee_agorot: agorotOrNull(newFee),
+        active_from: yearStartsOn,
+      })
+      setNewName('')
+      setNewMonthly('')
+      setNewFee('')
+      setCreateState('created')
+      setPlansVersion((n) => n + 1)
+      onChanged()
+    } catch {
+      setCreateState('failed')
+    }
+  }
 
   const repricings = useMemo<PlanRepricing[]>(() => {
     const out: PlanRepricing[] = []
@@ -154,6 +188,62 @@ export function PricesStep({
       {plans !== null && plans.length === 0 ? (
         <EmptyState title={t(locale, 'schedule.rollover.prices.empty')} />
       ) : null}
+
+      {/* The create half — always offered, because a club adding a track mid-rollover is
+          as real as a club opening its first. */}
+      <fieldset data-testid="rollover-prices-create">
+        <legend>{t(locale, 'schedule.rollover.prices.newTitle')}</legend>
+        <p style={noteStyle}>{t(locale, 'schedule.rollover.prices.newHint')}</p>
+        <TextField
+          label={t(locale, 'schedule.rollover.prices.newName')}
+          data-testid="rollover-new-plan-name"
+          value={newName}
+          onChange={(event) => setNewName(event.target.value)}
+        />
+        <TextField
+          label={t(locale, 'schedule.rollover.prices.newVolume')}
+          data-testid="rollover-new-plan-volume"
+          type="number"
+          min={1}
+          max={7}
+          value={newVolume}
+          onChange={(event) => setNewVolume(event.target.value)}
+        />
+        <TextField
+          label={t(locale, 'schedule.rollover.prices.newMonthly')}
+          data-testid="rollover-new-plan-monthly"
+          inputMode="decimal"
+          value={newMonthly}
+          onChange={(event) => setNewMonthly(event.target.value)}
+        />
+        <TextField
+          label={t(locale, 'schedule.rollover.prices.newFee')}
+          data-testid="rollover-new-plan-fee"
+          inputMode="decimal"
+          value={newFee}
+          onChange={(event) => setNewFee(event.target.value)}
+        />
+        <Button
+          data-testid="rollover-new-plan-submit"
+          disabled={createState === 'busy' || !newName.trim() || agorotOrNull(newMonthly) === null}
+          onClick={() => void createPlan()}
+        >
+          {t(locale, 'schedule.rollover.prices.newSubmit')}
+        </Button>
+        {createState === 'created' ? (
+          <p role="status" data-testid="rollover-new-plan-created">
+            {t(locale, 'schedule.rollover.prices.newCreated')}
+          </p>
+        ) : null}
+        {createState === 'failed' ? (
+          <p role="alert" style={errorStyle} data-testid="rollover-new-plan-failed">
+            {t(locale, 'schedule.rollover.prices.newFailed')}
+          </p>
+        ) : null}
+        <p style={noteStyle}>
+          <a href="#/prices">{t(locale, 'schedule.rollover.prices.fullScreen')}</a>
+        </p>
+      </fieldset>
 
       {plans !== null && plans.length > 0 ? (
         <div style={scrollStyle}>

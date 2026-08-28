@@ -115,7 +115,16 @@ function SummaryPair({ label, value, testId }: { label: string; value: number; t
   )
 }
 
-export function RolloverWizard({ locale, client }: { locale: Locale; client: RolloverClient }) {
+export function RolloverWizard({
+  locale,
+  client,
+  today,
+}: {
+  locale: Locale
+  client: RolloverClient
+  /** The app clock — YearStep pre-fills the season from it. */
+  today?: string
+}) {
   const [year, setYear] = useState<TrainingYear | null>(null)
   const [yearLoaded, setYearLoaded] = useState(false)
   const [state, setState] = useState<RolloverState | null>(null)
@@ -235,6 +244,7 @@ export function RolloverWizard({ locale, client }: { locale: Locale; client: Rol
           <p style={noteStyle}>{t(locale, 'schedule.rollover.year.missingHint')}</p>
         </header>
         <YearStep
+          today={today}
           locale={locale}
           status="pending"
           onDone={() => advance('year')}
@@ -380,6 +390,7 @@ export function RolloverWizard({ locale, client }: { locale: Locale; client: Rol
       <div data-testid="rollover-step-body">
         {current === 'year' ? (
           <YearStep
+            today={today}
             {...shared}
             client={client}
             year={state.training_year}
@@ -417,6 +428,7 @@ export function RolloverWizard({ locale, client }: { locale: Locale; client: Rol
             {...shared}
             client={client}
             trainingYearId={state.training_year.id}
+            yearStartsOn={state.training_year.starts_on}
             onChanged={() => void reload()}
           />
         ) : null}

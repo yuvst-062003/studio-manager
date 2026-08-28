@@ -565,7 +565,7 @@ export default function App() {
           ) : null}
           {route === 'attendance' ? <AttendanceSection locale={locale} /> : null}
           {route === 'rollover' ? (
-            <RolloverWizard locale={locale} client={rolloverClient} />
+            <RolloverWizard locale={locale} client={rolloverClient} today={today} />
           ) : null}
           {route === 'billing' ? (
             <BillingSection

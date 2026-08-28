@@ -181,6 +181,7 @@ export const schedule: Bundle = {
   'group.coaches.empty': 'Группе не назначен тренер',
   'group.coaches.person': 'Сотрудник',
   'groups.create': 'Новая группа',
+  'groups.openSchedule': 'Недельное расписание',
   'groups.form.name': 'Название группы',
   'groups.form.class': 'Класс',
   'groups.form.submit': 'Создать',
@@ -349,6 +350,16 @@ export const schedule: Bundle = {
   'rollover.students.failed': 'Не удалось сохранить изменения по ученикам',
 
   'rollover.prices.title': 'Цены на следующий год',
+  'rollover.prices.newTitle': 'Открыть новый тариф',
+  'rollover.prices.newHint': 'Для клуба в первый год — откройте тарифы здесь. Полное редактирование на экране цен',
+  'rollover.prices.newName': 'Название тарифа',
+  'rollover.prices.newVolume': 'Тренировок в неделю',
+  'rollover.prices.newMonthly': 'Цена в месяц (₪)',
+  'rollover.prices.newFee': 'Регистрационный взнос (₪, необязательно)',
+  'rollover.prices.newSubmit': 'Открыть тариф',
+  'rollover.prices.newCreated': 'Тариф открыт',
+  'rollover.prices.newFailed': 'Не удалось открыть тариф. Попробуйте ещё раз',
+  'rollover.prices.fullScreen': 'Полное управление — экран цен',
   'rollover.prices.intro':
     'Тариф никогда не правится на месте. Текущий тариф закрывается за день до начала года, а преемник открывается в день начала.',
   'rollover.prices.keepsHistory':

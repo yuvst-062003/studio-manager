@@ -132,6 +132,7 @@ function stub(
     announce: vi.fn(async () => ({ announcement_id: 'a1', families: 37 })),
     listHolidayPresets: vi.fn(async () => [
       { key: 'yom_kippur', name: 'יום כיפור', date_from: '2027-10-11', date_to: '2027-10-11' },
+      { key: 'summer_break', name: 'חופש גדול', date_from: '2028-07-01', date_to: '2028-08-31' },
     ]),
     createClosure: vi.fn(async () => ({ sessions_cancelled: 3 })),
     generateSessions: vi.fn(async () => ({
@@ -143,6 +144,7 @@ function stub(
     listGroups: vi.fn(async () => GROUPS),
     listClasses: vi.fn(async () => CLASSES),
     listEnrollments: vi.fn(async () => ENROLLMENTS),
+    createPricePlan: vi.fn(async () => PLANS[0]!),
     listPricePlans: vi.fn(async () => PLANS),
     ...overrides,
   }
@@ -468,18 +470,47 @@ describe('RolloverWizard · prices', () => {
   })
 })
 
+describe('RolloverWizard · prices — the create half (2026-08-28)', () => {
+  it('opens a NEW plan priced for the new year, instead of dead-ending on empty', async () => {
+    const client = stub({ closures: 'done', groups: 'done', students: 'done' })
+    client.listPricePlans = vi.fn(async () => [])
+    await renderWizard(client)
+    await screen.findByTestId('rollover-step-prices')
+    await screen.findByTestId('rollover-prices-create')
+
+    await userEvent.type(screen.getByTestId('rollover-new-plan-name'), 'פעמיים בשבוע')
+    await userEvent.clear(screen.getByTestId('rollover-new-plan-volume'))
+    await userEvent.type(screen.getByTestId('rollover-new-plan-volume'), '2')
+    await userEvent.type(screen.getByTestId('rollover-new-plan-monthly'), '300')
+    await userEvent.click(screen.getByTestId('rollover-new-plan-submit'))
+
+    await waitFor(() =>
+      expect(client.createPricePlan).toHaveBeenCalledWith({
+        name: 'פעמיים בשבוע',
+        sessions_per_week: 2,
+        monthly_amount_agorot: 30000,
+        registration_fee_agorot: null,
+        active_from: YEAR.starts_on,
+      }),
+    )
+    expect(await screen.findByTestId('rollover-new-plan-created')).toBeInTheDocument()
+  })
+})
+
 describe('RolloverWizard · closures', () => {
-  it('offers holidays unticked and closes nothing until the button is pressed', async () => {
-    // §5.6, which the wizard inherits rather than relaxes: "nothing is closed automatically
-    // — studios differ, and a wrong guess deletes real lessons."
+  it('pre-ticks the chagim, leaves the summer, and closes NOTHING until the button', async () => {
+    // Owner decision 2026-08-28: the seven ticks were always the same, so they arrive
+    // ticked — except the חופש הגדול, where clubs genuinely differ. §5.6's line survives
+    // where it matters: ticks are proposals, and zero closures are written until apply.
     const client = await renderWizard(stub())
     await screen.findByTestId('rollover-step-closures')
     await userEvent.click(screen.getByTestId('rollover-closures-presets'))
     const boxes = await screen.findAllByTestId('rollover-preset-day')
-    for (const box of boxes) expect(box).not.toBeChecked()
+    // One unticked box — the summer — and every chag ticked.
+    expect(boxes.filter((box) => !(box as HTMLInputElement).checked)).toHaveLength(1)
+    expect(boxes.filter((box) => (box as HTMLInputElement).checked)).toHaveLength(1)
     expect(client.createClosure).not.toHaveBeenCalled()
 
-    await userEvent.click(boxes[0] as HTMLElement)
     await userEvent.click(screen.getByTestId('rollover-closures-apply'))
     await waitFor(() => expect(client.createClosure).toHaveBeenCalledTimes(1))
     expect(client.createClosure).toHaveBeenCalledWith(
@@ -556,8 +587,13 @@ describe('RolloverWizard · no draft year', () => {
     render(<RolloverWizard locale="he" client={client} />)
     await screen.findByTestId('rollover-no-year')
 
+    // The fields arrive pre-filled with the season (owner decision 2026-08-28); a
+    // manager overriding them clears first, and so does this test.
+    await userEvent.clear(screen.getByTestId('rollover-year-input-name'))
     await userEvent.type(screen.getByTestId('rollover-year-input-name'), 'תשפ״ח')
+    await userEvent.clear(screen.getByTestId('rollover-year-input-starts'))
     await userEvent.type(screen.getByTestId('rollover-year-input-starts'), '2027-09-01')
+    await userEvent.clear(screen.getByTestId('rollover-year-input-ends'))
     await userEvent.type(screen.getByTestId('rollover-year-input-ends'), '2028-06-30')
     await userEvent.click(screen.getByTestId('rollover-year-create'))
 
@@ -569,14 +605,45 @@ describe('RolloverWizard · no draft year', () => {
     })
   })
 
+  it('pre-fills the season so the common case is one click (2026-08-28)', async () => {
+    // In August the season being set up is the one about to start; the name and both
+    // dates arrive filled, and creating the year is just pressing the button.
+    const client = stub()
+    client.listTrainingYears = vi.fn(async () => [])
+    render(<RolloverWizard locale="he" client={client} today="2026-08-15T12:00:00Z" />)
+    await screen.findByTestId('rollover-no-year')
+    expect(screen.getByTestId('rollover-year-input-name')).toHaveValue('2026–2027')
+    expect(screen.getByTestId('rollover-year-input-starts')).toHaveValue('2026-09-01')
+    expect(screen.getByTestId('rollover-year-input-ends')).toHaveValue('2027-08-31')
+
+    await userEvent.click(screen.getByTestId('rollover-year-create'))
+    await waitFor(() =>
+      expect(client.createTrainingYear).toHaveBeenCalledWith({
+        name: '2026–2027',
+        starts_on: '2026-09-01',
+        ends_on: '2027-08-31',
+      }),
+    )
+  })
+
+  it('defaults to the running season mid-year, not the next one', async () => {
+    // A first-setup club in January is configuring the season it is IN.
+    const client = stub()
+    client.listTrainingYears = vi.fn(async () => [])
+    render(<RolloverWizard locale="he" client={client} today="2027-01-15T12:00:00Z" />)
+    await screen.findByTestId('rollover-no-year')
+    expect(screen.getByTestId('rollover-year-input-starts')).toHaveValue('2026-09-01')
+  })
+
   it('refuses a year that ends before it starts, before asking the server', async () => {
     const client = stub()
     client.listTrainingYears = vi.fn(async () => [])
     render(<RolloverWizard locale="he" client={client} />)
     await screen.findByTestId('rollover-no-year')
 
-    await userEvent.type(screen.getByTestId('rollover-year-input-name'), 'תשפ״ח')
+    await userEvent.clear(screen.getByTestId('rollover-year-input-starts'))
     await userEvent.type(screen.getByTestId('rollover-year-input-starts'), '2028-06-30')
+    await userEvent.clear(screen.getByTestId('rollover-year-input-ends'))
     await userEvent.type(screen.getByTestId('rollover-year-input-ends'), '2027-09-01')
     await userEvent.click(screen.getByTestId('rollover-year-create'))
 
