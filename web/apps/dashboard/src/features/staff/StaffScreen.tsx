@@ -365,7 +365,7 @@ export function StaffScreen({ locale }: { locale: Locale }) {
                     {t(locale, 'common.staff.actions.revoke')}
                   </Button>
                 </span>
-              ) : member.roles.includes('owner') ? null : editingRoles === member.person_id ? (
+              ) : editingRoles === member.person_id ? (
                 <span style={actionsRowStyle}>
                   {GRANTABLE.map((role) => (
                     <Checkbox
@@ -406,6 +406,11 @@ export function StaffScreen({ locale }: { locale: Locale }) {
                   >
                     {t(locale, 'common.staff.actions.editRoles')}
                   </Button>
+                  {/* 2026-08-28: the owner row now carries the ROLE editor too — the
+                      owner granting themselves lead_coach is how "the manager coaches
+                      the groups I pick" starts. Ownership itself stays immovable: the
+                      server re-adds it on every save, and deactivate is never offered. */}
+                  {member.roles.includes('owner') ? null : (
                   <Button
                     data-testid={`deactivate-${member.person_id}`}
                     onClick={() =>
@@ -434,6 +439,7 @@ export function StaffScreen({ locale }: { locale: Locale }) {
                   >
                     {t(locale, 'common.staff.actions.deactivate')}
                   </Button>
+                  )}
                 </span>
               ),
           },

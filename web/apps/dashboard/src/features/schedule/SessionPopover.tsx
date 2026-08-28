@@ -116,7 +116,10 @@ export function SessionPopover({
   }, [client, fetcher])
 
   const coaches = useMemo(
-    () => staff.filter((row) => row.roles.some((r) => r === 'lead_coach' || r === 'assistant_coach')),
+    // 2026-08-28 (owner report): EVERY staff member is assignable, not only role-holding
+    // coaches. In a small club the owner teaching a class is the norm, and this filter
+    // meant "I can pick every coach except myself".
+    () => staff,
     [staff],
   )
 

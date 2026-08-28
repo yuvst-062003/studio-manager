@@ -174,6 +174,11 @@ function CreateSessionForm({
   const [open, setOpen] = useState(false)
   const [groups, setGroups] = useState<{ id: string; name: string }[]>([])
   const [locations, setLocations] = useState<{ id: string; name: string }[]>([])
+  // 2026-08-28 (owner report) — who teaches it, pickable at creation. EVERY staff member,
+  // owner included: in a small club the owner teaching is the norm, and a coach-role
+  // filter here would repeat the popover's "everyone except myself" bug.
+  const [staff, setStaff] = useState<{ person_id: string; name: string }[]>([])
+  const [coachId, setCoachId] = useState('')
   const [yearId, setYearId] = useState<string | null | undefined>(undefined)
   const [groupId, setGroupId] = useState('')
   const [day, setDay] = useState(defaultDay)
@@ -194,6 +199,28 @@ function CreateSessionForm({
         setYearId(years.find((year) => year.status === 'active')?.id ?? null)
       })
       .catch(() => live && setYearId(null))
+    // Best-effort, like the popover's: a failure just hides the coach select.
+    void apiFetch('/api/v1/staff')
+      .then(async (response) =>
+        response.ok
+          ? ((await response.json()) as {
+              items: { person_id: string | null; first_name: string | null; last_name: string | null }[]
+            }).items
+          : [],
+      )
+      .then(
+        (rows) =>
+          live &&
+          setStaff(
+            rows
+              .filter((row) => row.person_id !== null)
+              .map((row) => ({
+                person_id: row.person_id as string,
+                name: `${row.first_name ?? ''} ${row.last_name ?? ''}`.trim(),
+              })),
+          ),
+      )
+      .catch(() => undefined)
     return () => {
       live = false
     }
@@ -234,7 +261,16 @@ function CreateSessionForm({
             ends_at: studioWallTimeToUtc(day, endTime),
             location_id: locationId || null,
           })
-          .then(() => {
+          .then(async (created) => {
+            // The chosen teacher, planned rather than substituting — the same staff
+            // shape the popover writes, minus its is_substitute.
+            if (coachId) {
+              await client
+                .patchSession(created.id, {
+                  staff: [{ person_id: coachId, role: 'lead_coach', is_substitute: false }],
+                })
+                .catch(() => undefined)
+            }
             setOpen(false)
             onCreated()
           })
@@ -275,6 +311,21 @@ function CreateSessionForm({
         value={endTime}
         onChange={(event) => setEndTime(event.target.value)}
       />
+      <label>
+        {t(locale, 'schedule.session.createCoach')}
+        <select
+          data-testid="session-create-coach"
+          value={coachId}
+          onChange={(event) => setCoachId(event.target.value)}
+        >
+          <option value="">—</option>
+          {staff.map((member) => (
+            <option key={member.person_id} value={member.person_id}>
+              {member.name}
+            </option>
+          ))}
+        </select>
+      </label>
       <label>
         {t(locale, 'schedule.session.location')}
         <select

@@ -323,6 +323,45 @@ describe('F3 — the popover a session block opens', () => {
 
 
 describe('creating a session from the board (2026-08-28)', () => {
+  it('lets the creator pick ANY staff member as the coach — the owner included', async () => {
+    const user = userEvent.setup()
+    const client = stub()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) =>
+        String(input).includes('/staff')
+          ? new Response(
+              JSON.stringify({
+                items: [
+                  { person_id: 'p-owner', first_name: 'יובל', last_name: 'סטולין', roles: ['owner'] },
+                ],
+              }),
+              { status: 200 },
+            )
+          : new Response(JSON.stringify({ items: [] }), { status: 200 }),
+      ),
+    )
+    vi.mocked(client.listGroups).mockResolvedValue([
+      { id: 'g1', name: 'מתחילים', classId: 'c1', isActive: true },
+    ] as never)
+    vi.mocked(client.listTrainingYears).mockResolvedValue([
+      { id: 'y1', name: 'שנה', starts_on: '2026-09-01', ends_on: '2027-08-31', status: 'active' },
+    ] as never)
+    vi.mocked(client.patchSession).mockResolvedValue(TUESDAY_EVENING)
+    render(<WeekBoard locale="he" client={client} today="2026-11-03T12:00:00Z" />)
+    await user.click(await screen.findByTestId('session-create-open'))
+    await user.selectOptions(await screen.findByTestId('session-create-group'), 'g1')
+    // The owner appears in the coach list — no coach-role filter.
+    await user.selectOptions(await screen.findByTestId('session-create-coach'), 'p-owner')
+    await user.click(screen.getByTestId('session-create-submit'))
+    await waitFor(() =>
+      expect(client.patchSession).toHaveBeenCalledWith(TUESDAY_EVENING.id, {
+        staff: [{ person_id: 'p-owner', role: 'lead_coach', is_substitute: false }],
+      }),
+    )
+    vi.unstubAllGlobals()
+  })
+
   it('offers the verb at all — the backend endpoint shipped with no UI calling it', async () => {
     render(<WeekBoard locale="he" client={stub()} today="2026-11-03T12:00:00Z" />)
     expect(await screen.findByTestId('session-create-open')).toHaveTextContent(

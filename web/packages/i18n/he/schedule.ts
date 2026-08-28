@@ -173,6 +173,7 @@ export const schedule: Bundle = {
   'session.adHocDate': 'תאריך',
   'session.create': 'שיעור חדש',
   'session.createGroup': 'קבוצה',
+  'session.createCoach': 'מאמן (לא חובה)',
 
   // -- holiday presets, by key (D-M2-4) -------------------------------------------
   'closure.preset.rosh_hashanah': 'ראש השנה',

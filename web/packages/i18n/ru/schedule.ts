@@ -148,6 +148,7 @@ export const schedule: Bundle = {
   'session.adHocDate': 'Дата',
   'session.create': 'Новое занятие',
   'session.createGroup': 'Группа',
+  'session.createCoach': 'Тренер (необязательно)',
 
   'closure.preset.rosh_hashanah': 'Рош ха-Шана',
   'closure.preset.yom_kippur': 'Йом-Кипур',
