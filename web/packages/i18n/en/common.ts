@@ -156,6 +156,9 @@ export const common: Bundle = {
   'dev.noticeIcon': 'notice',
   // §5.1's setup wizard — artboards 5c and 5f.
   'setup.title': 'Setup wizard',
+  'setup.incomplete.title': 'Club setup is not finished yet',
+  'setup.incomplete.progress': '{{done}} of {{total}} steps completed',
+  'setup.incomplete.resume': 'Continue setup',
   'setup.reopen': 'Reopen this step',
   'setup.back': 'Back to the previous step',
   'setup.welcome': 'Welcome. We will set the club up in 6 steps.',

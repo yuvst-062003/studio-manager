@@ -16,6 +16,7 @@ import {
   EmptyState,
   Icon,
   LanguagePicker,
+  SetupIncompleteBanner,
   SetupWizard,
   SideNav,
   SignIn,
@@ -627,6 +628,19 @@ export default function App() {
           ) : null}
           {route === 'staff' ? <StaffScreen locale={locale} /> : null}
           {route === 'settings' ? <SettingsScreen locale={locale} /> : null}
+          {/* The unfinished-setup nudge (2026-08-28): visible on every manager screen
+              EXCEPT the wizard itself, keyed on the route so finishing a step and
+              navigating away re-asks. */}
+          {canSeeMoney && route !== 'setup' ? (
+            <SetupIncompleteBanner
+              key={route}
+              client={setupClient}
+              locale={locale}
+              onOpen={() => {
+                globalThis.location.hash = '#/setup'
+              }}
+            />
+          ) : null}
           {route === 'setup' ? <SetupWizard client={setupClient} locale={locale} /> : null}
           {/* The design pass's four mounts — 4f, 4e, 5a, 4g. There is no `home` branch
               any more: the empty "בחרו מסך מהתפריט" page is gone, and the weekly board

@@ -165,6 +165,9 @@ export const common: Bundle = {
   // §5.1's setup wizard — artboards 5c and 5f. Machine-translated; HB-ru-review still
   // open, so ru stays on `report` rather than `strict` in i18n-parity.mjs.
   'setup.title': 'Мастер настройки',
+  'setup.incomplete.title': 'Настройка клуба ещё не завершена',
+  'setup.incomplete.progress': 'Завершено {{done}} из {{total}} шагов',
+  'setup.incomplete.resume': 'Продолжить настройку',
   'setup.reopen': 'Открыть шаг заново',
   'setup.back': 'К предыдущему шагу',
   'setup.welcome': 'Добро пожаловать. Настроим клуб за 6 шагов.',

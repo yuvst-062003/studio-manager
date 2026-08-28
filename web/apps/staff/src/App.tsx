@@ -18,6 +18,7 @@ import {
   InstallBanner,
   InstallWalkthrough,
   LanguagePicker,
+  SetupIncompleteBanner,
   SetupWizard,
   SignIn,
   TabBar,
@@ -202,6 +203,9 @@ export default function App() {
   const onInstall = hash === '#/install'
   const onCash = hash === '#/cash'
   const onJoinLink = hash === '#/join-link'
+  // 2026-08-28 — the way BACK into the wizard after a dismissal. Resolve routes an owner
+  // in only on first run; the incomplete-setup banner needs a door that exists after it.
+  const onSetup = hash === '#/setup'
   // §5.7's register, opened from a session. The id is in the hash so the back button works
   // and a link survives a reload — the same shape both W2 lanes settled on, and the reason
   // NAV's `/attendance` entry became a hash below. A second segment picks the in-session
@@ -359,6 +363,19 @@ export default function App() {
               shell, so a coach in a basement sees it from Today and from the roster alike.
               Also the app's one `useNetworkMonitor` mount, which starts the probe loop. */}
           {session.access.staff ? <NetworkStatus locale={locale} /> : null}
+          {/* The unfinished-setup nudge (2026-08-28). Manager-gated — S4's lesson: a
+              manager-only read mounted in front of a coach is a 403 on every screen.
+              Hidden on the wizard itself; keyed on the hash so leaving it re-asks. */}
+          {session.access.staff && viewerIsManager && !onSetup ? (
+            <SetupIncompleteBanner
+              key={hash}
+              client={setupClient}
+              locale={locale}
+              onOpen={() => {
+                globalThis.location.hash = '#/setup'
+              }}
+            />
+          ) : null}
           {session.access.staff ? <StaffAlerts client={commsClient} locale={locale} /> : null}
           {/* §6.1's first-run routing still owns the DEFAULT screen: `Resolve` decides
               between the setup wizard, the tour and the refusal. Both W2 lanes hang a
@@ -446,7 +463,7 @@ export default function App() {
               viewerPersonId={membership?.person_id}
               viewerIsCoach={viewerIsCoach}
             />
-          ) : session.access.staff && !viewerIsManager && (onCash || onJoinLink) ? (
+          ) : session.access.staff && !viewerIsManager && (onCash || onJoinLink || onSetup) ? (
             // S10 — restricted, said out loud. The gate used to fall through to the
             // date-picker screen, which made the app look broken rather than reserved.
             <EmptyState
@@ -454,6 +471,8 @@ export default function App() {
               title={t(locale, 'common.permission.locked')}
               description={t(locale, 'common.permission.managerOnly')}
             />
+          ) : session.access.staff && viewerIsManager && onSetup ? (
+            <SetupWizard client={setupClient} locale={locale} />
           ) : session.access.staff && viewerIsManager && onCash ? (
             <PaymentPromisesSection locale={locale} />
           ) : session.access.staff && viewerIsManager && onJoinLink ? (

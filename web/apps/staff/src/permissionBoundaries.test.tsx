@@ -95,6 +95,57 @@ describe('S10 — the gated surfaces, per role', () => {
   })
 })
 
+describe('the setup nudge and its door (2026-08-28)', () => {
+  it('refuses #/setup to a coach, visibly — and never even asks the server', async () => {
+    const fetchSpy = staffFetch(['assistant_coach'])
+    vi.stubGlobal('fetch', fetchSpy)
+    globalThis.location.hash = '#/setup'
+    render(<App />)
+    expect(await REFUSAL()).toBeInTheDocument()
+    // The manager-gate is what keeps GET /setup off a coach's wire (S4's lesson).
+    const setupCalls = fetchSpy.mock.calls.filter(([input]) => String(input).includes('/setup'))
+    expect(setupCalls).toHaveLength(0)
+  })
+
+  it('shows a manager the unfinished-setup banner, and the resume lands in the wizard', async () => {
+    const base = staffFetch(['manager'])
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        if (String(input).includes('/setup')) {
+          return new Response(
+            JSON.stringify({
+              steps: [
+                { key: 'studio', status: 'done' },
+                { key: 'groups', status: 'pending' },
+              ],
+              complete: false,
+              dismissed_at: '2026-08-27T10:00:00Z',
+            }),
+            { status: 200 },
+          )
+        }
+        return base(input)
+      }),
+    )
+    render(<App />)
+    // waitFor rather than findBy: the shell re-keys the banner as the session settles,
+    // and the assertion must survive a node being replaced mid-flight.
+    await waitFor(() => expect(screen.getByTestId('setup-incomplete')).toBeInTheDocument(), {
+      timeout: 3000,
+    })
+    await userEvent.click(screen.getByTestId('setup-incomplete-resume'))
+    await waitFor(() => expect(globalThis.location.hash).toBe('#/setup'))
+  })
+
+  it('shows a coach no banner at all', async () => {
+    vi.stubGlobal('fetch', staffFetch(['lead_coach']))
+    render(<App />)
+    await screen.findByRole('button', { name: t('he', 'common.nav.more') })
+    expect(screen.queryByTestId('setup-incomplete')).toBeNull()
+  })
+})
+
 describe('S10 — 9e: the drawer teaches the role', () => {
   async function openDrawer() {
     await userEvent.click(
