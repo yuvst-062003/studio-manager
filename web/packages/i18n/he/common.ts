@@ -214,6 +214,8 @@ export const common: Bundle = {
   'setup.staff.role': 'תפקיד',
   'setup.staff.role.lead_coach': 'מאמן ראשי',
   'setup.staff.role.assistant_coach': 'מאמן משנה',
+  'setup.staff.role.owner': 'בעלים',
+  'setup.staff.role.manager': 'מנהל',
   'setup.staff.group': 'קבוצה',
   'setup.staff.noGroup': 'ללא קבוצה',
   'setup.staff.invite': 'שליחת הזמנה',

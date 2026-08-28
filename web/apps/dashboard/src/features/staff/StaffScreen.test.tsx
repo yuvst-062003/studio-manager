@@ -60,6 +60,15 @@ describe('StaffScreen', () => {
     expect(cells[1]).toHaveTextContent(t('he', 'common.staff.noHours'))
   })
 
+  it('renders every staff role translated — owner and manager included, never a raw key', async () => {
+    stub({ items: [{ ...MANAGER, roles: ['owner', 'manager'] }], groups_without_coach: [] })
+    render(<StaffScreen locale="he" />)
+    await screen.findByText('נועה מנהלת')
+    expect(screen.queryByText(/setup\.staff\.role/)).toBeNull()
+    const joined = `${t('he', 'common.setup.staff.role.owner')} · ${t('he', 'common.setup.staff.role.manager')}`
+    expect(screen.getByText(joined)).toBeInTheDocument()
+  })
+
   it('identifies a pending invitation by its address rather than an empty cell', async () => {
     stub({ items: [INVITED], groups_without_coach: [] })
     render(<StaffScreen locale="he" />)

@@ -96,7 +96,7 @@ export function BeltsWizardStep({
   // `seed` answer 409, the await threw, and the button silently did nothing: no error, no
   // continue, a wizard with no way forward. The step now reads the existing ladder first
   // and offers plain continuation; a seed failure gets words and a retry.
-  const [existingCount, setExistingCount] = useState<number | null>(null)
+  const [existingLadder, setExistingLadder] = useState<{ classId: string; count: number } | null>(null)
   const [seedError, setSeedError] = useState(false)
   const [busy, setBusy] = useState(false)
 
@@ -118,17 +118,21 @@ export function BeltsWizardStep({
   useEffect(() => {
     if (classId === null) return
     let live = true
-    setExistingCount(null)
     client
       .ladder(classId)
-      .then((page) => live && setExistingCount(page.items.length))
+      .then((page) => live && setExistingLadder({ classId, count: page.items.length }))
       // An unanswerable read behaves like "no ladder": the picker renders and the server
       // stays the authority — a 409 on commit still lands in the handled branch below.
-      .catch(() => live && setExistingCount(0))
+      .catch(() => live && setExistingLadder({ classId, count: 0 }))
     return () => {
       live = false
     }
   }, [client, classId])
+
+  // Tagging the answer with its classId makes "count for another class" read as null
+  // without resetting state inside the effect — a stale answer can never leak across a
+  // class switch.
+  const existingCount = existingLadder !== null && existingLadder.classId === classId ? existingLadder.count : null
 
   const preview = presets.find((preset) => preset.key === chosen)
 

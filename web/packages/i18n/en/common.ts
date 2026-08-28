@@ -205,6 +205,8 @@ export const common: Bundle = {
   'setup.staff.role': 'Role',
   'setup.staff.role.lead_coach': 'Lead coach',
   'setup.staff.role.assistant_coach': 'Assistant coach',
+  'setup.staff.role.owner': 'Owner',
+  'setup.staff.role.manager': 'Manager',
   'setup.staff.group': 'Group',
   'setup.staff.noGroup': 'No group',
   'setup.staff.invite': 'Send an invitation',

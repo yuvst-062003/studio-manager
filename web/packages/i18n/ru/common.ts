@@ -214,6 +214,8 @@ export const common: Bundle = {
   'setup.staff.role': 'Роль',
   'setup.staff.role.lead_coach': 'Главный тренер',
   'setup.staff.role.assistant_coach': 'Помощник тренера',
+  'setup.staff.role.owner': 'Владелец',
+  'setup.staff.role.manager': 'Менеджер',
   'setup.staff.group': 'Группа',
   'setup.staff.noGroup': 'Без группы',
   'setup.staff.invite': 'Отправить приглашение',
