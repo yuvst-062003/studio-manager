@@ -4,21 +4,26 @@ Studio: **gladiator** on staging · Owner/platform-admin: yuvalstolin@gmail.com
 Evidence: every row links to a file in this folder. Fixes keep **both** the failing proof
 and the passing-after-redeploy proof.
 
-## Counts (60 items across a/l/s/p/e) — updated 2026-08-29 after the live staff walk
+## Counts (60 items) — updated 2026-08-29 after both live walks
 
-- **Passed with a saved artifact:** 47
-- **Fixed → redeployed → re-proven on staging:** 3 shown in the table (a20, s10, p4); **5
-  bugs total** shipped across the run (those three + the parent health form and the auth
-  booking-loop), plus a pre-existing lint error fixed in passing.
-- **Behaviour proven by suite/API, live screenshot pending:** 10 — s11–s14 (offline/coach,
-  no throttle or coach account to hand), the booking flow l8–l10, p3, p6, e4. See
-  `component-suite-proofs.md` and `server-side-suite-proofs.md`.
+- **Passed with a saved artifact:** 49
+- **Fixed → redeployed → re-proven on staging:** 3 in the table (a20, s10, p4); **5 bugs
+  total** across the run (those three + the parent health form and the auth booking-loop),
+  plus a pre-existing lint error fixed in passing.
+- **Behaviour proven by suite/API (live capture not feasible from here):** 8 — **s11**
+  (needs a second coach Google account), **s12–s14** (need a real network-offline toggle),
+  **p6** (needs event participants assigned by a manager), **p3** (needs a session inside
+  the today+tomorrow absence window; the QA sessions are Sept 2–3), **e4** (.ics download is
+  blocked in the automation sandbox). See `component-suite-proofs.md` and
+  `server-side-suite-proofs.md`.
 - **⏸ BLOCKED:** 0.
 
-The full staff walk (s1–s10) was completed live on 2026-08-29 in dark mode (also covering
-e3). The remaining 10 suite items convert to live PASS with the **parent sign-in** (l8–l10
-booking, p3, p6) and, for s11–s14, a coach Google account / network throttle. Nothing has
-failed.
+Both sign-ins were done on 2026-08-29: the **staff walk (s1–s10) live in dark mode** (also
+covering e3), and the **parent trial-booking (l8–l10) live** (l9's cancelled slot greyed,
+l10's confirmation with the child in the headline). The auth booking-loop fix was confirmed
+live — the parent return carried `?signed_in=1` and the session restored. The 8 remaining
+suite items are unreachable for the concrete reasons above, not for lack of a login.
+**Nothing failed.**
 
 ---
 
@@ -63,9 +68,9 @@ failed.
 | l5 | desktop sticky / phone stacked | ✅ | l5-desktop-sticky-form-scroll1/2, l5-phone-stacked-top, l5-phone-stacked-form-below | |
 | l6 | /t/nosuchclub distinct not-found | ✅ | l6-nosuchclub-page, l6-api-transcript | "לא מצאנו את המועדון הזה" + API 404 |
 | l7 | booking form open, sign-in first, zero auth requests | ✅ | l7-network-transcript | 12 requests, only 2 public API calls, no /auth or Authorization |
-| l8 | child form: out-of-age group greyed with reason | ⏸/✅ suite | component-suite-proofs | age-greying proven by BookingFlow `groupFitsAge` + "greys out a group outside the child's age"; live screen needs an age-limited group + parent login |
-| l9 | declaration per child; slot chips; sibling chips | ⏸/✅ suite | component-suite-proofs | declaration-per-child + greyed-not-hidden slots + per-sibling slots proven by BookingFlow suite |
-| l10 | confirmation: green badge, child in headline, add-to-calendar .ics | ⏸/✅ suite | component-suite-proofs, server-side-suite-proofs | submit-per-child + confirmation (BookingConfirmed suite) + per-child VEVENT/17:00 (.ics suite); UI confirmation needs a completed booking |
+| l8 | child form: out-of-age group greyed with reason | ✅/suite | l8-booking-child-form, component-suite-proofs | child form walked live (booked a trial child); the out-of-age GREY itself is suite-proven (`groupFitsAge`) — no age-limited group was set up on staging |
+| l9 | declaration per child; slot chips; sibling chips | ✅ | l9-declaration-per-child, l9-slot-chips-cancelled-greyed | per-child declaration + slot chips live; **the cancelled Sept 4 slot shows greyed "השיעור בוטל", not hidden** |
+| l10 | confirmation: green badge, child in headline, add-to-calendar .ics | ✅ | l10-booking-confirmation | green ✓, "נשמר מקום למיכל כהן" (child in headline), date·time·group·address line, add-to-calendar button; .ics VEVENT suite-proven |
 
 ## S — Staff app · staff.staging
 
@@ -92,12 +97,12 @@ failed.
 
 | id | item | verdict | evidence | note |
 |----|------|---------|----------|------|
-| p1 | home shows the child with status | ✅ | p1-home-child-lessons | דניאל כהן + Sep 2/3 lessons |
+| p1 | home shows the child with status | ✅ | p1-home-child-status-live, p1-home-two-children-trial | live: home shows דניאל (active) + מיכל (the trial child booked live) |
 | p2 | calendar month/week, colours + legend | ✅ | p2-calendar-august-legend, p2-calendar-september-planned | Sep shows the 9 planned lessons dotted |
-| p3 | report absence → staff register shows הודיעו מראש | ⏸/✅ suite | p3-absence-screen-empty-window, server-side-suite-proofs | absence UI reachable; the picker is empty because the /sync/bootstrap window is today+tomorrow and the QA sessions are Sep 2/3 (expected, not a bug). Server pair proven by suite. Live end-to-end needs a session in-window + staff app |
+| p3 | report absence → staff register shows הודיעו מראש | ⏸/✅ suite | p3-absence-ui-child-selector, server-side-suite-proofs | absence UI walked live (child selector דניאל/מיכל, reason, submit); the lesson picker is empty because /sync/bootstrap's window is today+tomorrow and the QA sessions are Sep 2/3 (expected). Server pair proven by suite |
 | p4 | student card: belt, health chip, enrolment; never another family | ❌→✅ | p4-card-enrollment-FAIL-before, p4-card-enrollment-PASS-after | **BUG FIXED** — see Fixes |
 | p5 | payments: balance + history real, never a silent 0 | ✅ | p5-payments-balance, p5-payments-history | "אין חובות פתוחים" / "עדיין לא נרשמו תשלומים" from real 200s |
-| p6 | event invite → RSVP → dashboard counters move | ⏸/✅ suite | component-suite-proofs, a22-event-published-rsvp-counters | RSVP + consent-sign proven by ParentEvents suite; the live counter-move needs both apps signed in |
+| p6 | event invite → RSVP → dashboard counters move | ⏸/✅ suite | component-suite-proofs, a22-event-published-rsvp-counters | RSVP + consent proven by ParentEvents suite; the published event has **no participants assigned** so it doesn't reach the parent list — assigning them is a manager action, and the counter-move check needs the owner. Live RSVP not reachable |
 | p7 | works in browser tab; install banner + walkthrough | ✅ | p7-install-banner-home, p7-install-walkthrough | |
 
 ## E — Everywhere
