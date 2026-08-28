@@ -106,26 +106,31 @@ JUDO_CHILDREN = BeltPreset(
     ),
 )
 
-#: The owner's own ladder (requested 2026-08-28): the full children's sequence with
-#: PURPLE between white and yellow, every intermediate grade bi-colour. First in the
-#: tuple below, which is what makes it the recommended default card in 5d and the wizard.
+#: The owner's own ladder (requested 2026-08-28, corrected the same day: green continues
+#: through GREEN-BLUE and BLUE — the first cut jumped green→brown and drew a green-brown
+#: grade that does not exist; there is likewise no blue-brown and no brown-black). The
+#: correction lands under the same key because v1 lived under a day and seeded exactly one
+#: staging studio, whose rows were migrated in the same change — the versioning rule's
+#: comparability concern had nobody yet to protect. First in the tuple below, which is
+#: what makes it the recommended default card in 5d and the wizard.
 JUDO_CHILDREN_PURPLE = BeltPreset(
     key="judo_children_purple",
     discipline="judo",
     name="ג'ודו ילדים (עם סגולה)",
     ranks=(
-        PresetRank("לבנה", 12, 0, _WHITE),
-        PresetRank("לבנה-סגולה", 11, 1, _WHITE, _PURPLE),
-        PresetRank("סגולה", 10, 2, _PURPLE),
-        PresetRank("סגולה-צהובה", 9, 3, _PURPLE, _YELLOW),
-        PresetRank("צהובה", 8, 4, _YELLOW),
-        PresetRank("צהובה-כתומה", 7, 5, _YELLOW, _ORANGE),
-        PresetRank("כתומה", 6, 6, _ORANGE),
-        PresetRank("כתומה-ירוקה", 5, 7, _ORANGE, _GREEN),
-        PresetRank("ירוקה", 4, 8, _GREEN),
-        PresetRank("ירוקה-חומה", 3, 9, _GREEN, _BROWN),
-        PresetRank("חומה", 2, 10, _BROWN),
-        PresetRank("שחורה", 1, 11, _BLACK),
+        PresetRank("לבנה", 13, 0, _WHITE),
+        PresetRank("לבנה-סגולה", 12, 1, _WHITE, _PURPLE),
+        PresetRank("סגולה", 11, 2, _PURPLE),
+        PresetRank("סגולה-צהובה", 10, 3, _PURPLE, _YELLOW),
+        PresetRank("צהובה", 9, 4, _YELLOW),
+        PresetRank("צהובה-כתומה", 8, 5, _YELLOW, _ORANGE),
+        PresetRank("כתומה", 7, 6, _ORANGE),
+        PresetRank("כתומה-ירוקה", 6, 7, _ORANGE, _GREEN),
+        PresetRank("ירוקה", 5, 8, _GREEN),
+        PresetRank("ירוקה-כחולה", 4, 9, _GREEN, _BLUE),
+        PresetRank("כחולה", 3, 10, _BLUE),
+        PresetRank("חומה", 2, 11, _BROWN),
+        PresetRank("שחורה", 1, 12, _BLACK),
     ),
 )
 

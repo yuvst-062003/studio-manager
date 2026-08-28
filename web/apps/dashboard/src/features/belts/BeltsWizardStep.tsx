@@ -92,6 +92,13 @@ export function BeltsWizardStep({
   const [classes, setClasses] = useState<ClassOut[] | null>(null)
   const [classId, setClassId] = useState<string | null>(null)
   const [chosen, setChosen] = useState<string | null>(null)
+  // 2026-08-28 — the two dead ends the owner hit. A class that ALREADY has a ladder made
+  // `seed` answer 409, the await threw, and the button silently did nothing: no error, no
+  // continue, a wizard with no way forward. The step now reads the existing ladder first
+  // and offers plain continuation; a seed failure gets words and a retry.
+  const [existingCount, setExistingCount] = useState<number | null>(null)
+  const [seedError, setSeedError] = useState(false)
+  const [busy, setBusy] = useState(false)
 
   useEffect(() => {
     let live = true
@@ -108,16 +115,45 @@ export function BeltsWizardStep({
     }
   }, [client])
 
+  useEffect(() => {
+    if (classId === null) return
+    let live = true
+    setExistingCount(null)
+    client
+      .ladder(classId)
+      .then((page) => live && setExistingCount(page.items.length))
+      // An unanswerable read behaves like "no ladder": the picker renders and the server
+      // stays the authority — a 409 on commit still lands in the handled branch below.
+      .catch(() => live && setExistingCount(0))
+    return () => {
+      live = false
+    }
+  }, [client, classId])
+
   const preview = presets.find((preset) => preset.key === chosen)
 
   const commit = async () => {
     if (chosen === null || classId === null) return
-    if (chosen !== SCRATCH) {
-      await client.seed(classId, chosen)
+    setSeedError(false)
+    setBusy(true)
+    try {
+      if (chosen !== SCRATCH) {
+        await client.seed(classId, chosen)
+      }
+      // Reported either way: the manager has answered the question this step asks, and
+      // "I will define it by hand" is an answer.
+      onDone()
+    } catch (error) {
+      // 409 — the ladder exists. That IS the goal state of this step; refusing to
+      // continue over it is how the owner got stuck.
+      if (error instanceof Error && error.message.startsWith('409')) {
+        onDone()
+        return
+      }
+      setSeedError(true)
+    } finally {
+      setBusy(false)
     }
-    // Reported either way: the manager has answered the question this step asks, and
-    // "I will define it by hand" is an answer.
-    onDone()
   }
 
   return (
@@ -154,7 +190,23 @@ export function BeltsWizardStep({
         </fieldset>
       ) : null}
 
-      {classId === null ? null : (
+      {/* The class already answered this question. Say so and open the way forward —
+          a wizard step whose goal state blocks the wizard is a trap, not a step. */}
+      {classId !== null && existingCount !== null && existingCount > 0 ? (
+        <>
+          <p style={hintStyle} data-testid="belts-already-seeded">
+            {t(locale, 'events.belt.alreadySeeded').replace('{{count}}', String(existingCount))}
+          </p>
+          <p style={hintStyle}>{t(locale, 'events.belt.alreadySeededHint')}</p>
+          <p style={{ margin: 0 }}>
+            <Button data-testid="belts-continue" onClick={onDone} variant="primary">
+              {t(locale, 'events.belt.continue')}
+            </Button>
+          </p>
+        </>
+      ) : null}
+
+      {classId === null || existingCount === null || existingCount > 0 ? null : (
       <>
       <fieldset role="radiogroup" style={cardsStyle}>
         <legend style={legendStyle}>{t(locale, 'events.belt.title')}</legend>
@@ -200,8 +252,18 @@ export function BeltsWizardStep({
         </Card>
       ) : null}
 
+      {seedError ? (
+        <p role="alert" style={hintStyle} data-testid="belts-seed-failed">
+          {t(locale, 'events.belt.seedFailed')}
+        </p>
+      ) : null}
+
       <p style={{ margin: 0 }}>
-        <Button disabled={chosen === null} onClick={() => void commit()} variant="primary">
+        <Button
+          disabled={chosen === null || busy}
+          onClick={() => void commit()}
+          variant="primary"
+        >
           {t(locale, 'events.belt.add')}
           {preview ? ` · ${preview.ranks.length}` : ''}
         </Button>

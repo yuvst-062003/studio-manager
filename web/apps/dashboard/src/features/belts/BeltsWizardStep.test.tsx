@@ -10,7 +10,7 @@
 // **The container never computes completeness.** `types.ts` says so in as many words, and
 // it is what makes the seam hold: the container cannot know when *belts* is finished
 // without M7 reopening it, so the step reports its own outcome through `onDone`.
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import { renderHook } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -54,6 +54,7 @@ function makeClient(classes: unknown[] = ONE_CLASS): DashboardBeltsClient {
     presets: vi.fn().mockResolvedValue({ items: PRESETS, next_cursor: null, has_more: false }),
     classes: vi.fn().mockResolvedValue({ items: classes, next_cursor: null }),
     seed: vi.fn().mockResolvedValue({ items: [], next_cursor: null, has_more: false }),
+    ladder: vi.fn().mockResolvedValue({ items: [], next_cursor: null, has_more: false }),
   } as unknown as DashboardBeltsClient
 }
 
@@ -178,5 +179,47 @@ describe('5d — the belts wizard step', () => {
     expect(
       screen.getByRole('button', { name: new RegExp(t('he', 'events.belt.add')) }).textContent,
     ).toContain('3')
+  })
+})
+
+
+describe('the two dead ends (2026-08-28)', () => {
+  it('offers plain continuation when the class already HAS a ladder', async () => {
+    // The owner picked a system for a class I had seeded directly; seed answered 409, the
+    // await threw, and the button silently did nothing — a wizard with no way forward.
+    const client = makeClient()
+    vi.mocked(client.ladder).mockResolvedValue({
+      items: Array.from({ length: 13 }, (_, index) => ({ id: `r${index}` })),
+      next_cursor: null,
+      has_more: false,
+    } as never)
+    const { props } = renderStep({}, client)
+    expect(await screen.findByTestId('belts-already-seeded')).toHaveTextContent('13')
+    await userEvent.click(screen.getByTestId('belts-continue'))
+    expect(props.onDone).toHaveBeenCalled()
+    // The picker is withheld: the question is already answered.
+    expect(screen.queryByRole('radio')).toBeNull()
+  })
+
+  it('treats a 409 on seed as the goal state and continues', async () => {
+    const client = makeClient()
+    vi.mocked(client.seed).mockRejectedValue(new Error('409 conflict'))
+    const { props } = renderStep({}, client)
+    const radios = await screen.findAllByRole('radio', { name: /ג'ודו/ })
+    await userEvent.click(radios[0] as HTMLElement)
+    await userEvent.click(screen.getByRole('button', { name: new RegExp(t('he', 'events.belt.add')) }))
+    await waitFor(() => expect(props.onDone).toHaveBeenCalled())
+  })
+
+  it('says a seed failure out loud and keeps the button alive', async () => {
+    const client = makeClient()
+    vi.mocked(client.seed).mockRejectedValue(new TypeError('offline'))
+    const { props } = renderStep({}, client)
+    const radios = await screen.findAllByRole('radio', { name: /ג'ודו/ })
+    await userEvent.click(radios[0] as HTMLElement)
+    await userEvent.click(screen.getByRole('button', { name: new RegExp(t('he', 'events.belt.add')) }))
+    expect(await screen.findByTestId('belts-seed-failed')).toBeInTheDocument()
+    expect(props.onDone).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: new RegExp(t('he', 'events.belt.add')) })).toBeEnabled()
   })
 })

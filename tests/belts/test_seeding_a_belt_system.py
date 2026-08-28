@@ -45,9 +45,10 @@ def test_every_preset_is_a_total_order_with_valid_colours():
 
 
 def test_the_purple_ladder_is_the_default_and_matches_the_owners_sequence():
-    """2026-08-28 — the owner's ladder: purple sits between white and yellow, every
-    intermediate grade is bi-colour, twelve ranks to black. First in the tuple, which is
-    what the wizard renders as the recommended card."""
+    """2026-08-28 — the owner's ladder, corrected the same day: purple sits between
+    white and yellow, green continues through green-blue and blue, and the tail is plain
+    brown then black — no green-brown, no blue-brown, no brown-black. Thirteen ranks,
+    first in the tuple, which is what the wizard renders as the recommended card."""
     default = BELT_PRESETS[0]
     assert default.key == "judo_children_purple"
     assert [rank.name for rank in default.ranks] == [
@@ -60,7 +61,8 @@ def test_the_purple_ladder_is_the_default_and_matches_the_owners_sequence():
         "כתומה",
         "כתומה-ירוקה",
         "ירוקה",
-        "ירוקה-חומה",
+        "ירוקה-כחולה",
+        "כחולה",
         "חומה",
         "שחורה",
     ]
