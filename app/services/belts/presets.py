@@ -106,6 +106,29 @@ JUDO_CHILDREN = BeltPreset(
     ),
 )
 
+#: The owner's own ladder (requested 2026-08-28): the full children's sequence with
+#: PURPLE between white and yellow, every intermediate grade bi-colour. First in the
+#: tuple below, which is what makes it the recommended default card in 5d and the wizard.
+JUDO_CHILDREN_PURPLE = BeltPreset(
+    key="judo_children_purple",
+    discipline="judo",
+    name="ג'ודו ילדים (עם סגולה)",
+    ranks=(
+        PresetRank("לבנה", 12, 0, _WHITE),
+        PresetRank("לבנה-סגולה", 11, 1, _WHITE, _PURPLE),
+        PresetRank("סגולה", 10, 2, _PURPLE),
+        PresetRank("סגולה-צהובה", 9, 3, _PURPLE, _YELLOW),
+        PresetRank("צהובה", 8, 4, _YELLOW),
+        PresetRank("צהובה-כתומה", 7, 5, _YELLOW, _ORANGE),
+        PresetRank("כתומה", 6, 6, _ORANGE),
+        PresetRank("כתומה-ירוקה", 5, 7, _ORANGE, _GREEN),
+        PresetRank("ירוקה", 4, 8, _GREEN),
+        PresetRank("ירוקה-חומה", 3, 9, _GREEN, _BROWN),
+        PresetRank("חומה", 2, 10, _BROWN),
+        PresetRank("שחורה", 1, 11, _BLACK),
+    ),
+)
+
 KARATE = BeltPreset(
     key="karate",
     discipline="karate",
@@ -124,8 +147,10 @@ KARATE = BeltPreset(
 )
 
 #: Children first: `5d` marks it מומלץ, and a club setting up for the first time is far
-#: more often a children's club than an adults' one.
-BELT_PRESETS: tuple[BeltPreset, ...] = (JUDO_CHILDREN, JUDO_ADULTS, KARATE)
+#: more often a children's club than an adults' one. The purple ladder leads since
+#: 2026-08-28 — it is the owner's chosen default; the earlier children's set stays under
+#: its own key, per this module's versioning rule.
+BELT_PRESETS: tuple[BeltPreset, ...] = (JUDO_CHILDREN_PURPLE, JUDO_CHILDREN, JUDO_ADULTS, KARATE)
 
 _BY_KEY = {preset.key: preset for preset in BELT_PRESETS}
 

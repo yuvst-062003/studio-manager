@@ -44,6 +44,35 @@ def test_every_preset_is_a_total_order_with_valid_colours():
             )
 
 
+def test_the_purple_ladder_is_the_default_and_matches_the_owners_sequence():
+    """2026-08-28 — the owner's ladder: purple sits between white and yellow, every
+    intermediate grade is bi-colour, twelve ranks to black. First in the tuple, which is
+    what the wizard renders as the recommended card."""
+    default = BELT_PRESETS[0]
+    assert default.key == "judo_children_purple"
+    assert [rank.name for rank in default.ranks] == [
+        "לבנה",
+        "לבנה-סגולה",
+        "סגולה",
+        "סגולה-צהובה",
+        "צהובה",
+        "צהובה-כתומה",
+        "כתומה",
+        "כתומה-ירוקה",
+        "ירוקה",
+        "ירוקה-חומה",
+        "חומה",
+        "שחורה",
+    ]
+    # Every in-between grade carries its second colour; every full grade is plain.
+    for index, rank in enumerate(default.ranks):
+        if rank.name.count("-"):
+            assert rank.secondary_color_hex, rank.name
+        else:
+            assert rank.secondary_color_hex is None, rank.name
+        assert rank.order_index == index
+
+
 def test_the_children_preset_carries_bi_colour_grades():
     """Artboard `5d` -- 'חגורות ביניים לילדים הן בדרך כלל דו-צבעיות', and `5b` is explicit
     that the system includes them. A children's preset of solid belts would let this lane
