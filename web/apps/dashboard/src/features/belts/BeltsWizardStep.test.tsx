@@ -80,13 +80,13 @@ const commitButton = () =>
   screen.getByRole('button', { name: new RegExp(t('he', 'events.belt.add')) })
 
 describe('5d — the belts wizard step', () => {
-  it('registers itself into the container at order 2 without reopening it', () => {
+  it('registers itself into the container at order 3 without reopening it', () => {
     clearSlot('setup-wizard')
     registerBeltsWizardStep(makeClient())
     const { result } = renderHook(() => useSlot<WizardStepProps>('setup-wizard'))
     // `belts` is step 2 of six in WIZARD_STEP_ORDER: studio, belts, groups, prices, staff,
     // students. M1 registers 1, 3, 5 and 6; M6 registers 4 the same way.
-    expect(result.current.map((entry) => [entry.key, entry.order])).toEqual([['belts', 2]])
+    expect(result.current.map((entry) => [entry.key, entry.order])).toEqual([['belts', 3]])
   })
 
   it('reports its own outcome rather than letting the container compute it', async () => {

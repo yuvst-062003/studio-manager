@@ -39,11 +39,18 @@ from app.core.clock import now
 from app.models.studio import Studio
 from app.services.audit import AuditService
 
-#: The canvas fixes six steps, progress running right-to-left. M1 owns 1, 3, 5 and 6; M7
-#: fills `belts` and M6 fills `prices`. All six are listed here because *complete* means
-#: all six are done -- a five-step list would report a studio complete before its belt
-#: system existed.
-WIZARD_STEPS: tuple[str, ...] = ("studio", "belts", "groups", "prices", "staff", "students")
+#: The canvas fixes six steps, progress running right-to-left. M1 owns studio, groups,
+#: staff and students; M7 fills `belts` and M6 fills `prices`. All six are listed here
+#: because *complete* means all six are done -- a five-step list would report a studio
+#: complete before its belt system existed.
+#:
+#: `groups` precedes `belts`, against the canvas, because the canvas order cannot be
+#: walked: `belt_rank.class_id` is NOT NULL, classes are created in `groups`, and so the
+#: belts step at position 2 met a fresh owner with an empty class picker and no way
+#: forward (reported from the live wizard, 2026-08-29). Order here is a data dependency,
+#: not a layout: `WIZARD_STEP_ORDER` in `web/packages/ui/src/setup-wizard/types.ts`
+#: mirrors it, and `tests/structure/test_setup_router.py` holds the pair to it.
+WIZARD_STEPS: tuple[str, ...] = ("studio", "groups", "belts", "prices", "staff", "students")
 
 #: `pending` is settable since F6 — the REVERSAL of the original decision, on the
 #: rollover wizard's precedent: "a one-way ratchet would send them back through the whole

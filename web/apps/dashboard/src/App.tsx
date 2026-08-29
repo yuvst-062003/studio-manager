@@ -38,6 +38,7 @@ import './features/home/home.css'
 import './features/rollover/rollover.css'
 import './features/schedule/schedule.css'
 import './features/belts/belts-wizard.css'
+import './features/billing/prices-wizard.css'
 import { useToday } from './features/schedule/useToday'
 // §5.15's rollover — "the single highest-leverage screen in the product", and the one flow
 // a manager runs once a year. Its own route rather than a panel inside `#/schedule`,

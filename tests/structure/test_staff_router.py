@@ -19,6 +19,7 @@ from datetime import UTC, datetime, timedelta
 
 from app.models.person import Invitation, Person, RoleAssignment
 from app.models.structure import Group, GroupStaff
+from sqlalchemy import select
 
 STAFF = "/api/v1/staff"
 
@@ -79,9 +80,7 @@ def test_weekly_hours_is_zero_when_no_sessions_are_staffed(client, as_manager) -
     measurement for a person staffing nothing this week. A pending invitation still
     carries null — it staffs nothing by definition."""
     body = client.get(STAFF, headers=as_manager.headers).json()
-    assert all(
-        row["weekly_hours"] == 0.0 for row in body["items"] if row["person_id"] is not None
-    )
+    assert all(row["weekly_hours"] == 0.0 for row in body["items"] if row["person_id"] is not None)
 
 
 def test_permissions_come_from_the_role_and_are_not_stored(client, as_manager) -> None:
@@ -270,6 +269,67 @@ def test_invite_resend_revoke_round_trip(client, as_manager) -> None:
     assert all(r["email"] != "coach@example.invalid" for r in after["items"])
 
 
+def test_an_invitation_puts_the_coach_on_the_groups_it_names(
+    client, as_manager, app_session, a_class
+) -> None:
+    """The wizard's step 5 always asked which group the coach joins, and the answer had
+    nowhere to go — `StaffInvitationIn` had no group field, so every choice was dropped
+    silently (2026-08-29). The assignment is possible before acceptance because
+    `invite_staff` creates the Person now; only the login binding waits.
+    """
+    groups = [Group(studio_id=as_manager.studio_id, class_id=a_class, name=n) for n in ("א", "ב")]
+    app_session.add_all(groups)
+    app_session.commit()
+    ids = [str(g.id) for g in groups]
+    # Unique per run: this database is not dropped between runs, and a fixed address makes
+    # the second run of this test find two people.
+    email = f"coach-{uuid.uuid4().hex[:8]}@example.invalid"
+
+    created = client.post(
+        f"{STAFF}/invitations",
+        json={"email": email, "roles": ["lead_coach"], "group_ids": ids},
+        headers=as_manager.headers,
+    )
+    assert created.status_code == 201, created.text
+
+    person = app_session.execute(select(Person).where(Person.email == email)).scalar_one()
+    on = app_session.execute(
+        select(GroupStaff.group_id).where(
+            GroupStaff.person_id == person.id, GroupStaff.to_date.is_(None)
+        )
+    ).scalars()
+    assert sorted(str(g) for g in on) == sorted(ids)
+
+
+def test_an_invitation_naming_an_unknown_group_creates_nothing(client, as_manager) -> None:
+    """Refusing whole is the point: a coach invited to groups they were never put on is
+    worse than a rejected invitation, because nothing anywhere says the roster is wrong."""
+    stranger = str(uuid.uuid4())
+    email = f"ghost-{uuid.uuid4().hex[:8]}@example.invalid"
+    refused = client.post(
+        f"{STAFF}/invitations",
+        json={"email": email, "roles": ["lead_coach"], "group_ids": [stranger]},
+        headers=as_manager.headers,
+    )
+    assert refused.status_code == 422
+    assert refused.json()["detail"]["code"] == "bad_groups"
+    listed = client.get(STAFF, headers=as_manager.headers).json()
+    assert all(row["email"] != email for row in listed["items"])
+
+
+def test_an_invitation_without_groups_still_works(client, as_manager) -> None:
+    """§3.3 — a coach may exist before any group does."""
+    created = client.post(
+        f"{STAFF}/invitations",
+        json={
+            "email": f"solo-{uuid.uuid4().hex[:8]}@example.invalid",
+            "roles": ["assistant_coach"],
+        },
+        headers=as_manager.headers,
+    )
+    assert created.status_code == 201, created.text
+
+
 def test_accepting_a_staff_invitation_makes_the_person_staff(
     client, fake_provider, as_manager, app_session
 ) -> None:
@@ -339,9 +399,7 @@ def test_deactivating_a_groups_only_lead_coach_is_refused(
 
 
 def test_the_owner_cannot_be_deactivated(client, as_owner, as_manager) -> None:
-    refused = client.post(
-        f"{STAFF}/{as_owner.person_id}/deactivate", headers=as_manager.headers
-    )
+    refused = client.post(f"{STAFF}/{as_owner.person_id}/deactivate", headers=as_manager.headers)
     assert refused.status_code == 409
     assert refused.json()["detail"]["code"] == "owner_immovable"
 

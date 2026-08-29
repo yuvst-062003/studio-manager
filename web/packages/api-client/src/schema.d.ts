@@ -899,6 +899,8 @@ export interface paths {
          * List Enrollments
          * @description Always scoped to one student. C11 makes several live rows normal, so this is a
          *     small bounded list rather than a page -- G16's rule is about lists that grow.
+         *
+         *     Staff, or a guardian of this student: the parent card's קבוצות section is this read.
          */
         get: operations["list_enrollments_api_v1_enrollments_get"];
         put?: never;
@@ -7921,7 +7923,7 @@ export interface components {
             /** Registration Fee Agorot */
             registration_fee_agorot?: number | null;
             /** Sessions Per Week */
-            sessions_per_week: number;
+            sessions_per_week?: number | null;
         };
         /**
          * PricePlanOut
@@ -7951,7 +7953,7 @@ export interface components {
             /** Registration Fee Agorot */
             registration_fee_agorot: number;
             /** Sessions Per Week */
-            sessions_per_week: number;
+            sessions_per_week: number | null;
             /** Standing Order Link Url */
             standing_order_link_url?: string | null;
         };
@@ -9141,6 +9143,11 @@ export interface components {
             email: string;
             /** First Name */
             first_name?: string | null;
+            /**
+             * Group Ids
+             * @description Groups this coach starts on. `invite_staff` creates the Person NOW and acceptance only binds a login to it (§5.3), so the assignments are real from the moment the invitation is written — nothing waits for the coach to sign in. Empty means no group yet, which §3.3 allows.
+             */
+            group_ids?: string[];
             /** Last Name */
             last_name?: string | null;
             /** Roles */

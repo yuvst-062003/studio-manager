@@ -8,8 +8,8 @@ import type { SetupProgress, WizardStepId } from './types'
 import type { SetupClient } from './SetupWizard'
 import type { StudioClient, StudioDetails } from './StudioStep'
 import { defaultSeason } from './GroupsStep'
-import type { NamedRow, Slot, StructureClient } from './GroupsStep'
-import type { StaffClient, StaffInvite } from './StaffStep'
+import type { GroupRow, NamedRow, Slot, StructureClient } from './GroupsStep'
+import type { StaffClient } from './StaffStep'
 import type { SetupSummary, StudentsClient } from './StudentsStep'
 
 export type Fetcher = (path: string, init?: RequestInit) => Promise<Response>
@@ -58,6 +58,14 @@ export function makeStudioClient(fetcher: Fetcher): StudioClient {
 
 type Listed<T> = { items: T[] }
 
+/** The half of `StaffMemberOut` the wizard's pending panel reads. */
+type StaffMemberRow = {
+  email: string | null
+  roles: string[]
+  groups?: { id: string; name: string }[]
+  status: string
+}
+
 export function makeStructureClient(fetcher: Fetcher): StructureClient {
   const list = (path: string) =>
     fetcher(path)
@@ -70,10 +78,20 @@ export function makeStructureClient(fetcher: Fetcher): StructureClient {
 
   return {
     listClasses: () => list('/api/v1/classes'),
-    listGroups: () => list('/api/v1/groups'),
+    // `GroupOut` has carried `class_id` all along; this read used to narrow it away, and
+    // with it went the step's only way to tell which class a group belongs to.
+    listGroups: () =>
+      fetcher('/api/v1/groups')
+        .then(json<Listed<GroupRow>>)
+        .then((body) => body.items ?? []),
     listLocations: () => list('/api/v1/locations'),
     createClass: (name) => create('/api/v1/classes', { name }),
-    createGroup: (classId, name) => create('/api/v1/groups', { class_id: classId, name }),
+    createGroup: (classId, name) =>
+      fetcher('/api/v1/groups', {
+        method: 'POST',
+        headers: JSON_HEADERS,
+        body: JSON.stringify({ class_id: classId, name }),
+      }).then(json<GroupRow>),
     createLocation: (name) => create('/api/v1/locations', { name }),
     ensureTrainingYear: async () => {
       const years = await fetcher('/api/v1/training-years')
@@ -134,18 +152,35 @@ export function makeStaffClient(fetcher: Fetcher): StaffClient {
       fetcher('/api/v1/groups')
         .then(json<Listed<NamedRow>>)
         .then((body) => body.items ?? []),
+    // There is no invitations *list* endpoint and there never was — this read used to ask
+    // `/api/v1/invitations`, take the 404, and swallow it, so the pending panel was
+    // permanently empty and looked merely unused. `GET /staff` already returns pending
+    // invitations as rows carrying `status: "invited"`, which is the same information
+    // with the coach's groups attached.
     listInvitations: () =>
-      fetcher('/api/v1/invitations')
-        .then(json<Listed<StaffInvite>>)
-        .then((body) => body.items ?? [])
-        // An endpoint that does not exist yet must not blank the step. M1.4 shipped the
-        // invitation flow; listing pending invitations is not part of it.
+      fetcher('/api/v1/staff')
+        .then(json<Listed<StaffMemberRow>>)
+        .then((body) =>
+          (body.items ?? [])
+            .filter((row) => row.status === 'invited')
+            .map((row) => ({
+              email: row.email ?? '',
+              role: row.roles[0] ?? '',
+              groups: (row.groups ?? []).map((group) => group.name),
+            })),
+        )
+        // A failed read must not blank the step: the panel is a reassurance, not a gate.
         .catch(() => []),
-    invite: (email, role, groupId) =>
-      fetcher('/api/v1/invitations', {
+    // `/staff/invitations`, not `/invitations` — the shorter path was never mounted, so
+    // every invitation from the wizard 404'd and the step blamed the email address.
+    // The body is `StaffInvitationIn`: a list of roles, and the groups the coach starts
+    // on (assignable now because the Person is created with the invitation, not on
+    // acceptance).
+    invite: (email, role, groupIds) =>
+      fetcher('/api/v1/staff/invitations', {
         method: 'POST',
         headers: JSON_HEADERS,
-        body: JSON.stringify({ email, intended_role: role, group_id: groupId }),
+        body: JSON.stringify({ email, roles: [role], group_ids: groupIds }),
       }).then((response) => {
         if (!response.ok) throw new Error(String(response.status))
       }),

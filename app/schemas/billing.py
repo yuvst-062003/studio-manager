@@ -74,8 +74,11 @@ class PricePlanOut(BaseModel):
 
     id: uuid.UUID
     name: str
-    #: C11 — 'פעמיים בשבוע' is 2, 'כל יום' is 5.
-    sessions_per_week: int
+    #: C11 — 'פעמיים בשבוע' is 2, 'כל יום' is 5, and **null is open membership**. The
+    #: column has been nullable since W4; this said `int`, so an unlimited plan could not
+    #: be read back out at all — the failure would land on the list screen, not on the
+    #: write that caused it.
+    sessions_per_week: int | None
     monthly_amount_agorot: int
     registration_fee_agorot: int
     active_from: date

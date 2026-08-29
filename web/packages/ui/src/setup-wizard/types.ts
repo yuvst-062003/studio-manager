@@ -11,10 +11,16 @@ export type WizardStepId = 'studio' | 'belts' | 'groups' | 'prices' | 'staff' | 
 export type WizardStepStatus = 'pending' | 'done' | 'skipped'
 
 /** The canvas order, right-to-left in he. `order` in the slot registry mirrors it. */
+/**
+ * Mirrors `WIZARD_STEPS` in `app/services/structure/setup.py`, which carries the reason:
+ * `groups` runs before `belts` because a belt ladder hangs off a class (`belt_rank.class_id`
+ * is NOT NULL) and classes are created in `groups`. The canvas ordered them the other way
+ * and that order could not be walked — belts met a fresh owner with an empty class picker.
+ */
 export const WIZARD_STEP_ORDER: readonly WizardStepId[] = [
   'studio',
-  'belts',
   'groups',
+  'belts',
   'prices',
   'staff',
   'students',

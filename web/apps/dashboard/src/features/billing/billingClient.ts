@@ -86,7 +86,8 @@ export type DashboardBillingClient = {
   closePricePlan(planId: string, closesOn: string, amountAgorot: number): Promise<PricePlanOut>
   createPricePlan(input: {
     name: string
-    sessionsPerWeek: number
+    /** null is open membership — the column's third state, not a missing answer. */
+    sessionsPerWeek: number | null
     monthlyAmountAgorot: number
     registrationFeeAgorot: number | null
     activeFrom: string

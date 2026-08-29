@@ -10,12 +10,16 @@
 // the seam hold: the container cannot know when *belts* is finished without M7 reopening
 // it. The step reports its own outcome through `onDone`.
 //
-// **A ladder needs a class, and at step 2 there may not be one.** `WIZARD_STEP_ORDER` is
-// studio · belts · groups · prices · staff · students, `groups` is where classes are
-// created, and `belt_rank.class_id` is `NOT NULL`. Nothing in step 1 creates a class. So
-// this step reads M1's `/classes`, seeds into the one the manager picks, and — when the
-// studio has none yet — says so and offers `onSkip`, which is the outcome the container
-// already understands.
+// **A ladder needs a class, which is why this step MOVED.** `belt_rank.class_id` is
+// `NOT NULL` and `groups` is where classes are created. The canvas ordered belts at 2 and
+// groups at 3, so on a real first run this step opened with an empty class picker and the
+// owner could not finish it — reported from the live wizard, 2026-08-29. `WIZARD_STEP_ORDER`
+// is now studio · groups · belts · prices · staff · students, and the dependency is
+// satisfied by the time the owner arrives here.
+//
+// The empty-class path stays: a manager may still SKIP groups and reach this step with
+// none. It reads M1's `/classes`, seeds into the one the manager picks, and — when the
+// studio has none — says so and offers `onSkip`, an outcome the container understands.
 //
 // That contradicts `5d`, which draws no defer link, and the audit justified the absence:
 // "belt setup is required and pricing is not". The requirement stands; it is the ORDERING
@@ -349,7 +353,12 @@ export function BeltsWizardStep({
 export function registerBeltsWizardStep(client: DashboardBeltsClient): void {
   registerSlot<WizardStepProps>('setup-wizard', {
     key: 'belts',
-    order: 2,
+    // 3, not the canvas's 2. A ladder hangs off a class (`belt_rank.class_id` is NOT
+    // NULL) and classes are created in `groups`, so at 2 this step met a fresh owner with
+    // an empty class picker and no way forward. `WIZARD_STEP_ORDER` and `WIZARD_STEPS`
+    // carry the same swap; this number must match them or the owner lands on the wrong
+    // panel after finishing the previous step.
+    order: 3,
     render: (props: WizardStepProps) => <BeltsWizardStep {...props} client={client} />,
   })
 }

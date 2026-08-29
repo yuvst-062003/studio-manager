@@ -535,3 +535,256 @@
   flex-wrap: wrap;
   gap: var(--space-1);
 }
+
+/* Step 5's group picker. Was a single `<select>`, which could not express the common
+   answer ("all of them") or the second most common ("two of these five"). */
+.setup-teams {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 0;
+  border: 0;
+  margin: 0;
+  min-inline-size: 0;
+}
+
+.setup-teams__bulk {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.setup-teams__count {
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+}
+
+.setup-teams__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: 0;
+  margin: 0;
+  list-style: none;
+
+  /* Five groups fit; twenty scroll rather than push the invite button off-screen. */
+  max-block-size: 13rem;
+  overflow-y: auto;
+}
+
+.setup-team {
+  display: inline-flex;
+  align-items: center;
+  padding-block: var(--space-1);
+  padding-inline: var(--space-3);
+  background: var(--surface);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+}
+
+.setup-team[data-selected="true"] {
+  border-color: var(--fg);
+  border-width: var(--border-width-strong);
+}
+
+.setup-team:has(:focus-visible) {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* ── Step 2 · classes → groups → hours ─────────────────────────────────────────────
+   Rebuilt 2026-08-29. The step was three stacked forms and one flat list holding every
+   group in the club, each with its four-control time rows expanded inline; a manager
+   could not tell a class from a group, and every new group silently went to the first
+   class. It is now one class at a time, its groups as cards, and a dialog per group. */
+.setup-classes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.setup-classes__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+/* The selected class, in the one place the eye returns to. */
+.setup-classes__tabs [data-selected='true'] {
+  border-color: var(--fg);
+  border-width: var(--border-width-strong);
+}
+
+.setup-inline-form {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.setup-groups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-block-start: var(--space-4);
+}
+
+.setup-groups__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.setup-groups__list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  gap: var(--space-3);
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.setup-group-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--surface);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-lg);
+  min-inline-size: 0;
+}
+
+.setup-group-card__name {
+  font-weight: 600;
+}
+
+.setup-group-card__when {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+}
+
+.setup-group-card__none {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* A day and an hour range read as one line. The range is a `RangeText`, so the digits
+   stay an LTR island inside the RTL row rather than reordering around the dash. */
+.setup-slot-line {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.setup-halls {
+  margin-block-start: var(--space-4);
+}
+
+.setup-halls > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.setup-halls__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: 0;
+  margin-block-start: var(--space-2);
+  list-style: none;
+  color: var(--text-muted);
+}
+
+/* ── the group dialog ─────────────────────────────────────────────────────────────── */
+.setup-dialog__scrim {
+  position: fixed;
+
+  /* D10: `inset` is banned — the shorthand hides which edge is which, and this is a
+     bidirectional UI. */
+  inset-block: 0;
+  inset-inline: 0;
+  display: grid;
+  place-items: center;
+  padding: var(--space-4);
+  background: rgb(0 0 0 / 45%);
+  z-index: 40;
+}
+
+.setup-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  inline-size: min(38rem, 100%);
+
+  /* Taller than the viewport scrolls INSIDE the dialog: a group with five weekly slots
+     must not push its own save button past the bottom of the screen. */
+  max-block-size: min(44rem, 90vh);
+  overflow-y: auto;
+  padding: var(--space-4);
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 10px 30px rgb(0 0 0 / 25%);
+}
+
+.setup-dialog__title {
+  margin: 0;
+  font-size: var(--text-title);
+}
+
+.setup-dialog__legend {
+  margin: 0;
+  font-size: var(--text-label);
+  font-weight: 600;
+}
+
+.setup-slots {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+/* Inside the dialog a slot is a small card, so several of them read as separate rows
+   rather than one long wrap. The base `.setup-slot` above still supplies the layout and
+   the control styling — this only adds the frame. */
+.setup-slots > .setup-slot {
+  align-items: end;
+  padding: var(--space-2);
+  background: var(--surface-raised);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.setup-slot__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-inline-size: 0;
+}
+
+/* Visible labels, not screen-reader-only ones: four unlabelled controls in a row is
+   exactly the "inputs are not designed well" the owner reported. */
+.setup-slot__label {
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+}
+
+.setup-week__days > li[data-empty='true'] {
+  opacity: 0.65;
+}
+
+.setup-week__group {
+  margin-inline-start: var(--space-2);
+}

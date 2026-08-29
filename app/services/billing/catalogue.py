@@ -110,7 +110,7 @@ class CatalogueService:
         studio_id: uuid.UUID,
         *,
         name: str,
-        sessions_per_week: int,
+        sessions_per_week: int | None,
         monthly_amount_agorot: int,
         registration_fee_agorot: int | None,
         active_from: date,
@@ -119,7 +119,9 @@ class CatalogueService:
         self._require_money(monthly_amount_agorot, "monthly_amount_agorot")
         if registration_fee_agorot is not None:
             self._require_money(registration_fee_agorot, "registration_fee_agorot")
-        if sessions_per_week <= 0:
+        # None is open membership, not a missing answer — the column's documented third
+        # state. A counted plan still has to count at least one session.
+        if sessions_per_week is not None and sessions_per_week <= 0:
             raise RefusedError("a plan covers at least one session a week")
         plan = PricePlan(
             studio_id=studio_id,

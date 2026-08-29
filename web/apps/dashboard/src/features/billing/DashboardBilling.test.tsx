@@ -610,17 +610,24 @@ describe('the wizard\'s prices step', () => {
   }
 
   it('registers at the order WIZARD_STEP_ORDER gives prices', () => {
-    // studio · belts · groups · prices · staff · students. A step registered at the wrong
+    // studio · groups · belts · prices · staff · students. A step registered at the wrong
     // order lands the owner on the wrong panel after they finish the previous one.
     expect(PRICES_WIZARD_ORDER).toBe(4)
   })
+
+  /** Open the folded-away name and link fields. Most clubs never touch either. */
+  async function openExtras() {
+    await userEvent.click(screen.getByText(t('he', 'billing.plan.moreOptions')))
+  }
 
   it('creates a plan with the link the manager pasted beside the amount', async () => {
     const createPricePlan = vi.fn().mockResolvedValue({ id: 'plan-9' })
     const setStandingOrderLink = vi.fn().mockResolvedValue({})
     renderStep({ client: stub({ createPricePlan, setStandingOrderLink }) })
-    await userEvent.type(screen.getByTestId('wizard-plan-name'), 'פעמיים בשבוע')
+    await userEvent.click(screen.getByTestId('wizard-plan-freq-2'))
     await userEvent.type(screen.getByTestId('wizard-plan-amount'), '300')
+    await openExtras()
+    await userEvent.type(screen.getByTestId('wizard-plan-name'), 'פעמיים בשבוע')
     await userEvent.type(
       screen.getByTestId('wizard-plan-link'),
       'https://app.upay.co.il/recurring/300',
@@ -643,11 +650,82 @@ describe('the wizard\'s prices step', () => {
     const createPricePlan = vi.fn().mockResolvedValue({ id: 'plan-9' })
     const setStandingOrderLink = vi.fn().mockResolvedValue({})
     renderStep({ client: stub({ createPricePlan, setStandingOrderLink }) })
-    await userEvent.type(screen.getByTestId('wizard-plan-name'), 'פעמיים בשבוע')
+    await userEvent.click(screen.getByTestId('wizard-plan-freq-2'))
     await userEvent.type(screen.getByTestId('wizard-plan-amount'), '300')
     await userEvent.click(screen.getByTestId('wizard-plan-save'))
     await waitFor(() => expect(createPricePlan).toHaveBeenCalled())
     expect(setStandingOrderLink).not.toHaveBeenCalled()
+  })
+
+  // ── the 2026-08-29 rebuild ────────────────────────────────────────────────────────
+  it('asks how often as a choice, not as a bare number box', async () => {
+    // `חל על` ("applies to") was a `TextField` bound to sessionsPerWeek: no unit, no
+    // example, nothing saying what a good answer was. The manager who reported the step
+    // as not understandable described this ladder unprompted.
+    renderStep()
+    const options = within(screen.getByTestId('wizard-plan-frequency')).getAllByRole('button')
+    expect(options).toHaveLength(6)
+    expect(screen.getByTestId('wizard-plan-freq-3')).toHaveTextContent(
+      t('he', 'billing.plan.perWeek').replace('{{count}}', '3'),
+    )
+    expect(screen.getByTestId('wizard-plan-freq-open')).toHaveTextContent(
+      t('he', 'billing.plan.unlimited'),
+    )
+  })
+
+  it('sends null for an open membership rather than a made-up count', async () => {
+    // `price_plan.sessions_per_week` is nullable and NULL means open membership — the
+    // plan a club sells most. The API declared a non-null int on both sides until this
+    // was reported ("550 fully"), so the plan could not be expressed at all.
+    const createPricePlan = vi.fn().mockResolvedValue({ id: 'plan-9' })
+    renderStep({ client: stub({ createPricePlan }) })
+    await userEvent.click(screen.getByTestId('wizard-plan-freq-open'))
+    await userEvent.type(screen.getByTestId('wizard-plan-amount'), '550')
+    await userEvent.click(screen.getByTestId('wizard-plan-save'))
+    await waitFor(() => expect(createPricePlan).toHaveBeenCalled())
+    expect(createPricePlan).toHaveBeenCalledWith(
+      expect.objectContaining({ sessionsPerWeek: null, monthlyAmountAgorot: 55_000 }),
+    )
+  })
+
+  it('names the plan from the frequency when the manager gives no name', async () => {
+    // The name was required, so a club with no house name for "3 times a week" had to
+    // invent one before it could price anything.
+    const createPricePlan = vi.fn().mockResolvedValue({ id: 'plan-9' })
+    renderStep({ client: stub({ createPricePlan }) })
+    await userEvent.click(screen.getByTestId('wizard-plan-freq-3'))
+    await userEvent.type(screen.getByTestId('wizard-plan-amount'), '400')
+    await userEvent.click(screen.getByTestId('wizard-plan-save'))
+    await waitFor(() =>
+      expect(createPricePlan).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: t('he', 'billing.plan.perWeek').replace('{{count}}', '3'),
+          sessionsPerWeek: 3,
+        }),
+      ),
+    )
+  })
+
+  it('shows the plan as one sentence before it is created', async () => {
+    // "400 – 3 times a week" is how the club says it, and this is the only place the two
+    // answers meet before the plan exists.
+    renderStep()
+    expect(screen.queryByTestId('wizard-plan-preview')).toBeNull()
+    await userEvent.click(screen.getByTestId('wizard-plan-freq-3'))
+    await userEvent.type(screen.getByTestId('wizard-plan-amount'), '400')
+    const preview = await screen.findByTestId('wizard-plan-preview')
+    expect(preview).toHaveTextContent('400')
+    expect(preview).toHaveTextContent(
+      t('he', 'billing.plan.perWeek').replace('{{count}}', '3'),
+    )
+  })
+
+  it('will not create a plan before the frequency is answered', async () => {
+    const createPricePlan = vi.fn().mockResolvedValue({ id: 'plan-9' })
+    renderStep({ client: stub({ createPricePlan }) })
+    await userEvent.type(screen.getByTestId('wizard-plan-amount'), '400')
+    await userEvent.click(screen.getByTestId('wizard-plan-save'))
+    expect(createPricePlan).not.toHaveBeenCalled()
   })
 
   it('reports itself finished rather than letting the container guess', async () => {

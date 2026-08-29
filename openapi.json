@@ -7335,15 +7335,21 @@
             "title": "Registration Fee Agorot"
           },
           "sessions_per_week": {
-            "exclusiveMinimum": 0.0,
-            "maximum": 14.0,
-            "title": "Sessions Per Week",
-            "type": "integer"
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "maximum": 14.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sessions Per Week"
           }
         },
         "required": [
           "name",
-          "sessions_per_week",
           "monthly_amount_agorot",
           "active_from"
         ],
@@ -7388,8 +7394,15 @@
             "type": "integer"
           },
           "sessions_per_week": {
-            "title": "Sessions Per Week",
-            "type": "integer"
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sessions Per Week"
           },
           "standing_order_link_url": {
             "anyOf": [
@@ -9806,6 +9819,15 @@
               }
             ],
             "title": "First Name"
+          },
+          "group_ids": {
+            "description": "Groups this coach starts on. `invite_staff` creates the Person NOW and acceptance only binds a login to it (§5.3), so the assignments are real from the moment the invitation is written — nothing waits for the coach to sign in. Empty means no group yet, which §3.3 allows.",
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Group Ids",
+            "type": "array"
           },
           "last_name": {
             "anyOf": [
@@ -15078,7 +15100,7 @@
     },
     "/api/v1/enrollments": {
       "get": {
-        "description": "Always scoped to one student. C11 makes several live rows normal, so this is a\nsmall bounded list rather than a page -- G16's rule is about lists that grow.",
+        "description": "Always scoped to one student. C11 makes several live rows normal, so this is a\nsmall bounded list rather than a page -- G16's rule is about lists that grow.\n\nStaff, or a guardian of this student: the parent card's קבוצות section is this read.",
         "operationId": "list_enrollments_api_v1_enrollments_get",
         "parameters": [
           {

@@ -11,15 +11,26 @@
 // authored once, and this step has exactly one later owner — so a second seam would buy
 // nothing that "one lane owns this file" does not already give.
 // ─────────────────────────────────────────────────────────────────────────────
-import { useEffect, useState } from 'react'
-import type { CSSProperties } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { t } from '@studio/i18n'
+import { ActionBar } from '../primitives/ActionBar'
 import { Button } from '../primitives/Button'
 import { RangeText } from '../primitives/RangeText'
+import { SectionHeader } from '../primitives/SectionHeader'
 import { TextField } from '../primitives/TextField'
+import { useModalDialog } from '../useModalDialog'
 import type { WizardStepProps } from './types'
 
 export type NamedRow = { id: string; name: string }
+
+/**
+ * A group and the class it belongs to.
+ *
+ * The class was never carried before, and the step paid for it: every new group went to
+ * `classes[0]` — the first class ever created — with no picker anywhere on screen. A club
+ * with ג'ודו and קרוספיט could not put a group under קרוספיט at all.
+ */
+export type GroupRow = NamedRow & { class_id: string }
 
 /**
  * One weekly training slot: a day, an hour range, and optionally a hall.
@@ -38,10 +49,10 @@ export type Slot = {
 
 export type StructureClient = {
   listClasses: () => Promise<NamedRow[]>
-  listGroups: () => Promise<NamedRow[]>
+  listGroups: () => Promise<GroupRow[]>
   listLocations: () => Promise<NamedRow[]>
   createClass: (name: string) => Promise<NamedRow>
-  createGroup: (classId: string, name: string) => Promise<NamedRow>
+  createGroup: (classId: string, name: string) => Promise<GroupRow>
   createLocation: (name: string) => Promise<NamedRow>
   /** The rules a group already has. A manager returning to this step sees their own work. */
   readSchedule: (groupId: string) => Promise<Slot[]>
@@ -71,15 +82,6 @@ export type StructureClient = {
   putSchedule: (groupId: string, slots: Slot[], effectiveFrom: string) => Promise<void>
 }
 
-const listStyle: CSSProperties = { listStyle: 'none', margin: 0, padding: 0 }
-
-const rowStyle: CSSProperties = {
-  display: 'flex',
-  gap: 'var(--space-2)',
-  alignItems: 'end',
-  flexWrap: 'wrap',
-}
-
 
 
 /**
@@ -107,21 +109,205 @@ export function isComplete(slot: Slot): boolean {
   return Boolean(slot.start_time && slot.end_time && slot.end_time > slot.start_time)
 }
 
+/** Sunday 17:00–18:00 — the commonest shape, so a new row is edited rather than filled. */
+const DEFAULT_SLOT: Slot = {
+  weekday: 0,
+  start_time: '17:00',
+  end_time: '18:00',
+  location_id: null,
+}
+
 /** Local calendar day. `toISOString` answers in UTC, which after 21:00 here is tomorrow. */
 function todayKey(): string {
   const now = new Date()
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
 }
 
+/**
+ * The dialog one group is built in: its name, and the weekly hours it trains.
+ *
+ * A dialog rather than another row on the page, because the step's whole problem was that
+ * everything was on the page at once — three stacked forms and one flat list of every
+ * group in the club, with each group's four-control time rows expanded inline. Adding a
+ * group meant scrolling past every group already added.
+ *
+ * It opens on `+`, it holds one group, and it closes. Nothing is written until פורסם:
+ * the slots live here, so an abandoned dialog leaves nothing behind.
+ */
+function GroupDialog({
+  locale,
+  className,
+  initialName,
+  initialSlots,
+  locations,
+  onCancel,
+  onSave,
+}: {
+  locale: WizardStepProps['locale']
+  /** Named in the heading so the manager can see which class they are adding to. */
+  className: string
+  initialName: string
+  initialSlots: Slot[]
+  locations: NamedRow[]
+  onCancel: () => void
+  onSave: (name: string, slots: Slot[]) => void
+}) {
+  const titleId = useId()
+  const [name, setName] = useState(initialName)
+  const [rows, setRows] = useState<Slot[]>(
+    initialSlots.length > 0 ? initialSlots : [DEFAULT_SLOT],
+  )
+  const dialogRef = useModalDialog(true, onCancel)
+
+  const edit = (index: number, patch: Partial<Slot>) =>
+    setRows((current) => current.map((row, i) => (i === index ? { ...row, ...patch } : row)))
+
+  return (
+    <div className="setup-dialog__scrim">
+      <div
+        aria-labelledby={titleId}
+        aria-modal="true"
+        className="setup-dialog"
+        data-testid="group-dialog"
+        ref={dialogRef}
+        role="dialog"
+      >
+        <h4 className="setup-dialog__title" id={titleId}>
+          {t(locale, 'common.setup.groups.dialogTitle').replace('{{class}}', className)}
+        </h4>
+
+        <TextField
+          data-testid="group-dialog-name"
+          label={t(locale, 'common.setup.groups.groupName')}
+          onChange={(event) => setName(event.target.value)}
+          placeholder={t(locale, 'common.setup.groups.groupNamePlaceholder')}
+          value={name}
+        />
+
+        <p className="setup-dialog__legend">{t(locale, 'common.setup.groups.whenTitle')}</p>
+        <p className="setup-step__meta">{t(locale, 'common.setup.groups.whenHint')}</p>
+
+        <ul className="setup-slots">
+          {rows.map((slot, index) => (
+            <li className="setup-slot" key={index}>
+              <label className="setup-slot__field">
+                <span className="setup-slot__label">{t(locale, 'common.setup.groups.day')}</span>
+                <select
+                  data-testid={`dialog-day-${index}`}
+                  onChange={(event) => edit(index, { weekday: Number(event.target.value) })}
+                  value={slot.weekday}
+                >
+                  {WEEKDAYS.map((day) => (
+                    <option key={day} value={day}>
+                      {t(locale, `schedule.weekday.${day}`)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="setup-slot__field">
+                <span className="setup-slot__label">{t(locale, 'common.setup.groups.from')}</span>
+                <input
+                  data-testid={`dialog-from-${index}`}
+                  onChange={(event) => edit(index, { start_time: event.target.value })}
+                  type="time"
+                  value={slot.start_time}
+                />
+              </label>
+              <label className="setup-slot__field">
+                <span className="setup-slot__label">{t(locale, 'common.setup.groups.to')}</span>
+                <input
+                  data-testid={`dialog-to-${index}`}
+                  onChange={(event) => edit(index, { end_time: event.target.value })}
+                  type="time"
+                  value={slot.end_time}
+                />
+              </label>
+              {locations.length > 0 ? (
+                <label className="setup-slot__field">
+                  <span className="setup-slot__label">
+                    {t(locale, 'common.setup.groups.hall')}
+                  </span>
+                  <select
+                    data-testid={`dialog-hall-${index}`}
+                    onChange={(event) => edit(index, { location_id: event.target.value || null })}
+                    value={slot.location_id ?? ''}
+                  >
+                    <option value="">{t(locale, 'common.setup.groups.noHall')}</option>
+                    {locations.map((hall) => (
+                      <option key={hall.id} value={hall.id}>
+                        {hall.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
+              {/* The last row has no remove: a group with no hours is not a group, and a
+                  control that removes the only row leaves the dialog with nothing to save. */}
+              {rows.length > 1 ? (
+                <Button
+                  data-testid={`dialog-remove-${index}`}
+                  onClick={() => setRows((current) => current.filter((_, i) => i !== index))}
+                  variant="ghost"
+                >
+                  {t(locale, 'common.setup.groups.removeTime')}
+                </Button>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+
+        <Button
+          data-testid="dialog-add-time"
+          onClick={() => setRows((current) => [...current, DEFAULT_SLOT])}
+          variant="secondary"
+        >
+          {t(locale, 'common.setup.groups.addTime')}
+        </Button>
+
+        <ActionBar
+          end={
+            <Button
+              data-testid="group-dialog-save"
+              disabled={name.trim() === '' || !rows.some(isComplete)}
+              onClick={() => onSave(name.trim(), rows.filter(isComplete))}
+            >
+              {t(locale, 'common.setup.groups.saveGroup')}
+            </Button>
+          }
+          start={
+            <Button data-testid="group-dialog-cancel" onClick={onCancel} variant="ghost">
+              {t(locale, 'common.cancel')}
+            </Button>
+          }
+        />
+      </div>
+    </div>
+  )
+}
+
+/** "ראשון 17:00–18:00" — one slot, read as a sentence rather than four controls. */
+function SlotLine({ locale, slot }: { locale: WizardStepProps['locale']; slot: Slot }) {
+  return (
+    <span className="setup-slot-line">
+      <span>{t(locale, `schedule.weekday.${slot.weekday}`)}</span>
+      <RangeText from={slot.start_time} to={slot.end_time} />
+    </span>
+  )
+}
+
 export function makeGroupsStep(client: StructureClient) {
   return function GroupsStep({ locale, status, onDone, onSkip }: WizardStepProps) {
     const [classes, setClasses] = useState<NamedRow[]>([])
-    const [groups, setGroups] = useState<NamedRow[]>([])
+    const [groups, setGroups] = useState<GroupRow[]>([])
     const [locations, setLocations] = useState<NamedRow[]>([])
     const [className, setClassName] = useState('')
-    const [groupName, setGroupName] = useState('')
     const [locationName, setLocationName] = useState('')
     const [busy, setBusy] = useState(false)
+
+    /** Which class the manager is filling in. The whole step is scoped to it. */
+    const [activeClass, setActiveClass] = useState<string | null>(null)
+    /** `'new'` while adding, a group id while editing, null while closed. */
+    const [editing, setEditing] = useState<string | null>(null)
 
     useEffect(() => {
       let alive = true
@@ -131,6 +317,9 @@ export function makeGroupsStep(client: StructureClient) {
           setClasses(c)
           setGroups(g)
           setLocations(l)
+          // Land on a class rather than on a chooser: a club with one class should never
+          // have to pick it, and a club with three opens on the first.
+          setActiveClass((current) => current ?? c[0]?.id ?? null)
         },
       )
       return () => {
@@ -190,246 +379,192 @@ export function makeGroupsStep(client: StructureClient) {
       void work().finally(() => setBusy(false))
     }
 
+    const inClass = groups.filter((group) => group.class_id === activeClass)
+    const activeName = classes.find((row) => row.id === activeClass)?.name ?? ''
+    const editingGroup = editing && editing !== 'new' ? groups.find((g) => g.id === editing) : null
+
+    /** Save from the dialog: create the group if it is new, then write its hours. */
+    const saveFromDialog = (name: string, rows: Slot[]) => {
+      const target = editing
+      setEditing(null)
+      if (target === 'new') {
+        if (activeClass === null) return
+        run(async () => {
+          const row = await client.createGroup(activeClass, name)
+          setGroups((current) => [...current, row])
+          write(row.id, rows)
+        })
+        return
+      }
+      if (target) write(target, rows)
+    }
+
     return (
-      <section aria-labelledby="setup-groups-title" data-testid="setup-step-groups">
-        <h3 id="setup-groups-title">{t(locale, 'common.setup.step.groups')}</h3>
-        {/* The house pattern: a heading, then one line that removes a worry. This one
-            answers the two questions the times raise — do I have to press save, and can I
-            change them afterwards. `tools/__tests__/dead-promise-keys` is what caught the
-            string being added and never rendered. */}
-        <p className="setup-group-row__times-label">
-          {t(locale, 'common.setup.groups.timesLater')}
-        </p>
+      <section
+        aria-labelledby="setup-groups-title"
+        className="setup-step"
+        data-testid="setup-step-groups"
+      >
+        <SectionHeader level={3} title={t(locale, 'common.setup.step.groups')} />
+        {/* The step in one line, because its shape is not guessable: a class is the kind
+            of training, a group is the people who show up, and the hours hang off the
+            group. Managers read "class" as "lesson" until told otherwise. */}
+        <p className="setup-step__meta">{t(locale, 'common.setup.groups.explain')}</p>
 
-        <div style={rowStyle}>
-          <TextField
-            label={t(locale, 'common.setup.groups.className')}
-            value={className}
-            onChange={(event) => setClassName(event.target.value)}
-          />
-          <Button
-            disabled={busy || className.trim() === ''}
-            onClick={() =>
-              run(async () => {
-                const row = await client.createClass(className.trim())
-                setClasses((current) => [...current, row])
-                setClassName('')
-              })
-            }
-          >
-            {t(locale, 'common.setup.groups.addClass')}
-          </Button>
-        </div>
-        <ul data-testid="setup-classes" style={listStyle}>
-          {classes.map((row) => (
-            <li key={row.id}>{row.name}</li>
-          ))}
-        </ul>
-
-        <div style={rowStyle}>
-          <TextField
-            label={t(locale, 'common.setup.groups.groupName')}
-            value={groupName}
-            onChange={(event) => setGroupName(event.target.value)}
-            // A group belongs to a class, so there is nothing to name until one exists.
-            // Disabled and explained beats a 422 from the server.
-            disabled={classes.length === 0}
-            hint={classes.length === 0 ? t(locale, 'common.setup.groups.needClass') : undefined}
-          />
-          <Button
-            disabled={busy || classes.length === 0 || groupName.trim() === ''}
-            onClick={() =>
-              run(async () => {
-                const parent = classes[0]
-                if (!parent) return
-                const row = await client.createGroup(parent.id, groupName.trim())
-                setGroups((current) => [...current, row])
-                setGroupName('')
-              })
-            }
-          >
-            {t(locale, 'common.setup.groups.addGroup')}
-          </Button>
-        </div>
-        {/* Each group carries its own weekly times. A group trains the same days at the
-            same hours EVERY week, so a slot is a weekday and an hour range and never a
-            date — "Tuesday 10:00–14:00" is one row, and a group that also trains on Friday
-            has two.
-
-            This step used to create the structure and stop, and a test asserted that it
-            promised no schedule. That was right while the times lived only on the weekly
-            board; the owner's decision on 2026-08-29 is that a club is not set up until
-            its groups have hours, so the promise is now kept rather than withdrawn. */}
-        <ul data-testid="setup-groups" style={listStyle}>
-          {groups.map((row) => {
-            const rows = slots[row.id] ?? []
-            return (
-              <li className="setup-group-row" data-testid={`setup-group-${row.id}`} key={row.id}>
-                <span className="setup-group-row__name">{row.name}</span>
-                <span className="setup-group-row__times-label">
-                  {t(locale, 'common.setup.groups.times')}
-                </span>
-                {rows.map((slot, index) => (
-                  <span className="setup-slot" key={index}>
-                    <label>
-                      <span className="studio-visually-hidden">
-                        {t(locale, 'common.setup.groups.day')}
-                      </span>
-                      <select
-                        data-testid={`slot-day-${row.id}-${index}`}
-                        onChange={(event) =>
-                          write(
-                            row.id,
-                            rows.map((s, i) =>
-                              i === index ? { ...s, weekday: Number(event.target.value) } : s,
-                            ),
-                          )
-                        }
-                        value={slot.weekday}
-                      >
-                        {WEEKDAYS.map((day) => (
-                          <option key={day} value={day}>
-                            {t(locale, `schedule.weekday.${day}`)}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label>
-                      <span className="studio-visually-hidden">
-                        {t(locale, 'common.setup.groups.from')}
-                      </span>
-                      <input
-                        data-testid={`slot-from-${row.id}-${index}`}
-                        onChange={(event) =>
-                          write(
-                            row.id,
-                            rows.map((s, i) =>
-                              i === index ? { ...s, start_time: event.target.value } : s,
-                            ),
-                          )
-                        }
-                        type="time"
-                        value={slot.start_time}
-                      />
-                    </label>
-                    <span aria-hidden="true">–</span>
-                    <label>
-                      <span className="studio-visually-hidden">
-                        {t(locale, 'common.setup.groups.to')}
-                      </span>
-                      <input
-                        data-testid={`slot-to-${row.id}-${index}`}
-                        onChange={(event) =>
-                          write(
-                            row.id,
-                            rows.map((s, i) =>
-                              i === index ? { ...s, end_time: event.target.value } : s,
-                            ),
-                          )
-                        }
-                        type="time"
-                        value={slot.end_time}
-                      />
-                    </label>
-                    {locations.length > 0 ? (
-                      <label>
-                        <span className="studio-visually-hidden">
-                          {t(locale, 'common.setup.groups.hall')}
-                        </span>
-                        <select
-                          data-testid={`slot-hall-${row.id}-${index}`}
-                          onChange={(event) =>
-                            write(
-                              row.id,
-                              rows.map((s, i) =>
-                                i === index
-                                  ? { ...s, location_id: event.target.value || null }
-                                  : s,
-                              ),
-                            )
-                          }
-                          value={slot.location_id ?? ''}
-                        >
-                          <option value="">{t(locale, 'common.setup.groups.noHall')}</option>
-                          {locations.map((hall) => (
-                            <option key={hall.id} value={hall.id}>
-                              {hall.name}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    ) : null}
-                    <Button
-                      data-testid={`slot-remove-${row.id}-${index}`}
-                      onClick={() => write(row.id, rows.filter((_, i) => i !== index))}
-                      variant="ghost"
-                    >
-                      {t(locale, 'common.setup.groups.removeTime')}
-                    </Button>
-                  </span>
-                ))}
-                <Button
-                  data-testid={`slot-add-${row.id}`}
-                  onClick={() =>
-                    write(row.id, [
-                      ...rows,
-                      // Sunday 17:00–18:00: the commonest shape, so the manager edits
-                      // rather than fills in. An empty row would be four blanks.
-                      { weekday: 0, start_time: '17:00', end_time: '18:00', location_id: null },
-                    ])
-                  }
-                  variant="secondary"
-                >
-                  {t(locale, 'common.setup.groups.addTime')}
-                </Button>
-                {failedFor?.groupId === row.id ? (
-                  <span
-                    className="setup-group-row__failed"
-                    data-status={failedFor.needsYear ? 'pending' : 'danger'}
-                    data-testid={`slot-failed-${row.id}`}
-                    role="alert"
+        {/* ── 1. the class ──────────────────────────────────────────────────────────── */}
+        <div className="setup-classes">
+          <p className="setup-dialog__legend">{t(locale, 'common.setup.groups.classTitle')}</p>
+          {classes.length > 0 ? (
+            <ul className="setup-classes__tabs" data-testid="setup-classes">
+              {classes.map((row) => (
+                <li key={row.id}>
+                  <Button
+                    aria-pressed={row.id === activeClass}
+                    data-selected={row.id === activeClass}
+                    data-testid={`setup-class-${row.id}`}
+                    onClick={() => setActiveClass(row.id)}
+                    variant={row.id === activeClass ? 'secondary' : 'ghost'}
                   >
-                    {t(
-                      locale,
-                      failedFor.needsYear
-                        ? 'common.setup.groups.needYear'
-                        : 'common.setup.groups.saveFailed',
-                    )}
-                  </span>
-                ) : null}
-              </li>
-            )
-          })}
-        </ul>
-
-        <div style={rowStyle}>
-          <TextField
-            label={t(locale, 'common.setup.groups.locationName')}
-            value={locationName}
-            onChange={(event) => setLocationName(event.target.value)}
-          />
-          <Button
-            disabled={busy || locationName.trim() === ''}
-            onClick={() =>
-              run(async () => {
-                const row = await client.createLocation(locationName.trim())
-                setLocations((current) => [...current, row])
-                setLocationName('')
-              })
-            }
-          >
-            {t(locale, 'common.setup.groups.addLocation')}
-          </Button>
+                    {row.name}
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          <div className="setup-inline-form">
+            <TextField
+              label={t(locale, 'common.setup.groups.className')}
+              onChange={(event) => setClassName(event.target.value)}
+              placeholder={t(locale, 'common.setup.groups.classNamePlaceholder')}
+              value={className}
+            />
+            <Button
+              disabled={busy || className.trim() === ''}
+              onClick={() =>
+                run(async () => {
+                  const row = await client.createClass(className.trim())
+                  setClasses((current) => [...current, row])
+                  // A class created here is the one being filled in — anything else makes
+                  // the manager press it themselves to continue.
+                  setActiveClass(row.id)
+                  setClassName('')
+                })
+              }
+              variant="secondary"
+            >
+              {t(locale, 'common.setup.groups.addClass')}
+            </Button>
+          </div>
         </div>
-        <ul data-testid="setup-locations" style={listStyle}>
-          {locations.map((row) => (
-            <li key={row.id}>{row.name}</li>
-          ))}
-        </ul>
 
-        {/* The resulting week. A manager filling in five groups needs to see that Tuesday
-            is busy and Wednesday is empty, and that two groups do not want the same hall
-            at the same hour — none of which is visible from a list of groups. */}
+        {/* ── 2. the groups in it ───────────────────────────────────────────────────── */}
+        {activeClass === null ? (
+          <p className="setup-panel__empty" data-testid="setup-groups-need-class">
+            {t(locale, 'common.setup.groups.needClass')}
+          </p>
+        ) : (
+          <div className="setup-groups">
+            <div className="setup-groups__head">
+              <p className="setup-dialog__legend">
+                {t(locale, 'common.setup.groups.inClass').replace('{{class}}', activeName)}
+              </p>
+              <Button data-testid="setup-add-group" onClick={() => setEditing('new')}>
+                {t(locale, 'common.setup.groups.addGroup')}
+              </Button>
+            </div>
+
+            {inClass.length === 0 ? (
+              <p className="setup-panel__empty">{t(locale, 'common.setup.groups.noGroupsYet')}</p>
+            ) : (
+              <ul className="setup-groups__list" data-testid="setup-groups">
+                {inClass.map((row) => {
+                  const rows = (slots[row.id] ?? []).filter(isComplete)
+                  return (
+                    <li
+                      className="setup-group-card"
+                      data-testid={`setup-group-${row.id}`}
+                      key={row.id}
+                    >
+                      <span className="setup-group-card__name">{row.name}</span>
+                      <span className="setup-group-card__when">
+                        {rows.length === 0 ? (
+                          <span className="setup-group-card__none">
+                            {t(locale, 'common.setup.groups.noTimes')}
+                          </span>
+                        ) : (
+                          rows
+                            .slice()
+                            .sort(
+                              (a, b) =>
+                                a.weekday - b.weekday || a.start_time.localeCompare(b.start_time),
+                            )
+                            .map((slot, index) => (
+                              <SlotLine key={index} locale={locale} slot={slot} />
+                            ))
+                        )}
+                      </span>
+                      <Button
+                        data-testid={`setup-edit-group-${row.id}`}
+                        onClick={() => setEditing(row.id)}
+                        variant="ghost"
+                      >
+                        {t(locale, 'common.setup.groups.editGroup')}
+                      </Button>
+                      {failedFor?.groupId === row.id ? (
+                        <span
+                          className="setup-group-row__failed"
+                          data-status={failedFor.needsYear ? 'pending' : 'danger'}
+                          data-testid={`slot-failed-${row.id}`}
+                          role="alert"
+                        >
+                          {t(
+                            locale,
+                            failedFor.needsYear
+                              ? 'common.setup.groups.needYear'
+                              : 'common.setup.groups.saveFailed',
+                          )}
+                        </span>
+                      ) : null}
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+          </div>
+        )}
+
+        {/* ── 3. halls, last, because most clubs have one and never name it ─────────── */}
+        <details className="setup-halls">
+          <summary>{t(locale, 'common.setup.groups.hallsTitle')}</summary>
+          <p className="setup-step__meta">{t(locale, 'common.setup.groups.hallsHint')}</p>
+          <div className="setup-inline-form">
+            <TextField
+              label={t(locale, 'common.setup.groups.locationName')}
+              onChange={(event) => setLocationName(event.target.value)}
+              value={locationName}
+            />
+            <Button
+              disabled={busy || locationName.trim() === ''}
+              onClick={() =>
+                run(async () => {
+                  const row = await client.createLocation(locationName.trim())
+                  setLocations((current) => [...current, row])
+                  setLocationName('')
+                })
+              }
+              variant="secondary"
+            >
+              {t(locale, 'common.setup.groups.addLocation')}
+            </Button>
+          </div>
+          <ul className="setup-halls__list" data-testid="setup-locations">
+            {locations.map((row) => (
+              <li key={row.id}>{row.name}</li>
+            ))}
+          </ul>
+        </details>
+
+        {/* ── the resulting week, across every class ────────────────────────────────── */}
         <aside className="setup-week" data-testid="setup-week">
           <p className="setup-week__title">{t(locale, 'common.setup.groups.week')}</p>
           {Object.values(slots).flat().filter(isComplete).length === 0 ? (
@@ -446,10 +581,8 @@ export function makeGroupsStep(client: StructureClient) {
                   )
                   .sort((a, b) => a.slot.start_time.localeCompare(b.slot.start_time))
                 return (
-                  <li key={day}>
-                    <span className="setup-week__day">
-                      {t(locale, `schedule.weekday.${day}`)}
-                    </span>
+                  <li data-empty={onDay.length === 0} key={day}>
+                    <span className="setup-week__day">{t(locale, `schedule.weekday.${day}`)}</span>
                     {onDay.length === 0 ? (
                       <span className="setup-week__none">
                         {t(locale, 'common.setup.groups.dayEmpty')}
@@ -459,7 +592,7 @@ export function makeGroupsStep(client: StructureClient) {
                         {onDay.map(({ group, slot }, index) => (
                           <li key={`${group.id}-${index}`}>
                             <RangeText from={slot.start_time} to={slot.end_time} />
-                            <span>{group.name}</span>
+                            <span className="setup-week__group">{group.name}</span>
                           </li>
                         ))}
                       </ul>
@@ -471,13 +604,33 @@ export function makeGroupsStep(client: StructureClient) {
           )}
         </aside>
 
-        <Button disabled={busy || groups.length === 0} onClick={onDone}>
-          {t(locale, 'common.setup.continue')}
-        </Button>
-        <Button variant="ghost" onClick={onSkip}>
-          {t(locale, 'common.setup.skip')}
-        </Button>
-        <p data-testid="setup-groups-status">{t(locale, `common.setup.status.${status}`)}</p>
+        {editing ? (
+          <GroupDialog
+            className={activeName}
+            initialName={editingGroup?.name ?? ''}
+            initialSlots={editingGroup ? (slots[editingGroup.id] ?? []) : []}
+            locale={locale}
+            locations={locations}
+            onCancel={() => setEditing(null)}
+            onSave={saveFromDialog}
+          />
+        ) : null}
+
+        <ActionBar
+          end={
+            <Button disabled={busy || groups.length === 0} onClick={onDone}>
+              {t(locale, 'common.setup.continue')}
+            </Button>
+          }
+          start={
+            <Button onClick={onSkip} variant="ghost">
+              {t(locale, 'common.setup.skip')}
+            </Button>
+          }
+        />
+        <p className="setup-step__meta" data-testid="setup-groups-status">
+          {t(locale, `common.setup.status.${status}`)}
+        </p>
       </section>
     )
   }
