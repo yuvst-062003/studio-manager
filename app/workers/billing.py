@@ -43,6 +43,7 @@ from sqlalchemy.orm import Session
 
 from app.core.clock import now
 from app.core.db import get_engine
+from app.core.jobs import record_run
 from app.core.logging import configure_logging
 from app.core.tenancy import TenantSession, use_studio
 from app.models.billing import Charge
@@ -298,8 +299,15 @@ def run_daily(
 
 
 def main() -> int:
-    """The daily pass over every studio: `run_daily`, in its own transaction, for each."""
+    """The entry point, wrapped in its heartbeat. See app/core/jobs.py."""
     configure_logging()
+    with Session(get_engine()) as heartbeat, record_run(heartbeat, "billing-run") as run:
+        run.detail = _run_job()
+    return 0
+
+
+def _run_job() -> dict[str, int]:
+    """The daily pass over every studio: `run_daily`, in its own transaction, for each."""
     at = now()
     tally = Tally()
 
@@ -315,21 +323,21 @@ def main() -> int:
             run_daily(scoped, at=at, studio_id=studio_id, tally=tally)
             scoped.commit()
 
-    logger.info(
-        "billing jobs complete",
-        # Counts only. A log line naming a family, an amount or a card would be a copy in
-        # an aggregator that no later redaction can reach (§11.7).
-        extra={
-            "studios": tally.studios,
-            "charges_created": tally.charges_created,
-            "reminders": tally.reminders,
-            "manager_tasks": tally.manager_tasks,
-            "expired_orders": tally.expired,
-            "undeliverable": tally.undeliverable,
-            "prepay_notices": tally.prepay_notices,
-            "prepay_deferred": tally.prepay_deferred,
-        },
-    )
+    # Counts only. A log line naming a family, an amount or a card would be a copy in
+    # an aggregator that no later redaction can reach (§11.7) -- and the same dict is the
+    # heartbeat's detail, which an operator reads on screen and receives by email when a
+    # check goes red, so the rule binds harder here than it does on a log.
+    counts = {
+        "studios": tally.studios,
+        "charges_created": tally.charges_created,
+        "reminders": tally.reminders,
+        "manager_tasks": tally.manager_tasks,
+        "expired_orders": tally.expired,
+        "undeliverable": tally.undeliverable,
+        "prepay_notices": tally.prepay_notices,
+        "prepay_deferred": tally.prepay_deferred,
+    }
+    logger.info("billing jobs complete", extra=counts)
     if tally.prepay_deferred:
         # Quiet hours refused them. Not a failure -- the run is complete and the credit is
         # spent -- but the households on rung zero were not told, and the fix is the cron
@@ -346,7 +354,7 @@ def main() -> int:
             "some debt reminders could not be queued",
             extra={"undeliverable": tally.undeliverable},
         )
-    return 0
+    return counts
 
 
 def _is_run_day(session: Session, studio_id: uuid.UUID, today: date) -> bool:

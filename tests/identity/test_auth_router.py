@@ -188,6 +188,12 @@ def test_me_carries_no_field_that_leaks_the_other_app(client, fake_provider):
         # 2026-08-27). Nothing cross-app about it: it is null until a membership
         # resolves, and it never counts or names anything in the other app.
         "display_name",
+        # §18.1 -- whether to offer the platform console. Nothing cross-app about it
+        # either, and for a stronger reason than `display_name`: it is a fact about the
+        # global `auth_identity`, which §3.3 puts outside every studio, so it cannot leak
+        # a membership in the other app because it does not consult one. Reported, never
+        # accepted -- `PlatformAdmin` has no creation route on purpose.
+        "is_platform_admin",
     }
 
 

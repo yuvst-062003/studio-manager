@@ -466,6 +466,13 @@ def me(request: Request, session: SessionDep) -> MeResponse:
         studios=[_membership_out(m) for m in memberships],
         active_studio_id=active_studio_id,
         dev_tools=bool(getattr(request.state, "is_developer", False)),
+        # A query, not a claim -- see MeResponse.is_platform_admin. `resolved_id` is not in
+        # scope here; `identity_id` is the effective identity this request authenticated
+        # as, which is the one whose console access is being asked about. Deliberately NOT
+        # keyed on the acting persona: §19.4's role switcher changes which STUDIO's
+        # permissions resolve, and platform-admin sits above every studio, so a developer
+        # acting as a parent is still an operator and must not silently lose the console.
+        is_platform_admin=is_platform_admin(session, identity_id),
         acting_as_person_id=getattr(request.state, "acting_as_person_id", None),
         display_name=display_name,
     )

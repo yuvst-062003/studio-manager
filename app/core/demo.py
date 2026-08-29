@@ -19,7 +19,7 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from sqlalchemy import ColumnElement, Select, select
+from sqlalchemy import Select, SQLColumnExpression, select
 
 from app.models.studio import Studio
 
@@ -30,13 +30,22 @@ def non_demo_studio_ids() -> Select[Any]:
 
 
 def exclude_demo_studios(
-    stmt: Select[Any], studio_id_column: ColumnElement[uuid.UUID]
+    stmt: Select[Any], studio_id_column: SQLColumnExpression[uuid.UUID]
 ) -> Select[Any]:
     """Restrict a cross-studio query to studios holding real people.
 
     A subquery rather than a join: the caller has already built their own joins, and a
     helper that adds one changes their row count. `IN (SELECT ...)` composes with
     anything.
+
+    `SQLColumnExpression` and not `ColumnElement`, which is what this said from M0 until
+    §18.3's operations board became its first real caller. In SQLAlchemy 2.0's typing an
+    ORM attribute -- `BillingRun.studio_id` -- is an `InstrumentedAttribute`, whose base
+    is `SQLColumnExpression` and NOT the Core `ColumnElement`. So the original annotation
+    accepted a Core column and rejected every mapped attribute, which is the shape a
+    caller reaches for first. `ColumnElement` also derives from `SQLColumnExpression`, so
+    widening it here loses nothing and the docstring's stated use -- a `studio_id` on an
+    aggregate row -- still type-checks.
     """
     return stmt.where(studio_id_column.in_(non_demo_studio_ids()))
 

@@ -23,6 +23,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.db import get_engine
+from app.core.jobs import record_run
 from app.core.logging import configure_logging
 from app.services.demo.service import DemoStudioService
 
@@ -40,14 +41,24 @@ def main() -> int:
         )
         return 1
 
-    with Session(get_engine(), expire_on_commit=False) as session:
-        result = DemoStudioService.reset(session)
-        session.commit()
+    # The heartbeat starts AFTER the environment refusal above, deliberately. Outside
+    # staging this job is not meant to run, and a `job_run` row saying it did -- or that
+    # it failed -- would be a fact about a decision, not about a pass. `scheduled_here` in
+    # app/services/ops/checks.py is the other half of that same argument.
+    with Session(get_engine()) as heartbeat, record_run(heartbeat, "demo-reset") as run:
+        with Session(get_engine(), expire_on_commit=False) as session:
+            result = DemoStudioService.reset(session)
+            session.commit()
 
-    logger.info(
-        "nightly demo reset complete",
-        extra={"demo_version": result.version, "layers": list(result.layers_seeded)},
-    )
+        # `layers` is a list of fixture-layer NAMES, which is why it may be carried here:
+        # they are code identifiers, not people. §19.7's fixtures are the one dataset in
+        # this product where that is true.
+        counts = {"demo_version": result.version, "layers": len(result.layers_seeded)}
+        logger.info(
+            "nightly demo reset complete",
+            extra={"demo_version": result.version, "layers": list(result.layers_seeded)},
+        )
+        run.detail = counts
     return 0
 
 

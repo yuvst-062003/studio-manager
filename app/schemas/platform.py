@@ -70,3 +70,56 @@ class InvitationOut(BaseModel):
     email: str
     expires_at: datetime
     token: str
+
+
+# -- §18.3's operations board -----------------------------------------------------------
+#
+# "the rows, not the health chips (C4 -- M9 owns those, and the operations board with
+# them)" is what `get_studios` said it was leaving for later. This is later.
+#
+# **Every field below is machine-readable, and that is a rule rather than an oversight.**
+# Ids, counts, timestamps and enum-ish status strings; not one line of display copy. The
+# dashboard renders Hebrew from `@studio/i18n` like every other screen (G4), and the alert
+# email renders English from app/services/ops/alerts.py. An API that returned prose would
+# have to pick a language for a reader it cannot see, and would then be the one place in
+# the product where a user-facing string lives outside the locale files.
+
+
+class JobHealthOut(BaseModel):
+    """One scheduled job, as `infra/railway/jobs.json` declares it and `job_run` records it."""
+
+    name: str
+    schedule: str
+    environment: str
+    max_silence_minutes: int
+    last_run_at: datetime | None
+    last_success_at: datetime | None
+    last_status: str | None
+    #: No successful run inside the declared tolerance. Never true for a job this
+    #: environment does not schedule -- see `scheduled_here`.
+    overdue: bool
+    #: The most recent run ended in an exception. Separate from `overdue` on purpose: a
+    #: job failing every hour has a perfectly healthy heartbeat, and collapsing the two
+    #: would let a broken job hide behind its own punctuality.
+    failing: bool
+    scheduled_here: bool
+
+
+class SignalOut(BaseModel):
+    """An API or business signal. `status` is 'ok', 'red' or 'unknown'."""
+
+    id: str
+    status: str
+    value: int | None
+    since: datetime | None
+
+
+class OpsHealthResponse(BaseModel):
+    status: str
+    checked_at: datetime
+    env: str
+    jobs: list[JobHealthOut]
+    signals: list[SignalOut]
+    #: Whether an alert could actually be delivered. On the response because "no alerts"
+    #: and "no delivery" look identical from an empty inbox and mean opposite things.
+    email_configured: bool

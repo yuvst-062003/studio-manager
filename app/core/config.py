@@ -105,6 +105,34 @@ class Settings(BaseSettings):
 
     LOG_LEVEL: str = "INFO"
 
+    # -- operational alerting (app/services/ops) --------------------------------------
+    #
+    # Self-contained on purpose: no Sentry, no Better Stack, no SDK, no account. The
+    # heartbeat table and the platform console are the whole monitor, and this is the
+    # half that reaches a human who is not looking at a screen.
+
+    #: Where an alert email goes. Unset means email delivery is OFF, and the ops screen
+    #: says so out loud rather than implying a channel that does not exist -- an alerting
+    #: system nobody has configured is worse than none, because it is believed.
+    ALERT_EMAIL_TO: str | None = None
+    #: The envelope sender. Falls back to the recipient, which is what most SMTP hosts
+    #: accept when sending to yourself.
+    ALERT_EMAIL_FROM: str | None = None
+    #: Any SMTP host -- Gmail with an app password, Fastmail, a provider you already pay
+    #: for. stdlib `smtplib`, so this adds no Python dependency and no vendor.
+    SMTP_HOST: str | None = None
+    #: 587 is STARTTLS, which is what `app/services/ops/alerts.py` speaks. 465 (implicit
+    #: TLS) is not supported; that is a deliberate omission rather than an oversight, and
+    #: the sender raises rather than silently sending in the clear.
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: str | None = None
+    SMTP_PASSWORD: SecretStr | None = None
+
+    #: How long uPay may go without calling back before it counts as a red signal. Wide,
+    #: because a small club genuinely takes no online payment for days and an alert that
+    #: fires on a quiet week gets muted before it is ever right.
+    UPAY_CALLBACK_SILENCE_HOURS: int = 72
+
     @model_validator(mode="before")
     @classmethod
     def _blank_optional_is_unset(cls, data: Any) -> Any:

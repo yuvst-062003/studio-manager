@@ -2558,6 +2558,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/platform/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Ops Health
+         * @description §18.3's operations board -- the health chips `get_studios` deferred.
+         *
+         *     **Platform-admin, like every route in this file.** The job heartbeats are cross-studio
+         *     by nature (`sessions-complete` sweeps every club in one pass), so there is no studio
+         *     this could be scoped to and no owner it could honestly be shown to. A club owner
+         *     seeing the health of jobs for studios that are not theirs is a tenancy leak with a
+         *     friendly name.
+         *
+         *     **Not `/health`.** `app/routers/health.py` owns that: an unauthenticated liveness
+         *     probe that answers "is this process alive" and deliberately carries no tenant data.
+         *     This one answers "is this deployment WORKING", needs an operator, and reads the
+         *     database on every call -- three differences that make them different endpoints rather
+         *     than two shapes of one.
+         */
+        get: operations["get_ops_health_api_v1_platform_health_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/platform/studios": {
         parameters: {
             query?: never;
@@ -7541,6 +7573,32 @@ export interface components {
             total_agorot: number;
         };
         /**
+         * JobHealthOut
+         * @description One scheduled job, as `infra/railway/jobs.json` declares it and `job_run` records it.
+         */
+        JobHealthOut: {
+            /** Environment */
+            environment: string;
+            /** Failing */
+            failing: boolean;
+            /** Last Run At */
+            last_run_at: string | null;
+            /** Last Status */
+            last_status: string | null;
+            /** Last Success At */
+            last_success_at: string | null;
+            /** Max Silence Minutes */
+            max_silence_minutes: number;
+            /** Name */
+            name: string;
+            /** Overdue */
+            overdue: boolean;
+            /** Schedule */
+            schedule: string;
+            /** Scheduled Here */
+            scheduled_here: boolean;
+        };
+        /**
          * KpiOut
          * @description `4g`'s KPI strip — four metrics, each a bare number plus a delta line.
          *
@@ -7880,6 +7938,11 @@ export interface components {
              * Format: uuid
              */
             identity_id: string;
+            /**
+             * Is Platform Admin
+             * @default false
+             */
+            is_platform_admin: boolean;
             /** Studios */
             studios: components["schemas"]["StudioMembershipOut"][];
         };
@@ -8174,6 +8237,24 @@ export interface components {
             person_id: string;
             /** Student Ids */
             student_ids: string[];
+        };
+        /** OpsHealthResponse */
+        OpsHealthResponse: {
+            /**
+             * Checked At
+             * Format: date-time
+             */
+            checked_at: string;
+            /** Email Configured */
+            email_configured: boolean;
+            /** Env */
+            env: string;
+            /** Jobs */
+            jobs: components["schemas"]["JobHealthOut"][];
+            /** Signals */
+            signals: components["schemas"]["SignalOut"][];
+            /** Status */
+            status: string;
         };
         /**
          * ParentEventOut
@@ -9937,6 +10018,20 @@ export interface components {
             last_name: string;
             /** Preferred Group Id */
             preferred_group_id?: string | null;
+        };
+        /**
+         * SignalOut
+         * @description An API or business signal. `status` is 'ok', 'red' or 'unknown'.
+         */
+        SignalOut: {
+            /** Id */
+            id: string;
+            /** Since */
+            since: string | null;
+            /** Status */
+            status: string;
+            /** Value */
+            value: number | null;
         };
         /** StaffGroupOut */
         StaffGroupOut: {
@@ -15118,6 +15213,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_ops_health_api_v1_platform_health_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpsHealthResponse"];
                 };
             };
         };

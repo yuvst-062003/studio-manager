@@ -45,8 +45,18 @@ def test_the_env_template_documents_every_new_setting():
 
 
 def test_the_env_template_still_carries_no_credential_named_as_one():
-    text = ENV_TEMPLATE.read_text(encoding="utf-8").lower()
-    assert "password" not in text
+    """The VALUE, not the word.
+
+    This asserted the bare substring until `Settings` acquired `SMTP_PASSWORD`, which the
+    test above requires the template to document -- two repo rules meeting head-on, the
+    same shape as the `.env.example` exemption in `.claude/hooks/block-protected.sh`. The
+    detector and the full argument live in tests/config/test_database_config.py, imported
+    rather than copied so the two cannot drift into disagreeing about what a credential is.
+    """
+    from tests.config.test_database_config import _ASSIGNED_CREDENTIAL
+
+    found = _ASSIGNED_CREDENTIAL.findall(ENV_TEMPLATE.read_text(encoding="utf-8"))
+    assert not found, f"the template commits a credential value: {found}"
 
 
 # -- an empty optional setting is an UNSET one --------------------------------

@@ -443,4 +443,71 @@ export const common: Bundle = {
   'dash.home.today.hall': 'אולם',
   'dash.home.today.coach': 'מאמן',
   'dash.home.today.noCoach': 'לא שובץ מאמן',
+  // -- §18.1's platform console (#/platform) --------------------------------------
+  // Operator-facing, not club-facing: this whole block is read by one person, the
+  // platform admin, and it is offered only when /auth/me reports is_platform_admin.
+  // In `common` because CLAUDE.md fixes the nine namespaces and forbids editing
+  // web/packages/i18n/index.ts -- a `platform` namespace would mean editing it.
+  'platform.title': 'קונסולת פלטפורמה',
+  'platform.nav': 'פלטפורמה',
+  'platform.studios.title': 'מועדונים',
+  'platform.studios.empty': 'אין עדיין מועדונים',
+  'platform.studios.name': 'שם',
+  'platform.studios.slug': 'מזהה',
+  'platform.studios.status': 'סטטוס',
+  'platform.studios.created': 'נוצר',
+  'platform.studios.actions': 'פעולות',
+  'platform.status.active': 'פעיל',
+  'platform.status.suspended': 'מושעה',
+  'platform.demo': 'הדגמה',
+  'platform.new.title': 'הקמת מועדון חדש',
+  'platform.new.name': 'שם המועדון',
+  'platform.new.slug': 'מזהה באנגלית',
+  'platform.new.slugHint': 'אותיות קטנות, ספרות ומקפים בלבד',
+  'platform.new.timezone': 'אזור זמן',
+  'platform.new.locale': 'שפת ברירת מחדל',
+  'platform.new.submit': 'הקמת מועדון',
+  'platform.new.working': 'מקים…',
+  'platform.invite.title': 'הזמנת בעלים',
+  'platform.invite.email': 'דוא״ל',
+  'platform.invite.firstName': 'שם פרטי',
+  'platform.invite.lastName': 'שם משפחה',
+  'platform.invite.submit': 'שליחת הזמנה',
+  // The token comes back once and is stored only as a hash, so a screen that did not say
+  // so would be a screen that loses it silently -- the same wording the staff invite uses.
+  'platform.invite.tokenOnce': 'הקוד מוצג פעם אחת בלבד. העתיקו אותו עכשיו ומסרו אותו לבעלים.',
+  'platform.invite.expires': 'בתוקף עד',
+  'platform.suspend.action': 'השעיה',
+  'platform.suspend.confirm': 'להשעות את המועדון? הוא ייעלם מכל מחליפי המועדונים.',
+  'platform.error.failed': 'הפעולה נכשלה',
+
+  // -- §18.3's operations board ----------------------------------------------------
+  'ops.title': 'בריאות המערכת',
+  'ops.checkedAt': 'נבדק',
+  'ops.status.ok': 'תקין',
+  'ops.status.red': 'דורש טיפול',
+  'ops.jobs.title': 'משימות מתוזמנות',
+  'ops.jobs.name': 'משימה',
+  'ops.jobs.schedule': 'תזמון',
+  'ops.jobs.lastSuccess': 'הצלחה אחרונה',
+  'ops.jobs.state': 'מצב',
+  // Not "no data": a job that has never run is the exact failure this board was built
+  // for, and it must not read like a screen that has not loaded yet.
+  'ops.jobs.never': 'מעולם לא רצה',
+  'ops.jobs.ok': 'תקין',
+  'ops.jobs.overdue': 'לא רצה בזמן',
+  'ops.jobs.failing': 'נכשלה',
+  'ops.jobs.elsewhere': 'מתוזמנת בסביבה אחרת',
+  'ops.jobs.tolerance': 'סף שקט',
+  'ops.signals.title': 'אותות',
+  'ops.signal.api.unhandled_exceptions': 'שגיאות לא מטופלות ב-24 השעות האחרונות',
+  'ops.signal.billing.zero_charge_run': 'הרצות חיוב שלא יצרו אף חיוב',
+  'ops.signal.upay.callback_silence': 'שעות ללא קריאה חוזרת מ-uPay',
+  'ops.signal.ok': 'תקין',
+  'ops.signal.red': 'דורש טיפול',
+  // A real answer, not a soft "fine": an environment that has never taken a payment has
+  // not lost its payment provider, and calling that red teaches the reader to dismiss it.
+  'ops.signal.unknown': 'אין נתונים עדיין',
+  'ops.email.on': 'התראות במייל פעילות',
+  'ops.email.off': 'התראות במייל אינן מוגדרות — אין ערוץ שיודיע לכם',
 }

@@ -10,10 +10,17 @@ RUN pip install --no-cache-dir -r requirements-dev.txt
 
 COPY app ./app
 
-# app/core/cors.py resolves this as parents[2] and reads it at import, so a missing file
-# is not a degraded allowlist -- it is a container that cannot boot. Copied as the single
-# file rather than infra/ so the runtime image carries no runbook and no jobs.json.
+# app/core/cors.py resolves domains.json as parents[2] and reads it at import, so a
+# missing file is not a degraded allowlist -- it is a container that cannot boot.
+#
+# jobs.json joined it when the monitor landed: app/core/jobs.py reads the declared
+# schedule and each job's `max_silence_minutes`, which is what turns "no heartbeat" into
+# "overdue" on the platform console. Named files rather than `COPY infra ./infra`, so the
+# runtime image still carries no runbook -- and so that the next module reaching outside
+# app/ has to say so here. tests/test_the_image_ships_what_the_api_reads.py is what makes
+# that a rule instead of a habit; it fails on any module-level Path the image lacks.
 COPY infra/railway/domains.json ./infra/railway/domains.json
+COPY infra/railway/jobs.json ./infra/railway/jobs.json
 
 # Migrations run as the deploy's pre-deploy step, inside Railway's network -- the database
 # host is private, so `alembic upgrade head` cannot be run from a laptop. The package is a

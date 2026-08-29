@@ -32,6 +32,7 @@ function session(over: Partial<Session> = {}): Session {
     studios: [BASE_STUDIO],
     activeStudioId: 's',
     devTools: false,
+    isPlatformAdmin: false,
     actingAsPersonId: null,
     actingAsLabel: null,
     activeStudioName: 'מועדון',

@@ -77,6 +77,18 @@ RELOADABLE = (
     # identity.py above: frozen, a staging regenerate would hand a manager a development
     # host to paste into WhatsApp.
     "app.routers.onboarding",
+    # The operations board. `job_health` decides `scheduled_here` by comparing each job's
+    # declared environment against settings.ENV, and the alert email puts it in the
+    # subject line. Frozen, a staging process would judge production's seven jobs as its
+    # own and report them all permanently overdue -- which is precisely the noise the
+    # `scheduled_here` rule exists to prevent.
+    #
+    # Both before `app.routers.platform`, which imports `job_health`, `signals` and
+    # `email_configured` BY VALUE: reloading the router first would rebind it to the stale
+    # functions and undo the reload it was meant to inherit.
+    "app.services.ops.checks",
+    "app.services.ops.alerts",
+    "app.routers.platform",
     "app.main",
     # Not part of app.main's import graph -- this harness never reaches it, and
     # tests/dev/test_demo_reset_worker.py monkeypatches settings.ENV on the live

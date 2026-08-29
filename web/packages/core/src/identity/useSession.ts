@@ -17,6 +17,17 @@ export type Session = {
   activeStudioId: string | null
   /** §19.4 — whether the dev bar should render. Reported by the server, never asserted. */
   devTools: boolean
+  /**
+   * §18.1 — whether to offer the platform console. Reported by the server, never
+   * asserted, exactly like `devTools`.
+   *
+   * This decides whether a DOOR is drawn, never what is behind it: every `/platform/*`
+   * route re-confirms platform-admin against the database on its own. A client that
+   * flipped this to true would see the console's chrome and a 403 in every panel, which
+   * is the correct outcome — the boundary is the API's, and this is the app not offering
+   * a door it knows will not open.
+   */
+  isPlatformAdmin: boolean
   actingAsPersonId: string | null
   actingAsLabel: string | null
   activeStudioName: string | null
@@ -33,8 +44,14 @@ export function useSession(): Session {
   const [status, setStatus] = useState<SessionStatus>('loading')
   const [state, setState] = useState<SessionState | null>(null)
   const [displayName, setDisplayName] = useState<string | null>(null)
-  const [dev, setDev] = useState<{ devTools: boolean; actingAs: string | null; label: string | null }>({
+  const [dev, setDev] = useState<{
+    devTools: boolean
+    isPlatformAdmin: boolean
+    actingAs: string | null
+    label: string | null
+  }>({
     devTools: false,
+    isPlatformAdmin: false,
     actingAs: null,
     label: null,
   })
@@ -66,6 +83,10 @@ export function useSession(): Session {
         })
         setDev({
           devTools: Boolean(me.dev_tools),
+          // Re-read on every load, never cached from the token: removing an operator
+          // must not wait fifteen minutes for a claim to expire. The server takes the
+          // same care -- see MeResponse.is_platform_admin.
+          isPlatformAdmin: Boolean(me.is_platform_admin),
           actingAs: me.acting_as_person_id ?? null,
           label: response.headers.get('X-Acting-As'),
         })
@@ -119,6 +140,7 @@ export function useSession(): Session {
     studios: state?.studios ?? [],
     activeStudioId: state?.activeStudioId ?? null,
     devTools: dev.devTools,
+    isPlatformAdmin: dev.isPlatformAdmin,
     actingAsPersonId: dev.actingAs,
     actingAsLabel: dev.label,
     activeStudioName: active?.studio_name ?? null,
@@ -127,7 +149,7 @@ export function useSession(): Session {
     signOut: async () => {
       await signOut()
       setState(null)
-      setDev({ devTools: false, actingAs: null, label: null })
+      setDev({ devTools: false, isPlatformAdmin: false, actingAs: null, label: null })
       setDisplayName(null)
       setStatus('anonymous')
     },

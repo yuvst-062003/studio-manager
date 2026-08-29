@@ -52,6 +52,7 @@ from sqlalchemy.orm import Session
 
 from app.core.clock import now
 from app.core.db import get_engine
+from app.core.jobs import record_run
 from app.core.logging import configure_logging
 from app.core.tenancy import TenantSession, use_studio
 from app.models.people import Student, TrialBooking
@@ -217,7 +218,14 @@ def run_for_studio(session: Session, *, at: datetime, tally: Tally) -> Tally:
 
 
 def main() -> int:
+    """The entry point, wrapped in its heartbeat. See app/core/jobs.py."""
     configure_logging()
+    with Session(get_engine()) as heartbeat, record_run(heartbeat, "people-followups") as run:
+        run.detail = _run_job()
+    return 0
+
+
+def _run_job() -> dict[str, int]:
     at = now()
     tally = Tally()
 
@@ -242,19 +250,19 @@ def main() -> int:
             run_for_studio(scoped, at=at, tally=tally)
             scoped.commit()
 
-    logger.info(
-        "people follow-ups complete",
-        # Counts only. §5.4a's ladder is about children, and a log line naming one would
-        # be a name in an aggregator the scrubber cannot un-see (§11.7, G7).
-        extra={
-            "studios": len(tally.studios),
-            "reminders": tally.reminders,
-            "follow_ups": tally.follow_ups,
-            "marked_lost": tally.marked_lost,
-            "freezes_expired": tally.freezes_expired,
-            "undeliverable": tally.undeliverable,
-        },
-    )
+    # Counts only. §5.4a's ladder is about children, and a log line naming one would
+    # be a name in an aggregator the scrubber cannot un-see (§11.7, G7). The same dict
+    # becomes the heartbeat's detail, which is read on screen and mailed when red --
+    # `len(tally.studios)` and not the slugs, for that reason.
+    counts = {
+        "studios": len(tally.studios),
+        "reminders": tally.reminders,
+        "follow_ups": tally.follow_ups,
+        "marked_lost": tally.marked_lost,
+        "freezes_expired": tally.freezes_expired,
+        "undeliverable": tally.undeliverable,
+    }
+    logger.info("people follow-ups complete", extra=counts)
     if tally.undeliverable:
         # Not a failure: lane COMMS has not landed, and the state changes above still
         # happened. Reported at WARNING so it is visible rather than inferred from a gap.
@@ -262,7 +270,7 @@ def main() -> int:
             "some notifications could not be queued",
             extra={"undeliverable": tally.undeliverable},
         )
-    return 0
+    return counts
 
 
 if __name__ == "__main__":

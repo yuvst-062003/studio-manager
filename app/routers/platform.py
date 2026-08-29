@@ -20,11 +20,15 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from app.core.clock import now
+from app.core.config import settings
 from app.core.db import SessionDep
 from app.schemas.platform import (
     InvitationOut,
     InviteOwnerRequest,
+    JobHealthOut,
+    OpsHealthResponse,
     ProvisionStudioRequest,
+    SignalOut,
     StudioListResponse,
     StudioOut,
 )
@@ -36,6 +40,8 @@ from app.services.identity.platform import (
     suspend_studio,
 )
 from app.services.identity.resolution import is_platform_admin
+from app.services.ops.alerts import email_configured
+from app.services.ops.checks import job_health, red_check_ids, signals
 
 router = APIRouter(prefix="/platform", tags=["platform"])
 
@@ -146,3 +152,33 @@ def suspend(actor: PlatformAdminDep, studio_id: uuid.UUID, session: SessionDep) 
         ) from exc
     session.commit()
     return StudioOut.model_validate(studio, from_attributes=True)
+
+
+@router.get("/health", response_model=OpsHealthResponse)
+def get_ops_health(_: PlatformAdminDep, session: SessionDep) -> OpsHealthResponse:
+    """§18.3's operations board -- the health chips `get_studios` deferred.
+
+    **Platform-admin, like every route in this file.** The job heartbeats are cross-studio
+    by nature (`sessions-complete` sweeps every club in one pass), so there is no studio
+    this could be scoped to and no owner it could honestly be shown to. A club owner
+    seeing the health of jobs for studios that are not theirs is a tenancy leak with a
+    friendly name.
+
+    **Not `/health`.** `app/routers/health.py` owns that: an unauthenticated liveness
+    probe that answers "is this process alive" and deliberately carries no tenant data.
+    This one answers "is this deployment WORKING", needs an operator, and reads the
+    database on every call -- three differences that make them different endpoints rather
+    than two shapes of one.
+    """
+    at = now()
+    jobs = job_health(session, at=at)
+    found = signals(session, at=at)
+    red = red_check_ids(jobs, found)
+    return OpsHealthResponse(
+        status="red" if red else "ok",
+        checked_at=at,
+        env=settings.ENV,
+        jobs=[JobHealthOut.model_validate(job, from_attributes=True) for job in jobs],
+        signals=[SignalOut.model_validate(signal, from_attributes=True) for signal in found],
+        email_configured=email_configured(),
+    )

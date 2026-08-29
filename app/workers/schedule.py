@@ -39,6 +39,7 @@ from sqlalchemy.orm import Session as OrmSession
 
 from app.core.clock import now, parse_dev_now, use_dev_now
 from app.core.db import get_engine
+from app.core.jobs import record_run
 from app.core.logging import configure_logging
 from app.models.schedule import Session
 
@@ -66,7 +67,19 @@ def complete_ended_sessions(session: OrmSession, *, at: datetime) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """The entry point, wrapped in its heartbeat.
+
+    `record_run` is what makes this job's SILENCE observable: this module sat runnable and
+    uninvoked for a wave and a half, and nothing raised, because a job that never runs
+    raises nothing. See app/core/jobs.py.
+    """
     configure_logging()
+    with OrmSession(get_engine()) as heartbeat, record_run(heartbeat, "sessions-complete") as run:
+        run.detail = _run_job(argv)
+    return 0
+
+
+def _run_job(argv: list[str] | None = None) -> dict[str, int]:
     parser = argparse.ArgumentParser(prog="app.workers.schedule")
     parser.add_argument("--at", help="ISO 8601. §19.5's time travel, for the job path.")
     args = parser.parse_args(argv)
@@ -83,7 +96,10 @@ def main(argv: list[str] | None = None) -> int:
             session.commit()
 
     logger.info("sessions completed", extra={"completed": completed, "at": at.isoformat()})
-    return 0
+    # Counts only, and the same dict the log line carries -- the heartbeat row is read by
+    # an operator on a screen and, when red, mailed out, so §11.7's rule applies with more
+    # force here than it does to a log (app/models/ops.py).
+    return {"completed": completed}
 
 
 if __name__ == "__main__":

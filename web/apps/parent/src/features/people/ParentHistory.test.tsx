@@ -58,6 +58,7 @@ const trialFamily = (): Session =>
     activeStudioId: 'a',
     activeStudioName: 'מועדון א',
     devTools: false,
+    isPlatformAdmin: false,
     actingAsPersonId: null,
     actingAsLabel: null,
     displayName: 'יעל לוי',

@@ -294,6 +294,7 @@ Current entries, and where each must exist:
 | `comms-notify` | production | `*/15 * * * *` |
 | `sessions-complete` | production | `0 * * * *` |
 | `privacy-requests` | production | `20 * * * *` |
+| `ops-check` | **every environment** | `*/15 * * * *` |
 
 The order of the first four is load-bearing, not cosmetic: `plan-changes` must apply a
 downgrade before `billing-run` bills the month, and `billing-run` and `health-reminders`
@@ -301,3 +302,73 @@ must both sit after 08:00 because they enqueue notifications directly and `comms
 drains them within fifteen minutes — the quiet-hours refusal lives in `ReminderService`,
 which neither path goes through, so for those two the cron hour is the hour a parent's
 phone lights up.
+
+---
+
+## Monitoring, and how to know a job stopped
+
+`ops-check` is the only entry above that belongs in **every** environment, and it is the
+one the other eight are watched by. Each job now writes a `job_run` row on every pass
+(`app/core/jobs.py`), `ops-check` compares each job's last SUCCESSFUL run against the
+`max_silence_minutes` it declares in `jobs.json`, and the platform console at
+`#/platform` shows the result.
+
+**This is deliberately not an error hook.** Four workers were scheduled nowhere for a
+whole milestone and nothing noticed, because a job that never runs raises nothing. What is
+measured is the success and its time; silence is the signal.
+
+**`ops-check` cannot detect its own silence.** If it stops running, nothing is emailed —
+the same failure one level up. Its own heartbeat is on the console like every other job's,
+which makes the gap visible to somebody who looks. Closing it properly needs a pinger
+outside the box, which is the hosted vendor this design deliberately does without. If that
+trade stops being acceptable, an external uptime check on `GET /api/v1/health` is the
+smallest thing that fixes it.
+
+### Email alerts
+
+Off until configured, and the console says so in as many words rather than implying a
+channel that does not exist. stdlib `smtplib`, so there is no new dependency and no
+vendor — point it at any SMTP host (Gmail with an app password, Fastmail, whatever
+already sends your mail). STARTTLS on 587 only; implicit TLS on 465 is deliberately
+unsupported, because choosing between them from a port number risks sending credentials
+in the clear.
+
+```bash
+railway variables --service api \
+  --set "ALERT_EMAIL_TO=you@example.com" \
+  --set "SMTP_HOST=smtp.gmail.com" \
+  --set "SMTP_PORT=587" \
+  --set "SMTP_USERNAME=you@example.com" \
+  --set "SMTP_PASSWORD=<an app password, never your account password>"
+```
+
+An alert fires only when the set of failing checks GROWS, so a job broken over a weekend
+is one email rather than two hundred and eighty-eight. Recovery is silent, and clears the
+memory so the same failure recurring later is news again.
+
+### The console
+
+`#/platform` in the dashboard app, offered only to a `platform_admin`. It carries the
+operations board and §5.1's studio provisioning — list clubs, provision one, invite its
+owner, suspend it — which had working endpoints since M1 and no caller in `web/` at all.
+
+**There is still no route that creates a `platform_admin`, on purpose.** `PlatformAdmin`'s
+docstring is the rule: "a console able to mint its own operators would make the top of the
+chain self-issuing." `scripts/bootstrap-owner.py` remains the only thing in the repo that
+writes that row, run over `railway ssh --service api`, and the person being made an
+operator must have signed in once first so their `auth_identity` exists.
+
+### Applying the migration
+
+Migrations do not run on deploy — the Dockerfile CMD is uvicorn only, and the database
+host is private to Railway's network. Deploy the image FIRST (it carries the revision),
+then:
+
+```bash
+railway ssh --service api
+python -m alembic upgrade head
+```
+
+`00cc140ce237` adds `job_run` and `ops_event`. Until it is applied, `#/platform` answers
+500 on its board — the tables it reads do not exist yet.
+

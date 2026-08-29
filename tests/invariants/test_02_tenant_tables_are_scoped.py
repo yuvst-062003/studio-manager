@@ -43,6 +43,15 @@ CROSS_TENANT_TABLES = {
         "the PKCE verifier is written before any studio is resolved -- there is no "
         "tenant in context between the redirect out and the callback back"
     ),
+    "job_run": (
+        "a scheduled job is not a tenant's -- `sessions-complete` sweeps every studio in "
+        "one pass, so the studio_id would have to be invented, and invented tenancy is "
+        "worse than declared cross-tenancy"
+    ),
+    "ops_event": (
+        "an unhandled exception happens to a PROCESS, not to a club, and the row "
+        "deliberately carries no id that could be resolved to one (app/models/ops.py)"
+    ),
 }
 
 

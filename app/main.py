@@ -9,22 +9,28 @@ rather than the package and discovery would silently find nothing.
 """
 
 import importlib
+import logging
 import pkgutil
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import APIRouter, FastAPI
+from fastapi import APIRouter, FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from sqlalchemy.orm import Session
 
 from app import routers as routers_pkg
 from app.core.auth_context import AuthContextMiddleware
-from app.core.clock import X_DEV_NOW_HEADER, DevClockMiddleware
+from app.core.clock import X_DEV_NOW_HEADER, DevClockMiddleware, now
 from app.core.config import settings
 from app.core.cors import allowed_origins
 from app.core.db import get_engine
 from app.core.db_roles import enforce_runtime_role
 from app.core.dev_account import DEV_TOKEN_HEADER
 from app.core.logging import configure_logging
+from app.services.ops.checks import record_unhandled_exception
+
+logger = logging.getLogger(__name__)
 
 # SPEC 11.7 -- structured JSON logs with the scrubbing filter installed before
 # anything can log. Not a registration: seam 2's discovery loop is untouched.
@@ -96,6 +102,53 @@ app.add_middleware(
     # cross-origin client cannot read is a header it does not have.
     expose_headers=["X-Acting-As"],
 )
+
+
+@app.exception_handler(Exception)
+async def record_and_reraise(request: Request, exc: Exception) -> Response:
+    """Count unhandled exceptions so the ops screen can report (a), the API erroring.
+
+    **Records, then answers 500 in our own error shape.** `.claude/rules/api.md` -- "Errors
+    return our `ApiError` shape ... Never leak stack traces" -- and a bare Starlette 500
+    page is neither. The traceback goes to the structured logger, which is the scrubbed
+    path (§11.7).
+
+    **The row carries the route TEMPLATE, never the request's URL.** A populated path is an
+    id, and an id plus a timestamp is a person; `/api/v1/students/{student_id}` says what
+    broke without saying to whom. app/models/ops.py states the rule for the table.
+
+    **Its own session, and its own try.** The handler runs after the request's session has
+    been torn down, and an exception thrown while recording an exception would replace a
+    500 with a different 500 and lose both. Monitoring that can break the thing it watches
+    is worse than no monitoring.
+    """
+    logger.exception("unhandled exception", extra={"route": _route_template(request)})
+    try:
+        with Session(get_engine()) as session:
+            record_unhandled_exception(
+                session,
+                at=now(),
+                error_type=type(exc).__name__,
+                route=_route_template(request),
+            )
+            session.commit()
+    except Exception:  # noqa: BLE001 -- see the docstring: never break the response
+        logger.exception("could not record the unhandled exception")
+    return JSONResponse(
+        status_code=500,
+        content={"code": "internal_error", "message": "something went wrong"},
+    )
+
+
+def _route_template(request: Request) -> str | None:
+    """`/api/v1/students/{student_id}`, from the matched route rather than the URL.
+
+    `request.scope["route"]` is set by Starlette once a route matches. A 500 raised before
+    matching -- in middleware -- has none, and None is the honest answer there.
+    """
+    route = request.scope.get("route")
+    return getattr(route, "path", None)
+
 
 v1 = APIRouter(prefix="/api/v1")
 for _module in pkgutil.iter_modules(routers_pkg.__path__):

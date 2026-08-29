@@ -40,6 +40,7 @@ from sqlalchemy.orm import Session
 
 from app.core.clock import now
 from app.core.db import get_engine
+from app.core.jobs import record_run
 from app.core.logging import configure_logging
 from app.core.tenancy import TenantSession, use_studio
 from app.models.studio import Studio
@@ -55,7 +56,14 @@ class Tally:
 
 
 def main() -> int:
+    """The entry point, wrapped in its heartbeat. See app/core/jobs.py."""
     configure_logging()
+    with Session(bind=get_engine()) as heartbeat, record_run(heartbeat, "plan-changes") as run:
+        run.detail = _run_job()
+    return 0
+
+
+def _run_job() -> dict[str, int]:
     at = now()
     today = at.date()
     tally = Tally()
@@ -74,11 +82,11 @@ def main() -> int:
             tally.applied += PlanChangeService(scoped).apply_due(on=today, at=at)
             scoped.commit()
 
-    logger.info(
-        "plan changes applied",
-        extra={"studios": len(tally.studios), "applied": tally.applied},
-    )
-    return 0
+    counts = {"studios": len(tally.studios), "applied": tally.applied}
+    logger.info("plan changes applied", extra=counts)
+    # The heartbeat carries the same counts the log line does. Counts only -- never a
+    # studio slug, never a student: this row is read on a screen and mailed when red.
+    return counts
 
 
 if __name__ == "__main__":  # pragma: no cover -- the entry point itself

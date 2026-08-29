@@ -50,6 +50,7 @@ from sqlalchemy.orm import Session
 
 from app.core.clock import now
 from app.core.db import get_engine
+from app.core.jobs import record_run
 from app.core.logging import configure_logging
 from app.core.tenancy import TenantSession, use_studio
 from app.models.health import HealthDeclaration
@@ -219,7 +220,14 @@ def run_for_studio(session: TenantSession, studio: Studio, *, at: datetime, tall
 
 
 def main() -> int:
+    """The entry point, wrapped in its heartbeat. See app/core/jobs.py."""
     configure_logging()
+    with Session(bind=get_engine()) as heartbeat, record_run(heartbeat, "health-reminders") as run:
+        run.detail = _run_job()
+    return 0
+
+
+def _run_job() -> dict[str, int]:
     at = now()
     tally = Tally()
 
@@ -244,17 +252,16 @@ def main() -> int:
             run_for_studio(scoped, studio, at=at, tally=tally)
             scoped.commit()
 
-    logger.info(
-        "health reminders complete",
-        # Counts only, `extra=` and never an f-string. §5.5's ladder is about children, and a log
-        # line naming one would be a name in an aggregator the scrubber cannot un-see (G7).
-        extra={
-            "studios": len(tally.studios),
-            "reminders": tally.reminders,
-            "renewals": tally.renewals,
-            "undeliverable": tally.undeliverable,
-        },
-    )
+    # Counts only, `extra=` and never an f-string. §5.5's ladder is about children, and a log
+    # line naming one would be a name in an aggregator the scrubber cannot un-see (G7).
+    # The same dict is the heartbeat's detail, which leaves the building in an alert email.
+    counts = {
+        "studios": len(tally.studios),
+        "reminders": tally.reminders,
+        "renewals": tally.renewals,
+        "undeliverable": tally.undeliverable,
+    }
+    logger.info("health reminders complete", extra=counts)
     if tally.undeliverable:
         # Not a failure: lane COMMS has not landed, and the ledger entries above still happened.
         # WARNING so it is visible rather than inferred from a gap.
@@ -262,7 +269,7 @@ def main() -> int:
             "some health reminders could not be queued",
             extra={"undeliverable": tally.undeliverable},
         )
-    return 0
+    return counts
 
 
 if __name__ == "__main__":

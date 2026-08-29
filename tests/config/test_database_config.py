@@ -63,12 +63,59 @@ def test_env_example_documents_every_setting_the_backend_reads():
         assert re.search(rf"^{name}=", text, re.MULTILINE), f".env.example omits {name}"
 
 
+#: A key whose name contains `password` assigned a NON-EMPTY value -- in either the
+#: `KEY=value` form `.env.example` uses or the `key: value` form docker-compose does.
+#:
+#: **Only `.env.example` is judged by this.** `docker-compose.yml` keeps the original,
+#: stricter rule below -- the bare word, anywhere -- because local auth is `trust` and
+#: that file has no legitimate reason to say `password` at all. Relaxing a guard
+#: everywhere to resolve a conflict in one place is how a guard stops guarding.
+#:
+#: The conflict is real and had to be settled somewhere. `SMTP_PASSWORD` MUST appear in
+#: `.env.example`, because tests/identity/test_settings.py asserts every field of
+#: `Settings` has a line there -- rightly, since a setting nobody documents is a setting
+#: nobody sets. So for that one file the rule now says what it always meant: an EMPTY
+#: `SMTP_PASSWORD=` carries no credential, it is the documentation that one exists and
+#: belongs in the deployment's secrets. A FILLED one is exactly the regression, and is
+#: still caught -- see the paired test below.
+#: `[ \t]` and never `\s` around the separator. `\s` matches a NEWLINE, so an empty
+#: `SMTP_PASSWORD=` followed by a blank line and a comment matched `\s*\S+` across three
+#: lines and reported the `#` as the committed secret. Found by this file's own paired
+#: test, which is the entire reason it exists.
+_ASSIGNED_CREDENTIAL = re.compile(
+    r"^[ \t]*-?[ \t]*[^\s#]*password[^\s:=]*[ \t]*[:=][ \t]*\S", re.IGNORECASE | re.MULTILINE
+)
+
+
 def test_no_password_is_committed_anywhere_in_the_local_database_setup():
-    """Local auth is `trust` precisely so this repo never carries a credential. A
-    password appearing here is the regression this guards."""
-    for path in ("docker-compose.yml", ".env.example"):
-        text = (ROOT / path).read_text(encoding="utf-8").lower()
-        assert "password" not in text, f"{path} introduces a credential; local auth is trust"
+    """Local auth is `trust` precisely so this repo never carries a credential."""
+    compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8").lower()
+    assert "password" not in compose, (
+        "docker-compose.yml introduces a credential; local auth is trust"
+    )
+
+    template = (ROOT / ".env.example").read_text(encoding="utf-8")
+    found = _ASSIGNED_CREDENTIAL.findall(template)
+    assert not found, f".env.example commits a credential value: {found}"
+
+
+def test_the_credential_detector_still_fires():
+    """A detector that finds nothing proves nothing, and this one was deliberately
+    narrowed -- which is exactly when that risk is highest.
+
+    Both separator styles and both directions: the shapes that must be caught, and the
+    empty-key shape that must not. Without the last two cases somebody hitting a failure
+    here would 'fix' it by deleting the first three.
+    """
+    assert _ASSIGNED_CREDENTIAL.search("SMTP_PASSWORD=hunter2")
+    assert _ASSIGNED_CREDENTIAL.search("  POSTGRES_PASSWORD: swordfish"), "indented YAML too"
+    assert _ASSIGNED_CREDENTIAL.search("      - PGPASSWORD=swordfish"), "a YAML list item too"
+    assert _ASSIGNED_CREDENTIAL.search("password=x")
+    assert not _ASSIGNED_CREDENTIAL.search("SMTP_PASSWORD=")
+    assert not _ASSIGNED_CREDENTIAL.search("# use an app password here")
+    # The shape that actually broke it: an empty key, then a blank line, then a comment.
+    # `\s` around the separator matched across all three and called the `#` a secret.
+    assert not _ASSIGNED_CREDENTIAL.search("SMTP_PASSWORD=\n\n# a following comment")
 
 
 def test_no_test_builds_an_executable_path_out_of_venv():

@@ -5714,6 +5714,88 @@
         "title": "ItemOrderOut",
         "type": "object"
       },
+      "JobHealthOut": {
+        "description": "One scheduled job, as `infra/railway/jobs.json` declares it and `job_run` records it.",
+        "properties": {
+          "environment": {
+            "title": "Environment",
+            "type": "string"
+          },
+          "failing": {
+            "title": "Failing",
+            "type": "boolean"
+          },
+          "last_run_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Run At"
+          },
+          "last_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Status"
+          },
+          "last_success_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Success At"
+          },
+          "max_silence_minutes": {
+            "title": "Max Silence Minutes",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "overdue": {
+            "title": "Overdue",
+            "type": "boolean"
+          },
+          "schedule": {
+            "title": "Schedule",
+            "type": "string"
+          },
+          "scheduled_here": {
+            "title": "Scheduled Here",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "schedule",
+          "environment",
+          "max_silence_minutes",
+          "last_run_at",
+          "last_success_at",
+          "last_status",
+          "overdue",
+          "failing",
+          "scheduled_here"
+        ],
+        "title": "JobHealthOut",
+        "type": "object"
+      },
       "KpiOut": {
         "description": "`4g`'s KPI strip — four metrics, each a bare number plus a delta line.\n\n**Each predicate is spelled out here because each one has to be honest about the\npast**, and two of the obvious implementations are not:\n\n* `student.status` is a *current* column. Counting `status = 'active'` answers \"how\n  many are active now\", which is the same answer for every window a manager selects.\n  Membership is therefore read off the **dates**: a member on day D is a student with\n  `joined_on <= D` and (`left_on IS NULL` or `left_on > D`).\n* `session.status = 'completed'` is written by a worker that was never scheduled\n  until this wave, so every session that ended before this month is still\n  `scheduled`. Nothing here reads it — attendance comes from\n  `app/services/attendance/report.py`, which asks the clock instead.",
         "properties": {
@@ -6492,6 +6574,11 @@
             "title": "Identity Id",
             "type": "string"
           },
+          "is_platform_admin": {
+            "default": false,
+            "title": "Is Platform Admin",
+            "type": "boolean"
+          },
           "studios": {
             "items": {
               "$ref": "#/components/schemas/StudioMembershipOut"
@@ -7103,6 +7190,51 @@
           "already_registered"
         ],
         "title": "OnboardingRegisterOut",
+        "type": "object"
+      },
+      "OpsHealthResponse": {
+        "properties": {
+          "checked_at": {
+            "format": "date-time",
+            "title": "Checked At",
+            "type": "string"
+          },
+          "email_configured": {
+            "title": "Email Configured",
+            "type": "boolean"
+          },
+          "env": {
+            "title": "Env",
+            "type": "string"
+          },
+          "jobs": {
+            "items": {
+              "$ref": "#/components/schemas/JobHealthOut"
+            },
+            "title": "Jobs",
+            "type": "array"
+          },
+          "signals": {
+            "items": {
+              "$ref": "#/components/schemas/SignalOut"
+            },
+            "title": "Signals",
+            "type": "array"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "checked_at",
+          "env",
+          "jobs",
+          "signals",
+          "email_configured"
+        ],
+        "title": "OpsHealthResponse",
         "type": "object"
       },
       "ParentEventOut": {
@@ -10670,6 +10802,50 @@
           "last_name"
         ],
         "title": "SiblingRequestIn",
+        "type": "object"
+      },
+      "SignalOut": {
+        "description": "An API or business signal. `status` is 'ok', 'red' or 'unknown'.",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "since": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Since"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "value",
+          "since"
+        ],
+        "title": "SignalOut",
         "type": "object"
       },
       "StaffGroupOut": {
@@ -20176,6 +20352,28 @@
         "summary": "Settle Plan Change",
         "tags": [
           "billing"
+        ]
+      }
+    },
+    "/api/v1/platform/health": {
+      "get": {
+        "description": "§18.3's operations board -- the health chips `get_studios` deferred.\n\n**Platform-admin, like every route in this file.** The job heartbeats are cross-studio\nby nature (`sessions-complete` sweeps every club in one pass), so there is no studio\nthis could be scoped to and no owner it could honestly be shown to. A club owner\nseeing the health of jobs for studios that are not theirs is a tenancy leak with a\nfriendly name.\n\n**Not `/health`.** `app/routers/health.py` owns that: an unauthenticated liveness\nprobe that answers \"is this process alive\" and deliberately carries no tenant data.\nThis one answers \"is this deployment WORKING\", needs an operator, and reads the\ndatabase on every call -- three differences that make them different endpoints rather\nthan two shapes of one.",
+        "operationId": "get_ops_health_api_v1_platform_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpsHealthResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Ops Health",
+        "tags": [
+          "platform"
         ]
       }
     },

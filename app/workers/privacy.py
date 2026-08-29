@@ -31,6 +31,7 @@ from sqlalchemy.orm import Session
 
 from app.core.clock import now
 from app.core.db import get_engine
+from app.core.jobs import record_run
 from app.core.logging import configure_logging
 from app.models.reports import DataExportRequest, DeletionRequest
 
@@ -190,24 +191,43 @@ def process_deletions(session: Session, *, at: datetime) -> Tally:
 
 
 def main() -> int:
-    configure_logging()
+    """The entry point, wrapped in its heartbeat. See app/core/jobs.py.
 
+    **A pass that refuses every request is still a pass that RAN**, and the heartbeat says
+    so. That reads wrong at first and is deliberate: `assemble_export_bundle` and
+    `purge_subject_data` raise on purpose (HB-privacy-worker-unbuilt), the loops below
+    catch that and record `failed` on each REQUEST, and the exit code is 1. If the
+    heartbeat also called the job failed, this check would be red every hour for as long
+    as the holdback stays open -- and a permanently red check is how an operator learns to
+    ignore the screen, which costs more than the check is worth. The gap is tracked in
+    docs/plan/state.yaml, visible on the §11.3 status screen the guardian reads, and
+    carried here as an `errors` count in the run's own detail. What this heartbeat is for
+    is the different question nothing else answers: did the queue get drained at all.
+    """
+    configure_logging()
+    with Session(get_engine()) as heartbeat, record_run(heartbeat, "privacy-requests") as run:
+        run.detail = _run_job()
+        errors = run.detail["errors"]
+    return 0 if errors == 0 else 1
+
+
+def _run_job() -> dict[str, int]:
     with Session(get_engine(), expire_on_commit=False) as session:
         export_tally = process_data_exports(session, at=now())
         deletion_tally = process_deletions(session, at=now())
         session.commit()
 
     total_processed = export_tally.exports_processed + deletion_tally.deletions_processed
-    logger.info(
-        "privacy worker complete",
-        extra={
-            "exports_processed": export_tally.exports_processed,
-            "deletions_processed": deletion_tally.deletions_processed,
-            "errors": export_tally.errors + deletion_tally.errors,
-            "total": total_processed,
-        },
-    )
-    return 0 if (export_tally.errors + deletion_tally.errors) == 0 else 1
+    counts = {
+        "exports_processed": export_tally.exports_processed,
+        "deletions_processed": deletion_tally.deletions_processed,
+        "errors": export_tally.errors + deletion_tally.errors,
+        "total": total_processed,
+    }
+    logger.info("privacy worker complete", extra=counts)
+    # Counts only. §11.3 and §11.4 requests are ABOUT a person by definition, so the one
+    # thing this row must never carry is which -- see app/models/ops.py.
+    return counts
 
 
 if __name__ == "__main__":

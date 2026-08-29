@@ -87,6 +87,7 @@ import { DocumentsSection } from './features/health/DocumentsSection'
 import { PricesSection } from './features/billing/PricesSection'
 import { ReportsSection } from './features/reports/ReportsSection'
 import { BeltsIndex } from './features/belts/BeltsIndex'
+import { PlatformSection } from './features/platform'
 import { GlobalSearch } from './GlobalSearch'
 
 import { registerBillingAlertSection } from './features/billing/BillingAlertSection'
@@ -123,7 +124,16 @@ registerItemsWizardStep(makeDashboardBillingClient(apiFetch))
 // called by nothing, so the at-risk card had never once rendered on the dashboard.
 // The S1 slot-wiring guard now fails the build on any register* export no app calls.
 registerCommsAlerts(makeDashboardCommsClient(apiFetch))
-registerBillingDevTools(makeDashboardBillingClient(apiFetch))
+// §19.4 — the dev tool leaves the production bundle with the bar itself. Unconditional,
+// this shipped `RunJobTool` — a button that POSTs the real `/billing-runs` — into every
+// production dashboard bundle. Nothing rendered it, because `@studio/ui/dev-bar` had
+// already resolved to `AbsentDevBar`; the container's absence was doing the work, which
+// is the "hidden, not absent" outcome §19.4 refuses. See the matching branch in
+// apps/staff/src/features/attendance/index.ts for why the expression is written out
+// here rather than imported. Measured both ways by web/tools/__tests__/dev-bar-bundle.test.ts.
+if (import.meta.env.DEV || import.meta.env.VITE_DEV_TOOLS === 'true') {
+  registerBillingDevTools(makeDashboardBillingClient(apiFetch))
+}
 
 // F10 — the doors a coach's role cannot open stay out of their nav. The API was never
 // the hole (/staff is ManagerOrOwner, fees are redacted); the hole was offering doors
@@ -205,6 +215,7 @@ export type DashboardRoute =
   | 'prices'
   | 'items'
   | 'reports'
+  | 'platform'
   | 'home'
 
 /** Unknown hashes — and the empty one — resolve to the weekly board: 3a/1e make the
@@ -254,6 +265,10 @@ export function routeFromHash(hash: string): DashboardRoute {
   // since have retired.
   if (name === 'items') return 'items'
   if (name === 'reports') return 'reports'
+  // §18.1's operator console. NOT in MANAGER_ONLY_ROUTES: those are the doors a coach's
+  // ROLE cannot open, and platform-admin is not a role -- it is a row on the global
+  // `auth_identity`, above every studio. `PlatformSection` refuses on its own.
+  if (name === 'platform') return 'platform'
   if (name === 'staff' || name === 'settings' || name === 'setup') return name
   return 'schedule'
 }
@@ -307,6 +322,7 @@ function sideNavGroups(
   locale: Locale,
   canSeeMoney: boolean,
   badges: { debtHouseholds: number; missingDocuments: number },
+  isPlatformAdmin: boolean,
 ): SideNavGroup[] {
   const onGroups = hash.startsWith('#/groups')
   const groups: SideNavGroup[] = [
@@ -453,6 +469,30 @@ function sideNavGroups(
       ],
     })
   }
+  // §18.1's console, in its own group at the bottom. Gated on platform-admin and NOT on
+  // `canSeeMoney`: platform-admin is not a role in a studio, it is a row on the global
+  // `auth_identity` that sits above every studio, so an owner does not get this and an
+  // operator gets it whichever club they happen to be looking at.
+  //
+  // Its own group rather than an item inside כסף or מועדון, because it belongs to neither:
+  // everything above this line is about ONE club, and everything in here is about all of
+  // them. `web/tools/__tests__/unreachable-screens.test.ts` requires the link to exist —
+  // a routed screen nothing links to has shipped in this app four times.
+  if (isPlatformAdmin) {
+    groups.push({
+      key: 'platform',
+      label: t(locale, 'common.platform.nav'),
+      items: [
+        {
+          key: 'platform',
+          label: t(locale, 'common.platform.title'),
+          href: '#/platform',
+          icon: <Icon name="settings" />,
+          active: route === 'platform',
+        },
+      ],
+    })
+  }
   return groups
 }
 
@@ -574,7 +614,14 @@ export default function App() {
               label={t(locale, 'common.nav.menu')}
               studioName={session.activeStudioName ?? ''}
               studioNote={t(locale, 'common.appName.dashboard')}
-              groups={sideNavGroups(route, hash, locale, canSeeMoney, badges)}
+              groups={sideNavGroups(
+                route,
+                hash,
+                locale,
+                canSeeMoney,
+                badges,
+                session.isPlatformAdmin,
+              )}
               settingsItem={
                 canSeeMoney
                   ? {
@@ -749,6 +796,9 @@ export default function App() {
           {route === 'documents' ? <DocumentsSection locale={locale} /> : null}
           {route === 'prices' ? <PricesSection locale={locale} /> : null}
           {route === 'items' ? <ItemsSection locale={locale} /> : null}
+          {route === 'platform' ? (
+            <PlatformSection isPlatformAdmin={session.isPlatformAdmin} locale={locale} />
+          ) : null}
           {route === 'reports' && session.activeStudioId ? (
             <ReportsSection
               locale={locale}

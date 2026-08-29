@@ -51,5 +51,23 @@ export function registerAttendanceSections(): void {
     order: 5,
     render: ConflictSection,
   })
-  registerAttendanceDevTools()
+  // §19.4 — "tree-shaken out of production client bundles by an env flag, so it is not
+  // merely hidden." This call used to be unconditional, which made that sentence false
+  // for the two toggles: `devbar.tsx` shipped in every production bundle, carrying the
+  // `dev-tool-` test ids and the `setForcedMode` path that lies to the network monitor.
+  // Nothing RENDERED them — `@studio/ui/dev-bar` had already resolved to `AbsentDevBar`
+  // — so the container's absence was the only thing standing between dead code and a
+  // live button, and one `<DevBar>` mounted by a future lane would have removed it.
+  //
+  // The expression is written out here rather than imported from
+  // `packages/ui/src/dev-bar/index.ts`, which computes the identical one. Vite's
+  // `define` replaces `import.meta.env.*` textually, so an inline copy folds to a
+  // literal inside THIS module and rollup drops the branch, the import, and `./devbar`
+  // with it. A boolean imported across a module boundary asks rollup to propagate a
+  // constant instead, which is a weaker guarantee for the one property that matters.
+  // Both directions are measured by web/tools/__tests__/dev-bar-bundle.test.ts: a typo
+  // here fails the flag-ON case, not just the flag-off one.
+  if (import.meta.env.DEV || import.meta.env.VITE_DEV_TOOLS === 'true') {
+    registerAttendanceDevTools()
+  }
 }

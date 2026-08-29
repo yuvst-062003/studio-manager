@@ -49,6 +49,7 @@ from sqlalchemy.orm import Session
 
 from app.core.clock import now
 from app.core.db import get_engine
+from app.core.jobs import record_run
 from app.core.logging import configure_logging
 from app.core.tenancy import TenantSession, use_studio
 from app.models.comms import Announcement, Notification, NotificationDelivery, PushToken
@@ -196,7 +197,19 @@ def run_for_studio(session: TenantSession, *, at: datetime, tally: Tally) -> Non
 
 
 def main(argv: list[str] | None = None) -> int:
+    """The entry point, wrapped in its heartbeat. See app/core/jobs.py.
+
+    This job runs every fifteen minutes and carries cancellations -- §5.11's own example
+    is ביטול שיעור, היום 17:00. Its silence is the most expensive silence in the file,
+    which is why its tolerance in jobs.json is the tightest one there.
+    """
     configure_logging()
+    with Session(bind=get_engine()) as heartbeat, record_run(heartbeat, "comms-notify") as run:
+        run.detail = _run_job(argv)
+    return 0
+
+
+def _run_job(argv: list[str] | None = None) -> dict[str, int]:
     at = now()
     tally = Tally()
 
@@ -213,16 +226,16 @@ def main(argv: list[str] | None = None) -> int:
         tally.studios.append(slug)
         _run_one(studio_id, at=at, tally=tally)
 
-    logger.info(
-        "notify complete",
-        extra={
-            "studios": len(tally.studios),
-            "published": tally.published,
-            "fanned_out": tally.fanned_out,
-            "pushed": tally.pushed,
-            "push_failed": tally.push_failed,
-        },
-    )
+    # Counts only, and the same dict feeds the heartbeat -- which an operator reads on a
+    # screen and receives by email when a check goes red (app/models/ops.py).
+    counts = {
+        "studios": len(tally.studios),
+        "published": tally.published,
+        "fanned_out": tally.fanned_out,
+        "pushed": tally.pushed,
+        "push_failed": tally.push_failed,
+    }
+    logger.info("notify complete", extra=counts)
     if tally.push_failed:
         # Not a failure of the run: the announcements still published and the inbox rows are
         # still there. WARNING so it is visible rather than inferred from a gap between two
@@ -231,7 +244,7 @@ def main(argv: list[str] | None = None) -> int:
             "some pushes were refused by the provider",
             extra={"push_failed": tally.push_failed},
         )
-    return 0
+    return counts
 
 
 def _run_one(studio_id: uuid.UUID, *, at: datetime, tally: Tally) -> None:

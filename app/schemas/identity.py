@@ -102,6 +102,18 @@ class MeResponse(BaseModel):
     active_studio_id: uuid.UUID | None
     #: §19.4 -- whether to render the dev bar. Reported, never accepted.
     dev_tools: bool
+    #: §18.1 -- whether to offer the platform console. Reported, never accepted, and for
+    #: the same reason `dev_tools` is: §3.1 makes `platform_admin` a manually seeded row,
+    #: and a field a request could SET would be the self-issuing console the model forbids
+    #: (`PlatformAdmin`'s own docstring). tests/restrictions/test_04 walks every published
+    #: request body looking for exactly this shape of mistake.
+    #:
+    #: Re-derived from the database on every call rather than read off the token's `padm`
+    #: claim -- the claim is a fifteen-minute snapshot, and removing an operator must not
+    #: wait for it to expire. `require_platform_admin` takes the same care for the same
+    #: reason; this field exists so the dashboard does not have to probe a 403 to find out
+    #: whether to draw a door.
+    is_platform_admin: bool = False
     #: §19.4 -- the persona the API is resolving permissions from.
     acting_as_person_id: uuid.UUID | None
     #: The signed-in person's name, resolved for the ACTIVE studio (or the acting
