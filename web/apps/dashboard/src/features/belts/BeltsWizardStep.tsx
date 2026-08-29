@@ -62,9 +62,6 @@ const hintStyle: CSSProperties = {
   margin: 0,
 }
 
-/** `5d` lists the first few ranks and says how many follow. */
-const PREVIEW_ROWS = 7
-
 /** The fourth card. It creates nothing — the absence of a preset, not a preset. */
 export const SCRATCH = 'scratch'
 
@@ -259,13 +256,35 @@ export function BeltsWizardStep({
           </fieldset>
 
           <aside className="belts-preview" data-testid="belts-preview">
-            <SectionHeader level={3} title={t(locale, 'events.belt.presetPreview')} />
+            <SectionHeader
+              action={
+                preview ? (
+                  <span className="belts-preview__count" data-testid="belts-preview-count">
+                    {`${preview.ranks.length} ${t(locale, 'events.belt.rankPlural')}`}
+                  </span>
+                ) : undefined
+              }
+              level={3}
+              title={t(locale, 'events.belt.presetPreview')}
+            />
             {preview ? (
-              <>
+              /* Every rank, scrollable — not the first seven with the rest named. A manager
+                 choosing a twelve-rank ladder is choosing the whole ladder, and "and 5 more"
+                 hid the half that distinguishes one preset from another.
+
+                 `tabIndex={0}` because a scroll container that is not focusable cannot be
+                 scrolled from a keyboard at all: there is nothing inside it to tab to, so
+                 the arrow keys never reach it. Focusable and labelled, it behaves like the
+                 region it is. */
+              <div
+                aria-label={t(locale, 'events.belt.presetPreview')}
+                className="belts-preview__scroll"
+                data-testid="belts-preview-scroll"
+                role="group"
+                tabIndex={0}
+              >
                 <ul className="belts-preview__list">
-                  {/* Truncated at seven. `5d` shows the first few and says how many follow;
-                      a twelve-row list turns the preview into the tallest thing on screen. */}
-                  {preview.ranks.slice(0, PREVIEW_ROWS).map((rank) => (
+                  {preview.ranks.map((rank) => (
                     <li key={rank.name}>
                       <BeltBar
                         colorHex={rank.color_hex}
@@ -276,15 +295,7 @@ export function BeltsWizardStep({
                     </li>
                   ))}
                 </ul>
-                {preview.ranks.length > PREVIEW_ROWS ? (
-                  <p className="belts-preview__more" data-testid="belts-preview-more">
-                    {t(locale, 'events.belt.presetAndMore').replace(
-                      '{{count}}',
-                      String(preview.ranks.length - PREVIEW_ROWS),
-                    )}
-                  </p>
-                ) : null}
-              </>
+              </div>
             ) : (
               <p className="belts-preview__empty">
                 {t(locale, 'events.belt.presetPreviewEmpty')}

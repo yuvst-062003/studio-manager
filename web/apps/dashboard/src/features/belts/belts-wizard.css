@@ -108,7 +108,29 @@
   gap: var(--space-2);
 }
 
-.belts-preview__more,
+/* The whole ladder, scrolled rather than truncated. Capped so the preview cannot become
+ * the tallest thing on the screen — which is what truncation was solving — while still
+ * letting a manager reach every rank.
+ *
+ * `overscroll-behavior` keeps a flick at the end of the list from scrolling the page
+ * behind it, which on a trackpad reads as the panel jumping. */
+.belts-preview__scroll {
+  max-block-size: 20rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.belts-preview__scroll:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.belts-preview__count {
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+}
+
 .belts-preview__empty {
   margin: 0;
   color: var(--text-muted);

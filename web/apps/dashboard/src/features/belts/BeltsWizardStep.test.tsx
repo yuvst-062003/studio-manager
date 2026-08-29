@@ -249,13 +249,26 @@ describe('5d — what the choices actually show (2026-08-29)', () => {
     expect(within(card).getByRole('radio')).toBeChecked()
   })
 
-  it('previews the ladder and says how many ranks it did not list', async () => {
-    // `5d` shows the first few and names the remainder; a twelve-row list would be the
-    // tallest thing on the screen.
+  it('previews EVERY rank, in a region a manager can scroll', async () => {
+    // Truncating at seven and naming the remainder hid the half that distinguishes one
+    // preset from another — the bi-colour intermediates are most of why a club picks the
+    // twelve-rank ladder. Capped height plus overflow, not a shorter list.
     renderStep()
     await userEvent.click(await screen.findByLabelText(/ג'ודו ילדים/))
-    const preview = screen.getByTestId('belts-preview')
-    expect(preview.querySelectorAll('li').length).toBeLessThanOrEqual(7)
+    const scroll = screen.getByTestId('belts-preview-scroll')
+    expect(scroll.querySelectorAll('li')).toHaveLength(3)
+    expect(screen.getByTestId('belts-preview-count')).toHaveTextContent('3')
+  })
+
+  it('makes that region reachable from the keyboard', async () => {
+    // A scroll container with nothing focusable inside it cannot be scrolled by keyboard:
+    // there is nothing to tab to, so the arrow keys never reach it. It needs to be the
+    // focus target itself, and to say what it is when it gets focus.
+    renderStep()
+    await userEvent.click(await screen.findByLabelText(/ג'ודו ילדים/))
+    const scroll = screen.getByTestId('belts-preview-scroll')
+    expect(scroll).toHaveAttribute('tabindex', '0')
+    expect(scroll).toHaveAccessibleName(t('he', 'events.belt.presetPreview'))
   })
 
   it('names the count on the commit button, not a bare verb', async () => {
