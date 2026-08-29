@@ -301,6 +301,35 @@ component layer.
   chat was the second tab of a two-tab switcher, so the switcher went with it and the
   עדכוני מועדון inbox stands alone.
 
+## D13 — an empty calendar cell may start a session
+
+**Decided:** 2026-08-29 · owner request, in session
+
+**This reverses a decision `3a` records.** The spec for the week board says of an empty grid
+cell:
+
+> Drawn as a bare bordered cell with **no "add a session here" affordance**. The only way to
+> create a session is the top-bar CTA. That is a decision, not an omission to fix silently.
+
+It is now clickable, and opens the create form anchored at that cell with the day and start
+time already filled in. Recorded here so the reversal is not silent, which is what that
+sentence asked for.
+
+**Why the original reasoning still partly holds, and what changed.** `3a` was right that a
+grid of forty visible buttons is a worse screen than a grid. So the cell carries **no visible
+affordance**: it is a transparent button with an accessible name and nothing drawn, earning a
+faint wash only on hover or focus. What changed is the task — a manager setting a club up
+fills a whole timetable in one sitting, and routing every one of those through a top-bar
+button that then asks for the day and time they had just pointed at is the slower path to the
+same `POST /sessions`.
+
+**Its sibling.** A long press on an existing block picks it up, and the next cell chosen
+becomes its new day and time, carrying the duration. That is a `PATCH` to the route §5.6
+already documents as the move control — the same write the popover's date fields perform, so
+this adds an accelerator rather than a second way to change a session. It is deliberately not
+built on HTML5 drag-and-drop, which is unusable with a screen reader and does not fire on
+touch; the popover's date fields remain the keyboard path.
+
 ## Applied vs. pending
 
 | Decision | Recorded | Applied |
@@ -313,6 +342,7 @@ component layer.
 | D9.3 retitle `12f` to תשלומים | yes | **yes — edited + owner-approved 2026-08-24** |
 | SPEC.md §2.2 contradiction | yes | **yes — SPEC.md edited 2026-08-24** |
 | C10 — `3f` loses the health-block toggle | yes | **yes — canvas edited 2026-08-26 (W6)** |
+| D13 empty cell may start a session | yes | **yes — `WeekBoard.tsx`, 2026-08-29. The canvas is NOT edited: `3a` still draws an inert cell, and the affordance is invisible until hover.** |
 
 **All three D9 rows were re-verified against the artboard markup on 2026-08-26**, because
 `milestone-plan.md`'s C9 still claimed the opposite and that claim was blocking W6. They were

@@ -15,7 +15,7 @@
 // properties only** (D10): the rail and every table here run right-to-left in `he`, and
 // `padding-left` would be wrong in one of the two directions with nothing to catch it.
 import type { CSSProperties } from 'react'
-import { Button } from '@studio/ui'
+import { ActionBar, Button } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { isDerivedStep } from './types'
@@ -113,38 +113,66 @@ export function StepActions({
   doneLabel?: string
 }) {
   const derived = isDerivedStep(stepId)
-  return (
-    <div style={actionsStyle} data-testid={`rollover-actions-${stepId}`}>
-      <Button data-testid={`rollover-done-${stepId}`} onClick={onDone}>
-        {doneLabel ?? t(locale, derived ? 'schedule.rollover.continue' : 'schedule.rollover.markDone')}
+  // Was one flat flex row holding up to four buttons AND two sentences, all at the same
+  // rank, `gap: var(--space-3)` apart. A manager saw `[המשך]` with "this step is derived
+  // from the data" and "step state: done" strung along beside it, and nothing said which
+  // of the six things was the way forward.
+  //
+  // Two changes. Leaving the step goes on the inline-start edge and the one control that
+  // moves it forward goes on the inline-end edge, which is `ActionBar`'s whole job. And
+  // the two sentences leave the row entirely: **they are not actions**, they describe the
+  // step, and mixing description into a control row is what made it unreadable.
+  const leaving = [
+    onBack ? (
+      <Button key="back" variant="ghost" data-testid={`rollover-back-${stepId}`} onClick={onBack}>
+        {t(locale, 'schedule.rollover.back')}
       </Button>
-      {skippable && !derived ? (
-        <Button variant="ghost" data-testid={`rollover-skip-${stepId}`} onClick={onSkip}>
-          {t(locale, 'schedule.rollover.skipStep')}
-        </Button>
-      ) : null}
-      {onBack ? (
-        <Button variant="ghost" data-testid={`rollover-back-${stepId}`} onClick={onBack}>
-          {t(locale, 'schedule.rollover.back')}
-        </Button>
-      ) : null}
-      {onReopen && !derived && status !== 'pending' ? (
-        <Button variant="secondary" data-testid={`rollover-reopen-${stepId}`} onClick={onReopen}>
-          {t(locale, 'schedule.rollover.reopenStep')}
-        </Button>
-      ) : null}
-      {derived ? (
-        <span style={noteStyle} data-testid={`rollover-derived-${stepId}`}>
-          {t(locale, 'schedule.rollover.derivedHint')}
+    ) : null,
+    skippable && !derived ? (
+      <Button key="skip" variant="ghost" data-testid={`rollover-skip-${stepId}`} onClick={onSkip}>
+        {t(locale, 'schedule.rollover.skipStep')}
+      </Button>
+    ) : null,
+    onReopen && !derived && status !== 'pending' ? (
+      <Button
+        key="reopen"
+        variant="secondary"
+        data-testid={`rollover-reopen-${stepId}`}
+        onClick={onReopen}
+      >
+        {t(locale, 'schedule.rollover.reopenStep')}
+      </Button>
+    ) : null,
+  ].filter(Boolean)
+
+  return (
+    <div className="rollover-step-actions" data-testid={`rollover-actions-${stepId}`}>
+      <ActionBar
+        end={
+          <Button data-testid={`rollover-done-${stepId}`} onClick={onDone}>
+            {doneLabel ??
+              t(locale, derived ? 'schedule.rollover.continue' : 'schedule.rollover.markDone')}
+          </Button>
+        }
+        // `undefined` and not an empty fragment when a step offers no way out: a fragment
+        // is truthy, and ActionBar would render an empty group and spread to both edges
+        // around nothing. Step 1 of a fresh rollover is exactly that case.
+        start={leaving.length > 0 ? <>{leaving}</> : undefined}
+      />
+      <p className="rollover-step-actions__meta" style={noteStyle}>
+        {derived ? (
+          <span data-testid={`rollover-derived-${stepId}`}>
+            {t(locale, 'schedule.rollover.derivedHint')}
+          </span>
+        ) : null}
+        {/* The step's own status, as a word. Colour is never the only carrier (SC 1.4.1). */}
+        <span data-testid={`rollover-step-status-${stepId}`}>
+          {`${t(locale, 'schedule.rollover.statusLabel')}: ${t(
+            locale,
+            `schedule.rollover.status.${status}`,
+          )}`}
         </span>
-      ) : null}
-      {/* The step's own status, as a word. Colour is never the only carrier (SC 1.4.1). */}
-      <span style={noteStyle} data-testid={`rollover-step-status-${stepId}`}>
-        {`${t(locale, 'schedule.rollover.statusLabel')}: ${t(
-          locale,
-          `schedule.rollover.status.${status}`,
-        )}`}
-      </span>
+      </p>
     </div>
   )
 }

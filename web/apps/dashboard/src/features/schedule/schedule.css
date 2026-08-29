@@ -1,0 +1,374 @@
+/* Artboard `3a` — the week board's coverage strip and its session-block states.
+ *
+ * Layout and state only; every value is a token. The block states are driven by a
+ * `data-coverage` attribute rather than a style object, so a state is one CSS rule and
+ * `3a`'s five appearances stay readable side by side. */
+
+.week-missing {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  font-size: var(--text-label);
+  color: var(--text-secondary);
+}
+
+.week-missing li {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-1);
+}
+
+/* The count is the part a manager scans; the label explains it. Tone colours the count
+ * only, so the strip does not become a row of coloured sentences. */
+.week-missing li > b {
+  font-size: var(--text-title);
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.week-missing li[data-tone="danger"] > b { color: var(--danger); }
+.week-missing li[data-tone="pending"] > b { color: var(--pending); }
+.week-missing li[data-tone="muted"] > b { color: var(--text-muted); }
+
+/* The block itself. This lived in a module-level `CSSProperties` applied inline — and an
+ * inline `border` beats any class, so the state rules below silently did nothing: the
+ * uncovered block rendered with the same hairline as a covered one even after it had a
+ * rule of its own. Layout in CSS, state in CSS, and the cascade works again. */
+.week-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  border: var(--border-width-hairline) solid var(--border);
+  font-size: var(--text-caption);
+  text-align: start;
+  cursor: pointer;
+}
+
+.week-block[data-coverage="cancelled"] {
+  background: var(--cancelled-tint);
+  color: var(--cancelled);
+  text-decoration: line-through;
+}
+
+/* `3a`'s block states. The shipped board drew two of the five, so a class with no coach
+ * looked exactly like a covered one — which is how two coachless classes sat unremarked
+ * on the 2026-08-28 staging capture. Border, not fill: the block already carries text on
+ * `--surface`, and tinting it would put body copy on a coloured ground at four different
+ * contrast ratios. */
+.week-block[data-coverage="uncovered"] {
+  border-color: var(--danger);
+  border-width: var(--border-width-strong);
+}
+
+.week-block[data-coverage="unmarked"] {
+  border-color: var(--pending);
+  border-style: dashed;
+}
+
+.week-block:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* The day-of-month beside the weekday name. Quieter than the name — it disambiguates the
+ * week, it is not what a manager reads first. */
+.week-day__date {
+  color: var(--text-muted);
+  font-weight: var(--weight-regular);
+  font-variant-numeric: tabular-nums;
+}
+
+/* `3a`'s ruled week grid: a time gutter, then one column per day.
+ *
+ * A CSS grid flips with `dir` on its own, which is exactly why G12 bans the physical
+ * properties that would not — `grid-template-columns` reads start-to-end, so the gutter
+ * lands on the right in Hebrew and the left in English with no branch here.
+ *
+ * `subgrid` is deliberately avoided: each row declares the same template, so a row that
+ * fails to render still leaves the others aligned. */
+.week-grid {
+  display: grid;
+  overflow-x: auto;
+}
+
+.week-grid__row {
+  display: grid;
+  grid-template-columns: 4.5rem repeat(7, minmax(6rem, 1fr));
+}
+
+.week-grid__gutter {
+  padding-block: var(--space-2);
+  padding-inline: var(--space-2);
+  font-size: var(--text-caption);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  text-align: start;
+  border-block-start: var(--border-width-hairline) solid var(--border);
+}
+
+.week-grid__head {
+  padding-block: var(--space-2);
+  font-size: var(--text-label);
+  font-weight: var(--weight-medium);
+  text-align: start;
+  padding-inline: var(--space-2);
+  border-block-end: var(--border-width-strong) solid var(--border);
+}
+
+/* Today's column is named by the whole column, not only its heading — a manager scanning
+ * the middle of the grid should not have to look back up to find which day they are in. */
+.week-grid__head[data-today] {
+  color: var(--fg);
+  border-block-end-color: var(--fg);
+}
+
+.week-grid__cell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-block-size: 3.5rem;
+  padding: var(--space-1);
+  border-block-start: var(--border-width-hairline) solid var(--border);
+
+  /* The rule between days. Only on the inline-start edge, so the grid does not gain a
+   * double border where two cells meet. */
+  border-inline-start: var(--border-width-hairline) solid var(--border);
+
+  /* The slot button below fills the cell absolutely, so the cell is its containing block. */
+  position: relative;
+}
+
+.week-grid__cell[data-today] {
+  background: color-mix(in srgb, var(--fg) 3%, transparent);
+}
+
+/* Picking a class up off the board (2026-08-29). */
+
+/* The held class. Dimmed and outlined rather than hidden: a manager needs to see where it
+ * is moving FROM while they choose where it moves to. */
+.week-block[data-moving] {
+  opacity: 0.55;
+  outline: var(--border-width-strong) dashed var(--fg);
+  outline-offset: 2px;
+}
+
+/* The whole cell is the target, so it fills the cell rather than sitting in it. It carries
+ * no visible affordance by default — spec `3a` is right that a grid of forty buttons is
+ * worse than a grid — and earns one only on hover, on focus, or while something is held. */
+.week-grid__slot {
+  position: absolute;
+  inset-block: 0;
+  inset-inline: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.week-grid__slot:hover {
+  background: color-mix(in srgb, var(--fg) 4%, transparent);
+}
+
+.week-grid__slot:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+/* While a class is held every cell is a destination. Said with a wash, not an outline:
+ * twenty-one dashed borders at once is a louder screen than the one it replaced, and this
+ * design's register is calm and dense. The cell being POINTED AT gets the outline, so
+ * exactly one destination is ever drawn. */
+.week-grid__cell[data-target] .week-grid__slot {
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
+}
+
+.week-grid__cell[data-target] .week-grid__slot:hover,
+.week-grid__cell[data-target] .week-grid__slot:focus-visible {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  border: var(--border-width-strong) dashed var(--accent);
+}
+
+/* The instruction while something is held. Sticky, because the grid scrolls and the
+ * manager needs the way out visible wherever they have scrolled to. */
+.week-moving {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding-block: var(--space-2);
+  padding-inline: var(--space-3);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+  border: var(--border-width-hairline) solid var(--accent);
+  font-size: var(--text-label);
+}
+
+.week-moving__hint {
+  margin-inline-end: auto;
+}
+
+/* The create-in-a-slot popover. Positioned from the cell's own rect and rendered OUTSIDE
+ * the grid, because `.week-grid` scrolls and would clip anything inside it. */
+.week-slot-popover {
+  position: fixed;
+  z-index: 40;
+  transform: translateX(-50%);
+  max-inline-size: min(30rem, calc(100vw - var(--space-8)));
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  border: var(--border-width-hairline) solid var(--border);
+  box-shadow: 0 8px 28px rgb(0 0 0 / 16%);
+}
+
+.week-slot-popover__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-block-end: var(--space-3);
+  font-size: var(--text-label);
+  color: var(--text-muted);
+}
+
+/* `3a`'s filter bar. A fieldset, so it has no border of its own to reset away. */
+.week-filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.week-filter label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-label);
+  color: var(--text-secondary);
+}
+
+.week-filter select {
+  font-family: inherit;
+  font-size: var(--text-label);
+  color: var(--fg);
+  background: var(--surface);
+  border: var(--border-width-hairline) solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding-block: var(--space-1);
+  padding-inline: var(--space-2);
+}
+
+.week-filter select:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+/* The completed counter is the one number in the strip that is not a problem. */
+.week-missing li[data-tone="done"] > b { color: var(--paid); }
+
+/* D5's month view. A month answers "which days are busy", not "when exactly" — thirty
+ * days of ruled hour rows would be mostly blank and unreadably tall — so it is day cells
+ * holding compact pills rather than the time grid the day and week views share. */
+.month-grid {
+  display: grid;
+  gap: 0;
+}
+
+.month-grid__row {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.month-grid__head {
+  padding-block: var(--space-2);
+  padding-inline: var(--space-2);
+  font-size: var(--text-label);
+  font-weight: var(--weight-medium);
+  text-align: start;
+  border-block-end: var(--border-width-strong) solid var(--border);
+}
+
+.month-grid__cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-block-size: 6rem;
+  padding: var(--space-1);
+  border-block-start: var(--border-width-hairline) solid var(--border);
+  border-inline-start: var(--border-width-hairline) solid var(--border);
+}
+
+/* Days of the neighbouring month, kept so the grid stays rectangular. Dimmed rather than
+ * blanked: a manager dragging their eye across the first row needs to see that the month
+ * starts on a Wednesday, not that three cells are broken. */
+.month-grid__cell[data-outside] {
+  background: color-mix(in srgb, var(--fg) 2%, transparent);
+  color: var(--text-muted);
+}
+
+.month-grid__cell[data-today] {
+  background: color-mix(in srgb, var(--fg) 4%, transparent);
+}
+
+.month-grid__date {
+  align-self: flex-start;
+  font-size: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+.month-grid__cell[data-today] .month-grid__date {
+  color: var(--on-fg);
+  background: var(--fg);
+  border-radius: var(--radius-pill);
+  padding-inline: var(--space-2);
+}
+
+/* One line per class. Truncated rather than wrapped: a cell whose height depends on the
+ * longest group name makes every row in the month a different height. */
+.month-grid__pill {
+  display: block;
+  inline-size: 100%;
+  text-align: start;
+  font-family: inherit;
+  font-size: var(--text-micro);
+  line-height: var(--leading-normal);
+  color: var(--fg);
+  background: var(--surface);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-xs);
+  padding-block: 1px;
+  padding-inline: var(--space-1);
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.month-grid__pill[data-coverage="uncovered"] {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.month-grid__pill[data-coverage="cancelled"] {
+  color: var(--cancelled);
+  text-decoration: line-through;
+}
+
+.month-grid__pill:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}

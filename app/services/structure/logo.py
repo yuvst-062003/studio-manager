@@ -150,8 +150,17 @@ SETTINGS_FIELDS = ("sport", "address", "phone", "parent_locales")
 
 
 def studio_public_fields(studio: Studio) -> dict[str, Any]:
-    """The merged view. `parent_locales` falls back to the studio's own default so a row
-    written before M1.9 still answers the question."""
+    """The merged view.
+
+    `parent_locales` falls back to **all three** §9 ships, not to the studio's own default
+    (owner request, 2026-08-29: "this should not be a choice but a default -- the 3
+    languages should be available in the app"). Falling back to `[default_locale]` meant a
+    club that never opened the setting offered parents Hebrew only, and the Russian-speaking
+    parent of a Hebrew-speaking club got a Hebrew app with no way to say otherwise.
+
+    A club that HAS narrowed the list keeps its choice: this is the value for a row that
+    never set one, and the הגדרות panel is still where it can be narrowed on purpose.
+    """
     blob = studio.settings or {}
     return {
         "id": studio.id,
@@ -163,7 +172,7 @@ def studio_public_fields(studio: Studio) -> dict[str, Any]:
         "sport": blob.get("sport"),
         "address": blob.get("address"),
         "phone": blob.get("phone"),
-        "parent_locales": blob.get("parent_locales") or [studio.default_locale],
+        "parent_locales": blob.get("parent_locales") or list(SUPPORTED_LOCALES),
         # The הגדרות panel reads current landing copy back; a writer whose reads come
         # back empty looks like a save that failed.
         "landing": blob.get("landing") if isinstance(blob.get("landing"), dict) else {},

@@ -1,0 +1,537 @@
+/* §5.1's wizard — the layout its steps share.
+ *
+ * Every step was written as a flat run of headings, fields and buttons with no layer
+ * between them: a `<fieldset>` with the UA's own border, choices abutting because JSX
+ * strips the whitespace between elements, and a footer of loose siblings. This file is
+ * that missing layer. Logical properties only (D10).
+ */
+
+.setup-step {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+
+  /* A reading measure, not the width of whatever contains it. Two things go wrong without
+   * it on a 1440px dashboard: a text field stretches to 850px for a club name of twenty
+   * characters, and the footer's two buttons end up 890px apart — which is far enough that
+   * they stop reading as a pair and become two unrelated controls, the exact defect this
+   * pass exists to remove. */
+  max-inline-size: 44rem;
+}
+
+/* A named group of related controls. `border: 0` first: a fieldset carries a browser
+ * border and 2px of inline padding by default, and an undesigned box around a designed
+ * one reads as a rendering fault rather than a grouping. */
+.setup-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.setup-group__legend {
+  padding: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-tight);
+}
+
+/* Choices along a row. `.studio-choice` already spaces a box from its OWN label; nothing
+ * spaced one choice from the NEXT, so `עברית✓English☐Русский✓` ran together. */
+.setup-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-5);
+}
+
+/* The fields grid. `minmax(0, …)` and not `1fr`: a grid child's min-width is auto, so a
+ * long club name would widen the column past a 390px viewport. */
+.setup-fields {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fit, minmax(min(18rem, 100%), 1fr));
+}
+
+/* The logo drop zone. Square, and no wider than it is tall — it was `max-inline-size:
+ * 16rem` inside a full-width column, so it hugged one edge with a void beside it. */
+.setup-logo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  aspect-ratio: 1 / 1;
+  max-inline-size: 14rem;
+  padding: var(--space-4);
+  border: var(--border-width-hairline) dashed var(--border-strong);
+  border-radius: var(--radius-xl);
+  text-align: center;
+}
+
+.setup-logo__hint {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+}
+
+.setup-logo img {
+  max-inline-size: 100%;
+  block-size: auto;
+  border-radius: var(--radius-md);
+}
+
+.setup-logo__error {
+  margin: 0;
+  color: var(--danger);
+  font-size: var(--text-caption);
+}
+
+/* The step's own state, below its actions and never among them: it describes the step,
+ * it is not something to press. Same rule the rollover wizard's footer follows. */
+.setup-step__meta {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-caption);
+}
+
+/* ── The wizard's chrome — artboards 5c–5f ────────────────────────────────────────────
+ *
+ * The four artboards disagree about where the step list goes: `5d` draws it, `5e` and `5f`
+ * draw only the progress bar, and 5d's spec rules the list is right without saying where.
+ * Inline under the header is why 5e dropped it — there is no room once a step has content.
+ * A persistent RAIL is the answer: it is not competing with the step for the same band.
+ *
+ * The reassurance line lives in the rail rather than under the welcome heading. `5c` shows
+ * it once and 5d–5f never show it again, but an owner abandons a wizard on step 3, not
+ * step 1 — which is exactly when they need to read that nothing is final.
+ */
+
+.setup-shell {
+  display: flex;
+  flex-direction: column;
+  min-block-size: 100%;
+  background: var(--ground);
+}
+
+.setup-body > main {
+  grid-column: 2;
+  grid-row: 1;
+  min-inline-size: 0;
+}
+
+.setup-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding-block: var(--space-3);
+  padding-inline: var(--space-5);
+  background: var(--surface);
+  border-block-end: var(--border-width-hairline) solid var(--border);
+}
+
+.setup-header__brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--text-title);
+  font-weight: var(--weight-semibold);
+
+  /* Takes the free space so the counter and the exit sit on the far edge in either
+   * direction, with no physical property naming which edge that is. */
+  margin-inline-end: auto;
+}
+
+.setup-header__mark {
+  inline-size: 28px;
+  block-size: 28px;
+  border-radius: var(--radius-sm);
+  background: var(--fg);
+  flex: none;
+}
+
+.setup-header__count {
+  color: var(--text-secondary);
+  font-size: var(--text-label);
+  font-variant-numeric: tabular-nums;
+}
+
+/* A determinate bar, filled to the step's fraction. It fills from the inline START, so it
+ * grows leftwards in Hebrew and rightwards in English without a branch. */
+.setup-progress {
+  block-size: 3px;
+  background: var(--border);
+}
+
+.setup-progress__fill {
+  block-size: 100%;
+  background: var(--fg);
+  transition: inline-size var(--motion-base) var(--ease-standard);
+}
+
+.setup-body {
+  display: grid;
+
+  /* Two tracks, PLACED rather than filled in DOM order. Track 1 is the inline-start edge
+   * — the right in Hebrew, the left in English — which is where `DashNav` sits and where
+   * both the artboards and the Stitch pass put the rail.
+   *
+   * The placement is explicit because the step body stays FIRST in the DOM: a keyboard or
+   * screen-reader user should reach the thing they came to fill in before a list of six
+   * links, and letting the grid fill by source order would force the opposite. */
+  grid-template-columns: 15rem 1fr;
+  gap: var(--space-6);
+  padding: var(--space-6);
+  align-items: start;
+}
+
+/* §6.4 — a manager on a phone is a normal case, and a 15rem rail is not. Below that the
+ * rail goes above the step: still present, still naming where they are, no longer a
+ * column. */
+@media (width <= 860px) {
+  .setup-body {
+    grid-template-columns: 1fr;
+  }
+
+  .setup-rail,
+  .setup-body > main {
+    grid-column: 1;
+  }
+
+  .setup-rail {
+    grid-row: 1;
+  }
+
+  .setup-body > main {
+    grid-row: 2;
+  }
+}
+
+.setup-rail {
+  grid-column: 1;
+  grid-row: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  background: var(--surface);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-lg);
+  position: sticky;
+  inset-block-start: var(--space-4);
+}
+
+.setup-rail__title {
+  margin: 0;
+  font-size: var(--text-title);
+  font-weight: var(--weight-semibold);
+}
+
+.setup-rail__reassure {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--leading-normal);
+}
+
+.setup-rail__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+/* A node is a state, not a link, in v1: letting a manager jump to step 5 before step 2
+ * means the belt system does not exist when prices reference it. It is still a button —
+ * a step already reached can be returned to — and disabled where it cannot. */
+.setup-rail__node {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  inline-size: 100%;
+  padding-block: var(--space-2);
+  padding-inline: var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  font-family: inherit;
+  font-size: var(--text-label);
+  color: var(--text-secondary);
+  text-align: start;
+  cursor: pointer;
+}
+
+.setup-rail__node:disabled {
+  cursor: not-allowed;
+  color: var(--text-muted);
+}
+
+.setup-rail__node:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.setup-rail__node[aria-current="step"] {
+  background: color-mix(in srgb, var(--fg) 6%, transparent);
+  color: var(--fg);
+  font-weight: var(--weight-semibold);
+}
+
+/* `5d`'s three appearances: done is a filled success circle with a check, current a filled
+ * ink circle, upcoming an outlined one. The circle is never the only carrier — every node
+ * also has its state as a word, off-screen for a screen reader (SC 1.4.1). */
+.setup-rail__dot {
+  inline-size: 20px;
+  block-size: 20px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-circle);
+  border: var(--border-width-strong) solid var(--border-strong);
+  font-size: var(--text-micro);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+.setup-rail__node[data-state="done"] .setup-rail__dot {
+  background: var(--paid);
+  border-color: var(--paid);
+  color: var(--on-accent);
+}
+
+.setup-rail__node[data-state="current"] .setup-rail__dot {
+  background: var(--fg);
+  border-color: var(--fg);
+  color: var(--on-fg);
+}
+
+/* ── Step 3's weekly times (owner request, 2026-08-29) ────────────────────────────────
+ * A group trains the same days at the same hours every week, so a slot is a weekday and
+ * an hour range — never a date. */
+
+.setup-group-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding-block: var(--space-3);
+  border-block-start: var(--border-width-hairline) solid var(--border);
+}
+
+.setup-group-row:first-child {
+  border-block-start: 0;
+}
+
+.setup-group-row__name {
+  font-weight: var(--weight-semibold);
+  font-size: var(--text-body);
+}
+
+.setup-group-row__times-label {
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+
+  /* Pushes the rows onto their own line, so a group with three slots reads as one block
+   * rather than a paragraph of controls that happens to wrap. */
+  flex-basis: 100%;
+}
+
+.setup-slot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-basis: 100%;
+  flex-wrap: wrap;
+}
+
+.setup-slot select,
+.setup-slot input[type="time"] {
+  font-family: inherit;
+  font-size: var(--text-label);
+  color: var(--fg);
+  background: var(--surface);
+  border: var(--border-width-hairline) solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding-block: var(--space-1);
+  padding-inline: var(--space-2);
+}
+
+.setup-slot select:focus-visible,
+.setup-slot input[type="time"]:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+.setup-group-row__failed {
+  color: var(--danger);
+  font-size: var(--text-caption);
+  flex-basis: 100%;
+}
+
+/* Waiting on a training year is not an error — the manager did nothing wrong and there is
+ * nothing here for them to fix. Pending, not danger. */
+.setup-group-row__failed[data-status="pending"] {
+  color: var(--pending);
+}
+
+.setup-week {
+  padding: var(--space-4);
+  background: var(--surface);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.setup-week__title {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-title);
+  font-weight: var(--weight-semibold);
+}
+
+.setup-week__empty,
+.setup-week__none {
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+  margin: 0;
+}
+
+.setup-week__days {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  gap: var(--space-3);
+}
+
+.setup-week__day {
+  display: block;
+  font-size: var(--text-label);
+  font-weight: var(--weight-medium);
+  padding-block-end: var(--space-1);
+  border-block-end: var(--border-width-hairline) solid var(--border);
+  margin-block-end: var(--space-2);
+}
+
+.setup-week__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--text-caption);
+}
+
+.setup-week__list li {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Steps 5 and 6 ────────────────────────────────────────────────────────────────────
+ * The same two-column shape the other steps use: what you are doing, beside what it has
+ * produced so far. */
+
+.setup-two-col {
+  display: grid;
+  grid-template-columns: 1fr minmax(0, 17rem);
+  gap: var(--space-5);
+  align-items: start;
+}
+
+@media (width <= 900px) {
+  .setup-two-col {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* §3.1's two coach roles, side by side, each stating what it can and cannot do. The step
+ * offered a select labelled "role": an owner inviting their first coach had no way to
+ * know which to pick, and the difference is a real permission. */
+.setup-roles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.setup-role {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  background: var(--surface);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+}
+
+.setup-role[data-selected="true"] {
+  border-color: var(--fg);
+  border-width: var(--border-width-strong);
+}
+
+.setup-role:has(:focus-visible) {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.setup-role__what {
+  color: var(--text-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--leading-normal);
+}
+
+.setup-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--surface);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.setup-panel__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  font-size: var(--text-label);
+}
+
+.setup-panel__list li {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding-block-end: var(--space-3);
+  border-block-end: var(--border-width-hairline) solid var(--border);
+}
+
+.setup-panel__list li:last-child {
+  border-block-end: 0;
+  padding-block-end: 0;
+}
+
+/* An invitation is pending until the coach signs in. Said in words, and quietly: nothing
+ * has gone wrong, it is simply waiting. */
+.setup-panel__awaiting,
+.setup-panel__empty {
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+  margin: 0;
+}
+
+.setup-panel__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}

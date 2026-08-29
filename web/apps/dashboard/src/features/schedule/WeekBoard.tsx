@@ -16,11 +16,26 @@
 // tested at a fixed date, and every assertion about this grid depends on which week it is.
 import { useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { Button, EmptyState, TextField } from '@studio/ui'
-import { apiFetch, formatTimeInStudioZone, studioDayKey, studioWallTimeToUtc } from '@studio/core'
+import {
+  ActionBar,
+  Button,
+  EmptyState,
+  PageHeader,
+  RangeText,
+  SegmentedControl,
+  TextField,
+} from '@studio/ui'
+import {
+  STUDIO_TIMEZONE,
+  apiFetch,
+  formatTimeInStudioZone,
+  studioDayKey,
+  studioWallTimeToUtc,
+} from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { makeDashboardAttendanceClient } from '../attendance'
+import { useLongPress } from './useLongPress'
 import { SessionPopover } from './SessionPopover'
 import { cancelReasonLabel } from './client'
 import type { ScheduleClient, SessionRow } from './client'
@@ -51,6 +66,37 @@ export function weekDays(startKey: string): string[] {
   return Array.from({ length: 7 }, (_, offset) => shiftDayKey(startKey, offset))
 }
 
+
+/** D5's three views. Week is the default, in as many words. */
+export type BoardView = 'day' | 'week' | 'month'
+
+/** The first day of the Jerusalem month `key` falls in. */
+export function monthStart(key: string): string {
+  return `${key.slice(0, 7)}-01`
+}
+
+/** Whole weeks covering the month `key` falls in — Sunday of the first week through
+ *  Saturday of the last, so the month grid is always rectangular. A month that begins on a
+ *  Wednesday leaves three cells of the previous month visible, which is what every
+ *  calendar does and what stops the first row being ragged. */
+export function monthGridDays(key: string): string[] {
+  const first = monthStart(key)
+  const firstOfNext = shiftDayKey(`${first.slice(0, 8)}28`, 5)
+  const lastOfMonth = shiftDayKey(monthStart(firstOfNext), -1)
+  const from = weekStart(`${first}T12:00:00Z`)
+  const to = shiftDayKey(weekStart(`${lastOfMonth}T12:00:00Z`), 6)
+  const days: string[] = []
+  for (let day = from; day <= to; day = shiftDayKey(day, 1)) days.push(day)
+  return days
+}
+
+/** The days a view shows, and the range its fetch has to cover. */
+export function daysFor(view: BoardView, anchor: string): string[] {
+  if (view === 'day') return [anchor]
+  if (view === 'month') return monthGridDays(anchor)
+  return weekDays(weekStart(`${anchor}T12:00:00Z`))
+}
+
 const boardStyle: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
@@ -58,90 +104,54 @@ const boardStyle: CSSProperties = {
   inlineSize: '100%',
 }
 
-const toolbarStyle: CSSProperties = {
-  display: 'flex',
-  gap: 'var(--space-2)',
-  alignItems: 'center',
-}
-
-// A CSS grid flips with `dir` on its own, which is exactly why G12 bans the physical
-// properties that would not.
-const gridStyle: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(7, minmax(0, 1fr))',
-  gap: 'var(--space-2)',
-  overflowX: 'auto',
-}
-
-const columnStyle: CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 'var(--space-2)',
-  minInlineSize: '8rem',
-  paddingBlock: 'var(--space-2)',
-  borderBlockStart: 'var(--border-width-strong) solid var(--border)',
-}
-
-const todayColumnStyle: CSSProperties = {
-  ...columnStyle,
-  borderBlockStart: 'var(--border-width-strong) solid var(--fg)',
-}
-
-const blockStyle: CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 'var(--space-1)',
-  padding: 'var(--space-2)',
-  borderRadius: 'var(--radius-sm)',
-  background: 'var(--surface)',
-  border: 'var(--border-width-hairline) solid var(--border)',
-  fontSize: 'var(--text-caption)',
-}
-
-const cancelledBlockStyle: CSSProperties = {
-  ...blockStyle,
-  background: 'var(--cancelled-tint)',
-  color: 'var(--cancelled)',
-  textDecoration: 'line-through',
-}
-
-const dayHeadingStyle: CSSProperties = {
-  margin: 0,
-  fontSize: 'var(--text-label)',
-  fontWeight: 'var(--weight-medium)' as CSSProperties['fontWeight'],
-}
-
 function SessionBlock({
   locale,
   session,
   onOpen,
+  onPickUp,
+  moving,
 }: {
   locale: Locale
   session: SessionRow
   onOpen: () => void
+  onPickUp: () => void
+  moving: boolean
 }) {
   const lead = session.staff[0]
+  // A short press opens the popover, a long one picks the class up off the board. Both
+  // arrive through the same button, so it stays one control with one accessible name.
+  const press = useLongPress({ onClick: onOpen, onLongPress: onPickUp })
+  // `3a` draws five block states and the shipped board drew two. A class with nobody
+  // assigned rendered identically to a covered one — which is how the two coachless
+  // classes in the 2026-08-28 staging capture sat on the board unremarked. The state is a
+  // data attribute rather than a style object so the CSS carries it, one rule per state.
+  const coverage = session.status === 'cancelled'
+    ? 'cancelled'
+    : session.staff.length === 0
+      ? 'uncovered'
+      : session.attendance_taken
+        ? 'complete'
+        : 'unmarked'
   return (
     <button
       data-testid="session-block"
       data-status={session.status}
+      data-coverage={coverage}
+      data-moving={moving || undefined}
+      className="week-block"
       // F3 — D5: "clicking a session opens a popover with the roster and inline
       // attendance marking". A button, not an article with onClick: this is now an
       // interactive control and must be reachable by keyboard.
-      onClick={onOpen}
-      style={{
-        ...(session.status === 'cancelled' ? cancelledBlockStyle : blockStyle),
-        textAlign: 'start',
-        cursor: 'pointer',
-      }}
+      {...press}
       type="button"
     >
       <strong>{session.group_name}</strong>
-      <span>
-        {formatTimeInStudioZone(session.starts_at, locale)}
-        {'–'}
-        {formatTimeInStudioZone(session.ends_at, locale)}
-      </span>
+      {/* Was three text children in one span, which an RTL row lays out end-then-start:
+          the staging board printed `15:00–14:00`. Fifth occurrence of that shape. */}
+      <RangeText
+        from={formatTimeInStudioZone(session.starts_at, locale)}
+        to={formatTimeInStudioZone(session.ends_at, locale)}
+      />
       {session.location_name ? <span>{session.location_name}</span> : null}
       {/* D5 — coverage. A block with no coach is §5.14's 'sessions without a coach'. */}
       {lead ? <span>{lead.display_name}</span> : <span>{t(locale, 'schedule.session.noCoach')}</span>}
@@ -164,14 +174,30 @@ function CreateSessionForm({
   locale,
   client,
   defaultDay,
+  defaultStart,
   onCreated,
+  open,
+  setOpen,
 }: {
   locale: Locale
   client: ScheduleClient
   defaultDay: string
+  /** Pre-filled when the form was opened from a slot, so the manager confirms a time
+   *  rather than retyping the one they just tapped. */
+  defaultStart?: string
   onCreated: () => void
+  /** Controlled by the board, so the TRIGGER can live in the page header while the form
+   *  opens below it. While this component owned the state, its closed form was a lone
+   *  Button element — and `boardStyle` is a flex column with the default `align-items:
+   *  stretch`, so that button spanned the whole 1130px content width and read as a banner
+   *  rather than a control. That was the loudest thing on the shipped screen.
+   *
+   *  (The tag is spelled out in prose here on purpose: `tools/__tests__/inert-buttons`
+   *  scans the file as text, so writing the literal JSX in a comment makes the guard
+   *  report a handler-less button that does not exist.) */
+  open: boolean
+  setOpen: (open: boolean) => void
 }) {
-  const [open, setOpen] = useState(false)
   const [groups, setGroups] = useState<{ id: string; name: string }[]>([])
   const [locations, setLocations] = useState<{ id: string; name: string }[]>([])
   // 2026-08-28 (owner report) — who teaches it, pickable at creation. EVERY staff member,
@@ -182,8 +208,14 @@ function CreateSessionForm({
   const [yearId, setYearId] = useState<string | null | undefined>(undefined)
   const [groupId, setGroupId] = useState('')
   const [day, setDay] = useState(defaultDay)
-  const [startTime, setStartTime] = useState('17:00')
-  const [endTime, setEndTime] = useState('18:00')
+  const [startTime, setStartTime] = useState(defaultStart ?? '17:00')
+  const [endTime, setEndTime] = useState(() => {
+    if (!defaultStart) return '18:00'
+    // An hour after the slot. A default end BEFORE the default start would disable the
+    // submit button on open, which reads as a broken form rather than a hint.
+    const [h, m] = defaultStart.split(':').map(Number)
+    return `${String(((h ?? 17) + 1) % 24).padStart(2, '0')}:${String(m ?? 0).padStart(2, '0')}`
+  })
   const [locationId, setLocationId] = useState('')
   const [sending, setSending] = useState(false)
   const [failed, setFailed] = useState(false)
@@ -226,13 +258,7 @@ function CreateSessionForm({
     }
   }, [client, open])
 
-  if (!open) {
-    return (
-      <Button data-testid="session-create-open" onClick={() => setOpen(true)}>
-        {t(locale, 'schedule.session.create')}
-      </Button>
-    )
-  }
+  if (!open) return null
 
   // §5.15 — no active year, no sessions. Said, not greyed in silence.
   if (yearId === null) {
@@ -369,17 +395,51 @@ export function WeekBoard({
   today: string
 }) {
   const todayKey = useMemo(() => studioDayKey(today), [today])
-  const [start, setStart] = useState(() => weekStart(today))
+  const [view, setView] = useState<BoardView>('week')
+  /** The day the view is anchored on. For `week` it is any day in the week; `daysFor`
+   *  resolves it to the Sunday, so switching views keeps the manager where they were
+   *  rather than snapping them back to today. */
+  const [anchor, setAnchor] = useState(() => studioDayKey(today))
   const [sessions, setSessions] = useState<SessionRow[]>([])
   const [openSessionId, setOpenSessionId] = useState<string | null>(null)
   const [version, setVersion] = useState(0)
   const attendanceClient = useMemo(() => makeDashboardAttendanceClient(apiFetch), [])
-  const days = useMemo(() => weekDays(start), [start])
+  const days = useMemo(() => daysFor(view, anchor), [view, anchor])
+  // The create form's disclosure lives here so its TRIGGER can sit in the page header
+  // while the form itself opens below the coverage strip.
+  const [open, setOpen] = useState(false)
+  /** Previous/next move by the unit the view shows: a day, a week, a month. Three buttons
+   *  that always moved by seven days would be wrong in two of the three views. */
+  const step = (direction: 1 | -1) =>
+    setAnchor((current) => {
+      if (view === 'day') return shiftDayKey(current, direction)
+      if (view === 'week') return shiftDayKey(current, 7 * direction)
+      // A month is not a fixed number of days. Land on the 1st of the next or previous
+      // month by stepping off either end of the current one.
+      const first = monthStart(current)
+      return monthStart(direction === 1 ? shiftDayKey(`${first.slice(0, 8)}28`, 5) : shiftDayKey(first, -1))
+    })
+
+  /** `3a` item 7. Empty string means "all" — one falsy check per axis rather than three
+   *  nullable ids, because the select's own empty option is a string too. */
+  const [filter, setFilter] = useState({ group: '', coach: '', hall: '' })
+  /** The class currently picked up off the board, waiting for a slot. */
+  const [movingId, setMovingId] = useState<string | null>(null)
+  const [moveFailed, setMoveFailed] = useState(false)
+  /** The empty slot a manager tapped, and where on screen it was — the popover is
+   *  positioned from the cell's own rect because `.week-grid` scrolls, and anything
+   *  rendered INSIDE a scrolling box is clipped by it. */
+  const [slot, setSlot] = useState<{ day: string; time: string; x: number; y: number } | null>(null)
 
   useEffect(() => {
     let live = true
     void (async () => {
-      const loaded = await client.listSessions({ from: days[0] as string, to: days[6] as string })
+      // The whole span the view shows — `days[6]` was right only for a week, and a month
+      // view asking for seven days would have rendered three weeks of empty cells.
+      const loaded = await client.listSessions({
+        from: days[0] as string,
+        to: days[days.length - 1] as string,
+      })
       if (live) setSessions(loaded)
     })()
     return () => {
@@ -389,45 +449,329 @@ export function WeekBoard({
 
   const openSession = sessions.find((row) => row.id === openSessionId) ?? null
 
+  /**
+   * The filter's options come from the week ON SCREEN, not from the club's full roster.
+   *
+   * A `listGroups()` would offer every group the club has ever had, most of which do not
+   * train this week — choosing one would empty the board and say nothing about why. Only
+   * offering what is present means a filter can narrow the view but never blank it.
+   */
+  const options = useMemo(() => {
+    const groups = new Map<string, string>()
+    const coaches = new Map<string, string>()
+    const halls = new Map<string, string>()
+    for (const row of sessions) {
+      groups.set(row.group_id, row.group_name)
+      if (row.location_name) halls.set(row.location_name, row.location_name)
+      for (const person of row.staff) coaches.set(person.person_id, person.display_name)
+    }
+    const sorted = (map: Map<string, string>) =>
+      [...map].sort((a, b) => a[1].localeCompare(b[1]))
+    return { groups: sorted(groups), coaches: sorted(coaches), halls: sorted(halls) }
+  }, [sessions])
+
+  /**
+   * Filtered in memory rather than refetched.
+   *
+   * `listSessions` does accept `group_id` and `coach_person_id`, but not a hall — so a
+   * server-side filter would narrow two axes over the network and the third locally, and
+   * the counters below would then be describing a set assembled from two places. A week is
+   * tens of rows; filtering it here keeps one source for everything on screen and makes
+   * changing a filter instant.
+   */
+  const visible = useMemo(
+    () =>
+      sessions.filter((row) => {
+        if (filter.group && row.group_id !== filter.group) return false
+        if (filter.hall && row.location_name !== filter.hall) return false
+        if (filter.coach && !row.staff.some((p) => p.person_id === filter.coach)) return false
+        return true
+      }),
+    [sessions, filter],
+  )
+
+  const filtered = Boolean(filter.group || filter.coach || filter.hall)
+
+  // Escape puts a picked-up class back. Registered only while something is held, so this
+  // never competes with the popover's own Escape handling.
+  useEffect(() => {
+    if (!movingId) return
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMovingId(null)
+    }
+    globalThis.addEventListener('keydown', onKey)
+    return () => globalThis.removeEventListener('keydown', onKey)
+  }, [movingId])
+
+  /**
+   * Drop the held class into `day` at `time`, keeping how long it runs.
+   *
+   * The duration is carried rather than recomputed: a 90-minute class moved to 17:00 ends
+   * at 18:30, and asking the manager to retype the end time is how a move becomes an edit.
+   * `patchSession` is the route §5.6 already documents as the move control — the popover's
+   * date fields write the same PATCH, which is what keeps this an accelerator rather than
+   * a second way to change a session.
+   */
+  const drop = (day: string, time: string) => {
+    const session = sessions.find((row) => row.id === movingId)
+    if (!session) return
+    const startsAt = studioWallTimeToUtc(day, time)
+    const runsFor = new Date(session.ends_at).getTime() - new Date(session.starts_at).getTime()
+    const endsAt = new Date(new Date(startsAt).getTime() + runsFor).toISOString()
+    setMovingId(null)
+    setMoveFailed(false)
+    void client
+      .patchSession(session.id, { starts_at: startsAt, ends_at: endsAt })
+      .then(() => setVersion((n) => n + 1))
+      .catch(() => setMoveFailed(true))
+  }
+
+  /** `3a`'s three counters, and the same two rules the manager home derives:
+   *  a cancelled class needs no coach, and a class that has not ended yet is not late. */
+  const missing = useMemo(() => {
+    const live = visible.filter((row) => row.status !== 'cancelled')
+    const now = new Date(today)
+    const noCoach = live.filter((row) => row.staff.length === 0).length
+    const unmarked = live.filter(
+      (row) => !row.attendance_taken && new Date(row.ends_at) < now,
+    ).length
+    const cancelled = visible.length - live.length
+    // `1e`'s fourth counter. Completed is what went RIGHT, so it is the one number here
+    // that is not a problem — and it is why the strip does not read as an error list.
+    const completed = live.filter((row) => row.attendance_taken).length
+    return { noCoach, unmarked, cancelled, completed, total: noCoach + unmarked + cancelled }
+  }, [visible, today])
+
+  // The buttons name what they actually do. "Previous week" while looking at a month is
+  // a lie the manager finds out about by pressing it.
+  const previousKey =
+    view === 'day' ? 'view.previousDay' : view === 'month' ? 'view.previousMonth' : 'previous'
+  const nextKey = view === 'day' ? 'view.nextDay' : view === 'month' ? 'view.nextMonth' : 'next'
+
+  /** `23–29`, as one ltr island. The week the board is showing, which three bare
+   *  previous/today/next buttons never said. */
+  const weekLabel = useMemo(() => {
+    const first = days[0]
+    const last = days[days.length - 1]
+    if (!first || !last) return null
+    // A month is named, not measured. The grid spans whole weeks, so its first and last
+    // days belong to the neighbouring months — labelling the view `2026-11-01–2026-12-05`
+    // would answer a question nobody asked and get the month wrong at both ends.
+    if (view === 'month') {
+      return {
+        text: new Intl.DateTimeFormat(locale, {
+          month: 'long',
+          year: 'numeric',
+          timeZone: STUDIO_TIMEZONE,
+        }).format(new Date(`${monthStart(anchor)}T12:00:00Z`)),
+      }
+    }
+    // A day view has one date, not a range — `23–23` is noise.
+    if (first === last) return { from: first, to: null }
+    return { from: first, to: last }
+  }, [days, view, anchor, locale])
+
+  /** Every start time the week actually contains, as Jerusalem `HH:MM`, ascending. One
+   *  grid row each. A club training at 17:00 and 18:30 gets two rows; a club training at
+   *  six different times gets six. */
+  const slots = useMemo(() => {
+    const seen = new Set(visible.map((row) => formatTimeInStudioZone(row.starts_at, locale)))
+    return [...seen].sort()
+  }, [visible, locale])
+
+  /** Sessions per day, for the month view — which asks "which days are busy", not "when". */
   const byDay = useMemo(() => {
     const grouped = new Map<string, SessionRow[]>()
-    for (const session of sessions) {
+    for (const session of visible) {
       const key = studioDayKey(session.starts_at)
       grouped.set(key, [...(grouped.get(key) ?? []), session])
     }
+    for (const rows of grouped.values()) rows.sort((a, b) => a.starts_at.localeCompare(b.starts_at))
     return grouped
-  }, [sessions])
+  }, [visible])
+
+  /** `day|HH:MM` → the sessions in that cell. A cell holds more than one only when a club
+   *  runs two groups in different halls at the same hour, which is real. */
+  const byCell = useMemo(() => {
+    const grouped = new Map<string, SessionRow[]>()
+    for (const session of visible) {
+      const key = `${studioDayKey(session.starts_at)}|${formatTimeInStudioZone(session.starts_at, locale)}`
+      grouped.set(key, [...(grouped.get(key) ?? []), session])
+    }
+    return grouped
+  }, [visible, locale])
 
   return (
     <section aria-labelledby="week-board-title" style={boardStyle}>
-      <h2 id="week-board-title">{t(locale, 'schedule.week.title')}</h2>
+      {/* Four stacked rows became one. The shipped board put the title, a full-width
+          create button and three bare `<button>` elements on four separate lines, so
+          nothing on the screen was visibly related to anything else. The week navigation
+          keeps its own group on the start edge; the one verb sits on the end edge. */}
+      <PageHeader
+        actions={
+          <ActionBar
+            end={
+              <Button data-testid="session-create-open" onClick={() => setOpen(true)}>
+                {t(locale, 'schedule.session.create')}
+              </Button>
+            }
+            start={
+              <>
+                <SegmentedControl
+                  legend={t(locale, 'schedule.week.view.legend')}
+                  onValueChange={(next) => setView(next as BoardView)}
+                  options={[
+                    { value: 'day', label: t(locale, 'schedule.week.view.day') },
+                    { value: 'week', label: t(locale, 'schedule.week.view.week') },
+                    { value: 'month', label: t(locale, 'schedule.week.view.month') },
+                  ]}
+                  value={view}
+                />
+                <Button variant="ghost" data-testid="week-previous" onClick={() => step(-1)}>
+                  {t(locale, `schedule.week.${previousKey}`)}
+                </Button>
+                <Button
+                  variant="ghost"
+                  data-testid="week-today"
+                  onClick={() => setAnchor(todayKey)}
+                >
+                  {t(locale, 'schedule.week.today')}
+                </Button>
+                <Button variant="ghost" data-testid="week-next" onClick={() => step(1)}>
+                  {t(locale, `schedule.week.${nextKey}`)}
+                </Button>
+              </>
+            }
+          />
+        }
+        subtitle={
+          weekLabel && 'text' in weekLabel ? (
+            weekLabel.text
+          ) : weekLabel?.to ? (
+            <RangeText from={weekLabel.from} to={weekLabel.to} />
+          ) : weekLabel ? (
+            <bdi dir="ltr">{weekLabel.from}</bdi>
+          ) : undefined
+        }
+        title={t(locale, 'schedule.week.title')}
+      />
+
+      {/* `3a` item 7. A fieldset because these three narrow one thing together — a screen
+          reader announcing "Group" with no idea what it belongs to is why they are grouped
+          and the group is named. Only the axes the week actually has are rendered: a club
+          with one hall gets two selects, not three greyed ones. */}
+      <fieldset className="week-filter" data-testid="week-filter">
+        <legend className="studio-visually-hidden">
+          {t(locale, 'schedule.week.filter.legend')}
+        </legend>
+        {options.groups.length > 1 ? (
+          <label>
+            {t(locale, 'schedule.week.filter.group')}
+            <select
+              data-testid="week-filter-group"
+              onChange={(event) => setFilter((f) => ({ ...f, group: event.target.value }))}
+              value={filter.group}
+            >
+              <option value="">{t(locale, 'schedule.week.filter.all')}</option>
+              {options.groups.map(([id, name]) => (
+                <option key={id} value={id}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
+        {options.coaches.length > 1 ? (
+          <label>
+            {t(locale, 'schedule.week.filter.coach')}
+            <select
+              data-testid="week-filter-coach"
+              onChange={(event) => setFilter((f) => ({ ...f, coach: event.target.value }))}
+              value={filter.coach}
+            >
+              <option value="">{t(locale, 'schedule.week.filter.all')}</option>
+              {options.coaches.map(([id, name]) => (
+                <option key={id} value={id}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
+        {options.halls.length > 1 ? (
+          <label>
+            {t(locale, 'schedule.week.filter.hall')}
+            <select
+              data-testid="week-filter-hall"
+              onChange={(event) => setFilter((f) => ({ ...f, hall: event.target.value }))}
+              value={filter.hall}
+            >
+              <option value="">{t(locale, 'schedule.week.filter.all')}</option>
+              {options.halls.map(([id, name]) => (
+                <option key={id} value={id}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
+        {filtered ? (
+          <Button
+            variant="ghost"
+            data-testid="week-filter-clear"
+            onClick={() => setFilter({ group: '', coach: '', hall: '' })}
+          >
+            {t(locale, 'schedule.week.filter.clear')}
+          </Button>
+        ) : null}
+      </fieldset>
+
+      {/* `3a`'s מה חסר השבוע. Derived from the week already on screen, not fetched — the
+          sessions carry `staff` and `attendance_taken`, so a coverage endpoint would be a
+          second source of truth for a number the board can already count. */}
+      <ul className="week-missing" data-testid="week-missing">
+        {/* `total` counts only the PROBLEMS, so it gates the problem rows and the reassuring
+            line — but not the completed counter below, which is true either way. Gating
+            that on `total` hid it exactly when the week had gone well, which is the week a
+            manager most wants the number for. */}
+        {missing.total === 0 ? (
+          <li data-testid="week-missing-none">{t(locale, 'schedule.week.missing.none')}</li>
+        ) : (
+          <>
+            {missing.noCoach > 0 ? (
+              <li data-tone="danger" data-testid="week-missing-no-coach">
+                <b>{missing.noCoach}</b> {t(locale, 'schedule.week.missing.noCoach')}
+              </li>
+            ) : null}
+            {missing.unmarked > 0 ? (
+              <li data-tone="pending" data-testid="week-missing-unmarked">
+                <b>{missing.unmarked}</b> {t(locale, 'schedule.week.missing.unmarked')}
+              </li>
+            ) : null}
+            {missing.cancelled > 0 ? (
+              <li data-tone="muted" data-testid="week-missing-cancelled">
+                <b>{missing.cancelled}</b> {t(locale, 'schedule.week.missing.cancelled')}
+              </li>
+            ) : null}
+          </>
+        )}
+        {/* `1e`'s counter. Outside the branch above, and last: the only number in the
+            strip that is not a problem. */}
+        {missing.completed > 0 ? (
+          <li data-tone="done" data-testid="week-missing-completed">
+            <b>{missing.completed}</b> {t(locale, 'schedule.week.missing.completed')}
+          </li>
+        ) : null}
+      </ul>
 
       <CreateSessionForm
         locale={locale}
         client={client}
         defaultDay={todayKey}
         onCreated={() => setVersion((n) => n + 1)}
+        open={open}
+        setOpen={setOpen}
       />
-
-      <div style={toolbarStyle}>
-        <button
-          type="button"
-          data-testid="week-previous"
-          onClick={() => setStart((current) => shiftDayKey(current, -7))}
-        >
-          {t(locale, 'schedule.week.previous')}
-        </button>
-        <button type="button" data-testid="week-today" onClick={() => setStart(weekStart(today))}>
-          {t(locale, 'schedule.week.today')}
-        </button>
-        <button
-          type="button"
-          data-testid="week-next"
-          onClick={() => setStart((current) => shiftDayKey(current, 7))}
-        >
-          {t(locale, 'schedule.week.next')}
-        </button>
-      </div>
 
       {sessions.length === 0 ? (
         <EmptyState
@@ -436,35 +780,233 @@ export function WeekBoard({
         />
       ) : null}
 
-      <div role="grid" aria-label={t(locale, 'schedule.week.title')} style={gridStyle}>
-        {days.map((day, index) => {
-          const isToday = day === todayKey
-          return (
-            <div
+      {/* A week that HAS classes and a filter that hides all of them. Distinct from the
+          empty week above: the fix is to widen the filter, not to add a class. */}
+      {sessions.length > 0 && visible.length === 0 ? (
+        <EmptyState title={t(locale, 'schedule.week.filter.empty')} />
+      ) : null}
+
+      {movingId ? (
+        <div className="week-moving" data-testid="week-moving" role="status">
+          <span className="week-moving__hint">{t(locale, 'schedule.session.move.hint')}</span>
+          <Button
+            variant="ghost"
+            data-testid="week-moving-cancel"
+            onClick={() => setMovingId(null)}
+          >
+            {t(locale, 'schedule.session.move.cancel')}
+          </Button>
+        </div>
+      ) : null}
+
+      {moveFailed ? (
+        <p role="alert" data-testid="week-move-failed" style={{ color: 'var(--danger)' }}>
+          {t(locale, 'schedule.session.move.failed')}
+        </p>
+      ) : null}
+
+      {view === 'month' ? (
+        /* A month is not a time grid. Thirty days of ruled hour rows would be mostly
+           blank and unreadably tall; every calendar answers a month with day cells, and
+           the question changes with it — "which days are busy", not "when exactly". */
+        <div role="grid" aria-label={t(locale, 'schedule.week.view.month')} className="month-grid">
+          <div role="row" className="month-grid__row">
+            {days.slice(0, 7).map((day, index) => (
+              <span role="columnheader" className="month-grid__head" key={day}>
+                {t(locale, `schedule.weekday.${index}`)}
+              </span>
+            ))}
+          </div>
+          {Array.from({ length: days.length / 7 }, (_, week) => (
+            <div role="row" className="month-grid__row" key={days[week * 7]}>
+              {days.slice(week * 7, week * 7 + 7).map((day) => {
+                const rows = byDay.get(day) ?? []
+                return (
+                  <div
+                    role="gridcell"
+                    className="month-grid__cell"
+                    key={day}
+                    data-day={day}
+                    data-today={day === todayKey || undefined}
+                    /* A day from the neighbouring month, kept so the grid stays
+                       rectangular but dimmed so it is not mistaken for this one. */
+                    data-outside={day.slice(0, 7) !== anchor.slice(0, 7) || undefined}
+                    data-testid={`month-cell-${day}`}
+                  >
+                    <span className="month-grid__date">{Number(day.slice(8, 10))}</span>
+                    {rows.map((session) => (
+                      <button
+                        className="month-grid__pill"
+                        data-coverage={
+                          session.status === 'cancelled'
+                            ? 'cancelled'
+                            : session.staff.length === 0
+                              ? 'uncovered'
+                              : 'ok'
+                        }
+                        data-testid="month-session"
+                        key={session.id}
+                        onClick={() => setOpenSessionId(session.id)}
+                        type="button"
+                      >
+                        <bdi dir="ltr">{formatTimeInStudioZone(session.starts_at, locale)}</bdi>{' '}
+                        {session.group_name}
+                      </button>
+                    ))}
+                  </div>
+                )
+              })}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <>
+      {/* `3a`'s grid: a time gutter, then one column per day, ruled into rows — one row
+          per start time the week actually contains. The shipped board had no axis at all,
+          so blocks floated in unruled columns and two classes an hour apart looked like
+          two classes at the same time.
+
+          The rows are DERIVED from the week rather than fixed at the artboard's
+          16:00/17:00/18:30/20:00. Those four are one club's timetable drawn on one day;
+          hard-coding them would leave every other club's classes with no row to sit in. */}
+      <div
+        role="grid"
+        aria-label={t(locale, 'schedule.week.title')}
+        className="week-grid"
+      >
+        <div role="row" className="week-grid__row">
+          {/* The corner. Empty, but present: a grid row whose cells do not line up with
+              the header above it is a grid in name only. */}
+          <span role="columnheader" className="week-grid__gutter" />
+          {days.map((day, index) => (
+            <span
               key={day}
-              role="gridcell"
-              // Keyed rather than generic: the interesting assertion is WHICH day a
-              // session was filed under, not how many columns there are. The column count
-              // is `getAllByRole('gridcell')`, which asks the accessibility tree the same
-              // question instead of asking a test hook.
+              role="columnheader"
               data-testid={`week-day-${day}`}
               data-day={day}
-              aria-current={isToday ? 'date' : undefined}
-              style={isToday ? todayColumnStyle : columnStyle}
+              aria-current={day === todayKey ? 'date' : undefined}
+              className="week-grid__head"
+              data-today={day === todayKey || undefined}
             >
-              <h3 style={dayHeadingStyle}>{t(locale, `schedule.weekday.${index}`)}</h3>
-              {(byDay.get(day) ?? []).map((session) => (
-                <SessionBlock
-                  key={session.id}
-                  locale={locale}
-                  onOpen={() => setOpenSessionId(session.id)}
-                  session={session}
-                />
-              ))}
-            </div>
-          )
-        })}
+              {/* `3a` heads each column `א׳ 23`, not a bare weekday name: a manager
+                  looking at "next week" has no way to tell which week it is otherwise.
+                  The number is the Jerusalem day-of-month, taken from the key the column
+                  is already filed under rather than re-derived from an instant. */}
+              {t(locale, `schedule.weekday.${index}`)}{' '}
+              <span className="week-day__date">{Number(day.slice(8, 10))}</span>
+            </span>
+          ))}
+        </div>
+
+        {slots.map((time) => (
+          <div role="row" className="week-grid__row" key={time}>
+            <span role="rowheader" className="week-grid__gutter" data-testid={`week-slot-${time}`}>
+              {time}
+            </span>
+            {days.map((day) => {
+              const cell = byCell.get(`${day}|${time}`) ?? []
+              // A cell is a target while a class is held, and a way to start one when it
+              // is empty. Spec `3a` says an empty cell carries no "add here" affordance
+              // and calls that a decision — overridden deliberately on 2026-08-29 at the
+              // owner's request; see docs/design/decisions.md.
+              const acts = movingId !== null || cell.length === 0
+              return (
+                <div
+                  key={day}
+                  role="gridcell"
+                  className="week-grid__cell"
+                  data-day={day}
+                  data-slot={time}
+                  data-today={day === todayKey || undefined}
+                  data-target={movingId !== null || undefined}
+                  data-testid={`week-cell-${day}-${time}`}
+                >
+                  {acts ? (
+                    <button
+                      className="week-grid__slot"
+                      data-testid={`week-slot-action-${day}-${time}`}
+                      onClick={(event) => {
+                        if (movingId !== null) {
+                          drop(day, time)
+                          return
+                        }
+                        const box = event.currentTarget.getBoundingClientRect()
+                        setSlot({ day, time, x: box.left + box.width / 2, y: box.bottom })
+                      }}
+                      type="button"
+                    >
+                      {/* Named for a screen reader, invisible to everyone else: the cell
+                          must not look like a button, or the grid becomes forty of them. */}
+                      <span className="studio-visually-hidden">
+                        {t(
+                          locale,
+                          movingId !== null
+                            ? 'schedule.session.move.target'
+                            : 'schedule.session.slot.create',
+                        )}
+                      </span>
+                    </button>
+                  ) : null}
+                  {cell.map((session) => (
+                    <SessionBlock
+                      key={session.id}
+                      locale={locale}
+                      moving={session.id === movingId}
+                      onOpen={() => setOpenSessionId(session.id)}
+                      onPickUp={() => setMovingId(session.id)}
+                      session={session}
+                    />
+                  ))}
+                </div>
+              )
+            })}
+          </div>
+        ))}
       </div>
+        </>
+      )}
+
+
+      {slot ? (
+        <>
+          {/* A backdrop that only dismisses. The form inside is not a dialog — it does not
+              trap focus, because it is one small form and a manager comparing it against
+              the week behind it is the point of anchoring it here. */}
+          <div
+            data-testid="week-slot-backdrop"
+            onClick={() => setSlot(null)}
+            style={{ position: 'fixed', insetBlock: 0, insetInline: 0, zIndex: 39 }}
+          />
+          <div
+            className="week-slot-popover"
+            data-testid="week-slot-popover"
+            style={{ insetInlineStart: `${slot.x}px`, insetBlockStart: `${slot.y + 8}px` }}
+          >
+            <div className="week-slot-popover__head">
+              <span>
+                {slot.day} · {slot.time}
+              </span>
+              <Button variant="ghost" data-testid="week-slot-close" onClick={() => setSlot(null)}>
+                {t(locale, 'common.cancel')}
+              </Button>
+            </div>
+            <CreateSessionForm
+              client={client}
+              defaultDay={slot.day}
+              defaultStart={slot.time}
+              locale={locale}
+              onCreated={() => {
+                setSlot(null)
+                setVersion((n) => n + 1)
+              }}
+              open
+              setOpen={(next) => {
+                if (!next) setSlot(null)
+              }}
+            />
+          </div>
+        </>
+      ) : null}
 
       {openSession ? (
         <SessionPopover

@@ -31,7 +31,7 @@
 // rather than hidden, so the shape of the flow is stable between visits.
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { Button, Card, LoadFailed } from '@studio/ui'
+import { ActionBar, Button, Card, LoadFailed } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { fill } from './client'
@@ -363,29 +363,37 @@ export function RolloverWizard({
       {/* F6 — Back and reopen live at the wizard level, beside every step body, so no
           step component needs reopening to gain them. Derived steps refuse reopen —
           the server 409s a manual mark on either. */}
-      <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-        {position > 1 ? (
-          <Button
-            data-testid="rollover-back"
-            onClick={() => {
-              const previous = ROLLOVER_STEP_ORDER[position - 2]
-              if (previous) setActiveId(previous)
-            }}
-            variant="ghost"
-          >
-            {t(locale, 'schedule.rollover.back')}
-          </Button>
-        ) : null}
-        {!isDerivedStep(current) && activeStatus !== 'pending' ? (
-          <Button
-            data-testid="rollover-reopen"
-            onClick={() => void reopen(current)}
-            variant="secondary"
-          >
-            {t(locale, 'schedule.rollover.reopenStep')}
-          </Button>
-        ) : null}
-      </div>
+      {/* The two are not peers, and an unaligned flex row said they were: `back` leaves the
+          step, `reopen` acts on it. ActionBar puts leaving on the inline-start edge and
+          acting on the inline-end one, so which is which survives the glance — and the
+          gap and alignment stop being re-decided here in an inline style. */}
+      <ActionBar
+        end={
+          !isDerivedStep(current) && activeStatus !== 'pending' ? (
+            <Button
+              data-testid="rollover-reopen"
+              onClick={() => void reopen(current)}
+              variant="secondary"
+            >
+              {t(locale, 'schedule.rollover.reopenStep')}
+            </Button>
+          ) : undefined
+        }
+        start={
+          position > 1 ? (
+            <Button
+              data-testid="rollover-back"
+              onClick={() => {
+                const previous = ROLLOVER_STEP_ORDER[position - 2]
+                if (previous) setActiveId(previous)
+              }}
+              variant="ghost"
+            >
+              {t(locale, 'schedule.rollover.back')}
+            </Button>
+          ) : undefined
+        }
+      />
 
       <div data-testid="rollover-step-body">
         {current === 'year' ? (

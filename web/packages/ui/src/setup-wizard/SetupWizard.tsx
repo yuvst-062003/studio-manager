@@ -14,7 +14,6 @@
 // redirect from staff to the dashboard was considered and rejected, because an owner doing
 // setup on a phone is a normal case rather than an error.
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { CSSProperties } from 'react'
 import { t } from '@studio/i18n'
 import { LoadFailed } from '../primitives/LoadFailed'
 import type { Locale } from '@studio/i18n'
@@ -30,49 +29,6 @@ export type SetupClient = {
   setStep: (stepId: WizardStepId, status: 'done' | 'skipped' | 'pending') => Promise<SetupProgress>
   dismiss: () => Promise<SetupProgress>
 }
-
-const shellStyle: CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 'var(--space-4)',
-  // The narrow layout is the default and the wide one is the enhancement, rather than the
-  // other way round. A max-width with `margin-inline: auto` centres at 1440 and costs
-  // nothing at 390.
-  maxWidth: '72rem',
-  marginInline: 'auto',
-  width: '100%',
-}
-
-const railStyle: CSSProperties = {
-  display: 'flex',
-  flexWrap: 'wrap',
-  gap: 'var(--space-2)',
-  listStyle: 'none',
-  margin: 0,
-  padding: 0,
-}
-
-const stepChipStyle: CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: 'var(--space-2)',
-  // Logical properties throughout (G12): the rail runs right-to-left in he and
-  // left-to-right in en, and `padding-left` would be wrong in one of them.
-  paddingBlock: 'var(--space-2)',
-  paddingInline: 'var(--space-3)',
-  border: 'var(--border-width-hairline) solid var(--border)',
-  borderRadius: 'var(--radius-pill)',
-  background: 'var(--surface)',
-}
-
-const footerStyle: CSSProperties = {
-  display: 'flex',
-  flexWrap: 'wrap',
-  gap: 'var(--space-3)',
-  alignItems: 'center',
-}
-
-const spacerStyle: CSSProperties = { marginInlineStart: 'auto' }
 
 function statusLabel(locale: Locale, status: WizardStep['status']): string {
   return t(locale, `common.setup.status.${status}`)
@@ -179,104 +135,33 @@ export function SetupWizard({
   const StepBody = active?.render
   const position = current ? WIZARD_STEP_ORDER.indexOf(current) + 1 : 0
 
+  const done = steps.filter((step) => step.status !== 'pending').length
+  const last = position === WIZARD_STEP_ORDER.length
+
   return (
-    <section aria-labelledby="setup-title" data-testid="setup-wizard" style={shellStyle}>
-      <header>
-        <h2 id="setup-title">{t(locale, 'common.setup.title')}</h2>
+    <section
+      aria-labelledby="setup-title"
+      className="setup-shell"
+      data-testid="setup-wizard"
+    >
+      {/* `5c`–`5e`'s header. `5f` drops save-and-exit, because on the last step there is
+          nothing left to save for later — the exit there IS the primary action. */}
+      <header className="setup-header">
+        <span className="setup-header__brand">
+          <span aria-hidden="true" className="setup-header__mark" />
+          <span id="setup-title">{t(locale, 'common.setup.title')}</span>
+        </span>
         {position > 0 ? (
-          <p data-testid="setup-position">
+          <span className="setup-header__count" data-testid="setup-position">
             {t(locale, 'common.setup.stepOfSix').replace('{n}', String(position))}
-          </p>
+          </span>
         ) : null}
-        <p>{t(locale, 'common.setup.welcome')}</p>
-        {/* §5.1's reassurance, verbatim from artboard 5c. It is the sentence that makes
-            skipping feel safe, so it belongs on every step and not only the first. */}
-        <p>{t(locale, 'common.setup.nothingSentYet')}</p>
-      </header>
-
-      {/* An ordered list, so a screen reader announces "3 of 6" without the visual rail
-          having to say it. `aria-current` names the one being worked on. */}
-      <ol aria-label={t(locale, 'common.setup.progressLabel')} style={railStyle}>
-        {steps.map((step) => {
-          const registered = entries.some((entry) => entry.key === step.id)
-          return (
-            <li key={step.id}>
-              <button
-                type="button"
-                aria-current={step.id === current ? 'step' : undefined}
-                data-testid={`setup-rail-${step.id}`}
-                data-status={step.status}
-                disabled={!registered}
-                onClick={() => setActiveId(step.id as WizardStepId)}
-                style={stepChipStyle}
-              >
-                <span>{t(locale, `common.setup.step.${step.id}`)}</span>
-                {/* Never colour alone (SC 1.4.1) — the state is written out. */}
-                <span data-testid={`setup-rail-${step.id}-status`}>
-                  {statusLabel(locale, step.status)}
-                </span>
-              </button>
-            </li>
-          )
-        })}
-      </ol>
-
-      <div data-testid="setup-step-body">
-        {/* F6 — going back, both halves: navigate (Back) and un-answer (reopen). The rail
-            could always navigate; what did not exist was a way to change an answer. */}
-        {current && position > 1 ? (
-          <Button
-            data-testid="setup-back"
-            onClick={() => {
-              const order = WIZARD_STEP_ORDER.filter((id) =>
-                entries.some((entry) => entry.key === id),
-              )
-              const index = order.indexOf(current)
-              const previous = order[index - 1]
-              if (previous) setActiveId(previous)
-            }}
-            variant="ghost"
-          >
-            {t(locale, 'common.setup.back')}
-          </Button>
-        ) : null}
-        {current && activeStep && activeStep.status !== 'pending' ? (
-          <Button
-            data-testid="setup-reopen"
-            onClick={() => void reopen(current)}
-            variant="secondary"
-          >
-            {t(locale, 'common.setup.reopen')}
-          </Button>
-        ) : null}
-        {StepBody && activeStep && current ? (
-          <StepBody
-            locale={locale}
-            status={activeStep.status}
-            onDone={() => void report(current, 'done')}
-            onSkip={() => void report(current, 'skipped')}
-          />
-        ) : (
-          <p data-testid="setup-step-unbuilt">{t(locale, 'common.setup.stepNotBuilt')}</p>
-        )}
-      </div>
-
-      <footer style={footerStyle}>
-        {/* §5.1's two exits, both from artboard 5f. `dismiss` stops auto-routing and says
-            nothing about completeness — the two are separate on the server for the same
-            reason they are separate here. */}
-        <Button
-          onClick={() => {
-            void client.dismiss().then((next) => {
-              setProgress(next)
-              onExit?.('dashboard')
-            })
-          }}
-        >
-          {t(locale, 'common.setup.openDashboard')}
-        </Button>
+        {/* `5c`–`5e` draw save-and-exit; `5f` drops it and offers the dashboard instead,
+            because on the last step there is nothing left to save FOR later — finishing
+            IS the exit. Both of §5.1's exits stay reachable, one per phase. */}
         <Button
           variant="ghost"
+          data-testid="setup-save-exit"
           onClick={() => {
             void client.dismiss().then((next) => {
               setProgress(next)
@@ -286,12 +171,125 @@ export function SetupWizard({
         >
           {t(locale, 'common.setup.continueLater')}
         </Button>
-        <span style={spacerStyle} data-testid="setup-complete">
-          {progress.complete
-            ? t(locale, 'common.setup.complete')
-            : t(locale, 'common.setup.incomplete')}
-        </span>
-      </footer>
+        <Button
+          data-testid="setup-open-dashboard"
+          onClick={() => {
+            void client.dismiss().then((next) => {
+              setProgress(next)
+              onExit?.('dashboard')
+            })
+          }}
+          variant={last || progress.complete ? 'primary' : 'secondary'}
+        >
+          {t(locale, 'common.setup.openDashboard')}
+        </Button>
+      </header>
+
+      <div
+        aria-hidden="true"
+        className="setup-progress"
+        data-testid="setup-progress"
+        data-done={done}
+      >
+        <div
+          className="setup-progress__fill"
+          style={{ inlineSize: `${(done / WIZARD_STEP_ORDER.length) * 100}%` }}
+        />
+      </div>
+
+      <div className="setup-body">
+        <main data-testid="setup-step-body">
+          {/* F6 — going back, both halves: navigate (Back) and un-answer (reopen). The rail
+              could always navigate; what did not exist was a way to change an answer. */}
+          {current && position > 1 ? (
+            <Button
+              data-testid="setup-back"
+              onClick={() => {
+                const order = WIZARD_STEP_ORDER.filter((id) =>
+                  entries.some((entry) => entry.key === id),
+                )
+                const index = order.indexOf(current)
+                const previous = order[index - 1]
+                if (previous) setActiveId(previous)
+              }}
+              variant="ghost"
+            >
+              {t(locale, 'common.setup.back')}
+            </Button>
+          ) : null}
+          {current && activeStep && activeStep.status !== 'pending' ? (
+            <Button
+              data-testid="setup-reopen"
+              onClick={() => void reopen(current)}
+              variant="secondary"
+            >
+              {t(locale, 'common.setup.reopen')}
+            </Button>
+          ) : null}
+          {StepBody && activeStep && current ? (
+            <StepBody
+              locale={locale}
+              status={activeStep.status}
+              onDone={() => void report(current, 'done')}
+              onSkip={() => void report(current, 'skipped')}
+            />
+          ) : (
+            <p data-testid="setup-step-unbuilt">{t(locale, 'common.setup.stepNotBuilt')}</p>
+          )}
+        </main>
+
+        {/* An ordered list, so a screen reader announces "3 of 6" without the rail having
+            to say it. `aria-current` names the one being worked on. */}
+        <aside className="setup-rail">
+          <p className="setup-rail__title">{t(locale, 'common.setup.railTitle')}</p>
+          {/* §5.1's reassurance, verbatim from `5c`. It lives HERE and not under the
+              welcome heading: 5c shows it once and 5d–5f never show it again, but an owner
+              abandons a wizard on step 3, not step 1. */}
+          <p className="setup-rail__reassure">{t(locale, 'common.setup.nothingSentYet')}</p>
+          <ol
+            aria-label={t(locale, 'common.setup.progressLabel')}
+            className="setup-rail__list"
+          >
+            {steps.map((step, index) => {
+              const registered = entries.some((entry) => entry.key === step.id)
+              const state =
+                step.id === current ? 'current' : step.status !== 'pending' ? 'done' : 'upcoming'
+              return (
+                <li key={step.id}>
+                  <button
+                    type="button"
+                    aria-current={step.id === current ? 'step' : undefined}
+                    className="setup-rail__node"
+                    data-testid={`setup-rail-${step.id}`}
+                    data-status={step.status}
+                    data-state={state}
+                    disabled={!registered}
+                    onClick={() => setActiveId(step.id as WizardStepId)}
+                  >
+                    <span aria-hidden="true" className="setup-rail__dot">
+                      {state === 'done' ? '✓' : index + 1}
+                    </span>
+                    <span>{t(locale, `common.setup.step.${step.id}`)}</span>
+                    {/* Never a circle alone (SC 1.4.1) — the state is written out, and
+                        off-screen because the circle already says it to a sighted reader. */}
+                    <span
+                      className="studio-visually-hidden"
+                      data-testid={`setup-rail-${step.id}-status`}
+                    >
+                      {statusLabel(locale, step.status)}
+                    </span>
+                  </button>
+                </li>
+              )
+            })}
+          </ol>
+          <span className="studio-visually-hidden" data-testid="setup-complete">
+            {progress.complete
+              ? t(locale, 'common.setup.complete')
+              : t(locale, 'common.setup.incomplete')}
+          </span>
+        </aside>
+      </div>
     </section>
   )
 }

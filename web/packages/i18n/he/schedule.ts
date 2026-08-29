@@ -27,6 +27,34 @@ export const schedule: Bundle = {
   'week.today': 'היום',
   'week.previous': 'שבוע קודם',
   'week.next': 'שבוע הבא',
+  // D5 — "Three views only — day, week, month. Week is the default."
+  'week.view.legend': 'תצוגה',
+  'week.view.day': 'יום',
+  'week.view.week': 'שבוע',
+  'week.view.month': 'חודש',
+  'week.view.previousDay': 'יום קודם',
+  'week.view.nextDay': 'יום הבא',
+  'week.view.previousMonth': 'חודש קודם',
+  'week.view.nextMonth': 'חודש הבא',
+  'week.view.sessions': 'שיעורים',
+  // `3a`'s coverage strip — מה חסר השבוע. Counts are PARAMETERS, never joined into a
+  // sentence. Derived from the week's own sessions, not fetched: SessionRow already
+  // carries `staff` and `attendance_taken`.
+  'week.missing.title': 'מה חסר השבוע',
+  'week.missing.noCoach': 'שיעורים ללא מאמן',
+  'week.missing.unmarked': 'מפגשים ללא סימון נוכחות',
+  'week.missing.cancelled': 'בוטלו',
+  'week.missing.none': 'לא חסר כלום השבוע',
+  // `3a` item 7 + `1e`'s completed counter. The options are derived from the week on
+  // screen, so a filter is never offered that would empty the board.
+  'week.filter.legend': 'סינון הלוח',
+  'week.filter.group': 'קבוצה',
+  'week.filter.coach': 'מאמן',
+  'week.filter.hall': 'אולם',
+  'week.filter.all': 'הכל',
+  'week.filter.clear': 'ניקוי הסינון',
+  'week.filter.empty': 'אין שיעורים שמתאימים לסינון',
+  'week.missing.completed': 'הושלמו',
   'view.day': 'יום',
   'view.week': 'שבוע',
   'view.month': 'חודש',
@@ -62,6 +90,14 @@ export const schedule: Bundle = {
   'session.substitute': 'ממלא מקום',
   // D5 — a session block surfaces coverage and completion, not registration counts.
   'session.noCoach': 'לא שובץ מאמן',
+  // Moving a session by picking it up from the board (2026-08-29). The popover's date
+  // fields remain the keyboard path; this is the pointer one.
+  'session.move.hint': 'בחרו משבצת חדשה לשיעור',
+  'session.move.cancel': 'ביטול ההעברה',
+  'session.move.moved': 'השיעור הועבר',
+  'session.move.failed': 'לא הצלחנו להעביר את השיעור',
+  'session.move.target': 'העברה לכאן',
+  'session.slot.create': 'שיעור חדש במשבצת הזו',
   'session.attendanceTaken': 'נוכחות נרשמה',
   'session.durationMinutes': '{{minutes}} דק׳',
   'session.headcount': '{{count}} חניכים',

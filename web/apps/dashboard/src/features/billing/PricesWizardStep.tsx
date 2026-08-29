@@ -22,7 +22,15 @@
 // bug in the product, and it is invisible until a parent is billed ₪3.
 import { useCallback, useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { Button, Card, MoneyDisplay, TextField, registerSlot } from '@studio/ui'
+import {
+  ActionBar,
+  Button,
+  Card,
+  MoneyDisplay,
+  SectionHeader,
+  TextField,
+  registerSlot,
+} from '@studio/ui'
 import type { WizardStepProps } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { DashboardBillingClient, PricePlanOut } from './billingClient'
@@ -30,12 +38,6 @@ import { agorotFromShekels } from './money'
 
 /** `WIZARD_STEP_ORDER` is studio · belts · groups · prices · staff · students. */
 export const PRICES_WIZARD_ORDER = 4
-
-const columnStyle: CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 'var(--space-4)',
-}
 
 const rowStyle: CSSProperties = {
   display: 'flex',
@@ -102,8 +104,12 @@ export function PricesWizardStep({
   }
 
   return (
-    <div style={columnStyle} data-testid="wizard-step-prices">
-      <p>{t(locale, 'billing.plan.linkNeverInherited')}</p>
+    <div className="setup-step" data-testid="wizard-step-prices">
+      {/* `5e` opens with the question. The step opened with a note about standing-order
+          links and never said what it was for. */}
+      <SectionHeader level={3} title={t(locale, 'billing.plan.wizardTitle')} />
+      <p className="setup-step__meta">{t(locale, 'billing.plan.wizardHint')}</p>
+      <p className="setup-step__meta">{t(locale, 'billing.plan.linkNeverInherited')}</p>
 
       {plans.length > 0 ? (
         <Card>
@@ -176,6 +182,22 @@ export function PricesWizardStep({
           {t(locale, 'common.setup.skip')}
         </Button>
       </div>
+    
+      <ActionBar
+        end={
+          <Button onClick={onDone}>
+            {t(locale, 'common.setup.continueTo').replace(
+              '{{step}}',
+              t(locale, 'common.setup.step.staff'),
+            )}
+          </Button>
+        }
+        start={
+          <Button onClick={onSkip} variant="ghost">
+            {t(locale, 'billing.plan.later')}
+          </Button>
+        }
+      />
     </div>
   )
 }

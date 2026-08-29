@@ -10,7 +10,7 @@
 // **The container never computes completeness.** `types.ts` says so in as many words, and
 // it is what makes the seam hold: the container cannot know when *belts* is finished
 // without M7 reopening it, so the step reports its own outcome through `onDone`.
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import { renderHook } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -72,6 +72,13 @@ function renderStep(over: Partial<WizardStepProps> = {}, client = makeClient()) 
 
 afterEach(() => clearSlot('setup-wizard'))
 
+/** The step's commit button. `5d` names what it will MAKE — "create 12 ranks" — rather
+ *  than a verb, so it cannot be found by a fixed label: the count is part of the name.
+ *  Falls back to the bare verb, which is what renders before a preset is chosen. */
+const commitButton = () =>
+  screen.queryByRole('button', { name: /יצירת \d+ דרגות/ }) ??
+  screen.getByRole('button', { name: new RegExp(t('he', 'events.belt.add')) })
+
 describe('5d — the belts wizard step', () => {
   it('registers itself into the container at order 2 without reopening it', () => {
     clearSlot('setup-wizard')
@@ -86,7 +93,7 @@ describe('5d — the belts wizard step', () => {
     const { props, client } = renderStep()
     await userEvent.click(await screen.findByLabelText(/ג'ודו ילדים/))
     await userEvent.click(
-      screen.getByRole('button', { name: new RegExp(t('he', 'events.belt.add')) }),
+      commitButton(),
     )
     expect(client.seed).toHaveBeenCalledWith('c1', 'judo_children')
     expect(props.onDone).toHaveBeenCalled()
@@ -126,7 +133,7 @@ describe('5d — the belts wizard step', () => {
       await screen.findByLabelText(t('he', 'events.belt.presetScratch')),
     )
     await userEvent.click(
-      screen.getByRole('button', { name: new RegExp(t('he', 'events.belt.add')) }),
+      commitButton(),
     )
     // The fourth card creates nothing — it is the absence of a preset, not a preset. The
     // step is still done: the manager has answered the question it asks.
@@ -166,7 +173,7 @@ describe('5d — the belts wizard step', () => {
     await userEvent.click(await screen.findByLabelText('קראטה'))
     await userEvent.click(screen.getByLabelText(/ג'ודו ילדים/))
     await userEvent.click(
-      screen.getByRole('button', { name: new RegExp(t('he', 'events.belt.add')) }),
+      commitButton(),
     )
     expect(client.seed).toHaveBeenCalledWith('c2', 'judo_children')
   })
@@ -177,7 +184,7 @@ describe('5d — the belts wizard step', () => {
     renderStep()
     await userEvent.click(await screen.findByLabelText(/ג'ודו ילדים/))
     expect(
-      screen.getByRole('button', { name: new RegExp(t('he', 'events.belt.add')) }).textContent,
+      commitButton().textContent,
     ).toContain('3')
   })
 })
@@ -207,7 +214,7 @@ describe('the two dead ends (2026-08-28)', () => {
     const { props } = renderStep({}, client)
     const radios = await screen.findAllByRole('radio', { name: /ג'ודו/ })
     await userEvent.click(radios[0] as HTMLElement)
-    await userEvent.click(screen.getByRole('button', { name: new RegExp(t('he', 'events.belt.add')) }))
+    await userEvent.click(commitButton())
     await waitFor(() => expect(props.onDone).toHaveBeenCalled())
   })
 
@@ -217,9 +224,56 @@ describe('the two dead ends (2026-08-28)', () => {
     const { props } = renderStep({}, client)
     const radios = await screen.findAllByRole('radio', { name: /ג'ודו/ })
     await userEvent.click(radios[0] as HTMLElement)
-    await userEvent.click(screen.getByRole('button', { name: new RegExp(t('he', 'events.belt.add')) }))
+    await userEvent.click(commitButton())
     expect(await screen.findByTestId('belts-seed-failed')).toBeInTheDocument()
     expect(props.onDone).not.toHaveBeenCalled()
-    expect(screen.getByRole('button', { name: new RegExp(t('he', 'events.belt.add')) })).toBeEnabled()
+    expect(commitButton()).toBeEnabled()
+  })
+})
+
+describe('5d — what the choices actually show (2026-08-29)', () => {
+  it('draws each preset\'s belts on its own card, because the colours ARE the decision', async () => {
+    // The shipped step drew bare radio labels: a manager chose between "7 ranks" and
+    // "12 ranks" without seeing a single belt.
+    renderStep()
+    const card = await screen.findByTestId('belts-preset-judo_children')
+    expect(card.querySelectorAll('.studio-belt-bar').length).toBeGreaterThan(0)
+  })
+
+  it('marks the chosen card without relying on the border alone', async () => {
+    renderStep()
+    const card = await screen.findByTestId('belts-preset-judo_children')
+    await userEvent.click(within(card).getByRole('radio'))
+    expect(card).toHaveAttribute('data-selected', 'true')
+    // The radio is still the thing a screen reader reads.
+    expect(within(card).getByRole('radio')).toBeChecked()
+  })
+
+  it('previews EVERY rank, in a region a manager can scroll', async () => {
+    // Truncating at seven and naming the remainder hid the half that distinguishes one
+    // preset from another — the bi-colour intermediates are most of why a club picks the
+    // twelve-rank ladder. Capped height plus overflow, not a shorter list.
+    renderStep()
+    await userEvent.click(await screen.findByLabelText(/ג'ודו ילדים/))
+    const scroll = screen.getByTestId('belts-preview-scroll')
+    expect(scroll.querySelectorAll('li')).toHaveLength(3)
+    expect(screen.getByTestId('belts-preview-count')).toHaveTextContent('3')
+  })
+
+  it('makes that region reachable from the keyboard', async () => {
+    // A scroll container with nothing focusable inside it cannot be scrolled by keyboard:
+    // there is nothing to tab to, so the arrow keys never reach it. It needs to be the
+    // focus target itself, and to say what it is when it gets focus.
+    renderStep()
+    await userEvent.click(await screen.findByLabelText(/ג'ודו ילדים/))
+    const scroll = screen.getByTestId('belts-preview-scroll')
+    expect(scroll).toHaveAttribute('tabindex', '0')
+    expect(scroll).toHaveAccessibleName(t('he', 'events.belt.presetPreview'))
+  })
+
+  it('names the count on the commit button, not a bare verb', async () => {
+    renderStep()
+    await userEvent.click(await screen.findByLabelText(/ג'ודו ילדים/))
+    expect(commitButton().textContent).toMatch(/יצירת \d+ דרגות/)
   })
 })

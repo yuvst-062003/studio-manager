@@ -13,7 +13,8 @@ import { renderIn, DIRECTIONS } from '../testing'
 import { SetupWizard } from './SetupWizard'
 import type { SetupClient } from './SetupWizard'
 import { LOGO_EDGE, makeStudioStep, resizeToSquarePng } from './StudioStep'
-import { makeGroupsStep } from './GroupsStep'
+import { defaultSeason, makeGroupsStep } from './GroupsStep'
+import type { Slot } from './GroupsStep'
 import { makeStaffStep } from './StaffStep'
 import { makeStudentsStep } from './StudentsStep'
 import { WIZARD_STEP_ORDER } from './types'
@@ -315,12 +316,29 @@ describe('step 1 · פרטי מועדון', () => {
     }
   })
 
-  it('offers the three languages §9 ships and no more', async () => {
+  it('does not ask which languages parents see — a club offers all three', async () => {
+    // Owner request, 2026-08-29: "this should not be a choice but a default." Asking a
+    // first-run owner to pick was asking them to guess which languages their future
+    // parents read, and the server's default is now all three rather than one.
     const Step = makeStudioStep(studioClient())
     render(<Step locale="he" status="pending" onDone={vi.fn()} onSkip={vi.fn()} />)
-    await screen.findByLabelText(t('he', 'common.setup.studio.locale.he'))
-    const group = screen.getByRole('group', { name: t('he', 'common.setup.studio.parentLocales') })
-    expect(within(group).getAllByRole('checkbox')).toHaveLength(3)
+    await screen.findByLabelText(t('he', 'common.setup.studio.name'))
+    expect(
+      screen.queryByRole('group', { name: t('he', 'common.setup.studio.parentLocales') }),
+    ).toBeNull()
+    expect(screen.queryByRole('checkbox')).toBeNull()
+  })
+
+  it('does not write parent_locales, so a club that narrowed it keeps its choice', async () => {
+    // The step used to send the checkbox column on every save. Now that it has no opinion,
+    // sending the field at all would blank a deliberate narrowing made in the settings
+    // panel — `exclude_unset` on the server only helps if the client omits it.
+    const client = studioClient()
+    const Step = makeStudioStep(client)
+    render(<Step locale="he" status="pending" onDone={vi.fn()} onSkip={vi.fn()} />)
+    await userEvent.click(await screen.findByText(t('he', 'common.setup.continue')))
+    await waitFor(() => expect(client.update).toHaveBeenCalled())
+    expect(client.update.mock.calls[0]?.[0]).not.toHaveProperty('parent_locales')
   })
 
   it('saves and reports itself done — the container never infers it', async () => {
@@ -389,6 +407,13 @@ describe('step 3 · קבוצות ולו״ז', () => {
     createClass: vi.fn(async (name: string) => ({ id: 'c2', name })),
     createGroup: vi.fn(async (_classId: string, name: string) => ({ id: 'g1', name })),
     createLocation: vi.fn(async (name: string) => ({ id: 'l1', name })),
+    ensureTrainingYear: vi.fn<() => Promise<void>>(async () => undefined),
+    readSchedule: vi.fn<(groupId: string) => Promise<Slot[]>>(async () => []),
+    // Typed through the generic rather than by naming parameters the body never reads:
+    // `mock.calls` needs the tuple, and unused names are what the lint rule is for.
+    putSchedule: vi.fn<(groupId: string, slots: Slot[], effectiveFrom: string) => Promise<void>>(
+      async () => undefined,
+    ),
   })
 
   it('creates a group through the class that already exists', async () => {
@@ -411,11 +436,145 @@ describe('step 3 · קבוצות ולו״ז', () => {
     expect(await screen.findByText(t('he', 'common.setup.groups.needClass'))).toBeInTheDocument()
   })
 
-  it('carries no stale schedule promise — the weekly schedule shipped in W2 (F8)', async () => {
-    const Step = makeGroupsStep(structureClient())
+  it('sets each group\'s weekly times here, and writes them straight away', async () => {
+    // This test asserted the OPPOSITE until 2026-08-29: that the step promised no
+    // schedule, because the times lived only on the weekly board. The owner's decision is
+    // that a club is not set up until its groups have hours, so the promise is kept rather
+    // than withdrawn. A slot is a weekday and an hour range — it repeats every week and
+    // carries no date.
+    const client = structureClient()
+    const Step = makeGroupsStep(client)
+    render(<Step locale="he" status="pending" onDone={vi.fn()} onSkip={vi.fn()} />)
+
+    await userEvent.type(
+      await screen.findByLabelText(t('he', 'common.setup.groups.groupName')),
+      'מתחילים',
+    )
+    await userEvent.click(screen.getByText(t('he', 'common.setup.groups.addGroup')))
+    await userEvent.click(await screen.findByTestId('slot-add-g1'))
+
+    await waitFor(() => expect(client.putSchedule).toHaveBeenCalled())
+    const [groupId, sent] = client.putSchedule.mock.calls.at(-1) ?? []
+    expect(groupId).toBe('g1')
+    // Sunday 17:00–18:00 by default: the commonest shape, so a manager edits rather than
+    // fills in four blanks.
+    expect(sent).toEqual([
+      { weekday: 0, start_time: '17:00', end_time: '18:00', location_id: null },
+    ])
+  })
+
+  it('sends the WHOLE set on every change, because PUT replaces rather than appends', async () => {
+    // A partial send would delete the rows it omitted.
+    const client = structureClient()
+    const Step = makeGroupsStep(client)
+    render(<Step locale="he" status="pending" onDone={vi.fn()} onSkip={vi.fn()} />)
+    await userEvent.type(
+      await screen.findByLabelText(t('he', 'common.setup.groups.groupName')),
+      'מתחילים',
+    )
+    await userEvent.click(screen.getByText(t('he', 'common.setup.groups.addGroup')))
+    await userEvent.click(await screen.findByTestId('slot-add-g1'))
+    await userEvent.click(await screen.findByTestId('slot-add-g1'))
+    await waitFor(() => expect(client.putSchedule.mock.calls.at(-1)?.[1]).toHaveLength(2))
+  })
+
+
+  it('names the training year when that is why the save failed, and keeps the typing', async () => {
+    // `apply_schedule_change` reads the active training year BEFORE it writes anything, and
+    // no setup step opens one — so during first-run setup this 404 is the normal case, not
+    // a fault the manager can act on. Reported as pending, and the times stay on screen:
+    // losing what they typed to report a server state they cannot change is the worse
+    // failure of the two.
+    const client = {
+      ...structureClient(),
+      putSchedule: vi.fn<(g: string, s: Slot[], e: string) => Promise<void>>(async () => {
+        throw new Error('404')
+      }),
+    }
+    const Step = makeGroupsStep(client)
+    render(<Step locale="he" status="pending" onDone={vi.fn()} onSkip={vi.fn()} />)
+    await userEvent.type(
+      await screen.findByLabelText(t('he', 'common.setup.groups.groupName')),
+      'מתחילים',
+    )
+    await userEvent.click(screen.getByText(t('he', 'common.setup.groups.addGroup')))
+    await userEvent.click(await screen.findByTestId('slot-add-g1'))
+
+    const note = await screen.findByTestId('slot-failed-g1')
+    expect(note).toHaveTextContent(t('he', 'common.setup.groups.needYear'))
+    expect(note).toHaveAttribute('data-status', 'pending')
+    // The row is still there to be edited.
+    expect(screen.getByTestId('slot-from-g1-0')).toHaveValue('17:00')
+  })
+
+  it('still reports a real failure as a failure', async () => {
+    const client = {
+      ...structureClient(),
+      putSchedule: vi.fn<(g: string, s: Slot[], e: string) => Promise<void>>(async () => {
+        throw new Error('500')
+      }),
+    }
+    const Step = makeGroupsStep(client)
+    render(<Step locale="he" status="pending" onDone={vi.fn()} onSkip={vi.fn()} />)
+    await userEvent.type(
+      await screen.findByLabelText(t('he', 'common.setup.groups.groupName')),
+      'מתחילים',
+    )
+    await userEvent.click(screen.getByText(t('he', 'common.setup.groups.addGroup')))
+    await userEvent.click(await screen.findByTestId('slot-add-g1'))
+    expect(await screen.findByTestId('slot-failed-g1')).toHaveAttribute('data-status', 'danger')
+  })
+
+
+  it('opens the season before the first write, and only then', async () => {
+    // A weekly rule is not a lesson: it becomes lessons only when generated between two
+    // dates, and those dates are the training year's. Nothing in the six steps opened one,
+    // so a new club finished setup with a timetable that produced nothing. Opened here on
+    // the first time added — not on mount, which would create a year behind the back of a
+    // manager who never touches this.
+    const client = structureClient()
+    const Step = makeGroupsStep(client)
     render(<Step locale="he" status="pending" onDone={vi.fn()} onSkip={vi.fn()} />)
     await screen.findByTestId('setup-groups')
-    expect(screen.queryByTestId('setup-groups-schedule-note')).toBeNull()
+    expect(client.ensureTrainingYear).not.toHaveBeenCalled()
+
+    await userEvent.type(
+      screen.getByLabelText(t('he', 'common.setup.groups.groupName')),
+      'מתחילים',
+    )
+    await userEvent.click(screen.getByText(t('he', 'common.setup.groups.addGroup')))
+    await userEvent.click(await screen.findByTestId('slot-add-g1'))
+    await waitFor(() => expect(client.ensureTrainingYear).toHaveBeenCalled())
+    await waitFor(() => expect(client.putSchedule).toHaveBeenCalled())
+  })
+
+  it('proposes September to August, which is the Israeli season', async () => {
+    // From August onward the season being set up is the one about to START; before that,
+    // the one already running.
+    expect(defaultSeason(new Date('2026-09-15T12:00:00Z'))).toEqual({
+      name: '2026–2027',
+      starts_on: '2026-09-01',
+      ends_on: '2027-08-31',
+    })
+    expect(defaultSeason(new Date('2026-03-15T12:00:00Z')).name).toBe('2025–2026')
+  })
+
+  it('shows the week the times would create, so an empty Wednesday is visible', async () => {
+    const client = structureClient()
+    const Step = makeGroupsStep(client)
+    render(<Step locale="he" status="pending" onDone={vi.fn()} onSkip={vi.fn()} />)
+    expect(await screen.findByTestId('setup-week')).toHaveTextContent(
+      t('he', 'common.setup.groups.weekEmpty'),
+    )
+    await userEvent.type(
+      screen.getByLabelText(t('he', 'common.setup.groups.groupName')),
+      'מתחילים',
+    )
+    await userEvent.click(screen.getByText(t('he', 'common.setup.groups.addGroup')))
+    await userEvent.click(await screen.findByTestId('slot-add-g1'))
+    await waitFor(() =>
+      expect(screen.getByTestId('setup-week')).toHaveTextContent('מתחילים'),
+    )
   })
 })
 
@@ -446,10 +605,42 @@ describe('step 5 · צוות', () => {
   })
 
   it('offers only the two coach roles — owner and manager come from the console', async () => {
+    // The roles were a <select>; they are now two cards. Same rule, asked of the new shape:
+    // a club must not be able to mint its own administrators.
     const Step = makeStaffStep(staffClient())
     render(<Step locale="he" status="pending" onDone={vi.fn()} onSkip={vi.fn()} />)
-    const select = await screen.findByLabelText(t('he', 'common.setup.staff.role'))
-    expect(within(select).getAllByRole('option')).toHaveLength(2)
+    const group = await screen.findByRole('radiogroup', {
+      name: t('he', 'common.setup.staff.role'),
+    })
+    expect(within(group).getAllByRole('radio')).toHaveLength(2)
+    expect(screen.queryByText(t('he', 'common.setup.staff.role.owner'))).toBeNull()
+    expect(screen.queryByText(t('he', 'common.setup.staff.role.manager'))).toBeNull()
+  })
+
+  it('states what each role can and cannot do, where the choice is made', async () => {
+    // A bare select labelled "role" left an owner inviting their first coach with no way
+    // to know which to pick, and the difference is a real permission rather than a title.
+    const Step = makeStaffStep(staffClient())
+    render(<Step locale="he" status="pending" onDone={vi.fn()} onSkip={vi.fn()} />)
+    expect(await screen.findByTestId('staff-role-lead_coach')).toHaveTextContent(
+      t('he', 'common.setup.staff.role.lead_coachWhat'),
+    )
+    expect(screen.getByTestId('staff-role-assistant_coach')).toHaveTextContent(
+      t('he', 'common.setup.staff.role.assistant_coachWhat'),
+    )
+  })
+
+  it('says an invitation is waiting rather than leaving it looking broken', async () => {
+    const client = staffClient()
+    const Step = makeStaffStep(client)
+    render(<Step locale="he" status="pending" onDone={vi.fn()} onSkip={vi.fn()} />)
+    expect(await screen.findByText(t('he', 'common.setup.staff.noPending'))).toBeInTheDocument()
+    await userEvent.type(
+      screen.getByLabelText(t('he', 'common.setup.staff.email')),
+      'coach@example.com',
+    )
+    await userEvent.click(screen.getByText(t('he', 'common.setup.staff.invite')))
+    expect(await screen.findByText(t('he', 'common.setup.staff.awaiting'))).toBeInTheDocument()
   })
 
   it('lets a coach be invited before any group exists', async () => {
@@ -525,5 +716,120 @@ describe('F6 — going back', () => {
     await screen.findByTestId('setup-step-body')
     await userEvent.click(await screen.findByTestId('setup-back'))
     expect(screen.getByTestId('setup-rail-studio')).toHaveAttribute('aria-current', 'step')
+  })
+})
+
+describe('setup step 1 · what the Stitch pass added (2026-08-29)', () => {
+  const details = {
+    name: '',
+    sport: null,
+    address: null,
+    phone: null,
+    parent_locales: ['he'],
+    logo_url: null,
+  }
+  const studioClient = () => ({
+    read: vi.fn(async () => details),
+    update: vi.fn(async () => details),
+    uploadLogo: vi.fn(),
+  })
+
+  it('says which field is required rather than only disabling the button', async () => {
+    // The continue button disabling on an empty name told an owner THAT something was
+    // wrong and never WHICH field. The hint is wired through aria-describedby, so it is
+    // announced with the field rather than read out as "club name star".
+    const Step = makeStudioStep(studioClient() as never)
+    render(<Step locale="he" status="pending" onDone={vi.fn()} onSkip={vi.fn()} />)
+    const name = await screen.findByLabelText(t('he', 'common.setup.studio.name'))
+    expect(name).toBeRequired()
+    expect(name).toHaveAccessibleDescription(t('he', 'common.setup.studio.requiredHint'))
+  })
+
+  it('marks the fields that can be left empty', async () => {
+    const Step = makeStudioStep(studioClient() as never)
+    render(<Step locale="he" status="pending" onDone={vi.fn()} onSkip={vi.fn()} />)
+    const phone = await screen.findByLabelText(t('he', 'common.setup.studio.phone'))
+    expect(phone).toHaveAccessibleDescription(t('he', 'common.setup.studio.optionalHint'))
+    expect(phone).not.toBeRequired()
+  })
+
+  it('shows an example in each field, because a first-run form is one people hesitate over', async () => {
+    const Step = makeStudioStep(studioClient() as never)
+    render(<Step locale="he" status="pending" onDone={vi.fn()} onSkip={vi.fn()} />)
+    expect(await screen.findByPlaceholderText(t('he', 'common.setup.studio.namePlaceholder'))).toBeInTheDocument()
+    expect(screen.getByPlaceholderText(t('he', 'common.setup.studio.sportPlaceholder'))).toBeInTheDocument()
+  })
+
+  it('keeps the native file input reachable while hiding the UA control', async () => {
+    // The browser renders it as an English "Choose File / No file chosen" in the middle of
+    // an RTL Hebrew screen. Hidden with clip-path, NOT display:none — the latter would take
+    // it out of the accessibility tree along with the layout.
+    const Step = makeStudioStep(studioClient() as never)
+    render(<Step locale="he" status="pending" onDone={vi.fn()} onSkip={vi.fn()} />)
+    const input = await screen.findByLabelText(t('he', 'common.setup.studio.logoDrop'))
+    expect(input).toBeInTheDocument()
+    expect(input).toHaveClass('studio-visually-hidden')
+    expect(screen.getByRole('button', { name: t('he', 'common.setup.studio.logoChoose') })).toBeInTheDocument()
+  })
+
+  it('ranks the footer instead of leaving continue, skip and a status line at one rank', async () => {
+    const Step = makeStudioStep(studioClient() as never)
+    const { container } = render(<Step locale="he" status="pending" onDone={vi.fn()} onSkip={vi.fn()} />)
+    await screen.findByTestId('setup-step-studio')
+    const bar = container.querySelector('.studio-actionbar')
+    expect(bar).toHaveAttribute('data-align', 'between')
+    // The status describes the step; it is not something to press.
+    expect(bar).not.toContainElement(screen.getByTestId('setup-studio-status'))
+  })
+
+})
+
+describe('SetupWizard chrome — artboards 5c–5f (2026-08-29)', () => {
+  it('gives every step a node in three states, and never a circle alone', async () => {
+    // `5d` draws done / current / upcoming. The circle is not the only carrier: each node
+    // also states its status in words, off-screen, because the circle already says it to a
+    // sighted reader (SC 1.4.1).
+    registerM1Stubs()
+    render(<SetupWizard client={fakeClient()} locale="he" />)
+    const first = await screen.findByTestId('setup-rail-studio')
+    expect(first).toHaveAttribute('data-state', 'current')
+    expect(screen.getByTestId('setup-rail-groups')).toHaveAttribute('data-state', 'upcoming')
+    expect(screen.getByTestId('setup-rail-studio-status')).toHaveClass('studio-visually-hidden')
+  })
+
+  it('keeps the reassurance visible on every step, not only the first', async () => {
+    // `5c` shows it once and 5d–5f never show it again — but an owner abandons a wizard on
+    // step 3, not step 1, which is exactly when they need to read that nothing is final.
+    registerM1Stubs()
+    const { container } = render(<SetupWizard client={fakeClient()} locale="he" />)
+    await screen.findByTestId('setup-wizard')
+    const rail = container.querySelector('.setup-rail')
+    expect(rail).toHaveTextContent(t('he', 'common.setup.nothingSentYet'))
+  })
+
+  it('puts the step body FIRST in the DOM, whichever side the rail is drawn on', async () => {
+    // The rail is placed into the inline-start track by CSS rather than by source order:
+    // a keyboard user should reach what they came to fill in before a list of six links.
+    registerM1Stubs()
+    const { container } = render(<SetupWizard client={fakeClient()} locale="he" />)
+    await screen.findByTestId('setup-wizard')
+    const body = container.querySelector('.setup-body')
+    const kids = [...(body?.children ?? [])].map((el) => el.tagName)
+    expect(kids).toEqual(['MAIN', 'ASIDE'])
+  })
+
+  it('keeps both of §5.1 exits in the header', async () => {
+    registerM1Stubs()
+    render(<SetupWizard client={fakeClient()} locale="he" />)
+    expect(await screen.findByTestId('setup-save-exit')).toBeInTheDocument()
+    expect(screen.getByTestId('setup-open-dashboard')).toBeInTheDocument()
+  })
+
+  it('fills the progress bar by steps ANSWERED, not by where the manager is standing', async () => {
+    // A manager who paged back to step 1 has not undone anything, and a bar that shrank
+    // when they did would say they had.
+    registerM1Stubs()
+    render(<SetupWizard client={fakeClient()} locale="he" />)
+    expect(await screen.findByTestId('setup-progress')).toHaveAttribute('data-done', '0')
   })
 })

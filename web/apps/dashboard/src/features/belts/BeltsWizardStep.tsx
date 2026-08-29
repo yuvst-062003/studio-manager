@@ -29,7 +29,7 @@
 // says nothing about when a child moves between them.
 import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { BeltBar, Button, Card, Radio, registerSlot } from '@studio/ui'
+import { ActionBar, BeltBar, Button, Radio, SectionHeader, registerSlot } from '@studio/ui'
 import type { WizardStepProps } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { BeltPresetOut, ClassOut, DashboardBeltsClient } from './client'
@@ -60,23 +60,6 @@ const hintStyle: CSSProperties = {
   color: 'var(--text-secondary)',
   fontSize: 'var(--text-caption)',
   margin: 0,
-}
-
-const previewRowStyle: CSSProperties = {
-  alignItems: 'center',
-  display: 'flex',
-  gap: 'var(--space-2)',
-}
-
-const previewListStyle: CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 'var(--space-2)',
-  listStyle: 'none',
-  margin: 0,
-  // `padding-inline-start`, never `padding-left`: 5d finding 6 is a physical padding-right
-  // repeated to indent each card's swatch strip past its radio.
-  paddingInlineStart: 0,
 }
 
 /** The fourth card. It creates nothing — the absence of a preset, not a preset. */
@@ -211,68 +194,146 @@ export function BeltsWizardStep({
       ) : null}
 
       {classId === null || existingCount === null || existingCount > 0 ? null : (
-      <>
-      <fieldset role="radiogroup" style={cardsStyle}>
-        <legend style={legendStyle}>{t(locale, 'events.belt.title')}</legend>
-        {presets.map((preset) => (
-          <Card key={preset.key}>
-            <Radio
-              checked={chosen === preset.key}
-              label={`${preset.name} · ${preset.ranks.length} ${t(locale, 'events.belt.presetRankCount')}`}
-              name="belt-preset"
-              onChange={() => setChosen(preset.key)}
-              value={preset.key}
-            />
-          </Card>
-        ))}
-        <Card>
-          <Radio
-            checked={chosen === SCRATCH}
-            label={t(locale, 'events.belt.presetScratch')}
-            name="belt-preset"
-            onChange={() => setChosen(SCRATCH)}
-            value={SCRATCH}
-          />
-        </Card>
-      </fieldset>
-
-      {preview ? (
-        <Card caption={t(locale, 'events.belt.rankPlural')}>
-          <ul style={previewListStyle}>
-            {preview.ranks.map((rank) => (
-              <li key={rank.name} style={previewRowStyle}>
-                {/* Ringed, like every other belt in the product. The canvas rings only the
-                    white swatch and the white half of a bi-colour one, across all three
-                    preset strips and the preview list. */}
-                <BeltBar
-                  colorHex={rank.color_hex}
-                  label={rank.name}
-                  secondaryColorHex={rank.secondary_color_hex ?? undefined}
-                />
-                <span>{rank.name}</span>
-              </li>
+        <div className="belts-step">
+          {/* `5d` draws the choices beside a live preview. The shipped step drew bare radio
+              labels and put the preview in a card underneath, so a manager chose between
+              "7 ranks" and "12 ranks" without seeing a single belt — and the colours ARE
+              the decision. */}
+          <fieldset className="belts-step__choices" role="radiogroup">
+            <legend className="studio-visually-hidden">{t(locale, 'events.belt.title')}</legend>
+            {presets.map((preset) => (
+              <label
+                className="belts-card"
+                data-selected={chosen === preset.key}
+                data-testid={`belts-preset-${preset.key}`}
+                key={preset.key}
+              >
+                <span className="belts-card__head">
+                  <Radio
+                    checked={chosen === preset.key}
+                    label={preset.name}
+                    name="belt-preset"
+                    onChange={() => setChosen(preset.key)}
+                    value={preset.key}
+                  />
+                  <span className="belts-card__count">
+                    {`${preset.ranks.length} ${t(locale, 'events.belt.presetRankCount')}`}
+                  </span>
+                </span>
+                {/* What this preset would actually create. Ringed like every belt in the
+                    product — D7 makes the ring unconditional, so a white belt on a white
+                    card is still a belt and not a gap. */}
+                <span aria-hidden="true" className="belts-card__strip">
+                  {preset.ranks.map((rank) => (
+                    <BeltBar
+                      colorHex={rank.color_hex}
+                      key={rank.name}
+                      label={rank.name}
+                      secondaryColorHex={rank.secondary_color_hex ?? undefined}
+                    />
+                  ))}
+                </span>
+              </label>
             ))}
-          </ul>
-        </Card>
-      ) : null}
+            <label
+              className="belts-card"
+              data-selected={chosen === SCRATCH}
+              data-testid="belts-preset-scratch"
+            >
+              <span className="belts-card__head">
+                <Radio
+                  checked={chosen === SCRATCH}
+                  label={t(locale, 'events.belt.presetScratch')}
+                  name="belt-preset"
+                  onChange={() => setChosen(SCRATCH)}
+                  value={SCRATCH}
+                />
+                <span className="belts-card__count">
+                  {t(locale, 'events.belt.presetManual')}
+                </span>
+              </span>
+            </label>
+          </fieldset>
 
-      {seedError ? (
-        <p role="alert" style={hintStyle} data-testid="belts-seed-failed">
-          {t(locale, 'events.belt.seedFailed')}
-        </p>
-      ) : null}
+          <aside className="belts-preview" data-testid="belts-preview">
+            <SectionHeader
+              action={
+                preview ? (
+                  <span className="belts-preview__count" data-testid="belts-preview-count">
+                    {`${preview.ranks.length} ${t(locale, 'events.belt.rankPlural')}`}
+                  </span>
+                ) : undefined
+              }
+              level={3}
+              title={t(locale, 'events.belt.presetPreview')}
+            />
+            {preview ? (
+              /* Every rank, scrollable — not the first seven with the rest named. A manager
+                 choosing a twelve-rank ladder is choosing the whole ladder, and "and 5 more"
+                 hid the half that distinguishes one preset from another.
 
-      <p style={{ margin: 0 }}>
-        <Button
-          disabled={chosen === null || busy}
-          onClick={() => void commit()}
-          variant="primary"
-        >
-          {t(locale, 'events.belt.add')}
-          {preview ? ` · ${preview.ranks.length}` : ''}
-        </Button>
-      </p>
-      </>
+                 `tabIndex={0}` because a scroll container that is not focusable cannot be
+                 scrolled from a keyboard at all: there is nothing inside it to tab to, so
+                 the arrow keys never reach it. Focusable and labelled, it behaves like the
+                 region it is. */
+              <div
+                aria-label={t(locale, 'events.belt.presetPreview')}
+                className="belts-preview__scroll"
+                data-testid="belts-preview-scroll"
+                role="group"
+                tabIndex={0}
+              >
+                <ul className="belts-preview__list">
+                  {preview.ranks.map((rank) => (
+                    <li key={rank.name}>
+                      <BeltBar
+                        colorHex={rank.color_hex}
+                        label={rank.name}
+                        secondaryColorHex={rank.secondary_color_hex ?? undefined}
+                      />
+                      <span>{rank.name}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <p className="belts-preview__empty">
+                {t(locale, 'events.belt.presetPreviewEmpty')}
+              </p>
+            )}
+          </aside>
+
+          <div style={{ gridColumn: '1 / -1' }}>
+            {seedError ? (
+              <p role="alert" style={hintStyle} data-testid="belts-seed-failed">
+                {t(locale, 'events.belt.seedFailed')}
+              </p>
+            ) : null}
+            {/* `5d` names what the button will make, not the verb: "create 12 ranks". A
+                manager pressing it is committing to a ladder, and the count is the commitment. */}
+            <ActionBar
+              end={
+                <Button
+                  disabled={chosen === null || busy}
+                  onClick={() => void commit()}
+                  variant="primary"
+                >
+                  {preview
+                    ? t(locale, 'events.belt.presetCreate').replace(
+                        '{{count}}',
+                        String(preview.ranks.length),
+                      )
+                    : t(locale, 'events.belt.add')}
+                </Button>
+              }
+              start={
+                <Button onClick={onSkip} variant="ghost">
+                  {t(locale, 'events.belt.presetManual')}
+                </Button>
+              }
+            />
+          </div>
+        </div>
       )}
     </div>
   )

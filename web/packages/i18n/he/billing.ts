@@ -224,6 +224,10 @@ export const billing: Bundle = {
   // -- prices and plans (dashboard 5a, wizard 5e) --------------------------------
   'plan.title': 'מחירים ומסלולים',
   'plan.add': 'מסלול חדש',
+  // `5e`'s question. The step opened with a note about links and never said what it was for.
+  'plan.wizardTitle': 'כמה עולה להתאמן אצלכם?',
+  'plan.wizardHint': 'מספיק מסלול אחד כדי להתחיל. אפשר להוסיף עוד ולשנות מחירים בכל זמן.',
+  'plan.later': 'אקבע מחירים אחר כך',
   'plan.name': 'שם המסלול',
   'plan.monthlyAmount': 'מחיר חודשי',
   'plan.registrationFee': 'דמי הרשמה',

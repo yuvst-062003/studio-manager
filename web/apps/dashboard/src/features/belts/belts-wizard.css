@@ -1,0 +1,138 @@
+/* Artboard `5d` — the belt-system step.
+ *
+ * Two columns: the choices, and a live preview of the ladder each one would create. The
+ * shipped step drew the choices as bare radio labels and the preview as a card underneath,
+ * so a manager picked between "Judo · 7 ranks" and "Judo kids · 12 ranks" without seeing a
+ * single belt. The colours ARE the decision.
+ */
+
+.belts-step {
+  display: grid;
+  grid-template-columns: 1fr minmax(0, 18rem);
+  gap: var(--space-5);
+  align-items: start;
+}
+
+/* §6.4 — a manager on a phone is normal. One column, preview under the choices: it
+ * describes what was just picked, so below is the right place for it. */
+@media (width <= 900px) {
+  .belts-step {
+    grid-template-columns: 1fr;
+  }
+}
+
+.belts-step__choices {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+/* A preset is a card, and the whole card is the target — a radio the size of a full stop
+ * beside a strip of twelve belts is not what a manager aims at. */
+.belts-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--surface);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+}
+
+.belts-card:hover {
+  border-color: var(--border-strong);
+}
+
+.belts-card:has(:focus-visible) {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* `5d` gives the chosen card a heavy ink border. Not colour alone: the radio inside is
+ * still checked, and that is what a screen reader reads. */
+.belts-card[data-selected="true"] {
+  border-color: var(--fg);
+  border-width: var(--border-width-strong);
+}
+
+.belts-card__head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.belts-card__count {
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+  margin-inline-start: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The strip of what this preset would create. Wraps rather than scrolls: twelve belts on
+ * a narrow card is two rows, and a row that scrolls sideways hides half the answer. */
+.belts-card__strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.belts-preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--surface);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-lg);
+  position: sticky;
+  inset-block-start: var(--space-4);
+}
+
+.belts-preview__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  font-size: var(--text-label);
+}
+
+.belts-preview__list li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* The whole ladder, scrolled rather than truncated. Capped so the preview cannot become
+ * the tallest thing on the screen — which is what truncation was solving — while still
+ * letting a manager reach every rank.
+ *
+ * `overscroll-behavior` keeps a flick at the end of the list from scrolling the page
+ * behind it, which on a trackpad reads as the panel jumping. */
+.belts-preview__scroll {
+  max-block-size: 20rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.belts-preview__scroll:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.belts-preview__count {
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+.belts-preview__empty {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+}

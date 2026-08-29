@@ -165,6 +165,13 @@ export const common: Bundle = {
   // and the reassurance line is 5c verbatim: it is the sentence that makes skipping feel
   // safe, which is why every step carries it and not only the first.
   'setup.title': 'אשף הקמה',
+  // The wizard chrome, from artboards 5c-5f. `saveAndExit` sits in the header on every
+  // step but the last; 5f drops it because there is nothing left to save for later.
+  'setup.saveAndExit': 'שמירה ויציאה',
+  'setup.railTitle': 'אשף הקמה',
+  'setup.stepState.done': 'הושלם',
+  'setup.stepState.current': 'השלב הנוכחי',
+  'setup.stepState.upcoming': 'טרם הגיע',
   'setup.incomplete.title': 'הקמת המועדון עדיין לא הושלמה',
   'setup.incomplete.progress': 'הושלמו {{done}} מתוך {{total}} שלבים',
   'setup.incomplete.resume': 'המשך בהקמה',
@@ -201,6 +208,16 @@ export const common: Bundle = {
   'setup.studio.locale.en': 'English',
   'setup.studio.locale.ru': 'Русский',
   'setup.studio.logoDrop': 'גררו לוגו 512×512',
+  'setup.studio.logoChoose': 'בחירת קובץ',
+  // Which field must be filled, and what a good answer looks like. From the Stitch pass
+  // on 5c (2026-08-29): an owner who cannot tell required from optional fills all of them
+  // or none, and a first-run form with no examples is a form they hesitate over.
+  'setup.studio.requiredHint': 'חובה',
+  'setup.studio.optionalHint': 'לא חובה',
+  'setup.studio.namePlaceholder': 'לדוגמה: מועדון קודוקאן',
+  'setup.studio.sportPlaceholder': 'לדוגמה: ג׳ודו',
+  'setup.studio.addressPlaceholder': 'רחוב, עיר',
+  'setup.studio.phonePlaceholder': '03-0000000',
   'setup.studio.logoAlt': 'לוגו המועדון',
   'setup.studio.logoRejected': 'הקובץ לא התקבל. נדרש PNG, JPEG או WebP עד 2MB — SVG לא נתמך.',
   'setup.groups.className': 'שם השיעור',
@@ -209,6 +226,24 @@ export const common: Bundle = {
   'setup.groups.addGroup': 'הוספת קבוצה',
   'setup.groups.needClass': 'צריך ליצור שיעור לפני קבוצה',
   'setup.groups.locationName': 'שם האולם',
+  // Step 3's weekly times (owner request, 2026-08-29). A group trains the same days at
+  // the same hours every week, so a slot is a weekday and an hour range — never a date.
+  'setup.groups.times': 'שעות אימון',
+  'setup.groups.addTime': 'הוספת שעה',
+  'setup.groups.removeTime': 'הסרת השעה',
+  'setup.groups.day': 'יום',
+  'setup.groups.from': 'משעה',
+  'setup.groups.to': 'עד שעה',
+  'setup.groups.hall': 'אולם',
+  'setup.groups.noHall': 'ללא אולם',
+  'setup.groups.week': 'השבוע שייווצר',
+  'setup.groups.weekEmpty': 'הוסיפו שעות אימון כדי לראות את השבוע',
+  'setup.groups.dayEmpty': 'אין אימונים',
+  'setup.groups.saveFailed': 'לא הצלחנו לשמור את השעות',
+  // The rules cannot be applied before a training year exists to generate sessions into,
+  // and no setup step opens one. Named rather than reported as a generic failure.
+  'setup.groups.needYear': 'השעות יישמרו אחרי שתיפתח שנת פעילות — אפשר להמשיך, הן נשמרות כאן.',
+  'setup.groups.timesLater': 'השעות נקבעות כאן ונשמרות מיד — אפשר לשנות אותן בלוח השבועי.',
   'setup.groups.addLocation': 'הוספת אולם',
   'setup.staff.email': 'אימייל',
   'setup.staff.role': 'תפקיד',
@@ -221,6 +256,22 @@ export const common: Bundle = {
   'setup.staff.invite': 'שליחת הזמנה',
   'setup.staff.inviteFailed': 'ההזמנה לא נשלחה. בדקו את האימייל ונסו שוב.',
   'setup.staff.pending': 'טרם אישר',
+  // Steps 4-6's house chrome. The footer names where it goes next rather than saying
+  // "continue" — `5e` does, and "continue to staff" tells a manager what they are about
+  // to be asked. Each step's defer link uses its own words for the same reason.
+  'setup.continueTo': 'המשך ל{{step}}',
+  // §3.1's two coach roles, and the difference between them stated where the choice is
+  // made. The step offered a bare select labelled "role": an owner inviting their first
+  // coach had no way to know which one to pick.
+  'setup.staff.role.lead_coachWhat': 'יכול להעביר חניכים בין קבוצות ולפתוח מבחני חגורה',
+  'setup.staff.role.assistant_coachWhat': 'מסמן נוכחות. לא מנהל הרכב קבוצות ולא מבחנים',
+  'setup.staff.pendingTitle': 'הזמנות שנשלחו',
+  'setup.staff.noPending': 'עוד לא נשלחו הזמנות',
+  'setup.staff.awaiting': 'ממתין לכניסה ראשונה',
+  'setup.staff.aloneIsFine': 'אפשר להמשיך גם בלי להזמין אף אחד — מועדון שמאמן לבד הוא מקרה רגיל.',
+  'setup.staff.later': 'אזמין מאמנים אחר כך',
+  'setup.students.later': 'אוסיף חניכים אחר כך',
+  'setup.groups.later': 'אגדיר קבוצות אחר כך',
   'setup.students.ready': 'המועדון מוכן. נשאר להביא את החניכים.',
   'setup.students.summaryTitle': 'מה הוגדר עד כה',
   'setup.students.groupCount': '{groups} קבוצות · {classes} שיעורים',
@@ -327,4 +378,31 @@ export const common: Bundle = {
   'home.tab.payments': 'תשלומים',
   'home.tab.messages': 'הודעות',
   'home.tab.profile': 'פרופיל',
+
+  // The manager home (docs/design/proposals/manager-home.md). Counts and amounts are
+  // PARAMETERS, never concatenated into these strings — the setup banner already shows
+  // what joining three strings with no separator looks like on a shipped screen.
+  'dash.home.money.debt': 'חוב פתוח',
+  'dash.home.money.debtHint': 'ממתין ובפיגור',
+  'dash.home.money.collected': 'נגבה החודש',
+  'dash.home.money.overdue': 'משפחות בפיגור',
+  'dash.home.money.overdueHint': 'דורש טיפול',
+  'dash.home.attention.title': 'דורש טיפול',
+  'dash.home.attention.none': 'אין מה שדורש טיפול',
+  'dash.home.attention.all': 'כל ההתראות',
+  'dash.home.attention.health': 'הצהרות בריאות חסרות',
+  'dash.home.attention.noCoach': 'שיעורים ללא מאמן',
+  'dash.home.attention.unmarked': 'מפגשים ללא סימון נוכחות',
+  // The word beside the colour. A severity carried by colour alone fails SC 1.4.1, and
+  // `6c` already makes the word the rule rather than the exception.
+  'dash.home.severity.danger': 'דחוף',
+  'dash.home.severity.pending': 'ממתין',
+  'dash.home.today.title': 'שיעורים היום',
+  'dash.home.today.none': 'אין שיעורים היום',
+  'dash.home.today.fullWeek': 'לוח שבועי מלא',
+  'dash.home.today.group': 'קבוצה',
+  'dash.home.today.time': 'שעה',
+  'dash.home.today.hall': 'אולם',
+  'dash.home.today.coach': 'מאמן',
+  'dash.home.today.noCoach': 'לא שובץ מאמן',
 }
