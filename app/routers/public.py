@@ -66,6 +66,7 @@ from app.services.people.errors import NotFoundError
 from app.services.people.group_days import ScheduleReader
 from app.services.people.landing import LandingService, PublicGroup
 from app.services.schedule import ScheduleService
+from app.services.structure import landing_photos
 
 router = APIRouter(tags=["public"])
 
@@ -203,10 +204,12 @@ def _landing(slug: str, session: SessionDep) -> PublicLandingOut:
         # it a second time under a different key.
         address=landing_blob.get("address") or blob.get("address"),
         phone=landing_blob.get("phone") or blob.get("phone"),
-        # Empty until something writes `settings.landing.photo_object_keys`. The setup
-        # wizard has no photo step yet, and inventing a gallery it cannot feed would be a
-        # feature that exists only in a schema.
-        photo_urls=[],
+        # `settings.landing.photo_object_keys`, written by POST /studio/landing-photos
+        # (the הגדרות panel's strip), rendered in upload order.
+        photo_urls=[
+            landing_photos.public_photo_url(studio.slug, key)
+            for key in landing_photos.photo_keys(studio)
+        ],
         groups=[_group_out(group) for group in groups],
         belt_ladder=_belt_ladder(session, studio.id),
         trial_steps=[
@@ -266,6 +269,41 @@ def public_logo(slug: str, session: SessionDep, store: ObjectStoreDep) -> Respon
         media_type=content_type,
         # A logo changes about once a year. Cached hard, and keyed by slug, so the shop
         # window costs one request the first time and none after.
+        headers={"Cache-Control": "public, max-age=3600"},
+    )
+
+
+@router.get("/public/studios/{slug}/photos/{photo_id}")
+def public_photo(slug: str, photo_id: str, session: SessionDep, store: ObjectStoreDep) -> Response:
+    """§5.4a ① -- one photo of the landing strip, addressed by its minted id.
+
+    The id is matched against the studio's OWN list; there is no key in the URL and no way
+    to address another studio's object through this route -- the same posture as the logo's,
+    and the reason there is no generic `GET /files/{key}`.
+    """
+    try:
+        studio = LandingService.studio_by_slug(session, slug=slug)
+    except NotFoundError as exc:
+        raise _not_found() from exc
+    key = next(
+        (
+            candidate
+            for candidate in landing_photos.photo_keys(studio)
+            if landing_photos.photo_id_of(candidate) == photo_id
+        ),
+        None,
+    )
+    if key is None:
+        raise _not_found()
+    try:
+        data, content_type = store.get(key)
+    except ObjectNotFoundError as exc:
+        raise _not_found() from exc
+    return Response(
+        content=data,
+        media_type=content_type,
+        # A photo object is immutable -- a replace mints a NEW id -- so a shared cache may
+        # hold it as long as it likes without ever serving a stale strip.
         headers={"Cache-Control": "public, max-age=3600"},
     )
 

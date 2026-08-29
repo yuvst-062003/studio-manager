@@ -183,3 +183,85 @@ describe('a settings row says what it is (2026-08-29)', () => {
     ).toBeInTheDocument()
   })
 })
+
+describe('the landing photo strip (2026-08-29)', () => {
+  const PHOTOS = [
+    { id: 'p1', url: '/api/v1/public/studios/x/photos/p1' },
+    { id: 'p2', url: '/api/v1/public/studios/x/photos/p2' },
+  ]
+
+  function stubWithPhotos({
+    uploadResponse = new Response(
+      JSON.stringify({
+        photos: [...PHOTOS, { id: 'p3', url: '/api/v1/public/studios/x/photos/p3' }],
+      }),
+      { status: 200 },
+    ),
+    onDelete,
+  }: {
+    uploadResponse?: Response
+    onDelete?: (url: string) => void
+  } = {}) {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input)
+        if (init?.method === 'POST' && url.includes('/studio/landing-photos')) {
+          return uploadResponse
+        }
+        if (init?.method === 'DELETE' && url.includes('/studio/landing-photos/')) {
+          onDelete?.(url)
+          return new Response(null, { status: 204 })
+        }
+        return new Response(JSON.stringify({ ...STUDIO, landing_photos: PHOTOS }), {
+          status: 200,
+        })
+      }),
+    )
+  }
+
+  it('renders the strip with a delete button per photo', async () => {
+    stubWithPhotos()
+    render(<SettingsScreen locale="he" />)
+    expect(await screen.findByTestId('settings-landing-photos')).toBeInTheDocument()
+    expect(screen.getByTestId('settings-landing-photo-delete-p1')).toBeInTheDocument()
+    expect(screen.getByTestId('settings-landing-photo-delete-p2')).toBeInTheDocument()
+  })
+
+  it('uploads a picked file and repaints the strip from the response', async () => {
+    stubWithPhotos()
+    const user = userEvent.setup()
+    render(<SettingsScreen locale="he" />)
+    const input = await screen.findByLabelText(t('he', 'common.settings.landing.addPhoto'))
+    await user.upload(input, new File([new Uint8Array(8)], 'mat.png', { type: 'image/png' }))
+    expect(await screen.findByTestId('settings-landing-photo-delete-p3')).toBeInTheDocument()
+  })
+
+  it('deletes a photo and drops it from the strip', async () => {
+    const deleted: string[] = []
+    stubWithPhotos({ onDelete: (url) => deleted.push(url) })
+    const user = userEvent.setup()
+    render(<SettingsScreen locale="he" />)
+    await user.click(await screen.findByTestId('settings-landing-photo-delete-p1'))
+    await waitFor(() => expect(deleted.some((url) => url.endsWith('/p1'))).toBe(true))
+    await waitFor(() =>
+      expect(screen.queryByTestId('settings-landing-photo-delete-p1')).toBeNull(),
+    )
+  })
+
+  it('says the strip is full when the server refuses a seventh', async () => {
+    stubWithPhotos({
+      uploadResponse: new Response(
+        JSON.stringify({ detail: { code: 'too_many_photos', message: '' } }),
+        { status: 409 },
+      ),
+    })
+    const user = userEvent.setup()
+    render(<SettingsScreen locale="he" />)
+    const input = await screen.findByLabelText(t('he', 'common.settings.landing.addPhoto'))
+    await user.upload(input, new File([new Uint8Array(8)], 'mat.png', { type: 'image/png' }))
+    expect(
+      await screen.findByText(t('he', 'common.settings.landing.photoTooMany')),
+    ).toBeInTheDocument()
+  })
+})

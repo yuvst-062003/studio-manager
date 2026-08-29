@@ -4,7 +4,8 @@
 // the product somebody reaches with no account, and §5.4a calls it "the club's shop window,
 // not a form".
 import { render, screen, waitFor } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import userEvent from '@testing-library/user-event'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ReactElement } from 'react'
 import { DIRECTION, t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
@@ -141,13 +142,13 @@ describe('PublicLanding — 13a / 13c', () => {
     ).toBeInTheDocument()
   })
 
-  it('opens the form ON LOAD, with the sign-in wall as its first step (L4)', async () => {
-    // In both artboards the open form is the page's centre of gravity — the button that
-    // used to hide it was the gap. §5.4a step 1 still holds: the wall is the form's first
-    // step, so nothing about a child is typed before authenticating.
+  it('keeps the flow closed on load: the picker is the centre of gravity (redesign 2026-08-29)', async () => {
+    // The 2026-08-29 redesign supersedes the open-on-load decision: the page leads with a
+    // compact single-select group picker and ONE call to action; the flow (whose first step
+    // is still §5.4a's sign-in wall) opens when the CTA is pressed.
     render(<PublicLanding slug="judo-tel-aviv" locale="he" client={clientReturning(LANDING)} />)
-    expect(await screen.findByTestId('booking-sign-in')).toBeInTheDocument()
-    expect(screen.queryByTestId('landing-start-booking')).toBeNull()
+    expect(await screen.findByTestId('landing-group-picker')).toBeInTheDocument()
+    expect(screen.queryByTestId('booking-sign-in')).toBeNull()
     expect(screen.queryByTestId('booking-children')).toBeNull()
   })
 
@@ -290,5 +291,96 @@ describe('L4 — the seven regions', () => {
     render(<PublicLanding slug="x" locale="he" client={clientReturning(LANDING)} />)
     await screen.findByTestId('landing-hero')
     expect(screen.queryByTestId('landing-photos')).toBeNull()
+  })
+})
+
+describe('redesign 2026-08-29 — the group picker and the one CTA', () => {
+  const TWO_GROUPS: Landing = {
+    ...LANDING,
+    groups: [
+      LANDING.groups![0]!,
+      {
+        id: 'g2',
+        name: 'נוער',
+        description: null,
+        age_min: 9,
+        age_max: 12,
+        training_weekdays: [1, 3],
+        training_times: ['17:30'],
+      },
+    ],
+  }
+
+  afterEach(() => {
+    window.history.replaceState(null, '', '/')
+  })
+
+  it('renders one radio per group with the first pre-selected', async () => {
+    render(<PublicLanding slug="x" locale="he" client={clientReturning(TWO_GROUPS)} />)
+    const picker = await screen.findByTestId('landing-group-picker')
+    const radios = picker.querySelectorAll('input[type="radio"]')
+    expect(radios).toHaveLength(2)
+    expect(screen.getByRole('radio', { name: /מתחילים/ })).toBeChecked()
+  })
+
+  it('the CTA names the chosen group, and follows the selection', async () => {
+    const user = userEvent.setup()
+    render(<PublicLanding slug="x" locale="he" client={clientReturning(TWO_GROUPS)} />)
+    const cta = await screen.findByTestId('landing-cta')
+    expect(cta).toHaveTextContent('מתחילים')
+    await user.click(screen.getByRole('radio', { name: /נוער/ }))
+    expect(cta).toHaveTextContent('נוער')
+  })
+
+  it('the CTA opens the flow as a dialog, sign-in first, with the group carried in', async () => {
+    const user = userEvent.setup()
+    render(<PublicLanding slug="x" locale="he" client={clientReturning(TWO_GROUPS)} />)
+    await user.click(await screen.findByTestId('landing-cta'))
+    const dialog = screen.getByTestId('booking-dialog')
+    expect(dialog).toHaveAttribute('role', 'dialog')
+    expect(screen.getByTestId('booking-sign-in')).toBeInTheDocument()
+    expect(screen.getByTestId('booking-sign-in-link')).toHaveAttribute(
+      'href',
+      expect.stringContaining(encodeURIComponent('book=g1')),
+    )
+  })
+
+  it('the change button drops back to the picker', async () => {
+    const user = userEvent.setup()
+    render(<PublicLanding slug="x" locale="he" client={clientReturning(TWO_GROUPS)} />)
+    await user.click(await screen.findByTestId('landing-cta'))
+    await user.click(screen.getByTestId('booking-dialog-change'))
+    expect(screen.queryByTestId('booking-dialog')).toBeNull()
+    expect(screen.getByTestId('landing-group-picker')).toBeInTheDocument()
+  })
+
+  it('the sticky bar mirrors the CTA and disappears while the flow is open', async () => {
+    const user = userEvent.setup()
+    render(<PublicLanding slug="x" locale="he" client={clientReturning(TWO_GROUPS)} />)
+    const bar = await screen.findByTestId('landing-sticky-cta')
+    expect(bar).toHaveTextContent('מתחילים')
+    await user.click(bar)
+    expect(screen.getByTestId('booking-dialog')).toBeInTheDocument()
+    expect(screen.queryByTestId('landing-sticky-cta')).toBeNull()
+  })
+
+  it('?book= reopens the flow after the sign-in round trip, group intact', async () => {
+    // The return_path carries the choice; landing on it signed-in must resume the booking,
+    // not drop the parent back on the shop window to start again.
+    window.history.replaceState(null, '', '/t/x?book=g2')
+    render(<PublicLanding slug="x" locale="he" client={clientReturning(TWO_GROUPS)} signedIn />)
+    expect(await screen.findByTestId('booking-dialog')).toBeInTheDocument()
+    expect(screen.getByTestId('booking-group-0')).toHaveValue('g2')
+  })
+
+  it('each desktop group card books THAT group', async () => {
+    const user = userEvent.setup()
+    render(<PublicLanding slug="x" locale="he" client={clientReturning(TWO_GROUPS)} />)
+    await user.click(await screen.findByTestId('landing-group-book-g2'))
+    expect(screen.getByTestId('booking-dialog')).toBeInTheDocument()
+    expect(screen.getByTestId('booking-sign-in-link')).toHaveAttribute(
+      'href',
+      expect.stringContaining(encodeURIComponent('book=g2')),
+    )
   })
 })

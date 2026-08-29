@@ -39,6 +39,8 @@ type LandingContent = {
   trial_steps?: string[] | null
 }
 
+type LandingPhoto = { id: string; url: string }
+
 type StudioDetails = {
   name: string
   sport: string | null
@@ -48,6 +50,7 @@ type StudioDetails = {
   parent_locales: string[]
   logo_url: string | null
   landing?: LandingContent
+  landing_photos?: LandingPhoto[]
 }
 
 //: 3f's own left rail, in its own order. The five M1 does not own are listed rather than
@@ -103,6 +106,29 @@ const rowStyle: CSSProperties = {
 
 const rowBodyStyle: CSSProperties = { flex: 1, minInlineSize: 0 }
 
+const photoStripStyle: CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: 'var(--space-3)',
+  listStyle: 'none',
+  margin: 0,
+  padding: 0,
+}
+
+const photoTileStyle: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 'var(--space-1)',
+}
+
+const photoImgStyle: CSSProperties = {
+  blockSize: '6rem',
+  inlineSize: '8rem',
+  objectFit: 'cover',
+  borderRadius: 'var(--radius-md)',
+  border: 'var(--border-width-hairline) solid var(--border)',
+}
+
 /** 3f's toggle row: the switch, plus the explanatory line the artboard puts under it. */
 export function SettingToggle({
   label,
@@ -152,6 +178,7 @@ export function SettingsScreen({ locale }: { locale: Locale }) {
   const billingClient = useMemo(() => makeDashboardBillingClient(apiFetch), [])
   const [details, setDetails] = useState<StudioDetails | null>(null)
   const [saveState, setSaveState] = useState<'idle' | 'saved' | 'failed'>('idle')
+  const [photoError, setPhotoError] = useState<string | null>(null)
 
   useEffect(() => {
     let alive = true
@@ -180,6 +207,55 @@ export function SettingsScreen({ locale }: { locale: Locale }) {
         setSaveState('saved')
       })
       .catch(() => setSaveState('failed'))
+  }
+
+  // The strip's writers — multipart POST and a keyed DELETE, both repainting from the
+  // response rather than guessing. Errors land in their own line, mapped by the server's
+  // code: 'failed' alone sends an owner back to the same six-photo strip or the same SVG.
+  const uploadPhoto = (file: File) => {
+    setPhotoError(null)
+    const body = new FormData()
+    body.append('file', file)
+    void apiFetch('/api/v1/studio/landing-photos', { method: 'POST', body })
+      .then(async (response) => {
+        if (!response.ok) {
+          const detail = ((await response.json().catch(() => ({}))) as {
+            detail?: { code?: string }
+          }).detail
+          setPhotoError(
+            detail?.code === 'too_many_photos'
+              ? 'common.settings.landing.photoTooMany'
+              : detail?.code === 'unsupported_image'
+                ? 'common.settings.landing.photoBadType'
+                : response.status === 413
+                  ? 'common.settings.landing.photoTooLarge'
+                  : 'common.settings.landing.photoFailed',
+          )
+          return
+        }
+        const next = (await response.json()) as { photos: LandingPhoto[] }
+        setDetails((current) => (current ? { ...current, landing_photos: next.photos } : current))
+      })
+      .catch(() => setPhotoError('common.settings.landing.photoFailed'))
+  }
+
+  const deletePhoto = (id: string) => {
+    setPhotoError(null)
+    void apiFetch(`/api/v1/studio/landing-photos/${id}`, { method: 'DELETE' })
+      .then((response) => {
+        if (!response.ok) throw new Error(String(response.status))
+        setDetails((current) =>
+          current
+            ? {
+                ...current,
+                landing_photos: (current.landing_photos ?? []).filter(
+                  (photo) => photo.id !== id,
+                ),
+              }
+            : current,
+        )
+      })
+      .catch(() => setPhotoError('common.settings.landing.photoFailed'))
   }
 
   return (
@@ -337,6 +413,52 @@ export function SettingsScreen({ locale }: { locale: Locale }) {
                   }
                 />
               </label>
+
+              {/* The landing gallery — the strip §5.4a ① promised and `photo_urls=[]`
+                  stubbed. Photos are public by definition (they are the shop window), so
+                  the thumbnails ARE the public URLs. */}
+              <h4>{t(locale, 'common.settings.landing.photos')}</h4>
+              <p>{t(locale, 'common.settings.landing.photosHint')}</p>
+              <ul style={photoStripStyle} data-testid="settings-landing-photos">
+                {(details.landing_photos ?? []).map((photo) => (
+                  <li key={photo.id} style={photoTileStyle}>
+                    <img
+                      src={photo.url}
+                      alt={t(locale, 'common.settings.landing.photoAlt')}
+                      style={photoImgStyle}
+                    />
+                    <button
+                      type="button"
+                      className="studio-btn"
+                      data-variant="ghost"
+                      data-testid={`settings-landing-photo-delete-${photo.id}`}
+                      onClick={() => deletePhoto(photo.id)}
+                    >
+                      {t(locale, 'common.settings.landing.removePhoto')}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              <label>
+                {t(locale, 'common.settings.landing.addPhoto')}
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  style={{ display: 'block' }}
+                  data-testid="settings-landing-photo-input"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0]
+                    if (file) uploadPhoto(file)
+                    // Same file again after a delete must refire onChange.
+                    event.target.value = ''
+                  }}
+                />
+              </label>
+              {photoError ? (
+                <p role="alert" data-testid="settings-landing-photo-error">
+                  {t(locale, photoError)}
+                </p>
+              ) : null}
             </div>
           )}
         </Card>

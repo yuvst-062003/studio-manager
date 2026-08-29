@@ -122,6 +122,18 @@ def studio_logo_key(studio_id: uuid.UUID, content_type: str) -> str:
     return f"studios/{studio_id}/logo.{extension}"
 
 
+def studio_landing_photo_key(studio_id: uuid.UUID, photo_id: str, content_type: str) -> str:
+    """`studios/{studio_id}/landing/{photo_id}.{ext}` -- the landing gallery's slot.
+
+    Same contract as the logo's: constructed here from a server-minted photo_id (a uuid4
+    hex), never from anything a client sent, and named by the *sniffed* content type.
+    """
+    extension = IMAGE_EXTENSIONS.get(content_type)
+    if extension is None:
+        raise UnsupportedImageError(f"not a storable image type: {content_type!r}")
+    return f"studios/{studio_id}/landing/{photo_id}.{extension}"
+
+
 # -- what the bytes must be ----------------------------------------------------
 def sniff_image_type(data: bytes) -> str | None:
     """The first bytes, and nothing else. Returns None for anything not allowed.

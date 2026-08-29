@@ -2852,6 +2852,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/public/studios/{slug}/photos/{photo_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Public Photo
+         * @description §5.4a ① -- one photo of the landing strip, addressed by its minted id.
+         *
+         *     The id is matched against the studio's OWN list; there is no key in the URL and no way
+         *     to address another studio's object through this route -- the same posture as the logo's,
+         *     and the reason there is no generic `GET /files/{key}`.
+         */
+        get: operations["public_photo_api_v1_public_studios__slug__photos__photo_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/push-tokens": {
         parameters: {
             query?: never;
@@ -4316,6 +4340,48 @@ export interface paths {
         patch: operations["update_studio_api_v1_studio_patch"];
         trace?: never;
     };
+    "/api/v1/studio/landing-photos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload Landing Photo
+         * @description §5.4a ① -- the landing gallery's writer, on the logo's rails: sniffed bytes,
+         *     capped read, server-built keys. Returns the whole strip so the panel repaints from
+         *     one response.
+         */
+        post: operations["upload_landing_photo_api_v1_studio_landing_photos_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/studio/landing-photos/{photo_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Landing Photo
+         * @description Idempotent -- deleting a photo that is not on the strip is a 204, not a 404.
+         */
+        delete: operations["delete_landing_photo_api_v1_studio_landing_photos__photo_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/studio/logo": {
         parameters: {
             query?: never;
@@ -5089,6 +5155,14 @@ export interface components {
             cheque_prepay_months?: number | null;
             /** Run Day */
             run_day?: number | null;
+        };
+        /** Body_upload_landing_photo_api_v1_studio_landing_photos_post */
+        Body_upload_landing_photo_api_v1_studio_landing_photos_post: {
+            /**
+             * File
+             * @description PNG, JPEG or WebP. Never SVG.
+             */
+            file: string;
         };
         /** Body_upload_logo_api_v1_studio_logo_post */
         Body_upload_logo_api_v1_studio_logo_post: {
@@ -7113,6 +7187,26 @@ export interface components {
             order_index: number;
             /** Secondary Color Hex */
             secondary_color_hex: string | null;
+        };
+        /**
+         * LandingPhotoOut
+         * @description One slot of the landing strip: the minted id (what DELETE addresses) and the public
+         *     URL (what an <img> renders). Never the key -- §2.5 keeps keys server-side.
+         */
+        LandingPhotoOut: {
+            /** Id */
+            id: string;
+            /** Url */
+            url: string;
+        };
+        /**
+         * LandingPhotosOut
+         * @description What POST /studio/landing-photos returns: the whole strip, in render order, so the
+         *     panel repaints from one response instead of stitching.
+         */
+        LandingPhotosOut: {
+            /** Photos */
+            photos: components["schemas"]["LandingPhotoOut"][];
         };
         /** LocationCreate */
         LocationCreate: {
@@ -10310,6 +10404,8 @@ export interface components {
              */
             id: string;
             landing?: components["schemas"]["StudioLandingContent"];
+            /** Landing Photos */
+            landing_photos?: components["schemas"]["LandingPhotoOut"][];
             /** Logo Url */
             logo_url?: string | null;
             /** Name */
@@ -14931,6 +15027,38 @@ export interface operations {
             };
         };
     };
+    public_photo_api_v1_public_studios__slug__photos__photo_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+                photo_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     register_push_token_api_v1_push_tokens_post: {
         parameters: {
             query?: never;
@@ -17426,6 +17554,68 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["app__schemas__studio__StudioOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_landing_photo_api_v1_studio_landing_photos_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_landing_photo_api_v1_studio_landing_photos_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LandingPhotosOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_landing_photo_api_v1_studio_landing_photos__photo_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                photo_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

@@ -24,6 +24,7 @@ from app.core.storage import (
 from app.models.studio import Studio
 from app.schemas.studio import SUPPORTED_LOCALES
 from app.services.audit import AuditService
+from app.services.structure import landing_photos
 
 
 class NoLogoError(Exception):
@@ -176,6 +177,14 @@ def studio_public_fields(studio: Studio) -> dict[str, Any]:
         # The הגדרות panel reads current landing copy back; a writer whose reads come
         # back empty looks like a save that failed.
         "landing": blob.get("landing") if isinstance(blob.get("landing"), dict) else {},
+        # The strip, as {id, url} pairs -- ids for DELETE, public URLs for the <img>s.
+        "landing_photos": [
+            {
+                "id": landing_photos.photo_id_of(key),
+                "url": landing_photos.public_photo_url(studio.slug, key),
+            }
+            for key in landing_photos.photo_keys(studio)
+        ],
     }
 
 

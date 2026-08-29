@@ -232,6 +232,10 @@ export const people: Bundle = {
     'You have already used a trial class. Please contact the club',
   'landing.back': 'Back',
   'landing.next': 'Continue',
+  'landing.noCommitment': 'No commitment · signing up takes a minute',
+  'landing.bookTrial': 'Book a trial lesson',
+  'landing.changeGroup': 'Change',
+  'landing.closeBooking': 'Close',
 
   'trialHealth.title': 'Health declaration for the trial class',
   'trialHealth.subtitle':

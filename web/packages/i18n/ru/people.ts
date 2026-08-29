@@ -235,6 +235,10 @@ export const people: Bundle = {
     'Вы уже использовали пробное занятие. Свяжитесь с клубом',
   'landing.back': 'Назад',
   'landing.next': 'Продолжить',
+  'landing.noCommitment': 'Без обязательств · регистрация занимает минуту',
+  'landing.bookTrial': 'Записаться на пробное занятие',
+  'landing.changeGroup': 'Изменить',
+  'landing.closeBooking': 'Закрыть',
 
   'trialHealth.title': 'Декларация о здоровье для пробного занятия',
   'trialHealth.subtitle':

@@ -160,12 +160,14 @@ describe('L6 — the anonymous landing touches no session', () => {
     globalThis.history.pushState({}, '', '/')
   })
 
-  it('returning from the OAuth callback with signed_in=1 restores the session and opens the child form', async () => {
+  it('returning from the OAuth callback with signed_in=1 restores the session and resumes the booking', async () => {
     // A full-page OAuth return is a fresh JS context: the in-memory token is empty, and
     // the landing never refreshes for anonymous visitors. The callback's marker is the
     // one case where a refresh is known to be worth it — without acting on it the booking
     // flow greets the freshly-signed-in parent with its sign-in step again, forever.
-    globalThis.history.pushState({}, '', '/t/gladiator?signed_in=1')
+    // Redesign 2026-08-29: the flow no longer opens on load; the return_path carries the
+    // picked group as `?book=`, and THAT reopens the flow at the child form.
+    globalThis.history.pushState({}, '', '/t/gladiator?book=g1&signed_in=1')
     const calls: string[] = []
     vi.stubGlobal(
       'fetch',
@@ -194,7 +196,17 @@ describe('L6 — the anonymous landing touches no session', () => {
             about: null,
             address: null,
             photo_urls: [],
-            groups: [],
+            groups: [
+              {
+                id: 'g1',
+                name: 'מתחילים',
+                description: null,
+                age_min: null,
+                age_max: null,
+                training_weekdays: [],
+                training_times: [],
+              },
+            ],
           }),
           { status: 200 },
         )
@@ -202,11 +214,10 @@ describe('L6 — the anonymous landing touches no session', () => {
     )
     render(<App />)
     await waitFor(() => expect(calls.some((url) => url.includes('/auth/refresh'))).toBe(true))
-    await waitFor(() =>
-      expect(screen.getByText(t('he', 'people.landing.step.children'))).toBeInTheDocument(),
-    )
-    // The marker is one-shot: stripped, so a copied URL or a later reload does not refire it.
-    expect(globalThis.location.search).toBe('')
+    await waitFor(() => expect(screen.getByTestId('booking-children')).toBeInTheDocument())
+    // The marker is one-shot: stripped so a copied URL or a later reload does not refire
+    // it — while `book` survives the strip; it is what resumed the flow just now.
+    expect(globalThis.location.search).toBe('?book=g1')
     globalThis.history.pushState({}, '', '/')
   })
 })

@@ -28,6 +28,21 @@ class StudioLogoOut(BaseModel):
     logo_url: str = Field(description="The scoped read route, cache-busted by updated_at.")
 
 
+class LandingPhotoOut(BaseModel):
+    """One slot of the landing strip: the minted id (what DELETE addresses) and the public
+    URL (what an <img> renders). Never the key -- §2.5 keeps keys server-side."""
+
+    id: str
+    url: str
+
+
+class LandingPhotosOut(BaseModel):
+    """What POST /studio/landing-photos returns: the whole strip, in render order, so the
+    panel repaints from one response instead of stitching."""
+
+    photos: list[LandingPhotoOut]
+
+
 class StudioLandingContent(BaseModel):
     """The shop window's copy — landing decision 1 (2026-08-27): the club writes its own
     pitch. This is the WRITER the decision assumed and nobody built: the public landing
@@ -66,6 +81,8 @@ class StudioOut(BaseModel):
     phone: str | None = None
     parent_locales: list[str]
     landing: StudioLandingContent = Field(default_factory=StudioLandingContent)
+    #: The strip the הגדרות panel manages; served publicly, listed here for the editor.
+    landing_photos: list[LandingPhotoOut] = Field(default_factory=list)
 
 
 class StudioUpdate(BaseModel):

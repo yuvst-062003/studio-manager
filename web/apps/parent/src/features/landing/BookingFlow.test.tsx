@@ -407,3 +407,53 @@ describe('decision 3 (2026-08-27) — one-step chips alone, per-child frames wit
     expect(wrapper.closest('fieldset')).not.toBeNull()
   })
 })
+
+describe('landing redesign (2026-08-29) — pre-selected group and step progress', () => {
+  it('pre-fills the first child’s group from the landing picker', async () => {
+    render(
+      <BookingFlow
+        slug="judo"
+        locale="he"
+        client={makeClient()}
+        groups={GROUPS}
+        signedIn
+        initialGroupId="g2"
+      />,
+    )
+    expect(screen.getByTestId('booking-group-0')).toHaveValue('g2')
+  })
+
+  it('carries the chosen group through the sign-in round trip', async () => {
+    // The parent picked a group, then went to Google. Losing that choice on the way back
+    // is the funnel leak §5.4a added sign-in-first to avoid.
+    render(
+      <BookingFlow
+        slug="judo"
+        locale="he"
+        client={makeClient()}
+        groups={GROUPS}
+        initialGroupId="g2"
+      />,
+    )
+    expect(screen.getByTestId('booking-sign-in-link')).toHaveAttribute(
+      'href',
+      expect.stringContaining(encodeURIComponent('/t/judo?book=g2')),
+    )
+  })
+
+  it('shows the four steps with the current one marked', async () => {
+    render(<BookingFlow slug="judo" locale="he" client={makeClient()} groups={GROUPS} signedIn />)
+    const progress = screen.getByTestId('booking-progress')
+    for (const key of ['signIn', 'children', 'health', 'slot'] as const) {
+      expect(progress).toHaveTextContent(t('he', `people.landing.step.${key}`))
+    }
+    const current = progress.querySelector('[aria-current="step"]')
+    expect(current).toHaveTextContent(t('he', 'people.landing.step.children'))
+  })
+
+  it('marks sign-in as the current step for a stranger', async () => {
+    render(<BookingFlow slug="judo" locale="he" client={makeClient()} groups={GROUPS} />)
+    const current = screen.getByTestId('booking-progress').querySelector('[aria-current="step"]')
+    expect(current).toHaveTextContent(t('he', 'people.landing.step.signIn'))
+  })
+})

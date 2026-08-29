@@ -262,6 +262,10 @@ export const people: Bundle = {
   'landing.alreadyUsed': 'כבר מימשתם שיעור ניסיון. פנו למועדון',
   'landing.back': 'חזרה',
   'landing.next': 'המשך',
+  'landing.noCommitment': 'ללא התחייבות · ההרשמה אורכת דקה',
+  'landing.bookTrial': 'קביעת שיעור ניסיון',
+  'landing.changeGroup': 'שינוי',
+  'landing.closeBooking': 'סגירה',
 
   // §5.4a step 3 — the SHORT trial form, against the seeded kind='trial' template.
   'trialHealth.title': 'הצהרת בריאות לשיעור ניסיון',

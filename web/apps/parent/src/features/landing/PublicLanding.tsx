@@ -1,28 +1,34 @@
-// Parent artboards 13a (mobile, full scroll) and 13c (desktop, sticky form beside it).
+// Parent artboards 13a (mobile, full scroll) and 13c (desktop, sticky form beside it),
+// reworked by the approved redesign of 2026-08-29 ("Trial Landing Redesign" canvas).
 //
 // **One component, two widths.** 13a and 13c are the same page: the difference is a CSS
-// grid that collapses, not a second tree. Two components would be two places to change the
-// club's own copy, and the desktop one would rot first.
+// grid that collapses, not a second tree. The responsive half lives in `landing.css` —
+// see its header for what may go there and why nothing else may.
 //
-// §5.4a ①: "the club's shop window, not a form. Logo, photos, what the club does, where and
-// when, and one offer: שיעור ניסיון חינם." So everything above the fold is readable with no
-// session at all — the sign-in wall stands in front of *booking*, never in front of
-// *reading*. A stranger tapping an Instagram link must see the club.
+// **The redesign's centre of gravity is the PICKER, not the form.** The page leads with a
+// compact single-select list of groups and ONE call to action that names the chosen group;
+// pressing it opens the booking flow in a dialog (BookingDialog) with the choice carried
+// in. On the phone the CTA also lives in a bar stuck to the bottom of the screen. This
+// supersedes the open-on-load decision — the open form pushed everything a stranger came
+// to read below a wall of inputs.
+//
+// §5.4a ①: "the club's shop window, not a form." Everything is readable with no session at
+// all — the sign-in wall stands in front of *booking*, never in front of *reading*.
 //
 // **The copy is the club's; the chrome is translated** (landing decision 1, 2026-08-27).
 // `headline`, `about`, `address`, `trial_steps` and the phone are all data from
-// `studio.settings` — a shared Hebrew sentence about "ג׳ודו מגיל 5" is simply wrong for a
-// club that teaches from four. i18n keys carry only headings, buttons and states.
+// `studio.settings`. i18n keys carry only headings, buttons and states.
 //
 // G12 — logical properties only. This page renders right-to-left in Hebrew and
 // left-to-right in English, and it is the one screen in the product a stranger sees first.
 import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { Alert, BeltLadder, Card, EmptyState } from '@studio/ui'
+import { Alert, BeltLadder, Button, Card, EmptyState } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import type { LandingClient, PublicGroup, PublicLanding as Landing } from './landingClient'
-import { BookingFlow } from './BookingFlow'
+import { BookingDialog } from './BookingDialog'
+import './landing.css'
 
 type LoadState =
   | { kind: 'loading' }
@@ -33,16 +39,19 @@ type LoadState =
 
 const pageStyle: CSSProperties = {
   display: 'grid',
-  // 13a stacks; 13c puts the form beside the club. One declaration, and the browser picks.
-  gridTemplateColumns: 'repeat(auto-fit, minmax(20rem, 1fr))',
   gap: 'var(--space-5)',
   maxInlineSize: '72rem',
   marginInline: 'auto',
   inlineSize: '100%',
   padding: 'var(--space-4)',
+  // The tatami weave — two faint thread directions over the ground, drawn from the same
+  // ink token every theme already flips, so it survives dark mode without a second value.
+  backgroundImage:
+    'repeating-linear-gradient(0deg, color-mix(in srgb, var(--fg) 3%, transparent) 0 1px, transparent 1px 12px), ' +
+    'repeating-linear-gradient(90deg, color-mix(in srgb, var(--fg) 2%, transparent) 0 1px, transparent 1px 48px)',
 }
 
-const clubColumnStyle: CSSProperties = {
+const restColumnStyle: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
   gap: 'var(--space-5)',
@@ -58,6 +67,29 @@ const invertedBandStyle: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
   gap: 'var(--space-3)',
+}
+
+// The hero clips its own watermark; nothing else may overflow it either.
+const heroStyle: CSSProperties = {
+  ...invertedBandStyle,
+  position: 'relative',
+  overflow: 'hidden',
+}
+
+// 柔道 — the redesign's one ornament, hidden from AT. A decorative glyph, not copy: it is
+// the same in every locale, which is why it does not live in i18n. No webfont is loaded
+// for two characters; every platform's own CJK serif renders them.
+const kanjiStyle: CSSProperties = {
+  position: 'absolute',
+  insetInlineEnd: 'var(--space-3)',
+  insetBlockEnd: 'var(--space-2)',
+  writingMode: 'vertical-rl',
+  fontFamily: "'Hiragino Mincho ProN', 'Yu Mincho', 'Noto Serif JP', serif",
+  fontSize: '72px',
+  fontWeight: 'var(--weight-semibold)',
+  lineHeight: 1,
+  color: 'color-mix(in srgb, var(--on-fg) 8%, transparent)',
+  pointerEvents: 'none',
 }
 
 const brandRowStyle: CSSProperties = {
@@ -82,14 +114,51 @@ const heroCaptionStyle: CSSProperties = {
 }
 
 const offerStyle: CSSProperties = {
-  // 13c's sticky form. On 13a the grid is one column and `position: sticky` is inert, so
-  // the same rule serves both.
-  position: 'sticky',
-  insetBlockStart: 'var(--space-4)',
-  alignSelf: 'start',
   display: 'flex',
   flexDirection: 'column',
   gap: 'var(--space-3)',
+}
+
+const offerBodyStyle: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 'var(--space-3)',
+}
+
+const trustLineStyle: CSSProperties = {
+  color: 'var(--text-muted)',
+  fontSize: 'var(--text-caption)',
+  margin: 0,
+}
+
+const pickerFieldsetStyle: CSSProperties = {
+  border: 'var(--border-width-hairline) solid var(--border)',
+  borderRadius: 'var(--radius-lg)',
+  margin: 0,
+  padding: 0,
+  overflow: 'hidden',
+  background: 'var(--surface)',
+}
+
+const pickerLegendStyle: CSSProperties = {
+  // SlotChips' visually-hidden legend, restated inline: the group list explains itself.
+  blockSize: '1px',
+  clipPath: 'inset(50%)',
+  inlineSize: '1px',
+  overflow: 'hidden',
+  position: 'absolute',
+  whiteSpace: 'nowrap',
+}
+
+const pickRowTextStyle: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 'var(--space-1)',
+}
+
+const pickRowMetaStyle: CSSProperties = {
+  color: 'var(--text-secondary)',
+  fontSize: 'var(--text-caption)',
 }
 
 const logoStyle: CSSProperties = {
@@ -165,16 +234,83 @@ function scheduleLine(locale: Locale, group: PublicGroup): string {
   return [days, times].filter(Boolean).join(' · ')
 }
 
-export function GroupRow({ group, locale }: { group: PublicGroup; locale: Locale }) {
+function ageLine(locale: Locale, group: PublicGroup): string | null {
+  return group.age_min != null || group.age_max != null
+    ? `${t(locale, 'people.landing.ageRange')}: ${group.age_min ?? ''}–${group.age_max ?? ''}`
+    : null
+}
+
+/** The picker row's one-line résumé of a group: ages, then days-and-times. */
+function groupMeta(locale: Locale, group: PublicGroup): string {
+  return [ageLine(locale, group), scheduleLine(locale, group)].filter(Boolean).join(' · ')
+}
+
+/**
+ * Redesign 2026-08-29 — the compact single-select picker. SlotChips' accessibility shape
+ * (fieldset, hidden legend, real radios, `:has(:focus-visible)` ring in landing.css),
+ * row-shaped so three groups cost three lines, not three cards with three buttons.
+ */
+function GroupPicker({
+  groups,
+  locale,
+  value,
+  onValueChange,
+}: {
+  groups: PublicGroup[]
+  locale: Locale
+  value: string | null
+  onValueChange: (id: string) => void
+}) {
+  return (
+    <fieldset style={pickerFieldsetStyle} data-testid="landing-group-picker">
+      <legend style={pickerLegendStyle}>{t(locale, 'people.landing.chooseGroup')}</legend>
+      {groups.map((group) => {
+        const selected = value === group.id
+        const meta = groupMeta(locale, group)
+        return (
+          <label
+            key={group.id}
+            className="landing-pick-row"
+            data-selected={selected ? 'true' : undefined}
+            data-testid={`landing-pick-${group.id}`}
+          >
+            <input
+              type="radio"
+              className="landing-pick-input"
+              name="landing-group"
+              checked={selected}
+              onChange={() => onValueChange(group.id)}
+            />
+            <span className="landing-pick-dot" aria-hidden="true" />
+            <span style={pickRowTextStyle}>
+              <span style={{ fontWeight: selected ? 'var(--weight-semibold)' : 'var(--weight-medium)' }}>
+                <bdi>{group.name}</bdi>
+              </span>
+              {meta ? <span style={pickRowMetaStyle}>{meta}</span> : null}
+            </span>
+          </label>
+        )
+      })}
+    </fieldset>
+  )
+}
+
+export function GroupRow({
+  group,
+  locale,
+  onBook,
+}: {
+  group: PublicGroup
+  locale: Locale
+  /** Redesign 2026-08-29 — 13c's per-card button; books THIS group. */
+  onBook: (id: string) => void
+}) {
   const weekdays = group.training_weekdays ?? []
-  const ages =
-    group.age_min != null || group.age_max != null
-      ? `${t(locale, 'people.landing.ageRange')}: ${group.age_min ?? ''}–${group.age_max ?? ''}`
-      : null
+  const ages = ageLine(locale, group)
   return (
     <li style={groupRowStyle}>
       <span style={groupAccentStyle} aria-hidden="true" />
-      <span>
+      <span style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
         <h3 data-testid="landing-group-name" style={{ margin: 0 }}>
           <bdi>{group.name}</bdi>
         </h3>
@@ -191,6 +327,15 @@ export function GroupRow({ group, locale }: { group: PublicGroup; locale: Locale
             {t(locale, 'people.weekdays.noSchedule')}
           </p>
         )}
+        <span>
+          <Button
+            variant="secondary"
+            onClick={() => onBook(group.id)}
+            data-testid={`landing-group-book-${group.id}`}
+          >
+            {t(locale, 'people.landing.bookTrial')}
+          </Button>
+        </span>
       </span>
     </li>
   )
@@ -209,6 +354,14 @@ export function PublicLanding({
   signedIn?: boolean
 }) {
   const [state, setState] = useState<LoadState>({ kind: 'loading' })
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  // The `?book=` resume: the sign-in round trip's return_path carries the picked group
+  // (BookingFlow writes it), so landing back here reopens the flow instead of dropping the
+  // parent on the shop window again. The dialog itself still waits for the landing to load
+  // and a group to exist — `flowOpen` alone renders nothing.
+  const [flowOpen, setFlowOpen] = useState(
+    () => new URLSearchParams(globalThis.location?.search ?? '').get('book') != null,
+  )
 
   useEffect(() => {
     let live = true
@@ -264,57 +417,120 @@ export function PublicLanding({
   // The affordances the phone unlocks — both stripped to digits for the URL schemes.
   const phoneDigits = landing.phone ? landing.phone.replace(/[^\d+]/g, '') : null
 
-  return (
-    <main style={pageStyle} data-testid="public-landing">
-      <div style={clubColumnStyle}>
-        {/* Region 1 — the hero band, inverted. */}
-        <section style={invertedBandStyle} aria-labelledby="landing-club-name" data-testid="landing-hero">
-          <div style={brandRowStyle}>
-            {landing.logo_url ? (
-              // The club's own logo, from the unauthenticated public route — the
-              // tenant-scoped one needs a token a stranger does not have.
-              <img
-                src={landing.logo_url}
-                alt={landing.studio_name}
-                style={logoStyle}
-                data-testid="landing-logo"
-              />
-            ) : null}
-            {/* The club's name is DATA, not a translated string: it is what the club
-                calls itself, in whatever language they chose. */}
-            <h1 id="landing-club-name" style={{ margin: 0, fontSize: 'var(--text-title)' }}>
-              <bdi>{landing.studio_name}</bdi>
-            </h1>
-            {landing.phone ? (
-              <a
-                href={`tel:${phoneDigits}`}
-                style={{ color: 'inherit', marginInlineStart: 'auto' }}
-                data-testid="landing-phone"
-              >
-                <bdi dir="ltr">{landing.phone}</bdi>
-              </a>
-            ) : null}
-          </div>
-          {/* The two-line headline at L2's display size — the club's words, with the
-              chrome offer as the fallback so a club that wrote nothing still has a hero. */}
-          <p style={heroHeadlineStyle} data-testid="landing-headline">
-            {landing.headline ?? t(locale, 'people.landing.title')}
-          </p>
-          <p style={{ margin: 0, opacity: 0.85 }}>{t(locale, 'people.landing.subtitle')}</p>
-          {ladder.length > 0 ? (
-            <>
-              <BeltLadder
-                items={ladder.map((rank) => ({
-                  colorHex: rank.color_hex,
-                  label: rank.name,
-                  secondaryColorHex: rank.secondary_color_hex,
-                }))}
-              />
-              <p style={heroCaptionStyle}>{t(locale, 'people.landing.beltCaption')}</p>
-            </>
-          ) : null}
-        </section>
+  // Derived, not synced: an explicit pick wins, then the round trip's `?book=`, then the
+  // first group — so the CTA names a group from the very first ready render.
+  const resumedId = new URLSearchParams(globalThis.location?.search ?? '').get('book')
+  const selectedGroup =
+    groups.find((group) => group.id === (selectedId ?? resumedId)) ?? groups[0] ?? null
+  const bookGroup = (id: string) => {
+    setSelectedId(id)
+    setFlowOpen(true)
+  }
+  const ctaLabel = (
+    <>
+      {t(locale, 'people.landing.bookTrial')}
+      {selectedGroup ? (
+        <>
+          {' — '}
+          <bdi>{selectedGroup.name}</bdi>
+        </>
+      ) : null}
+    </>
+  )
 
+  return (
+    <main className="landing-page" style={pageStyle} data-testid="public-landing">
+      {/* Region 1 — the hero band, inverted, with the redesign's kanji watermark. */}
+      <section
+        className="landing-hero-area"
+        style={heroStyle}
+        aria-labelledby="landing-club-name"
+        data-testid="landing-hero"
+      >
+        <span aria-hidden="true" style={kanjiStyle}>
+          柔道
+        </span>
+        <div style={brandRowStyle}>
+          {landing.logo_url ? (
+            // The club's own logo, from the unauthenticated public route — the
+            // tenant-scoped one needs a token a stranger does not have.
+            <img
+              src={landing.logo_url}
+              alt={landing.studio_name}
+              style={logoStyle}
+              data-testid="landing-logo"
+            />
+          ) : null}
+          {/* The club's name is DATA, not a translated string: it is what the club
+              calls itself, in whatever language they chose. */}
+          <h1 id="landing-club-name" style={{ margin: 0, fontSize: 'var(--text-title)' }}>
+            <bdi>{landing.studio_name}</bdi>
+          </h1>
+          {landing.phone ? (
+            <a
+              href={`tel:${phoneDigits}`}
+              style={{ color: 'inherit', marginInlineStart: 'auto' }}
+              data-testid="landing-phone"
+            >
+              <bdi dir="ltr">{landing.phone}</bdi>
+            </a>
+          ) : null}
+        </div>
+        {/* The two-line headline at L2's display size — the club's words, with the
+            chrome offer as the fallback so a club that wrote nothing still has a hero. */}
+        <p style={heroHeadlineStyle} data-testid="landing-headline">
+          {landing.headline ?? t(locale, 'people.landing.title')}
+        </p>
+        <p style={{ margin: 0, opacity: 0.85 }}>{t(locale, 'people.landing.subtitle')}</p>
+        {ladder.length > 0 ? (
+          <>
+            <BeltLadder
+              items={ladder.map((rank) => ({
+                colorHex: rank.color_hex,
+                label: rank.name,
+                secondaryColorHex: rank.secondary_color_hex,
+              }))}
+            />
+            <p style={heroCaptionStyle}>{t(locale, 'people.landing.beltCaption')}</p>
+          </>
+        ) : null}
+      </section>
+
+      {/* Region 5 — the offer: picker first, ONE call to action (redesign 2026-08-29). */}
+      <section className="landing-offer-area" style={offerStyle} aria-labelledby="landing-offer">
+        <Card>
+          <div style={offerBodyStyle}>
+            <h2 id="landing-offer" style={{ margin: 0 }}>
+              {t(locale, 'people.landing.title')}
+            </h2>
+            <p style={{ margin: 0 }}>{t(locale, 'people.landing.subtitle')}</p>
+            <p style={trustLineStyle}>{t(locale, 'people.landing.noCommitment')}</p>
+            {groups.length > 0 ? (
+              <>
+                <GroupPicker
+                  groups={groups}
+                  locale={locale}
+                  value={selectedGroup?.id ?? null}
+                  onValueChange={setSelectedId}
+                />
+                <Button
+                  disabled={!selectedGroup}
+                  onClick={() => setFlowOpen(true)}
+                  data-testid="landing-cta"
+                >
+                  {ctaLabel}
+                </Button>
+              </>
+            ) : (
+              <p data-testid="landing-no-groups" style={{ margin: 0 }}>
+                {t(locale, 'people.landing.noGroups')}
+              </p>
+            )}
+          </div>
+        </Card>
+      </section>
+
+      <div className="landing-rest-area" style={restColumnStyle}>
         {/* Photos — §5.4a ① names them explicitly; rendered the moment the API sends any. */}
         {photos.length > 0 ? (
           <div style={photosStyle} data-testid="landing-photos">
@@ -345,20 +561,21 @@ export function PublicLanding({
           </section>
         ) : null}
 
-        {/* Region 4 — "when you can come": ONE card of read-only rows. The rows carry no
-            pointer affordance and no selected state; the only picker is in the form. */}
-        <section aria-labelledby="landing-groups">
+        {/* Region 4 — the groups in detail, with descriptions and 13c's per-card button.
+            Desktop furniture: on the phone the picker rows already say all of this, so
+            landing.css hides the section below 64rem. */}
+        <section className="landing-groups-detail" aria-labelledby="landing-groups">
           <h2 id="landing-groups">{t(locale, 'people.landing.groupsTitle')}</h2>
           {groups.length > 0 ? (
             <Card>
               <ul style={groupListStyle} data-testid="landing-group-card">
                 {groups.map((group) => (
-                  <GroupRow key={group.id} group={group} locale={locale} />
+                  <GroupRow key={group.id} group={group} locale={locale} onBook={bookGroup} />
                 ))}
               </ul>
             </Card>
           ) : (
-            <p data-testid="landing-no-groups">{t(locale, 'people.landing.noGroups')}</p>
+            <p>{t(locale, 'people.landing.noGroups')}</p>
           )}
         </section>
 
@@ -405,25 +622,35 @@ export function PublicLanding({
         </footer>
       </div>
 
-      {/* Region 5 — the reservation form, OPEN. In both artboards the open form is the
-          page's centre of gravity; a button in front of it was the gap. */}
-      <section style={offerStyle} aria-labelledby="landing-offer">
-        <Card>
-          {/* §5.4a — 'one offer: שיעור ניסיון חינם'. L6: the link's only job is a first
-              lesson, so nothing here promises a place in the club. */}
-          <h2 id="landing-offer">{t(locale, 'people.landing.title')}</h2>
-          <p>{t(locale, 'people.landing.subtitle')}</p>
-          <BookingFlow
-            slug={slug}
-            locale={locale}
-            client={client}
-            groups={groups}
-            signedIn={signedIn}
-            address={landing.address}
-            phone={landing.phone}
-          />
-        </Card>
-      </section>
+      {/* The mobile sticky CTA — landing.css pins it to the screen's bottom edge and hides
+          it at desk widths, where the offer column is already in view. Gone while the flow
+          is open: the dialog owns the screen then. */}
+      {!flowOpen && selectedGroup ? (
+        <div className="landing-sticky-bar">
+          <Button
+            onClick={() => setFlowOpen(true)}
+            data-testid="landing-sticky-cta"
+            style={{ inlineSize: '100%' }}
+          >
+            {ctaLabel}
+          </Button>
+        </div>
+      ) : null}
+
+      {flowOpen && selectedGroup ? (
+        <BookingDialog
+          slug={slug}
+          locale={locale}
+          client={client}
+          groups={groups}
+          group={selectedGroup}
+          groupMeta={groupMeta(locale, selectedGroup)}
+          signedIn={signedIn}
+          address={landing.address ?? null}
+          phone={landing.phone ?? null}
+          onClose={() => setFlowOpen(false)}
+        />
+      ) : null}
     </main>
   )
 }

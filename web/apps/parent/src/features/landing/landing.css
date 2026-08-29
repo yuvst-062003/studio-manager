@@ -1,0 +1,144 @@
+/* Redesign 2026-08-29 — the responsive half of the landing page.
+ *
+ * Everything that is the same at both widths stays as inline styles in the components,
+ * like the rest of the app. This file holds ONLY what a media query can express and an
+ * inline style cannot: the 13c two-column grid, the mobile-only sticky CTA bar, the
+ * desktop-only groups detail, and the booking dialog's sheet-vs-centered shape. An inline
+ * style would beat these overrides, so the properties written here must not also be
+ * written inline. */
+
+/* -- the booking dialog: a bottom sheet in the hand, a centered card at a desk -------- */
+.landing-scrim {
+  background: var(--scrim);
+  inset-block: 0;
+  inset-inline: 0;
+  position: fixed;
+  z-index: 40;
+}
+
+.landing-booking-dialog {
+  background: var(--surface);
+  border-start-end-radius: var(--radius-xl);
+  border-start-start-radius: var(--radius-xl);
+  box-shadow: 0 -12px 32px rgb(23 21 15 / 18%);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  inset-block-end: 0;
+  inset-inline: 0;
+  max-block-size: 85dvh;
+  overflow-y: auto;
+  padding: var(--space-5);
+  position: fixed;
+  z-index: 41;
+}
+
+/* -- the mobile sticky CTA bar -------------------------------------------------------- */
+.landing-sticky-bar {
+  background: var(--surface);
+  border-block-start: var(--border-width-hairline) solid var(--border);
+  box-shadow: 0 -6px 16px rgb(23 21 15 / 6%);
+  inset-block-end: 0;
+  inset-inline: 0;
+  padding: var(--space-3) var(--space-4) var(--space-5);
+  position: fixed;
+  z-index: 30;
+}
+
+/* -- the group picker rows (SlotChips' accessibility shape, row-shaped) --------------- */
+.landing-pick-row {
+  align-items: center;
+  cursor: pointer;
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+
+  /* §6.2's thumb rule — a row is a tap target. */
+  min-block-size: 44px;
+}
+
+.landing-pick-row + .landing-pick-row {
+  border-block-start: var(--border-width-hairline) solid var(--border);
+}
+
+.landing-pick-row[data-selected='true'] {
+  background: color-mix(in srgb, var(--accent) 9%, var(--surface));
+}
+
+.landing-pick-row:has(.landing-pick-input:focus-visible) {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.landing-pick-input {
+  block-size: 1px;
+  clip-path: inset(50%);
+  inline-size: 1px;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+}
+
+.landing-pick-dot {
+  background: var(--surface);
+  block-size: 20px;
+  border: var(--border-width-hairline) solid var(--border-strong);
+  border-radius: var(--radius-circle);
+  flex: none;
+  inline-size: 20px;
+}
+
+.landing-pick-row[data-selected='true'] .landing-pick-dot {
+  border: 6px solid var(--accent);
+}
+
+/* -- one component, two widths -------------------------------------------------------- */
+@media (width <= 63.9375rem) {
+  /* 13a — the sticky bar floats over the page end; without this it covers the footer. */
+  .landing-page {
+    padding-block-end: 6rem;
+  }
+
+  /* The picker rows already carry every group's ages and schedule; the detail cards are
+   * the desktop column's furniture. */
+  .landing-groups-detail {
+    display: none;
+  }
+}
+
+@media (width >= 64rem) {
+  .landing-page {
+    grid-template-columns: minmax(0, 1fr) 25rem;
+    grid-template-rows: auto 1fr;
+  }
+
+  .landing-hero-area {
+    grid-area: 1 / 1;
+  }
+
+  .landing-rest-area {
+    grid-area: 2 / 1;
+  }
+
+  /* 13c's sticky offer column, spanning both content rows. */
+  .landing-offer-area {
+    align-self: start;
+    grid-area: 1 / 2 / 3 / 3;
+    inset-block-start: var(--space-4);
+    position: sticky;
+  }
+
+  .landing-sticky-bar {
+    display: none;
+  }
+
+  .landing-booking-dialog {
+    border-radius: var(--radius-xl);
+    block-size: fit-content;
+    inline-size: 100%;
+    inset-block: 0;
+    inset-inline: 0;
+    margin: auto;
+    max-inline-size: 30rem;
+  }
+}

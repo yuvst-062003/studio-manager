@@ -50,7 +50,88 @@ const rowStyle: CSSProperties = {
   alignItems: 'end',
 }
 
-const blankChild = (): Child => ({ first_name: '', last_name: '', birthdate: '', group_id: '' })
+const blankChild = (groupId = ''): Child => ({
+  first_name: '',
+  last_name: '',
+  birthdate: '',
+  group_id: groupId,
+})
+
+const STEPS = ['sign-in', 'children', 'health', 'slot'] as const
+
+const STEP_KEY: Record<Step, string> = {
+  'sign-in': 'signIn',
+  children: 'children',
+  health: 'health',
+  slot: 'slot',
+}
+
+const progressStyle: CSSProperties = {
+  listStyle: 'none',
+  margin: 0,
+  padding: 0,
+  display: 'flex',
+  alignItems: 'flex-start',
+  gap: 'var(--space-2)',
+}
+
+const progressItemStyle: CSSProperties = {
+  flex: 1,
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  gap: 'var(--space-1)',
+  textAlign: 'center',
+  fontSize: 'var(--text-micro)',
+  color: 'var(--text-muted)',
+}
+
+const progressDotStyle: CSSProperties = {
+  inlineSize: '26px',
+  blockSize: '26px',
+  borderRadius: 'var(--radius-circle)',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  fontSize: 'var(--text-label)',
+  border: 'var(--border-width-hairline) solid var(--border-strong)',
+  background: 'var(--surface)',
+  color: 'var(--text-muted)',
+}
+
+/** The four §5.4a steps as a progress rail, the current one marked for AT and eye alike. */
+function StepProgress({ locale, current }: { locale: Locale; current: Step }) {
+  return (
+    <ol style={progressStyle} data-testid="booking-progress">
+      {STEPS.map((step, index) => {
+        const active = step === current
+        return (
+          <li
+            key={step}
+            aria-current={active ? 'step' : undefined}
+            style={
+              active
+                ? { ...progressItemStyle, color: 'var(--fg)', fontWeight: 'var(--weight-semibold)' }
+                : progressItemStyle
+            }
+          >
+            <span
+              style={
+                active
+                  ? { ...progressDotStyle, background: 'var(--fg)', color: 'var(--on-fg)', border: 'none' }
+                  : progressDotStyle
+              }
+              aria-hidden="true"
+            >
+              {index + 1}
+            </span>
+            {t(locale, `people.landing.step.${STEP_KEY[step]}`)}
+          </li>
+        )
+      })}
+    </ol>
+  )
+}
 
 /**
  * §5.4a step 2 — "groups filtered by the child's age where age_min/age_max are set".
@@ -82,6 +163,7 @@ export function BookingFlow({
   today = new Date(),
   address = null,
   phone = null,
+  initialGroupId = null,
 }: {
   slug: string
   locale: Locale
@@ -92,9 +174,11 @@ export function BookingFlow({
   /** 13b's when-line address and change-the-time WhatsApp — from the landing payload. */
   address?: string | null
   phone?: string | null
+  /** Redesign 2026-08-29 — the group the landing picker chose; pre-fills the first child. */
+  initialGroupId?: string | null
 }) {
   const [step, setStep] = useState<Step>(signedIn ? 'children' : 'sign-in')
-  const [children, setChildren] = useState<Child[]>([blankChild()])
+  const [children, setChildren] = useState<Child[]>([blankChild(initialGroupId ?? '')])
   const [confirmed, setConfirmed] = useState<boolean[]>([false])
   // Keyed by group, because §5.4a step 4 offers 'the next N upcoming sessions of EACH
   // chosen group'. Two siblings in one group share one fetch; two siblings in different
@@ -133,10 +217,14 @@ export function BookingFlow({
   // -- step 1: sign in, before anything is typed ------------------------------
   if (step === 'sign-in') {
     // `return_path` brings them back to this exact club after the provider round trip, so
-    // the flow resumes instead of dropping them on a generic home screen.
-    const returnPath = encodeURIComponent(`/t/${slug}`)
+    // the flow resumes instead of dropping them on a generic home screen — and it carries
+    // the picked group, so the choice survives the trip (PublicLanding reads `?book=`).
+    const returnPath = encodeURIComponent(
+      `/t/${slug}${initialGroupId ? `?book=${initialGroupId}` : ''}`,
+    )
     return (
       <section aria-labelledby="booking-signin" data-testid="booking-sign-in">
+        <StepProgress locale={locale} current={step} />
         <h3 id="booking-signin">{t(locale, 'people.landing.step.signIn')}</h3>
         <p>{t(locale, 'people.landing.signInHint')}</p>
         <a
@@ -161,6 +249,7 @@ export function BookingFlow({
     )
     return (
       <section aria-labelledby="booking-children" data-testid="booking-children">
+        <StepProgress locale={locale} current={step} />
         <h3 id="booking-children">{t(locale, 'people.landing.step.children')}</h3>
         <ul style={listStyle}>
           {children.map((child, index) => (
@@ -247,6 +336,7 @@ export function BookingFlow({
     const allConfirmed = confirmed.every(Boolean)
     return (
       <section aria-labelledby="booking-health" data-testid="booking-health">
+        <StepProgress locale={locale} current={step} />
         <h3 id="booking-health">{t(locale, 'people.trialHealth.title')}</h3>
         <p>{t(locale, 'people.trialHealth.subtitle')}</p>
         <ul style={listStyle}>
@@ -323,6 +413,7 @@ export function BookingFlow({
 
   return (
     <form onSubmit={submit} aria-labelledby="booking-slot" data-testid="booking-slot">
+      <StepProgress locale={locale} current="slot" />
       <h3 id="booking-slot">{t(locale, 'people.landing.chooseSlot')}</h3>
       {children.map((child, index) => {
         const forChild = slotsByGroup[child.group_id] ?? []

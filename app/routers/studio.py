@@ -35,7 +35,14 @@ from app.core.storage import (
     build_object_store,
 )
 from app.core.tenancy import TenantSessionDep, require_current_studio_id
-from app.schemas.studio import StudioLogoOut, StudioOut, StudioUpdate
+from app.schemas.studio import (
+    LandingPhotoOut,
+    LandingPhotosOut,
+    StudioLogoOut,
+    StudioOut,
+    StudioUpdate,
+)
+from app.services.structure import landing_photos as photos_service
 from app.services.structure import logo as logo_service
 
 router = APIRouter(tags=["studio"])
@@ -198,6 +205,92 @@ def read_logo(session: TenantSessionDep, store: ObjectStoreDep) -> Response:
     return Response(
         content=data, media_type=content_type, headers={"Cache-Control": "private, max-age=300"}
     )
+
+
+def _photos_out(session: TenantSessionDep, studio_id: uuid.UUID) -> LandingPhotosOut:
+    studio = logo_service.active_studio(session, studio_id)
+    session.refresh(studio)
+    return LandingPhotosOut(
+        photos=[
+            LandingPhotoOut(
+                id=photos_service.photo_id_of(key),
+                url=photos_service.public_photo_url(studio.slug, key),
+            )
+            for key in photos_service.photo_keys(studio)
+        ]
+    )
+
+
+@router.post("/studio/landing-photos", response_model=LandingPhotosOut)
+async def upload_landing_photo(
+    _: ManagerOrOwner,
+    request: Request,
+    session: TenantSessionDep,
+    file: LogoUpload,
+    store: ObjectStoreDep,
+) -> LandingPhotosOut:
+    """§5.4a ① -- the landing gallery's writer, on the logo's rails: sniffed bytes,
+    capped read, server-built keys. Returns the whole strip so the panel repaints from
+    one response."""
+    declared = request.headers.get("content-length")
+    if declared and declared.isdigit() and int(declared) > MAX_UPLOAD_BYTES * 2:
+        raise _too_large()
+
+    studio_id = require_current_studio_id()
+    person_id, identity_id = _actor(request)
+    data = await _read_capped(file)
+    try:
+        photos_service.store_photo(
+            session,
+            store,
+            studio_id=studio_id,
+            data=data,
+            actor_person_id=person_id,
+            actor_identity_id=identity_id,
+        )
+    except UnsupportedImageError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail={
+                "code": "unsupported_image",
+                "message": "a photo must be a PNG, a JPEG or a WebP. SVG is never accepted.",
+            },
+        ) from exc
+    except photos_service.TooManyPhotosError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "too_many_photos",
+                "message": (
+                    f"the landing page shows at most {photos_service.MAX_LANDING_PHOTOS} "
+                    "photos. Delete one to make room."
+                ),
+            },
+        ) from exc
+    session.commit()
+    return _photos_out(session, studio_id)
+
+
+@router.delete("/studio/landing-photos/{photo_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_landing_photo(
+    _: ManagerOrOwner,
+    photo_id: str,
+    request: Request,
+    session: TenantSessionDep,
+    store: ObjectStoreDep,
+) -> Response:
+    """Idempotent -- deleting a photo that is not on the strip is a 204, not a 404."""
+    person_id, identity_id = _actor(request)
+    photos_service.delete_photo(
+        session,
+        store,
+        studio_id=require_current_studio_id(),
+        photo_id=photo_id,
+        actor_person_id=person_id,
+        actor_identity_id=identity_id,
+    )
+    session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.delete("/studio/logo", status_code=status.HTTP_204_NO_CONTENT)
