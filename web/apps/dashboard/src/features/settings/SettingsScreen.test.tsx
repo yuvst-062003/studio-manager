@@ -159,3 +159,27 @@ describe('the landing-content panel (2026-08-28)', () => {
     )
   })
 })
+
+describe('a settings row says what it is (2026-08-29)', () => {
+  it('shows each language name, not three rows reading "shown to parents"', async () => {
+    // `Switch` keeps its own label screen-reader-only — right for a switch whose row
+    // already names it, and `SettingToggle` never rendered that name. So the three
+    // parent-language toggles were visually identical: "מוצג להורים" three times, with no
+    // way to tell which row was Hebrew and which was Russian.
+    stub()
+    const { container } = render(<SettingsScreen locale="he" />)
+    await screen.findByTestId('settings-panel-studio')
+    const visible = [...container.querySelectorAll('.settings-row__label')].map(
+      (node) => node.textContent,
+    )
+    for (const code of ['he', 'en', 'ru'] as const) {
+      expect(visible).toContain(t('he', `common.setup.studio.locale.${code}`))
+    }
+    // The switch keeps the same string as its accessible name, so a screen reader still
+    // hears which language each row is — and hears it once, because the visible copy is
+    // aria-hidden.
+    expect(
+      screen.getByRole('switch', { name: t('he', 'common.setup.studio.locale.ru') }),
+    ).toBeInTheDocument()
+  })
+})

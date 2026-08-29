@@ -444,12 +444,34 @@ describe('5a — prices and plans', () => {
         onChanged={vi.fn()}
       />,
     )
-    await userEvent.type(screen.getByLabelText(t(LOCALE, 'billing.plan.name')), 'כל יום')
+    // The frequency is the first question on this screen too since 2026-08-29 — it used to
+    // be a bare `חל על` number box here while the wizard had already been rebuilt, so one
+    // club saw two designs for one decision.
+    await userEvent.click(screen.getByTestId('wizard-plan-freq-5'))
     await userEvent.type(screen.getByLabelText(t(LOCALE, 'billing.plan.monthlyAmount')), '500')
     await userEvent.click(screen.getByTestId('plan-save'))
     expect(createPricePlan).toHaveBeenCalledWith(
-      expect.objectContaining({ monthlyAmountAgorot: 50_000 }),
+      expect.objectContaining({ monthlyAmountAgorot: 50_000, sessionsPerWeek: 5 }),
     )
+  })
+
+  it('asks how often here in the same shape the wizard asks it', async () => {
+    // Same control, same testids, one implementation — `PlanFrequency.tsx`. The two
+    // screens drifting apart is the thing that was reported.
+    render(
+      <PricePlansScreen
+        locale={LOCALE}
+        client={stub()}
+        plans={[]}
+        onChanged={vi.fn()}
+      />,
+    )
+    expect(screen.getByTestId('wizard-plan-frequency')).toBeInTheDocument()
+    expect(screen.getByTestId('wizard-plan-freq-open')).toHaveTextContent(
+      t(LOCALE, 'billing.plan.unlimited'),
+    )
+    // And the old bare number box is gone.
+    expect(screen.queryByLabelText(t(LOCALE, 'billing.plan.appliesTo'))).toBeNull()
   })
 
   it('renders the empty state before any plan exists', () => {

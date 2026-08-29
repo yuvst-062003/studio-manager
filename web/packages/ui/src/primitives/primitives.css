@@ -168,6 +168,25 @@
   padding-inline: var(--field-pad-inline);
 }
 
+/* `select` — the third branch of the same field.
+ *
+ * It inherits the border, the padding and the focus ring above, which is the whole point:
+ * twenty-five raw selects sat beside TextFields at the UA's own size, and the students
+ * screen put a 158×22 search box next to a 95×20 status filter with their baselines two
+ * pixels apart. `appearance: none` is deliberately NOT set — the UA's disclosure arrow is
+ * the affordance that says this control has a list behind it, and replacing it with a
+ * background image would need a direction-aware position in a bidirectional UI for no
+ * gain. */
+.studio-field__input--select {
+  /* A select shrinks to its widest option; in a filter row beside a text field that makes
+     two controls of unrelated widths. */
+  inline-size: 100%;
+
+  /* The UA gives select its own line-height, so without this it sits a pixel or two off
+     the text field it shares a row with. */
+  line-height: var(--leading-tight);
+}
+
 /* `multiline` — the textarea branch. It inherits every rule above, which is the point:
    the border, the focus ring and the error state are the same field, drawn taller.
 

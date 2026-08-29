@@ -70,6 +70,7 @@ export { Table } from './primitives/Table'
 export type { TableColumn } from './primitives/Table'
 export { Switch } from './primitives/Switch'
 export { TextField } from './primitives/TextField'
+export { SelectField } from './primitives/SelectField'
 export { ThemeControl } from './primitives/ThemeControl'
 export { Toast } from './primitives/Toast'
 

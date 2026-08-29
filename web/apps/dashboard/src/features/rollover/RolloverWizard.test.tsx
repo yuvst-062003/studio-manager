@@ -591,10 +591,10 @@ describe('RolloverWizard · no draft year', () => {
     // manager overriding them clears first, and so does this test.
     await userEvent.clear(screen.getByTestId('rollover-year-input-name'))
     await userEvent.type(screen.getByTestId('rollover-year-input-name'), 'תשפ״ח')
-    await userEvent.clear(screen.getByTestId('rollover-year-input-starts'))
-    await userEvent.type(screen.getByTestId('rollover-year-input-starts'), '2027-09-01')
-    await userEvent.clear(screen.getByTestId('rollover-year-input-ends'))
-    await userEvent.type(screen.getByTestId('rollover-year-input-ends'), '2028-06-30')
+    await userEvent.clear(screen.getByLabelText(t('he', 'schedule.rollover.year.startsOn')))
+    await userEvent.type(screen.getByLabelText(t('he', 'schedule.rollover.year.startsOn')), '2027-09-01')
+    await userEvent.clear(screen.getByLabelText(t('he', 'schedule.rollover.year.endsOn')))
+    await userEvent.type(screen.getByLabelText(t('he', 'schedule.rollover.year.endsOn')), '2028-06-30')
     await userEvent.click(screen.getByTestId('rollover-year-create'))
 
     await waitFor(() => expect(client.createTrainingYear).toHaveBeenCalled())
@@ -613,8 +613,8 @@ describe('RolloverWizard · no draft year', () => {
     render(<RolloverWizard locale="he" client={client} today="2026-08-15T12:00:00Z" />)
     await screen.findByTestId('rollover-no-year')
     expect(screen.getByTestId('rollover-year-input-name')).toHaveValue('2026–2027')
-    expect(screen.getByTestId('rollover-year-input-starts')).toHaveValue('2026-09-01')
-    expect(screen.getByTestId('rollover-year-input-ends')).toHaveValue('2027-08-31')
+    expect(screen.getByLabelText(t('he', 'schedule.rollover.year.startsOn'))).toHaveValue('2026-09-01')
+    expect(screen.getByLabelText(t('he', 'schedule.rollover.year.endsOn'))).toHaveValue('2027-08-31')
 
     await userEvent.click(screen.getByTestId('rollover-year-create'))
     await waitFor(() =>
@@ -632,7 +632,7 @@ describe('RolloverWizard · no draft year', () => {
     client.listTrainingYears = vi.fn(async () => [])
     render(<RolloverWizard locale="he" client={client} today="2027-01-15T12:00:00Z" />)
     await screen.findByTestId('rollover-no-year')
-    expect(screen.getByTestId('rollover-year-input-starts')).toHaveValue('2026-09-01')
+    expect(screen.getByLabelText(t('he', 'schedule.rollover.year.startsOn'))).toHaveValue('2026-09-01')
   })
 
   it('refuses a year that ends before it starts, before asking the server', async () => {
@@ -641,10 +641,10 @@ describe('RolloverWizard · no draft year', () => {
     render(<RolloverWizard locale="he" client={client} />)
     await screen.findByTestId('rollover-no-year')
 
-    await userEvent.clear(screen.getByTestId('rollover-year-input-starts'))
-    await userEvent.type(screen.getByTestId('rollover-year-input-starts'), '2028-06-30')
-    await userEvent.clear(screen.getByTestId('rollover-year-input-ends'))
-    await userEvent.type(screen.getByTestId('rollover-year-input-ends'), '2027-09-01')
+    await userEvent.clear(screen.getByLabelText(t('he', 'schedule.rollover.year.startsOn')))
+    await userEvent.type(screen.getByLabelText(t('he', 'schedule.rollover.year.startsOn')), '2028-06-30')
+    await userEvent.clear(screen.getByLabelText(t('he', 'schedule.rollover.year.endsOn')))
+    await userEvent.type(screen.getByLabelText(t('he', 'schedule.rollover.year.endsOn')), '2027-09-01')
     await userEvent.click(screen.getByTestId('rollover-year-create'))
 
     expect(await screen.findByTestId('rollover-year-error')).toHaveTextContent(

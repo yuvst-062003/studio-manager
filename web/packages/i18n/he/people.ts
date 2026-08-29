@@ -63,6 +63,7 @@ export const people: Bundle = {
   'status.left': 'עזב',
   'status.lost': 'לא הצטרף',
   'status.label': 'סטטוס',
+  'status.any': 'כל הסטטוסים',
   'status.history': 'היסטוריית סטטוס',
   'status.changedOn': 'שונה בתאריך',
   'status.reason': 'סיבה',

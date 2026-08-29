@@ -15,11 +15,11 @@
 //
 // **Kyu has two keys and no field on the canvas.** `belt.kyuOptional` was written
 // deliberately, so the field ships.
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { t } from '@studio/i18n'
-import { BeltSystemScreen } from './BeltSystemScreen'
+import { movedTo, BeltSystemScreen } from './BeltSystemScreen'
 import type { DashboardBeltsClient, LadderRankOut } from './client'
 
 function rank(over: Partial<LadderRankOut> = {}): LadderRankOut {
@@ -192,5 +192,62 @@ describe('5b — the belt system', () => {
     await screen.findByRole('table')
     expect(screen.queryByText(/נוכחות/)).toBeNull()
     expect(screen.queryByText(/%/)).toBeNull()
+  })
+})
+
+// ── drag to reorder (2026-08-29, owner request) ─────────────────────────────────────
+describe('movedTo', () => {
+  it('drops a rank at an arbitrary index, not just one step', () => {
+    // `moved` walks one place at a time, which is all a button needs. A drag lands
+    // anywhere, so the rule it writes is a different one and is worth its own function.
+    expect(movedTo(['a', 'b', 'c', 'd'], 'a', 2)).toEqual(['b', 'c', 'a', 'd'])
+    expect(movedTo(['a', 'b', 'c', 'd'], 'd', 0)).toEqual(['d', 'a', 'b', 'c'])
+  })
+
+  it('is a no-op for a rank that is already there, or one that is not in the list', () => {
+    expect(movedTo(['a', 'b', 'c'], 'b', 1)).toEqual(['a', 'b', 'c'])
+    expect(movedTo(['a', 'b', 'c'], 'z', 0)).toEqual(['a', 'b', 'c'])
+  })
+
+  it('clamps a drop past either end rather than losing the rank', () => {
+    expect(movedTo(['a', 'b', 'c'], 'a', 99)).toEqual(['b', 'c', 'a'])
+    expect(movedTo(['a', 'b', 'c'], 'c', -5)).toEqual(['c', 'a', 'b'])
+  })
+})
+
+describe('dragging a belt to a new place in the ladder', () => {
+  it('posts the whole finished order after a drop', async () => {
+    const client = renderScreen()
+    const white = await rowFor('לבנה')
+    const green = await rowFor('ירוקה')
+    // A DataTransfer stand-in: jsdom has no drag implementation, and what is under test is
+    // the reorder the handlers compute, not the browser's transfer object.
+    const dataTransfer = {
+      data: {} as Record<string, string>,
+      effectAllowed: '',
+      dropEffect: '',
+      setData(key: string, value: string) {
+        this.data[key] = value
+      },
+      getData(key: string) {
+        return this.data[key] ?? ''
+      },
+    }
+    fireEvent.dragStart(white, { dataTransfer })
+    fireEvent.dragOver(green, { dataTransfer })
+    fireEvent.drop(green, { dataTransfer })
+    // White was first and green fourth; dropping it there leaves the other four in order.
+    await waitFor(() =>
+      expect(client.reorder).toHaveBeenCalledWith('c1', ['r2', 'r3', 'r4', 'r1', 'r5', 'r6']),
+    )
+  })
+
+  it('keeps the buttons, because a drag is not reachable from a keyboard', async () => {
+    // SC 2.1.1. The drag is an addition to the arrows, never a replacement for them —
+    // a manager on a keyboard or a touch screen must still be able to reorder the ladder.
+    renderScreen()
+    const row = await rowFor('צהובה')
+    expect(within(row).getByRole('button', { name: t('he', 'events.belt.moveUp') })).toBeInTheDocument()
+    expect(within(row).getByRole('button', { name: t('he', 'events.belt.moveDown') })).toBeInTheDocument()
   })
 })

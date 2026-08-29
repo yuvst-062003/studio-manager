@@ -35,22 +35,11 @@ import type { WizardStepProps } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { DashboardBillingClient, PricePlanOut } from './billingClient'
 import { agorotFromShekels } from './money'
+import { PlanFrequencyPicker, PlanPreview, frequencyLabel } from './PlanFrequency'
 
 /** `WIZARD_STEP_ORDER` is studio · groups · belts · prices · staff · students. */
 export const PRICES_WIZARD_ORDER = 4
 
-/**
- * How often a plan lets a student train, as a choice rather than a number box.
- *
- * `null` is open membership — `price_plan.sessions_per_week` is nullable and its own
- * docstring gives this club's ladder: "300 → 0, 400 → 1, 550 → NULL = unlimited".
- *
- * This was a bare `TextField` labelled חל על ("applies to") bound to `sessionsPerWeek`,
- * with no unit and no hint of what a good answer looked like. A manager reported the step
- * as not understandable and described, unprompted, exactly the ladder below — which is
- * what the field always meant and never said (2026-08-29).
- */
-const FREQUENCIES: readonly (number | null)[] = [1, 2, 3, 4, 5, null]
 
 const rowStyle: CSSProperties = {
   display: 'flex',
@@ -59,12 +48,6 @@ const rowStyle: CSSProperties = {
   flexWrap: 'wrap',
 }
 
-/** "3 אימונים בשבוע", or "מנוי חופשי" for the open plan. */
-function frequencyLabel(locale: WizardStepProps['locale'], perWeek: number | null): string {
-  return perWeek === null
-    ? t(locale, 'billing.plan.unlimited')
-    : t(locale, 'billing.plan.perWeek').replace('{{count}}', String(perWeek))
-}
 
 export function PricesWizardStep({
   locale,
@@ -162,25 +145,9 @@ export function PricesWizardStep({
       <Card caption={t(locale, 'billing.plan.add')}>
         {/* ① how often — the question the step is actually about. A plan is priced by
             training volume (C11), so this is chosen before anything else and every other
-            field reads as a consequence of it. */}
-        <fieldset className="plan-frequency" data-testid="wizard-plan-frequency">
-          <legend className="plan-frequency__legend">
-            {t(locale, 'billing.plan.howOften')}
-          </legend>
-          <div className="plan-frequency__options">
-            {FREQUENCIES.map((option) => (
-              <Button
-                data-selected={perWeek === option}
-                data-testid={`wizard-plan-freq-${option ?? 'open'}`}
-                key={String(option)}
-                onClick={() => setPerWeek(option)}
-                variant={perWeek === option ? 'secondary' : 'ghost'}
-              >
-                {frequencyLabel(locale, option)}
-              </Button>
-            ))}
-          </div>
-        </fieldset>
+            field reads as a consequence of it. Shared with the standing prices screen:
+            two designs for one decision is what the owner reported. */}
+        <PlanFrequencyPicker locale={locale} onChange={setPerWeek} value={perWeek} />
 
         {/* ② how much. */}
         <TextField
@@ -192,19 +159,7 @@ export function PricesWizardStep({
           value={monthly}
         />
 
-        {/* The plan as one sentence, before it is created. "400 – 3 times a week" is how
-            the club talks about it, and it is the only place the two answers meet. */}
-        {perWeek !== undefined && monthly.trim() !== '' ? (
-          <p className="plan-preview" data-testid="wizard-plan-preview">
-            <strong>{name.trim() || frequencyLabel(locale, perWeek)}</strong>
-            <span>·</span>
-            <MoneyDisplay
-              agorot={agorotFromShekels(monthly)}
-              label={t(locale, 'billing.plan.monthlyAmount')}
-            />
-            <span>{t(locale, 'billing.plan.perMonth')}</span>
-          </p>
-        ) : null}
+        <PlanPreview locale={locale} name={name} perWeek={perWeek} shekels={monthly} />
 
         {/* ③ the two answers most clubs leave alone. Folded away so the step is two
             questions, not four boxes of equal weight. */}

@@ -338,6 +338,7 @@ export const schedule: Bundle = {
   'rollover.year.name': 'שם השנה',
   'rollover.year.startsOn': 'תאריך פתיחה',
   'rollover.year.endsOn': 'תאריך סיום',
+  'rollover.year.endsBeforeStart': 'תאריך הסיום חייב להיות אחרי תאריך הפתיחה',
   'rollover.year.create': 'פתיחת שנה בטיוטה',
   'rollover.year.created': 'השנה נפתחה כטיוטה',
   'rollover.year.missing': 'אין שנת פעילות בטיוטה',

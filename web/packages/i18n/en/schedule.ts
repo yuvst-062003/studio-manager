@@ -293,6 +293,7 @@ export const schedule: Bundle = {
   'rollover.year.name': 'Year name',
   'rollover.year.startsOn': 'Start date',
   'rollover.year.endsOn': 'End date',
+  'rollover.year.endsBeforeStart': 'The end date must come after the start date',
   'rollover.year.create': 'Open the year as a draft',
   'rollover.year.created': 'The year was opened as a draft',
   'rollover.year.missing': 'There is no draft training year',

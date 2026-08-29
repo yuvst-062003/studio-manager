@@ -46,6 +46,7 @@ export const people: Bundle = {
   'status.left': 'Left',
   'status.lost': 'Did not join',
   'status.label': 'Status',
+  'status.any': 'Any status',
   'status.history': 'Status history',
   'status.changedOn': 'Changed on',
   'status.reason': 'Reason',

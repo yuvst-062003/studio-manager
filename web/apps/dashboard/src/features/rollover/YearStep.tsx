@@ -10,7 +10,7 @@
 // 409 — it is derived. `StepActions` renders "continue" instead, which advances the
 // container without sending anything.
 import { useState } from 'react'
-import { Button, Card, RangeText, TextField } from '@studio/ui'
+import { Button, Card, DateRangePicker, RangeText, TextField } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { RolloverClient, TrainingYear } from './client'
 import type { RolloverStepProps } from './types'
@@ -141,19 +141,20 @@ export function YearStep({
             value={name}
             onChange={(event) => setName(event.target.value)}
           />
-          <TextField
-            label={t(locale, 'schedule.rollover.year.startsOn')}
-            data-testid="rollover-year-input-starts"
-            type="date"
-            value={startsOn}
-            onChange={(event) => setStartsOn(event.target.value)}
-          />
-          <TextField
-            label={t(locale, 'schedule.rollover.year.endsOn')}
-            data-testid="rollover-year-input-ends"
-            type="date"
-            value={endsOn}
-            onChange={(event) => setEndsOn(event.target.value)}
+          {/* The two dates are a RANGE, and `DateRangePicker` is the primitive that says
+              so: it pairs them, sizes them alike, and refuses an end before its start —
+              which two loose `type="date"` fields could not do, and did not. Reported as
+              "can't pick dates normally" (2026-08-29). */}
+          <DateRangePicker
+            errorMessage={t(locale, 'schedule.rollover.year.endsBeforeStart')}
+            from={startsOn}
+            fromLabel={t(locale, 'schedule.rollover.year.startsOn')}
+            onChange={(range) => {
+              setStartsOn(range.from)
+              setEndsOn(range.to)
+            }}
+            to={endsOn}
+            toLabel={t(locale, 'schedule.rollover.year.endsOn')}
           />
           <Button data-testid="rollover-year-create" disabled={busy} onClick={() => void create()}>
             {t(locale, 'schedule.rollover.year.create')}
