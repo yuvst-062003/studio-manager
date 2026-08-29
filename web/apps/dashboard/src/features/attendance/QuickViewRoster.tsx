@@ -13,10 +13,11 @@
 //     affordance. A group larger than fits has nowhere to go." It scrolls.
 //   * finding 5 — "the summary omits the absent count entirely, though absences are in the
 //     roster." It does not.
-import { AttendanceMark, Button, StatusChip } from '@studio/ui'
+import { AttendanceMark, Button, PlanBadge, StatusChip } from '@studio/ui'
 import type { AttendanceState } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
+import type { PlanBadgeData } from '../billing/usePlanBadges'
 import type { RosterRow } from '@studio/core'
 
 /** `1e`'s four marks, the same four as `1c` at a smaller size. Notified and unmarked share
@@ -54,12 +55,24 @@ export function QuickViewRoster({
   onMark,
   onBulkPresent,
   onClose,
+  plans,
 }: {
   roster: RosterRow[]
   locale: Locale
   onMark: (studentId: string, status: RosterRow['status']) => void
   onBulkPresent: () => void
   onClose: () => void
+  /**
+   * Plan frequency per student, or undefined for a viewer who may not see it.
+   *
+   * **Passed in rather than read here, and that is the safety property.** This popover is
+   * rendered on a screen coaches also reach, and `price_plan_id` is what invariant 3's
+   * detector treats as a financial field — §3.2's hard rule is that coaches never see
+   * money. The caller holds the permission and simply passes nothing for a coach, so a
+   * coach-rendered roster has no plan data in it to leak rather than having some it must
+   * remember to hide.
+   */
+  plans?: PlanBadgeData
 }) {
   const present = roster.filter((row) => row.status === 'present').length
   const absent = roster.filter((row) => row.status.startsWith('absent')).length
@@ -105,6 +118,14 @@ export function QuickViewRoster({
             >
               <AttendanceMark label={t(locale, LABEL[row.status])} state={GLYPH[row.status]} />
               <bdi>{row.display_name}</bdi>
+              {/* Only when the caller supplied plans — see the prop's note. */}
+              {plans ? (
+                <PlanBadge
+                  loading={plans.loading}
+                  locale={locale}
+                  perWeek={plans.frequencies[row.student_id]}
+                />
+              ) : null}
               {row.has_absence_report ? (
                 <span data-testid={`quickview-note-${row.student_id}`}>
                   {t(locale, 'attendance.source.preReported')}

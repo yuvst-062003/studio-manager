@@ -608,6 +608,10 @@ export default function App() {
               client={scheduleClient}
               hash={hash}
               today={today}
+              // §3.2 — 'coaches never see money'. The plan badge on a roster row is read
+              // from a manager-only route, so the permission travels with the request to
+              // draw it rather than the roster deciding for itself.
+              canSeeMoney={canSeeMoney}
             />
           ) : null}
           {route === 'students' && studentRoute === 'new' ? (

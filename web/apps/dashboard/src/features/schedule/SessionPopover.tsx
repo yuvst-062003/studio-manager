@@ -13,6 +13,7 @@ import { studioDayKey, studioWallTimeToUtc } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { QuickViewRoster } from '../attendance'
+import type { PlanBadgeData } from '../billing/usePlanBadges'
 import type { DashboardAttendanceClient, DashboardSessionRoster } from '../attendance'
 import { ConfirmDialog } from '../rollover/ConfirmDialog'
 import type { ScheduleClient, SessionRow } from './client'
@@ -63,6 +64,7 @@ export function SessionPopover({
   fetcher,
   onClose,
   onChanged,
+  plans,
 }: {
   locale: Locale
   session: SessionRow
@@ -72,6 +74,8 @@ export function SessionPopover({
   fetcher: (path: string, init?: RequestInit) => Promise<Response>
   onClose: () => void
   onChanged: () => void
+  /** Undefined for a coach. Forwarded to the roster; see `QuickViewRoster`'s note. */
+  plans?: PlanBadgeData
 }) {
   const dialog = useModalDialog(true, onClose)
   const [roster, setRoster] = useState<DashboardSessionRoster | null>(null)
@@ -147,6 +151,7 @@ export function SessionPopover({
         {roster ? (
           <QuickViewRoster
             locale={locale}
+            plans={plans}
             onBulkPresent={() =>
               void attendanceClient
                 .bulkPresent(session.id)

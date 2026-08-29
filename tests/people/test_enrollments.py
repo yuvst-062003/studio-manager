@@ -625,3 +625,39 @@ def test_a_move_of_an_ended_enrollment_is_refused(
             actor_person_id=None,
             schedule=twice_weekly,
         )
+
+
+# -- the bulk plan read, for the badge on a student row (2026-08-29) --------------------
+def test_the_bulk_price_plan_route_is_manager_only(client, as_manager, as_lead_coach):
+    """One read for a whole roster, so a screen showing many students does not make one
+    request per child.
+
+    Same rule as the per-student route and for the same reason: `price_plan_id` is what
+    invariant 3's detector reads as a financial field, so this must never be coach
+    reachable. `GET /students` IS coach-tagged, which is exactly why the plan cannot simply
+    be added to `StudentSummaryOut` and needs a route of its own.
+    """
+    from app.main import app
+
+    tag_list = app.openapi()["paths"]["/api/v1/students/price-plans"]["get"]["tags"]
+    assert "coach" not in tag_list
+    assert (
+        client.get("/api/v1/students/price-plans", headers=as_lead_coach.headers).status_code
+        == 403
+    )
+
+
+def test_the_bulk_price_plan_route_answers_for_every_student(client, as_manager):
+    student = _student_via_api(client, as_manager)
+    body = client.get("/api/v1/students/price-plans", headers=as_manager.headers).json()
+    rows = {row["student_id"]: row["price_plan_id"] for row in body["items"]}
+    # Present with a null plan rather than absent: "no plan set" is a state the badge
+    # renders, and a missing row would be indistinguishable from a student who was not read.
+    assert student in rows
+    assert rows[student] is None
+
+
+def test_the_literal_path_is_not_swallowed_by_the_student_id_route(client, as_manager):
+    """`/students/{student_id}` is declared above this and would otherwise match
+    `price-plans` as a UUID and answer 422. Declaration order is load-bearing."""
+    assert client.get("/api/v1/students/price-plans", headers=as_manager.headers).status_code == 200

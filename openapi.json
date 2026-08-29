@@ -10889,6 +10889,51 @@
         "title": "StudentPricePlanOut",
         "type": "object"
       },
+      "StudentPricePlanRow": {
+        "description": "One student's plan, for a screen that shows many of them at once.",
+        "properties": {
+          "price_plan_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Plan Id"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "student_id",
+          "price_plan_id"
+        ],
+        "title": "StudentPricePlanRow",
+        "type": "object"
+      },
+      "StudentPricePlansPage": {
+        "description": "Every student's plan in one manager-scoped read.\n\nA roster badge needs the plan for twenty children at once, and the per-student route\nbelow would be twenty requests. It cannot come from `GET /students` instead: that route\nis coach-tagged, `price_plan_id` is what invariant 3's detector reads as a financial\nfield, and adding it to `StudentSummaryOut` would fail the gate — correctly.\n\nA student with no plan appears with `price_plan_id: null` rather than being left out,\nbecause \"no plan set\" is a state the badge draws and an absent row is indistinguishable\nfrom a student the caller never read.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/StudentPricePlanRow"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "StudentPricePlansPage",
+        "type": "object"
+      },
       "StudentStatusHistoryListResponse": {
         "properties": {
           "items": {
@@ -23025,6 +23070,28 @@
           }
         },
         "summary": "Bulk Students Route",
+        "tags": [
+          "people"
+        ]
+      }
+    },
+    "/api/v1/students/price-plans": {
+      "get": {
+        "description": "Every student's plan in one read, for the badge on a roster row.\n\n**Declared above `/students/{student_id}` on purpose.** FastAPI matches in declaration\norder, so below it this literal path would be taken as a `student_id`, fail to parse as\na UUID and answer 422. A test holds the order.\n\nManager-only and deliberately **untagged**, exactly like the per-student route beside\nit: `price_plan_id` is what invariant 3's detector reads as a financial field, and\n`GET /students` — the obvious place to put this — is coach-tagged, so the plan cannot\nlive on `StudentSummaryOut` at all.",
+        "operationId": "student_price_plans_api_v1_students_price_plans_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentPricePlansPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Student Price Plans",
         "tags": [
           "people"
         ]

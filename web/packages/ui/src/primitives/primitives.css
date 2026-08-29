@@ -1507,3 +1507,37 @@ a.studio-stat-tile:focus-visible {
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
+/* The tuition plan a student is on, small enough for a table cell (2026-08-29).
+ *
+ * A club prices by how often a child trains (C11), so the badge is a frequency and never
+ * an amount: `×3`, or `∞` for an open membership. `data-plan="none"` is the one a manager
+ * has to act on — a student with no plan is not being billed at all. */
+.studio-plan-badge {
+  align-items: center;
+  border: var(--border-width-hairline) solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  display: inline-flex;
+  font-size: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+  justify-content: center;
+  line-height: 1;
+  min-inline-size: 2.25rem;
+  padding-block: var(--space-1);
+  padding-inline: var(--space-2);
+}
+
+/* An open membership is the club's top plan, so it reads as the filled one. */
+.studio-plan-badge[data-plan='open'] {
+  background: var(--fg);
+  border-color: var(--fg);
+  color: var(--on-fg);
+}
+
+/* Not a plan the manager chose — a gap. Bordered in the same tone the product uses for
+   "needs attention" everywhere else, never colour alone: the text says it too. */
+.studio-plan-badge[data-plan='none'] {
+  border-color: var(--pending);
+  color: var(--pending);
+  font-weight: 600;
+}

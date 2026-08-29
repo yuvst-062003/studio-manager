@@ -3808,6 +3808,35 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/students/price-plans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Student Price Plans
+         * @description Every student's plan in one read, for the badge on a roster row.
+         *
+         *     **Declared above `/students/{student_id}` on purpose.** FastAPI matches in declaration
+         *     order, so below it this literal path would be taken as a `student_id`, fail to parse as
+         *     a UUID and answer 422. A test holds the order.
+         *
+         *     Manager-only and deliberately **untagged**, exactly like the per-student route beside
+         *     it: `price_plan_id` is what invariant 3's detector reads as a financial field, and
+         *     `GET /students` — the obvious place to put this — is coach-tagged, so the plan cannot
+         *     live on `StudentSummaryOut` at all.
+         */
+        get: operations["student_price_plans_api_v1_students_price_plans_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/students/{student_id}": {
         parameters: {
             query?: never;
@@ -9562,6 +9591,36 @@ export interface components {
             student_id: string;
             /** Weekly Volume */
             weekly_volume: number;
+        };
+        /**
+         * StudentPricePlanRow
+         * @description One student's plan, for a screen that shows many of them at once.
+         */
+        StudentPricePlanRow: {
+            /** Price Plan Id */
+            price_plan_id: string | null;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+        };
+        /**
+         * StudentPricePlansPage
+         * @description Every student's plan in one manager-scoped read.
+         *
+         *     A roster badge needs the plan for twenty children at once, and the per-student route
+         *     below would be twenty requests. It cannot come from `GET /students` instead: that route
+         *     is coach-tagged, `price_plan_id` is what invariant 3's detector reads as a financial
+         *     field, and adding it to `StudentSummaryOut` would fail the gate — correctly.
+         *
+         *     A student with no plan appears with `price_plan_id: null` rather than being left out,
+         *     because "no plan set" is a state the badge draws and an absent row is indistinguishable
+         *     from a student the caller never read.
+         */
+        StudentPricePlansPage: {
+            /** Items */
+            items: components["schemas"]["StudentPricePlanRow"][];
         };
         /** StudentStatusHistoryListResponse */
         StudentStatusHistoryListResponse: {
@@ -16518,6 +16577,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    student_price_plans_api_v1_students_price_plans_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudentPricePlansPage"];
                 };
             };
         };

@@ -410,6 +410,29 @@ class StudentDetailOut(BaseModel):
     guardians: list[GuardianOut] = Field(default_factory=list)
 
 
+class StudentPricePlanRow(BaseModel):
+    """One student's plan, for a screen that shows many of them at once."""
+
+    student_id: uuid.UUID
+    price_plan_id: uuid.UUID | None
+
+
+class StudentPricePlansPage(BaseModel):
+    """Every student's plan in one manager-scoped read.
+
+    A roster badge needs the plan for twenty children at once, and the per-student route
+    below would be twenty requests. It cannot come from `GET /students` instead: that route
+    is coach-tagged, `price_plan_id` is what invariant 3's detector reads as a financial
+    field, and adding it to `StudentSummaryOut` would fail the gate — correctly.
+
+    A student with no plan appears with `price_plan_id: null` rather than being left out,
+    because "no plan set" is a state the badge draws and an absent row is indistinguishable
+    from a student the caller never read.
+    """
+
+    items: list[StudentPricePlanRow]
+
+
 class StudentPricePlanOut(BaseModel):
     """C11's two numbers, manager-scoped. **Never** returned from a `coach`-tagged route.
 

@@ -195,6 +195,8 @@ export const billing: Bundle = {
   'plan.howOften': 'How many times a week does this plan cover?',
   'plan.perWeek': '{{count}} times a week',
   'plan.unlimited': 'Unlimited',
+  'plan.badge.noneTitle': 'No plan set — this student is not being billed',
+  'plan.badge.column': 'Plan',
   'plan.perMonth': 'per month',
   'plan.monthlyHint': 'In shekels. For example 400',
   'plan.nameHint': 'Optional — without a name we use the training frequency',

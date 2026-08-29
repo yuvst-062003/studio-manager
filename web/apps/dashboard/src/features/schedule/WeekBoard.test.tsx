@@ -881,3 +881,33 @@ describe('the grid gives its columns to the view that is showing', () => {
     )
   })
 })
+
+describe('the plan badge is a manager thing, all the way down', () => {
+  it("does not even ASK for plans on a coach's board", async () => {
+    // Not merely "does not draw them". `/students/price-plans` is manager-only and would
+    // answer 403 for a coach, so a board that requested it anyway would log a permission
+    // error on every open. The permission gates the request, not just the render.
+    const seen: string[] = []
+    vi.stubGlobal('fetch', (input: RequestInfo | URL) => {
+      seen.push(String(input))
+      return Promise.resolve(new Response('{"items":[]}', { status: 200 }))
+    })
+    render(<WeekBoard locale="he" client={stub()} today="2026-11-03T12:00:00Z" />)
+    await screen.findByTestId('session-block')
+    expect(seen.some((url) => url.includes('/students/price-plans'))).toBe(false)
+    vi.unstubAllGlobals()
+  })
+
+  it('asks once for a manager, however many sessions are opened', async () => {
+    const seen: string[] = []
+    vi.stubGlobal('fetch', (input: RequestInfo | URL) => {
+      seen.push(String(input))
+      return Promise.resolve(new Response('{"items":[]}', { status: 200 }))
+    })
+    render(<WeekBoard canSeeMoney locale="he" client={stub()} today="2026-11-03T12:00:00Z" />)
+    await waitFor(() =>
+      expect(seen.filter((url) => url.includes('/students/price-plans'))).toHaveLength(1),
+    )
+    vi.unstubAllGlobals()
+  })
+})

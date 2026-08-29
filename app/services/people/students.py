@@ -426,6 +426,21 @@ class StudentService:
         )
 
     @staticmethod
+    def list_price_plans(session: Session) -> list[tuple[uuid.UUID, uuid.UUID | None]]:
+        """`(student_id, price_plan_id)` for every student in the studio.
+
+        No viewer scoping and no pagination, both deliberate. The caller is
+        `ManagerOrOwner`, who sees the whole club by definition — a group-scoped variant
+        would be a coach-shaped read of a field no coach may have. And the result is two
+        UUIDs per student: a club of a thousand children is a few tens of kilobytes, which
+        is cheaper than the roster screen paginating a lookup map.
+
+        `TenantSession` scopes it to the active studio, as it does every query.
+        """
+        rows = session.execute(select(Student.id, Student.price_plan_id)).all()
+        return [(row[0], row[1]) for row in rows]
+
+    @staticmethod
     def get(
         session: Session,
         *,

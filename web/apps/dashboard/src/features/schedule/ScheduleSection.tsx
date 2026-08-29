@@ -44,12 +44,15 @@ export function ScheduleSection({
   client,
   hash,
   today,
+  canSeeMoney = false,
 }: {
   locale: Locale
   client: ScheduleClient
   hash: string
   /** An ISO instant. A prop, not `new Date()`, all the way down. */
   today: string
+  /** §3.2 — coaches never see money, so only a manager gets the plan badge on a roster. */
+  canSeeMoney?: boolean
 }) {
   const route = scheduleRoute(hash)
   const needsGroups = route.view === 'groups' || route.view === 'group'
@@ -146,5 +149,5 @@ export function ScheduleSection({
     )
   }
 
-  return <WeekBoard locale={locale} client={client} today={today} />
+  return <WeekBoard canSeeMoney={canSeeMoney} locale={locale} client={client} today={today} />
 }

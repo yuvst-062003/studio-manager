@@ -278,3 +278,37 @@ describe('artboard 1e — the Quick View roster', () => {
     expect(screen.getByLabelText('נעדר בהצדקה')).toBeInTheDocument()
   })
 })
+
+// ── the plan badge on a roster row (2026-08-29) ─────────────────────────────────────
+describe('the plan badge never reaches a coach', () => {
+  it('draws the badge when the caller supplies plans', () => {
+    render(
+      <QuickViewRoster
+        locale="he"
+        onBulkPresent={vi.fn()}
+        onClose={vi.fn()}
+        onMark={vi.fn()}
+        plans={{ frequencies: { s1: 3 }, names: { s1: 'x' }, loading: false }}
+        roster={[row({ student_id: 's1', display_name: 'דנה לוי' })]}
+      />,
+    )
+    expect(screen.getByTestId('plan-badge')).toHaveTextContent('×3')
+  })
+
+  it('renders NO badge at all when plans are absent — which is a coach', () => {
+    // §3.2's hard rule: coaches never see money, and `price_plan_id` is what invariant 3's
+    // detector treats as a financial field. The permission lives with the caller, so a
+    // coach's roster has no plan data in it to leak rather than having some it must
+    // remember to hide. Passing nothing is the whole mechanism, and this is that test.
+    render(
+      <QuickViewRoster
+        locale="he"
+        onBulkPresent={vi.fn()}
+        onClose={vi.fn()}
+        onMark={vi.fn()}
+        roster={[row({ student_id: 's1', display_name: 'דנה לוי' })]}
+      />,
+    )
+    expect(screen.queryByTestId('plan-badge')).toBeNull()
+  })
+})

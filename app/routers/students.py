@@ -54,6 +54,8 @@ from app.schemas.people import (
     StudentMarkLostIn,
     StudentOut,
     StudentPricePlanOut,
+    StudentPricePlanRow,
+    StudentPricePlansPage,
     StudentStatusHistoryListResponse,
     StudentSummaryOut,
     StudentSummaryPage,
@@ -241,6 +243,28 @@ def list_students(
         items=[_summary(row) for row in rows],
         next_cursor=next_cursor,
         has_more=next_cursor is not None,
+    )
+
+
+@router.get("/students/price-plans", response_model=StudentPricePlansPage)
+def student_price_plans(_: ManagerOrOwner, session: TenantSessionDep) -> StudentPricePlansPage:
+    """Every student's plan in one read, for the badge on a roster row.
+
+    **Declared above `/students/{student_id}` on purpose.** FastAPI matches in declaration
+    order, so below it this literal path would be taken as a `student_id`, fail to parse as
+    a UUID and answer 422. A test holds the order.
+
+    Manager-only and deliberately **untagged**, exactly like the per-student route beside
+    it: `price_plan_id` is what invariant 3's detector reads as a financial field, and
+    `GET /students` — the obvious place to put this — is coach-tagged, so the plan cannot
+    live on `StudentSummaryOut` at all.
+    """
+    rows = StudentService.list_price_plans(session)
+    return StudentPricePlansPage(
+        items=[
+            StudentPricePlanRow(student_id=student_id, price_plan_id=price_plan_id)
+            for student_id, price_plan_id in rows
+        ]
     )
 
 

@@ -9,8 +9,9 @@
 // fabrication — so the column exists, is labelled, and says when it fills in.
 import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { Button, EmptyState, SelectField, StatusChip, Table, TextField } from '@studio/ui'
+import { Button, EmptyState, PlanBadge, SelectField, StatusChip, Table, TextField } from '@studio/ui'
 import { apiFetch, appendPage } from '@studio/core'
+import { usePlanBadges } from '../billing/usePlanBadges'
 import type { CursorPage } from '@studio/core'
 import { ConfirmDialog } from '../rollover/ConfirmDialog'
 import { t } from '@studio/i18n'
@@ -70,6 +71,9 @@ export function StudentsScreen({
   const [page, setPage] = useState<StudentPage>({ items: [], next_cursor: null, has_more: false })
   // F8 — the payment column, from `charge` at last. Manager-only read; a failed read
   // renders the em dash rather than a reassuring ✓.
+  // Manager-only, like the debt map beside it: `price_plan_id` is a financial field as
+  // far as invariant 3 is concerned, and this whole screen is manager-scoped already.
+  const plans = usePlanBadges()
   const [openByStudent, setOpenByStudent] = useState<Record<string, 'overdue' | 'open'> | null>(
     null,
   )
@@ -416,6 +420,22 @@ export function StudentsScreen({
                   <span data-testid="students-document">
                     {t(locale, documentLabelKey(student.health_status))}
                   </span>
+                ),
+              },
+              {
+                id: 'plan',
+                header: t(locale, 'billing.plan.badge.column'),
+                width: '5rem',
+                // C11 — the club prices by how often a child trains, and that was
+                // invisible here: the list showed whether they had PAID but never what
+                // they were being billed for. A student absent from the map has no plan
+                // and is therefore not billed at all, which the badge marks.
+                cell: (student) => (
+                  <PlanBadge
+                    loading={plans.loading}
+                    locale={locale}
+                    perWeek={plans.frequencies[student.id]}
+                  />
                 ),
               },
               {

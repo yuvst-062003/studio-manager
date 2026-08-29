@@ -35,6 +35,7 @@ import {
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { makeDashboardAttendanceClient } from '../attendance'
+import { usePlanBadges } from '../billing/usePlanBadges'
 import { useLongPress } from './useLongPress'
 import { SessionPopover } from './SessionPopover'
 import { cancelReasonLabel } from './client'
@@ -416,13 +417,20 @@ export function WeekBoard({
   locale,
   client,
   today,
+  canSeeMoney = false,
 }: {
   locale: Locale
   client: ScheduleClient
   /** An ISO instant. A prop, not `new Date()` — see the module header. */
   today: string
+  /** §3.2 — coaches never see money, so only a manager gets the plan badge on a roster. */
+  canSeeMoney?: boolean
 }) {
   const todayKey = useMemo(() => studioDayKey(today), [today])
+  // Read once for the whole board rather than per popover: a manager opening five sessions
+  // in a row should not refetch the club's plans five times. Disabled for a coach, so a
+  // coach's board never issues the manager-only request at all.
+  const plans = usePlanBadges(canSeeMoney)
   const [view, setView] = useState<BoardView>('week')
   /** The day the view is anchored on. For `week` it is any day in the week; `daysFor`
    *  resolves it to the Sunday, so switching views keeps the manager where they were
@@ -1079,6 +1087,7 @@ export function WeekBoard({
           locale={locale}
           onChanged={() => setVersion((n) => n + 1)}
           onClose={() => setOpenSessionId(null)}
+          plans={canSeeMoney ? plans : undefined}
           session={openSession}
         />
       ) : null}

@@ -238,6 +238,8 @@ export const billing: Bundle = {
   'plan.howOften': 'כמה פעמים בשבוע מתאמנים במסלול הזה?',
   'plan.perWeek': '{{count}} אימונים בשבוע',
   'plan.unlimited': 'ללא הגבלה',
+  'plan.badge.noneTitle': 'לא הוגדר מסלול — החניך לא מחויב',
+  'plan.badge.column': 'מסלול',
   'plan.perMonth': 'לחודש',
   'plan.monthlyHint': 'בשקלים. למשל 400',
   'plan.nameHint': 'לא חובה — בלי שם נשתמש בכמות האימונים',

@@ -199,6 +199,8 @@ export const billing: Bundle = {
   'plan.howOften': 'Сколько раз в неделю по этому тарифу?',
   'plan.perWeek': '{{count}} раза в неделю',
   'plan.unlimited': 'Без ограничений',
+  'plan.badge.noneTitle': 'Тариф не задан — ученику не выставляются счета',
+  'plan.badge.column': 'Тариф',
   'plan.perMonth': 'в месяц',
   'plan.monthlyHint': 'В шекелях. Например 400',
   'plan.nameHint': 'Необязательно — без названия используем количество тренировок',

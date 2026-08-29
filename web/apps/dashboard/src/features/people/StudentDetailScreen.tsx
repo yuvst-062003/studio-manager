@@ -9,7 +9,8 @@
 // reads as a financial field, so it never travels on the coach-reachable card.
 import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { BeltBar, Button, Card, StatusChip } from '@studio/ui'
+import { BeltBar, Button, Card, PlanBadge, StatusChip } from '@studio/ui'
+import { usePlanBadges } from '../billing/usePlanBadges'
 import { formatDateInStudioZone } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
@@ -40,6 +41,9 @@ export function StudentDetailScreen({
   locale: Locale
   client: DashboardPeopleClient
 }) {
+  // Manager-scoped, like the price-plan read beside it. Resolves the plan id this screen
+  // already fetches into something a person can read.
+  const plans = usePlanBadges()
   const [student, setStudent] = useState<StudentDetail | null>(null)
   const [enrollments, setEnrollments] = useState<EnrollmentOut[]>([])
   const [history, setHistory] = useState<StatusHistoryOut[]>([])
@@ -154,9 +158,24 @@ export function StudentDetailScreen({
 
       <Card>
         <h2>{t(locale, 'people.convert.pricePlan')}</h2>
-        {/* An ID field and a hint, never an amount and never a picker. L2 — `price_plan` is
-            W4's table and this lane stores the id without resolving it. */}
-        <p data-testid="detail-price-plan">{plan?.price_plan_id ?? '—'}</p>
+        {/* Was the raw `price_plan_id` UUID — right when L2 was written, because
+            `price_plan` was W4's table and did not exist yet to resolve against. It does
+            now, so a manager reads the plan rather than its primary key. Still never an
+            amount and never a picker: C11 keeps the price a manager-scoped id here. */}
+        <p data-testid="detail-price-plan">
+          {plan?.price_plan_id ? (
+            <>
+              <PlanBadge
+                loading={plans.loading}
+                locale={locale}
+                perWeek={plans.frequencies[studentId]}
+              />{' '}
+              <bdi>{plans.names[studentId] ?? plan.price_plan_id}</bdi>
+            </>
+          ) : (
+            '—'
+          )}
+        </p>
         <p data-testid="detail-price-hint">{t(locale, 'people.convert.pricePlanHint')}</p>
         <p data-testid="detail-weekly-volume">
           {t(locale, 'people.convert.weeklyVolume')}: {plan?.weekly_volume ?? 0}
