@@ -204,6 +204,13 @@ export const events: Bundle = {
   'belt.holders': 'Students at this rank',
   'belt.noClassYet': 'The belt system is defined once the classes exist',
   'belt.presetTitle': 'Which belt system does your club use?',
+  // `5d`'s two-column shape: the choices beside a live preview of the ladder.
+  'belt.presetHint': 'You can add, remove and reorder ranks later. Intermediate belts are usually two-coloured.',
+  'belt.presetPreview': 'The ranks that will be created',
+  'belt.presetPreviewEmpty': 'Choose a system to see its ranks',
+  'belt.presetAndMore': 'and {{count}} more ranks',
+  'belt.presetCreate': 'Create {{count}} ranks',
+  'belt.presetManual': 'Set up by hand',
   'belt.presetScratch': 'Set it up by hand',
   'belt.presetRankCount': 'ranks in this set',
 

@@ -242,6 +242,14 @@ export const events: Bundle = {
   'belt.holders': 'חניכים בדרגה',
   'belt.noClassYet': 'מערכת החגורות תוגדר אחרי יצירת החוגים',
   'belt.presetTitle': 'איזו מערכת חגורות נהוגה אצלכם?',
+  // `5d`'s two-column shape: the choices beside a live preview of the ladder each one
+  // would create. The list truncates rather than running the card to twelve rows.
+  'belt.presetHint': 'אפשר להוסיף, למחוק ולשנות סדר בהמשך. חגורות ביניים הן בדרך כלל דו־צבעיות.',
+  'belt.presetPreview': 'הדרגות שייווצרו',
+  'belt.presetPreviewEmpty': 'בחרו מערכת כדי לראות את הדרגות',
+  'belt.presetAndMore': 'ועוד {{count}} דרגות',
+  'belt.presetCreate': 'יצירת {{count}} דרגות',
+  'belt.presetManual': 'הגדרה ידנית',
   'belt.presetScratch': 'הגדרה ידנית',
   'belt.presetRankCount': 'דרגות בערכה',
 

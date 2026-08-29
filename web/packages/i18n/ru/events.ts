@@ -208,6 +208,13 @@ export const events: Bundle = {
   'belt.holders': 'Учеников в степени',
   'belt.noClassYet': 'Система поясов задаётся после создания секций',
   'belt.presetTitle': 'Какая система поясов принята у вас?',
+  // `5d`'s two-column shape: the choices beside a live preview of the ladder.
+  'belt.presetHint': 'Добавить, удалить и переупорядочить можно позже. Промежуточные пояса обычно двухцветные.',
+  'belt.presetPreview': 'Степени, которые будут созданы',
+  'belt.presetPreviewEmpty': 'Выберите систему, чтобы увидеть степени',
+  'belt.presetAndMore': 'и ещё {{count}} степеней',
+  'belt.presetCreate': 'Создать {{count}} степеней',
+  'belt.presetManual': 'Настроить вручную',
   'belt.presetScratch': 'Задать вручную',
   'belt.presetRankCount': 'степеней в наборе',
 
