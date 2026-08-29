@@ -94,13 +94,32 @@
  * fails to render still leaves the others aligned. */
 .week-grid {
   display: grid;
-  overflow-x: auto;
+  overflow: auto;
+
+  /* The axis is a fixed 14 hours now rather than however many start times the week
+     happened to contain, so it is taller than the viewport on a laptop. It scrolls inside
+     itself: the page must not grow a second scrollbar, and the day headings stay put. */
+  max-block-size: min(34rem, 62vh);
 }
+
 
 .week-grid__row {
   display: grid;
-  grid-template-columns: 4.5rem repeat(7, minmax(6rem, 1fr));
+
+  /* The column count is the VIEW's, not always seven. Hard-coded at 7, the day view drew
+     its one column at a seventh of the width with six dead tracks beside it — the grid
+     was correct and looked broken. `--week-columns` is set on `.week-grid` by the board. */
+  grid-template-columns: 4.5rem repeat(var(--week-columns, 7), minmax(6rem, 1fr));
 }
+
+/* The day headings stay visible while the hours scroll under them. */
+.week-grid > .week-grid__row:first-child {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 2;
+  background: var(--surface);
+}
+
 
 .week-grid__gutter {
   padding-block: var(--space-2);

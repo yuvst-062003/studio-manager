@@ -16,10 +16,21 @@
 // does this money clear".
 import { useState } from 'react'
 import type { CSSProperties } from 'react'
-import { Button, Card, MoneyDisplay, TextField } from '@studio/ui'
+import { Button, Card, MoneyDisplay, Radio, TextField } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import type { DashboardBillingClient } from './billingClient'
+
+/**
+ * The routes a manager records BY HAND.
+ *
+ * `upay_card` is absent deliberately: uPay's IPN writes those rows, and a hand-entered
+ * card payment would be a second source of truth for money that already has one.
+ * `credit_adjustment` is absent because it is not money arriving — it is a correction,
+ * and it has its own audited path.
+ */
+const MANUAL_METHODS = ['cash', 'cheque', 'bank_transfer'] as const
+type ManualMethod = (typeof MANUAL_METHODS)[number]
 
 const columnStyle: CSSProperties = {
   display: 'flex',
@@ -40,6 +51,7 @@ export function RecordPaymentDialog({
   household,
   onClose,
 }: RecordPaymentDialogProps) {
+  const [method, setMethod] = useState<ManualMethod>('cash')
   const [shekels, setShekels] = useState('')
   const [receivedAt, setReceivedAt] = useState('')
   const [note, setNote] = useState('')
@@ -61,7 +73,7 @@ export function RecordPaymentDialog({
           // billed ₪3.20.
           amountAgorot: Math.round(Number(shekels) * 100),
           receivedAt: new Date(receivedAt).toISOString(),
-          method: 'cash',
+          method,
           note: note || undefined,
         }),
       )
@@ -85,6 +97,26 @@ export function RecordPaymentDialog({
           value={shekels}
           onChange={(event) => setShekels(event.target.value)}
         />
+        {/* How the money arrived. This was hard-coded to cash, so a club that took a
+            cheque had it filed as cash and §10's "how much is sitting in undeposited
+            cheques" could not be answered from the data — even though `payment.method`
+            has stored the difference since W4 and the promises panel already asks it. */}
+        <fieldset className="payment-methods" role="radiogroup">
+          <legend className="payment-methods__legend">
+            {t(locale, 'billing.payment.method')}
+          </legend>
+          {MANUAL_METHODS.map((option) => (
+            <Radio
+              checked={method === option}
+              data-testid={`payment-method-${option}`}
+              key={option}
+              label={t(locale, `billing.payment.method.${option}`)}
+              name="payment-method"
+              onChange={() => setMethod(option)}
+              value={option}
+            />
+          ))}
+        </fieldset>
         <TextField
           label={t(locale, 'billing.payment.note')}
           multiline

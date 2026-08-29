@@ -11,6 +11,7 @@
 import { useState } from 'react'
 import type { CSSProperties } from 'react'
 import { Button, Card, EmptyState, MoneyDisplay, StatusChip, TextField } from '@studio/ui'
+import { PlanFrequencyPicker, PlanPreview, frequencyLabel } from './PlanFrequency'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import type { DashboardBillingClient, PricePlanOut } from './billingClient'
@@ -50,17 +51,20 @@ export type PricePlansScreenProps = {
 export function PricePlansScreen({ locale, client, plans, onChanged }: PricePlansScreenProps) {
   const [openPlanId, setOpenPlanId] = useState<string | null>(null)
   const [name, setName] = useState('')
-  const [sessions, setSessions] = useState('2')
+  /** `undefined` means not chosen yet; `null` is a chosen open membership. */
+  const [perWeek, setPerWeek] = useState<number | null | undefined>(undefined)
   const [monthly, setMonthly] = useState('')
   const [inFlight, setInFlight] = useState(false)
 
   async function create() {
-    if (inFlight) return
+    if (inFlight || perWeek === undefined) return
     setInFlight(true)
     try {
       await client.createPricePlan({
-        name,
-        sessionsPerWeek: Number(sessions),
+        // The frequency already names the plan, so a club with no house name for
+        // "3 times a week" is not stopped by a box it must invent an answer for.
+        name: name.trim() || frequencyLabel(locale, perWeek),
+        sessionsPerWeek: perWeek,
         // G2 at the one boundary where a human types money.
         monthlyAmountAgorot: agorotFromShekels(monthly),
         registrationFeeAgorot: null,
@@ -68,6 +72,7 @@ export function PricePlansScreen({ locale, client, plans, onChanged }: PricePlan
       })
       onChanged()
       setName('')
+      setPerWeek(undefined)
       setMonthly('')
     } finally {
       setInFlight(false)
@@ -141,25 +146,35 @@ export function PricePlansScreen({ locale, client, plans, onChanged }: PricePlan
         </Card>
       ) : null}
 
+      {/* The same three questions the setup wizard asks, in the same order and with the
+          same controls. This screen kept the original `חל על` number box after the wizard's
+          was rebuilt, so one club saw two designs for one decision (reported 2026-08-29). */}
       <Card caption={t(locale, 'billing.plan.add')}>
+        <PlanFrequencyPicker locale={locale} onChange={setPerWeek} value={perWeek} />
         <TextField
-          label={t(locale, 'billing.plan.name')}
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-        />
-        <TextField
-          label={t(locale, 'billing.plan.appliesTo')}
-          inputMode="numeric"
-          value={sessions}
-          onChange={(event) => setSessions(event.target.value)}
-        />
-        <TextField
-          label={t(locale, 'billing.plan.monthlyAmount')}
+          hint={t(locale, 'billing.plan.monthlyHint')}
           inputMode="decimal"
-          value={monthly}
+          label={t(locale, 'billing.plan.monthlyAmount')}
           onChange={(event) => setMonthly(event.target.value)}
+          value={monthly}
         />
-        <Button variant="primary" data-testid="plan-save" disabled={inFlight} onClick={create}>
+        <PlanPreview locale={locale} name={name} perWeek={perWeek} shekels={monthly} />
+        <details className="plan-extras">
+          <summary>{t(locale, 'billing.plan.moreOptions')}</summary>
+          <TextField
+            hint={t(locale, 'billing.plan.nameHint')}
+            label={t(locale, 'billing.plan.name')}
+            onChange={(event) => setName(event.target.value)}
+            placeholder={perWeek === undefined ? undefined : frequencyLabel(locale, perWeek)}
+            value={name}
+          />
+        </details>
+        <Button
+          data-testid="plan-save"
+          disabled={inFlight || perWeek === undefined || monthly.trim() === ''}
+          onClick={create}
+          variant="primary"
+        >
           {t(locale, 'billing.plan.add')}
         </Button>
       </Card>

@@ -9,7 +9,7 @@
 // fabrication — so the column exists, is labelled, and says when it fills in.
 import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { Button, EmptyState, StatusChip, Table } from '@studio/ui'
+import { Button, EmptyState, SelectField, StatusChip, Table, TextField } from '@studio/ui'
 import { apiFetch, appendPage } from '@studio/core'
 import type { CursorPage } from '@studio/core'
 import { ConfirmDialog } from '../rollover/ConfirmDialog'
@@ -22,6 +22,8 @@ const filterRowStyle: CSSProperties = {
   flexWrap: 'wrap',
   gap: 'var(--space-3)',
   alignItems: 'end',
+  // Two fields on one line, each wide enough to read but neither taking the whole row.
+  maxInlineSize: '32rem',
 }
 
 const STATUSES = [
@@ -230,31 +232,31 @@ export function StudentsScreen({
         {t(locale, 'people.student.add')}
       </a>
 
+      {/* Both were bare `<label>`s wrapped round raw controls, so they rendered at the
+          UA's own size: a 158×22 search box beside a 95×20 status filter with their
+          baselines two pixels apart. The primitives put them on one baseline at one size. */}
       <div style={filterRowStyle}>
-        <label>
-          {t(locale, 'people.student.search')}
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder={t(locale, 'people.search.placeholder')}
-            data-testid="students-search"
-          />
-        </label>
-        <label>
-          {t(locale, 'people.status.label')}
-          <select
-            value={status}
-            onChange={(event) => setStatus(event.target.value)}
-            data-testid="students-status-filter"
-          >
-            <option value="">—</option>
-            {STATUSES.map((value) => (
-              <option key={value} value={value}>
-                {t(locale, `people.status.${value}`)}
-              </option>
-            ))}
-          </select>
-        </label>
+        <TextField
+          data-testid="students-search"
+          label={t(locale, 'people.student.search')}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder={t(locale, 'people.search.placeholder')}
+          type="search"
+          value={query}
+        />
+        <SelectField
+          data-testid="students-status-filter"
+          label={t(locale, 'people.status.label')}
+          onChange={(event) => setStatus(event.target.value)}
+          value={status}
+        >
+          <option value="">{t(locale, 'people.status.any')}</option>
+          {STATUSES.map((value) => (
+            <option key={value} value={value}>
+              {t(locale, `people.status.${value}`)}
+            </option>
+          ))}
+        </SelectField>
       </div>
 
       {loaded && page.items.length === 0 ? (

@@ -67,6 +67,8 @@ export function makeStudioStep(client: StudioClient) {
     const [details, setDetails] = useState<StudioDetails | null>(null)
     const [saving, setSaving] = useState(false)
     const [logoError, setLogoError] = useState<string | null>(null)
+    /** The chosen file, shown before (and while) the server has it. */
+    const [preview, setPreview] = useState<string | null>(null)
     const fileInput = useRef<HTMLInputElement>(null)
 
     useEffect(() => {
@@ -86,14 +88,30 @@ export function makeStudioStep(client: StudioClient) {
 
     const pickLogo = async (file: File) => {
       setLogoError(null)
+      // Show it NOW, from the file the owner just chose, rather than after the round trip.
+      // The only preview used to be `logo_url` coming back from the server, so between
+      // choosing a file and the upload finishing — and forever, if the upload failed —
+      // the drop-zone still read "drop a 512×512 logo" and nothing appeared to have
+      // happened. Reported as "I choose an image and it doesn't show it to me".
+      let localUrl: string | null = null
       try {
         const resized = await resizeToSquarePng(file)
+        localUrl = URL.createObjectURL(resized)
+        setPreview(localUrl)
         const { logo_url } = await client.uploadLogo(resized)
         set('logo_url', logo_url)
       } catch {
         // The server's own refusals (SVG, >2 MB, not an image) land here too. One message
-        // that names the rule beats three that name none of them.
+        // that names the rule beats three that name none of them. The optimistic preview
+        // is withdrawn: a picture on screen beside "that file was not accepted" would say
+        // the upload worked.
+        setPreview(null)
         setLogoError(t(locale, 'common.setup.studio.logoRejected'))
+      } finally {
+        // The blob is held by the <img> until it paints; revoking on the next frame keeps
+        // the object URL from leaking for the life of the wizard.
+        const created = localUrl
+        if (created) setTimeout(() => URL.revokeObjectURL(created), 10_000)
       }
     }
 
@@ -150,9 +168,10 @@ export function makeStudioStep(client: StudioClient) {
             {t(locale, 'common.setup.studio.logoAlt')}
           </legend>
           <div className="setup-logo" data-testid="setup-logo-dropzone">
-            {details.logo_url ? (
+            {preview ?? details.logo_url ? (
               <img
-                src={details.logo_url}
+                data-testid="setup-logo-preview"
+                src={preview ?? details.logo_url ?? undefined}
                 alt={t(locale, 'common.setup.studio.logoAlt')}
                 width={LOGO_EDGE / 4}
                 height={LOGO_EDGE / 4}

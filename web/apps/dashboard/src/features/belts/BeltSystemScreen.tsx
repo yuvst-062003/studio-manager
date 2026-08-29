@@ -90,6 +90,25 @@ export function moved(ids: string[], id: string, delta: -1 | 1): string[] {
   return next
 }
 
+/**
+ * The list with one rank dropped at `toIndex`.
+ *
+ * `moved` walks one place at a time, which is all an arrow button needs; a drag lands
+ * anywhere, so it is a different rule. Out-of-range drops CLAMP rather than no-op: a drag
+ * released past the end of the list means "put it last", and losing the rank instead would
+ * be the one outcome the manager cannot have meant.
+ */
+export function movedTo(ids: string[], id: string, toIndex: number): string[] {
+  const from = ids.indexOf(id)
+  if (from < 0) return ids
+  const to = Math.max(0, Math.min(ids.length - 1, toIndex))
+  if (to === from) return ids
+  const next = [...ids]
+  next.splice(from, 1)
+  next.splice(to, 0, id)
+  return next
+}
+
 export function BeltSystemScreen({
   classId,
   client,
@@ -104,6 +123,9 @@ export function BeltSystemScreen({
   const [loadFailed, setLoadFailed] = useState(false)
   const [attempt, setAttempt] = useState(0)
   const [draft, setDraft] = useState<Draft | null>(null)
+  /** The rank being dragged, and the row it is currently over. Both null when idle. */
+  const [draggingId, setDraggingId] = useState<string | null>(null)
+  const [overId, setOverId] = useState<string | null>(null)
   const [refusal, setRefusal] = useState<string | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
 
@@ -147,6 +169,24 @@ export function BeltSystemScreen({
         delta,
       ),
     )
+    reload()
+  }
+
+  /**
+   * Drag to reorder (owner request, 2026-08-29).
+   *
+   * An ADDITION to the arrows, never a replacement: a drag is unreachable from a keyboard
+   * (SC 2.1.1) and awkward on a touch screen, and the ladder must stay reorderable from
+   * both. The write is identical either way — the whole finished order, because a pairwise
+   * swap through `uq_belt_rank_class_order` passes through a colliding intermediate state.
+   */
+  const dropOn = async (targetId: string) => {
+    const id = draggingId
+    setDraggingId(null)
+    setOverId(null)
+    if (!id || id === targetId) return
+    const ids = ladder.map((rank) => rank.id)
+    await client.reorder(classId, movedTo(ids, id, ids.indexOf(targetId)))
     reload()
   }
 
@@ -202,7 +242,7 @@ export function BeltSystemScreen({
         <EmptyState title={t(locale, 'events.belt.empty')} />
       ) : (
         <Card>
-          <table style={tableStyle}>
+          <table className="belt-ladder" style={tableStyle}>
             <caption style={hintStyle}>{t(locale, 'events.belt.rankPlural')}</caption>
             <thead>
               <tr>
@@ -225,7 +265,32 @@ export function BeltSystemScreen({
             </thead>
             <tbody>
               {ladder.map((row, index) => (
-                <tr key={row.id}>
+                <tr
+                  data-dragging={draggingId === row.id || undefined}
+                  data-over={overId === row.id && draggingId !== row.id ? '' : undefined}
+                  draggable
+                  key={row.id}
+                  onDragEnd={() => {
+                    setDraggingId(null)
+                    setOverId(null)
+                  }}
+                  onDragOver={(event) => {
+                    // Without preventDefault the row is not a drop target at all — the
+                    // browser's default for dragover is "refuse".
+                    event.preventDefault()
+                    setOverId(row.id)
+                  }}
+                  onDragStart={(event) => {
+                    setDraggingId(row.id)
+                    // Firefox starts no drag unless some data is set.
+                    event.dataTransfer.setData('text/plain', row.id)
+                    event.dataTransfer.effectAllowed = 'move'
+                  }}
+                  onDrop={(event) => {
+                    event.preventDefault()
+                    void dropOn(row.id)
+                  }}
+                >
                   <td style={cellStyle}>
                     {/* One BeltBar per rank — never a hand-built swatch. The ring is its
                         guarantee and it has no prop that turns it off. */}

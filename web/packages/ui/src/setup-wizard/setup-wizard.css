@@ -741,6 +741,14 @@
   font-size: var(--text-title);
 }
 
+/* Only as wide as its label. Full-width it read as the dialog's main action, sitting
+   directly above the save button that actually is one. `align-self`, not `justify-self`:
+   the dialog is a COLUMN flex container, so the cross axis is the inline one and
+   `justify-self` has no effect on a flex child at all. */
+.setup-dialog [data-testid="dialog-add-time"] {
+  align-self: flex-start;
+}
+
 .setup-dialog__legend {
   margin: 0;
   font-size: var(--text-label);
@@ -757,14 +765,35 @@
 }
 
 /* Inside the dialog a slot is a small card, so several of them read as separate rows
-   rather than one long wrap. The base `.setup-slot` above still supplies the layout and
-   the control styling — this only adds the frame. */
+   rather than one long wrap. The base `.setup-slot` above still supplies the control
+   styling — this adds the frame and the track sizes.
+ *
+ * A grid, not a wrapping flex row: as flex the three controls bunched against the reading
+ * edge of a full-width box and left a wide dead area beside them, and each field took its
+ * own intrinsic width so the day select, the two times and the hall were four different
+ * sizes on one line. Named tracks make them line up down the column when there are several
+ * slots, which is the thing being compared. */
 .setup-slots > .setup-slot {
+  display: grid;
+  grid-template-columns: minmax(6rem, 1fr) minmax(6rem, 1fr) minmax(6rem, 1fr) auto;
   align-items: end;
-  padding: var(--space-2);
+  gap: var(--space-2);
+  padding: var(--space-3);
   background: var(--surface-raised);
   border: var(--border-width-hairline) solid var(--border);
   border-radius: var(--radius-md);
+}
+
+.setup-slots > .setup-slot select,
+.setup-slots > .setup-slot input[type="time"] {
+  inline-size: 100%;
+}
+
+/* Narrow enough that four tracks would each be unusable: stack into two. */
+@media (width <= 34rem) {
+  .setup-slots > .setup-slot {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 
 .setup-slot__field {

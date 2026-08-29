@@ -1,0 +1,54 @@
+/* Artboard `3f` — the settings screen, tidied 2026-08-29.
+ *
+ * The rail's buttons were unstyled natives, so each sized itself to its own text: nine
+ * entries at nine different widths, and the disabled ones — which carry a trailing
+ * "· עדיין לא זמין" — half again as wide as the rest. It read as scattered chips rather
+ * than as a menu, which is what the owner meant by the screen needing a fix. */
+.settings-rail__button {
+  background: none;
+  border: 0;
+  border-radius: var(--radius-md);
+  color: var(--fg);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--text-body);
+
+  /* One width for the column, one alignment down it — the two things that make a list of
+     links read as a menu. */
+  inline-size: 100%;
+  padding-block: var(--space-2);
+  padding-inline: var(--space-3);
+  text-align: start;
+}
+
+.settings-rail__button:disabled {
+  color: var(--text-muted);
+  cursor: default;
+}
+
+.settings-rail__button:hover:not(:disabled) {
+  background: var(--surface-raised);
+}
+
+/* The section being read. A weight and a background, never colour alone (SC 1.4.1). */
+.settings-rail__button[aria-current='page'] {
+  background: var(--surface-raised);
+  font-weight: 600;
+}
+
+/* "not yet available", small and under the name rather than trailing it on one line —
+   which is what made those entries the widest things in the column. */
+.settings-rail__soon {
+  display: block;
+  font-size: var(--text-caption);
+}
+
+.settings-row__label {
+  font-weight: var(--weight-medium);
+}
+
+.settings-row__description {
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+  margin-block: var(--space-1) 0;
+}

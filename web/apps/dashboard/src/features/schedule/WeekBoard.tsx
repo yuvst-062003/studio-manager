@@ -42,6 +42,34 @@ import type { ScheduleClient, SessionRow } from './client'
 
 const DAY_MS = 86_400_000
 
+/**
+ * The hours the grid always rules, inclusive.
+ *
+ * A judo club's day runs from an after-school class to a late adult session, so this is
+ * the window a manager expects to see without scrolling. It is a floor and a ceiling on
+ * what is *always drawn*, never on what CAN be drawn: `hours` widens past it for any
+ * session outside, so a 06:00 class is never hidden.
+ */
+const DAY_WINDOW: { from: number; to: number } = { from: 8, to: 21 }
+
+/**
+ * The Jerusalem hour an instant falls in, 0–23, or null if it cannot be read.
+ *
+ * `formatTimeInStudioZone` is `hour12: false` with 2-digit hours, so the first two
+ * characters are the hour in every locale — which is what makes this safe to slice rather
+ * than re-derive. `24:00` is a legal midnight rendering in some engines; it folds to 0.
+ */
+function hourOf(iso: string, locale: Locale): number | null {
+  const hour = Number(formatTimeInStudioZone(iso, locale).slice(0, 2))
+  return Number.isFinite(hour) ? hour % 24 : null
+}
+
+/** The `HH:00` row an instant belongs on. 18:30 sits on the 18:00 rule. */
+function hourSlot(iso: string, locale: Locale): string {
+  const hour = hourOf(iso, locale)
+  return `${String(hour ?? 0).padStart(2, '0')}:00`
+}
+
 /** A `YYYY-MM-DD` key shifted by whole days. Safe across DST because it never leaves noon. */
 function shiftDayKey(key: string, days: number): string {
   return studioDayKey(new Date(new Date(`${key}T12:00:00Z`).getTime() + days * DAY_MS))
@@ -571,12 +599,34 @@ export function WeekBoard({
     return { from: first, to: last }
   }, [days, view, anchor, locale])
 
-  /** Every start time the week actually contains, as Jerusalem `HH:MM`, ascending. One
-   *  grid row each. A club training at 17:00 and 18:30 gets two rows; a club training at
-   *  six different times gets six. */
-  const slots = useMemo(() => {
-    const seen = new Set(visible.map((row) => formatTimeInStudioZone(row.starts_at, locale)))
-    return [...seen].sort()
+  /**
+   * The hour axis: one row per hour, `HH:00`, ascending.
+   *
+   * **Fixed, not derived from the sessions present.** The rows used to be the distinct
+   * start times the week contained, which read as a reasonable economy and was not: a week
+   * with nothing in it got seven day headings above *no rows at all*, and a manager could
+   * not click an empty 18:00 cell to create a class there because that cell only existed
+   * once something already started at 18:00. That is the one case where nothing needs
+   * creating. Both halves were reported separately on 2026-08-29; they are one cause.
+   *
+   * `DAY_WINDOW` is a default, not a ceiling — the axis widens to reach any session
+   * outside it, so a club training at 06:00 still sees its class. That is what the old
+   * comment here was right about: hard-coding `3a`'s 16:00/17:00/18:30/20:00 would be one
+   * club's timetable imposed on every other. A ruler that always exists and stretches when
+   * it must keeps that property without the empty-week hole.
+   */
+  const hours = useMemo(() => {
+    let first = DAY_WINDOW.from
+    let last = DAY_WINDOW.to
+    for (const row of visible) {
+      const hour = hourOf(row.starts_at, locale)
+      if (hour === null) continue
+      first = Math.min(first, hour)
+      last = Math.max(last, hour)
+    }
+    return Array.from({ length: last - first + 1 }, (_, index) =>
+      `${String(first + index).padStart(2, '0')}:00`,
+    )
   }, [visible, locale])
 
   /** Sessions per day, for the month view — which asks "which days are busy", not "when". */
@@ -590,14 +640,24 @@ export function WeekBoard({
     return grouped
   }, [visible])
 
-  /** `day|HH:MM` → the sessions in that cell. A cell holds more than one only when a club
-   *  runs two groups in different halls at the same hour, which is real. */
+  /**
+   * `day|HH:00` → the sessions in that cell.
+   *
+   * Keyed by the HOUR, not by the exact start time: a class at 18:30 belongs on the 18:00
+   * rule, next to the one at 18:00, rather than on a rule of its own. Keying by the exact
+   * minute is what made the axis ragged — six classes at six odd minutes produced six
+   * rules and no readable grid.
+   *
+   * A cell holds more than one session only when a club runs two groups in different halls
+   * within the same hour, which is real and is why this is a list.
+   */
   const byCell = useMemo(() => {
     const grouped = new Map<string, SessionRow[]>()
     for (const session of visible) {
-      const key = `${studioDayKey(session.starts_at)}|${formatTimeInStudioZone(session.starts_at, locale)}`
+      const key = `${studioDayKey(session.starts_at)}|${hourSlot(session.starts_at, locale)}`
       grouped.set(key, [...(grouped.get(key) ?? []), session])
     }
+    for (const rows of grouped.values()) rows.sort((a, b) => a.starts_at.localeCompare(b.starts_at))
     return grouped
   }, [visible, locale])
 
@@ -873,6 +933,9 @@ export function WeekBoard({
         role="grid"
         aria-label={t(locale, 'schedule.week.title')}
         className="week-grid"
+        // The day view has one column, the week seven. A custom property rather than a
+        // width: the tracks are the grid's, and CSS is where they belong.
+        style={{ '--week-columns': days.length } as CSSProperties}
       >
         <div role="row" className="week-grid__row">
           {/* The corner. Empty, but present: a grid row whose cells do not line up with
@@ -898,7 +961,7 @@ export function WeekBoard({
           ))}
         </div>
 
-        {slots.map((time) => (
+        {hours.map((time) => (
           <div role="row" className="week-grid__row" key={time}>
             <span role="rowheader" className="week-grid__gutter" data-testid={`week-slot-${time}`}>
               {time}

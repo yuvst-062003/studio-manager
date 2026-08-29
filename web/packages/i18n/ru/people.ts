@@ -49,6 +49,7 @@ export const people: Bundle = {
   'status.left': 'Ушёл',
   'status.lost': 'Не вступил',
   'status.label': 'Статус',
+  'status.any': 'Любой статус',
   'status.history': 'История статусов',
   'status.changedOn': 'Изменено',
   'status.reason': 'Причина',

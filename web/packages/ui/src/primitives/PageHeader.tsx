@@ -24,16 +24,21 @@ export function PageHeader({
   subtitle,
   actions,
   className,
+  titleId,
 }: {
   title: string
   subtitle?: ReactNode
   actions?: ReactNode
   className?: string
+  /** So a landmark can point `aria-labelledby` at the title it already renders. */
+  titleId?: string
 }) {
   return (
     <header className={className ? `studio-page-header ${className}` : 'studio-page-header'}>
       <div className="studio-page-header__titles">
-        <h1 className="studio-page-header__title">{title}</h1>
+        <h1 className="studio-page-header__title" id={titleId}>
+          {title}
+        </h1>
         {subtitle ? <p className="studio-page-header__subtitle">{subtitle}</p> : null}
       </div>
       {actions ? <div className="studio-page-header__actions">{actions}</div> : null}

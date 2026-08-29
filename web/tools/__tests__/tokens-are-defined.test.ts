@@ -46,11 +46,24 @@ const FILES = walk(WEB)
 function definedTokens(): Set<string> {
   const defined = new Set<string>()
   for (const file of FILES) {
-    if (!file.endsWith('.css')) continue
-    for (const match of readFileSync(file, 'utf8').matchAll(/(--[a-zA-Z0-9-]+)\s*:/g)) {
-      // The capture group is non-optional in the pattern, but `noUncheckedIndexedAccess`
-      // types every index access as possibly-undefined and a match with no group 1 cannot
-      // occur. Skipping is cheaper than asserting.
+    const source = readFileSync(file, 'utf8')
+    if (file.endsWith('.css')) {
+      for (const match of source.matchAll(/(--[a-zA-Z0-9-]+)\s*:/g)) {
+        // The capture group is non-optional in the pattern, but `noUncheckedIndexedAccess`
+        // types every index access as possibly-undefined and a match with no group 1 cannot
+        // occur. Skipping is cheaper than asserting.
+        if (match[1]) defined.add(match[1])
+      }
+      continue
+    }
+    // A component may set a custom property on its OWN element — `--week-columns` on the
+    // week board, whose value is the number of days the current view shows. That is a
+    // layout variable, not a design token: it has no place in `tokens.css`, and D2's three
+    // tiers are not weakened by it. Counted as defined so the audit keeps doing the job it
+    // exists for — catching `var(--spacing-3)` when the token is `--space-3` — without
+    // forbidding a legitimate shape. Only a QUOTED key counts, so a `var()` read is never
+    // mistaken for a definition.
+    for (const match of source.matchAll(/['"](--[a-zA-Z0-9-]+)['"]\s*:/g)) {
       if (match[1]) defined.add(match[1])
     }
   }

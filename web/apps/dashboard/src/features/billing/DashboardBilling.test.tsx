@@ -124,6 +124,34 @@ describe('3e — collections', () => {
     expect(screen.getByTestId('record-payment-surplus')).toBeInTheDocument()
   })
 
+  it('records a CHEQUE, which is the route the dialogue could not express', async () => {
+    // `payment.method` has allowed 'cheque' since W4 and `ManualPaymentIn` accepts it;
+    // the promises panel already asks a family whether they will bring cash or cheques.
+    // The dialogue that actually records the money hard-coded `method: 'cash'`, so every
+    // cheque a club took was filed as cash and §10's question — "how much is sitting in
+    // undeposited cheques" — could never be answered from the data (reported 2026-08-29).
+    const recordPayment = vi.fn().mockResolvedValue({ allocated: 1, unallocatedAgorot: 0 })
+    renderCollections({ client: stub({ recordPayment }) })
+    await userEvent.click(screen.getAllByTestId('record-cash')[0]!)
+    await userEvent.click(screen.getByTestId('payment-method-cheque'))
+    await userEvent.type(screen.getByLabelText(t(LOCALE, 'billing.payment.amount')), '320')
+    await userEvent.type(screen.getByLabelText(t(LOCALE, 'billing.payment.date')), '2026-11-12')
+    await userEvent.click(screen.getByTestId('record-payment-submit'))
+    expect(recordPayment).toHaveBeenCalledWith(expect.objectContaining({ method: 'cheque' }))
+  })
+
+  it('offers the routes a club actually takes money by, and defaults to cash', async () => {
+    renderCollections()
+    await userEvent.click(screen.getAllByTestId('record-cash')[0]!)
+    for (const method of ['cash', 'cheque', 'bank_transfer']) {
+      expect(screen.getByTestId(`payment-method-${method}`)).toBeInTheDocument()
+    }
+    // A card is never recorded by hand — uPay's IPN writes those, and a manual one would
+    // be a second source of truth for money that already has one.
+    expect(screen.queryByTestId('payment-method-upay_card')).toBeNull()
+    expect(screen.getByTestId('payment-method-cash')).toBeChecked()
+  })
+
   it('puts invariant 5 in words on the charge-generation button', async () => {
     // 3e finding 2. `billing.run.idempotentHint` IS invariant 5 written for the manager, on
     // the single most consequential button on the dashboard — and the artboard draws it with
@@ -416,12 +444,34 @@ describe('5a — prices and plans', () => {
         onChanged={vi.fn()}
       />,
     )
-    await userEvent.type(screen.getByLabelText(t(LOCALE, 'billing.plan.name')), 'כל יום')
+    // The frequency is the first question on this screen too since 2026-08-29 — it used to
+    // be a bare `חל על` number box here while the wizard had already been rebuilt, so one
+    // club saw two designs for one decision.
+    await userEvent.click(screen.getByTestId('wizard-plan-freq-5'))
     await userEvent.type(screen.getByLabelText(t(LOCALE, 'billing.plan.monthlyAmount')), '500')
     await userEvent.click(screen.getByTestId('plan-save'))
     expect(createPricePlan).toHaveBeenCalledWith(
-      expect.objectContaining({ monthlyAmountAgorot: 50_000 }),
+      expect.objectContaining({ monthlyAmountAgorot: 50_000, sessionsPerWeek: 5 }),
     )
+  })
+
+  it('asks how often here in the same shape the wizard asks it', async () => {
+    // Same control, same testids, one implementation — `PlanFrequency.tsx`. The two
+    // screens drifting apart is the thing that was reported.
+    render(
+      <PricePlansScreen
+        locale={LOCALE}
+        client={stub()}
+        plans={[]}
+        onChanged={vi.fn()}
+      />,
+    )
+    expect(screen.getByTestId('wizard-plan-frequency')).toBeInTheDocument()
+    expect(screen.getByTestId('wizard-plan-freq-open')).toHaveTextContent(
+      t(LOCALE, 'billing.plan.unlimited'),
+    )
+    // And the old bare number box is gone.
+    expect(screen.queryByLabelText(t(LOCALE, 'billing.plan.appliesTo'))).toBeNull()
   })
 
   it('renders the empty state before any plan exists', () => {

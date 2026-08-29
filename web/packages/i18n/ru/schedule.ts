@@ -295,6 +295,7 @@ export const schedule: Bundle = {
   'rollover.year.name': 'Название года',
   'rollover.year.startsOn': 'Дата начала',
   'rollover.year.endsOn': 'Дата окончания',
+  'rollover.year.endsBeforeStart': 'Дата окончания должна быть позже даты начала',
   'rollover.year.create': 'Открыть год как черновик',
   'rollover.year.created': 'Год открыт как черновик',
   'rollover.year.missing': 'Черновика учебного года нет',

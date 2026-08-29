@@ -296,3 +296,18 @@ describe('an account with no role in the active studio (2026-08-29)', () => {
     expect(screen.queryByTestId('dashboard-refusal')).toBeNull()
   })
 })
+
+describe('the global search lives in the shell header (2026-08-29)', () => {
+  it('sits in the header beside the club name, not inside the page content', async () => {
+    // It was rendered as a CHILD of AppShell, so it landed in <main> — floating above
+    // whatever screen was showing, at a different place on every one of them, and reading
+    // as part of the page rather than as part of the app. Reported as "the search option
+    // is misplaced; it should be on the white bar with the club name".
+    globalThis.location.hash = '#/schedule'
+    stubApi(SIGNED_IN)
+    render(<App />)
+    const box = await screen.findByTestId('global-search')
+    expect(box.closest('header')).not.toBeNull()
+    expect(box.closest('main')).toBeNull()
+  })
+})

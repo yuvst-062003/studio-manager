@@ -27,7 +27,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import { apiFetch } from '@studio/core'
-import { Card, Switch, TextField } from '@studio/ui'
+import { Card, PageHeader, SectionHeader, Switch, TextField } from '@studio/ui'
 import { StructurePanel } from './StructurePanel'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
@@ -70,11 +70,21 @@ const SECTIONS = [
 
 const PARENT_LOCALES = ['he', 'en', 'ru'] as const
 
+/**
+ * The rail and the panel.
+ *
+ * `repeat(auto-fit, minmax(15rem, 1fr))` gave the two tracks EQUAL widths, so a nav rail
+ * of nine short words was as wide as the panel holding every field on the screen — the
+ * settings screen read as two columns of unrelated things rather than as a menu and its
+ * contents. The same mistake `auto-fit` invited in the setup wizard's rail.
+ *
+ * Explicit tracks, with the panel taking what is left. Below the breakpoint they stack,
+ * which is the one thing `auto-fit` was right about and is stated outright here.
+ */
 const layoutStyle: CSSProperties = {
   display: 'grid',
   gap: 'var(--space-4)',
-  // Narrow first: one column at 390, the rail beside the panel once there is room.
-  gridTemplateColumns: 'repeat(auto-fit, minmax(min(15rem, 100%), 1fr))',
+  gridTemplateColumns: 'minmax(12rem, 15rem) minmax(0, 1fr)',
   alignItems: 'start',
 }
 
@@ -84,6 +94,9 @@ const rowStyle: CSSProperties = {
   display: 'flex',
   gap: 'var(--space-3)',
   alignItems: 'center',
+  // The name on the reading edge, the control on the far one — 3f's row shape. They were
+  // stacked in one column, so the switch sat under its own description.
+  justifyContent: 'space-between',
   paddingBlock: 'var(--space-3)',
   borderBlockEnd: 'var(--border-width-hairline) solid var(--border)',
 }
@@ -109,15 +122,25 @@ export function SettingToggle({
   return (
     <div style={rowStyle}>
       <div style={rowBodyStyle}>
-        <Switch
-          label={label}
-          checked={checked}
-          disabled={disabled}
-          stateLabels={stateLabels}
-          onCheckedChange={(next) => onChange?.(next)}
-        />
-        {description ? <p>{description}</p> : null}
+        {/* The row's own name, visible. `Switch` keeps its label screen-reader-only —
+            correct for a switch whose row already names it, which this row did not: the
+            three parent-language toggles all rendered as "מוצג להורים" with nothing saying
+            which was Hebrew and which was Russian (reported 2026-08-29).
+
+            `aria-hidden` because the switch beside it already carries exactly this string
+            as its accessible name; without it a screen reader would read the row twice. */}
+        <span aria-hidden="true" className="settings-row__label">
+          {label}
+        </span>
+        {description ? <p className="settings-row__description">{description}</p> : null}
       </div>
+      <Switch
+        label={label}
+        checked={checked}
+        disabled={disabled}
+        stateLabels={stateLabels}
+        onCheckedChange={(next) => onChange?.(next)}
+      />
     </div>
   )
 }
@@ -161,16 +184,20 @@ export function SettingsScreen({ locale }: { locale: Locale }) {
 
   return (
     <section aria-labelledby="settings-title">
-      <header>
-        <h2 id="settings-title">{t(locale, 'common.settings.title')}</h2>
-        {/* 3f's own subtitle. It is a promise the screen has to keep, which is why every
-            field below saves on blur rather than behind a Save button. */}
-        <p>{t(locale, 'common.settings.autosave')}</p>
-        <p role="status" data-testid="settings-save-state">
-          {saveState === 'saved' ? t(locale, 'common.settings.saved') : null}
-          {saveState === 'failed' ? t(locale, 'common.settings.saveFailed') : null}
-        </p>
-      </header>
+      {/* 3f's subtitle is a promise the screen has to keep, which is why every field below
+          saves on blur rather than behind a Save button — so it belongs in the header
+          beside the title, not as a loose paragraph under it. */}
+      <PageHeader
+        actions={
+          <p role="status" data-testid="settings-save-state">
+            {saveState === 'saved' ? t(locale, 'common.settings.saved') : null}
+            {saveState === 'failed' ? t(locale, 'common.settings.saveFailed') : null}
+          </p>
+        }
+        subtitle={t(locale, 'common.settings.autosave')}
+        title={t(locale, 'common.settings.title')}
+        titleId="settings-title"
+      />
 
       <div style={layoutStyle}>
         <nav aria-label={t(locale, 'common.settings.title')}>
@@ -178,14 +205,21 @@ export function SettingsScreen({ locale }: { locale: Locale }) {
             {SECTIONS.map((entry) => (
               <li key={entry.key}>
                 <button
-                  type="button"
                   aria-current={entry.key === section ? 'page' : undefined}
-                  disabled={!entry.owned}
+                  className="settings-rail__button"
                   data-testid={`settings-section-${entry.key}`}
+                  disabled={!entry.owned}
                   onClick={() => setSection(entry.key)}
+                  type="button"
                 >
                   {t(locale, `common.settings.section.${entry.key}`)}
-                  {entry.owned ? null : ` · ${t(locale, 'common.settings.notYetAvailable')}`}
+                  {/* Under the name rather than trailing it on the same line, which is
+                      what made the unbuilt sections the widest entries in the column. */}
+                  {entry.owned ? null : (
+                    <span className="settings-rail__soon">
+                      {t(locale, 'common.settings.notYetAvailable')}
+                    </span>
+                  )}
                 </button>
               </li>
             ))}
@@ -207,7 +241,7 @@ export function SettingsScreen({ locale }: { locale: Locale }) {
             <p data-testid="settings-loading">{t(locale, 'common.setup.loading')}</p>
           ) : (
             <div data-testid="settings-panel-studio">
-              <h3>{t(locale, 'common.settings.section.studio')}</h3>
+              <SectionHeader level={3} title={t(locale, 'common.settings.section.studio')} />
 
               {details.logo_url ? (
                 <img
@@ -273,7 +307,7 @@ export function SettingsScreen({ locale }: { locale: Locale }) {
                   `settings.landing.*` and nothing could write it: decision 1 said "the
                   club writes its own pitch" and shipped no pen. Address and phone are
                   NOT repeated here — the landing falls back to the fields above. */}
-              <h3>{t(locale, 'common.settings.landing.title')}</h3>
+              <SectionHeader level={3} title={t(locale, 'common.settings.landing.title')} />
               <p>{t(locale, 'common.settings.landing.hint')}</p>
               <TextField
                 label={t(locale, 'common.settings.landing.headline')}
