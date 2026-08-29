@@ -165,6 +165,13 @@ export const common: Bundle = {
   // and the reassurance line is 5c verbatim: it is the sentence that makes skipping feel
   // safe, which is why every step carries it and not only the first.
   'setup.title': 'אשף הקמה',
+  // The wizard chrome, from artboards 5c-5f. `saveAndExit` sits in the header on every
+  // step but the last; 5f drops it because there is nothing left to save for later.
+  'setup.saveAndExit': 'שמירה ויציאה',
+  'setup.railTitle': 'אשף הקמה',
+  'setup.stepState.done': 'הושלם',
+  'setup.stepState.current': 'השלב הנוכחי',
+  'setup.stepState.upcoming': 'טרם הגיע',
   'setup.incomplete.title': 'הקמת המועדון עדיין לא הושלמה',
   'setup.incomplete.progress': 'הושלמו {{done}} מתוך {{total}} שלבים',
   'setup.incomplete.resume': 'המשך בהקמה',

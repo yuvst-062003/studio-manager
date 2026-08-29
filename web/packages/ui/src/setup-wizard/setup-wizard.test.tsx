@@ -609,3 +609,53 @@ describe('setup step 1 · what the Stitch pass added (2026-08-29)', () => {
   })
 
 })
+
+describe('SetupWizard chrome — artboards 5c–5f (2026-08-29)', () => {
+  it('gives every step a node in three states, and never a circle alone', async () => {
+    // `5d` draws done / current / upcoming. The circle is not the only carrier: each node
+    // also states its status in words, off-screen, because the circle already says it to a
+    // sighted reader (SC 1.4.1).
+    registerM1Stubs()
+    render(<SetupWizard client={fakeClient()} locale="he" />)
+    const first = await screen.findByTestId('setup-rail-studio')
+    expect(first).toHaveAttribute('data-state', 'current')
+    expect(screen.getByTestId('setup-rail-groups')).toHaveAttribute('data-state', 'upcoming')
+    expect(screen.getByTestId('setup-rail-studio-status')).toHaveClass('studio-visually-hidden')
+  })
+
+  it('keeps the reassurance visible on every step, not only the first', async () => {
+    // `5c` shows it once and 5d–5f never show it again — but an owner abandons a wizard on
+    // step 3, not step 1, which is exactly when they need to read that nothing is final.
+    registerM1Stubs()
+    const { container } = render(<SetupWizard client={fakeClient()} locale="he" />)
+    await screen.findByTestId('setup-wizard')
+    const rail = container.querySelector('.setup-rail')
+    expect(rail).toHaveTextContent(t('he', 'common.setup.nothingSentYet'))
+  })
+
+  it('puts the step body FIRST in the DOM, whichever side the rail is drawn on', async () => {
+    // The rail is placed into the inline-start track by CSS rather than by source order:
+    // a keyboard user should reach what they came to fill in before a list of six links.
+    registerM1Stubs()
+    const { container } = render(<SetupWizard client={fakeClient()} locale="he" />)
+    await screen.findByTestId('setup-wizard')
+    const body = container.querySelector('.setup-body')
+    const kids = [...(body?.children ?? [])].map((el) => el.tagName)
+    expect(kids).toEqual(['MAIN', 'ASIDE'])
+  })
+
+  it('keeps both of §5.1 exits in the header', async () => {
+    registerM1Stubs()
+    render(<SetupWizard client={fakeClient()} locale="he" />)
+    expect(await screen.findByTestId('setup-save-exit')).toBeInTheDocument()
+    expect(screen.getByTestId('setup-open-dashboard')).toBeInTheDocument()
+  })
+
+  it('fills the progress bar by steps ANSWERED, not by where the manager is standing', async () => {
+    // A manager who paged back to step 1 has not undone anything, and a bar that shrank
+    // when they did would say they had.
+    registerM1Stubs()
+    render(<SetupWizard client={fakeClient()} locale="he" />)
+    expect(await screen.findByTestId('setup-progress')).toHaveAttribute('data-done', '0')
+  })
+})

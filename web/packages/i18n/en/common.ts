@@ -156,6 +156,12 @@ export const common: Bundle = {
   'dev.noticeIcon': 'notice',
   // §5.1's setup wizard — artboards 5c and 5f.
   'setup.title': 'Setup wizard',
+  // The wizard chrome, from artboards 5c-5f.
+  'setup.saveAndExit': 'Save and exit',
+  'setup.railTitle': 'Setup wizard',
+  'setup.stepState.done': 'Done',
+  'setup.stepState.current': 'Current step',
+  'setup.stepState.upcoming': 'Not yet reached',
   'setup.incomplete.title': 'Club setup is not finished yet',
   'setup.incomplete.progress': '{{done}} of {{total}} steps completed',
   'setup.incomplete.resume': 'Continue setup',

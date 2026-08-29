@@ -165,6 +165,12 @@ export const common: Bundle = {
   // §5.1's setup wizard — artboards 5c and 5f. Machine-translated; HB-ru-review still
   // open, so ru stays on `report` rather than `strict` in i18n-parity.mjs.
   'setup.title': 'Мастер настройки',
+  // The wizard chrome, from artboards 5c-5f.
+  'setup.saveAndExit': 'Сохранить и выйти',
+  'setup.railTitle': 'Мастер настройки',
+  'setup.stepState.done': 'Готово',
+  'setup.stepState.current': 'Текущий шаг',
+  'setup.stepState.upcoming': 'Ещё не начат',
   'setup.incomplete.title': 'Настройка клуба ещё не завершена',
   'setup.incomplete.progress': 'Завершено {{done}} из {{total}} шагов',
   'setup.incomplete.resume': 'Продолжить настройку',
