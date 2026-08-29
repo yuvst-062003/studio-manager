@@ -472,11 +472,28 @@ export function WeekBoard({
     void (async () => {
       // The whole span the view shows — `days[6]` was right only for a week, and a month
       // view asking for seven days would have rendered three weeks of empty cells.
-      const loaded = await client.listSessions({
-        from: days[0] as string,
-        to: days[days.length - 1] as string,
-      })
-      if (live) setSessions(loaded)
+      try {
+        const loaded = await client.listSessions({
+          from: days[0] as string,
+          to: days[days.length - 1] as string,
+        })
+        if (live) setSessions(loaded)
+      } catch (error) {
+        // `void` silences the floating-promise lint; it does not handle anything. Without
+        // this catch a failed load became an *unhandled* rejection — thrown past every
+        // boundary that could have shown it, leaving a board that is empty for a reason
+        // nobody can read, and in the suite an error attributed to whichever test happened
+        // to be running when the promise settled.
+        //
+        // The board keeps whatever it last had rather than blanking: a week that was on
+        // screen a moment ago is better than an empty grid that looks like a club with no
+        // classes. What this deliberately does NOT do is render an error surface — there is
+        // no such convention in this app yet (no reporter in `packages/core`, no shared
+        // error state in this family of loaders) and inventing one here would put copy in
+        // the `schedule` namespace and a pattern in one component, decided by the file that
+        // happened to be broken first.
+        console.error('WeekBoard: failed to load sessions', error)
+      }
     })()
     return () => {
       live = false

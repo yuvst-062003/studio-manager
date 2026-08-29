@@ -910,4 +910,35 @@ describe('the plan badge is a manager thing, all the way down', () => {
     )
     vi.unstubAllGlobals()
   })
+  // A load that fails must fail INSIDE the component. `void (async () => ...)()` silences
+  // the floating-promise lint without handling anything, so a rejected listSessions became
+  // an unhandled rejection: in the suite it surfaced as an error attributed to whichever
+  // test happened to be running when the promise settled, and in production it is a board
+  // that stays empty with the reason thrown past every boundary that could have shown it.
+  it('handles a failed session load instead of rejecting into the void', async () => {
+    const client = stub()
+    client.listSessions = vi.fn(async () => {
+      throw new Error('network is down')
+    })
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    render(<WeekBoard locale="he" client={client} today="2026-11-03T12:00:00Z" />)
+
+    await waitFor(() => expect(client.listSessions).toHaveBeenCalled())
+    // Give any rejection that escaped the effect a turn of the event loop to surface.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+
+    // The failure was handled inside the component. Before the catch, this test passed its
+    // own assertions while vitest still exited 1 on an unhandled rejection -- so the thing
+    // being asserted is that the reason reached a handler at all.
+    expect(logged).toHaveBeenCalledWith(
+      'WeekBoard: failed to load sessions',
+      expect.objectContaining({ message: 'network is down' }),
+    )
+    // And the board is still standing rather than having thrown out of render.
+    expect(screen.queryAllByTestId('session-block')).toHaveLength(0)
+    logged.mockRestore()
+  })
 })
