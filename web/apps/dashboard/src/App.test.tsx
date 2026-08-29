@@ -220,3 +220,22 @@ describe('F9 — the global search', () => {
     expect(screen.queryByTestId('global-search')).toBeNull()
   })
 })
+
+describe('every route the manager can reach has a door (2026-08-29)', () => {
+  it('offers the manager home in the RENDERED sidebar, not only in the NAV array', async () => {
+    // The sidebar is built by `sideNavGroups`, not from the NAV constant above it. Adding
+    // `#/home` to the constant alone left the screen built and unreachable — which is the
+    // defect the canvas audit found twelve times, and the one this screen was supposed to
+    // avoid. The two lists are separate and this is what stops them drifting again.
+    stubApi(SIGNED_IN)
+    render(<App />)
+    const link = await screen.findByRole('link', { name: t('he', 'common.dash.home.title') })
+    expect(link).toHaveAttribute('href', '#/home')
+  })
+
+  it('resolves that hash to its own route rather than falling through to the board', async () => {
+    expect(routeFromHash('#/home')).toBe('home')
+    // And the fallback is still the board: `#/` is deliberately NOT the home yet.
+    expect(routeFromHash('#/')).toBe('schedule')
+  })
+})

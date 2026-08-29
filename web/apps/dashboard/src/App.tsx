@@ -285,6 +285,16 @@ function sideNavGroups(
       label: t(locale, 'common.dash.nav.daily'),
       items: [
         {
+          // The rendered sidebar is built HERE, not from the NAV array above — which is
+          // why adding the home screen to that array left it unreachable, exactly the
+          // defect the canvas audit found twelve times and this screen was meant to avoid.
+          key: 'home',
+          label: t(locale, 'common.dash.home.title'),
+          href: '#/home',
+          icon: <Icon name="home" />,
+          active: route === 'home',
+        },
+        {
           key: 'schedule',
           label: t(locale, 'common.dash.nav.weekly'),
           href: '#/schedule',
