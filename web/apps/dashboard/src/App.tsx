@@ -32,6 +32,8 @@ import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { ScheduleSection } from './features/schedule/ScheduleSection'
 import { makeScheduleClient } from './features/schedule/client'
+import { ManagerHome, makeHomeClient } from './features/home'
+import './features/home/home.css'
 import { useToday } from './features/schedule/useToday'
 // §5.15's rollover — "the single highest-leverage screen in the product", and the one flow
 // a manager runs once a year. Its own route rather than a panel inside `#/schedule`,
@@ -139,6 +141,7 @@ const MANAGER_ONLY_ROUTES = new Set([
 ])
 
 const NAV = [
+  { key: 'home', labelKey: 'common.dash.home.title', href: '#/home' },
   { key: 'schedule', labelKey: 'schedule.week.title', href: '#/schedule' },
   { key: 'groups', labelKey: 'schedule.groups.title', href: '#/groups' },
   { key: 'closures', labelKey: 'schedule.closure.title', href: '#/closures' },
@@ -176,6 +179,7 @@ export type DashboardRoute =
   | 'documents'
   | 'prices'
   | 'reports'
+  | 'home'
 
 /** Unknown hashes — and the empty one — resolve to the weekly board: 3a/1e make the
  *  board the manager's home, and "בחרו מסך מהתפריט" was a landing page that landed
@@ -188,6 +192,12 @@ export function routeFromHash(hash: string): DashboardRoute {
   // `#/students/<id>`, `#/students/new` and `#/alerts` in features/people. That is what
   // keeps this shared file to one NAV group and one branch per vertical rather than one
   // per screen, which is what let both W2 lanes edit it without colliding on every screen.
+  // The manager home (docs/design/proposals/manager-home.md). Mounted at its OWN hash and
+  // not at `#/`, deliberately: the 2026-08-27 pass made the board the landing screen
+  // because the previous home "landed nowhere", and that reasoning is still sound until
+  // this screen has been looked at on real data. Flipping the fallback is a one-line
+  // change here and an open question in the proposal, not something to do silently.
+  if (name === 'home') return 'home'
   if (name === 'schedule' || name === 'closures' || name.startsWith('groups')) return 'schedule'
   // §5.15's rollover. One hash and one screen: the wizard's own seven steps are its
   // internal state, not routes — a manager who bookmarked step 5 would land on a step the
@@ -437,6 +447,7 @@ export default function App() {
   // object every render would re-fetch progress forever.
   const setupClient = useMemo(() => makeSetupClient(apiFetch), [])
   const scheduleClient = useMemo(() => makeScheduleClient(apiFetch), [])
+  const homeClient = useMemo(() => makeHomeClient(apiFetch), [])
   const peopleClient = useMemo(() => makeDashboardPeopleClient(apiFetch), [])
   const eventsClient = useMemo(() => makeDashboardEventsClient(apiFetch), [])
   const beltsClient = useMemo(() => makeDashboardBeltsClient(apiFetch), [])
@@ -529,6 +540,15 @@ export default function App() {
               rendering a broken screen: the doors match the nav. */}
           {!canSeeMoney && MANAGER_ONLY_ROUTES.has(route) ? (
             <EmptyState title={t(locale, 'common.dash.forbidden')} />
+          ) : null}
+          {route === 'home' ? (
+            <ManagerHome
+              client={homeClient}
+              locale={locale}
+              studioId={session.activeStudioId ?? ''}
+              studioName={session.activeStudioName ?? undefined}
+              today={today}
+            />
           ) : null}
           {route === 'schedule' ? (
             <ScheduleSection

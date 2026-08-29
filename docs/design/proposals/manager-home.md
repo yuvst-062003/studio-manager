@@ -168,10 +168,22 @@ separator, visible on the first screen a manager sees.
 
 ## Gaps — what this screen cannot show yet
 
-**Coverage has no endpoint.** Nothing in `app/routers/` answers "which sessions this week
-have no coach" or "which finished unmarked", though `3a` specifies both and `6c` lists them
-as alert kinds. Region 3 ships with its two coverage rows **absent**, not faked. Adding
-`GET /api/v1/schedule/coverage` is a separate piece of work with its own spec.
+**Coverage needed no endpoint after all.** This section previously said it did. That was
+wrong, and building the screen is what found it: `SessionRow` already carries `staff[]` and
+`attendance_taken`, and `listSessions({from, to})` already pages a whole range. So both
+counts `3a` asks for are derived from the week's sessions — `summariseSessions` in
+`homeClient.ts` — with no new route, no new service and no migration. `GET
+/api/v1/schedule/coverage` is not needed and should not be built.
+
+Two rules that derivation has to keep, both held by tests:
+
+- A **cancelled** session is not uncovered. A cancelled class needs no coach.
+- A session that has **not ended yet** is not unmarked. A future class is not late.
+
+**Enrolment count is the real gap.** `3a` and the Stitch draft both show `16/20` per class,
+and `SessionRow` carries no roster size. The column is **absent** from region 4 rather than
+faked; filling it means either a per-session roster read (one request per row, which this
+screen will not do) or an enrolment count on the session payload.
 
 ## Open questions
 

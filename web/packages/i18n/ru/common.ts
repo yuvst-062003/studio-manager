@@ -326,4 +326,28 @@ export const common: Bundle = {
   'home.tab.payments': 'Платежи',
   'home.tab.messages': 'Сообщения',
   'home.tab.profile': 'Профиль',
+
+  // The manager home (docs/design/proposals/manager-home.md). Counts and amounts are
+  // PARAMETERS, never concatenated into these strings.
+  'dash.home.money.debt': 'Открытый долг',
+  'dash.home.money.debtHint': 'Ожидает и просрочено',
+  'dash.home.money.collected': 'Собрано за месяц',
+  'dash.home.money.overdue': 'Семьи в просрочке',
+  'dash.home.money.overdueHint': 'Требует внимания',
+  'dash.home.attention.title': 'Требует внимания',
+  'dash.home.attention.none': 'Ничего не требует внимания',
+  'dash.home.attention.all': 'Все уведомления',
+  'dash.home.attention.health': 'Нет медицинских деклараций',
+  'dash.home.attention.noCoach': 'Занятия без тренера',
+  'dash.home.attention.unmarked': 'Занятия без отметки посещаемости',
+  'dash.home.severity.danger': 'Срочно',
+  'dash.home.severity.pending': 'Ожидает',
+  'dash.home.today.title': 'Занятия сегодня',
+  'dash.home.today.none': 'Сегодня занятий нет',
+  'dash.home.today.fullWeek': 'Вся неделя',
+  'dash.home.today.group': 'Группа',
+  'dash.home.today.time': 'Время',
+  'dash.home.today.hall': 'Зал',
+  'dash.home.today.coach': 'Тренер',
+  'dash.home.today.noCoach': 'Тренер не назначен',
 }

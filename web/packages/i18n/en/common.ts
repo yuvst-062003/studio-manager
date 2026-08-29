@@ -316,4 +316,28 @@ export const common: Bundle = {
   'home.tab.payments': 'Payments',
   'home.tab.messages': 'Messages',
   'home.tab.profile': 'Profile',
+
+  // The manager home (docs/design/proposals/manager-home.md). Counts and amounts are
+  // PARAMETERS, never concatenated into these strings.
+  'dash.home.money.debt': 'Open debt',
+  'dash.home.money.debtHint': 'Pending and overdue',
+  'dash.home.money.collected': 'Collected this month',
+  'dash.home.money.overdue': 'Families overdue',
+  'dash.home.money.overdueHint': 'Needs attention',
+  'dash.home.attention.title': 'Needs attention',
+  'dash.home.attention.none': 'Nothing needs attention',
+  'dash.home.attention.all': 'All alerts',
+  'dash.home.attention.health': 'Missing health declarations',
+  'dash.home.attention.noCoach': 'Classes with no coach',
+  'dash.home.attention.unmarked': 'Sessions with attendance unmarked',
+  'dash.home.severity.danger': 'Urgent',
+  'dash.home.severity.pending': 'Pending',
+  'dash.home.today.title': "Today's classes",
+  'dash.home.today.none': 'No classes today',
+  'dash.home.today.fullWeek': 'Full week',
+  'dash.home.today.group': 'Group',
+  'dash.home.today.time': 'Time',
+  'dash.home.today.hall': 'Hall',
+  'dash.home.today.coach': 'Coach',
+  'dash.home.today.noCoach': 'No coach assigned',
 }

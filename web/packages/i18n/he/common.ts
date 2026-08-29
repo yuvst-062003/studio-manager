@@ -327,4 +327,31 @@ export const common: Bundle = {
   'home.tab.payments': 'תשלומים',
   'home.tab.messages': 'הודעות',
   'home.tab.profile': 'פרופיל',
+
+  // The manager home (docs/design/proposals/manager-home.md). Counts and amounts are
+  // PARAMETERS, never concatenated into these strings — the setup banner already shows
+  // what joining three strings with no separator looks like on a shipped screen.
+  'dash.home.money.debt': 'חוב פתוח',
+  'dash.home.money.debtHint': 'ממתין ובפיגור',
+  'dash.home.money.collected': 'נגבה החודש',
+  'dash.home.money.overdue': 'משפחות בפיגור',
+  'dash.home.money.overdueHint': 'דורש טיפול',
+  'dash.home.attention.title': 'דורש טיפול',
+  'dash.home.attention.none': 'אין מה שדורש טיפול',
+  'dash.home.attention.all': 'כל ההתראות',
+  'dash.home.attention.health': 'הצהרות בריאות חסרות',
+  'dash.home.attention.noCoach': 'שיעורים ללא מאמן',
+  'dash.home.attention.unmarked': 'מפגשים ללא סימון נוכחות',
+  // The word beside the colour. A severity carried by colour alone fails SC 1.4.1, and
+  // `6c` already makes the word the rule rather than the exception.
+  'dash.home.severity.danger': 'דחוף',
+  'dash.home.severity.pending': 'ממתין',
+  'dash.home.today.title': 'שיעורים היום',
+  'dash.home.today.none': 'אין שיעורים היום',
+  'dash.home.today.fullWeek': 'לוח שבועי מלא',
+  'dash.home.today.group': 'קבוצה',
+  'dash.home.today.time': 'שעה',
+  'dash.home.today.hall': 'אולם',
+  'dash.home.today.coach': 'מאמן',
+  'dash.home.today.noCoach': 'לא שובץ מאמן',
 }
