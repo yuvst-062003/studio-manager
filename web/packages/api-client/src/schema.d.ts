@@ -7147,6 +7147,8 @@ export interface components {
              * @default 1
              */
             quantity: number;
+            /** Size */
+            size?: string | null;
         };
         /** ItemOrderOut */
         ItemOrderOut: {
@@ -8090,6 +8092,8 @@ export interface components {
             name: string;
             /** Price Agorot */
             price_agorot: number;
+            /** Sizes */
+            sizes?: string[];
         };
         /** ProductOut */
         ProductOut: {
@@ -8106,11 +8110,17 @@ export interface components {
             name: string;
             /** Price Agorot */
             price_agorot: number;
+            /** Sizes */
+            sizes?: string[];
         };
         /**
          * ProductPatch
          * @description Every field optional. There is no `quantity` and there will not be one -- §4.3 and
          *     §5.10 both say inventory is a different product.
+         *
+         *     `sizes: []` CLEARS the sizes and is distinguishable from not sending the field, because
+         *     the route dumps with `exclude_unset`. "It turned out not to come in sizes" has to be a
+         *     saveable correction.
          */
         ProductPatch: {
             /** Description */
@@ -8121,6 +8131,8 @@ export interface components {
             name?: string | null;
             /** Price Agorot */
             price_agorot?: number | null;
+            /** Sizes */
+            sizes?: string[] | null;
         };
         /**
          * ProtectedSessionOut
@@ -9186,7 +9198,7 @@ export interface components {
         SetupProgressOut: {
             /**
              * Complete
-             * @description Every one of the six steps is done.
+             * @description Every one of the wizard steps is done.
              */
             complete: boolean;
             /**
@@ -9237,6 +9249,8 @@ export interface components {
             name: string;
             /** Price Agorot */
             price_agorot: number;
+            /** Sizes */
+            sizes?: string[];
         };
         /**
          * SiblingRequestIn

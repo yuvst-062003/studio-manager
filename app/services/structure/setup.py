@@ -8,7 +8,7 @@
 
 So there are two states, not one:
 
-  *complete*      -- every one of the six steps is `done`. The dashboard checklist
+  *complete*      -- every one of the steps is `done`. The dashboard checklist
                      disappears.
   `dismissed_at`  -- the owner reached step 6 and chose an exit. Auto-routing stops.
 
@@ -40,9 +40,9 @@ from app.models.studio import Studio
 from app.services.audit import AuditService
 
 #: The canvas fixes six steps, progress running right-to-left. M1 owns studio, groups,
-#: staff and students; M7 fills `belts` and M6 fills `prices`. All six are listed here
-#: because *complete* means all six are done -- a five-step list would report a studio
-#: complete before its belt system existed.
+#: staff and students; M7 fills `belts` and M6 fills `prices` and `items`. All of them are
+#: listed here because *complete* means all of them are done -- a five-step list would
+#: report a studio complete before its belt system existed.
 #:
 #: `groups` precedes `belts`, against the canvas, because the canvas order cannot be
 #: walked: `belt_rank.class_id` is NOT NULL, classes are created in `groups`, and so the
@@ -50,7 +50,26 @@ from app.services.audit import AuditService
 #: forward (reported from the live wizard, 2026-08-29). Order here is a data dependency,
 #: not a layout: `WIZARD_STEP_ORDER` in `web/packages/ui/src/setup-wizard/types.ts`
 #: mirrors it, and `tests/structure/test_setup_router.py` holds the pair to it.
-WIZARD_STEPS: tuple[str, ...] = ("studio", "groups", "belts", "prices", "staff", "students")
+#:
+#: **`items` is seventh, and last, deliberately (2026-08-29).** §4.3's catalogue -- גי,
+#: חגורה, כפפות, דמי ביטוח -- had no step and no screen, so a club's sellable items could
+#: only ever be created through the API. It sits after `students` because it is the only
+#: step nothing else depends on: a club can run a season without ever selling a גי, and
+#: putting it earlier would place the most skippable question in front of the ones that
+#: unblock everything else.
+#:
+#: Adding a step makes every studio that was `complete` incomplete again, and the
+#: setup banner reappears for them. That is the honest reading -- they have not set up
+#: their items -- and `skipped` is one press away for a club that sells nothing.
+WIZARD_STEPS: tuple[str, ...] = (
+    "studio",
+    "groups",
+    "belts",
+    "prices",
+    "staff",
+    "students",
+    "items",
+)
 
 #: `pending` is settable since F6 — the REVERSAL of the original decision, on the
 #: rollover wizard's precedent: "a one-way ratchet would send them back through the whole

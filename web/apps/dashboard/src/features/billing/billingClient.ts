@@ -8,6 +8,21 @@ import type { components } from '@studio/api-client'
 export type ChargeOut = components['schemas']['ChargeOut']
 export type PricePlanOut = components['schemas']['PricePlanOut']
 export type ProductOut = components['schemas']['ProductOut']
+
+/**
+ * What the items screen and the wizard's step 7 send.
+ *
+ * `sizes` is a list of labels and its emptiness IS "this item has no sizes" — a חגורה.
+ * There is no `hasSizes` here: the toggle on the screen is UI state, and shipping it to
+ * the server would create a second field describing one fact.
+ */
+export type ProductInput = {
+  name: string
+  priceAgorot: number
+  description?: string | null
+  sizes: string[]
+  isActive?: boolean
+}
 export type BillingRunOut = components['schemas']['BillingRunOut']
 export type UpayIpnRecordOut = components['schemas']['UpayIpnRecordOut']
 export type RecurringSubscriptionOut = components['schemas']['RecurringSubscriptionOut']
@@ -92,7 +107,14 @@ export type DashboardBillingClient = {
     registrationFeeAgorot: number | null
     activeFrom: string
   }): Promise<PricePlanOut>
-  products(): Promise<ProductOut[]>
+  /** `include_inactive` because a retired item is edited back into life on the same
+   *  screen — §11.4's shape for a catalogue: retired, never deleted, since charges already
+   *  raised for it name it. */
+  products(includeInactive?: boolean): Promise<ProductOut[]>
+  createProduct(input: ProductInput): Promise<ProductOut>
+  /** Partial. Omitting `sizes` leaves them alone; sending `[]` clears them, which is what
+   *  "it turned out not to come in sizes" has to be able to save. */
+  updateProduct(productId: string, input: Partial<ProductInput>): Promise<ProductOut>
   paymentPromises(status?: string, method?: PromiseMethod): Promise<ManagerPaymentPromiseOut[]>
   planChanges(): Promise<ManagerPlanChangeOut[]>
   settlePlanChange(changeId: string): Promise<void>
@@ -242,24 +264,17 @@ export function makeDashboardBillingClient(fetcher: Fetcher): DashboardBillingCl
     // and the standing-order case genuinely needs somebody to cancel the old uPay mandate
     // and send the new link, because G8 says the provider cannot.
     async planChanges() {
-      return (
-        await json<{ items: ManagerPlanChangeOut[] }>(await fetcher('/api/v1/plan-changes'))
-      ).items
+      return (await json<{ items: ManagerPlanChangeOut[] }>(await fetcher('/api/v1/plan-changes')))
+        .items
     },
     async settlePlanChange(changeId: string) {
-      await json(
-        await fetcher(`/api/v1/plan-changes/${changeId}/settle`, { method: 'POST' }),
-      )
+      await json(await fetcher(`/api/v1/plan-changes/${changeId}/settle`, { method: 'POST' }))
     },
     async confirmPromise(promiseId: string) {
-      await json(
-        await fetcher(`/api/v1/payment-promises/${promiseId}/confirm`, { method: 'POST' }),
-      )
+      await json(await fetcher(`/api/v1/payment-promises/${promiseId}/confirm`, { method: 'POST' }))
     },
     async declinePromise(promiseId: string) {
-      await json(
-        await fetcher(`/api/v1/payment-promises/${promiseId}/decline`, { method: 'POST' }),
-      )
+      await json(await fetcher(`/api/v1/payment-promises/${promiseId}/decline`, { method: 'POST' }))
     },
     async closePricePlan(planId, closesOn, amountAgorot) {
       return json<PricePlanOut>(
@@ -288,8 +303,42 @@ export function makeDashboardBillingClient(fetcher: Fetcher): DashboardBillingCl
         }),
       )
     },
-    async products() {
-      return (await json<{ items: ProductOut[] }>(await fetcher('/api/v1/products'))).items
+    async products(includeInactive = false) {
+      const query = includeInactive ? '?include_inactive=true&limit=200' : '?limit=200'
+      return (await json<{ items: ProductOut[] }>(await fetcher(`/api/v1/products${query}`))).items
+    },
+    async createProduct(input) {
+      return json<ProductOut>(
+        await fetcher('/api/v1/products', {
+          method: 'POST',
+          headers: JSON_HEADERS,
+          body: JSON.stringify({
+            name: input.name,
+            price_agorot: input.priceAgorot,
+            description: input.description ?? null,
+            sizes: input.sizes,
+          }),
+        }),
+      )
+    },
+    async updateProduct(productId, input) {
+      // Built key by key rather than dumped: a `sizes: undefined` in the body would be
+      // dropped by JSON.stringify, but `is_active: undefined` would not survive a future
+      // refactor as reliably, and the server's `exclude_unset` is only as honest as what
+      // it is sent.
+      const body: Record<string, unknown> = {}
+      if (input.name !== undefined) body.name = input.name
+      if (input.priceAgorot !== undefined) body.price_agorot = input.priceAgorot
+      if (input.description !== undefined) body.description = input.description
+      if (input.isActive !== undefined) body.is_active = input.isActive
+      if (input.sizes !== undefined) body.sizes = input.sizes
+      return json<ProductOut>(
+        await fetcher(`/api/v1/products/${productId}`, {
+          method: 'PATCH',
+          headers: JSON_HEADERS,
+          body: JSON.stringify(body),
+        }),
+      )
     },
   }
 }

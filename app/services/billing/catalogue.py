@@ -21,6 +21,7 @@ stopped selling still has to render its name.
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
 from datetime import date, timedelta
 from urllib.parse import urlsplit
 
@@ -31,6 +32,14 @@ from app.core.config import settings
 from app.integrations.upay.form import UPAY_ENDPOINT
 from app.models.billing import PricePlan, Product
 from app.services.billing.errors import ConflictError, NotFoundError, RefusedError
+
+#: A picker, not a catalogue of a supplier's whole range. A גי runs 100..190 in tens (ten
+#: labels) and gloves run S/M/L; twenty is generous and still a list a parent can read on a
+#: phone without scrolling past the button.
+MAX_SIZES = 20
+#: `120`, `S`, `XL`, `1.5 מ׳`. Anything longer is a description that wandered into the
+#: wrong field, and it is about to be rendered inside a radio label.
+MAX_SIZE_LABEL = 24
 
 
 def validate_standing_order_link(url: str) -> str:
@@ -240,6 +249,34 @@ class CatalogueService:
         return [(student_id, plan) for student_id, plan in rows]
 
     # -- products -------------------------------------------------------------
+    @staticmethod
+    def normalise_sizes(sizes: Sequence[str] | None) -> list[str]:
+        """The one place a size list is cleaned, so the column holds what the parent picks from.
+
+        Trimmed, blanks dropped, de-duplicated, ORDER PRESERVED. Order is the manager's:
+        a גי runs 100, 110, 120 and gloves run S, M, L, and sorting either alphabetically
+        would put 100 before 90 and L before M. De-duplication is case-sensitive on purpose
+        -- `s` and `S` are the same size to a person and folding them is right, but folding
+        them would also fold two genuinely different labels in a script that has no case,
+        so equality is on the trimmed string and the manager sees their own list back.
+
+        Bounded here rather than by a CHECK: `MAX_SIZES` and `MAX_SIZE_LABEL` are product
+        decisions about a picker's usable length, not truths about the data.
+        """
+        seen: set[str] = set()
+        kept: list[str] = []
+        for raw in sizes or ():
+            label = (raw or "").strip()
+            if not label or label in seen:
+                continue
+            if len(label) > MAX_SIZE_LABEL:
+                raise RefusedError(f"a size label is at most {MAX_SIZE_LABEL} characters")
+            seen.add(label)
+            kept.append(label)
+        if len(kept) > MAX_SIZES:
+            raise RefusedError(f"an item carries at most {MAX_SIZES} sizes")
+        return kept
+
     def list_products(
         self,
         *,
@@ -270,13 +307,18 @@ class CatalogueService:
         name: str,
         price_agorot: int,
         description: str | None,
+        sizes: Sequence[str] | None = None,
     ) -> Product:
+        """`sizes` defaults to empty, which is the honest answer for an item nobody was
+        asked about -- a חגורה has no sizes and neither does a caller that omitted the
+        field."""
         self._require_money(price_agorot, "price_agorot")
         product = Product(
             studio_id=studio_id,
             name=name,
             price_agorot=price_agorot,
             description=description,
+            sizes=self.normalise_sizes(sizes),
             is_active=True,
         )
         self._session.add(product)
@@ -291,8 +333,16 @@ class CatalogueService:
         price_agorot: int | None = None,
         description: str | None = None,
         is_active: bool | None = None,
+        sizes: Sequence[str] | None = None,
     ) -> Product:
-        """A partial update. Deactivation goes through `is_active`; there is no delete."""
+        """A partial update. Deactivation goes through `is_active`; there is no delete.
+
+        **An empty `sizes` clears them**, which is why this one is `is not None` like the
+        rest rather than truthiness: "this item turned out not to come in sizes after all"
+        is an ordinary correction, and a falsy-skip would make it the one edit the screen
+        could not save. The router's `exclude_unset` is what separates "sent empty" from
+        "not sent".
+        """
         product = self.get_product(product_id)
         if price_agorot is not None:
             self._require_money(price_agorot, "price_agorot")
@@ -303,6 +353,8 @@ class CatalogueService:
             product.description = description
         if is_active is not None:
             product.is_active = is_active
+        if sizes is not None:
+            product.sizes = self.normalise_sizes(sizes)
         self._session.flush()
         return product
 

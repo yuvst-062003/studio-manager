@@ -66,7 +66,7 @@ from app.schemas.billing import (
 )
 from app.services.audit import AuditService
 from app.services.billing import BillingService
-from app.services.billing.catalogue import CatalogueService
+from app.services.billing.catalogue import MAX_SIZES, CatalogueService
 from app.services.billing.errors import ConflictError, NotFoundError, RefusedError
 from app.services.billing.orders import OrderService
 from app.services.billing.payment_promise import PaymentPromiseService
@@ -175,6 +175,7 @@ def _product_out(product: Product) -> ProductOut:
         description=product.description,
         price_agorot=product.price_agorot,
         is_active=product.is_active,
+        sizes=list(product.sizes or ()),
     )
 
 
@@ -363,16 +364,26 @@ class ProductIn(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     price_agorot: int = Field(ge=0)
     description: str | None = Field(default=None, max_length=2000)
+    #: Omitted is an item with no sizes -- a חגורה, and also every product created before
+    #: this field existed. Trimmed, de-duplicated and bounded by
+    #: `CatalogueService.normalise_sizes`, which is the one place that decides.
+    sizes: list[str] = Field(default_factory=list, max_length=MAX_SIZES)
 
 
 class ProductPatch(BaseModel):
     """Every field optional. There is no `quantity` and there will not be one -- §4.3 and
-    §5.10 both say inventory is a different product."""
+    §5.10 both say inventory is a different product.
+
+    `sizes: []` CLEARS the sizes and is distinguishable from not sending the field, because
+    the route dumps with `exclude_unset`. "It turned out not to come in sizes" has to be a
+    saveable correction.
+    """
 
     name: str | None = Field(default=None, min_length=1, max_length=120)
     price_agorot: int | None = Field(default=None, ge=0)
     description: str | None = Field(default=None, max_length=2000)
     is_active: bool | None = None
+    sizes: list[str] | None = Field(default=None, max_length=MAX_SIZES)
 
 
 class HandoutOptionOut(BaseModel):
@@ -433,6 +444,7 @@ def create_product(
             name=body.name,
             price_agorot=body.price_agorot,
             description=body.description,
+            sizes=body.sizes,
         )
     except RefusedError as exc:
         raise _refused(exc) from exc

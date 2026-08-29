@@ -95,6 +95,12 @@ class ProductOut(BaseModel):
     description: str | None
     price_agorot: int
     is_active: bool
+    #: The sizes this item is ordered in, in the manager's own order. **Empty means the item
+    #: has no sizes** -- a חגורה -- and there is no `has_sizes` flag beside it, because two
+    #: fields describing one fact drift and `has_sizes=true, sizes=[]` would render a parent
+    #: a size picker with nothing in it. One price covers every size (§5.10): a size is what
+    #: the club hands over, not what the family is charged.
+    sizes: list[str] = Field(default_factory=list)
 
 
 # -- charges ------------------------------------------------------------------

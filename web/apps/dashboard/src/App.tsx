@@ -94,6 +94,11 @@ import { registerBillingAlertSection } from './features/billing/BillingAlertSect
 // registered into it — the one step of the six whose slot was empty, so an owner who
 // finished `groups` landed on a panel saying השלב הזה עדיין לא זמין.
 import { registerPricesWizardStep } from './features/billing/PricesWizardStep'
+// §5.1's step 7 — §4.3's sellable items. Unlike `prices`, this id had to be ADDED to
+// `WIZARD_STEP_ORDER` and to `WIZARD_STEPS` on the server: the catalogue never had a step
+// reserved for it, which is why a club's גי could only ever be created by an API call.
+import { registerItemsWizardStep } from './features/billing/ItemsWizardStep'
+import { ItemsSection } from './features/billing/ItemsSection'
 import { makeDashboardBillingClient, registerBillingDevTools } from './features/billing'
 
 registerM1WizardSteps(apiFetch)
@@ -111,6 +116,9 @@ registerBeltsWizardStep(makeDashboardBeltsClient(apiFetch))
 // (payment-routes §5) and is optional there — a club may not have its uPay links on day
 // one, and Settings → Payments is where a missing one is filled in later.
 registerPricesWizardStep(makeDashboardBillingClient(apiFetch))
+// Step 7, and the last: a club can run a season without ever selling a גי, so this is the
+// one step whose skip is as real an answer as its finish.
+registerItemsWizardStep(makeDashboardBillingClient(apiFetch))
 // M8's at-risk card and M6's billing dev tool — both exported since their waves and
 // called by nothing, so the at-risk card had never once rendered on the dashboard.
 // The S1 slot-wiring guard now fails the build on any register* export no app calls.
@@ -125,6 +133,9 @@ const MANAGER_ONLY_KEYS = new Set([
   'alerts',
   'billing',
   'prices',
+  // A catalogue is a price list. Invariant 3 keeps fees out of a coach's responses; this
+  // keeps the door that answers 403 out of their nav.
+  'items',
   'documents',
   'reports',
   'staff',
@@ -138,6 +149,9 @@ const MANAGER_ONLY_ROUTES = new Set([
   'alerts',
   'billing',
   'prices',
+  // A catalogue is a price list. Invariant 3 keeps fees out of a coach's responses; this
+  // keeps the door that answers 403 out of their nav.
+  'items',
   'documents',
   'reports',
   'staff',
@@ -160,6 +174,7 @@ const NAV = [
   { key: 'alerts', labelKey: 'people.alerts.title', href: '#/alerts' },
   { key: 'billing', labelKey: 'billing.debt.title', href: '#/billing' },
   { key: 'prices', labelKey: 'common.dash.nav.prices', href: '#/prices' },
+  { key: 'items', labelKey: 'billing.product.title', href: '#/items' },
   { key: 'attendance', labelKey: 'common.nav.attendance', href: '#/attendance' },
   { key: 'comms', labelKey: 'common.nav.announcements', href: '#/comms' },
   { key: 'documents', labelKey: 'common.dash.nav.documents', href: '#/documents' },
@@ -188,6 +203,7 @@ export type DashboardRoute =
   | 'comms'
   | 'documents'
   | 'prices'
+  | 'items'
   | 'reports'
   | 'home'
 
@@ -233,6 +249,10 @@ export function routeFromHash(hash: string): DashboardRoute {
   if (name === 'comms') return 'comms'
   if (name === 'documents') return 'documents'
   if (name === 'prices') return 'prices'
+  // §4.3's catalogue. One hash and one screen — the item being edited is state on the
+  // screen, not a route: a bookmarked `#/items/<id>` would point at a row a manager may
+  // since have retired.
+  if (name === 'items') return 'items'
   if (name === 'reports') return 'reports'
   if (name === 'staff' || name === 'settings' || name === 'setup') return name
   return 'schedule'
@@ -258,7 +278,9 @@ function useSideNavBadges(enabled: boolean): { debtHouseholds: number; missingDo
     void (async () => {
       const [charges, documents] = await Promise.all([
         apiFetch('/api/v1/charges?status=open&limit=200')
-          .then((r) => (r.ok ? (r.json() as Promise<{ items: { payer_person_id: string }[] }>) : { items: [] }))
+          .then((r) =>
+            r.ok ? (r.json() as Promise<{ items: { payer_person_id: string }[] }>) : { items: [] },
+          )
           .catch(() => ({ items: [] as { payer_person_id: string }[] })),
         apiFetch('/api/v1/health-declarations/summary')
           .then((r) => (r.ok ? (r.json() as Promise<{ health_status: string }[]>) : []))
@@ -402,6 +424,15 @@ function sideNavGroups(
           active: route === 'prices',
         },
         {
+          // In כסף rather than in מועדון: an item is a price list. `11a`'s handover sheet
+          // and `12e`'s shop both read this catalogue, and both create charges from it.
+          key: 'items',
+          label: t(locale, 'billing.product.title'),
+          href: '#/items',
+          icon: <Icon name="payments" />,
+          active: route === 'items',
+        },
+        {
           key: 'documents',
           label: t(locale, 'common.dash.nav.documents'),
           href: '#/documents',
@@ -459,9 +490,7 @@ export default function App() {
   // Read off the ACTIVE studio's membership: §19.4's persona switcher moves the active
   // studio without a reload, and a role taken from the first membership in the list would
   // then be somebody else's.
-  const membership = session.studios.find(
-    (row) => row.studio_id === session.activeStudioId,
-  )
+  const membership = session.studios.find((row) => row.studio_id === session.activeStudioId)
   const canSeeMoney =
     membership?.roles.some((role) => role === 'owner' || role === 'manager') ?? false
   /**
@@ -618,11 +647,7 @@ export default function App() {
             <AddStudentScreen locale={locale} client={peopleClient} />
           ) : null}
           {route === 'students' && studentRoute && studentRoute !== 'new' ? (
-            <StudentDetailScreen
-              studentId={studentRoute}
-              locale={locale}
-              client={peopleClient}
-            />
+            <StudentDetailScreen studentId={studentRoute} locale={locale} client={peopleClient} />
           ) : null}
           {route === 'students' && !studentRoute ? (
             <>
@@ -637,9 +662,7 @@ export default function App() {
               />
             </>
           ) : null}
-          {route === 'alerts' ? (
-            <AlertCentre locale={locale} client={peopleClient} />
-          ) : null}
+          {route === 'alerts' ? <AlertCentre locale={locale} client={peopleClient} /> : null}
           {route === 'attendance' ? <AttendanceSection locale={locale} /> : null}
           {route === 'rollover' ? (
             <RolloverWizard locale={locale} client={rolloverClient} today={today} />
@@ -725,6 +748,7 @@ export default function App() {
           ) : null}
           {route === 'documents' ? <DocumentsSection locale={locale} /> : null}
           {route === 'prices' ? <PricesSection locale={locale} /> : null}
+          {route === 'items' ? <ItemsSection locale={locale} /> : null}
           {route === 'reports' && session.activeStudioId ? (
             <ReportsSection
               locale={locale}

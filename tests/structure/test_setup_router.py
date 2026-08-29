@@ -6,7 +6,7 @@
   "each step can be skipped and returned to; progress is persisted so the wizard
    survives a closed app"
 
-*complete* is all six steps `done` and governs the dashboard checklist. `dismissed_at` is
+*complete* is every step `done` and governs the dashboard checklist. `dismissed_at` is
 the owner choosing an exit at step 6 and governs auto-routing. Collapsing them breaks one
 sentence or the other: if skipping counted as complete the checklist would vanish over a
 studio with no classes, and if the wizard reopened until everything was `done` an owner who
@@ -37,7 +37,7 @@ def patch_step(client, caller, step_id: str, status: str):
 
 
 # -- the shape ----------------------------------------------------------------
-def test_a_fresh_studio_has_six_pending_steps(client, as_owner) -> None:
+def test_a_fresh_studio_has_every_step_pending(client, as_owner) -> None:
     body = get_setup(client, as_owner).json()
     assert [s["id"] for s in body["steps"]] == list(WIZARD_STEPS)
     assert {s["status"] for s in body["steps"]} == {"pending"}
@@ -45,11 +45,18 @@ def test_a_fresh_studio_has_six_pending_steps(client, as_owner) -> None:
     assert body["dismissed_at"] is None
 
 
-def test_the_six_steps_are_the_canvas_order(client, as_owner) -> None:
+def test_the_steps_are_the_canvas_order_plus_items(client, as_owner) -> None:
     """The canvas fixes six steps, progress running right-to-left. M1 owns 1, 3, 5 and 6;
-    M7 fills belts and M6 fills prices."""
+    M7 fills belts and M6 fills prices.
+
+    `items` is a seventh, added 2026-08-29: §4.3's catalogue had no step and no screen, so
+    a club's sellable items could only be created through the API. It is LAST because it is
+    the only step nothing else depends on -- a club can run a season without ever selling a
+    גי — and this assertion is the pair to `WIZARD_STEP_ORDER` in
+    `web/packages/ui/src/setup-wizard/types.ts`, which must agree with it.
+    """
     steps = get_setup(client, as_owner).json()["steps"]
-    assert [s["order"] for s in steps] == [1, 2, 3, 4, 5, 6]
+    assert [s["order"] for s in steps] == [1, 2, 3, 4, 5, 6, 7]
     assert [s["id"] for s in steps] == [
         "studio",
         "groups",
@@ -57,6 +64,7 @@ def test_the_six_steps_are_the_canvas_order(client, as_owner) -> None:
         "prices",
         "staff",
         "students",
+        "items",
     ]
 
 
@@ -125,7 +133,7 @@ def test_writing_progress_does_not_clobber_the_rest_of_settings(
 
 
 # -- the split that SPEC §5.1 forces ------------------------------------------
-def test_complete_needs_every_one_of_the_six_done(client, as_owner) -> None:
+def test_complete_needs_every_one_of_them_done(client, as_owner) -> None:
     for step in WIZARD_STEPS[:-1]:
         patch_step(client, as_owner, step, "done")
     assert get_setup(client, as_owner).json()["complete"] is False

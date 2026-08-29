@@ -10,7 +10,7 @@ import { Alert, Button, LoadFailed } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { OrderItemsScreen } from './OrderItemsScreen'
-import type { OrderableProduct } from './OrderItemsScreen'
+import type { OrderLine, OrderableProduct } from './OrderItemsScreen'
 
 export function ShopSection({ locale }: { locale: Locale }) {
   const [products, setProducts] = useState<readonly OrderableProduct[] | null>(null)
@@ -25,11 +25,20 @@ export function ShopSection({ locale }: { locale: Locale }) {
         if (!response.ok) throw new Error(String(response.status))
         return ((await response.json()) as { items: OrderableProduct[] }).items
       },
-      async order(productIds: string[]): Promise<void> {
+      async order(lines: OrderLine[]): Promise<void> {
         const response = await apiFetch('/api/v1/me/orders/items', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ items: productIds.map((id) => ({ product_id: id, quantity: 1 })) }),
+          body: JSON.stringify({
+            items: lines.map((line) => ({
+              product_id: line.productId,
+              quantity: 1,
+              // Omitted rather than sent null for a sizeless item: the route refuses a size
+              // against one, and `size: null` is the same as absent to the validator but
+              // reads on the wire like an answer that was given.
+              ...(line.size ? { size: line.size } : {}),
+            })),
+          }),
         })
         if (!response.ok) throw new Error(String(response.status))
       },
@@ -65,7 +74,12 @@ export function ShopSection({ locale }: { locale: Locale }) {
   if (ordered) {
     return (
       <div
-        style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', padding: 'var(--space-4)' }}
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 'var(--space-4)',
+          padding: 'var(--space-4)',
+        }}
         data-testid="shop-ordered"
       >
         <Alert tone="paid" iconLabel={t(locale, 'billing.shop.title')}>
@@ -87,10 +101,10 @@ export function ShopSection({ locale }: { locale: Locale }) {
       <OrderItemsScreen
         locale={locale}
         products={products}
-        onOrder={async (productIds) => {
+        onOrder={async (lines) => {
           setFailed(false)
           try {
-            await client.order(productIds)
+            await client.order(lines)
             setOrdered(true)
           } catch {
             setFailed(true)

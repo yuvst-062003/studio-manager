@@ -11,6 +11,17 @@ had no read at all -- `OrderItemsScreen` shipped mounted to nothing and the clie
   one creates a normal `charge` with kind='manual'". The charges are then payable by any
   route -- the card order and the cash request both take charge ids, which is exactly why
   this endpoint returns them.
+
+**Sizes (2026-08-29).** A גי is ordered in a size and a חגורה is not, and `product.sizes`
+is the manager's answer per item. A line therefore carries `size`, and this route is where
+the pairing is enforced in BOTH directions: a sized item without one is refused, and a size
+against a sizeless item is refused too. The second half matters as much as the first --
+accepting "מידה 120" on a belt would put a number on a handover sheet that means nothing to
+whoever reads it.
+
+The size is validated by MEMBERSHIP of `product.sizes`, never taken as free text. It is
+about to be written onto a charge the club fulfils from, and a client that could send any
+string could send one no supplier stocks.
 """
 
 from __future__ import annotations
@@ -26,6 +37,7 @@ from app.core.tenancy import TenantSessionDep, require_current_studio_id
 from app.models.billing import Product
 from app.services.audit import AuditService
 from app.services.billing import BillingService
+from app.services.billing.catalogue import MAX_SIZE_LABEL
 
 router = APIRouter(tags=["billing"])
 
@@ -38,6 +50,9 @@ class ShopProductOut(BaseModel):
     name: str
     description: str | None
     price_agorot: int
+    #: Empty means the item has no sizes and the parent is asked for none. One price covers
+    #: every size -- there is no per-size amount to redact or reveal here.
+    sizes: list[str] = Field(default_factory=list)
 
 
 class ShopProductListOut(BaseModel):
@@ -47,6 +62,9 @@ class ShopProductListOut(BaseModel):
 class ItemOrderLineIn(BaseModel):
     product_id: uuid.UUID
     quantity: int = Field(default=1, ge=1, le=MAX_QUANTITY)
+    #: Which size, for an item that has any. Checked against the product's own list in the
+    #: route -- the length bound here only keeps an absurd body out of the validator.
+    size: str | None = Field(default=None, max_length=MAX_SIZE_LABEL)
 
 
 class ItemOrderIn(BaseModel):
@@ -56,6 +74,50 @@ class ItemOrderIn(BaseModel):
 class ItemOrderOut(BaseModel):
     charge_ids: list[uuid.UUID]
     total_agorot: int
+
+
+def _checked_size(product: Product, size: str | None) -> str | None:
+    """The pairing rule, enforced both ways. See the module docstring.
+
+    Returns the size as the CATALOGUE spells it, not as the client sent it: a parent whose
+    keyboard added a trailing space would otherwise put `"120 "` on a handover sheet, and
+    two spellings of one size is how a club counts the same order twice.
+    """
+    sizes = list(product.sizes or ())
+    chosen = (size or "").strip()
+    if not sizes:
+        if chosen:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail={"code": "refused", "message": "this item does not come in sizes"},
+            )
+        return None
+    if not chosen:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={"code": "size_required", "message": "choose a size for this item"},
+        )
+    if chosen not in sizes:
+        # Not 404: the product exists and the parent may retry with a size that is offered.
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={"code": "refused", "message": "that size is not offered for this item"},
+        )
+    return chosen
+
+
+def _line_label(name: str, quantity: int, size: str | None) -> str:
+    """What the family and the club both read on the charge.
+
+    `proration_note` is the column an item order already wrote its name into, and it is
+    still the only free-text field a charge has. The name is wrong for this use -- it means
+    "why this amount differs from the plan" -- and a `charge.line_note` is the right fix;
+    that is a schema decision, and putting the size somewhere the club cannot see it would
+    be the worse of the two errors. Trimmed to the column's 200 characters by construction:
+    120 + a size label + a count cannot reach it.
+    """
+    label = name if quantity == 1 else f"{name} × {quantity}"
+    return f"{label} · {size}" if size else label
 
 
 def _caller(request: Request) -> uuid.UUID:
@@ -79,7 +141,11 @@ def my_products(request: Request, session: TenantSessionDep) -> ShopProductListO
     return ShopProductListOut(
         items=[
             ShopProductOut(
-                id=row.id, name=row.name, description=row.description, price_agorot=row.price_agorot
+                id=row.id,
+                name=row.name,
+                description=row.description,
+                price_agorot=row.price_agorot,
+                sizes=list(row.sizes or ()),
             )
             for row in rows
         ]
@@ -111,6 +177,7 @@ def order_items(body: ItemOrderIn, request: Request, session: TenantSessionDep) 
                 status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail={"code": "refused", "message": "this item cannot be ordered"},
             )
+        size = _checked_size(product, line.size)
         amount = product.price_agorot * line.quantity
         charge = billing.create_charge(
             studio_id,
@@ -120,9 +187,7 @@ def order_items(body: ItemOrderIn, request: Request, session: TenantSessionDep) 
             at.date(),
             student_id=None,
         )
-        charge.proration_note = (
-            product.name if line.quantity == 1 else f"{product.name} × {line.quantity}"
-        )
+        charge.proration_note = _line_label(product.name, line.quantity, size)
         charge_ids.append(charge.id)
         total += amount
     AuditService.record(
