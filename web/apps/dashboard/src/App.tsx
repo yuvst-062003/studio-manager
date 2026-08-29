@@ -685,7 +685,6 @@ export default function App() {
               onSaved={(id) => {
                 globalThis.location.hash = `#/events/${id}`
               }}
-              targets={[]}
             />
           ) : null}
           {route === 'events' && !eventRoute ? (

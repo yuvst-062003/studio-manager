@@ -17,6 +17,11 @@
 //
 // **Finding 10 — `events.fee.chargeOnConfirm` and `consent.blocksConfirmation` both exist
 // and neither is drawn**, on the screen that configures both.
+//
+// **מי מוזמן, פרטים להורים and תצוגה מקדימה** — 7b draws all three and the form had none of
+// them. The audience one was not cosmetic: `targets` was hardcoded to `[]` at the only
+// mount, so every event the dashboard published materialised a roster of nobody. Those
+// tests live in `EventAudienceAndPreview.test.tsx`.
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
@@ -28,12 +33,17 @@ function makeClient(over: Partial<DashboardEventsClient> = {}): DashboardEventsC
   return {
     create: vi.fn().mockResolvedValue({ id: 'e1' }),
     publish: vi.fn().mockResolvedValue({ event: { id: 'e1' }, registrations_created: 3 }),
+    // The audience picker's three reads. Empty is the honest default for a form test: a
+    // club with no classes yet still has to be able to save a draft.
+    classes: vi.fn().mockResolvedValue({ items: [] }),
+    groups: vi.fn().mockResolvedValue({ items: [] }),
+    searchStudents: vi.fn().mockResolvedValue({ items: [] }),
     ...over,
   } as unknown as DashboardEventsClient
 }
 
 function renderForm(client: DashboardEventsClient, onSaved = vi.fn()) {
-  render(<EventForm client={client} locale="he" onSaved={onSaved} targets={[]} />)
+  render(<EventForm client={client} locale="he" onSaved={onSaved} />)
   return onSaved
 }
 
@@ -113,7 +123,9 @@ describe('7b — the create form', () => {
     await userEvent.click(
       screen.getByRole('switch', { name: t('he', 'events.consent.required') }),
     )
-    expect(screen.getByText(t('he', 'events.consent.blocksConfirmation'))).toBeInTheDocument()
+    // Twice, deliberately: the form's own hint to the manager, and the preview of the
+    // parent's screen where the gate is the thing they will actually run into.
+    expect(screen.getAllByText(t('he', 'events.consent.blocksConfirmation'))).toHaveLength(2)
   })
 
   it('offers no capacity, no minimum age and no transport field', () => {

@@ -217,4 +217,34 @@ export const events: Bundle = {
   // -- 12d ------------------------------------------------------------------------------
   'belt.ordinalOfTotal': 'Rank of',
   'belt.progressCaption': 'The ranks awarded so far',
+
+  // -- 7b — who is invited (§5.8's targeting, on the screen that creates the event) ----
+  'target.everyone': 'The whole club',
+  'target.chosen': 'Chosen audiences',
+  'target.classes': 'Classes',
+  'target.groups': 'Groups',
+  'target.classesEmpty': 'No classes yet',
+  'target.groupsEmpty': 'No groups yet',
+  'target.sweepHint': 'A class or a group invites its active students at the moment of publishing',
+  'target.studentSearch': 'Add a student by name',
+  'target.studentSearchHint': 'A student picked by name is invited even if their group was not',
+  'target.studentNoResults': 'No student by that name',
+  'target.chosenStudents': 'Students picked by name',
+  'target.remove': 'Remove',
+  'target.none': 'No audience chosen',
+  'target.required': 'With no audience the event publishes and reaches nobody',
+  'target.byBeltOrAgeUnsupported': 'Filtering by belt or by age does not exist — an audience is the club, a class, a group or a student',
+
+  // -- 7b — details for parents ---------------------------------------------------------
+  'parentDetails.title': 'Details for parents',
+  'parentDetails.field': 'What to bring, and what parents need to know',
+  'parentDetails.hint': 'This text is shown to the parent on the invitation — what to bring, where to meet, departure and return',
+
+  // -- 7b — the preview ------------------------------------------------------------------
+  'preview.title': 'Preview — the parent app',
+  'preview.hint': 'How the invitation will look to a parent. The buttons here do nothing',
+  'preview.untitled': 'Untitled',
+  'preview.noDate': 'No date yet',
+  'preview.audience': 'Will reach',
+  'form.locationClub': 'The club hall',
 }

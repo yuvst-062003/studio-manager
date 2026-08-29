@@ -8,6 +8,16 @@ import { describe, expect, it } from 'vitest'
  * mark-lost buttons sitting beside a convert button whose own comment records the same
  * defect being fixed once already. A control that renders and does nothing teaches the
  * manager the product is broken; this fails the build on the next one.
+ *
+ * **An UNCONDITIONALLY disabled button is exempt, and only that.** `7b`'s preview of the
+ * parent's screen draws the two RSVP buttons a parent will press: they are the shape of an
+ * answer, not an answer, and they are `<Button disabled>` rather than divs so assistive
+ * tech reports a control that exists and cannot be used. That is the opposite of the defect
+ * — nothing here teaches anyone the product is broken, because the control says so itself.
+ *
+ * The exemption is deliberately narrow: `disabled` bare or `disabled={true}` only. A
+ * `disabled={somethingComputed}` button with no handler is the real bug wearing the
+ * exemption's clothes — it is enabled on some render, and on that render it does nothing.
  */
 
 const WEB = resolve(new URL('../..', import.meta.url).pathname)
@@ -56,7 +66,10 @@ describe.each(APPS)('no inert Button in apps/%s', (app) => {
           /type=(["']|\{["'])submit/.test(tag) ||
           // Spread props may carry the handler; the call site cannot be judged here.
           /\{\s*\.\.\./.test(tag)
-        if (!acts) offenders.push(`${path.slice(WEB.length + 1)}:${line}`)
+        // Always disabled — never clickable on any render, so it cannot be a control that
+        // silently does nothing. `disabled={expr}` is NOT this and still fails.
+        const inertOnPurpose = /\bdisabled(?=[\s/>])/.test(tag) || /\bdisabled=\{true\}/.test(tag)
+        if (!acts && !inertOnPurpose) offenders.push(`${path.slice(WEB.length + 1)}:${line}`)
       }
     }
     expect(offenders).toEqual([])

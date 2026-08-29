@@ -21,6 +21,13 @@ export type CandidateOut = components['schemas']['CandidateOut']
 export type EventExamResultOut = components['schemas']['EventExamResultOut']
 export type EventExamResultIn = components['schemas']['EventExamResultIn']
 export type BeltRankOut = components['schemas']['BeltRankOut']
+//: `7b`'s מי מוזמן picker. §5.8 targets the studio, a class, a group or a student, so the
+//: picker needs the first three lists and a name search for the fourth. M1 owns these
+//: shapes; naming them here rather than re-declaring their fields keeps the picker
+//: independent of columns another lane may add.
+export type ClassOut = components['schemas']['ClassOut']
+export type GroupOut = components['schemas']['GroupOut']
+export type StudentSummaryOut = components['schemas']['StudentSummaryOut']
 
 export type EventType = EventOut['type']
 export type EventStatus = EventOut['status']
@@ -63,6 +70,25 @@ export function makeDashboardEventsClient(fetcher: Fetcher) {
 
     read: async (eventId: string): Promise<EventOut> =>
       json(await fetcher(`/api/v1/events/${eventId}`)),
+
+    /**
+     * `7b`'s audience picker, in three calls. M1's endpoints, read-only.
+     *
+     * Classes and groups are fetched whole rather than paginated: a club has tens of them
+     * and a picker that only offered the first page would silently hide the group a
+     * manager came to choose. Students are the opposite — a club has hundreds and §5.8
+     * names them one at a time, so that one is a search.
+     */
+    classes: async (): Promise<{ items: ClassOut[] }> =>
+      json(await fetcher('/api/v1/classes?limit=200')),
+
+    groups: async (): Promise<{ items: GroupOut[] }> =>
+      json(await fetcher('/api/v1/groups?limit=200')),
+
+    /** `q` is required by the caller, not by the API: an unfiltered fetch here would pull
+     *  the whole club to populate a box nobody has typed in yet. */
+    searchStudents: async (q: string): Promise<{ items: StudentSummaryOut[] }> =>
+      json(await fetcher(`/api/v1/students?q=${encodeURIComponent(q)}&limit=20`)),
 
     create: async (body: EventCreateIn): Promise<EventOut> =>
       json(

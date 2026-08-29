@@ -6,7 +6,9 @@
 // configures.
 export { EventsScreen, splitByTime } from './EventsScreen'
 export { EventCard, chipStatusFor, invitedCount } from './EventCard'
-export { EventForm, validate } from './EventForm'
+export { DEFAULT_TARGETS, EventForm, validate } from './EventForm'
+export { EventPreviewCard, wallDate, wallTime } from './EventPreviewCard'
+export { EventTargetPicker, describeTargets, reachesNobody, targetKey } from './EventTargetPicker'
 export { EventPage, isConfirmed, tally } from './EventPage'
 export { ExamsScreen } from './ExamsScreen'
 export { ExamEligibilityScreen } from './ExamEligibilityScreen'
@@ -20,5 +22,6 @@ export type {
   EventOut,
   EventRegistrationOut,
   EventStatus,
+  EventTargetOut,
   EventType,
 } from './client'

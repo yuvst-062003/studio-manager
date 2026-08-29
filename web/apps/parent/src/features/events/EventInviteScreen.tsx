@@ -19,6 +19,11 @@
 //
 // **Findings 5 and 6, cut:** capacity and a transport arrangement with departure and return
 // times. §5.8's event has a column for neither.
+//
+// **`description` is rendered, and was not.** 7b's פרטים להורים panel — what to bring, where
+// to meet, when the bus leaves — writes `event.description`, this screen receives it on
+// every row of `/me/events`, and it was dropped on the floor: a manager filled the box and
+// no parent ever saw a word of it. `pre-wrap`, because the manager typed a list.
 import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { Alert, Button, Card, LoadFailed, MoneyDisplay, StatusChip } from '@studio/ui'
@@ -41,6 +46,15 @@ const hintStyle: CSSProperties = {
   color: 'var(--text-secondary)',
   fontSize: 'var(--text-caption)',
   margin: 0,
+}
+
+/** The manager typed a list — "בגד ים, מגבת, כובע" over three lines — and collapsing its
+ *  newlines would turn the one thing a parent has to act on into a paragraph. */
+const detailStyle: CSSProperties = {
+  color: 'var(--fg)',
+  fontSize: 'var(--text-body)',
+  margin: 0,
+  whiteSpace: 'pre-wrap',
 }
 
 const footerStyle: CSSProperties = {
@@ -123,6 +137,9 @@ export function EventInviteScreen({
       </p>
       <h2 style={titleStyle}>{event.title}</h2>
       <p style={hintStyle}>{event.location_text}</p>
+
+      {/* The manager's own words to this family, on the screen 7b previews. */}
+      {event.description ? <p style={detailStyle}>{event.description}</p> : null}
 
       {/* Finding 2 — the key exists and the canvas never draws it, so nothing on the
           artboard says what pressing confirm actually does to the family's balance. */}

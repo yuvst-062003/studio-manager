@@ -259,4 +259,47 @@ export const events: Bundle = {
   // to `core`, which is not this lane's package.
   'belt.ordinalOfTotal': 'דרגה מתוך',
   'belt.progressCaption': 'הדרגות שהוענקו עד היום',
+
+  // -- 7b — מי מוזמן. §5.8's targeting, on the screen that creates the event ----------
+  // The form shipped with `targets` hardcoded to `[]`, so every event published from the
+  // dashboard materialised a roster of nobody. These are the strings that fix it.
+  'target.everyone': 'כל המועדון',
+  'target.chosen': 'קהלים נבחרים',
+  'target.classes': 'חוגים',
+  'target.groups': 'קבוצות',
+  'target.classesEmpty': 'עדיין אין חוגים',
+  'target.groupsEmpty': 'עדיין אין קבוצות',
+  // §5.8 — a class or a group sweeps its ACTIVE and TRIAL students at publish time, and a
+  // manager choosing one needs to know the list is resolved then and not now.
+  'target.sweepHint': 'חוג או קבוצה מזמינים את החניכים הפעילים בהם ברגע הפרסום',
+  'target.studentSearch': 'הוספת חניך בשמו',
+  // §5.9 step 1 — a student named directly is not status-filtered. That is the difference
+  // between naming a child and sweeping a group, and it is the reason to say it here.
+  'target.studentSearchHint': 'חניך שנבחר בשמו מוזמן גם אם קבוצתו לא נבחרה',
+  'target.studentNoResults': 'לא נמצא חניך בשם הזה',
+  'target.chosenStudents': 'חניכים שנבחרו בשמם',
+  'target.remove': 'הסרה',
+  'target.none': 'לא נבחר קהל יעד',
+  // The whole reason this section exists. Publishing is allowed with no audience — the API
+  // permits it — and the result is an event nobody was invited to.
+  'target.required': 'בלי קהל יעד האירוע יפורסם ולא יגיע לאף אחד',
+  // The canvas draws לפי חגורה and לפי גיל chips. `event_target.target_type` is a CHECK
+  // with four members and a lane never runs a migration, so the two are reported, not built.
+  'target.byBeltOrAgeUnsupported': 'סינון לפי חגורה או לפי גיל אינו קיים — קהל יעד הוא מועדון, חוג, קבוצה או חניך',
+
+  // -- 7b — פרטים להורים ---------------------------------------------------------------
+  'parentDetails.title': 'פרטים להורים',
+  'parentDetails.field': 'מה להביא ומידע להורים',
+  'parentDetails.hint': 'הטקסט הזה מוצג להורה בהזמנה — מה להביא, מקום המפגש, שעת יציאה וחזרה',
+
+  // -- 7b — תצוגה מקדימה ----------------------------------------------------------------
+  'preview.title': 'תצוגה מקדימה — אפליקציית ההורים',
+  'preview.hint': 'כך תיראה ההזמנה אצל ההורה. הכפתורים כאן אינם פעילים',
+  'preview.untitled': 'ללא שם',
+  'preview.noDate': 'טרם נקבע מועד',
+  'preview.audience': 'יישלח אל',
+  // 7b's location toggle read `target.studio` — 'כל המועדון', an AUDIENCE — for the club's
+  // own hall. The canvas says אולם המועדון, and the two controls now read differently on the
+  // one screen that has both.
+  'form.locationClub': 'אולם המועדון',
 }
