@@ -101,7 +101,7 @@ describe('ManagerHome', () => {
     // So the assertion is the mechanism: one wrapper, explicitly ltr, holding both ends.
     const { container } = renderHome(data())
     await screen.findByText('מתחילים')
-    const range = container.querySelector('.dash-home__time')
+    const range = container.querySelector('.studio-range')
     expect(range).toHaveAttribute('dir', 'ltr')
     expect(range?.textContent).toBe('16:00–17:00')
     expect(range?.querySelectorAll('bdi')).toHaveLength(0)

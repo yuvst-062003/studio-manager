@@ -10,7 +10,7 @@
 // 409 — it is derived. `StepActions` renders "continue" instead, which advances the
 // container without sending anything.
 import { useState } from 'react'
-import { Button, Card, TextField } from '@studio/ui'
+import { Button, Card, RangeText, TextField } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { RolloverClient, TrainingYear } from './client'
 import type { RolloverStepProps } from './types'
@@ -107,7 +107,12 @@ export function YearStep({
       {year ? (
         <Card caption={t(locale, 'schedule.rollover.year.dates')}>
           <p data-testid="rollover-year-name">{year.name}</p>
-          <p data-testid="rollover-year-range">{`${year.starts_on} – ${year.ends_on}`}</p>
+          {/* Was a template literal, and on staging it printed `2027-09-01 – 2026-09-01`:
+              two ltr date runs with a neutral dash between them, inside an RTL paragraph,
+              are free to be reordered. RangeText is the one ltr island that prevents it. */}
+          <p data-testid="rollover-year-range">
+            <RangeText from={year.starts_on} to={year.ends_on} />
+          </p>
           {/* The year's state is a word, never a colour or a chip alone. */}
           <p data-testid="rollover-year-status">
             {`${t(locale, 'schedule.rollover.year.statusLabel')}: ${t(

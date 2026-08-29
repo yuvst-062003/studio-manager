@@ -8,6 +8,7 @@ import {
   LoadFailed,
   MoneyDisplay,
   PageHeader,
+  RangeText,
   SectionHeader,
   StatTile,
   StatusChip,
@@ -102,17 +103,14 @@ export function ManagerHome({
       id: 'time',
       header: t(locale, 'common.dash.home.today.time'),
       width: '20%',
-      // ONE ltr island for the whole range, not two isolated ends. Two `<bdi>` siblings
-      // are each internally correct and still lay out end-then-start in an RTL row, which
-      // renders 16:00–17:00 as `17:00–16:00` — the identical defect the Stitch draft of
-      // this screen shipped, reproduced here on the first attempt. A range is a single
-      // left-to-right run in Hebrew typography; `dir="ltr"` on the wrapper is what says so.
+      // The first draft of this cell used two sibling `<bdi>` ends and rendered
+      // 16:00–17:00 as `17:00–16:00`. RangeText is that fix, extracted — it is the third
+      // place in this codebase to have shipped the same bidi bug.
       cell: (row) => (
-        <bdi className="dash-home__time" dir="ltr">
-          {formatTimeInStudioZone(row.startsAt, locale)}
-          {'–'}
-          {formatTimeInStudioZone(row.endsAt, locale)}
-        </bdi>
+        <RangeText
+          from={formatTimeInStudioZone(row.startsAt, locale)}
+          to={formatTimeInStudioZone(row.endsAt, locale)}
+        />
       ),
     },
     {

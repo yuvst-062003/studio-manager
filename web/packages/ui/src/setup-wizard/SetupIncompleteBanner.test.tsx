@@ -35,6 +35,32 @@ describe('SetupIncompleteBanner', () => {
     expect(onOpen).toHaveBeenCalled()
   })
 
+  it('separates the title, the count and the button instead of running them together', async () => {
+    // Staging printed `הקמת המועדוןעדיין לא הושלמההושלמו 1 מתוך 6 שלבים` — two sentences
+    // and a count as one word, on the first screen a manager sees. Alert renders its
+    // children in a single <p>, so with no layout the three are inline siblings and JSX
+    // strips the whitespace between them. The assertion is the structure that prevents
+    // it, because the failure is in layout and the text nodes were always distinct.
+    const { container } = render(
+      <SetupIncompleteBanner
+        client={client(
+          vi.fn(async () => ({ steps: STEPS(1), complete: false, dismissed_at: null }) as never),
+        )}
+        locale="he"
+        onOpen={vi.fn()}
+      />,
+    )
+    await screen.findByTestId('setup-incomplete-progress')
+    const text = container.querySelector('.studio-setup-nudge__text')
+    expect(text).not.toBeNull()
+    // Title and count live together in the text column…
+    expect(text).toContainElement(screen.getByTestId('setup-incomplete-progress'))
+    // …and the button is outside it, so it can be pushed to the far edge.
+    expect(text).not.toContainElement(screen.getByTestId('setup-incomplete-resume'))
+    // No <div> inside the <p>: that would close the paragraph early in a real browser.
+    expect(container.querySelector('.studio-alert__body div')).toBeNull()
+  })
+
   it('shows even after the wizard was DISMISSED — that is the state it exists for', async () => {
     render(
       <SetupIncompleteBanner

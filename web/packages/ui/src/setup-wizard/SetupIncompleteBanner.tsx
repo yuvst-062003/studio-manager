@@ -54,15 +54,26 @@ export function SetupIncompleteBanner({
   return (
     <div data-testid="setup-incomplete">
       <Alert iconLabel={t(locale, 'common.setup.incomplete.title')} tone="pending">
-        <strong>{t(locale, 'common.setup.incomplete.title')}</strong>
-        <span data-testid="setup-incomplete-progress">
-          {t(locale, 'common.setup.incomplete.progress')
-            .replace('{{done}}', String(done))
-            .replace('{{total}}', String(progress.steps.length))}
+        {/* `Alert` renders its children inside a single <p>, so these three were inline
+            siblings — and JSX strips the whitespace between elements on separate lines.
+            On staging that printed `הקמת המועדוןעדיין לא הושלמההושלמו 1 מתוך 6 שלבים`:
+            two sentences and a count run together, on the first screen a manager sees.
+            Spans rather than divs because a <div> inside a <p> is invalid and the
+            browser would close the paragraph early, which is a worse bug than the one
+            being fixed. */}
+        <span className="studio-setup-nudge">
+          <span className="studio-setup-nudge__text">
+            <strong>{t(locale, 'common.setup.incomplete.title')}</strong>
+            <span data-testid="setup-incomplete-progress">
+              {t(locale, 'common.setup.incomplete.progress')
+                .replace('{{done}}', String(done))
+                .replace('{{total}}', String(progress.steps.length))}
+            </span>
+          </span>
+          <Button data-testid="setup-incomplete-resume" onClick={onOpen} variant="secondary">
+            {t(locale, 'common.setup.incomplete.resume')}
+          </Button>
         </span>
-        <Button data-testid="setup-incomplete-resume" onClick={onOpen} variant="secondary">
-          {t(locale, 'common.setup.incomplete.resume')}
-        </Button>
       </Alert>
     </div>
   )

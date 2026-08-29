@@ -1449,3 +1449,29 @@ a.studio-stat-tile:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
+
+/* The unfinished-setup nudge. Alert gives its children one <p>, so without a layout here
+ * the title, the progress count and the button are inline siblings with no separator —
+ * which is what printed two sentences and a count as one word on staging. */
+.studio-setup-nudge {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  inline-size: 100%;
+}
+
+.studio-setup-nudge__text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+
+  /* Takes the free space so the button sits on the far edge in either direction. */
+  margin-inline-end: auto;
+}
+
+/* A range of two values — see RangeText. Tabular figures so a column of ranges lines up;
+ * `nowrap` because a range broken across two lines stops being one. */
+.studio-range {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}

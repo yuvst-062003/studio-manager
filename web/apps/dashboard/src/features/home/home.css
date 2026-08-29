@@ -65,12 +65,6 @@
   margin: 0;
 }
 
-/* Each end of the range is its own isolated run — see the `time` column in ManagerHome.
- * The gap is on the separator rather than a `gap`, so the dash stays glued between them. */
-.dash-home__time {
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
 
 /* `SectionHeader` already names this table on screen, so the `<caption>` printed the same
  * words a second time. It is not removed — it is the table's accessible name, and Table
