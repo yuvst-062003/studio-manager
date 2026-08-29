@@ -7,7 +7,7 @@
 import type { SetupProgress, WizardStepId } from './types'
 import type { SetupClient } from './SetupWizard'
 import type { StudioClient, StudioDetails } from './StudioStep'
-import type { NamedRow, StructureClient } from './GroupsStep'
+import type { NamedRow, Slot, StructureClient } from './GroupsStep'
 import type { StaffClient, StaffInvite } from './StaffStep'
 import type { SetupSummary, StudentsClient } from './StudentsStep'
 
@@ -74,6 +74,33 @@ export function makeStructureClient(fetcher: Fetcher): StructureClient {
     createClass: (name) => create('/api/v1/classes', { name }),
     createGroup: (classId, name) => create('/api/v1/groups', { class_id: classId, name }),
     createLocation: (name) => create('/api/v1/locations', { name }),
+    readSchedule: (groupId) =>
+      fetcher(`/api/v1/groups/${groupId}/schedule`)
+        .then(json<{ rules: Slot[] }>)
+        .then((body) => body.rules ?? [])
+        // A group with no rules yet answers like a group with none: this step's job is to
+        // create the first ones, and an unreadable schedule must not block that.
+        .catch(() => []),
+    putSchedule: (groupId, slots, effectiveFrom) =>
+      fetcher(`/api/v1/groups/${groupId}/schedule`, {
+        method: 'PUT',
+        headers: JSON_HEADERS,
+        body: JSON.stringify({
+          // Each rule carries the same start date as the set: §5.6 versions rules by date
+          // and never edits one in place, and at setup there is no earlier version.
+          rules: slots.map((slot) => ({ ...slot, effective_from: effectiveFrom })),
+          effective_from: effectiveFrom,
+          // `apply` defaults to FALSE on the server, which returns a preview and writes
+          // nothing. During setup there is no existing year to impact, so a preview would
+          // be a silent no-op that looks like a save.
+          apply: true,
+        }),
+      }).then(async (response) => {
+        // The status is carried, not swallowed: 404 here means "no active training year"
+        // — the rules cannot be generated into sessions before a year exists, and no setup
+        // step opens one. The step tells a manager that rather than "we could not save".
+        if (!response.ok) throw new Error(String(response.status))
+      }),
   }
 }
 

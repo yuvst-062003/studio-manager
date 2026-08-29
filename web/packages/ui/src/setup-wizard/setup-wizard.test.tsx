@@ -14,6 +14,7 @@ import { SetupWizard } from './SetupWizard'
 import type { SetupClient } from './SetupWizard'
 import { LOGO_EDGE, makeStudioStep, resizeToSquarePng } from './StudioStep'
 import { makeGroupsStep } from './GroupsStep'
+import type { Slot } from './GroupsStep'
 import { makeStaffStep } from './StaffStep'
 import { makeStudentsStep } from './StudentsStep'
 import { WIZARD_STEP_ORDER } from './types'
@@ -406,6 +407,12 @@ describe('step 3 · קבוצות ולו״ז', () => {
     createClass: vi.fn(async (name: string) => ({ id: 'c2', name })),
     createGroup: vi.fn(async (_classId: string, name: string) => ({ id: 'g1', name })),
     createLocation: vi.fn(async (name: string) => ({ id: 'l1', name })),
+    readSchedule: vi.fn<(groupId: string) => Promise<Slot[]>>(async () => []),
+    // Typed through the generic rather than by naming parameters the body never reads:
+    // `mock.calls` needs the tuple, and unused names are what the lint rule is for.
+    putSchedule: vi.fn<(groupId: string, slots: Slot[], effectiveFrom: string) => Promise<void>>(
+      async () => undefined,
+    ),
   })
 
   it('creates a group through the class that already exists', async () => {
@@ -428,11 +435,111 @@ describe('step 3 · קבוצות ולו״ז', () => {
     expect(await screen.findByText(t('he', 'common.setup.groups.needClass'))).toBeInTheDocument()
   })
 
-  it('carries no stale schedule promise — the weekly schedule shipped in W2 (F8)', async () => {
-    const Step = makeGroupsStep(structureClient())
+  it('sets each group\'s weekly times here, and writes them straight away', async () => {
+    // This test asserted the OPPOSITE until 2026-08-29: that the step promised no
+    // schedule, because the times lived only on the weekly board. The owner's decision is
+    // that a club is not set up until its groups have hours, so the promise is kept rather
+    // than withdrawn. A slot is a weekday and an hour range — it repeats every week and
+    // carries no date.
+    const client = structureClient()
+    const Step = makeGroupsStep(client)
     render(<Step locale="he" status="pending" onDone={vi.fn()} onSkip={vi.fn()} />)
-    await screen.findByTestId('setup-groups')
-    expect(screen.queryByTestId('setup-groups-schedule-note')).toBeNull()
+
+    await userEvent.type(
+      await screen.findByLabelText(t('he', 'common.setup.groups.groupName')),
+      'מתחילים',
+    )
+    await userEvent.click(screen.getByText(t('he', 'common.setup.groups.addGroup')))
+    await userEvent.click(await screen.findByTestId('slot-add-g1'))
+
+    await waitFor(() => expect(client.putSchedule).toHaveBeenCalled())
+    const [groupId, sent] = client.putSchedule.mock.calls.at(-1) ?? []
+    expect(groupId).toBe('g1')
+    // Sunday 17:00–18:00 by default: the commonest shape, so a manager edits rather than
+    // fills in four blanks.
+    expect(sent).toEqual([
+      { weekday: 0, start_time: '17:00', end_time: '18:00', location_id: null },
+    ])
+  })
+
+  it('sends the WHOLE set on every change, because PUT replaces rather than appends', async () => {
+    // A partial send would delete the rows it omitted.
+    const client = structureClient()
+    const Step = makeGroupsStep(client)
+    render(<Step locale="he" status="pending" onDone={vi.fn()} onSkip={vi.fn()} />)
+    await userEvent.type(
+      await screen.findByLabelText(t('he', 'common.setup.groups.groupName')),
+      'מתחילים',
+    )
+    await userEvent.click(screen.getByText(t('he', 'common.setup.groups.addGroup')))
+    await userEvent.click(await screen.findByTestId('slot-add-g1'))
+    await userEvent.click(await screen.findByTestId('slot-add-g1'))
+    await waitFor(() => expect(client.putSchedule.mock.calls.at(-1)?.[1]).toHaveLength(2))
+  })
+
+
+  it('names the training year when that is why the save failed, and keeps the typing', async () => {
+    // `apply_schedule_change` reads the active training year BEFORE it writes anything, and
+    // no setup step opens one — so during first-run setup this 404 is the normal case, not
+    // a fault the manager can act on. Reported as pending, and the times stay on screen:
+    // losing what they typed to report a server state they cannot change is the worse
+    // failure of the two.
+    const client = {
+      ...structureClient(),
+      putSchedule: vi.fn<(g: string, s: Slot[], e: string) => Promise<void>>(async () => {
+        throw new Error('404')
+      }),
+    }
+    const Step = makeGroupsStep(client)
+    render(<Step locale="he" status="pending" onDone={vi.fn()} onSkip={vi.fn()} />)
+    await userEvent.type(
+      await screen.findByLabelText(t('he', 'common.setup.groups.groupName')),
+      'מתחילים',
+    )
+    await userEvent.click(screen.getByText(t('he', 'common.setup.groups.addGroup')))
+    await userEvent.click(await screen.findByTestId('slot-add-g1'))
+
+    const note = await screen.findByTestId('slot-failed-g1')
+    expect(note).toHaveTextContent(t('he', 'common.setup.groups.needYear'))
+    expect(note).toHaveAttribute('data-status', 'pending')
+    // The row is still there to be edited.
+    expect(screen.getByTestId('slot-from-g1-0')).toHaveValue('17:00')
+  })
+
+  it('still reports a real failure as a failure', async () => {
+    const client = {
+      ...structureClient(),
+      putSchedule: vi.fn<(g: string, s: Slot[], e: string) => Promise<void>>(async () => {
+        throw new Error('500')
+      }),
+    }
+    const Step = makeGroupsStep(client)
+    render(<Step locale="he" status="pending" onDone={vi.fn()} onSkip={vi.fn()} />)
+    await userEvent.type(
+      await screen.findByLabelText(t('he', 'common.setup.groups.groupName')),
+      'מתחילים',
+    )
+    await userEvent.click(screen.getByText(t('he', 'common.setup.groups.addGroup')))
+    await userEvent.click(await screen.findByTestId('slot-add-g1'))
+    expect(await screen.findByTestId('slot-failed-g1')).toHaveAttribute('data-status', 'danger')
+  })
+
+  it('shows the week the times would create, so an empty Wednesday is visible', async () => {
+    const client = structureClient()
+    const Step = makeGroupsStep(client)
+    render(<Step locale="he" status="pending" onDone={vi.fn()} onSkip={vi.fn()} />)
+    expect(await screen.findByTestId('setup-week')).toHaveTextContent(
+      t('he', 'common.setup.groups.weekEmpty'),
+    )
+    await userEvent.type(
+      screen.getByLabelText(t('he', 'common.setup.groups.groupName')),
+      'מתחילים',
+    )
+    await userEvent.click(screen.getByText(t('he', 'common.setup.groups.addGroup')))
+    await userEvent.click(await screen.findByTestId('slot-add-g1'))
+    await waitFor(() =>
+      expect(screen.getByTestId('setup-week')).toHaveTextContent('מתחילים'),
+    )
   })
 })
 

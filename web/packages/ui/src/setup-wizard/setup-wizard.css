@@ -309,3 +309,125 @@
   border-color: var(--fg);
   color: var(--on-fg);
 }
+
+/* ── Step 3's weekly times (owner request, 2026-08-29) ────────────────────────────────
+ * A group trains the same days at the same hours every week, so a slot is a weekday and
+ * an hour range — never a date. */
+
+.setup-group-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding-block: var(--space-3);
+  border-block-start: var(--border-width-hairline) solid var(--border);
+}
+
+.setup-group-row:first-child {
+  border-block-start: 0;
+}
+
+.setup-group-row__name {
+  font-weight: var(--weight-semibold);
+  font-size: var(--text-body);
+}
+
+.setup-group-row__times-label {
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+
+  /* Pushes the rows onto their own line, so a group with three slots reads as one block
+   * rather than a paragraph of controls that happens to wrap. */
+  flex-basis: 100%;
+}
+
+.setup-slot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-basis: 100%;
+  flex-wrap: wrap;
+}
+
+.setup-slot select,
+.setup-slot input[type="time"] {
+  font-family: inherit;
+  font-size: var(--text-label);
+  color: var(--fg);
+  background: var(--surface);
+  border: var(--border-width-hairline) solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding-block: var(--space-1);
+  padding-inline: var(--space-2);
+}
+
+.setup-slot select:focus-visible,
+.setup-slot input[type="time"]:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+.setup-group-row__failed {
+  color: var(--danger);
+  font-size: var(--text-caption);
+  flex-basis: 100%;
+}
+
+/* Waiting on a training year is not an error — the manager did nothing wrong and there is
+ * nothing here for them to fix. Pending, not danger. */
+.setup-group-row__failed[data-status="pending"] {
+  color: var(--pending);
+}
+
+.setup-week {
+  padding: var(--space-4);
+  background: var(--surface);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.setup-week__title {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-title);
+  font-weight: var(--weight-semibold);
+}
+
+.setup-week__empty,
+.setup-week__none {
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+  margin: 0;
+}
+
+.setup-week__days {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  gap: var(--space-3);
+}
+
+.setup-week__day {
+  display: block;
+  font-size: var(--text-label);
+  font-weight: var(--weight-medium);
+  padding-block-end: var(--space-1);
+  border-block-end: var(--border-width-hairline) solid var(--border);
+  margin-block-end: var(--space-2);
+}
+
+.setup-week__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--text-caption);
+}
+
+.setup-week__list li {
+  display: flex;
+  flex-direction: column;
+}
