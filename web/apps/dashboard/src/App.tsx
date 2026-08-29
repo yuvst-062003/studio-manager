@@ -16,6 +16,7 @@ import {
   EmptyState,
   Icon,
   LanguagePicker,
+  RefusalScreen,
   SetupIncompleteBanner,
   SetupWizard,
   SideNav,
@@ -142,6 +143,10 @@ const MANAGER_ONLY_ROUTES = new Set([
   'setup',
   'closures',
 ])
+
+/** §6.1 — 'given a direct link, not a dead end.' A person with no dashboard role often
+ *  does have a staff one, and the staff app will refuse them in turn if not. */
+const STAFF_APP_URL = '/staff'
 
 const NAV = [
   { key: 'home', labelKey: 'common.dash.home.title', href: '#/home' },
@@ -452,10 +457,28 @@ export default function App() {
   // Read off the ACTIVE studio's membership: §19.4's persona switcher moves the active
   // studio without a reload, and a role taken from the first membership in the list would
   // then be somebody else's.
+  const membership = session.studios.find(
+    (row) => row.studio_id === session.activeStudioId,
+  )
   const canSeeMoney =
-    session.studios
-      .find((membership) => membership.studio_id === session.activeStudioId)
-      ?.roles.some((role) => role === 'owner' || role === 'manager') ?? false
+    membership?.roles.some((role) => role === 'owner' || role === 'manager') ?? false
+  /**
+   * A person with a record in the club and NO role at all.
+   *
+   * Found on staging: `SignedIn` passed and `AnyStaff` did not, so `/sessions` answered
+   * 200 while classes, groups, students, events, announcements, charges, reports and
+   * health-declarations all answered 403 — and the dashboard rendered its whole shell over
+   * the top, every panel showing a generic error. The staff and parent apps have refused
+   * this case since §6.1; the dashboard had no equivalent.
+   *
+   * F10 closed the neighbouring hole — "the doors a coach's role cannot open stay out of
+   * their nav ... the hole was offering doors that answer 403" — for a coach. This is the
+   * same hole one step further along: someone with no role was still offered every door.
+   *
+   * Keyed on "no role at all", never on "not an owner": a lead coach has a genuine,
+   * narrower dashboard and must keep it.
+   */
+  const hasNoRole = membership !== undefined && membership.roles.length === 0
   // Memoised: SetupWizard reads through this in an effect keyed on the client, so a fresh
   // object every render would re-fetch progress forever.
   const setupClient = useMemo(() => makeSetupClient(apiFetch), [])
@@ -493,7 +516,20 @@ export default function App() {
         />
       ) : null}
 
-      {session.status === 'signed-in' ? (
+      {/* Refused BEFORE the shell, not inside it: the point is that none of the doors are
+          offered, and a refusal rendered inside AppShell would still draw the nav. */}
+      {session.status === 'signed-in' && hasNoRole ? (
+        // No wrapper: `RefusalScreen` already carries `data-testid="dashboard-refusal"`,
+        // and a second one made the query ambiguous.
+        <RefusalScreen
+          locale={locale}
+          onSignOut={() => void session.signOut()}
+          otherAppUrl={STAFF_APP_URL}
+          which="dashboard"
+        />
+      ) : null}
+
+      {session.status === 'signed-in' && !hasNoRole ? (
         <AppShell
           title={session.activeStudioName ?? ''}
           items={canSeeMoney ? NAV : NAV.filter((entry) => !MANAGER_ONLY_KEYS.has(entry.key))}

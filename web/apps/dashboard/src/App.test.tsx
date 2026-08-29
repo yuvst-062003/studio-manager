@@ -239,3 +239,60 @@ describe('every route the manager can reach has a door (2026-08-29)', () => {
     expect(routeFromHash('#/')).toBe('schedule')
   })
 })
+
+describe('an account with no role in the active studio (2026-08-29)', () => {
+  // Found on staging. A person row existed in the club with ZERO role assignments, so
+  // `SignedIn` passed and `AnyStaff` did not: `/sessions` answered 200 and classes,
+  // groups, students, events, announcements, charges, reports and health-declarations all
+  // answered 403. The dashboard rendered its whole shell over that and every panel showed
+  // a generic error.
+  //
+  // The staff and parent apps have refused this case since §6.1 — each has a Resolve that
+  // renders `RefusalScreen`. The dashboard had neither. F10 closed the neighbouring hole
+  // ("the doors a coach's role cannot open stay out of their nav") and this is the same
+  // hole one step further: a person with NO role was still offered every door.
+  const NO_ROLE = {
+    ...SESSION,
+    studios: [
+      { studio_id: 's', studio_name: 'מכבי ג׳ודו רעננה', studio_is_demo: false, roles: [] },
+    ],
+  }
+
+  it('refuses instead of rendering a dashboard whose every panel 403s', async () => {
+    stubApi({
+      '/auth/refresh': { access_token: 'tok', expires_in: 900, ...NO_ROLE },
+      '/auth/me': NO_ROLE,
+      '/api/v1/sessions': { items: [] },
+    })
+    render(<App />)
+    expect(await screen.findByTestId('dashboard-refusal')).toBeInTheDocument()
+    // And the doors are gone with it.
+    expect(screen.queryByRole('link', { name: t('he', 'common.dash.nav.weekly') })).toBeNull()
+  })
+
+  it('still renders the shell for a role that HAS access', async () => {
+    // The refusal must key on "no role at all", not on "not an owner" — a lead coach has
+    // a genuine, narrower dashboard and must keep it.
+    const COACH = {
+      ...SESSION,
+      studios: [
+        {
+          studio_id: 's',
+          studio_name: 'מכבי ג׳ודו רעננה',
+          studio_is_demo: false,
+          roles: ['lead_coach'],
+        },
+      ],
+    }
+    stubApi({
+      '/auth/refresh': { access_token: 'tok', expires_in: 900, ...COACH },
+      '/auth/me': COACH,
+      '/api/v1/sessions': { items: [] },
+    })
+    render(<App />)
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'מכבי ג׳ודו רעננה' })).toBeInTheDocument(),
+    )
+    expect(screen.queryByTestId('dashboard-refusal')).toBeNull()
+  })
+})

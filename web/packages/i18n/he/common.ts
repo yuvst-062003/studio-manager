@@ -104,6 +104,11 @@ export const common: Bundle = {
   'refusal.parent.title': 'לא נמצאו תלמידים המשויכים אליך',
   'refusal.parent.body': 'פנה למנהל הסטודיו שלך.',
   'refusal.parent.otherApp': 'אפליקציית הצוות',
+  // The dashboard's refusal. A person with a record in the club but no role at all: the
+  // staff and parent apps have refused this since §6.1, the dashboard rendered over it.
+  'refusal.dashboard.title': 'אין לחשבון הזה הרשאות במועדון',
+  'refusal.dashboard.body': 'בקשו מבעלי המועדון להוסיף לכם תפקיד, או התחברו עם חשבון אחר.',
+  'refusal.dashboard.otherApp': 'אפליקציית הצוות',
   'tour.1': 'כאן השיעורים של היום',
   'tour.2': 'לחיצה לסימון נוכחות',
   'tour.3': 'עובד גם בלי אינטרנט',
