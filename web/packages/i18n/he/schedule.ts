@@ -35,6 +35,16 @@ export const schedule: Bundle = {
   'week.missing.unmarked': 'מפגשים ללא סימון נוכחות',
   'week.missing.cancelled': 'בוטלו',
   'week.missing.none': 'לא חסר כלום השבוע',
+  // `3a` item 7 + `1e`'s completed counter. The options are derived from the week on
+  // screen, so a filter is never offered that would empty the board.
+  'week.filter.legend': 'סינון הלוח',
+  'week.filter.group': 'קבוצה',
+  'week.filter.coach': 'מאמן',
+  'week.filter.hall': 'אולם',
+  'week.filter.all': 'הכל',
+  'week.filter.clear': 'ניקוי הסינון',
+  'week.filter.empty': 'אין שיעורים שמתאימים לסינון',
+  'week.missing.completed': 'הושלמו',
   'view.day': 'יום',
   'view.week': 'שבוע',
   'view.month': 'חודש',

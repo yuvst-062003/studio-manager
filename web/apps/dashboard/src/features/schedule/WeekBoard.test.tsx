@@ -613,3 +613,92 @@ describe('WeekBoard · moving a class, and starting one in a slot', () => {
     expect(screen.queryByTestId('week-moving')).toBeNull()
   })
 })
+
+describe('WeekBoard · filters (3a item 7)', () => {
+  const OTHER_COACH = { person_id: 'p2', display_name: 'יוסי כהן', role: 'lead_coach' as const, is_substitute: false }
+  const A: SessionRow = { ...TUESDAY_EVENING, id: 'fa', group_id: 'g1', group_name: 'מתחילים', location_name: 'אולם א׳' }
+  const B: SessionRow = {
+    ...TUESDAY_EVENING,
+    id: 'fb',
+    group_id: 'g2',
+    group_name: 'מתקדמים',
+    location_name: 'אולם ב׳',
+    starts_at: '2026-11-05T15:00:00Z',
+    ends_at: '2026-11-05T17:00:00Z',
+    staff: [OTHER_COACH],
+  }
+
+  it('offers only what the week on screen actually contains', async () => {
+    // Not `listGroups()`: that would offer every group the club has ever had, and picking
+    // one that does not train this week would blank the board with no explanation.
+    render(<WeekBoard locale="he" client={stub([A, B])} today="2026-11-03T12:00:00Z" />)
+    const group = await screen.findByTestId('week-filter-group')
+    const names = [...group.querySelectorAll('option')].map((o) => o.textContent)
+    expect(names).toEqual([t('he', 'schedule.week.filter.all'), 'מתחילים', 'מתקדמים'])
+  })
+
+  it('hides an axis the week cannot vary — one hall means no hall filter', async () => {
+    render(<WeekBoard locale="he" client={stub([A])} today="2026-11-03T12:00:00Z" />)
+    await screen.findByTestId('session-block')
+    expect(screen.queryByTestId('week-filter-hall')).toBeNull()
+  })
+
+  it('narrows the grid to one group', async () => {
+    render(<WeekBoard locale="he" client={stub([A, B])} today="2026-11-03T12:00:00Z" />)
+    await waitFor(() => expect(screen.getAllByTestId('session-block')).toHaveLength(2))
+    await userEvent.selectOptions(screen.getByTestId('week-filter-group'), 'g2')
+    await waitFor(() => expect(screen.getAllByTestId('session-block')).toHaveLength(1))
+    // Scoped to the block: the group name also appears as an <option> in the filter.
+    expect(screen.getByTestId('session-block')).toHaveTextContent('מתקדמים')
+  })
+
+  it('narrows by coach, matching any coach on the session rather than only the lead', async () => {
+    render(<WeekBoard locale="he" client={stub([A, B])} today="2026-11-03T12:00:00Z" />)
+    await waitFor(() => expect(screen.getAllByTestId('session-block')).toHaveLength(2))
+    await userEvent.selectOptions(screen.getByTestId('week-filter-coach'), 'p2')
+    await waitFor(() => expect(screen.getAllByTestId('session-block')).toHaveLength(1))
+  })
+
+  it('counts what is missing from the FILTERED view, not the whole week', async () => {
+    // The strip describes what is on screen. A strip that kept counting hidden classes
+    // would be reporting a week the manager cannot see.
+    const uncovered: SessionRow = { ...B, id: 'fc', staff: [] }
+    render(<WeekBoard locale="he" client={stub([A, uncovered])} today="2026-11-03T12:00:00Z" />)
+    expect(await screen.findByTestId('week-missing-no-coach')).toHaveTextContent('1')
+    await userEvent.selectOptions(screen.getByTestId('week-filter-group'), 'g1')
+    await waitFor(() => expect(screen.queryByTestId('week-missing-no-coach')).toBeNull())
+  })
+
+  it('says the filter is too narrow rather than showing a blank grid', async () => {
+    // Distinct from an empty week: the fix is to widen the filter, not to add a class.
+    render(<WeekBoard locale="he" client={stub([A, B])} today="2026-11-03T12:00:00Z" />)
+    await waitFor(() => expect(screen.getAllByTestId('session-block')).toHaveLength(2))
+    await userEvent.selectOptions(screen.getByTestId('week-filter-group'), 'g1')
+    await userEvent.selectOptions(screen.getByTestId('week-filter-hall'), 'אולם ב׳')
+    expect(await screen.findByText(t('he', 'schedule.week.filter.empty'))).toBeInTheDocument()
+  })
+
+  it('offers a way back to the whole week only once something is narrowed', async () => {
+    render(<WeekBoard locale="he" client={stub([A, B])} today="2026-11-03T12:00:00Z" />)
+    await screen.findByTestId('week-filter-group')
+    expect(screen.queryByTestId('week-filter-clear')).toBeNull()
+    await userEvent.selectOptions(screen.getByTestId('week-filter-group'), 'g2')
+    await userEvent.click(await screen.findByTestId('week-filter-clear'))
+    await waitFor(() => expect(screen.getAllByTestId('session-block')).toHaveLength(2))
+  })
+
+  it('counts completed classes — the one number in the strip that is not a problem', async () => {
+    const done: SessionRow = { ...A, id: 'fd', attendance_taken: true }
+    render(<WeekBoard locale="he" client={stub([done])} today="2026-11-03T12:00:00Z" />)
+    expect(await screen.findByTestId('week-missing-completed')).toHaveTextContent('1')
+  })
+
+  it('still shows the completed count on a week with nothing missing', async () => {
+    // The first version gated the whole strip on `total`, which counts only problems — so
+    // a week that had gone perfectly showed "nothing missing" and hid the number proving it.
+    const done: SessionRow = { ...A, id: 'fe', attendance_taken: true }
+    render(<WeekBoard locale="he" client={stub([done])} today="2026-11-03T12:00:00Z" />)
+    expect(await screen.findByTestId('week-missing-none')).toBeInTheDocument()
+    expect(screen.getByTestId('week-missing-completed')).toHaveTextContent('1')
+  })
+})

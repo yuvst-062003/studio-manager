@@ -359,6 +359,9 @@ export function WeekBoard({
   // The create form's disclosure lives here so its TRIGGER can sit in the page header
   // while the form itself opens below the coverage strip.
   const [open, setOpen] = useState(false)
+  /** `3a` item 7. Empty string means "all" — one falsy check per axis rather than three
+   *  nullable ids, because the select's own empty option is a string too. */
+  const [filter, setFilter] = useState({ group: '', coach: '', hall: '' })
   /** The class currently picked up off the board, waiting for a slot. */
   const [movingId, setMovingId] = useState<string | null>(null)
   const [moveFailed, setMoveFailed] = useState(false)
@@ -379,6 +382,49 @@ export function WeekBoard({
   }, [client, days, version])
 
   const openSession = sessions.find((row) => row.id === openSessionId) ?? null
+
+  /**
+   * The filter's options come from the week ON SCREEN, not from the club's full roster.
+   *
+   * A `listGroups()` would offer every group the club has ever had, most of which do not
+   * train this week — choosing one would empty the board and say nothing about why. Only
+   * offering what is present means a filter can narrow the view but never blank it.
+   */
+  const options = useMemo(() => {
+    const groups = new Map<string, string>()
+    const coaches = new Map<string, string>()
+    const halls = new Map<string, string>()
+    for (const row of sessions) {
+      groups.set(row.group_id, row.group_name)
+      if (row.location_name) halls.set(row.location_name, row.location_name)
+      for (const person of row.staff) coaches.set(person.person_id, person.display_name)
+    }
+    const sorted = (map: Map<string, string>) =>
+      [...map].sort((a, b) => a[1].localeCompare(b[1]))
+    return { groups: sorted(groups), coaches: sorted(coaches), halls: sorted(halls) }
+  }, [sessions])
+
+  /**
+   * Filtered in memory rather than refetched.
+   *
+   * `listSessions` does accept `group_id` and `coach_person_id`, but not a hall — so a
+   * server-side filter would narrow two axes over the network and the third locally, and
+   * the counters below would then be describing a set assembled from two places. A week is
+   * tens of rows; filtering it here keeps one source for everything on screen and makes
+   * changing a filter instant.
+   */
+  const visible = useMemo(
+    () =>
+      sessions.filter((row) => {
+        if (filter.group && row.group_id !== filter.group) return false
+        if (filter.hall && row.location_name !== filter.hall) return false
+        if (filter.coach && !row.staff.some((p) => p.person_id === filter.coach)) return false
+        return true
+      }),
+    [sessions, filter],
+  )
+
+  const filtered = Boolean(filter.group || filter.coach || filter.hall)
 
   // Escape puts a picked-up class back. Registered only while something is held, so this
   // never competes with the popover's own Escape handling.
@@ -417,15 +463,18 @@ export function WeekBoard({
   /** `3a`'s three counters, and the same two rules the manager home derives:
    *  a cancelled class needs no coach, and a class that has not ended yet is not late. */
   const missing = useMemo(() => {
-    const live = sessions.filter((row) => row.status !== 'cancelled')
+    const live = visible.filter((row) => row.status !== 'cancelled')
     const now = new Date(today)
     const noCoach = live.filter((row) => row.staff.length === 0).length
     const unmarked = live.filter(
       (row) => !row.attendance_taken && new Date(row.ends_at) < now,
     ).length
-    const cancelled = sessions.length - live.length
-    return { noCoach, unmarked, cancelled, total: noCoach + unmarked + cancelled }
-  }, [sessions, today])
+    const cancelled = visible.length - live.length
+    // `1e`'s fourth counter. Completed is what went RIGHT, so it is the one number here
+    // that is not a problem — and it is why the strip does not read as an error list.
+    const completed = live.filter((row) => row.attendance_taken).length
+    return { noCoach, unmarked, cancelled, completed, total: noCoach + unmarked + cancelled }
+  }, [visible, today])
 
   /** `23–29`, as one ltr island. The week the board is showing, which three bare
    *  previous/today/next buttons never said. */
@@ -438,20 +487,20 @@ export function WeekBoard({
    *  grid row each. A club training at 17:00 and 18:30 gets two rows; a club training at
    *  six different times gets six. */
   const slots = useMemo(() => {
-    const seen = new Set(sessions.map((row) => formatTimeInStudioZone(row.starts_at, locale)))
+    const seen = new Set(visible.map((row) => formatTimeInStudioZone(row.starts_at, locale)))
     return [...seen].sort()
-  }, [sessions, locale])
+  }, [visible, locale])
 
   /** `day|HH:MM` → the sessions in that cell. A cell holds more than one only when a club
    *  runs two groups in different halls at the same hour, which is real. */
   const byCell = useMemo(() => {
     const grouped = new Map<string, SessionRow[]>()
-    for (const session of sessions) {
+    for (const session of visible) {
       const key = `${studioDayKey(session.starts_at)}|${formatTimeInStudioZone(session.starts_at, locale)}`
       grouped.set(key, [...(grouped.get(key) ?? []), session])
     }
     return grouped
-  }, [sessions, locale])
+  }, [visible, locale])
 
   return (
     <section aria-labelledby="week-board-title" style={boardStyle}>
@@ -498,10 +547,84 @@ export function WeekBoard({
         title={t(locale, 'schedule.week.title')}
       />
 
+      {/* `3a` item 7. A fieldset because these three narrow one thing together — a screen
+          reader announcing "Group" with no idea what it belongs to is why they are grouped
+          and the group is named. Only the axes the week actually has are rendered: a club
+          with one hall gets two selects, not three greyed ones. */}
+      <fieldset className="week-filter" data-testid="week-filter">
+        <legend className="studio-visually-hidden">
+          {t(locale, 'schedule.week.filter.legend')}
+        </legend>
+        {options.groups.length > 1 ? (
+          <label>
+            {t(locale, 'schedule.week.filter.group')}
+            <select
+              data-testid="week-filter-group"
+              onChange={(event) => setFilter((f) => ({ ...f, group: event.target.value }))}
+              value={filter.group}
+            >
+              <option value="">{t(locale, 'schedule.week.filter.all')}</option>
+              {options.groups.map(([id, name]) => (
+                <option key={id} value={id}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
+        {options.coaches.length > 1 ? (
+          <label>
+            {t(locale, 'schedule.week.filter.coach')}
+            <select
+              data-testid="week-filter-coach"
+              onChange={(event) => setFilter((f) => ({ ...f, coach: event.target.value }))}
+              value={filter.coach}
+            >
+              <option value="">{t(locale, 'schedule.week.filter.all')}</option>
+              {options.coaches.map(([id, name]) => (
+                <option key={id} value={id}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
+        {options.halls.length > 1 ? (
+          <label>
+            {t(locale, 'schedule.week.filter.hall')}
+            <select
+              data-testid="week-filter-hall"
+              onChange={(event) => setFilter((f) => ({ ...f, hall: event.target.value }))}
+              value={filter.hall}
+            >
+              <option value="">{t(locale, 'schedule.week.filter.all')}</option>
+              {options.halls.map(([id, name]) => (
+                <option key={id} value={id}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
+        {filtered ? (
+          <Button
+            variant="ghost"
+            data-testid="week-filter-clear"
+            onClick={() => setFilter({ group: '', coach: '', hall: '' })}
+          >
+            {t(locale, 'schedule.week.filter.clear')}
+          </Button>
+        ) : null}
+      </fieldset>
+
       {/* `3a`'s מה חסר השבוע. Derived from the week already on screen, not fetched — the
           sessions carry `staff` and `attendance_taken`, so a coverage endpoint would be a
           second source of truth for a number the board can already count. */}
       <ul className="week-missing" data-testid="week-missing">
+        {/* `total` counts only the PROBLEMS, so it gates the problem rows and the reassuring
+            line — but not the completed counter below, which is true either way. Gating
+            that on `total` hid it exactly when the week had gone well, which is the week a
+            manager most wants the number for. */}
         {missing.total === 0 ? (
           <li data-testid="week-missing-none">{t(locale, 'schedule.week.missing.none')}</li>
         ) : (
@@ -523,6 +646,13 @@ export function WeekBoard({
             ) : null}
           </>
         )}
+        {/* `1e`'s counter. Outside the branch above, and last: the only number in the
+            strip that is not a problem. */}
+        {missing.completed > 0 ? (
+          <li data-tone="done" data-testid="week-missing-completed">
+            <b>{missing.completed}</b> {t(locale, 'schedule.week.missing.completed')}
+          </li>
+        ) : null}
       </ul>
 
       <CreateSessionForm
@@ -539,6 +669,12 @@ export function WeekBoard({
           title={t(locale, 'schedule.today.empty')}
           description={t(locale, 'schedule.today.emptyHint')}
         />
+      ) : null}
+
+      {/* A week that HAS classes and a filter that hides all of them. Distinct from the
+          empty week above: the fix is to widen the filter, not to add a class. */}
+      {sessions.length > 0 && visible.length === 0 ? (
+        <EmptyState title={t(locale, 'schedule.week.filter.empty')} />
       ) : null}
 
       {movingId ? (
