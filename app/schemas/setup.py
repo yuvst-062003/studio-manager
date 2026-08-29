@@ -22,7 +22,7 @@ class SetupProgressOut(BaseModel):
     """
 
     steps: list[SetupStepOut]
-    complete: bool = Field(description="Every one of the six steps is done.")
+    complete: bool = Field(description="Every one of the wizard steps is done.")
     dismissed_at: str | None = Field(
         default=None, description="The owner chose an exit at step 6. Auto-routing stops."
     )

@@ -20,12 +20,7 @@ import type { BillingClient, ChargeOut, PaymentOut, PaymentPromiseOut } from './
 
 const LOCALE = 'he' as const
 
-function charge(
-  id: string,
-  month: number,
-  amount = 25_000,
-  isCoveredElsewhere = false,
-): ChargeOut {
+function charge(id: string, month: number, amount = 25_000, isCoveredElsewhere = false): ChargeOut {
   return {
     id,
     payer_person_id: 'payer-1',
@@ -126,9 +121,7 @@ describe('1b — the pay screen', () => {
     // silently missing from the picker, is a support call.
     renderPay({ debts: [debt('c1', 9), debt('c2', 10, { coveredElsewhere: true })] })
     expect(screen.getAllByTestId('debt-row')).toHaveLength(2)
-    expect(screen.getByTestId('covered-elsewhere')).toHaveTextContent(
-      'החיוב כלול בתשלום שכבר נפתח',
-    )
+    expect(screen.getByTestId('covered-elsewhere')).toHaveTextContent('החיוב כלול בתשלום שכבר נפתח')
     expect(screen.getByTestId('months-control')).toHaveAttribute('data-max', '1')
   })
 
@@ -270,7 +263,9 @@ describe('1b — the standing-order links', () => {
     const config = (await import('../../../vite.config.ts?raw')).default as string
     expect(config).not.toContain('runtimeCaching')
     // And the precache glob is built assets only -- no JSON, so no API response.
-    expect(config).toMatch(/globPatterns:\s*\['\*\*\/\*\.\{js,css,html,woff2,png,svg,webmanifest\}'\]/)
+    expect(config).toMatch(
+      /globPatterns:\s*\['\*\*\/\*\.\{js,css,html,woff2,png,svg,webmanifest\}'\]/,
+    )
   })
 
   it('renders the card with no anchor when no plan has a link', () => {
@@ -334,7 +329,10 @@ describe('1b — the two hand-carried routes', () => {
   })
 
   it('badges the charge rows a pending cheque promise covers, in its own words', () => {
-    renderPay({ promises: [promise('r1', 'cheque', { charge_ids: ['c1'] })], onPaymentPromise: vi.fn() })
+    renderPay({
+      promises: [promise('r1', 'cheque', { charge_ids: ['c1'] })],
+      onPaymentPromise: vi.fn(),
+    })
     expect(screen.getByText('צ׳קים בהמתנה')).toBeInTheDocument()
     expect(screen.queryByText('מזומן בהמתנה')).not.toBeInTheDocument()
   })
@@ -363,7 +361,7 @@ describe('1b — prepayment and credit', () => {
   // declares one and later sees what is left of it.
   const TERMS = { cashMonths: 3, chequeMonths: 12, monthlyTotalAgorot: 30_000 }
 
-  it('offers the club\'s own term on each route, with the breakdown', () => {
+  it("offers the club's own term on each route, with the breakdown", () => {
     // §6 — the breakdown is shown rather than a single figure, because 900 ₪ with no
     // explanation is the kind of number a parent phones the office about.
     renderPay({ prepayTerms: TERMS, onPaymentPromise: vi.fn() })
@@ -375,7 +373,7 @@ describe('1b — prepayment and credit', () => {
     expect(within(cash).getByTestId('promise-grand-total')).toHaveTextContent('1,400')
   })
 
-  it('settles EVERY open charge, not the card route\'s month selection', () => {
+  it("settles EVERY open charge, not the card route's month selection", () => {
     // A three-child family owing one month. The cash and cheque cards carry no month chips,
     // so they used to inherit whatever the card route's chips held — 2 by default — and
     // reported "חיובים פתוחים" as two of the three children's charges. The parent then
@@ -450,7 +448,9 @@ describe('1b — prepayment and credit', () => {
     renderPay({ prepayTerms: TERMS, creditAgorot: 60_000 })
     const ahead = screen.getByTestId('paid-ahead')
     expect(ahead).toBeInTheDocument()
-    expect(ahead).toHaveTextContent(t(LOCALE, 'billing.prepay.coversMonths').replace('{{count}}', '2'))
+    expect(ahead).toHaveTextContent(
+      t(LOCALE, 'billing.prepay.coversMonths').replace('{{count}}', '2'),
+    )
     expect(within(ahead).queryByTestId('paid-ahead-part')).not.toBeInTheDocument()
   })
 
@@ -520,7 +520,12 @@ describe('the selection arithmetic', () => {
   it('groups by the due month and not by the row order', () => {
     // Two children whose charges arrive interleaved and shuffled. One month must still be
     // exactly one month.
-    const charges = [charge('oct-b', 10), charge('sep-b', 9), charge('oct-a', 10), charge('sep-a', 9)]
+    const charges = [
+      charge('oct-b', 10),
+      charge('sep-b', 9),
+      charge('oct-a', 10),
+      charge('sep-a', 9),
+    ]
     expect(oldestMonths(charges, 1).map((c) => c.id)).toEqual(['sep-a', 'sep-b'])
   })
 
@@ -655,10 +660,7 @@ describe('12f — payment history', () => {
     // dead controls. A payment has a method, not a kind, so `PaymentAllocationOut.kind` now
     // carries the kind of the charge each allocation settled.
     renderHistory({
-      payments: [
-        settling('p1', 'upay_card', 'tuition'),
-        settling('p2', 'cash', 'event'),
-      ],
+      payments: [settling('p1', 'upay_card', 'tuition'), settling('p2', 'cash', 'event')],
     })
     expect(screen.getAllByTestId('payment-row')).toHaveLength(2)
     fireEvent.click(screen.getByLabelText(t(LOCALE, 'billing.charge.kind.event')))
@@ -679,9 +681,7 @@ describe('the return from uPay', () => {
     // §5.10 step 5 — 'the redirect is NEVER the source of truth. A closed tab still produces
     // an IPN.' 1b finding 2 and 12e's own table both record that this state is not drawn
     // anywhere, and it is the one state the whole flow depends on being honest about.
-    render(
-      <PaymentCompleteScreen locale={LOCALE} status="pending" onOpenPayments={vi.fn()} />,
-    )
+    render(<PaymentCompleteScreen locale={LOCALE} status="pending" onOpenPayments={vi.fn()} />)
     expect(screen.getByText(t(LOCALE, 'billing.order.verifying'))).toBeInTheDocument()
     expect(screen.getByText(t(LOCALE, 'billing.order.verifyingHint'))).toBeInTheDocument()
   })
@@ -690,11 +690,7 @@ describe('the return from uPay', () => {
     // §5.10: the money IS in the merchant account. Telling the parent it failed would be
     // wrong in the direction that costs them a second payment.
     render(
-      <PaymentCompleteScreen
-        locale={LOCALE}
-        status="amount_mismatch"
-        onOpenPayments={vi.fn()}
-      />,
+      <PaymentCompleteScreen locale={LOCALE} status="amount_mismatch" onOpenPayments={vi.fn()} />,
     )
     expect(screen.getByText(t(LOCALE, 'billing.order.mismatchAlert'))).toBeInTheDocument()
     expect(screen.getByText(t(LOCALE, 'billing.order.mismatchHint'))).toBeInTheDocument()
@@ -702,9 +698,26 @@ describe('the return from uPay', () => {
 })
 
 describe('12e — ordering items', () => {
+  // The old fixture called the first item `גי מידה 140` — the size baked into the NAME,
+  // which is what a club had to do while `product` had no sizes: one row per size, each
+  // its own catalogue entry. `sizes` is the fix, and the fixture is the before/after.
   const PRODUCTS = [
-    { id: 'p1', name: 'גי מידה 140', description: null, price_agorot: 18_000, is_active: true },
-    { id: 'p2', name: 'חגורה', description: null, price_agorot: 6_000, is_active: true },
+    {
+      id: 'p1',
+      name: 'גי',
+      description: null,
+      price_agorot: 18_000,
+      is_active: true,
+      sizes: ['120', '140', '160'],
+    },
+    {
+      id: 'p2',
+      name: 'חגורה',
+      description: null,
+      price_agorot: 6_000,
+      is_active: true,
+      sizes: [],
+    },
   ]
 
   it('shows no stock count, no availability and says so', () => {
@@ -734,6 +747,81 @@ describe('12e — ordering items', () => {
   it('renders the empty state when the club sells nothing', () => {
     render(<OrderItemsScreen locale={LOCALE} products={[]} onOrder={vi.fn()} />)
     expect(screen.getByText('לא הוגדרו פריטים')).toBeInTheDocument()
+  })
+
+  // -- sizes (2026-08-29) ------------------------------------------------------
+  const pick = (index: number) =>
+    userEvent.click(within(screen.getAllByTestId('product-row')[index]!).getByRole('checkbox'))
+
+  it('asks for a size only once a sized item is chosen', async () => {
+    // Every picker at once would be a dozen radio groups on a phone to sell one belt, and
+    // one under an unchosen item asks a question nobody has reached yet.
+    render(<OrderItemsScreen locale={LOCALE} products={PRODUCTS} onOrder={vi.fn()} />)
+    expect(screen.queryByRole('radio', { name: '140' })).toBeNull()
+    await pick(0)
+    expect(screen.getByRole('radio', { name: '140' })).toBeInTheDocument()
+  })
+
+  it('never asks for a size on an item that has none', async () => {
+    // A חגורה. Asking would be a question with no answer, and sending one is refused by
+    // the route anyway.
+    render(<OrderItemsScreen locale={LOCALE} products={PRODUCTS} onOrder={vi.fn()} />)
+    await pick(1)
+    expect(within(screen.getAllByTestId('product-row')[1]!).queryByRole('radio')).toBeNull()
+  })
+
+  it('will not order a sized item until the size is answered, and says why', async () => {
+    // The server's `size_required` 422, moved to before the press — this screen's next
+    // step is a payment page, and a parent should not be bounced off it.
+    const onOrder = vi.fn()
+    render(<OrderItemsScreen locale={LOCALE} products={PRODUCTS} onOrder={onOrder} />)
+    await pick(0)
+    expect(screen.getByTestId('order-button')).toBeDisabled()
+    expect(screen.getByTestId('choose-size-first')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('radio', { name: '140' }))
+    expect(screen.getByTestId('order-button')).toBeEnabled()
+    expect(screen.queryByTestId('choose-size-first')).toBeNull()
+  })
+
+  it('sends the chosen size per line, and null for an item with none', async () => {
+    const onOrder = vi.fn().mockResolvedValue(undefined)
+    render(<OrderItemsScreen locale={LOCALE} products={PRODUCTS} onOrder={onOrder} />)
+    await pick(0)
+    await userEvent.click(screen.getByRole('radio', { name: '160' }))
+    await pick(1)
+    await userEvent.click(screen.getByTestId('order-button'))
+
+    expect(onOrder).toHaveBeenCalledWith([
+      { productId: 'p1', size: '160' },
+      // `null`, never `''` — an empty string is a size the parent did not choose, and the
+      // route refuses any size at all against a sizeless item.
+      { productId: 'p2', size: null },
+    ])
+  })
+
+  it('remembers a size across unticking and reticking the item', async () => {
+    // Re-asking would read as the app having lost it; the parent has not changed their
+    // mind about the size just because they changed it about the item.
+    const onOrder = vi.fn().mockResolvedValue(undefined)
+    render(<OrderItemsScreen locale={LOCALE} products={PRODUCTS} onOrder={onOrder} />)
+    await pick(0)
+    await userEvent.click(screen.getByRole('radio', { name: '120' }))
+    await pick(0)
+    await pick(0)
+    expect(screen.getByTestId('order-button')).toBeEnabled()
+    await userEvent.click(screen.getByTestId('order-button'))
+    expect(onOrder).toHaveBeenCalledWith([{ productId: 'p1', size: '120' }])
+  })
+
+  it('still says nothing about availability, now that there are sizes to say it about', () => {
+    // §5.10 did not move because the catalogue grew a column. Which sizes the club OFFERS
+    // is not which sizes it HAS.
+    const { container } = render(
+      <OrderItemsScreen locale={LOCALE} products={PRODUCTS} onOrder={vi.fn()} />,
+    )
+    expect(container.textContent).not.toMatch(/במלאי|נותרו|אזל/)
+    expect(container.querySelectorAll('[data-disabled="true"]')).toHaveLength(0)
   })
 })
 

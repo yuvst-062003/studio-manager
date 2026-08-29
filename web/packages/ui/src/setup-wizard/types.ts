@@ -1,12 +1,17 @@
 // SPEC §5.1's wizard, as a contract two other milestones will register into.
 //
-// The step ids are all six the canvas draws, not the four M1 builds: *complete* means
-// every one of the six is `done`, and a four-value union would report a studio finished
-// before its belt system existed.
+// The step ids are all the canvas draws, not the four M1 builds: *complete* means every
+// one of them is `done`, and a four-value union would report a studio finished before its
+// belt system existed.
+//
+// `items` is a seventh, added 2026-08-29 and owned by M6 alongside `prices`. Adding a step
+// makes every studio that was `complete` incomplete again and brings the setup banner back
+// for them — which is the honest reading, since they have not set up their items, and
+// `skipped` is one press away for a club that sells nothing.
 import type { ComponentType } from 'react'
 import type { Locale } from '@studio/i18n'
 
-export type WizardStepId = 'studio' | 'belts' | 'groups' | 'prices' | 'staff' | 'students'
+export type WizardStepId = 'studio' | 'belts' | 'groups' | 'prices' | 'staff' | 'students' | 'items'
 
 export type WizardStepStatus = 'pending' | 'done' | 'skipped'
 
@@ -24,6 +29,11 @@ export const WIZARD_STEP_ORDER: readonly WizardStepId[] = [
   'prices',
   'staff',
   'students',
+  // §4.3's sellable items (2026-08-29). LAST, because it is the only step nothing else
+  // depends on: a club can run a whole season without ever selling a גי, and putting the
+  // most skippable question in front of the ones that unblock everything else is how an
+  // owner stalls on step 3 of 7.
+  'items',
 ]
 
 export type WizardStep = {
@@ -36,7 +46,7 @@ export type WizardStep = {
 /** The `GET /api/v1/setup` payload, and what every transition returns. */
 export type SetupProgress = {
   steps: WizardStep[]
-  /** Every one of the six is `done`. Governs the dashboard checklist, nothing else. */
+  /** Every one of them is `done`. Governs the dashboard checklist, nothing else. */
   complete: boolean
   /** The owner chose an exit at step 6. Governs auto-routing, nothing else. */
   dismissed_at: string | null

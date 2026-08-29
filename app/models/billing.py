@@ -169,11 +169,30 @@ class Product(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
     **No stock counts.** §4.3 and §5.10 both say it outright: "inventory is a different
     product". Selling one creates a normal `charge` with `kind='manual'`. A `quantity`
     column here would be the first step into a product this one is deliberately not.
+
+    **`sizes` is a list of labels, and its emptiness IS "this item has no sizes".** A גי is
+    ordered in a size and a חגורה is not, which the manager decides per item. There is
+    deliberately no `has_sizes` boolean beside it: two columns describing one fact drift,
+    and `has_sizes=true, sizes=[]` is a state that would let a parent be shown a size picker
+    with nothing in it.
+
+    **The labels are free text, not an enum.** Clubs size a גי in centimetres (100..190),
+    gloves in S/M/L and a belt not at all; a CHECK listing "the" sizes would be a guess
+    about somebody else's supplier. Length and count are bounded in `CatalogueService`,
+    which is also where they are trimmed and de-duplicated.
+
+    **Still no per-size price.** One item, one `price_agorot`: a size is what the club hands
+    over, not what the family is charged. Per-size pricing is a `product_size` table, which
+    is a different decision and not this one.
     """
 
     __tablename__ = "product"
     __tenant_table_args__ = (
         CheckConstraint("price_agorot >= 0", name="product_price_non_negative"),
+        # `sizes` is an ARRAY of labels or nothing. Postgres would happily store a bare
+        # string or an object in a JSONB column, and the order endpoint's membership test
+        # would then be asking whether a character is in a word.
+        CheckConstraint("jsonb_typeof(sizes) = 'array'", name="product_sizes_is_array"),
         Index("ix_product_studio_id_is_active", "studio_id", "is_active"),
     )
 
@@ -181,6 +200,12 @@ class Product(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
     description: Mapped[str | None] = mapped_column(Text)
     price_agorot: Mapped[int] = mapped_column(Integer, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    #: `server_default` as well as `default`: every product that existed before this column
+    #: did is sizeless, and a NULL here would make "no sizes" and "not answered yet" the
+    #: same value on the one question this column exists to answer.
+    sizes: Mapped[list[str]] = mapped_column(
+        JSONB, nullable=False, default=list, server_default="[]"
+    )
 
 
 class Charge(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):

@@ -311,4 +311,42 @@ export const billing: Bundle = {
   'planChange.effectiveOn': 'מתאריך',
   'planChange.settle': 'טופל',
   'planChange.hint': 'שני אמצעי תשלום משולמים מראש, ולכן שינוי מסלול לא נסגר מעצמו — יש לגבות את ההפרש או לעדכן את הוראת הקבע.',
+
+  // -- פריטים למכירה — the items screen, the wizard's step 7 and the size a parent picks -----
+  // §4.3's catalogue is 'גי, חגורה, כפפות, דמי ביטוח'. Two of the four are ordered in a
+  // size and two are not, which is the manager's answer per item.
+  'product.plural': 'פריטים',
+  'product.subtitle': 'מה המועדון מוכר — גי, חגורה, כפפות',
+  'product.save': 'שמירת הפריט',
+  'product.saved': 'הפריט נשמר',
+  'product.edit': 'עריכת פריט',
+  'product.cancel': 'ביטול',
+  'product.retire': 'הפסקת מכירה',
+  'product.revive': 'החזרה למכירה',
+  'product.retired': 'אינו נמכר',
+  'product.showRetired': 'הצגת פריטים שהופסקו',
+  // §11.4's shape, restated for a catalogue: a product is retired, never deleted, because
+  // charges already raised for it name it.
+  'product.noDeleteHint': 'פריט מופסק ממכירה ולא נמחק — חיובים שכבר נוצרו מציינים אותו',
+
+  // The sizes. An empty list IS 'this item has no sizes' — there is no separate flag.
+  'product.hasSizes': 'הפריט מגיע במידות',
+  'product.hasSizesHint': 'גי כן, חגורה לא. הורה שמזמין יתבקש לבחור מידה',
+  'product.sizes': 'מידות',
+  'product.sizesHint': 'הסדר שתקלידו הוא הסדר שהורה יראה',
+  'product.sizeAdd': 'הוספת מידה',
+  'product.sizeNew': 'מידה חדשה',
+  'product.sizeRemove': 'הסרת מידה',
+  'product.sizesNone': 'ללא מידות',
+  'product.sizesRequired': 'פריט עם מידות חייב לכלול לפחות מידה אחת',
+  'product.sizeDuplicate': 'המידה כבר ברשימה',
+  // 12e — the parent's side.
+  'product.chooseSize': 'בחירת מידה',
+  'product.chooseSizeFirst': 'בחרו מידה לפני ההזמנה',
+
+  // The wizard's seventh step.
+  'product.wizardTitle': 'פריטים למכירה',
+  'product.wizardHint': 'אפשר לדלג — מועדון שאינו מוכר פריטים אינו צריך את השלב הזה',
+  'product.wizardDone': 'סיום השלב',
+  'product.required': 'שדה חובה',
 }

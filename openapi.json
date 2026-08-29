@@ -5400,6 +5400,18 @@
             "minimum": 1.0,
             "title": "Quantity",
             "type": "integer"
+          },
+          "size": {
+            "anyOf": [
+              {
+                "maxLength": 24,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size"
           }
         },
         "required": [
@@ -7508,6 +7520,14 @@
             "minimum": 0.0,
             "title": "Price Agorot",
             "type": "integer"
+          },
+          "sizes": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Sizes",
+            "type": "array"
           }
         },
         "required": [
@@ -7546,6 +7566,13 @@
           "price_agorot": {
             "title": "Price Agorot",
             "type": "integer"
+          },
+          "sizes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Sizes",
+            "type": "array"
           }
         },
         "required": [
@@ -7559,7 +7586,7 @@
         "type": "object"
       },
       "ProductPatch": {
-        "description": "Every field optional. There is no `quantity` and there will not be one -- §4.3 and\n§5.10 both say inventory is a different product.",
+        "description": "Every field optional. There is no `quantity` and there will not be one -- §4.3 and\n§5.10 both say inventory is a different product.\n\n`sizes: []` CLEARS the sizes and is distinguishable from not sending the field, because\nthe route dumps with `exclude_unset`. \"It turned out not to come in sizes\" has to be a\nsaveable correction.",
         "properties": {
           "description": {
             "anyOf": [
@@ -7608,6 +7635,21 @@
               }
             ],
             "title": "Price Agorot"
+          },
+          "sizes": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 20,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sizes"
           }
         },
         "title": "ProductPatch",
@@ -9652,7 +9694,7 @@
         "description": "What all three setup routes return, so a caller never has to re-fetch.\n\n`complete` and `dismissed_at` are separate on purpose -- SPEC §5.1 states two\ndifferent things and app/services/structure/setup.py carries the reasoning.",
         "properties": {
           "complete": {
-            "description": "Every one of the six steps is done.",
+            "description": "Every one of the wizard steps is done.",
             "title": "Complete",
             "type": "boolean"
           },
@@ -9781,6 +9823,13 @@
           "price_agorot": {
             "title": "Price Agorot",
             "type": "integer"
+          },
+          "sizes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Sizes",
+            "type": "array"
           }
         },
         "required": [
