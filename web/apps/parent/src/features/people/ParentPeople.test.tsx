@@ -445,3 +445,20 @@ describe('FirstRegistration — 12j', () => {
     noPhysicalCss(container)
   })
 })
+
+describe('the empty group picker says so (2026-08-30)', () => {
+  it('shows the no-groups message with a retry instead of a silent blank fieldset', async () => {
+    // "Parents can't pick a program" — the picker rendered its legend over NOTHING when
+    // the read failed or the club published no groups.
+    const fetchMock = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>(
+      async () => new Response('{}', { status: 500 }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    render(<AddSibling locale="he" client={makeClient()} />)
+    expect(await screen.findByTestId('sibling-no-groups')).toHaveTextContent(
+      t('he', 'people.sibling.noGroups'),
+    )
+    expect(screen.getByTestId('sibling-retry-groups')).toBeInTheDocument()
+    vi.unstubAllGlobals()
+  })
+})

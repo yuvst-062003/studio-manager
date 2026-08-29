@@ -195,6 +195,8 @@ export const people: Bundle = {
   'sibling.steps.declaration': 'חותמים על הצהרת בריאות',
   'sibling.steps.billing': 'החיוב מתחיל רק אחרי האישור — שום דבר לא חויב עדיין',
   'sibling.ages': 'גילאי {min}–{max}',
+  'sibling.noGroups': 'לא הצלחנו לטעון את רשימת הקבוצות. אפשר לשלוח בלי לבחור קבוצה — המנהל ישבץ, או לנסות שוב.',
+  'sibling.retryGroups': 'טעינה מחדש',
   'sibling.title': 'הוספת ילד נוסף',
   'join.title': 'הצטרפות למועדון — הרשמת משפחה',
   'directions.title': 'הוראות הגעה',

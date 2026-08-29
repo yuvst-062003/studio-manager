@@ -51,6 +51,12 @@ export function AddSibling({
     { id: string; name: string; description: string | null; age_min: number | null; age_max: number | null; training_weekdays: number[] }[]
   >([])
 
+  // 2026-08-30 — "parents can't pick a program". The list CAN come back empty (a failed
+  // read, or a club that published no groups), and the screen used to render the legend
+  // over NOTHING, silently. `groupsState` is what lets it say so and offer a retry.
+  const [groupsState, setGroupsState] = useState<'loading' | 'ready' | 'empty'>('loading')
+  const [fetchAttempt, setFetchAttempt] = useState(0)
+
   useEffect(() => {
     if (groups.length > 0) return
     let live = true
@@ -63,12 +69,16 @@ export function AddSibling({
           ? ((await response.json()) as { items: typeof publicGroups }).items
           : []
       })
-      .then((items) => live && setPublicGroups(items))
-      .catch(() => undefined)
+      .then((items) => {
+        if (!live) return
+        setPublicGroups(items)
+        setGroupsState(items.length > 0 ? 'ready' : 'empty')
+      })
+      .catch(() => live && setGroupsState('empty'))
     return () => {
       live = false
     }
-  }, [groups.length])
+  }, [groups.length, fetchAttempt])
   const [sending, setSending] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [failed, setFailed] = useState(false)
@@ -131,6 +141,24 @@ export function AddSibling({
       {/* A PREFERENCE, not a decision — §5.4 puts the group on the manager's approval. */}
       <fieldset data-testid="sibling-group">
         <legend>{t(locale, 'people.landing.chooseGroup')}</legend>
+        {/* Said, never blank (2026-08-30): an empty list under a "choose a group" legend
+            read as the picker being broken. The form still submits without a group —
+            the manager places the child — and that is said too. */}
+        {groups.length === 0 && groupsState === 'empty' ? (
+          <div data-testid="sibling-no-groups" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', alignItems: 'start' }}>
+            <p style={{ margin: 0 }}>{t(locale, 'people.sibling.noGroups')}</p>
+            <Button
+              variant="ghost"
+              data-testid="sibling-retry-groups"
+              onClick={() => {
+                setGroupsState('loading')
+                setFetchAttempt((n) => n + 1)
+              }}
+            >
+              {t(locale, 'people.sibling.retryGroups')}
+            </Button>
+          </div>
+        ) : null}
         {(groups.length > 0
           ? groups.map((group) => ({ ...group, description: null, age_min: null, age_max: null, training_weekdays: [] as number[] }))
           : publicGroups

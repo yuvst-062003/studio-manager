@@ -162,6 +162,8 @@ export const people: Bundle = {
   'sibling.steps.declaration': 'You sign the health declaration',
   'sibling.steps.billing': 'Billing starts only after approval — nothing is charged yet',
   'sibling.ages': 'Ages {min}–{max}',
+  'sibling.noGroups': 'We could not load the group list. You can submit without choosing — the manager will place the child — or try again.',
+  'sibling.retryGroups': 'Reload',
   'sibling.title': 'Add another child',
   'join.title': 'Join the club — family registration',
   'directions.title': 'Getting here',
