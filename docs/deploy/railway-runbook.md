@@ -268,11 +268,36 @@ all-zero placeholder so the shape is documented without a usable key being commi
 ## Scheduled jobs
 
 [`infra/railway/jobs.json`](../../infra/railway/jobs.json) is the source of truth for
-what runs on a schedule and why; `tests/config/test_jobs_config.py` asserts every
-declared command points at a module that exists, so a rename fails the build rather
-than silently stopping a job.
+what runs on a schedule and why; `tests/config/test_jobs_config.py` asserts **both**
+directions — every declared command points at a module that exists, so a rename fails
+the build rather than silently stopping a job, and every runnable module is declared, so
+a worker cannot ship dead. The second half was added after four had: `billing`,
+`schedule`, `health_reminders` and `privacy` each had a `main()`, a `__main__` block and
+no cron entry anywhere.
 
-**Still manual:** Railway's cron is configured per service in the dashboard. Create a
-cron service in the `staging` environment for each entry in that file, using its
-`schedule` and `command` verbatim. This is the one half of the mechanism a test cannot
-reach — if the dashboard and the file disagree, the file is right.
+**Still manual, and this is the half that has actually been wrong:** Railway's cron is
+configured per service in the dashboard. Create a cron service for each entry in that
+file, in **the environment the entry's `environment` field names** — `demo-reset` is
+staging-only, the other seven are production — using its `schedule` and `command`
+verbatim. A `jobs.json` entry on its own schedules nothing. This is the one half of the
+mechanism no test can reach; if the dashboard and the file disagree, the file is right.
+
+Current entries, and where each must exist:
+
+| Job | Environment | Schedule (Asia/Jerusalem) |
+|---|---|---|
+| `demo-reset` | staging | `0 2 * * *` |
+| `plan-changes` | production | `30 2 * * *` |
+| `billing-run` | production | `30 8 * * *` |
+| `people-followups` | production | `0 9 * * *` |
+| `health-reminders` | production | `30 9 * * *` |
+| `comms-notify` | production | `*/15 * * * *` |
+| `sessions-complete` | production | `0 * * * *` |
+| `privacy-requests` | production | `20 * * * *` |
+
+The order of the first four is load-bearing, not cosmetic: `plan-changes` must apply a
+downgrade before `billing-run` bills the month, and `billing-run` and `health-reminders`
+must both sit after 08:00 because they enqueue notifications directly and `comms-notify`
+drains them within fifteen minutes — the quiet-hours refusal lives in `ReminderService`,
+which neither path goes through, so for those two the cron hour is the hour a parent's
+phone lights up.

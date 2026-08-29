@@ -20,10 +20,11 @@ The demo studio is included deliberately. §19.7's `exclude_demo_studios` guards
 *numbers*; this is a per-row status, and a status that lagged only in the demo studio would
 make the demo the one place the product looked broken.
 
-**Not yet scheduled.** `infra/railway/jobs.json` is the source of truth for cron and is not
-this lane's file; until an entry lands there this module runs only when invoked by hand.
-`tests/config/test_jobs_config.py` checks that declared jobs name real modules, not that
-every module is declared, so nothing here goes red about it — see the lane's report.
+**Scheduled hourly** as `sessions-complete` in `infra/railway/jobs.json`, which carries the
+argument for the hour. It was not, for a wave and a half: `tests/config/test_jobs_config.py`
+checked only that declared jobs name real modules and never the converse, so this file and
+three others sat runnable and uninvoked with a green build. That test now asserts both
+directions, which is the only reason this paragraph can be trusted to stay true.
 """
 
 from __future__ import annotations

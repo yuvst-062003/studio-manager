@@ -1152,6 +1152,34 @@ holdbacks:
     status: closed
     opened: 2026-08-26
     closed: 2026-08-26
+  - id: HB-privacy-worker-unbuilt
+    kind: conflict
+    title: §11.3's export bundle and §11.4's purge are seams that raise, and the job is scheduled anyway
+    why: >-
+      `app/routers/privacy.py`'s four endpoints, both request models and `app/workers/privacy.py`
+      all exist, which reads from the outside like a finished feature. The two functions that
+      would do the work were `TODO` comments with the success path written underneath them.
+
+      The export was protected from itself by accident: `data_export_request` carries
+      `(status = 'completed') = (object_key IS NOT NULL)`, so PostgreSQL rejects a claim of
+      success with no bundle. `deletion_request` has no equivalent and no equivalent can be
+      written — "the data is gone" is not a column. The stub therefore marked a §11.4 erasure
+      request `completed` having deleted nothing, and no constraint, screen, log line or audit
+      row downstream could catch it.
+
+      Both are now named seams that raise `NotImplementedError`, counted and reported the way
+      `app/workers/billing.py` handles W5's comms seam, and asserted by
+      tests/privacy/test_privacy_worker.py — which checks the subject's surviving row, not the
+      status the worker writes about itself.
+
+      The job is scheduled in that state on purpose. Unscheduled, a request sat `pending`
+      forever with nothing to look at; scheduled, it resolves to `failed` with a reason, which
+      is what the §11.3 status screen has to be able to show. This entry is open until the
+      bundle and the purge exist. Whoever builds the GDPR screen owns closing it — a screen
+      that reports `failed` honestly is shippable, a screen that reports `completed` is not.
+    blocks: M9 GDPR self-service
+    status: open
+    opened: 2026-08-29
   - id: HB-w3-manual-offline
     kind: carried
     title: The 90-minute real-device airplane-mode run has not happened
