@@ -41,7 +41,14 @@ const mainStyle: CSSProperties = {
   flex: 1,
 }
 
-const spacerStyle: CSSProperties = { marginInlineStart: 'auto' }
+/* Pushed to the inline-end — the far side from the nav, which in an RTL document is the
+   left. A flex row so the search and the studio switcher sit on one line. */
+const spacerStyle: CSSProperties = {
+  marginInlineStart: 'auto',
+  display: 'flex',
+  alignItems: 'center',
+  gap: 'var(--space-3)',
+}
 
 export function AppShell({
   title,
@@ -52,6 +59,7 @@ export function AppShell({
   locale,
   devBar,
   drawerFooter,
+  headerEnd,
   sideNav,
   tabBar,
   children,
@@ -64,6 +72,15 @@ export function AppShell({
   locale: Locale
   devBar?: ReactNode
   drawerFooter?: ReactNode
+  /**
+   * App-wide controls that belong to the CHROME rather than to a screen — the dashboard's
+   * global search. Rendered in the header on the inline-end, beside the studio switcher.
+   *
+   * It exists because the search was passed as a child and therefore rendered inside
+   * `<main>`: it moved with each screen's layout, sat in a different place on every one of
+   * them, and read as part of the page rather than as part of the app.
+   */
+  headerEnd?: ReactNode
   /** Desktop sidebar (dashboard). Hidden by its own CSS under 1024px. */
   sideNav?: ReactNode
   /** Bottom tab bar (phone apps). The main area pads itself so content clears it. A
@@ -108,6 +125,7 @@ export function AppShell({
             </button>
             <h1 style={titleStyle}>{title}</h1>
             <span style={spacerStyle}>
+              {headerEnd}
               {onSwitchStudio ? (
                 <StudioSwitcher
                   studios={studios}

@@ -188,6 +188,25 @@ optgroup {
   font-family: inherit;
 }
 
+/* Date and time fields are LTR everywhere, including inside an RTL document.
+ *
+ * `18:00` is an hour then a minute in every locale this product speaks — the order is the
+ * value's, not the page's. Chrome's UA stylesheet already forces this, which is exactly
+ * what makes it dangerous to leave implicit: the bug is invisible in the browser most of
+ * this was built in and shows up as `00:18` elsewhere (reported from the group-hours
+ * dialog, 2026-08-29). Thirty of these inputs are spread across fifteen files and none of
+ * them set `dir`; stating the rule once here is what keeps the thirty-first correct too.
+ *
+ * `text-align: start` so the digits still sit on the reading edge of an RTL form. */
+input[type="time"],
+input[type="date"],
+input[type="datetime-local"],
+input[type="month"],
+input[type="week"] {
+  direction: ltr;
+  text-align: start;
+}
+
 :focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;

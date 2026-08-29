@@ -535,6 +535,10 @@ export default function App() {
           title={session.activeStudioName ?? ''}
           items={canSeeMoney ? NAV : NAV.filter((entry) => !MANAGER_ONLY_KEYS.has(entry.key))}
           locale={locale}
+          // F9 — one search, every screen, keyboard-reachable ('/'). Manager-only, like the
+          // route behind it. In the CHROME rather than in the page: as a child of the shell
+          // it rendered inside <main> and moved with each screen's layout.
+          headerEnd={canSeeMoney ? <GlobalSearch locale={locale} /> : null}
           sideNav={
             <SideNav
               label={t(locale, 'common.nav.menu')}
@@ -583,9 +587,6 @@ export default function App() {
             />
           }
         >
-          {/* F9 — one search, every screen, keyboard-reachable ('/'). Manager-only,
-              like the route behind it. */}
-          {canSeeMoney ? <GlobalSearch locale={locale} /> : null}
           {/* F10 — a typed hash for a forbidden route refuses gracefully instead of
               rendering a broken screen: the doors match the nav. */}
           {!canSeeMoney && MANAGER_ONLY_ROUTES.has(route) ? (

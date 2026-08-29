@@ -71,7 +71,7 @@ export type DashboardBillingClient = {
     payerPersonId: string
     amountAgorot: number
     receivedAt: string
-    method: 'cash' | 'bank_transfer' | 'standing_order' | 'credit_adjustment'
+    method: 'cash' | 'cheque' | 'bank_transfer' | 'standing_order' | 'credit_adjustment'
     note?: string
   }): Promise<{ allocated: number; unallocatedAgorot: number }>
   unmatched(): Promise<UpayIpnRecordOut[]>

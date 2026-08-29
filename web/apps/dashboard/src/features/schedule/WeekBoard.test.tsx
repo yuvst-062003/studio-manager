@@ -93,7 +93,10 @@ describe('weekStart', () => {
 describe('WeekBoard (3a)', () => {
   it('draws seven day columns', async () => {
     render(<WeekBoard locale="he" client={stub()} today="2026-11-03T12:00:00Z" />)
-    await waitFor(() => expect(screen.getAllByRole('gridcell')).toHaveLength(7))
+    // Seven columns, ruled into hours: the cell count is days × hours, so the column count
+    // is what this asserts. Cells are counted by the hour-axis tests below.
+    await waitFor(() => expect(screen.getAllByRole('columnheader')).toHaveLength(8))
+    expect(screen.getAllByTestId(/^week-day-/)).toHaveLength(7)
   })
 
   it('files a session under its Jerusalem day, not its UTC day', async () => {
@@ -220,7 +223,7 @@ describe('WeekBoard (3a)', () => {
 
   it('marks today for a screen reader as well as visually', async () => {
     render(<WeekBoard locale="he" client={stub()} today="2026-11-03T12:00:00Z" />)
-    await waitFor(() => expect(screen.getAllByRole('gridcell')).toHaveLength(7))
+    await waitFor(() => expect(screen.getAllByTestId(/^week-day-/)).toHaveLength(7))
     expect(screen.getByTestId('week-day-2026-11-03')).toHaveAttribute('aria-current', 'date')
   })
 
@@ -495,11 +498,24 @@ describe('WeekBoard · 3a', () => {
     expect(screen.getByTestId('week-slot-17:00')).toBeInTheDocument()
   })
 
-  it('collapses two classes at the same hour into one row, not two', async () => {
-    const sameHour: SessionRow = { ...TUESDAY_EVENING, id: 'p1', starts_at: '2026-11-05T15:00:00Z', ends_at: '2026-11-05T17:00:00Z' }
-    render(<WeekBoard locale="he" client={stub([TUESDAY_EVENING, sameHour])} today="2026-11-03T12:00:00Z" />)
+  it('collapses two classes at the same hour into one cell, not two rows', async () => {
+    // Two groups in different halls within one hour is real, and they belong side by side
+    // in that hour's cell. The hour also appears exactly ONCE on the axis, however many
+    // classes fall in it — which is the half that used to break when rows were derived
+    // from the distinct start times present.
+    const sameHour: SessionRow = {
+      ...TUESDAY_EVENING,
+      id: 'p1',
+      starts_at: '2026-11-03T15:30:00Z',
+      ends_at: '2026-11-03T17:00:00Z',
+    }
+    render(
+      <WeekBoard locale="he" client={stub([TUESDAY_EVENING, sameHour])} today="2026-11-03T12:00:00Z" />,
+    )
     await screen.findByTestId('week-slot-17:00')
-    expect(screen.getAllByRole('rowheader')).toHaveLength(1)
+    expect(screen.getAllByTestId(HOUR_ROW).filter((n) => n.textContent === '17:00')).toHaveLength(1)
+    const cell = document.querySelector('[data-testid="week-cell-2026-11-03-17:00"]')
+    expect(cell?.querySelectorAll('[data-testid="session-block"]')).toHaveLength(2)
   })
 
   it('puts a session in the cell for its day AND its time', async () => {
@@ -516,8 +532,9 @@ describe('WeekBoard · 3a', () => {
       <WeekBoard locale="he" client={stub()} today="2026-11-03T12:00:00Z" />,
     )
     await screen.findByTestId('session-block')
-    // Seven days, one slot: seven cells, six of them holding no class.
-    expect(container.querySelectorAll('[role="gridcell"]')).toHaveLength(7)
+    // Seven days across a fixed hour axis, so the row for 17:00 is seven cells wide with
+    // six of them holding no class.
+    expect(container.querySelectorAll('[data-slot="17:00"][role="gridcell"]')).toHaveLength(7)
     const saturday = container.querySelector('[data-testid="week-cell-2026-11-07-17:00"]')
     expect(saturday).not.toBeNull()
     // Empty of CLASSES — not of children. Since 2026-08-29 an empty cell also carries the
@@ -783,5 +800,84 @@ describe('WeekBoard · D5 three views', () => {
     const header = await screen.findByRole('banner')
     expect(header).not.toHaveTextContent('2026-12-05')
     expect(header.textContent).toMatch(/2026/)
+  })
+})
+
+// ── the hour axis (2026-08-29) ──────────────────────────────────────────────────────
+/** The hour rowheaders only — `week-slot-action-*` shares the prefix and is not a row. */
+const HOUR_ROW = /^week-slot-\d{2}:\d{2}$/
+
+describe('the time grid is an axis, not a summary of what is already there', () => {
+  it('rules an EMPTY week into clickable hours', async () => {
+    // The rows used to be derived from the start times the week actually contained, so a
+    // week with no sessions had no rows at all: seven day headings above nothing. That is
+    // also why "click an empty cell to create" could not work — the cell for 18:00 only
+    // appeared once something already started at 18:00, which is the one case where you
+    // do not need to create anything. Reported as two separate bugs; one cause.
+    render(<WeekBoard locale="he" client={stub([])} today="2026-11-03T12:00:00Z" />)
+    await waitFor(() => expect(screen.getAllByTestId(HOUR_ROW).length).toBeGreaterThan(6))
+    // And every hour of the empty week offers a way to start a session there.
+    expect(screen.getByTestId('week-slot-action-2026-11-03-18:00')).toBeInTheDocument()
+  })
+
+  it('keeps the axis stable whatever the week contains', async () => {
+    const { rerender } = render(
+      <WeekBoard locale="he" client={stub([])} today="2026-11-03T12:00:00Z" />,
+    )
+    const empty = (await screen.findAllByTestId(HOUR_ROW)).map((n) => n.textContent)
+    rerender(<WeekBoard locale="he" client={stub([TUESDAY_EVENING])} today="2026-11-03T12:00:00Z" />)
+    await screen.findByTestId('session-block')
+    const filled = screen.getAllByTestId(HOUR_ROW).map((n) => n.textContent)
+    // A club whose classes all sit inside the default window sees the same ruler either
+    // way — the grid must not jump under the manager when a session is added or removed.
+    expect(filled).toEqual(empty)
+  })
+
+  it('widens the axis to reach a session outside the default window', async () => {
+    // A club training at 06:00 must still see its class. The window is a default, not a
+    // ceiling — hard-coding the artboard's four times would have stranded exactly this.
+    const dawn: SessionRow = { ...TUESDAY_EVENING, id: 'dawn', starts_at: '2026-11-03T04:00:00Z' }
+    render(<WeekBoard locale="he" client={stub([dawn])} today="2026-11-03T12:00:00Z" />)
+    expect(await screen.findByTestId('week-slot-06:00')).toBeInTheDocument()
+  })
+
+  it('files a session on the half hour into its own hour row', async () => {
+    // 18:30 belongs on the 18:00 rule. Keying cells by the exact start time is what made
+    // the axis ragged and gave every distinct minute its own row.
+    const halfPast: SessionRow = {
+      ...TUESDAY_EVENING,
+      id: 'half',
+      starts_at: '2026-11-03T16:30:00Z',
+    }
+    const { container } = render(
+      <WeekBoard locale="he" client={stub([halfPast])} today="2026-11-03T12:00:00Z" />,
+    )
+    await screen.findByTestId('session-block')
+    expect(
+      container.querySelector('[data-slot="18:00"] [data-testid="session-block"]'),
+    ).not.toBeNull()
+    // The block still says when it really starts.
+    expect(screen.getByTestId('session-block')).toHaveTextContent('18:30')
+  })
+})
+
+describe('the grid gives its columns to the view that is showing', () => {
+  it('draws one full-width column in the day view, not one seventh and six dead tracks', async () => {
+    // `grid-template-columns` was hard-coded to seven, so the day view drew its single
+    // column at a seventh of the width with six empty tracks stretching beside it. The
+    // grid was correct and looked broken.
+    const { container } = render(
+      <WeekBoard locale="he" client={stub()} today="2026-11-03T12:00:00Z" />,
+    )
+    await screen.findByTestId('session-block')
+    const grid = container.querySelector<HTMLElement>('.week-grid')
+    expect(grid?.style.getPropertyValue('--week-columns')).toBe('7')
+
+    await userEvent.click(screen.getByRole('radio', { name: t('he', 'schedule.view.day') }))
+    await waitFor(() =>
+      expect(
+        container.querySelector<HTMLElement>('.week-grid')?.style.getPropertyValue('--week-columns'),
+      ).toBe('1'),
+    )
   })
 })

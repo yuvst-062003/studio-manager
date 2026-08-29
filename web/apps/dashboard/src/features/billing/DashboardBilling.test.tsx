@@ -124,6 +124,34 @@ describe('3e — collections', () => {
     expect(screen.getByTestId('record-payment-surplus')).toBeInTheDocument()
   })
 
+  it('records a CHEQUE, which is the route the dialogue could not express', async () => {
+    // `payment.method` has allowed 'cheque' since W4 and `ManualPaymentIn` accepts it;
+    // the promises panel already asks a family whether they will bring cash or cheques.
+    // The dialogue that actually records the money hard-coded `method: 'cash'`, so every
+    // cheque a club took was filed as cash and §10's question — "how much is sitting in
+    // undeposited cheques" — could never be answered from the data (reported 2026-08-29).
+    const recordPayment = vi.fn().mockResolvedValue({ allocated: 1, unallocatedAgorot: 0 })
+    renderCollections({ client: stub({ recordPayment }) })
+    await userEvent.click(screen.getAllByTestId('record-cash')[0]!)
+    await userEvent.click(screen.getByTestId('payment-method-cheque'))
+    await userEvent.type(screen.getByLabelText(t(LOCALE, 'billing.payment.amount')), '320')
+    await userEvent.type(screen.getByLabelText(t(LOCALE, 'billing.payment.date')), '2026-11-12')
+    await userEvent.click(screen.getByTestId('record-payment-submit'))
+    expect(recordPayment).toHaveBeenCalledWith(expect.objectContaining({ method: 'cheque' }))
+  })
+
+  it('offers the routes a club actually takes money by, and defaults to cash', async () => {
+    renderCollections()
+    await userEvent.click(screen.getAllByTestId('record-cash')[0]!)
+    for (const method of ['cash', 'cheque', 'bank_transfer']) {
+      expect(screen.getByTestId(`payment-method-${method}`)).toBeInTheDocument()
+    }
+    // A card is never recorded by hand — uPay's IPN writes those, and a manual one would
+    // be a second source of truth for money that already has one.
+    expect(screen.queryByTestId('payment-method-upay_card')).toBeNull()
+    expect(screen.getByTestId('payment-method-cash')).toBeChecked()
+  })
+
   it('puts invariant 5 in words on the charge-generation button', async () => {
     // 3e finding 2. `billing.run.idempotentHint` IS invariant 5 written for the manager, on
     // the single most consequential button on the dashboard — and the artboard draws it with
