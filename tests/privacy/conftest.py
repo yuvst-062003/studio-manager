@@ -113,7 +113,14 @@ def _make_caller(
                 studio_id=studio.id,
                 student_id=guardian_of,
                 person_id=person.id,
-                is_primary=True,
+                # **Not primary, and the fixtures could not make it primary if they wanted
+                # to**: `uq_guardian_one_primary_per_student` is a partial unique index and
+                # every child in these fixtures already has a primary guardian (the payer).
+                # It is also the stronger fixture. §5.3: "All guardians are equal" -- there
+                # is no permission branching on `is_primary` anywhere in the product, so a
+                # privacy check that passed only for the primary would be a bug this
+                # caller is shaped to catch.
+                is_primary=False,
                 relation="parent",
             )
         )
@@ -131,6 +138,17 @@ def as_owner(client, fake_provider, app_session, studio) -> Caller:
 @pytest.fixture
 def as_manager(client, fake_provider, app_session, studio) -> Caller:
     return _make_caller(client, fake_provider, app_session, studio, role="manager")
+
+
+@pytest.fixture
+def as_stranger(client, fake_provider, app_session, studio) -> Caller:
+    """Signed in, in this studio, and nobody's guardian and nothing's manager.
+
+    §6.1 step 5's gate is answered by whoever is holding the phone, so every consent and
+    every subject-access route needs a caller who is authenticated and still entitled to
+    nothing. `role=None` and `guardian_of=None` is exactly that person.
+    """
+    return _make_caller(client, fake_provider, app_session, studio, role=None)
 
 
 @pytest.fixture
@@ -242,6 +260,31 @@ def a_family_with_data(
 
     app_session.commit()
     return tuple(students)
+
+
+@pytest.fixture
+def as_guardian(
+    client,
+    fake_provider,
+    app_session,
+    studio,
+    a_family_with_data: tuple[PricedStudent, PricedStudent],
+) -> Caller:
+    """A guardian of the first child in `a_family_with_data`.
+
+    §6.1's blocking consent gate and §11.3's "a guardian requests everything held about
+    their students" are both answered by this person and by nobody else in the fixtures --
+    `as_manager` holds a role, and §3.3 makes a guardian a `guardian` row rather than a
+    role, which is why `_make_caller` takes `guardian_of` instead of another role string.
+    """
+    return _make_caller(
+        client,
+        fake_provider,
+        app_session,
+        studio,
+        role=None,
+        guardian_of=a_family_with_data[0].student_id,
+    )
 
 
 @pytest.fixture

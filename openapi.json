@@ -2034,6 +2034,118 @@
         "title": "ClosureOut",
         "type": "object"
       },
+      "ConsentGrantIn": {
+        "description": "`version` is the one the CLIENT rendered, not a suggestion.\n\nA mismatch is a 409: recording the server's current version for a screen that showed\nthe previous one is how a consent ledger comes to hold agreements nobody made.",
+        "properties": {
+          "grants": {
+            "additionalProperties": {
+              "type": "boolean"
+            },
+            "minProperties": 1,
+            "title": "Grants",
+            "type": "object"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "grants"
+        ],
+        "title": "ConsentGrantIn",
+        "type": "object"
+      },
+      "ConsentRecordOut": {
+        "description": "One decision in §11.6's ledger. Never an aggregate: two acceptances are two rows.",
+        "properties": {
+          "consent_type": {
+            "title": "Consent Type",
+            "type": "string"
+          },
+          "granted": {
+            "title": "Granted",
+            "type": "boolean"
+          },
+          "granted_at": {
+            "title": "Granted At",
+            "type": "string"
+          },
+          "revoked_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked At"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "consent_type",
+          "version",
+          "granted",
+          "granted_at",
+          "revoked_at"
+        ],
+        "title": "ConsentRecordOut",
+        "type": "object"
+      },
+      "ConsentStateOut": {
+        "description": "What §6.1 step 5's gate reads, and what the privacy screen renders.\n\n`policy_is_draft` and `policy_version_label` are on the wire rather than hardcoded in\nthe client so the draft banner cannot be left behind on a screen after the reviewed\ntext lands. The banner is data.",
+        "properties": {
+          "outstanding": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Outstanding",
+            "type": "array"
+          },
+          "policy_is_draft": {
+            "title": "Policy Is Draft",
+            "type": "boolean"
+          },
+          "policy_version": {
+            "title": "Policy Version",
+            "type": "integer"
+          },
+          "policy_version_label": {
+            "title": "Policy Version Label",
+            "type": "string"
+          },
+          "records": {
+            "items": {
+              "$ref": "#/components/schemas/ConsentRecordOut"
+            },
+            "title": "Records",
+            "type": "array"
+          },
+          "required": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Required",
+            "type": "array"
+          }
+        },
+        "required": [
+          "policy_version",
+          "policy_version_label",
+          "policy_is_draft",
+          "required",
+          "outstanding",
+          "records"
+        ],
+        "title": "ConsentStateOut",
+        "type": "object"
+      },
       "CursorPage_AnnouncementOut_": {
         "properties": {
           "has_more": {
@@ -2859,7 +2971,7 @@
         "title": "CursorPage[UpayIpnRecordOut]",
         "type": "object"
       },
-      "DataExportRequest": {
+      "DataExportRequestIn": {
         "description": "Request to export a person's personal data.",
         "properties": {
           "include_audit_trail": {
@@ -2876,12 +2988,23 @@
         "required": [
           "person_id"
         ],
-        "title": "DataExportRequest",
+        "title": "DataExportRequestIn",
         "type": "object"
       },
       "DataExportResponse": {
         "description": "Response with export job status.",
         "properties": {
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
           "expires_at": {
             "anyOf": [
               {
@@ -2935,7 +3058,7 @@
         "title": "DebtReminderIn",
         "type": "object"
       },
-      "DeletionRequest": {
+      "DeletionRequestIn": {
         "description": "Request to delete a person's personal data.",
         "properties": {
           "person_id": {
@@ -2952,7 +3075,7 @@
           "person_id",
           "reason"
         ],
-        "title": "DeletionRequest",
+        "title": "DeletionRequestIn",
         "type": "object"
       },
       "DeletionResponse": {
@@ -2962,6 +3085,17 @@
             "format": "uuid",
             "title": "Deletion Id",
             "type": "string"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
           },
           "person_id": {
             "format": "uuid",
@@ -7494,6 +7628,113 @@
           "active_to"
         ],
         "title": "PricePlanOut",
+        "type": "object"
+      },
+      "PrivacyRequestOut": {
+        "description": "One row of §11.3's \"where is my export\" list, and of §16's operator queue.\n\n`has_bundle` and not `object_key`: §8.1 keeps the bundle in object storage and the key\nis the pointer to a child's complete record. A screen needs to know whether a download\nexists, and the download is authorised per request rather than by holding the key.",
+        "properties": {
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "has_bundle": {
+            "title": "Has Bundle",
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "requested_by_person_id": {
+            "format": "uuid",
+            "title": "Requested By Person Id",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "subject_person_id": {
+            "format": "uuid",
+            "title": "Subject Person Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "subject_person_id",
+          "requested_by_person_id",
+          "status",
+          "error",
+          "reason",
+          "has_bundle",
+          "created_at",
+          "completed_at"
+        ],
+        "title": "PrivacyRequestOut",
+        "type": "object"
+      },
+      "PrivacyRequestsOut": {
+        "properties": {
+          "deletions": {
+            "items": {
+              "$ref": "#/components/schemas/PrivacyRequestOut"
+            },
+            "title": "Deletions",
+            "type": "array"
+          },
+          "exports": {
+            "items": {
+              "$ref": "#/components/schemas/PrivacyRequestOut"
+            },
+            "title": "Exports",
+            "type": "array"
+          }
+        },
+        "required": [
+          "exports",
+          "deletions"
+        ],
+        "title": "PrivacyRequestsOut",
         "type": "object"
       },
       "ProductIn": {
@@ -19665,15 +19906,77 @@
         ]
       }
     },
+    "/api/v1/privacy/consents": {
+      "get": {
+        "description": "What §6.1 step 5's blocking gate reads, about the CALLER and nobody else.\n\nNo `person_id` parameter, deliberately. A consent is a thing a person did, and a route\nthat could report anyone's would be a route whose authorisation rule had to be argued\nfor. The operator's view of another person's consents belongs on §16's screen, reading\n§11.2's audit trail.",
+        "operationId": "read_consents_api_v1_privacy_consents_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsentStateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Read Consents",
+        "tags": [
+          "privacy"
+        ]
+      },
+      "post": {
+        "description": "Append §6.1 step 5's acceptance -- one row per consent, never an update.\n\nA withdrawal is the same call with `false`, and it puts the gate back in front of the\napp. That is the honest consequence and not a bug: without the privacy consent the\nproduct may not process the family's data, and \"a consent that cannot be withdrawn is\nnot consent\" (`ConsentRecord`'s docstring).",
+        "operationId": "grant_consents_api_v1_privacy_consents_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConsentGrantIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsentStateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Grant Consents",
+        "tags": [
+          "privacy"
+        ]
+      }
+    },
     "/api/v1/privacy/delete": {
       "post": {
-        "description": "Request deletion of a person's personal data.\n\nEnqueues a task to delete data within retention window constraints\n(e.g., financial records retained per Israeli law).\n\nReturns a deletion tracking ID for status checks.",
+        "description": "§11.4 -- the subject, their guardian, or a manager acting for either.\n\nEnqueues a task to delete data within retention window constraints (financial records\nare retained per Israeli law and the person is anonymized rather than deleted). The\nworker's `purge_subject_data` raises until it is built, so this request will end\n`failed` -- which is what `GET /privacy/requests` reports and what the screen shows.",
         "operationId": "request_deletion_api_v1_privacy_delete_post",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/DeletionRequest"
+                "$ref": "#/components/schemas/DeletionRequestIn"
               }
             }
           },
@@ -19709,7 +20012,7 @@
     },
     "/api/v1/privacy/delete/{deletion_id}": {
       "get": {
-        "description": "Poll status of a deletion request.",
+        "description": "Poll status of a deletion request. Authorised against its subject -- see `/export/{id}`.",
         "operationId": "get_deletion_status_api_v1_privacy_delete__deletion_id__get",
         "parameters": [
           {
@@ -19753,13 +20056,13 @@
     },
     "/api/v1/privacy/export": {
       "post": {
-        "description": "Request GDPR data export for a person.\n\nReturns a job ID. Client polls `/export/{job_id}` to check status.\nData is available for download when status is 'ready'.\n\nQuery parameters:\n- include_audit_trail: whether to include audit logs (default: true)",
+        "description": "§11.3 -- the subject, their guardian, or a manager acting for either.\n\nReturns a job ID. Client polls `/export/{job_id}`, or reads `/privacy/requests`, which\nneeds no id kept in browser state.",
         "operationId": "request_data_export_api_v1_privacy_export_post",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/DataExportRequest"
+                "$ref": "#/components/schemas/DataExportRequestIn"
               }
             }
           },
@@ -19795,7 +20098,7 @@
     },
     "/api/v1/privacy/export/{job_id}": {
       "get": {
-        "description": "Poll status of a data export job.",
+        "description": "Poll status of a data export job.\n\nAuthorised against the request's SUBJECT. Opening POST to guardians opens GET too, and\na UUID is a guess away -- answering with a status to anyone holding the id would make\nthe id itself the authorisation.",
         "operationId": "get_export_status_api_v1_privacy_export__job_id__get",
         "parameters": [
           {
@@ -19832,6 +20135,28 @@
           }
         },
         "summary": "Get Export Status",
+        "tags": [
+          "privacy"
+        ]
+      }
+    },
+    "/api/v1/privacy/requests": {
+      "get": {
+        "description": "§11.3's \"where is my export\", and §16's operator queue, from one route.\n\nA manager sees every request in the studio; anyone else sees their own subjects'. Both\nare answering the same question about a different scope, and two routes would be two\nauthorisation rules to keep in step.",
+        "operationId": "list_requests_api_v1_privacy_requests_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrivacyRequestsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Requests",
         "tags": [
           "privacy"
         ]

@@ -67,6 +67,10 @@ import {
   makeStaffCommsClient,
   registerCommsSections,
 } from './features/comms'
+// §16's operator view of §11.3 and §11.4. Nothing in either app rendered a `privacy.*`
+// string before this wave, so a complete he/en/ru copy set sat behind no screen and four
+// working endpoints sat behind no caller.
+import { PrivacyOperatorScreen, makeStaffPrivacyClient } from './features/privacy'
 import { StaffAlerts } from './StaffAlerts'
 import { DrawerIdentity, PermissionBoundaries } from './features/identity/DrawerIdentity'
 import { NetworkStatus } from './NetworkStatus'
@@ -155,6 +159,7 @@ export default function App() {
   const eventsClient = useMemo(() => makeStaffEventsClient(apiFetch), [])
   const attendanceClient = useMemo(() => makeStaffAttendanceClient(apiFetch), [])
   const commsClient = useMemo(() => makeStaffCommsClient(apiFetch), [])
+  const privacyClient = useMemo(() => makeStaffPrivacyClient(apiFetch), [])
   // §6.1 step 6 — "offline prime: today's and tomorrow's sessions + rosters are fetched and
   // written to IndexedDB BEFORE the coach reaches Today", and "the first launch BLOCKS on
   // this fetch". The gate below renders instead of the app while it runs.
@@ -203,6 +208,11 @@ export default function App() {
   const onInstall = hash === '#/install'
   const onCash = hash === '#/cash'
   const onJoinLink = hash === '#/join-link'
+  // §16's privacy queue. Manager-gated below with `#/cash` and `#/join-link`: a coach
+  // reading it would get an empty list — the endpoint scopes a non-manager to their OWN
+  // subjects — and an empty list on a screen titled "requests in this club" reads as
+  // "there are none", which is a different and worse claim than "not yours".
+  const onPrivacy = hash === '#/privacy'
   // 2026-08-28 — the way BACK into the wizard after a dismissal. Resolve routes an owner
   // in only on first run; the incomplete-setup banner needs a door that exists after it.
   const onSetup = hash === '#/setup'
@@ -287,6 +297,16 @@ export default function App() {
                   locale={locale}
                   canMoveStudents={membership?.roles.includes('lead_coach') ?? false}
                 />
+              ) : null}
+              {/* §16's privacy queue, in 9e's drawer — the same place the parent app puts
+                  its own privacy link. A link and not a NAV entry: NAV is the coach's four
+                  working surfaces, and this is an operator control. Manager-only, matching
+                  the route's own gate: a link a coach follows to a refusal is a link that
+                  teaches the app is broken. */}
+              {viewerIsManager ? (
+                <p style={{ margin: 0 }}>
+                  <a href="#/privacy">{t(locale, 'reports.privacy.requests.operatorTitle')}</a>
+                </p>
               ) : null}
               <AccountDrawerFooter locale={locale} onChooseLocale={setLocale} accountName={session.displayName} />
             </>
@@ -463,7 +483,9 @@ export default function App() {
               viewerPersonId={membership?.person_id}
               viewerIsCoach={viewerIsCoach}
             />
-          ) : session.access.staff && !viewerIsManager && (onCash || onJoinLink || onSetup) ? (
+          ) : session.access.staff &&
+            !viewerIsManager &&
+            (onCash || onJoinLink || onSetup || onPrivacy) ? (
             // S10 — restricted, said out loud. The gate used to fall through to the
             // date-picker screen, which made the app look broken rather than reserved.
             <EmptyState
@@ -477,6 +499,8 @@ export default function App() {
             <PaymentPromisesSection locale={locale} />
           ) : session.access.staff && viewerIsManager && onJoinLink ? (
             <JoinLinkSection locale={locale} />
+          ) : session.access.staff && viewerIsManager && onPrivacy ? (
+            <PrivacyOperatorScreen client={privacyClient} locale={locale} />
           ) : session.access.staff && onStudents ? (
             <StudentsSearch
               locale={locale}

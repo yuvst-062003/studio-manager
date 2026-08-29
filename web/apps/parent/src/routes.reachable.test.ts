@@ -93,6 +93,11 @@ describe('every routed screen is reachable from inside the app', () => {
     expect(routes.length).toBeGreaterThan(8)
     expect(routes).toContain('#/payments')
     expect(routes).toContain('#/events')
+    // §6.1 step 5's sibling screen. Named here and not left to the sweep below because
+    // this route is a subject's access, rectification and erasure rights — the ones §11.3
+    // and §11.4 owe them — and a screen nobody can find is a right nobody can exercise.
+    // Every other screen in this document shipped unreachable at least once.
+    expect(routes).toContain('#/privacy')
   })
 
   it.each([...routedHashes(readFileSync(APP, 'utf8'))])(

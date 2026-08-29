@@ -357,6 +357,17 @@ waves:
           offline queue that never flushed, and client_mark_id not being a UUID.
         status: shipped
         on: 2026-08-26
+      - id: W5.P1
+        title: >-
+          §6.1 step 5 — the BLOCKING consent gate, the terms and privacy policy text
+          (he/en/ru, an UNREVIEWED DRAFT recorded at consent_record.version = 0), and the
+          §11 privacy screen in the parent and staff apps. Before this, ConsentRecord was
+          constructed in exactly one place in the product and of the five CONSENT_TYPES
+          only `event` was ever written: no guardian had ever accepted terms or a privacy
+          policy, and no policy text existed in the repo in any language. The screen
+          reports `failed` honestly — see HB-privacy-worker-unbuilt, which stays open.
+        status: shipped
+        on: 2026-08-29
   - id: W6
     milestone: M10
     title: Rollover and polish
@@ -1177,6 +1188,13 @@ holdbacks:
       is what the §11.3 status screen has to be able to show. This entry is open until the
       bundle and the purge exist. Whoever builds the GDPR screen owns closing it — a screen
       that reports `failed` honestly is shippable, a screen that reports `completed` is not.
+
+      W5.P1 built that screen, in both apps, and it reports `failed` with the worker's own
+      reason — so the gap is now visible to the guardian who asked and to the operator who
+      has to answer them. The entry stays OPEN: a screen that says the erasure did not run
+      is not an erasure. `assemble_export_bundle` and `purge_subject_data` still raise, and
+      there is still no endpoint that could serve a bundle, which is why the parent screen
+      deliberately offers no download link.
     blocks: M9 GDPR self-service
     status: open
     opened: 2026-08-29
