@@ -1,0 +1,282 @@
+/* Artboard `4g` — דוחות. Layout and two charts, drawn with CSS grid and nothing else.
+ *
+ * **No charting library, deliberately.** These are bar charts with no axes, no tooltips
+ * and no legend beyond a swatch and a word. Every charting package in reach ships a
+ * layout engine, an SVG renderer, a colour scale and an animation loop to draw what a
+ * grid of `<div>`s with a percentage `block-size` already draws — and it would arrive
+ * with its own idea of direction, which is the one thing this screen cannot delegate.
+ * `4g`'s primitives table says it plainly: "No charting primitive exists, and none should
+ * be generic — build it in `reports`."
+ *
+ * **The RTL behaviour is inherited, not written.** Both charts lay their columns out with
+ * `grid-auto-flow: column`, which follows the document's inline direction: in Hebrew the
+ * first column lands on the right, which is exactly what `4g` asks for — "the earliest
+ * month at the reading start, the latest at the end … Do not reverse it", and the same
+ * for the belt ladder, lowest rank first. There is no positioning here to get wrong,
+ * which is why there is no physical property in this file either (D10).
+ *
+ * Every colour is a token except one, and that one is not in this file: belt fills are
+ * `belt_rank.color_hex`, per-studio DATA, and they arrive as an inline style. */
+
+.dash-reports {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.dash-reports__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+/* `4g`: "The header uses a flex: 1 spacer, not a float — logical and correct." */
+.dash-reports__spacer {
+  flex: 1;
+}
+
+.dash-reports__kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: var(--space-4);
+}
+
+/* Left panel wide, right column narrow — until the column is genuinely too narrow for a
+ * twelve-column chart, at which point stacking beats squeezing. */
+.dash-reports__body {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.dash-reports__side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+@media (width <= 60rem) {
+  .dash-reports__body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* -- the KPI tile ------------------------------------------------------------------
+ * Feature-specific, as `4g`'s primitives table says. `StatTile` is close and is the
+ * wrong shape here: it tones the VALUE, and `4g` tones the DELTA and leaves every figure
+ * in ink. */
+.dash-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.dash-kpi__label {
+  color: var(--text-secondary);
+  font-size: var(--text-label);
+  font-weight: var(--weight-medium);
+}
+
+.dash-kpi__value {
+  color: var(--fg);
+  font-size: var(--text-display);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-tight);
+  font-variant-numeric: tabular-nums;
+}
+
+.dash-kpi__delta {
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  align-items: baseline;
+}
+
+.dash-kpi__delta[data-tone='paid'] {
+  color: var(--paid);
+}
+
+.dash-kpi__delta[data-tone='danger'] {
+  color: var(--danger);
+}
+
+.dash-kpi__note {
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+}
+
+/* -- the legend, shared by both charts ---------------------------------------------- */
+.dash-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dash-legend__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.dash-legend__swatch {
+  inline-size: 0.75rem;
+  block-size: 0.75rem;
+  border-radius: var(--radius-sm);
+
+  /* Same reasoning as `BeltBar`'s unconditional ring: a swatch that is only a fill is
+   * invisible whenever the fill happens to match the ground. */
+  box-shadow: inset 0 0 0 var(--border-width-hairline) var(--border-strong);
+}
+
+/* -- the twelve-month stacked bar chart --------------------------------------------- */
+.dash-chart {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: var(--space-2);
+  align-items: end;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dash-chart__column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-inline-size: 0;
+}
+
+/* No y-axis and no per-bar label, by the artboard. The height is the whole encoding, so
+ * the track has to be tall enough for a difference to be visible at a glance. */
+.dash-chart__stack {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  block-size: 10rem;
+  border-block-end: var(--border-width-hairline) solid var(--border);
+}
+
+.dash-chart__segment {
+  inline-size: 100%;
+}
+
+.dash-chart__segment[data-part='collected'] {
+  background: var(--fg);
+}
+
+.dash-chart__segment[data-part='outstanding'] {
+  background: var(--danger);
+}
+
+.dash-chart__month {
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* -- retention ---------------------------------------------------------------------- */
+.dash-retention {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dash-retention__row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.dash-retention__label {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-size: var(--text-label);
+}
+
+.dash-retention__cohort {
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+}
+
+/* The weakest bucket, in `--danger`. One row, and only when a weakest bucket exists —
+ * the fill is a semantic statement ("this is the one to worry about"), not a highlight. */
+.dash-retention__row[data-weakest='true'] .studio-progress__fill {
+  background: var(--danger);
+}
+
+/* -- the belt distribution ----------------------------------------------------------
+ * ▲ THE ONE PLACE `4g` KNOWINGLY BREAKS THE MONOCHROME-PLUS-ONE-ACCENT RULE. Belt
+ * colours are data (D3, §5.9), configured per studio, and a promotions chart whose bars
+ * were not belt-coloured would be harder to read rather than more restrained. It is not a
+ * licence to colour anything else on this screen, and whoever ports this must carry the
+ * exception across deliberately. */
+.dash-belts {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: var(--space-2);
+  align-items: end;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dash-belts__column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-inline-size: 0;
+}
+
+.dash-belts__track {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  block-size: 8rem;
+}
+
+/* The ring is unconditional, exactly as in `BeltBar` — and, exactly as in `BeltBar`, it
+ * is written INLINE by the component rather than here. `BeltBar.test.tsx` gives the
+ * reason: "A stylesheet ring would be asserted nowhere: jsdom applies no CSS rules."
+ * D7's own table is why it has to be asserted somewhere: black on the dark ground is
+ * 1.02:1 and white on the light ground is 1.08:1, so a fill-only bar DISAPPEARS and the
+ * chart loses a column without telling anyone. The artboard rings only the near-white bar
+ * and leaves the black one bare; that is a bug in the drawing, and it is not reproduced. */
+.dash-belts__bar {
+  inline-size: 100%;
+}
+
+/* The artboard carries NO value labels at all, so a manager can compare heights and
+ * cannot read a count. The spec says to add the numbers, and this is them. */
+.dash-belts__count {
+  text-align: center;
+  font-size: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+  color: var(--fg);
+}
+
+.dash-belts__name {
+  text-align: center;
+  font-size: var(--text-caption);
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

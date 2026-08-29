@@ -717,6 +717,52 @@
         "title": "BeltPresetOut",
         "type": "object"
       },
+      "BeltPromotionOut": {
+        "description": "One bar of `קידומי חגורה בעונה`.\n\n▲ **This is the one place `4g` knowingly breaks the monochrome-plus-one-accent rule,\nand it is defensible**: belt colours are data (D3, §5.9), configured per studio in\n`belt_rank.color_hex`, not decoration chosen by a designer. A promotions chart whose\nbars were not belt-coloured would be harder to read, not more restrained. Whoever\nports this screen to another surface must carry the exception across deliberately —\nit is not a licence to colour anything else.\n\n`secondary_color_hex` rides along because `5b` allows bi-colour grades and a chart\nthat could not draw one would push the next lane into inventing its own bar.",
+        "properties": {
+          "belt_rank_id": {
+            "format": "uuid",
+            "title": "Belt Rank Id",
+            "type": "string"
+          },
+          "color_hex": {
+            "title": "Color Hex",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "order_index": {
+            "title": "Order Index",
+            "type": "integer"
+          },
+          "promotions": {
+            "title": "Promotions",
+            "type": "integer"
+          },
+          "secondary_color_hex": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Secondary Color Hex"
+          }
+        },
+        "required": [
+          "belt_rank_id",
+          "name",
+          "color_hex",
+          "order_index",
+          "promotions"
+        ],
+        "title": "BeltPromotionOut",
+        "type": "object"
+      },
       "BeltRankIn": {
         "properties": {
           "class_id": {
@@ -5668,6 +5714,100 @@
         "title": "ItemOrderOut",
         "type": "object"
       },
+      "KpiOut": {
+        "description": "`4g`'s KPI strip — four metrics, each a bare number plus a delta line.\n\n**Each predicate is spelled out here because each one has to be honest about the\npast**, and two of the obvious implementations are not:\n\n* `student.status` is a *current* column. Counting `status = 'active'` answers \"how\n  many are active now\", which is the same answer for every window a manager selects.\n  Membership is therefore read off the **dates**: a member on day D is a student with\n  `joined_on <= D` and (`left_on IS NULL` or `left_on > D`).\n* `session.status = 'completed'` is written by a worker that was never scheduled\n  until this wave, so every session that ended before this month is still\n  `scheduled`. Nothing here reads it — attendance comes from\n  `app/services/attendance/report.py`, which asks the clock instead.",
+        "properties": {
+          "active_students": {
+            "title": "Active Students",
+            "type": "integer"
+          },
+          "active_students_delta": {
+            "title": "Active Students Delta",
+            "type": "integer"
+          },
+          "attendance_decided_marks": {
+            "default": 0,
+            "title": "Attendance Decided Marks",
+            "type": "integer"
+          },
+          "attendance_percent": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attendance Percent"
+          },
+          "attendance_percent_delta": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attendance Percent Delta"
+          },
+          "attendance_unmarked_marks": {
+            "default": 0,
+            "title": "Attendance Unmarked Marks",
+            "type": "integer"
+          },
+          "avg_monthly_revenue_agorot": {
+            "title": "Avg Monthly Revenue Agorot",
+            "type": "integer"
+          },
+          "churn_permille": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Churn Permille"
+          },
+          "churn_permille_delta": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Churn Permille Delta"
+          },
+          "revenue_per_student_agorot": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revenue Per Student Agorot"
+          },
+          "undated_departures": {
+            "default": 0,
+            "title": "Undated Departures",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "active_students",
+          "active_students_delta",
+          "avg_monthly_revenue_agorot"
+        ],
+        "title": "KpiOut",
+        "type": "object"
+      },
       "LadderRankOut": {
         "description": "One rung, plus the two facts a ladder screen cannot render without.\n\nComposed rather than added to `BeltRankOut`, which is W4's contract and not this lane's\nto widen -- the same move `HealthTemplatePublishedOut` makes.\n\n`next_rank_id` is `events.belt.next` and `holders` is `5b`'s חניכים column, which is\nalso the data a delete refusal explains itself with.",
         "properties": {
@@ -6413,7 +6553,7 @@
         "type": "object"
       },
       "MonthlyReportSummary": {
-        "description": "Summary of charges in a billing period.",
+        "description": "Summary of charges in a billing period.\n\nMoved here verbatim from `app/routers/reports.py` so the overview can reuse it\nwithout a second shape saying the same thing. Same class name, so the OpenAPI\ncomponent name — and therefore the generated client — is unchanged.",
         "properties": {
           "overdue_agorot": {
             "title": "Overdue Agorot",
@@ -7469,6 +7609,48 @@
           "reason"
         ],
         "title": "PaymentReversalIn",
+        "type": "object"
+      },
+      "PeriodWindowOut": {
+        "description": "The window the server actually reported on, echoed back.\n\nEchoed for the reason `AttendanceReportOut` echoes its range: a client should render\nwhat it received rather than what it asked for. Here it matters more, because\n`season` resolves against a row the client has never seen.",
+        "properties": {
+          "from_date": {
+            "format": "date",
+            "title": "From Date",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "month",
+              "season",
+              "year"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "season_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Season Name"
+          },
+          "to_date": {
+            "format": "date",
+            "title": "To Date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "from_date",
+          "to_date"
+        ],
+        "title": "PeriodWindowOut",
         "type": "object"
       },
       "PlanChangeIn": {
@@ -8901,6 +9083,69 @@
         "title": "ReportDeliveryResponse",
         "type": "object"
       },
+      "ReportsOverviewOut": {
+        "description": "Artboard `4g`, whole.\n\n`period` is null exactly when the switcher asked for a season the studio does not\nhave. Everything else is then empty and the screen renders `reports.empty`.",
+        "properties": {
+          "belts": {
+            "items": {
+              "$ref": "#/components/schemas/BeltPromotionOut"
+            },
+            "title": "Belts",
+            "type": "array"
+          },
+          "billing_month": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MonthlyReportSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "has_data": {
+            "default": false,
+            "title": "Has Data",
+            "type": "boolean"
+          },
+          "kpi": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KpiOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "period": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PeriodWindowOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "retention": {
+            "items": {
+              "$ref": "#/components/schemas/RetentionBucketOut"
+            },
+            "title": "Retention",
+            "type": "array"
+          },
+          "revenue": {
+            "items": {
+              "$ref": "#/components/schemas/RevenueMonthOut"
+            },
+            "title": "Revenue",
+            "type": "array"
+          }
+        },
+        "title": "ReportsOverviewOut",
+        "type": "object"
+      },
       "ResendOut": {
         "description": "How many sends `[ שלח שוב ]` could actually retry.\n\nA count and not a boolean, because it is frequently zero and the screen has to say so.\nOnly `failed` rows are retryable — see `DeliveryReporter.retry_failed` — so a report\nshowing five misses that are all `denied` retries nothing, and a button that claimed\notherwise would be lying to a manager in a hurry.",
         "properties": {
@@ -8913,6 +9158,97 @@
           "retried_count"
         ],
         "title": "ResendOut",
+        "type": "object"
+      },
+      "RetentionBucketOut": {
+        "description": "One row of `שימור לפי ותק` — a survival rate, with its cohort printed.\n\n**Per-bucket survival, not cumulative retention.** \"Of the students who reached this\nmuch tenure, how many made it through to the end of the bucket.\" The cumulative form\n— share of everyone still here — is monotonically non-decreasing *by construction*,\nso it says \"early churn is worst\" whatever the data does, which is a chart that\ncannot be wrong and cannot teach anything either.\n\n**`cohort` excludes anyone who has not had time to fail.** A child who joined last\nmonth has not survived three months and has not failed to; counting them as a loss\nwould make the first bar sink every time the club recruited. The exclusion is why\n`cohort` is published beside `percent`: a 100% bar over a cohort of two is a\ndifferent fact from a 100% bar over a cohort of eighty.",
+        "properties": {
+          "cohort": {
+            "title": "Cohort",
+            "type": "integer"
+          },
+          "key": {
+            "enum": [
+              "m0_3",
+              "m3_6",
+              "m6_12",
+              "m12_plus"
+            ],
+            "title": "Key",
+            "type": "string"
+          },
+          "lower_months": {
+            "title": "Lower Months",
+            "type": "integer"
+          },
+          "percent": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Percent"
+          },
+          "retained": {
+            "title": "Retained",
+            "type": "integer"
+          },
+          "upper_months": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Upper Months"
+          }
+        },
+        "required": [
+          "key",
+          "lower_months",
+          "cohort",
+          "retained"
+        ],
+        "title": "RetentionBucketOut",
+        "type": "object"
+      },
+      "RevenueMonthOut": {
+        "description": "One column of `הכנסות מול חוב`.\n\n**The spec's finding 3, decided.** The chart compares collected against *debt\nremaining* while `financial.collectedVsExpected` compares against *expected*; those\nare two different numbers under one heading. Both are here, and the stack is\ncollected-plus-outstanding so the column height is the billed total and the split is\nthe answer to \"how much of it arrived\".\n\n`collected` is the sum of `payment_allocation`, not of charges whose status is\n`settled`: that is what `BillingService.payer_balance` counts, and it is the only one\nof the two that shows a half-paid month as half paid.",
+        "properties": {
+          "billed_agorot": {
+            "title": "Billed Agorot",
+            "type": "integer"
+          },
+          "collected_agorot": {
+            "title": "Collected Agorot",
+            "type": "integer"
+          },
+          "month": {
+            "title": "Month",
+            "type": "integer"
+          },
+          "outstanding_agorot": {
+            "title": "Outstanding Agorot",
+            "type": "integer"
+          },
+          "year": {
+            "title": "Year",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "year",
+          "month",
+          "billed_agorot",
+          "collected_agorot",
+          "outstanding_agorot"
+        ],
+        "title": "RevenueMonthOut",
         "type": "object"
       },
       "RolloverAnnounceIn": {
@@ -22002,6 +22338,126 @@
           }
         },
         "summary": "Get Monthly Report",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/{studio_id}/overview": {
+      "get": {
+        "description": "Artboard `4g` — the KPI strip, the twelve-month revenue trend, retention by tenure\nand the belt-promotion distribution, in one round trip.\n\n**One request rather than five.** The five panels are one question asked of one\nwindow, and five endpoints would let the period switcher drive them out of step for a\nframe — the argument `GET /attendance/report` already makes for `4c`.\n\n**`ManagerOrOwner`.** §3.2 puts studio-wide figures and `Export data` on owner and\nmanager only, and the CSV button sitting beside this data is the same. A coach's view\nof attendance is the register itself.\n\nA season the studio does not have answers **200 with a null period**, not 404: \"no\ndata for the selected period\" is a state `reports.empty` is written for, and a screen\nthat showed an error there would be telling a manager something broke when nothing\ndid.",
+        "operationId": "get_overview_api_v1_reports__studio_id__overview_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "studio_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Studio Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "month | season | year",
+            "in": "query",
+            "name": "period",
+            "required": false,
+            "schema": {
+              "default": "month",
+              "description": "month | season | year",
+              "enum": [
+                "month",
+                "season",
+                "year"
+              ],
+              "title": "Period",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportsOverviewOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Overview",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/{studio_id}/overview.csv": {
+      "get": {
+        "description": "`ייצוא CSV` — the same numbers, as a file, synchronously.\n\n§11.3's five-state export request is a different object for a different job; see\n`app/services/reports/csv_export.py`. This one is built and returned in the request\nthat asked for it, over the same window the screen is showing, so a manager can never\ndownload a period other than the one they are looking at.",
+        "operationId": "export_overview_csv_api_v1_reports__studio_id__overview_csv_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "studio_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Studio Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "month | season | year",
+            "in": "query",
+            "name": "period",
+            "required": false,
+            "schema": {
+              "default": "month",
+              "description": "month | season | year",
+              "enum": [
+                "month",
+                "season",
+                "year"
+              ],
+              "title": "Period",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Export Overview Csv",
         "tags": [
           "reports"
         ]

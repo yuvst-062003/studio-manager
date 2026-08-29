@@ -63,14 +63,22 @@ def test_a_skipped_gate_says_so_out_loud():
     worker, a test directory and three apps' worth of screens -- so every gate in it has
     targets and nothing is skipped.
 
-    `reports` is the vertical with gaps now: lane REPORTS (M9) opens after this one merges, so
-    it has an i18n namespace, two files the `reports|privacy` branch already names, and no
-    `tests/reports/` and no frontend. When M9 fills it in, move this to whichever vertical is
-    then pending -- or, if none is, point it at a vertical that genuinely owns no frontend and
-    say so here.
+    **Re-pointed a third time by lane REPORTS (M9)**, and this time to the case the
+    paragraph above names as the terminal one: "if none is, point it at a vertical that
+    genuinely owns no frontend and say so here." `reports` now has `tests/reports/`, a
+    service package, two feature directories and CSS, so nothing in it is skipped either.
+
+    `structure` is that vertical, and it is not a temporary gap. SPEC gives M2 no feature
+    directory of its own -- the schedule screens live under `features/schedule/`, which
+    belongs to a different vertical -- so `lane-check.sh structure` skips its frontend, its
+    eslint and its CSS gates by design and will keep doing so. That makes it a stable
+    subject for a test about the SCRIPT's honesty rather than about any lane's progress,
+    which is what this test has always actually been about. There is nowhere left to move
+    it to, and there should not need to be.
     """
-    stdout = _run("reports", "--dry-run").stdout
+    stdout = _run("structure", "--dry-run").stdout
     assert "skipped" in stdout
+    assert "no frontend tests for structure" in stdout
 
 
 def test_a_fully_built_vertical_skips_nothing():
@@ -79,10 +87,19 @@ def test_a_fully_built_vertical_skips_nothing():
     `billing` is complete after M6, so every gate in it now has targets. If this ever goes
     red, a path the lane owns has gone missing -- which is the failure the `skipped` line
     exists to make visible, seen from the other side.
+
+    `reports` joins it after M9. It is worth naming explicitly rather than trusting the
+    absence of `skipped`, because this lane's own service layer was invisible to the gate
+    for a whole milestone: `py_candidates` tests `-e "app/services/reports"` and the code
+    lived in `app/services/reports.py`, a FILE, so `lane-check.sh reports` type-checked and
+    linted nothing in it and still printed green. Turning it into a package is what closed
+    that, and a lane whose sources go missing again fails here.
     """
-    stdout = _run("billing", "--dry-run").stdout
-    assert "skipped" not in stdout, stdout
-    assert "7 scoped gates" in stdout
+    for vertical in ("billing", "reports"):
+        stdout = _run(vertical, "--dry-run").stdout
+        assert "skipped" not in stdout, stdout
+        assert "7 scoped gates" in stdout
+        assert f"app/services/{vertical}" in stdout, stdout
 
 
 def test_it_runs_the_frontend_tools_from_inside_the_web_workspace():

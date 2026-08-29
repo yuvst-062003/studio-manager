@@ -270,4 +270,54 @@ export const reports: Bundle = {
   'send.confirm': 'Отправить',
   'send.cancel': 'Отмена',
   'send.done': 'Отчёт отправлен на почту',
+
+  // -- artboard `4g`'s own strings; see he/reports.ts for what each finding settles ----
+  'period.month': 'Месяц',
+  'period.season': 'Сезон',
+  'period.year': 'Год',
+  'period.seasonMissing': 'Активный сезон не задан',
+
+  'overview.churn': 'Ежемесячный отток',
+  'overview.avgMonthlyRevenue': 'Средний доход за месяц',
+  'overview.avgAttendance': 'Средняя посещаемость',
+  'overview.noValue': 'Нет данных',
+
+  'delta.sincePeriodStart': 'с начала периода',
+  'delta.vsPrevious': 'к предыдущему периоду',
+  'delta.perStudent': 'на ученика',
+  'delta.noChange': 'Без изменений',
+  'delta.noComparison': 'Нет предыдущего периода для сравнения',
+
+  'attendance.decidedCount': 'из {{count}} учтённых отметок',
+  'attendance.unmarkedCount': '{{count}} отметок не проставлены',
+  'attendance.noData': 'Нет данных о посещаемости за период',
+
+  'financial.collectedVsDebt': 'Доход и задолженность',
+  'financial.billed': 'Начислено',
+  'financial.outstanding': 'Остаток долга',
+  'financial.chartBasis': 'Высота столбца — вся сумма начислений за месяц',
+  'financial.chartLabel': 'Доход и задолженность по месяцам',
+  'financial.monthSummary': 'Итоги начислений за {{month}}',
+
+  'retention.title': 'Удержание по стажу',
+  'retention.basis': 'Из тех, кто достиг этого стажа, — сколько дошли до его конца',
+  'retention.bucket.m0_3': 'До 3 месяцев',
+  'retention.bucket.m3_6': '3–6 месяцев',
+  'retention.bucket.m6_12': '6–12 месяцев',
+  'retention.bucket.m12_plus': 'Больше года',
+  'retention.cohort': 'Выборка: {{count}}',
+  'retention.noCohort': 'Пока недостаточно стажа',
+  'retention.weakest': 'Самый слабый интервал',
+  'retention.insightEarly':
+    'Большинство уходов приходится на первые три месяца — там и стоит вести наблюдение.',
+  'retention.undatedDepartures': '{{count}} уходов без даты не учитываются',
+
+  'belts.title': 'Присвоения поясов за период',
+  'belts.chartLabel': 'Присвоения поясов по степеням',
+  'belts.promotions': '{{count}} присвоений',
+  'belts.empty': 'За период пояса не присваивались',
+
+  'export.failed': 'Экспорт не удался. Попробуйте ещё раз.',
+  'export.nothing': 'Нечего экспортировать',
+
 }

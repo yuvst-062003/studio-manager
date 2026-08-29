@@ -372,6 +372,25 @@ waves:
           reports `failed` honestly — see HB-privacy-worker-unbuilt, which stays open.
         status: shipped
         on: 2026-08-29
+      - id: W5.P2
+        title: >-
+          §5.14 and artboard `4g` — the reports screen the reports milestone never had.
+          `app/services/reports/` did not exist as a package, so `lane-check.sh reports`
+          type-checked and linted NOTHING in this lane's service layer and still printed
+          green; it is a package now, and the gate reaches it. It also carried a dead
+          bucket: `monthly_summary` compared `charge.status` against `'paid'`, which is not
+          one of the four values the CHECK constraint allows, so `נגבה` has read ₪0 for
+          every studio since the screen shipped. Built on top: `GET /reports/{id}/overview`
+          and its synchronous CSV — a three-way period switcher backed by `training_year`
+          for `עונה`, a KPI strip of active students / churn / average revenue / average
+          attendance, a twelve-month revenue-versus-debt stacked bar, retention by tenure
+          and a belt-promotion distribution. No charting dependency: CSS grid and
+          percentage heights, which is what a bar chart with no axes is. Every metric is
+          date-based rather than status-based so it is honest for past months, attendance
+          reuses lane ATTENDANCE's decided-marks rule rather than restating it, and §5.14
+          is now said out loud beside the figure it governs.
+        status: shipped
+        on: 2026-08-30
   - id: W6
     milestone: M10
     title: Rollover and polish

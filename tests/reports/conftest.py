@@ -21,15 +21,20 @@ from __future__ import annotations
 import uuid
 from collections.abc import Iterator
 from dataclasses import dataclass
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
 from app.core.db import get_engine
 from app.core.tenancy import TenantSession, use_studio
+from app.models.attendance import Attendance
+from app.models.belts import BeltRank
 from app.models.billing import Charge, PricePlan
 from app.models.identity import AuthIdentity
 from app.models.people import Student
 from app.models.person import Guardian, Person, RoleAssignment
+from app.models.schedule import Session as SessionRow
+from app.models.schedule import TrainingYear
+from app.models.structure import Class, Group
 from app.models.studio import Studio
 from fastapi.testclient import TestClient
 from sqlalchemy import select
@@ -284,3 +289,124 @@ def tenant_session(studio: Studio) -> Iterator[TenantSession]:
     """
     with use_studio(studio.id), TenantSession(bind=get_engine(), expire_on_commit=False) as s:
         yield s
+
+
+# ── artboard `4g`'s fixtures ─────────────────────────────────────────────────────────
+# The four money cards above answer a billing question. `4g` asks four different ones —
+# members, churn, revenue and attendance — plus retention and belt promotions, and none
+# of them can be arranged out of charges alone.
+
+
+@pytest.fixture
+def a_training_year(app_session: Session, studio: Studio) -> TrainingYear:
+    """The season. §5.15 allows exactly one ACTIVE year per studio, which is what makes
+    `period=season` resolvable without a setting anybody has to configure."""
+    row = TrainingYear(
+        studio_id=studio.id,
+        name="תשפ״ז",
+        starts_on=YEAR_STARTS,
+        ends_on=date(2027, 8, 31),
+        status="active",
+    )
+    app_session.add(row)
+    app_session.commit()
+    return row
+
+
+@pytest.fixture
+def a_group(app_session: Session, studio: Studio) -> Group:
+    klass = Class(studio_id=studio.id, name=f"ג'ודו {uuid.uuid4().hex[:6]}")
+    app_session.add(klass)
+    app_session.flush()
+    group = Group(studio_id=studio.id, class_id=klass.id, name="מתחילים", kind="base")
+    app_session.add(group)
+    app_session.commit()
+    return group
+
+
+@pytest.fixture
+def a_belt_ladder(app_session: Session, studio: Studio) -> list[BeltRank]:
+    """Three ranks, deliberately created out of order.
+
+    `4g`'s belt chart runs lowest rank at the reading start, so the service must order by
+    `order_index` rather than by insertion — a fixture that inserted them in order could
+    not tell the difference.
+    """
+    klass = Class(studio_id=studio.id, name=f"סולם {uuid.uuid4().hex[:6]}")
+    app_session.add(klass)
+    app_session.flush()
+    ranks = [
+        BeltRank(
+            studio_id=studio.id, class_id=klass.id, name=name, order_index=order, color_hex=color
+        )
+        for name, order, color in (
+            ("שחורה", 2, "#17150f"),
+            ("לבנה", 0, "#fffefb"),
+            ("צהובה", 1, "#d9a800"),
+        )
+    ]
+    app_session.add_all(ranks)
+    app_session.commit()
+    return sorted(ranks, key=lambda rank: rank.order_index)
+
+
+def make_member(
+    app_session: Session,
+    studio: Studio,
+    *,
+    joined_on: date,
+    left_on: date | None = None,
+    status: str = "active",
+) -> Student:
+    """A student placed on a timeline. `4g`'s membership predicate reads these two dates
+    and never `status`, so every test here sets them explicitly."""
+    person = Person(studio_id=studio.id, first_name="חניך", last_name=uuid.uuid4().hex[:6])
+    app_session.add(person)
+    app_session.flush()
+    student = Student(
+        studio_id=studio.id,
+        person_id=person.id,
+        status=status,
+        joined_on=joined_on,
+        left_on=left_on,
+    )
+    app_session.add(student)
+    app_session.commit()
+    return student
+
+
+def make_session(
+    app_session: Session, studio: Studio, group: Group, year: TrainingYear, *, starts_at: datetime
+) -> SessionRow:
+    row = SessionRow(
+        studio_id=studio.id,
+        group_id=group.id,
+        training_year_id=year.id,
+        starts_at=starts_at,
+        ends_at=starts_at + timedelta(hours=1),
+        # Left as `scheduled` ON PURPOSE. The worker that writes `completed` was never
+        # scheduled until this wave, so every session that ended before this month is
+        # still `scheduled` in any real database — a fixture that pre-completed its
+        # sessions would test a shape production does not have.
+        status="scheduled",
+    )
+    app_session.add(row)
+    app_session.commit()
+    return row
+
+
+def mark(
+    app_session: Session, studio: Studio, session_row: SessionRow, student: Student, status: str
+) -> None:
+    app_session.add(
+        Attendance(
+            studio_id=studio.id,
+            session_id=session_row.id,
+            student_id=student.id,
+            status=status,
+            marked_at=T0,
+            device_marked_at=T0,
+            client_mark_id=uuid.uuid4(),
+        )
+    )
+    app_session.commit()

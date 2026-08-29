@@ -318,4 +318,83 @@ export const reports: Bundle = {
   'send.confirm': 'שליחה',
   'send.cancel': 'ביטול',
   'send.done': 'הדוח נשלח למייל',
+
+  // ==================================================================================
+  // Artboard `4g`'s own strings — the design pass that gave this screen its charts.
+  //
+  // Nothing under `privacy.*` above is touched: that family is §11's kit, landed by the
+  // same milestone's other half, and it lives here only because `types.ts` lists exactly
+  // nine namespaces.
+  //
+  // Three of `4g`'s ten findings are settled by the keys below:
+  //
+  //  - **Finding 2 — the switcher and `period.*` are different taxonomies.** The artboard
+  //    draws `חודש / עונה / שנה`; the namespace carried `thisMonth`, `lastMonth`,
+  //    `last12Months` and `custom`. The artboard wins, because `עונה` turns out to have a
+  //    model (`training_year`) while `custom` implies a range control this screen does not
+  //    draw. The four old values stay, unused by `4g`.
+  //  - **Finding 4 — retention is in the title and had no key family.** It has one now,
+  //    and its four buckets are an enum, the shape `billing.debt.aging.*` already models
+  //    for debt.
+  //  - **Finding 8 — the footnote is an insight, not a label.** Decided as AUTHORED copy
+  //    shown only when the data says it: `retention.insightEarly` renders only while the
+  //    first bucket really is the weakest. A generated sentence would be an untranslatable
+  //    Hebrew string the i18n layer cannot reach.
+  // ==================================================================================
+  'period.month': 'חודש',
+  'period.season': 'עונה',
+  'period.year': 'שנה',
+  'period.seasonMissing': 'לא הוגדרה עונה פעילה',
+
+  'overview.churn': 'נשירה חודשית',
+  'overview.avgMonthlyRevenue': 'הכנסה חודשית ממוצעת',
+  'overview.avgAttendance': 'נוכחות ממוצעת',
+  'overview.noValue': 'אין נתון',
+
+  // The delta line under each KPI. Every one of them is a comparison against the previous
+  // period or a per-student figure — never against a target. `4g` prints `מעל היעד (2.5%)`
+  // and a churn target has no key, no column and no setting (finding 7), so this screen
+  // does not pretend to have one.
+  'delta.sincePeriodStart': 'מתחילת התקופה',
+  'delta.vsPrevious': 'לעומת התקופה הקודמת',
+  'delta.perStudent': 'לחניך',
+  'delta.noChange': 'ללא שינוי',
+  'delta.noComparison': 'אין תקופה קודמת להשוואה',
+
+  // §5.14 beside the figure, not only inside it — finding 5. `attendance.unmarkedExcluded`
+  // above existed and nothing used it; these two put a number next to the sentence.
+  'attendance.decidedCount': 'מתוך {{count}} סימונים שהוכרעו',
+  'attendance.unmarkedCount': '{{count}} סימונים לא הושלמו',
+  'attendance.noData': 'אין נתוני נוכחות לתקופה',
+
+  // Finding 3 — the chart compares collected against DEBT, and
+  // `financial.collectedVsExpected` above compares against EXPECTED. Two different
+  // numbers under one heading, so the chart gets the heading that describes it.
+  'financial.collectedVsDebt': 'הכנסות מול חוב',
+  'financial.billed': 'חויב',
+  'financial.outstanding': 'נותר בחוב',
+  'financial.chartBasis': 'גובה העמודה הוא סך החיוב באותו חודש',
+  'financial.chartLabel': 'הכנסות מול חוב, לפי חודש',
+  'financial.monthSummary': 'סיכום החיוב לחודש {{month}}',
+
+  'retention.title': 'שימור לפי ותק',
+  'retention.basis': 'מתוך מי שהגיע לוותק הזה — כמה נשארו עד סופו',
+  'retention.bucket.m0_3': 'עד 3 חודשים',
+  'retention.bucket.m3_6': '3–6 חודשים',
+  'retention.bucket.m6_12': '6–12 חודשים',
+  'retention.bucket.m12_plus': 'מעל שנה',
+  'retention.cohort': 'מדגם {{count}}',
+  'retention.noCohort': 'אין עדיין ותק מספיק',
+  'retention.weakest': 'הוותק החלש ביותר',
+  'retention.insightEarly': 'רוב הנשירה מתרחשת בשלושת החודשים הראשונים — שם כדאי למקד מעקב.',
+  'retention.undatedDepartures': '{{count}} עזיבות ללא תאריך אינן נכללות בחישוב',
+
+  'belts.title': 'קידומי חגורה בתקופה',
+  'belts.chartLabel': 'קידומי חגורה לפי דרגה',
+  'belts.promotions': '{{count}} קידומים',
+  'belts.empty': 'לא הוענקו חגורות בתקופה',
+
+  'export.failed': 'הייצוא נכשל. נסו שוב.',
+  'export.nothing': 'אין נתונים לייצוא',
+
 }

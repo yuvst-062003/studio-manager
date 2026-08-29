@@ -3386,6 +3386,65 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/reports/{studio_id}/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Overview
+         * @description Artboard `4g` — the KPI strip, the twelve-month revenue trend, retention by tenure
+         *     and the belt-promotion distribution, in one round trip.
+         *
+         *     **One request rather than five.** The five panels are one question asked of one
+         *     window, and five endpoints would let the period switcher drive them out of step for a
+         *     frame — the argument `GET /attendance/report` already makes for `4c`.
+         *
+         *     **`ManagerOrOwner`.** §3.2 puts studio-wide figures and `Export data` on owner and
+         *     manager only, and the CSV button sitting beside this data is the same. A coach's view
+         *     of attendance is the register itself.
+         *
+         *     A season the studio does not have answers **200 with a null period**, not 404: "no
+         *     data for the selected period" is a state `reports.empty` is written for, and a screen
+         *     that showed an error there would be telling a manager something broke when nothing
+         *     did.
+         */
+        get: operations["get_overview_api_v1_reports__studio_id__overview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/{studio_id}/overview.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Overview Csv
+         * @description `ייצוא CSV` — the same numbers, as a file, synchronously.
+         *
+         *     §11.3's five-state export request is a different object for a different job; see
+         *     `app/services/reports/csv_export.py`. This one is built and returned in the request
+         *     that asked for it, over the same window the screen is showing, so a manager can never
+         *     download a period other than the one they are looking at.
+         */
+        get: operations["export_overview_csv_api_v1_reports__studio_id__overview_csv_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/reports/{studio_id}/send-monthly": {
         parameters: {
             query?: never;
@@ -5211,6 +5270,37 @@ export interface components {
             name: string;
             /** Ranks */
             ranks: components["schemas"]["BeltRankPresetOut"][];
+        };
+        /**
+         * BeltPromotionOut
+         * @description One bar of `קידומי חגורה בעונה`.
+         *
+         *     ▲ **This is the one place `4g` knowingly breaks the monochrome-plus-one-accent rule,
+         *     and it is defensible**: belt colours are data (D3, §5.9), configured per studio in
+         *     `belt_rank.color_hex`, not decoration chosen by a designer. A promotions chart whose
+         *     bars were not belt-coloured would be harder to read, not more restrained. Whoever
+         *     ports this screen to another surface must carry the exception across deliberately —
+         *     it is not a licence to colour anything else.
+         *
+         *     `secondary_color_hex` rides along because `5b` allows bi-colour grades and a chart
+         *     that could not draw one would push the next lane into inventing its own bar.
+         */
+        BeltPromotionOut: {
+            /**
+             * Belt Rank Id
+             * Format: uuid
+             */
+            belt_rank_id: string;
+            /** Color Hex */
+            color_hex: string;
+            /** Name */
+            name: string;
+            /** Order Index */
+            order_index: number;
+            /** Promotions */
+            promotions: number;
+            /** Secondary Color Hex */
+            secondary_color_hex?: string | null;
         };
         /** BeltRankIn */
         BeltRankIn: {
@@ -7451,6 +7541,55 @@ export interface components {
             total_agorot: number;
         };
         /**
+         * KpiOut
+         * @description `4g`'s KPI strip — four metrics, each a bare number plus a delta line.
+         *
+         *     **Each predicate is spelled out here because each one has to be honest about the
+         *     past**, and two of the obvious implementations are not:
+         *
+         *     * `student.status` is a *current* column. Counting `status = 'active'` answers "how
+         *       many are active now", which is the same answer for every window a manager selects.
+         *       Membership is therefore read off the **dates**: a member on day D is a student with
+         *       `joined_on <= D` and (`left_on IS NULL` or `left_on > D`).
+         *     * `session.status = 'completed'` is written by a worker that was never scheduled
+         *       until this wave, so every session that ended before this month is still
+         *       `scheduled`. Nothing here reads it — attendance comes from
+         *       `app/services/attendance/report.py`, which asks the clock instead.
+         */
+        KpiOut: {
+            /** Active Students */
+            active_students: number;
+            /** Active Students Delta */
+            active_students_delta: number;
+            /**
+             * Attendance Decided Marks
+             * @default 0
+             */
+            attendance_decided_marks: number;
+            /** Attendance Percent */
+            attendance_percent?: number | null;
+            /** Attendance Percent Delta */
+            attendance_percent_delta?: number | null;
+            /**
+             * Attendance Unmarked Marks
+             * @default 0
+             */
+            attendance_unmarked_marks: number;
+            /** Avg Monthly Revenue Agorot */
+            avg_monthly_revenue_agorot: number;
+            /** Churn Permille */
+            churn_permille?: number | null;
+            /** Churn Permille Delta */
+            churn_permille_delta?: number | null;
+            /** Revenue Per Student Agorot */
+            revenue_per_student_agorot?: number | null;
+            /**
+             * Undated Departures
+             * @default 0
+             */
+            undated_departures: number;
+        };
+        /**
          * LadderRankOut
          * @description One rung, plus the two facts a ladder screen cannot render without.
          *
@@ -7771,6 +7910,10 @@ export interface components {
         /**
          * MonthlyReportSummary
          * @description Summary of charges in a billing period.
+         *
+         *     Moved here verbatim from `app/routers/reports.py` so the overview can reuse it
+         *     without a second shape saying the same thing. Same class name, so the OpenAPI
+         *     component name — and therefore the generated client — is unchanged.
          */
         MonthlyReportSummary: {
             /** Overdue Agorot */
@@ -8269,6 +8412,33 @@ export interface components {
         PaymentReversalIn: {
             /** Reason */
             reason: string;
+        };
+        /**
+         * PeriodWindowOut
+         * @description The window the server actually reported on, echoed back.
+         *
+         *     Echoed for the reason `AttendanceReportOut` echoes its range: a client should render
+         *     what it received rather than what it asked for. Here it matters more, because
+         *     `season` resolves against a row the client has never seen.
+         */
+        PeriodWindowOut: {
+            /**
+             * From Date
+             * Format: date
+             */
+            from_date: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "month" | "season" | "year";
+            /** Season Name */
+            season_name?: string | null;
+            /**
+             * To Date
+             * Format: date
+             */
+            to_date: string;
         };
         /** PlanChangeIn */
         PlanChangeIn: {
@@ -8948,6 +9118,29 @@ export interface components {
             status: string;
         };
         /**
+         * ReportsOverviewOut
+         * @description Artboard `4g`, whole.
+         *
+         *     `period` is null exactly when the switcher asked for a season the studio does not
+         *     have. Everything else is then empty and the screen renders `reports.empty`.
+         */
+        ReportsOverviewOut: {
+            /** Belts */
+            belts?: components["schemas"]["BeltPromotionOut"][];
+            billing_month?: components["schemas"]["MonthlyReportSummary"] | null;
+            /**
+             * Has Data
+             * @default false
+             */
+            has_data: boolean;
+            kpi?: components["schemas"]["KpiOut"] | null;
+            period?: components["schemas"]["PeriodWindowOut"] | null;
+            /** Retention */
+            retention?: components["schemas"]["RetentionBucketOut"][];
+            /** Revenue */
+            revenue?: components["schemas"]["RevenueMonthOut"][];
+        };
+        /**
          * ResendOut
          * @description How many sends `[ שלח שוב ]` could actually retry.
          *
@@ -8959,6 +9152,65 @@ export interface components {
         ResendOut: {
             /** Retried Count */
             retried_count: number;
+        };
+        /**
+         * RetentionBucketOut
+         * @description One row of `שימור לפי ותק` — a survival rate, with its cohort printed.
+         *
+         *     **Per-bucket survival, not cumulative retention.** "Of the students who reached this
+         *     much tenure, how many made it through to the end of the bucket." The cumulative form
+         *     — share of everyone still here — is monotonically non-decreasing *by construction*,
+         *     so it says "early churn is worst" whatever the data does, which is a chart that
+         *     cannot be wrong and cannot teach anything either.
+         *
+         *     **`cohort` excludes anyone who has not had time to fail.** A child who joined last
+         *     month has not survived three months and has not failed to; counting them as a loss
+         *     would make the first bar sink every time the club recruited. The exclusion is why
+         *     `cohort` is published beside `percent`: a 100% bar over a cohort of two is a
+         *     different fact from a 100% bar over a cohort of eighty.
+         */
+        RetentionBucketOut: {
+            /** Cohort */
+            cohort: number;
+            /**
+             * Key
+             * @enum {string}
+             */
+            key: "m0_3" | "m3_6" | "m6_12" | "m12_plus";
+            /** Lower Months */
+            lower_months: number;
+            /** Percent */
+            percent?: number | null;
+            /** Retained */
+            retained: number;
+            /** Upper Months */
+            upper_months?: number | null;
+        };
+        /**
+         * RevenueMonthOut
+         * @description One column of `הכנסות מול חוב`.
+         *
+         *     **The spec's finding 3, decided.** The chart compares collected against *debt
+         *     remaining* while `financial.collectedVsExpected` compares against *expected*; those
+         *     are two different numbers under one heading. Both are here, and the stack is
+         *     collected-plus-outstanding so the column height is the billed total and the split is
+         *     the answer to "how much of it arrived".
+         *
+         *     `collected` is the sum of `payment_allocation`, not of charges whose status is
+         *     `settled`: that is what `BillingService.payer_balance` counts, and it is the only one
+         *     of the two that shows a half-paid month as half paid.
+         */
+        RevenueMonthOut: {
+            /** Billed Agorot */
+            billed_agorot: number;
+            /** Collected Agorot */
+            collected_agorot: number;
+            /** Month */
+            month: number;
+            /** Outstanding Agorot */
+            outstanding_agorot: number;
+            /** Year */
+            year: number;
         };
         /**
          * RolloverAnnounceIn
@@ -16196,6 +16448,74 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MonthlyReportSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_overview_api_v1_reports__studio_id__overview_get: {
+        parameters: {
+            query?: {
+                /** @description month | season | year */
+                period?: "month" | "season" | "year";
+            };
+            header?: never;
+            path: {
+                studio_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportsOverviewOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_overview_csv_api_v1_reports__studio_id__overview_csv_get: {
+        parameters: {
+            query?: {
+                /** @description month | season | year */
+                period?: "month" | "season" | "year";
+            };
+            header?: never;
+            path: {
+                studio_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

@@ -13,11 +13,16 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Query
+from fastapi.responses import Response
 from pydantic import BaseModel
 
 from app.core.auth_context import ManagerOrOwner
+from app.core.clock import now
 from app.core.tenancy import TenantSessionDep
-from app.services.reports import ReportService
+from app.services.reports import ReportService, build_overview
+from app.services.reports.csv_export import overview_csv, overview_filename
+from app.services.reports.periods import PeriodKind, Window
+from app.services.reports.schemas import MonthlyReportSummary, ReportsOverviewOut
 
 router = APIRouter(prefix="/reports", tags=["reports"])
 
@@ -27,18 +32,6 @@ class MonthlyReportParams(BaseModel):
 
     year: int
     month: int
-
-
-class MonthlyReportSummary(BaseModel):
-    """Summary of charges in a billing period."""
-
-    period_year: int
-    period_month: int
-    total_students: int
-    total_agorot: int
-    settled_agorot: int
-    overdue_agorot: int
-    pending_agorot: int
 
 
 class ChargeDetail(BaseModel):
@@ -168,3 +161,66 @@ def send_monthly_report(
             notification_id=None,
             status="failed",
         )
+
+
+# ── artboard `4g` — the whole screen, and the file version of it ─────────────────────
+#: `4g` draws `חודש / עונה / שנה`. See `app/services/reports/periods.py` for why the
+#: artboard's taxonomy won over `reports.period.*`'s four values.
+PeriodQuery = Annotated[PeriodKind, Query(description="month | season | year")]
+
+
+@router.get("/{studio_id}/overview", response_model=ReportsOverviewOut)
+def get_overview(
+    studio_id: uuid.UUID,
+    _: ManagerOrOwner,
+    session: TenantSessionDep,
+    period: PeriodQuery = "month",
+) -> ReportsOverviewOut:
+    """Artboard `4g` — the KPI strip, the twelve-month revenue trend, retention by tenure
+    and the belt-promotion distribution, in one round trip.
+
+    **One request rather than five.** The five panels are one question asked of one
+    window, and five endpoints would let the period switcher drive them out of step for a
+    frame — the argument `GET /attendance/report` already makes for `4c`.
+
+    **`ManagerOrOwner`.** §3.2 puts studio-wide figures and `Export data` on owner and
+    manager only, and the CSV button sitting beside this data is the same. A coach's view
+    of attendance is the register itself.
+
+    A season the studio does not have answers **200 with a null period**, not 404: "no
+    data for the selected period" is a state `reports.empty` is written for, and a screen
+    that showed an error there would be telling a manager something broke when nothing
+    did.
+    """
+    return build_overview(session, kind=period, now=now())
+
+
+@router.get("/{studio_id}/overview.csv")
+def export_overview_csv(
+    studio_id: uuid.UUID,
+    _: ManagerOrOwner,
+    session: TenantSessionDep,
+    period: PeriodQuery = "month",
+) -> Response:
+    """`ייצוא CSV` — the same numbers, as a file, synchronously.
+
+    §11.3's five-state export request is a different object for a different job; see
+    `app/services/reports/csv_export.py`. This one is built and returned in the request
+    that asked for it, over the same window the screen is showing, so a manager can never
+    download a period other than the one they are looking at.
+    """
+    overview = build_overview(session, kind=period, now=now())
+    if overview.period is None:
+        # Nothing to export, and an empty file with headers would be worse than none: it
+        # opens in Excel looking like a report of zeroes.
+        return Response(status_code=204)
+    window = Window(
+        kind=overview.period.kind,
+        from_date=overview.period.from_date,
+        to_date=overview.period.to_date,
+    )
+    return Response(
+        content=overview_csv(overview),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{overview_filename(window)}"'},
+    )

@@ -99,3 +99,78 @@ def test_send_monthly_report_as_manager(
     assert "status" in data
     # Either queued (if COMMS is available) or failed (if not implemented)
     assert data["status"] in ("queued", "failed")
+
+
+# ── artboard `4g`'s two endpoints ────────────────────────────────────────────────────
+
+
+def test_overview_is_one_round_trip_for_the_whole_screen(client, as_manager: Caller):
+    """Five panels, one request. Five endpoints would let the period switcher drive them
+    out of step for a frame — the argument `GET /attendance/report` makes for `4c`."""
+    response = client.get(
+        f"/api/v1/reports/{as_manager.studio_id}/overview?period=month",
+        headers=as_manager.headers,
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["period"]["kind"] == "month"
+    assert set(body) >= {"period", "kpi", "billing_month", "revenue", "retention", "belts"}
+    assert len(body["revenue"]) == 12
+
+
+def test_overview_defaults_to_the_month(client, as_manager: Caller):
+    response = client.get(
+        f"/api/v1/reports/{as_manager.studio_id}/overview", headers=as_manager.headers
+    )
+    assert response.status_code == 200
+    assert response.json()["period"]["kind"] == "month"
+
+
+def test_overview_rejects_a_period_that_is_not_one_of_the_three(client, as_manager: Caller):
+    response = client.get(
+        f"/api/v1/reports/{as_manager.studio_id}/overview?period=fortnight",
+        headers=as_manager.headers,
+    )
+    assert response.status_code == 422
+
+
+def test_overview_requires_a_manager(client):
+    response = client.get(
+        "/api/v1/reports/00000000-0000-0000-0000-000000000000/overview?period=month"
+    )
+    assert response.status_code == 401
+
+
+def test_a_season_the_studio_never_operated_in_is_a_null_period_not_a_404(
+    client, as_manager: Caller
+):
+    """`reports.empty` is written for exactly this, and an error would tell a manager
+    something broke when nothing did."""
+    response = client.get(
+        f"/api/v1/reports/{as_manager.studio_id}/overview?period=season",
+        headers=as_manager.headers,
+    )
+    assert response.status_code == 200
+    assert response.json()["period"] is None
+
+
+def test_the_csv_export_is_synchronous_and_attaches(client, as_manager: Caller):
+    """§11.3's five-state request object is a different thing for a different job; `4g`
+    says to treat this button as 'a simple synchronous action'."""
+    response = client.get(
+        f"/api/v1/reports/{as_manager.studio_id}/overview.csv?period=month",
+        headers=as_manager.headers,
+    )
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/csv")
+    assert "attachment" in response.headers["content-disposition"]
+    assert response.text.startswith("﻿")
+
+
+def test_the_csv_export_of_a_season_that_does_not_exist_is_no_content(client, as_manager: Caller):
+    """An empty file with headers opens in Excel looking like a report of zeroes."""
+    response = client.get(
+        f"/api/v1/reports/{as_manager.studio_id}/overview.csv?period=season",
+        headers=as_manager.headers,
+    )
+    assert response.status_code == 204

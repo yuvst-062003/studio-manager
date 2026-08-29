@@ -267,4 +267,54 @@ export const reports: Bundle = {
   'send.confirm': 'Send',
   'send.cancel': 'Cancel',
   'send.done': 'Report sent by email',
+
+  // -- artboard `4g`'s own strings; see he/reports.ts for what each finding settles ----
+  'period.month': 'Month',
+  'period.season': 'Season',
+  'period.year': 'Year',
+  'period.seasonMissing': 'No active season',
+
+  'overview.churn': 'Monthly churn',
+  'overview.avgMonthlyRevenue': 'Average monthly revenue',
+  'overview.avgAttendance': 'Average attendance',
+  'overview.noValue': 'No figure',
+
+  'delta.sincePeriodStart': 'since the period started',
+  'delta.vsPrevious': 'vs the previous period',
+  'delta.perStudent': 'per student',
+  'delta.noChange': 'No change',
+  'delta.noComparison': 'No previous period to compare',
+
+  'attendance.decidedCount': 'of {{count}} decided marks',
+  'attendance.unmarkedCount': '{{count}} marks left unmarked',
+  'attendance.noData': 'No attendance data for this period',
+
+  'financial.collectedVsDebt': 'Revenue vs debt',
+  'financial.billed': 'Billed',
+  'financial.outstanding': 'Still owed',
+  'financial.chartBasis': 'Each column is that month’s total billing',
+  'financial.chartLabel': 'Revenue vs debt, by month',
+  'financial.monthSummary': 'Billing summary for {{month}}',
+
+  'retention.title': 'Retention by tenure',
+  'retention.basis': 'Of those who reached this much tenure, how many made it to the end of it',
+  'retention.bucket.m0_3': 'Up to 3 months',
+  'retention.bucket.m3_6': '3–6 months',
+  'retention.bucket.m6_12': '6–12 months',
+  'retention.bucket.m12_plus': 'Over a year',
+  'retention.cohort': 'Cohort of {{count}}',
+  'retention.noCohort': 'Not enough tenure yet',
+  'retention.weakest': 'Weakest stretch',
+  'retention.insightEarly':
+    'Most departures happen in the first three months — that is where follow-up pays.',
+  'retention.undatedDepartures': '{{count}} departures carry no date and are excluded',
+
+  'belts.title': 'Belt promotions this period',
+  'belts.chartLabel': 'Belt promotions by rank',
+  'belts.promotions': '{{count}} promotions',
+  'belts.empty': 'No belts were awarded in this period',
+
+  'export.failed': 'The export failed. Try again.',
+  'export.nothing': 'Nothing to export',
+
 }
