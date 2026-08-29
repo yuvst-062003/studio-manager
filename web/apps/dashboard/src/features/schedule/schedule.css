@@ -1,0 +1,85 @@
+/* Artboard `3a` — the week board's coverage strip and its session-block states.
+ *
+ * Layout and state only; every value is a token. The block states are driven by a
+ * `data-coverage` attribute rather than a style object, so a state is one CSS rule and
+ * `3a`'s five appearances stay readable side by side. */
+
+.week-missing {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  font-size: var(--text-label);
+  color: var(--text-secondary);
+}
+
+.week-missing li {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-1);
+}
+
+/* The count is the part a manager scans; the label explains it. Tone colours the count
+ * only, so the strip does not become a row of coloured sentences. */
+.week-missing li > b {
+  font-size: var(--text-title);
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.week-missing li[data-tone="danger"] > b { color: var(--danger); }
+.week-missing li[data-tone="pending"] > b { color: var(--pending); }
+.week-missing li[data-tone="muted"] > b { color: var(--text-muted); }
+
+/* The block itself. This lived in a module-level `CSSProperties` applied inline — and an
+ * inline `border` beats any class, so the state rules below silently did nothing: the
+ * uncovered block rendered with the same hairline as a covered one even after it had a
+ * rule of its own. Layout in CSS, state in CSS, and the cascade works again. */
+.week-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  border: var(--border-width-hairline) solid var(--border);
+  font-size: var(--text-caption);
+  text-align: start;
+  cursor: pointer;
+}
+
+.week-block[data-coverage="cancelled"] {
+  background: var(--cancelled-tint);
+  color: var(--cancelled);
+  text-decoration: line-through;
+}
+
+/* `3a`'s block states. The shipped board drew two of the five, so a class with no coach
+ * looked exactly like a covered one — which is how two coachless classes sat unremarked
+ * on the 2026-08-28 staging capture. Border, not fill: the block already carries text on
+ * `--surface`, and tinting it would put body copy on a coloured ground at four different
+ * contrast ratios. */
+.week-block[data-coverage="uncovered"] {
+  border-color: var(--danger);
+  border-width: var(--border-width-strong);
+}
+
+.week-block[data-coverage="unmarked"] {
+  border-color: var(--pending);
+  border-style: dashed;
+}
+
+.week-block:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* The day-of-month beside the weekday name. Quieter than the name — it disambiguates the
+ * week, it is not what a manager reads first. */
+.week-day__date {
+  color: var(--text-muted);
+  font-weight: var(--weight-regular);
+  font-variant-numeric: tabular-nums;
+}

@@ -9,8 +9,11 @@ import type { ReactNode } from 'react'
  * column stops reading as a button and reads as a banner, and nothing in the stack is
  * visibly related to anything else.
  *
- * `subtitle` carries the studio name. It belongs here and **only** here: the shipped
- * dashboard renders `מועדון גלדיאטור` twice, once in the top bar and once in the nav.
+ * `subtitle` carries the studio name, or which week a board is showing. A node rather
+ * than a string because a range of dates has to arrive as `RangeText` — interpolating
+ * one into a string is how `2027-09-01 – 2026-09-01` reached staging. It belongs here
+ * and **only** here: the shipped dashboard renders `מועדון גלדיאטור` twice, once in the
+ * top bar and once in the nav.
  *
  * `actions` is a slot rather than a list of buttons, because a screen's action set is
  * that screen's business — this component owns the row, not its contents. Wrap them in
@@ -23,7 +26,7 @@ export function PageHeader({
   className,
 }: {
   title: string
-  subtitle?: string
+  subtitle?: ReactNode
   actions?: ReactNode
   className?: string
 }) {

@@ -27,6 +27,14 @@ export const schedule: Bundle = {
   'week.today': 'היום',
   'week.previous': 'שבוע קודם',
   'week.next': 'שבוע הבא',
+  // `3a`'s coverage strip — מה חסר השבוע. Counts are PARAMETERS, never joined into a
+  // sentence. Derived from the week's own sessions, not fetched: SessionRow already
+  // carries `staff` and `attendance_taken`.
+  'week.missing.title': 'מה חסר השבוע',
+  'week.missing.noCoach': 'שיעורים ללא מאמן',
+  'week.missing.unmarked': 'מפגשים ללא סימון נוכחות',
+  'week.missing.cancelled': 'בוטלו',
+  'week.missing.none': 'לא חסר כלום השבוע',
   'view.day': 'יום',
   'view.week': 'שבוע',
   'view.month': 'חודש',

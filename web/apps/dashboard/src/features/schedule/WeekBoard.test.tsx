@@ -407,3 +407,72 @@ describe('creating a session from the board (2026-08-28)', () => {
     )
   })
 })
+
+// The design pass (2026-08-29) — `3a`'s coverage strip, its block states, dated column
+// headings, and the header row that replaced four stacked ones.
+describe('WeekBoard · 3a', () => {
+  const UNCOVERED: SessionRow = { ...TUESDAY_EVENING, id: 'u1', staff: [] }
+  const CANCELLED: SessionRow = { ...TUESDAY_EVENING, id: 'c1', status: 'cancelled' }
+  const MARKED: SessionRow = { ...TUESDAY_EVENING, id: 'm1', attendance_taken: true }
+
+  it('marks an uncovered class differently from a covered one', async () => {
+    // The shipped board drew a class with nobody assigned exactly like a covered one,
+    // which is how two coachless classes sat unremarked on the staging capture.
+    render(<WeekBoard locale="he" client={stub([UNCOVERED, MARKED])} today="2026-11-03T12:00:00Z" />)
+    const blocks = await screen.findAllByTestId('session-block')
+    const coverage = blocks.map((b) => b.getAttribute('data-coverage'))
+    expect(coverage).toContain('uncovered')
+    expect(coverage).toContain('complete')
+  })
+
+  it('counts what is missing from the week already on screen, not from a second request', async () => {
+    // No coverage endpoint exists and none is needed: the sessions carry `staff` and
+    // `attendance_taken`, so a second source of truth would only be able to disagree.
+    render(
+      <WeekBoard locale="he" client={stub([UNCOVERED, CANCELLED])} today="2026-11-03T12:00:00Z" />,
+    )
+    expect(await screen.findByTestId('week-missing-no-coach')).toHaveTextContent('1')
+    expect(screen.getByTestId('week-missing-cancelled')).toHaveTextContent('1')
+  })
+
+  it('does not count a cancelled class as uncovered — a cancelled class needs no coach', async () => {
+    render(<WeekBoard locale="he" client={stub([CANCELLED])} today="2026-11-03T12:00:00Z" />)
+    await screen.findByTestId('week-missing-cancelled')
+    expect(screen.queryByTestId('week-missing-no-coach')).toBeNull()
+  })
+
+  it('says so when nothing is missing rather than showing an empty strip', async () => {
+    render(<WeekBoard locale="he" client={stub([MARKED])} today="2026-11-03T12:00:00Z" />)
+    expect(await screen.findByTestId('week-missing-none')).toBeInTheDocument()
+  })
+
+  it('heads each column with its date, so a manager knows which week they are on', async () => {
+    render(<WeekBoard locale="he" client={stub()} today="2026-11-03T12:00:00Z" />)
+    // The week of Tuesday 3 November 2026 starts on Sunday the 1st.
+    const sunday = await screen.findByTestId('week-day-2026-11-01')
+    expect(sunday.querySelector('.week-day__date')?.textContent).toBe('1')
+  })
+
+  it('holds a session time range in one ltr island', async () => {
+    // The staging board printed `15:00–14:00`: three text children in one span, laid out
+    // end-then-start by the RTL row around them.
+    render(<WeekBoard locale="he" client={stub()} today="2026-11-03T12:00:00Z" />)
+    const block = await screen.findByTestId('session-block')
+    const range = block.querySelector('.studio-range')
+    expect(range).toHaveAttribute('dir', 'ltr')
+    expect(range?.textContent).toBe('17:00–19:00')
+  })
+
+  it('puts the title, the week navigation and the one verb in a single header row', async () => {
+    // Four stacked rows before: a title, a FULL-WIDTH create button, and three bare
+    // <button> elements, none of them visibly related to the others.
+    const { container } = render(
+      <WeekBoard locale="he" client={stub()} today="2026-11-03T12:00:00Z" />,
+    )
+    const header = await screen.findByRole('banner')
+    expect(header).toContainElement(screen.getByTestId('week-today'))
+    expect(header).toContainElement(screen.getByTestId('session-create-open'))
+    // Navigation on one edge, the verb on the other — not six controls at one rank.
+    expect(container.querySelector('.studio-actionbar')).toHaveAttribute('data-align', 'between')
+  })
+})
