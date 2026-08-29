@@ -234,6 +234,29 @@ function AuthedApp() {
   // parent §6.5 worked hardest to keep.
   const [gatedChildren, setGatedChildren] = useState<readonly GatedStudent[] | null>(null)
   const [declarationsSigned, setDeclarationsSigned] = useState(0)
+  // `2a` §7's unread badge. Fetched by the SHELL and not by `InboxScreen`, because a badge
+  // that appeared only after the inbox had been opened would announce news the parent had
+  // just finished reading. `notificationsRead` bumps to re-fetch after the inbox marks
+  // anything read, so the badge clears without a reload.
+  const [unreadCount, setUnreadCount] = useState(0)
+  const [notificationsRead, setNotificationsRead] = useState(0)
+  useEffect(() => {
+    if (session.status !== 'signed-in') return
+    let alive = true
+    void apiFetch('/api/v1/notifications')
+      .then((response) =>
+        response.ok
+          ? (response.json() as Promise<{ items: { read_at: string | null }[] }>)
+          : { items: [] },
+      )
+      // A failed read is NO badge rather than a stale one: the count is a nudge, and a
+      // wrong nudge about unread mail is worse than none.
+      .then((data) => alive && setUnreadCount(data.items.filter((row) => row.read_at === null).length))
+      .catch(() => alive && setUnreadCount(0))
+    return () => {
+      alive = false
+    }
+  }, [session.status, notificationsRead])
   useEffect(() => {
     if (session.status !== 'signed-in') return
     let alive = true
@@ -377,6 +400,7 @@ function AuthedApp() {
                     href: '#/announcements',
                     icon: <Icon name="messages" size={20} />,
                     active: onAnnouncements,
+                    badge: unreadCount,
                   },
                   {
                     key: 'profile',
@@ -534,7 +558,11 @@ function AuthedApp() {
               studentId={invite[1]!}
             />
           ) : onAnnouncements ? (
-            <InboxScreen client={commsClient} locale={locale} />
+            <InboxScreen
+              client={commsClient}
+              locale={locale}
+              onReadChange={() => setNotificationsRead((n) => n + 1)}
+            />
           ) : onEvents ? (
             <ParentEventsScreen
               client={eventsClient}

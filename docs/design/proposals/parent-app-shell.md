@@ -52,16 +52,18 @@ code that shipped — not a preference.
 
 | # | Spec says | Shipped does | Evidence |
 |---|---|---|---|
-| 1 | `2a` §7 — four tabs, **with an unread badge on messages** | `TabBarItem` has `key · label · href · icon · active · onSelect` and no badge field at all. A parent with four unread announcements gets no signal. | `packages/ui/src/shell/TabBar.tsx:10-18` |
+| 1 | `2a` §7 — four tabs, **with an unread badge on messages** | ~~`TabBarItem` had no badge field at all, so a parent with four unread announcements got no signal.~~ **Built.** `TabBarItem.badge`; the shell fetches the count, `0` renders nothing, `>99` renders `99+`, and the number goes in the accessible name. | `packages/ui/src/shell/TabBar.tsx` |
 | 2 | `2a` §6 — the agenda row carries **a belt swatch** and **a trailing status chip** | Row is child name · group · time. Neither swatch nor chip. | `ParentHome.tsx` lesson row |
-| 3 | `2a` §6 — **rows sharing a time hide the repeated time label**, so concurrent lessons read as one block | Every row prints its own time. A family with two children at 16:30 sees 16:30 twice. | same |
-| 4 | `2a` §5 — the debt banner is **conditional on the selected day being today** | Rendered whenever `debtAgorot > 0`, on every day of the strip. | `ParentHome.tsx` — `{debtAgorot > 0 ? …}`, no day term |
+| 3 | `2a` §6 — **rows sharing a time hide the repeated time label**, so concurrent lessons read as one block | ~~Every row prints its own time.~~ **Built.** Hidden with `visibility`, not removed — the second lesson really is at that hour, so the fact stays in the tree for anyone who cannot see the alignment. | same |
+| 4 | `2a` §5 — the debt banner is **conditional on the selected day being today** | ~~Rendered on every day of the strip, so stepping back to last Tuesday asked the parent to pay for it.~~ **Built.** | `ParentHome.tsx` |
 | 5 | `2b` — four read/unread keys exist and **none of the four is expressed on the artboard** | Two of the four ship (`inbox.markAllRead`, `inbox.new`); `inbox.unread` and `inbox.markRead` are defined and rendered nowhere. So the artboard and the code disagree with each other *and* with the key set. | `2b` spec §"Read and unread"; `grep comms.inbox.* apps/parent/src` |
 | 6 | — | The profile tab is titled **חניכים** and its only per-child affordance is the destructive **עזיבת המועדון** | `#/profile`, measured |
 | 7 | — | The calendar's control row wraps prev/next, month/week and the absence link into one band; the month cells are `role=cell` with no button | `ChildCalendar.tsx` |
 
-1–4 are the ones a Stitch pass would most likely also reach independently, which is why
-running it is worth doing before building any of them.
+**1, 3 and 4 are built** — they are spec compliance, not composition, so they needed no
+adjudication. **2, 5, 6 and 7 are not**, and should not be until Stitch has run: each one
+is a question about arrangement or about which of two models is right, which is precisely
+what the precedence rule reserves for it.
 
 ## Regions — the shell
 
@@ -163,7 +165,7 @@ before this session and was not being used here:
 | Primitive | Why it is shared |
 |---|---|
 | `formatMonthLabel(year, month, locale)` in `@studio/core` | The calendar printed `2026-08` as its heading. Every month picker in the product needs this and none had it. Shipped. |
-| A badge on `TabBarItem` | Delta #1. The staff app's tab bar will want it too. **Not built.** |
+| `TabBarItem.badge` | Delta #1, shipped. The staff app's tab bar can now use it too. |
 
 ## i18n
 
@@ -182,9 +184,12 @@ which reads *"the club will get back to you after the lesson"* for a family whos
 not booked. Needs either a field on the students payload or a trial-booking read. The copy
 is wrong for the fallback branch either way and is a decision, not a fix.
 
-**The unread badge needs a count the shell does not fetch.** `App.tsx` reads
-`/me/students`; the unread count lives in `/notifications`. Either the shell fetches it or
-`InboxScreen` lifts it — a composition question, and one Stitch should be asked about.
+~~**The unread badge needs a count the shell does not fetch.**~~ **Closed.** The shell
+fetches it, because the alternative — `InboxScreen` lifting it — produces a badge that
+only appears once the parent has already opened the inbox and read the thing it was
+announcing. `InboxScreen` takes an `onReadChange` callback so the count clears without a
+reload. This was listed as a composition question for Stitch; it turned out to have one
+defensible answer, so it was not one.
 
 **Enrolment-style counts on the agenda row.** `2a` draws a trailing status chip per lesson;
 the chip's value for a *future* lesson is `planned`, which is derivable, but for a past one

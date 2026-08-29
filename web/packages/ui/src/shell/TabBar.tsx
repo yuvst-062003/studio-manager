@@ -15,6 +15,20 @@ export type TabBarItem = {
   icon: ReactNode
   active?: boolean
   onSelect?: () => void
+  /**
+   * An unread count. Parent `2a` §7 — "four tabs, with an unread badge on messages".
+   *
+   * `0` renders nothing: an empty inbox is not a notification, and a badge showing zero is
+   * a permanent mark that stops meaning anything. Counts above 99 render `99+` so a parent
+   * back from a month away does not widen the bar; the exact number is not the point past
+   * that, and the tab has four slots to share.
+   */
+  badge?: number
+}
+
+/** The badge's own text, and the suffix that goes in the accessible name. */
+function badgeLabel(count: number): string {
+  return count > 99 ? '99+' : String(count)
 }
 
 export function TabBar({ items, label }: { items: TabBarItem[]; label: string }) {
@@ -27,6 +41,10 @@ export function TabBar({ items, label }: { items: TabBarItem[]; label: string })
               <a
                 href={item.href}
                 aria-current={item.active ? 'page' : undefined}
+                // The count belongs in the NAME, not only in the mark: a screen reader
+                // should say "הודעות 4", and a bare numeral beside a word is not a count
+                // of anything a listener can identify.
+                aria-label={item.badge ? `${item.label} ${badgeLabel(item.badge)}` : undefined}
                 data-testid={`tab-${item.key}`}
                 className={
                   item.active ? 'studio-tabbar__item studio-tabbar__item--active' : 'studio-tabbar__item'
@@ -34,6 +52,11 @@ export function TabBar({ items, label }: { items: TabBarItem[]; label: string })
               >
                 {item.icon}
                 <span>{item.label}</span>
+                {item.badge ? (
+                  <span aria-hidden="true" className="studio-tabbar__badge" data-testid={`tab-${item.key}-badge`}>
+                    {badgeLabel(item.badge)}
+                  </span>
+                ) : null}
               </a>
             ) : (
               <button

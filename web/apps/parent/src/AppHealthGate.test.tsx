@@ -31,9 +31,15 @@ vi.mock('@studio/core', async (importOriginal) => {
   }
 })
 
+/** `read_at: null` is unread; anything else has been read. */
+function note(id: string, read: boolean) {
+  return { id, kind: 'announcement.published', title: 't', body: 'b', payload: {}, created_at: '2026-08-28T06:00:00Z', read_at: read ? '2026-08-28T07:00:00Z' : null }
+}
+
 function stubChildren(
   healthStatus: 'missing' | 'trial_signed' | 'signed',
   status: 'trial' | 'active' = 'active',
+  unread: ReturnType<typeof note>[] = [],
 ) {
   vi.stubGlobal(
     'fetch',
@@ -54,6 +60,9 @@ function stubChildren(
           }),
           { status: 200 },
         )
+      }
+      if (url.includes('/api/v1/notifications')) {
+        return new Response(JSON.stringify({ items: unread }), { status: 200 })
       }
       return new Response(JSON.stringify({ items: [] }), { status: 200 })
     }),
@@ -98,6 +107,22 @@ describe('the §6.1 health gate, mounted in the shell', () => {
 })
 
 describe('the tab bar, in the shell where 1a draws it', () => {
+  it('badges the messages tab with the unread count', async () => {
+    // `2a` §7 — "four tabs, with an unread badge on messages". The count is fetched by the
+    // SHELL, not by the inbox: a badge that only appeared once you had already opened the
+    // inbox would tell you nothing you did not just find out.
+    stubChildren('signed', 'active', [note('n1', false), note('n2', false), note('n3', true)])
+    render(<App />)
+    await waitFor(() => expect(screen.getByTestId('tab-messages-badge')).toHaveTextContent('2'))
+  })
+
+  it('shows no badge when everything has been read', async () => {
+    stubChildren('signed', 'active', [note('n1', true)])
+    render(<App />)
+    await waitFor(() => expect(screen.getByTestId('tab-bar')).toBeInTheDocument())
+    expect(screen.queryByTestId('tab-messages-badge')).toBeNull()
+  })
+
   it('renders the four tabs on a signed family and none while the gate holds', async () => {
     stubChildren('signed')
     render(<App />)

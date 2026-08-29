@@ -88,10 +88,15 @@ export function InboxScreen({
   client,
   locale,
   userAgent,
+  onReadChange,
 }: {
   client: ParentCommsClient
   locale: Locale
   userAgent?: string
+  /** Fired after anything is marked read, so the shell's tab badge can re-count. The
+   *  count is the SHELL's — see App.tsx — because a badge owned by this screen would
+   *  only ever appear once the parent had already read the thing it was announcing. */
+  onReadChange?: () => void
 }) {
   const [rows, setRows] = useState<NotificationOut[]>([])
   const [loaded, setLoaded] = useState(false)
@@ -126,15 +131,17 @@ export function InboxScreen({
         ),
       )
       await client.markRead(row.id).catch(() => undefined)
+      onReadChange?.()
     },
-    [client],
+    [client, onReadChange],
   )
 
   const markAll = useCallback(async () => {
     await client.markAllRead().catch(() => undefined)
     const page = await client.inbox().catch(() => null)
     if (page) setRows(page.items)
-  }, [client])
+    onReadChange?.()
+  }, [client, onReadChange])
 
   const unread = rows.filter((row) => row.read_at === null).length
 

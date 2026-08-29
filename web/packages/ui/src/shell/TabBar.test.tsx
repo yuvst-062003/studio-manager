@@ -23,6 +23,46 @@ describe('TabBar', () => {
     expect(screen.getByTestId('tab-payments')).not.toHaveAttribute('aria-current')
   })
 
+  it('carries an unread badge, with the count in the accessible name', () => {
+    // Parent `2a` §7 draws "four tabs, with an unread badge on messages" and `TabBarItem`
+    // had no badge field at all, so a parent with four unread announcements got no signal
+    // anywhere in the app. The count goes in the ACCESSIBLE NAME rather than beside the
+    // label as bare text: a screen reader announcing "messages 4" is the whole point, and
+    // a bare "4" floating next to a word is not a count of anything in particular.
+    render(
+      <TabBar
+        label="ניווט"
+        items={[
+          { key: 'home', label: 'בית', href: '#/', icon: <span />, active: true },
+          { key: 'messages', label: 'הודעות', href: '#/announcements', icon: <span />, badge: 4 },
+        ]}
+      />,
+    )
+    expect(screen.getByTestId('tab-messages-badge')).toHaveTextContent('4')
+    expect(screen.getByTestId('tab-messages')).toHaveAccessibleName(/4/)
+  })
+
+  it('renders no badge at zero — an empty inbox is not a notification', () => {
+    render(
+      <TabBar
+        label="ניווט"
+        items={[{ key: 'messages', label: 'הודעות', href: '#/announcements', icon: <span />, badge: 0 }]}
+      />,
+    )
+    expect(screen.queryByTestId('tab-messages-badge')).toBeNull()
+    expect(screen.getByTestId('tab-messages')).toHaveAccessibleName('הודעות')
+  })
+
+  it('caps the badge so a long-absent parent does not widen the bar', () => {
+    render(
+      <TabBar
+        label="ניווט"
+        items={[{ key: 'messages', label: 'הודעות', href: '#/announcements', icon: <span />, badge: 132 }]}
+      />,
+    )
+    expect(screen.getByTestId('tab-messages-badge')).toHaveTextContent('99+')
+  })
+
   it('renders an action item as a button and fires it', async () => {
     const onSelect = vi.fn()
     render(

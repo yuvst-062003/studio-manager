@@ -139,6 +139,18 @@ const cardLinkStyle: CSSProperties = {
   paddingInline: 'var(--space-3)',
 }
 
+/**
+ * Does this row start at the same instant as the one above it?
+ *
+ * `2a` §6's merged block. Compared on the raw ISO instant rather than on the formatted
+ * label: two sessions a second apart format identically at minute precision and are not
+ * the same slot, and the whole point is that the reader may treat a hidden label as "same
+ * as above".
+ */
+function sharesTimeWithPrevious(lessons: readonly HomeLesson[], index: number): boolean {
+  return index > 0 && lessons[index - 1]!.startsAt === lessons[index]!.startsAt
+}
+
 /** Today / tomorrow get their names; further out, the studio-zone date carries the row. */
 function dayLabel(iso: string, locale: Locale): string {
   return formatDateInStudioZone(iso, locale)
@@ -248,7 +260,10 @@ export function ParentHome({
           a declaration never reaches this screen — so the debt card is the one that can
           actually appear here. Quiet line when nothing needs attention (4h's rule: state
           the goal state, never draw an empty box). */}
-      {debtAgorot > 0 ? (
+      {/* `2a` §5 — the debt + health banner is conditional on the selected day being
+          TODAY. It rendered on every day of the strip, so stepping back to last Tuesday
+          asked the parent to pay for it. */}
+      {debtAgorot > 0 && selectedDay === todayKey ? (
         <Card>
           <div style={alertRowStyle} data-testid="parent-home-debt">
             <Icon name="warning" size={20} style={{ color: 'var(--debt)' }} />
@@ -326,7 +341,7 @@ export function ParentHome({
               <div key={day} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
                 <h3 style={dayHeaderStyle}>{day}</h3>
                 <ul style={lessonListStyle}>
-                  {lessons.map((lesson) => (
+                  {lessons.map((lesson, index) => (
                     <li key={lesson.id} data-testid="parent-home-lesson">
                       <Card>
                         <div style={lessonRowStyle}>
@@ -344,11 +359,26 @@ export function ParentHome({
                               <bdi>{lesson.groupName}</bdi>
                             </div>
                           </div>
+                          {/* `2a` §6 — "rows sharing a time hide the repeated time label,
+                              so concurrent lessons read as one merged block". A family with
+                              two children at 16:30 was reading 16:30 twice, which looks
+                              like two separate things rather than one hour with two
+                              children in it.
+                              
+                              HIDDEN, not dropped. The second lesson really is at that
+                              hour, and a row that removed the fact outright would be
+                              lying to anyone who cannot see the alignment that replaces
+                              it — so the time stays in the tree and only its ink goes. */}
                           <span
+                            data-testid="lesson-time"
+                            data-repeated={String(sharesTimeWithPrevious(lessons, index))}
                             style={{
                               fontVariantNumeric: 'tabular-nums',
                               fontWeight: 600,
                               fontSize: 'var(--text-title)',
+                              visibility: sharesTimeWithPrevious(lessons, index)
+                                ? 'hidden'
+                                : undefined,
                             }}
                           >
                             {formatTimeInStudioZone(lesson.startsAt, locale)}

@@ -98,6 +98,62 @@ describe('ParentHome', () => {
     expect(screen.queryByText('קבוצה אחרת')).toBeNull()
   })
 
+  it('hides a repeated time so concurrent lessons read as one block', () => {
+    // `2a` §6 — "Rows sharing a time hide the repeated time label, so concurrent lessons
+    // read as one merged block." A family with two children at 16:30 was reading 16:30
+    // twice, which looks like two different things happening.
+    render(
+      <ParentHome
+        locale="he"
+        students={CHILDREN}
+        upcoming={[
+          { id: 'a', startsAt: '2026-08-30T14:00:00Z', groupName: 'מתחילים' },
+          { id: 'b', startsAt: '2026-08-30T14:00:00Z', groupName: 'מתקדמים' },
+        ]}
+      />,
+    )
+    const rows = screen.getAllByTestId('parent-home-lesson')
+    expect(rows).toHaveLength(2)
+    expect(rows[0]).toHaveTextContent('17:00')
+    // Still announced to a screen reader — the second lesson genuinely is at 17:00, and a
+    // row that simply dropped the fact would be lying to anyone not seeing the alignment.
+    expect(within(rows[0]!).getByTestId('lesson-time')).toHaveAttribute('data-repeated', 'false')
+    const second = within(rows[1]!).getByTestId('lesson-time')
+    expect(second).toHaveAttribute('data-repeated', 'true')
+    // Hidden, not removed: the second lesson really is at 17:00, and a row that dropped
+    // the fact would be lying to anyone who cannot see the alignment that replaces it.
+    expect(second).toHaveTextContent('17:00')
+  })
+
+  it('keeps the time on a row that starts at a different hour', () => {
+    render(
+      <ParentHome
+        locale="he"
+        students={CHILDREN}
+        upcoming={[
+          { id: 'a', startsAt: '2026-08-30T14:00:00Z', groupName: 'מתחילים' },
+          { id: 'b', startsAt: '2026-08-30T15:00:00Z', groupName: 'מתקדמים' },
+        ]}
+      />,
+    )
+    const rows = screen.getAllByTestId('parent-home-lesson')
+    const second = within(rows[1]!).getByTestId('lesson-time')
+    expect(second).toHaveAttribute('data-repeated', 'false')
+    expect(second).toHaveTextContent('18:00')
+  })
+
+  it('raises the debt alert only on today', async () => {
+    // `2a` §5 — the debt + health banner is "conditional: rendered only when the selected
+    // day is today". It was rendering on every day of the strip, so stepping back to last
+    // Tuesday asked a parent to pay for it.
+    render(<ParentHome locale="he" students={CHILDREN} upcoming={LESSONS} debtAgorot={32000} />)
+    expect(screen.getByTestId('parent-home-debt')).toBeInTheDocument()
+    const strip = screen.getByTestId('parent-day-strip')
+    const days = within(strip).getAllByRole('button')
+    await userEvent.click(days[0]!)
+    expect(screen.queryByTestId('parent-home-debt')).toBeNull()
+  })
+
   it('skips the family layer for a family with one child', () => {
     // §19.3 gives `dev+parent1` exactly one job — "the single-child path that skips the
     // family layer" — and the layer was not skipped: a parent of one child got an "הכל"
