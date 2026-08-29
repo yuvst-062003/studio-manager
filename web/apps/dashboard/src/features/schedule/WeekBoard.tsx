@@ -21,6 +21,7 @@ import { apiFetch, formatTimeInStudioZone, studioDayKey, studioWallTimeToUtc } f
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { makeDashboardAttendanceClient } from '../attendance'
+import { useLongPress } from './useLongPress'
 import { SessionPopover } from './SessionPopover'
 import { cancelReasonLabel } from './client'
 import type { ScheduleClient, SessionRow } from './client'
@@ -62,12 +63,19 @@ function SessionBlock({
   locale,
   session,
   onOpen,
+  onPickUp,
+  moving,
 }: {
   locale: Locale
   session: SessionRow
   onOpen: () => void
+  onPickUp: () => void
+  moving: boolean
 }) {
   const lead = session.staff[0]
+  // A short press opens the popover, a long one picks the class up off the board. Both
+  // arrive through the same button, so it stays one control with one accessible name.
+  const press = useLongPress({ onClick: onOpen, onLongPress: onPickUp })
   // `3a` draws five block states and the shipped board drew two. A class with nobody
   // assigned rendered identically to a covered one — which is how the two coachless
   // classes in the 2026-08-28 staging capture sat on the board unremarked. The state is a
@@ -84,11 +92,12 @@ function SessionBlock({
       data-testid="session-block"
       data-status={session.status}
       data-coverage={coverage}
+      data-moving={moving || undefined}
       className="week-block"
       // F3 — D5: "clicking a session opens a popover with the roster and inline
       // attendance marking". A button, not an article with onClick: this is now an
       // interactive control and must be reachable by keyboard.
-      onClick={onOpen}
+      {...press}
       type="button"
     >
       <strong>{session.group_name}</strong>
@@ -120,6 +129,7 @@ function CreateSessionForm({
   locale,
   client,
   defaultDay,
+  defaultStart,
   onCreated,
   open,
   setOpen,
@@ -127,6 +137,9 @@ function CreateSessionForm({
   locale: Locale
   client: ScheduleClient
   defaultDay: string
+  /** Pre-filled when the form was opened from a slot, so the manager confirms a time
+   *  rather than retyping the one they just tapped. */
+  defaultStart?: string
   onCreated: () => void
   /** Controlled by the board, so the TRIGGER can live in the page header while the form
    *  opens below it. While this component owned the state, its closed form was a lone
@@ -150,8 +163,14 @@ function CreateSessionForm({
   const [yearId, setYearId] = useState<string | null | undefined>(undefined)
   const [groupId, setGroupId] = useState('')
   const [day, setDay] = useState(defaultDay)
-  const [startTime, setStartTime] = useState('17:00')
-  const [endTime, setEndTime] = useState('18:00')
+  const [startTime, setStartTime] = useState(defaultStart ?? '17:00')
+  const [endTime, setEndTime] = useState(() => {
+    if (!defaultStart) return '18:00'
+    // An hour after the slot. A default end BEFORE the default start would disable the
+    // submit button on open, which reads as a broken form rather than a hint.
+    const [h, m] = defaultStart.split(':').map(Number)
+    return `${String(((h ?? 17) + 1) % 24).padStart(2, '0')}:${String(m ?? 0).padStart(2, '0')}`
+  })
   const [locationId, setLocationId] = useState('')
   const [sending, setSending] = useState(false)
   const [failed, setFailed] = useState(false)
@@ -340,6 +359,13 @@ export function WeekBoard({
   // The create form's disclosure lives here so its TRIGGER can sit in the page header
   // while the form itself opens below the coverage strip.
   const [open, setOpen] = useState(false)
+  /** The class currently picked up off the board, waiting for a slot. */
+  const [movingId, setMovingId] = useState<string | null>(null)
+  const [moveFailed, setMoveFailed] = useState(false)
+  /** The empty slot a manager tapped, and where on screen it was — the popover is
+   *  positioned from the cell's own rect because `.week-grid` scrolls, and anything
+   *  rendered INSIDE a scrolling box is clipped by it. */
+  const [slot, setSlot] = useState<{ day: string; time: string; x: number; y: number } | null>(null)
 
   useEffect(() => {
     let live = true
@@ -353,6 +379,40 @@ export function WeekBoard({
   }, [client, days, version])
 
   const openSession = sessions.find((row) => row.id === openSessionId) ?? null
+
+  // Escape puts a picked-up class back. Registered only while something is held, so this
+  // never competes with the popover's own Escape handling.
+  useEffect(() => {
+    if (!movingId) return
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMovingId(null)
+    }
+    globalThis.addEventListener('keydown', onKey)
+    return () => globalThis.removeEventListener('keydown', onKey)
+  }, [movingId])
+
+  /**
+   * Drop the held class into `day` at `time`, keeping how long it runs.
+   *
+   * The duration is carried rather than recomputed: a 90-minute class moved to 17:00 ends
+   * at 18:30, and asking the manager to retype the end time is how a move becomes an edit.
+   * `patchSession` is the route §5.6 already documents as the move control — the popover's
+   * date fields write the same PATCH, which is what keeps this an accelerator rather than
+   * a second way to change a session.
+   */
+  const drop = (day: string, time: string) => {
+    const session = sessions.find((row) => row.id === movingId)
+    if (!session) return
+    const startsAt = studioWallTimeToUtc(day, time)
+    const runsFor = new Date(session.ends_at).getTime() - new Date(session.starts_at).getTime()
+    const endsAt = new Date(new Date(startsAt).getTime() + runsFor).toISOString()
+    setMovingId(null)
+    setMoveFailed(false)
+    void client
+      .patchSession(session.id, { starts_at: startsAt, ends_at: endsAt })
+      .then(() => setVersion((n) => n + 1))
+      .catch(() => setMoveFailed(true))
+  }
 
   /** `3a`'s three counters, and the same two rules the manager home derives:
    *  a cancelled class needs no coach, and a class that has not ended yet is not late. */
@@ -481,6 +541,25 @@ export function WeekBoard({
         />
       ) : null}
 
+      {movingId ? (
+        <div className="week-moving" data-testid="week-moving" role="status">
+          <span className="week-moving__hint">{t(locale, 'schedule.session.move.hint')}</span>
+          <Button
+            variant="ghost"
+            data-testid="week-moving-cancel"
+            onClick={() => setMovingId(null)}
+          >
+            {t(locale, 'schedule.session.move.cancel')}
+          </Button>
+        </div>
+      ) : null}
+
+      {moveFailed ? (
+        <p role="alert" data-testid="week-move-failed" style={{ color: 'var(--danger)' }}>
+          {t(locale, 'schedule.session.move.failed')}
+        </p>
+      ) : null}
+
       {/* `3a`'s grid: a time gutter, then one column per day, ruled into rows — one row
           per start time the week actually contains. The shipped board had no axis at all,
           so blocks floated in unruled columns and two classes an hour apart looked like
@@ -518,28 +597,62 @@ export function WeekBoard({
           ))}
         </div>
 
-        {slots.map((slot) => (
-          <div role="row" className="week-grid__row" key={slot}>
-            <span role="rowheader" className="week-grid__gutter" data-testid={`week-slot-${slot}`}>
-              {slot}
+        {slots.map((time) => (
+          <div role="row" className="week-grid__row" key={time}>
+            <span role="rowheader" className="week-grid__gutter" data-testid={`week-slot-${time}`}>
+              {time}
             </span>
             {days.map((day) => {
-              const cell = byCell.get(`${day}|${slot}`) ?? []
+              const cell = byCell.get(`${day}|${time}`) ?? []
+              // A cell is a target while a class is held, and a way to start one when it
+              // is empty. Spec `3a` says an empty cell carries no "add here" affordance
+              // and calls that a decision — overridden deliberately on 2026-08-29 at the
+              // owner's request; see docs/design/decisions.md.
+              const acts = movingId !== null || cell.length === 0
               return (
                 <div
                   key={day}
                   role="gridcell"
                   className="week-grid__cell"
                   data-day={day}
-                  data-slot={slot}
+                  data-slot={time}
                   data-today={day === todayKey || undefined}
-                  data-testid={`week-cell-${day}-${slot}`}
+                  data-target={movingId !== null || undefined}
+                  data-testid={`week-cell-${day}-${time}`}
                 >
+                  {acts ? (
+                    <button
+                      className="week-grid__slot"
+                      data-testid={`week-slot-action-${day}-${time}`}
+                      onClick={(event) => {
+                        if (movingId !== null) {
+                          drop(day, time)
+                          return
+                        }
+                        const box = event.currentTarget.getBoundingClientRect()
+                        setSlot({ day, time, x: box.left + box.width / 2, y: box.bottom })
+                      }}
+                      type="button"
+                    >
+                      {/* Named for a screen reader, invisible to everyone else: the cell
+                          must not look like a button, or the grid becomes forty of them. */}
+                      <span className="studio-visually-hidden">
+                        {t(
+                          locale,
+                          movingId !== null
+                            ? 'schedule.session.move.target'
+                            : 'schedule.session.slot.create',
+                        )}
+                      </span>
+                    </button>
+                  ) : null}
                   {cell.map((session) => (
                     <SessionBlock
                       key={session.id}
                       locale={locale}
+                      moving={session.id === movingId}
                       onOpen={() => setOpenSessionId(session.id)}
+                      onPickUp={() => setMovingId(session.id)}
                       session={session}
                     />
                   ))}
@@ -549,6 +662,48 @@ export function WeekBoard({
           </div>
         ))}
       </div>
+
+
+      {slot ? (
+        <>
+          {/* A backdrop that only dismisses. The form inside is not a dialog — it does not
+              trap focus, because it is one small form and a manager comparing it against
+              the week behind it is the point of anchoring it here. */}
+          <div
+            data-testid="week-slot-backdrop"
+            onClick={() => setSlot(null)}
+            style={{ position: 'fixed', insetBlock: 0, insetInline: 0, zIndex: 39 }}
+          />
+          <div
+            className="week-slot-popover"
+            data-testid="week-slot-popover"
+            style={{ insetInlineStart: `${slot.x}px`, insetBlockStart: `${slot.y + 8}px` }}
+          >
+            <div className="week-slot-popover__head">
+              <span>
+                {slot.day} · {slot.time}
+              </span>
+              <Button variant="ghost" data-testid="week-slot-close" onClick={() => setSlot(null)}>
+                {t(locale, 'common.cancel')}
+              </Button>
+            </div>
+            <CreateSessionForm
+              client={client}
+              defaultDay={slot.day}
+              defaultStart={slot.time}
+              locale={locale}
+              onCreated={() => {
+                setSlot(null)
+                setVersion((n) => n + 1)
+              }}
+              open
+              setOpen={(next) => {
+                if (!next) setSlot(null)
+              }}
+            />
+          </div>
+        </>
+      ) : null}
 
       {openSession ? (
         <SessionPopover

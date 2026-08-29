@@ -70,6 +70,14 @@ export const schedule: Bundle = {
   'session.substitute': 'ממלא מקום',
   // D5 — a session block surfaces coverage and completion, not registration counts.
   'session.noCoach': 'לא שובץ מאמן',
+  // Moving a session by picking it up from the board (2026-08-29). The popover's date
+  // fields remain the keyboard path; this is the pointer one.
+  'session.move.hint': 'בחרו משבצת חדשה לשיעור',
+  'session.move.cancel': 'ביטול ההעברה',
+  'session.move.moved': 'השיעור הועבר',
+  'session.move.failed': 'לא הצלחנו להעביר את השיעור',
+  'session.move.target': 'העברה לכאן',
+  'session.slot.create': 'שיעור חדש במשבצת הזו',
   'session.attendanceTaken': 'נוכחות נרשמה',
   'session.durationMinutes': '{{minutes}} דק׳',
   'session.headcount': '{{count}} חניכים',

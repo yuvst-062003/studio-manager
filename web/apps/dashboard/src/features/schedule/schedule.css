@@ -139,8 +139,104 @@
   /* The rule between days. Only on the inline-start edge, so the grid does not gain a
    * double border where two cells meet. */
   border-inline-start: var(--border-width-hairline) solid var(--border);
+
+  /* The slot button below fills the cell absolutely, so the cell is its containing block. */
+  position: relative;
 }
 
 .week-grid__cell[data-today] {
   background: color-mix(in srgb, var(--fg) 3%, transparent);
+}
+
+/* Picking a class up off the board (2026-08-29). */
+
+/* The held class. Dimmed and outlined rather than hidden: a manager needs to see where it
+ * is moving FROM while they choose where it moves to. */
+.week-block[data-moving] {
+  opacity: 0.55;
+  outline: var(--border-width-strong) dashed var(--fg);
+  outline-offset: 2px;
+}
+
+/* The whole cell is the target, so it fills the cell rather than sitting in it. It carries
+ * no visible affordance by default — spec `3a` is right that a grid of forty buttons is
+ * worse than a grid — and earns one only on hover, on focus, or while something is held. */
+.week-grid__slot {
+  position: absolute;
+  inset-block: 0;
+  inset-inline: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.week-grid__slot:hover {
+  background: color-mix(in srgb, var(--fg) 4%, transparent);
+}
+
+.week-grid__slot:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+/* While a class is held every cell is a destination. Said with a wash, not an outline:
+ * twenty-one dashed borders at once is a louder screen than the one it replaced, and this
+ * design's register is calm and dense. The cell being POINTED AT gets the outline, so
+ * exactly one destination is ever drawn. */
+.week-grid__cell[data-target] .week-grid__slot {
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
+}
+
+.week-grid__cell[data-target] .week-grid__slot:hover,
+.week-grid__cell[data-target] .week-grid__slot:focus-visible {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  border: var(--border-width-strong) dashed var(--accent);
+}
+
+/* The instruction while something is held. Sticky, because the grid scrolls and the
+ * manager needs the way out visible wherever they have scrolled to. */
+.week-moving {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding-block: var(--space-2);
+  padding-inline: var(--space-3);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+  border: var(--border-width-hairline) solid var(--accent);
+  font-size: var(--text-label);
+}
+
+.week-moving__hint {
+  margin-inline-end: auto;
+}
+
+/* The create-in-a-slot popover. Positioned from the cell's own rect and rendered OUTSIDE
+ * the grid, because `.week-grid` scrolls and would clip anything inside it. */
+.week-slot-popover {
+  position: fixed;
+  z-index: 40;
+  transform: translateX(-50%);
+  max-inline-size: min(30rem, calc(100vw - var(--space-8)));
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  border: var(--border-width-hairline) solid var(--border);
+  box-shadow: 0 8px 28px rgb(0 0 0 / 16%);
+}
+
+.week-slot-popover__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-block-end: var(--space-3);
+  font-size: var(--text-label);
+  color: var(--text-muted);
 }

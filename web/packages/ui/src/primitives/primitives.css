@@ -1475,3 +1475,16 @@ a.studio-stat-tile:focus-visible {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+
+/* Present to a screen reader, absent to everyone else. `clip-path` and not `display:none`
+ * — the latter removes the element from the accessibility tree too, which is the opposite
+ * of what this is for. Same technique the theme control's off-screen radio already uses;
+ * hoisted here the first time a second caller wanted it. */
+.studio-visually-hidden {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

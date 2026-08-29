@@ -2,11 +2,12 @@
 //
 // D5: the session block "surfaces coverage and completion — is a coach assigned, is it
 // cancelled, has attendance been taken — *not* registration counts."
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { t } from '@studio/i18n'
 import { WeekBoard, weekDays, weekStart } from './WeekBoard'
+import { LONG_PRESS_MS } from './useLongPress'
 import type { ScheduleClient, SessionRow } from './client'
 
 const base = {
@@ -515,10 +516,100 @@ describe('WeekBoard · 3a', () => {
       <WeekBoard locale="he" client={stub()} today="2026-11-03T12:00:00Z" />,
     )
     await screen.findByTestId('session-block')
-    // Seven days, one slot: seven cells, six of them empty.
+    // Seven days, one slot: seven cells, six of them holding no class.
     expect(container.querySelectorAll('[role="gridcell"]')).toHaveLength(7)
     const saturday = container.querySelector('[data-testid="week-cell-2026-11-07-17:00"]')
     expect(saturday).not.toBeNull()
-    expect(saturday?.children).toHaveLength(0)
+    // Empty of CLASSES — not of children. Since 2026-08-29 an empty cell also carries the
+    // invisible button that starts one, which is the point of the cell being there.
+    expect(saturday?.querySelector('[data-testid="session-block"]')).toBeNull()
+  })
+})
+
+describe('WeekBoard · moving a class, and starting one in a slot', () => {
+  it('starts a new class from an empty cell, pre-filled with that day and time', async () => {
+    // Overrides `3a`'s "no add-here affordance" decision, at the owner's request
+    // (2026-08-29). The cell is a button with an accessible name and no visible chrome —
+    // a grid of forty visible buttons is what `3a` was right to refuse.
+    render(<WeekBoard locale="he" client={stub()} today="2026-11-03T12:00:00Z" />)
+    const cell = await screen.findByTestId('week-slot-action-2026-11-05-17:00')
+    expect(cell).toHaveAccessibleName(t('he', 'schedule.session.slot.create'))
+    await userEvent.click(cell)
+    expect(await screen.findByTestId('week-slot-popover')).toHaveTextContent('2026-11-05')
+    expect(screen.getByTestId('week-slot-popover')).toHaveTextContent('17:00')
+  })
+
+  it('does not offer to start one in a cell that already has a class', async () => {
+    render(<WeekBoard locale="he" client={stub()} today="2026-11-03T12:00:00Z" />)
+    await screen.findByTestId('session-block')
+    expect(screen.queryByTestId('week-slot-action-2026-11-03-17:00')).toBeNull()
+  })
+
+  it('picks a class up on a long press and puts it down in the slot you choose', async () => {
+    const client = stub()
+    render(<WeekBoard locale="he" client={client} today="2026-11-03T12:00:00Z" />)
+    const block = await screen.findByTestId('session-block')
+
+    fireEvent.pointerDown(block, { button: 0, clientX: 0, clientY: 0 })
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, LONG_PRESS_MS + 20))
+    })
+    fireEvent.pointerUp(block)
+
+    expect(await screen.findByTestId('week-moving')).toBeInTheDocument()
+    await userEvent.click(screen.getByTestId('week-slot-action-2026-11-05-17:00'))
+
+    // The duration is carried, not recomputed: a two-hour class stays two hours.
+    expect(client.patchSession).toHaveBeenCalledWith('s1', {
+      starts_at: '2026-11-05T15:00:00.000Z',
+      ends_at: '2026-11-05T17:00:00.000Z',
+    })
+  })
+
+  it('opens the popover on a SHORT press, and not on the long one', async () => {
+    // A pointerup is followed by a click however long the button was held, so without the
+    // swallow the popover would open on top of the move the manager just started.
+    render(<WeekBoard locale="he" client={stub()} today="2026-11-03T12:00:00Z" />)
+    const block = await screen.findByTestId('session-block')
+
+    fireEvent.pointerDown(block, { button: 0, clientX: 0, clientY: 0 })
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, LONG_PRESS_MS + 20))
+    })
+    fireEvent.pointerUp(block)
+    fireEvent.click(block)
+    expect(screen.queryByTestId('session-popover')).toBeNull()
+
+    // A short press still opens it — and the keyboard path is a plain click.
+    await userEvent.click(screen.getByTestId('week-moving-cancel'))
+    await userEvent.click(block)
+    expect(await screen.findByTestId('session-popover')).toBeInTheDocument()
+  })
+
+  it('gives a held class back on Escape', async () => {
+    render(<WeekBoard locale="he" client={stub()} today="2026-11-03T12:00:00Z" />)
+    const block = await screen.findByTestId('session-block')
+    fireEvent.pointerDown(block, { button: 0, clientX: 0, clientY: 0 })
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, LONG_PRESS_MS + 20))
+    })
+    fireEvent.pointerUp(block)
+    await screen.findByTestId('week-moving')
+    // Fired on the document: it bubbles to the window listener the board registers.
+    fireEvent.keyDown(document, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByTestId('week-moving')).toBeNull())
+  })
+
+  it('does not pick up when the finger drifts — that is a scroll, not a press', async () => {
+    // A manager checking cover on a tablet would otherwise pick up a class every flick.
+    render(<WeekBoard locale="he" client={stub()} today="2026-11-03T12:00:00Z" />)
+    const block = await screen.findByTestId('session-block')
+    fireEvent.pointerDown(block, { button: 0, clientX: 0, clientY: 0 })
+    fireEvent.pointerMove(block, { clientX: 0, clientY: 60 })
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, LONG_PRESS_MS + 20))
+    })
+    fireEvent.pointerUp(block)
+    expect(screen.queryByTestId('week-moving')).toBeNull()
   })
 })

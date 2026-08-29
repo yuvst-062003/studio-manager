@@ -55,6 +55,13 @@ export const schedule: Bundle = {
   'session.coach': 'Тренер',
   'session.substitute': 'Замена',
   'session.noCoach': 'Тренер не назначен',
+  // Moving a session by picking it up from the board.
+  'session.move.hint': 'Выберите новый слот для занятия',
+  'session.move.cancel': 'Отменить перенос',
+  'session.move.moved': 'Занятие перенесено',
+  'session.move.failed': 'Не удалось перенести занятие',
+  'session.move.target': 'Перенести сюда',
+  'session.slot.create': 'Новое занятие в этом слоте',
   'session.attendanceTaken': 'Посещаемость отмечена',
   'session.durationMinutes': '{{minutes}} мин',
   'session.headcount': '{{count}} учеников',
