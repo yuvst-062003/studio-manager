@@ -97,3 +97,38 @@ def test_anonymous_cannot_read_or_order(client, app_session, studio):
         ).status_code
         == 401
     )
+
+
+def test_the_parents_note_travels_on_the_charge_label(
+    client, app_session, studio, a_priced_student, as_guardian_of
+):
+    """2026-08-30 — 'a parent buying a product should be able to write a note, and the
+    manager should see it.' The note rides the charge's own line label, so every surface
+    that names the charge shows it without a second field to plumb."""
+    gi = _product(app_session, studio, name="גי", price=18_000)
+    parent = as_guardian_of(a_priced_student.student_id)
+    response = client.post(
+        "/api/v1/me/orders/items",
+        json={"items": [{"product_id": str(gi), "quantity": 2, "note": "רקמה: יוסי"}]},
+        headers=parent.headers,
+    )
+    assert response.status_code == 201, response.text
+    app_session.expire_all()
+    charge = app_session.execute(
+        select(Charge).where(Charge.id == uuid.UUID(response.json()["charge_ids"][0]))
+    ).scalar_one()
+    assert "גי × 2" in charge.proration_note
+    assert "רקמה: יוסי" in charge.proration_note
+
+
+def test_an_overlong_note_is_refused_not_truncated(
+    client, app_session, studio, a_priced_student, as_guardian_of
+):
+    gi = _product(app_session, studio, name="גי", price=18_000)
+    parent = as_guardian_of(a_priced_student.student_id)
+    response = client.post(
+        "/api/v1/me/orders/items",
+        json={"items": [{"product_id": str(gi), "note": "א" * 200}]},
+        headers=parent.headers,
+    )
+    assert response.status_code == 422

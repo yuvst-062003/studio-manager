@@ -97,6 +97,12 @@ export function makeHealthClient(fetcher: Fetcher) {
     /** §11.2 — opening this is a full read and the server logs it. `documents.viewFullNotice`
      * warns the manager before they do, which 4e finding 1 says must be built. */
     pdfUrl: (studentId: string): string => `/api/v1/students/${studentId}/health-declaration/pdf`,
+
+    /** The authenticated read behind the control (2026-08-30). A plain `<a href>` to the
+     * URL above carries no bearer token — the read came back 401 and the SPA fallback put
+     * the manager on the calendar instead of the document. */
+    pdf: (studentId: string): Promise<Response> =>
+      fetcher(`/api/v1/students/${studentId}/health-declaration/pdf`),
   }
 }
 

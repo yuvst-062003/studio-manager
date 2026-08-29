@@ -95,3 +95,40 @@ describe('Resolve', () => {
     expect(container.textContent).not.toMatch(/(מנהל|מאמן)\s*\d/)
   })
 })
+
+describe('the invitation LINK (2026-08-30)', () => {
+  it('redeems ?invite= on arrival and reloads the session', async () => {
+    // The manager's add-a-student screen hands the parent a URL carrying the token;
+    // arriving with it IS the consent, so the field is pre-filled and the redeem fires
+    // without retyping.
+    window.history.replaceState(null, '', '/?invite=tok-123')
+    const fetchMock = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>(
+      async () => new Response('{}', { status: 200 }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    const s = session({ access: { staff: false, parent: false } })
+    render(<Resolve session={s} locale="he" />)
+    await waitFor(() => expect(s.reload).toHaveBeenCalled())
+    const [url, init] = fetchMock.mock.calls[0]!
+    expect(String(url)).toContain('/auth/accept-invitation')
+    expect(String(init?.body)).toContain('tok-123')
+    expect(screen.getByLabelText(t('he', 'common.auth.inviteCodeLabel'))).toHaveValue('tok-123')
+    vi.unstubAllGlobals()
+    window.history.replaceState(null, '', '/')
+  })
+
+  it('leaves the pre-filled manual path standing when the redeem fails', async () => {
+    window.history.replaceState(null, '', '/?invite=tok-bad')
+    const fetchMock = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>(
+      async () => new Response('{}', { status: 410 }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    const s = session({ access: { staff: false, parent: false } })
+    render(<Resolve session={s} locale="he" />)
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled())
+    expect(s.reload).not.toHaveBeenCalled()
+    expect(screen.getByLabelText(t('he', 'common.auth.inviteCodeLabel'))).toHaveValue('tok-bad')
+    vi.unstubAllGlobals()
+    window.history.replaceState(null, '', '/')
+  })
+})

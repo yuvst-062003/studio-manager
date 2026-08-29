@@ -16,6 +16,10 @@ const TODAY = '2026-08-29T09:00:00.000Z'
 const data = (over: Partial<HomeData> = {}): HomeData => ({
   money: { debtAgorot: 480000, collectedAgorot: 1250000, debtHouseholds: 12 },
   attention: { missingHealth: 3, noCoach: 2, unmarked: 0 },
+  attendance: [
+    { group_id: 'g1', group_name: 'ג׳וניורים', rate_percent: 82 },
+    { group_id: 'g2', group_name: 'נבחרת', rate_percent: null },
+  ],
   today: [
     {
       id: 's1',
@@ -196,5 +200,22 @@ describe('todayFrom', () => {
       new Date('2026-08-29T09:00:00.000Z'),
     )
     expect(rows[0]?.coach).toBe('Lead')
+  })
+})
+
+describe('the attendance bars (2026-08-30)', () => {
+  it('draws a bar per group with the number beside it, and no bar for an unmarked group', async () => {
+    renderHome(data())
+    const chart = await screen.findByTestId('home-attendance-chart')
+    expect(chart).toHaveTextContent('82%')
+    expect(chart).toHaveTextContent('ג׳וניורים')
+    // A group nobody marked has no rate — the column says so instead of claiming 0%.
+    expect(chart).toHaveTextContent(t('he', 'common.dash.home.attendanceChart.noRate'))
+  })
+
+  it('renders no chart card when the read failed', async () => {
+    renderHome(data({ attendance: null }))
+    await screen.findByTestId('home-attendance-chart').catch(() => undefined)
+    expect(screen.queryByTestId('home-attendance-chart')).toBeNull()
   })
 })

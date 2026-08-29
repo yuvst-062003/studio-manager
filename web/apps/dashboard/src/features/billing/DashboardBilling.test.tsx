@@ -915,3 +915,34 @@ describe('the plan-change settlement queue', () => {
     expect(container.querySelector('[data-testid="plan-change-row"]')).toBeNull()
   })
 })
+
+describe('the household detail drill (2026-08-30)', () => {
+  it('opens the open charges under the row — labels, the parent’s note riding them', async () => {
+    // The 3e no-expansion note recorded a gap, not a rule; the owner asked for it: a
+    // parent's shop-order note travels on the charge label, and the manager needs a place
+    // that shows it.
+    const openCharges = vi.fn().mockResolvedValue([
+      {
+        id: 'c1',
+        kind: 'manual',
+        amount_agorot: 36_000,
+        proration_note: 'גי × 2 — רקמה: יוסי',
+        due_date: '2026-09-01',
+        status: 'open',
+      },
+    ])
+    renderCollections({ client: stub({ openCharges } as Partial<DashboardBillingClient>) })
+    await userEvent.click(screen.getAllByTestId('household-details')[0]!)
+    expect(await screen.findByText(/רקמה: יוסי/)).toBeInTheDocument()
+    expect(openCharges).toHaveBeenCalledWith('payer-1')
+  })
+
+  it('says so when a payer has no open charges', async () => {
+    const openCharges = vi.fn().mockResolvedValue([])
+    renderCollections({ client: stub({ openCharges } as Partial<DashboardBillingClient>) })
+    await userEvent.click(screen.getAllByTestId('household-details')[0]!)
+    expect(
+      await screen.findByText(t(LOCALE, 'billing.debt.detailsEmpty')),
+    ).toBeInTheDocument()
+  })
+})

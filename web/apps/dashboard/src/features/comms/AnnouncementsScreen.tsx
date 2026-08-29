@@ -41,6 +41,17 @@ const sectionStyle: CSSProperties = {
   gap: 'var(--space-2)',
 }
 
+// 2026-08-30 (owner request) — the preview beside the composer, not under it: at the
+// INLINE-END, so it sits on the left of a Hebrew screen and the right of an English one.
+// `auto-fit` collapses the two columns on a phone; DOM order keeps the composer first,
+// which in RTL puts it on the right and the preview on the left with no branch.
+const composerGridStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(20rem, 1fr))',
+  gap: 'var(--space-5)',
+  alignItems: 'start',
+}
+
 const titleStyle: CSSProperties = {
   color: 'var(--fg)',
   fontSize: 'var(--text-title)',
@@ -194,7 +205,8 @@ export function AnnouncementsScreen({
       <h1 style={titleStyle}>{t(locale, 'comms.announcement.title')}</h1>
 
       <Card>
-        <section style={sectionStyle} aria-labelledby="composer-title">
+        <section style={composerGridStyle} aria-labelledby="composer-title">
+        <div style={sectionStyle}>
           <h2 id="composer-title" style={titleStyle}>
             {t(locale, 'comms.announcement.create')}
           </h2>
@@ -262,8 +274,22 @@ export function AnnouncementsScreen({
             </p>
           )}
 
-          {/* -- תצוגה מקדימה -------------------------------------------------- */}
-          <h3 style={titleStyle}>{t(locale, 'comms.preview.title')}</h3>
+          <Button disabled={!canSend} onClick={() => void send()}>
+            {t(locale, 'comms.announcement.publish')}
+          </Button>
+          {sent ? (
+            <p style={lineStyle} data-testid="announcement-sent">
+              {t(locale, 'comms.announcement.published')}
+            </p>
+          ) : null}
+        </div>
+
+        {/* -- תצוגה מקדימה — its own inline-end column (owner request 2026-08-30):
+            left of a Hebrew composer, right of an English one, under it on a phone. -- */}
+        <aside style={sectionStyle} data-testid="preview-pane" aria-labelledby="preview-title">
+          <h3 id="preview-title" style={titleStyle}>
+            {t(locale, 'comms.preview.title')}
+          </h3>
           <p style={hintStyle}>{t(locale, 'comms.preview.pushLine')}</p>
           <div style={lockScreenStyle} data-testid="push-preview">
             <strong style={lineStyle}>{truncateForLockScreen(title)}</strong>
@@ -274,15 +300,7 @@ export function AnnouncementsScreen({
             <strong style={lineStyle}>{title}</strong>
             <span style={lineStyle}>{body}</span>
           </div>
-
-          <Button disabled={!canSend} onClick={() => void send()}>
-            {t(locale, 'comms.announcement.publish')}
-          </Button>
-          {sent ? (
-            <p style={lineStyle} data-testid="announcement-sent">
-              {t(locale, 'comms.announcement.published')}
-            </p>
-          ) : null}
+        </aside>
         </section>
       </Card>
 

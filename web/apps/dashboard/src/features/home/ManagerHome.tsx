@@ -192,6 +192,44 @@ export function ManagerHome({
         </Card>
       ) : null}
 
+      {/* The attendance bars (owner request 2026-08-30): rate per group over the last 30
+          days, from 4c's own endpoint. A group nobody marked draws NO bar and says so —
+          0% would be a claim about children who were never counted. */}
+      {data?.attendance && data.attendance.length > 0 ? (
+        <Card>
+          <SectionHeader
+            action={<a href="#/attendance">{t(locale, 'common.dash.home.attendanceChart.all')}</a>}
+            title={t(locale, 'common.dash.home.attendanceChart.title')}
+          />
+          <ol
+            className="dash-home__attendance-chart"
+            aria-label={t(locale, 'common.dash.home.attendanceChart.title')}
+            data-testid="home-attendance-chart"
+          >
+            {data.attendance.map((group) => (
+              <li key={group.group_id} className="dash-home__attendance-column">
+                <span className="dash-home__attendance-value">
+                  {group.rate_percent === null
+                    ? t(locale, 'common.dash.home.attendanceChart.noRate')
+                    : `${Math.round(group.rate_percent)}%`}
+                </span>
+                <span className="dash-home__attendance-track" aria-hidden="true">
+                  {group.rate_percent !== null ? (
+                    <span
+                      className="dash-home__attendance-bar"
+                      style={{ blockSize: `${Math.max(2, Math.min(100, group.rate_percent))}%` }}
+                    />
+                  ) : null}
+                </span>
+                <span className="dash-home__attendance-name">
+                  <bdi>{group.group_name}</bdi>
+                </span>
+              </li>
+            ))}
+          </ol>
+        </Card>
+      ) : null}
+
       {todaysClasses ? (
         <Card>
           <SectionHeader

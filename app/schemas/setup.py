@@ -26,6 +26,10 @@ class SetupProgressOut(BaseModel):
     dismissed_at: str | None = Field(
         default=None, description="The owner chose an exit at step 6. Auto-routing stops."
     )
+    #: 2026-08-30 — where the steps a surface has not built are edited. The staff app
+    #: registers four of seven; its wizard links the other three here instead of showing
+    #: dead rail buttons. None when the environment's dashboard host is still PENDING.
+    dashboard_url: str | None = None
 
 
 class SetupStepIn(BaseModel):

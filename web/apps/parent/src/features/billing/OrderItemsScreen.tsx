@@ -21,7 +21,7 @@
 // the club *offers* is not which sizes it *has*, and this screen must not imply otherwise.
 import { useState } from 'react'
 import type { CSSProperties } from 'react'
-import { Button, Card, Checkbox, EmptyState, MoneyDisplay, SlotChips } from '@studio/ui'
+import { Button, Card, Checkbox, EmptyState, MoneyDisplay, SelectField, SlotChips, TextField } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 /** What the screen renders — the payer-side catalogue read (`/me/products`) serves
@@ -38,8 +38,15 @@ export type OrderableProduct = {
 }
 
 /** One line of the order. `size` is null for an item that has none — which is a different
- *  thing from an unanswered picker, and `readyToOrder` below is what tells them apart. */
-export type OrderLine = { productId: string; size: string | null }
+ *  thing from an unanswered picker, and `readyToOrder` below is what tells them apart.
+ *  `quantity` and `note` (2026-08-30): how many, and the parent's own words on the line
+ *  ("רקמה: יוסי") — the server rides the note on the charge's label for the manager. */
+export type OrderLine = { productId: string; size: string | null; quantity: number; note: string | null }
+
+//: The server's own ceiling (`MAX_QUANTITY` in app/routers/shop.py). A SELECT of 1..10
+//: rather than a number field: the ceiling is the control's own edge, so nothing needs
+//: clamping and a phone keyboard never opens for a one-digit answer.
+const QUANTITIES = Array.from({ length: 10 }, (_, index) => index + 1)
 
 const columnStyle: CSSProperties = {
   display: 'flex',
@@ -59,7 +66,16 @@ const rowStyle: CSSProperties = {
 //: not just the 20px box.
 const itemRowStyle: CSSProperties = {
   display: 'flex',
+  flexDirection: 'column',
+  gap: 'var(--space-2)',
   paddingBlock: 'var(--space-2)',
+}
+
+const lineDetailsStyle: CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: 'var(--space-3)',
+  alignItems: 'start',
 }
 
 export type OrderItemsScreenProps = {
@@ -94,10 +110,13 @@ export function OrderItemsScreen({ locale, products, onOrder }: OrderItemsScreen
   // גי and ticks it again has not changed their mind about the size, and re-asking would
   // read as the app having lost it.
   const [sizes, setSizes] = useState<Record<string, string>>({})
+  // Same keep-on-untick rule as `sizes`, and for the same reason.
+  const [quantities, setQuantities] = useState<Record<string, number>>({})
+  const [notes, setNotes] = useState<Record<string, string>>({})
   const [inFlight, setInFlight] = useState(false)
   const total = products
     .filter((product) => chosen.includes(product.id))
-    .reduce((sum, product) => sum + product.price_agorot, 0)
+    .reduce((sum, product) => sum + product.price_agorot * (quantities[product.id] ?? 1), 0)
 
   if (products.length === 0) {
     // `12e`'s state table: not drawn, and `billing.product.empty` exists for it.
@@ -156,6 +175,36 @@ export function OrderItemsScreen({ locale, products, onOrder }: OrderItemsScreen
                   value={sizes[product.id] ?? null}
                 />
               ) : null}
+              {/* Quantity and the parent's note (2026-08-30), only under a CHOSEN item —
+                  same rule as the size picker, for the same reason. */}
+              {picked ? (
+                <div style={lineDetailsStyle}>
+                  <SelectField
+                    label={t(locale, 'billing.product.quantity')}
+                    value={String(quantities[product.id] ?? 1)}
+                    onChange={(event) =>
+                      setQuantities((previous) => ({
+                        ...previous,
+                        [product.id]: Number.parseInt(event.target.value, 10) || 1,
+                      }))
+                    }
+                  >
+                    {QUANTITIES.map((count) => (
+                      <option key={count} value={String(count)}>
+                        {count}
+                      </option>
+                    ))}
+                  </SelectField>
+                  <TextField
+                    label={t(locale, 'billing.product.noteLabel')}
+                    maxLength={120}
+                    value={notes[product.id] ?? ''}
+                    onChange={(event) =>
+                      setNotes((previous) => ({ ...previous, [product.id]: event.target.value }))
+                    }
+                  />
+                </div>
+              ) : null}
             </div>
           )
         })}
@@ -187,6 +236,8 @@ export function OrderItemsScreen({ locale, products, onOrder }: OrderItemsScreen
                 size: products.find((row) => row.id === id)?.sizes?.length
                   ? (sizes[id] ?? null)
                   : null,
+                quantity: quantities[id] ?? 1,
+                note: notes[id]?.trim() || null,
               })),
             )
           } finally {

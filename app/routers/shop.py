@@ -65,6 +65,10 @@ class ItemOrderLineIn(BaseModel):
     #: Which size, for an item that has any. Checked against the product's own list in the
     #: route -- the length bound here only keeps an absurd body out of the validator.
     size: str | None = Field(default=None, max_length=MAX_SIZE_LABEL)
+    #: 2026-08-30 -- the parent's own words on the line ("רקמה: יוסי"). Short by design:
+    #: it rides `charge.proration_note` (String(200)) beside the built label, so the cap
+    #: leaves room for the longest label a real product name produces.
+    note: str | None = Field(default=None, max_length=120)
 
 
 class ItemOrderIn(BaseModel):
@@ -187,7 +191,13 @@ def order_items(body: ItemOrderIn, request: Request, session: TenantSessionDep) 
             at.date(),
             student_id=None,
         )
-        charge.proration_note = _line_label(product.name, line.quantity, size)
+        label = _line_label(product.name, line.quantity, size)
+        if line.note:
+            # The parent's note, ON the label -- every surface that names the charge
+            # (collections, the payer's own list) then shows it with no second field.
+            # Clipped to the column, label first: the label is what reconciles money.
+            label = f"{label} — {line.note.strip()}"[:200]
+        charge.proration_note = label
         charge_ids.append(charge.id)
         total += amount
     AuditService.record(

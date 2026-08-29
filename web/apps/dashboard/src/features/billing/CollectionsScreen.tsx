@@ -21,7 +21,7 @@ import { apiFetch, downloadFile } from '@studio/core'
 import { Button, Card, Checkbox, EmptyState, MoneyDisplay, StatusChip } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
-import type { BillingRunOut, DashboardBillingClient } from './billingClient'
+import type { BillingRunOut, ChargeOut, DashboardBillingClient } from './billingClient'
 import { ageBucket, escalationRung } from './billingClient'
 import { RecordPaymentDialog } from './RecordPaymentDialog'
 
@@ -36,6 +36,24 @@ const rowStyle: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   gap: 'var(--space-4)',
+}
+
+const detailListStyle: CSSProperties = {
+  listStyle: 'none',
+  margin: 0,
+  padding: 'var(--space-2) var(--space-4)',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 'var(--space-2)',
+  borderBlockEnd: 'var(--border-width-hairline) solid var(--border)',
+}
+
+const detailRowStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 'var(--space-3)',
+  fontSize: 'var(--text-label)',
+  color: 'var(--text-secondary)',
 }
 
 export type HouseholdRow = {
@@ -115,6 +133,22 @@ export function CollectionsScreen({
   const [running, setRunning] = useState(false)
   const [runResult, setRunResult] = useState<BillingRunOut | null>(null)
   const [payingFor, setPayingFor] = useState<HouseholdRow | null>(null)
+  // The household drill (2026-08-30). 3e's no-expansion note recorded a GAP, not a rule;
+  // the owner asked for the row to answer "what exactly is owed" — which is also the one
+  // place a parent's shop-order note (riding the charge label) reaches a manager's eyes.
+  const [detailsFor, setDetailsFor] = useState<string | null>(null)
+  const [detailCharges, setDetailCharges] = useState<Record<string, readonly ChargeOut[]>>({})
+  const toggleDetails = (payerPersonId: string) => {
+    setDetailsFor((current) => (current === payerPersonId ? null : payerPersonId))
+    if (!detailCharges[payerPersonId]) {
+      void client
+        .openCharges(payerPersonId)
+        .then((items) =>
+          setDetailCharges((previous) => ({ ...previous, [payerPersonId]: items })),
+        )
+        .catch(() => undefined)
+    }
+  }
 
   const total = useMemo(
     () => households.reduce((sum, row) => sum + row.balanceAgorot, 0),
@@ -223,7 +257,8 @@ export function CollectionsScreen({
         ) : (
           <Card>
             {households.map((row) => (
-              <div key={row.payerPersonId} style={rowStyle} data-testid="household-row">
+              <div key={row.payerPersonId} data-testid="household-block">
+              <div style={rowStyle} data-testid="household-row">
                 <Checkbox
                   // Never empty (ship-audit D1): an empty label is an unnamed checkbox to
                   // a screen reader. The students name the family when the payer read
@@ -295,6 +330,34 @@ export function CollectionsScreen({
                 >
                   {t(locale, 'billing.payment.recordCash')}
                 </Button>
+                <Button
+                  variant="ghost"
+                  data-testid="household-details"
+                  aria-expanded={detailsFor === row.payerPersonId}
+                  onClick={() => toggleDetails(row.payerPersonId)}
+                >
+                  {t(locale, 'billing.debt.details')}
+                </Button>
+              </div>
+              {detailsFor === row.payerPersonId ? (
+                <ul style={detailListStyle} data-testid="household-charges">
+                  {(detailCharges[row.payerPersonId] ?? []).map((charge) => (
+                    <li key={charge.id} style={detailRowStyle}>
+                      {/* The label first: it is what the money is FOR, and it is where a
+                          parent's own note arrives. The kind is the fallback for charges
+                          the run wrote with no label of their own. */}
+                      <span style={{ flex: 1 }}>
+                        {charge.proration_note || t(locale, `billing.charge.kind.${charge.kind}`)}
+                      </span>
+                      <span>{charge.due_date}</span>
+                      <MoneyDisplay agorot={charge.amount_agorot} tone="debt" />
+                    </li>
+                  ))}
+                  {(detailCharges[row.payerPersonId] ?? []).length === 0 ? (
+                    <li>{t(locale, 'billing.debt.detailsEmpty')}</li>
+                  ) : null}
+                </ul>
+              ) : null}
               </div>
             ))}
             <div style={rowStyle}>

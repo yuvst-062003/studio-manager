@@ -98,6 +98,24 @@ export function DocumentsScreen({ locale, client, onEditTemplate }: DocumentsScr
   const [rows, setRows] = useState<HealthStatusSummaryOut[] | null>(null)
   const [failed, setFailed] = useState(false)
   const [reminded, setReminded] = useState<Record<string, boolean>>({})
+  const [pdfFailed, setPdfFailed] = useState<Record<string, boolean>>({})
+
+  // The tab opens synchronously inside the click (no popup block), then receives the
+  // blob; on failure it closes rather than sitting blank with the club's name on it.
+  const openPdf = async (studentId: string) => {
+    setPdfFailed((previous) => ({ ...previous, [studentId]: false }))
+    const tab = globalThis.open('', '_blank')
+    if (tab) tab.opener = null
+    try {
+      const response = await client.pdf(studentId)
+      if (!response.ok) throw new Error(String(response.status))
+      const url = URL.createObjectURL(await response.blob())
+      if (tab) tab.location.replace(url)
+    } catch {
+      tab?.close()
+      setPdfFailed((previous) => ({ ...previous, [studentId]: true }))
+    }
+  }
 
   // The failure flag is cleared in the resolve branch rather than before the request. Clearing
   // it here synchronously is a setState in an effect body, which react-hooks/set-state-in-effect
@@ -186,16 +204,26 @@ export function DocumentsScreen({ locale, client, onEditTemplate }: DocumentsScr
             />
             {row.health_status === 'signed' ? (
               <>
-                {/* `noreferrer` as well as `noopener`: the URL of a health-declaration PDF
-                    names a student, and sending it as a Referer to whatever the browser
-                    opens next leaks that outside §11.2's audited read. */}
-                <a
-                  href={client.pdfUrl(row.student_id)}
-                  rel="noopener noreferrer"
-                  target="_blank"
+                {/* A BUTTON that fetches, never an `<a href>` to the API (2026-08-30): a
+                    bare navigation carries no bearer token, so the read came back 401 and
+                    the SPA fallback landed the manager on the calendar instead of the
+                    document. The tab opens synchronously (inside the click, so no popup
+                    block), then receives the blob; `opener` is severed for the same
+                    reason the old link carried `noopener` — and a blob: URL sends no
+                    Referer, which is what `noreferrer` was for. */}
+                <Button
+                  data-testid={`view-full-${row.student_id}`}
+                  onClick={() => void openPdf(row.student_id)}
+                  type="button"
+                  variant="secondary"
                 >
                   {t(locale, 'health.documents.viewFull')}
-                </a>
+                </Button>
+                {pdfFailed[row.student_id] ? (
+                  <span role="alert" data-testid={`pdf-error-${row.student_id}`}>
+                    {t(locale, 'health.documents.error')}
+                  </span>
+                ) : null}
                 {/* 4e finding 1. §11.2 logs the read; the manager is told before it happens. */}
                 <span
                   data-testid={`audit-notice-${row.student_id}`}

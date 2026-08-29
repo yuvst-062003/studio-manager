@@ -36,6 +36,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, attributes
 
 from app.core.clock import now
+from app.core.config import settings
+from app.core.cors import app_origin
 from app.models.studio import Studio
 from app.services.audit import AuditService
 
@@ -66,9 +68,11 @@ WIZARD_STEPS: tuple[str, ...] = (
     "groups",
     "belts",
     "prices",
+    # 2026-08-30 (owner request): items moved to sit right after prices — the two money
+    # questions answered together — instead of last.
+    "items",
     "staff",
     "students",
-    "items",
 )
 
 #: `pending` is settable since F6 — the REVERSAL of the original decision, on the
@@ -139,6 +143,9 @@ def read(session: Session, *, studio_id: uuid.UUID) -> dict[str, Any]:
         # report a finished studio.
         "complete": all(step["status"] == "done" for step in rendered),
         "dismissed_at": progress["dismissed_at"],
+        # The staff wizard links its unbuilt steps at the dashboard's own wizard
+        # (2026-08-30) -- resolved from the same table the OAuth callback trusts.
+        "dashboard_url": app_origin("dashboard", settings.ENV),
     }
 
 

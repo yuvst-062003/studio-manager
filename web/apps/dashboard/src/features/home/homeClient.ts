@@ -59,10 +59,20 @@ export interface HomeTodaySession {
  * endpoints is down is worse than one that shows three regions and an error in the
  * fourth, which is why this is `allSettled` and not `all`.
  */
+/** One bar of the board's attendance chart (owner request 2026-08-30). `rate_percent`
+ *  null is load-bearing, same as the report screen's: a group nobody marked has no rate,
+ *  and 0% would be a claim about children who were simply never counted. */
+export interface HomeGroupRate {
+  group_id: string
+  group_name: string
+  rate_percent: number | null
+}
+
 export interface HomeData {
   money: HomeMoney | null
   attention: HomeAttention | null
   today: HomeTodaySession[] | null
+  attendance: HomeGroupRate[] | null
 }
 
 export interface HomeClient {
@@ -122,7 +132,7 @@ export function makeHomeClient(fetcher: Fetcher): HomeClient {
   return {
     async load(studioId, today) {
       const { from, to } = weekBounds(today)
-      const [money, health, sessions] = await Promise.allSettled([
+      const [money, health, sessions, attendance] = await Promise.allSettled([
         (async (): Promise<HomeMoney> => {
           const [summary, charges] = await Promise.all([
             json<MonthlySummary>(
@@ -153,6 +163,16 @@ export function makeHomeClient(fetcher: Fetcher): HomeClient {
           )
           return body.items
         })(),
+        // The board's attendance bars (owner request 2026-08-30) — the report screen's own
+        // endpoint over the last 30 days, so the board and 4c can never disagree.
+        (async (): Promise<HomeGroupRate[]> => {
+          const monthAgo = new Date(today)
+          monthAgo.setDate(monthAgo.getDate() - 30)
+          const body = await json<{ groups: HomeGroupRate[] }>(
+            await fetcher(`${API}/attendance/report?from=${isoDay(monthAgo)}&to=${isoDay(today)}`),
+          )
+          return body.groups
+        })(),
       ])
 
       const rows = sessions.status === 'fulfilled' ? sessions.value : null
@@ -168,6 +188,7 @@ export function makeHomeClient(fetcher: Fetcher): HomeClient {
         money: money.status === 'fulfilled' ? money.value : null,
         attention,
         today: rows ? todayFrom(rows, today) : null,
+        attendance: attendance.status === 'fulfilled' ? attendance.value : null,
       }
     },
   }

@@ -32,11 +32,12 @@ export function ShopSection({ locale }: { locale: Locale }) {
           body: JSON.stringify({
             items: lines.map((line) => ({
               product_id: line.productId,
-              quantity: 1,
+              quantity: line.quantity,
               // Omitted rather than sent null for a sizeless item: the route refuses a size
               // against one, and `size: null` is the same as absent to the validator but
               // reads on the wire like an answer that was given.
               ...(line.size ? { size: line.size } : {}),
+              ...(line.note ? { note: line.note } : {}),
             })),
           }),
         })

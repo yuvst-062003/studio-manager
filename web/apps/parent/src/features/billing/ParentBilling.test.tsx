@@ -793,10 +793,10 @@ describe('12e — ordering items', () => {
     await userEvent.click(screen.getByTestId('order-button'))
 
     expect(onOrder).toHaveBeenCalledWith([
-      { productId: 'p1', size: '160' },
+      { productId: 'p1', size: '160', quantity: 1, note: null },
       // `null`, never `''` — an empty string is a size the parent did not choose, and the
       // route refuses any size at all against a sizeless item.
-      { productId: 'p2', size: null },
+      { productId: 'p2', size: null, quantity: 1, note: null },
     ])
   })
 
@@ -811,7 +811,7 @@ describe('12e — ordering items', () => {
     await pick(0)
     expect(screen.getByTestId('order-button')).toBeEnabled()
     await userEvent.click(screen.getByTestId('order-button'))
-    expect(onOrder).toHaveBeenCalledWith([{ productId: 'p1', size: '120' }])
+    expect(onOrder).toHaveBeenCalledWith([{ productId: 'p1', size: '120', quantity: 1, note: null }])
   })
 
   it('still says nothing about availability, now that there are sizes to say it about', () => {
@@ -838,5 +838,47 @@ describe('the student-card payment strip', () => {
   it('shows the debt through MoneyDisplay when there is one', () => {
     render(<PaymentStrip locale={LOCALE} balanceAgorot={32_000} onOpenPayments={vi.fn()} />)
     expect(screen.getByTestId('payment-strip').querySelector('.studio-money')).not.toBeNull()
+  })
+})
+
+describe('quantity and the parent’s note (2026-08-30)', () => {
+  const PRODUCTS = [
+    { id: 'p1', name: 'גי', price_agorot: 18_000, sizes: [] },
+    { id: 'p2', name: 'חגורה', price_agorot: 4_000, sizes: [] },
+  ]
+
+  it('a chosen item grows a quantity field, and the total follows it', async () => {
+    render(<OrderItemsScreen locale={LOCALE} products={PRODUCTS} onOrder={vi.fn()} />)
+    await userEvent.click(within(screen.getAllByTestId('product-row')[0]!).getByRole('checkbox'))
+    await userEvent.selectOptions(
+      screen.getByLabelText(t(LOCALE, 'billing.product.quantity')),
+      '3',
+    )
+    const amounts = [...document.querySelectorAll('.studio-money')]
+    expect(amounts[amounts.length - 1]?.textContent).toContain('540')
+  })
+
+  it('quantity and note travel on the order line', async () => {
+    const onOrder = vi.fn(() => Promise.resolve())
+    render(<OrderItemsScreen locale={LOCALE} products={PRODUCTS} onOrder={onOrder} />)
+    await userEvent.click(within(screen.getAllByTestId('product-row')[0]!).getByRole('checkbox'))
+    await userEvent.selectOptions(
+      screen.getByLabelText(t(LOCALE, 'billing.product.quantity')),
+      '2',
+    )
+    await userEvent.type(
+      screen.getByLabelText(t(LOCALE, 'billing.product.noteLabel')),
+      'רקמה: יוסי',
+    )
+    await userEvent.click(screen.getByTestId('order-button'))
+    expect(onOrder).toHaveBeenCalledWith([
+      { productId: 'p1', size: null, quantity: 2, note: 'רקמה: יוסי' },
+    ])
+  })
+
+  it('an unchosen item asks neither quantity nor note', () => {
+    render(<OrderItemsScreen locale={LOCALE} products={PRODUCTS} onOrder={vi.fn()} />)
+    expect(screen.queryByLabelText(t(LOCALE, 'billing.product.quantity'))).toBeNull()
+    expect(screen.queryByLabelText(t(LOCALE, 'billing.product.noteLabel'))).toBeNull()
   })
 })

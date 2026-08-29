@@ -384,6 +384,14 @@ function AuthedApp() {
         <SignIn
           locale={locale}
           app="parent"
+          // An invitation link (`/?invite=<token>`, 2026-08-30) must survive the OAuth
+          // round trip, or the parent lands back with the token gone and Resolve's
+          // no-match screen asks them to retype what the link already carried.
+          returnPath={
+            globalThis.location?.search.includes('invite=')
+              ? `/${globalThis.location.search}`
+              : '/'
+          }
           languagePicker={<LanguagePicker locale={locale} onChoose={setLocale} />}
         />
       ) : null}

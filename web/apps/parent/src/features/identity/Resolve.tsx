@@ -28,7 +28,31 @@ import { makeParentScheduleClient } from '../schedule/client'
 const STAFF_APP_URL = '/staff'
 
 export function Resolve({ session, locale }: { session: Session; locale: Locale }) {
-  const [code, setCode] = useState('')
+  // Pre-filled from an invitation LINK (`/?invite=<token>`, 2026-08-30) — the manager's
+  // add-a-student screen hands the parent this URL; retyping a long token from it is the
+  // exact friction the link exists to remove.
+  const [code, setCode] = useState(
+    () => new URLSearchParams(globalThis.location?.search ?? '').get('invite') ?? '',
+  )
+  const redeem = (token: string) =>
+    apiFetch('/api/v1/auth/accept-invitation', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
+    }).then((response) => {
+      if (response.ok) session.reload()
+    })
+
+  // The link's token is redeemed on arrival, once — a parent who followed the link has
+  // already said yes. A failed redeem leaves the pre-filled field on screen, which is
+  // the manual path with the typing already done.
+  const arrivedWithInvite = code !== '' && !session.access.parent
+  useEffect(() => {
+    if (!arrivedWithInvite) return
+    const wanted = new URLSearchParams(globalThis.location?.search ?? '').get('invite')
+    if (wanted) void redeem(wanted)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one shot, on arrival only.
+  }, [])
   // Memoised: `useMyStudents` reads through this in an effect keyed on the client, so a
   // fresh object every render would re-fetch forever.
   const peopleClient = useMemo(() => makePeopleClient(apiFetch), [])
@@ -132,11 +156,7 @@ export function Resolve({ session, locale }: { session: Session; locale: Locale 
           <button
             type="button"
             onClick={() => {
-              void apiFetch('/api/v1/auth/accept-invitation', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ token: code }),
-              }).then(() => session.reload())
+              void redeem(code)
             }}
           >
             {t(locale, 'common.auth.haveInviteCode')}

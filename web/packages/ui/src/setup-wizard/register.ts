@@ -36,12 +36,13 @@ export function registerM1WizardSteps(fetcher: Fetcher): void {
   })
   registerSlot<WizardStepProps>('setup-wizard', {
     key: 'staff',
-    order: 5,
+    // 6, not 5: items sits at 5 since 2026-08-30 (owner request).
+    order: 6,
     render: makeStaffStep(makeStaffClient(fetcher)),
   })
   registerSlot<WizardStepProps>('setup-wizard', {
     key: 'students',
-    order: 6,
+    order: 7,
     render: makeStudentsStep(makeStudentsClient(fetcher)),
   })
 }

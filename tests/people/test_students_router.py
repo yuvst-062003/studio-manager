@@ -87,6 +87,10 @@ def test_a_manager_creates_a_student(client, as_manager):
     assert body["student"]["status"] == "lead"
     assert body["student"]["health_status"] == "missing"
     assert body["invitation_token"]
+    # 2026-08-30 — the schema promised 'a copyable link for a parent standing at the
+    # desk' and returned only the raw token. The URL is the parent app's own origin
+    # with the token as `?invite=`, which Resolve redeems after sign-in.
+    assert body["invitation_url"].endswith(f"/?invite={body['invitation_token']}")
 
 
 def test_a_manager_who_names_a_group_gets_an_enrollment_immediately(

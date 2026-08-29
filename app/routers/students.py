@@ -35,6 +35,8 @@ from pydantic import BaseModel, Field
 
 from app.core.auth_context import AnyStaff, ManagerOrOwner
 from app.core.clock import now
+from app.core.config import settings
+from app.core.cors import app_origin
 from app.core.tenancy import TenantSession, TenantSessionDep
 from app.models.people import Student
 from app.models.person import Person
@@ -361,7 +363,15 @@ def create_student(
     token = created.invitation_token
     session.commit()
     student, person = StudentService.get(session, student_id=created.student.id)
-    return StudentCreateResult(student=_out(session, student, person), invitation_token=token)
+    # 2026-08-30 — the copyable link the schema promised. The parent app's Resolve
+    # redeems `?invite=` after sign-in; the origin comes from domains.json through the
+    # same table the OAuth callback trusts, so this can never point anywhere else.
+    origin = app_origin("parent", settings.ENV)
+    return StudentCreateResult(
+        student=_out(session, student, person),
+        invitation_token=token,
+        invitation_url=f"{origin}/?invite={token}" if token and origin else None,
+    )
 
 
 @router.patch("/students/{student_id}", response_model=StudentOut)

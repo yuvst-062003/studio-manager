@@ -49,11 +49,10 @@ def test_the_steps_are_the_canvas_order_plus_items(client, as_owner) -> None:
     """The canvas fixes six steps, progress running right-to-left. M1 owns 1, 3, 5 and 6;
     M7 fills belts and M6 fills prices.
 
-    `items` is a seventh, added 2026-08-29: §4.3's catalogue had no step and no screen, so
-    a club's sellable items could only be created through the API. It is LAST because it is
-    the only step nothing else depends on -- a club can run a season without ever selling a
-    גי — and this assertion is the pair to `WIZARD_STEP_ORDER` in
-    `web/packages/ui/src/setup-wizard/types.ts`, which must agree with it.
+    `items` is a seventh, added 2026-08-29 and moved to sit right after `prices` on
+    2026-08-30 (owner request) — the two money questions answered together. This assertion
+    is the pair to `WIZARD_STEP_ORDER` in `web/packages/ui/src/setup-wizard/types.ts`,
+    which must agree with it.
     """
     steps = get_setup(client, as_owner).json()["steps"]
     assert [s["order"] for s in steps] == [1, 2, 3, 4, 5, 6, 7]
@@ -62,9 +61,9 @@ def test_the_steps_are_the_canvas_order_plus_items(client, as_owner) -> None:
         "groups",
         "belts",
         "prices",
+        "items",
         "staff",
         "students",
-        "items",
     ]
 
 
@@ -246,3 +245,11 @@ def test_the_schema_and_the_service_agree_on_what_is_settable() -> None:
     from app.schemas.setup import SetupStepIn
 
     assert set(get_args(SetupStepIn.model_fields["status"].annotation)) == set(SETTABLE_STATUSES)
+
+
+def test_the_payload_names_the_dashboard(client, as_owner) -> None:
+    """2026-08-30 — the staff app registers four of seven steps; its wizard links the
+    other three at the dashboard instead of showing dead rail buttons. The origin comes
+    from the same table the OAuth callback trusts."""
+    body = get_setup(client, as_owner).json()
+    assert body["dashboard_url"] == "http://localhost:5175"

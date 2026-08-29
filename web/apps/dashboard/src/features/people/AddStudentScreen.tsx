@@ -18,6 +18,8 @@ import { Alert, Button, TextField } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { WeekdayPicker, attendsWeekdaysFor } from './WeekdayPicker'
+import { CopyButton } from './SharingCards'
+import { ImportStudentsPanel } from './ImportStudentsPanel'
 import type { DashboardPeopleClient, GroupOption } from './peopleClient'
 
 //: §5.4(a) is 'child details AND GROUP -> save'. `group_id` empty is the phone-enquiry
@@ -70,6 +72,7 @@ export function AddStudentScreen({
   const [sending, setSending] = useState(false)
   const [failed, setFailed] = useState(false)
   const [invitationToken, setInvitationToken] = useState<string | null>(null)
+  const [invitationUrl, setInvitationUrl] = useState<string | null>(null)
   const [done, setDone] = useState(false)
 
   useEffect(() => {
@@ -113,6 +116,7 @@ export function AddStudentScreen({
     setFailed(false)
     try {
       let token: string | null = null
+      let url: string | null = null
       // §5.4a's worked example: "יעל submits one form with דנה and יוסי. The manager
       // approves once." Each child is its own request; the SERVER matches them onto the
       // same parent by the verified address, which is what stops a second Person appearing.
@@ -140,10 +144,15 @@ export function AddStudentScreen({
           setFailed(true)
           return
         }
-        const body = (await response.json()) as { invitation_token?: string | null }
+        const body = (await response.json()) as {
+          invitation_token?: string | null
+          invitation_url?: string | null
+        }
         token = token ?? body.invitation_token ?? null
+        url = url ?? body.invitation_url ?? null
       }
       setInvitationToken(token)
+      setInvitationUrl(url)
       setDone(true)
       onCreated?.()
     } catch {
@@ -159,8 +168,18 @@ export function AddStudentScreen({
         <h2 id="add-done">{t(locale, 'people.student.saved')}</h2>
         {invitationToken ? (
           // §5.4(a) — 'sends the parent an invitation'. Shown once, for a parent standing
-          // at the desk; only its hash is stored, so it cannot be shown again.
-          <p data-testid="add-student-invitation">{invitationToken}</p>
+          // at the desk; only its hash is stored, so it cannot be shown again. The LINK
+          // (2026-08-30) is what the manager actually sends — the bare token stays as the
+          // fallback for an environment whose parent host is still PENDING.
+          <div data-testid="add-student-invitation" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+            <p style={{ margin: 0 }}>{t(locale, 'people.invite.linkHint')}</p>
+            <p style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+              <span data-testid="add-student-invite-url" style={{ overflowWrap: 'anywhere' }}>
+                <bdi dir="ltr">{invitationUrl ?? invitationToken}</bdi>
+              </span>
+              <CopyButton locale={locale} value={invitationUrl ?? invitationToken} />
+            </p>
+          </div>
         ) : (
           // L7 — a matched parent already has a login. §5.4a: 'No second invitation, no
           // second account, no second login.'
@@ -171,6 +190,7 @@ export function AddStudentScreen({
   }
 
   return (
+    <>
     <form onSubmit={submit} style={formStyle} aria-labelledby="add-student" data-testid="add-student">
       <h1 id="add-student">{t(locale, 'people.student.add')}</h1>
 
@@ -300,5 +320,9 @@ export function AddStudentScreen({
         {t(locale, 'people.student.add')}
       </Button>
     </form>
+    {/* Owner request 2026-08-30 — 'can import a file'. The same screen, because it is the
+        same question ("get these families in") answered at a different volume. */}
+    <ImportStudentsPanel locale={locale} client={client} onImported={onCreated} />
+    </>
   )
 }

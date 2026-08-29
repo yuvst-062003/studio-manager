@@ -158,6 +158,9 @@ export const common: Bundle = {
   'dev.ipn.orderRef': 'order public_ref',
   'dev.noticeIcon': 'notice',
   // §5.1's setup wizard — artboards 5c and 5f.
+  'setup.stepInDashboard': 'This step is edited in the manager dashboard.',
+'setup.skipForNow': 'Skip for now',
+  'setup.finishCta': 'Finish — go to the dashboard',
   'setup.title': 'Setup wizard',
   // The wizard chrome, from artboards 5c-5f.
   'setup.saveAndExit': 'Save and exit',
@@ -279,6 +282,9 @@ export const common: Bundle = {
   'setup.students.studentCount': '{n} students',
   'setup.students.changeableLater': 'Everything can be changed later in Settings — belts and prices included.',
   // Dashboard artboards 3d (staff) and 3f (settings).
+  'dash.home.attendanceChart.title': 'Attendance — last 30 days',
+  'dash.home.attendanceChart.all': 'Full report',
+  'dash.home.attendanceChart.noRate': 'No data',
   'dash.home.title': 'Manager dashboard',
   'dash.home.body': 'Pick a screen from the menu.',
   'dash.nav.staff': 'Staff',
@@ -409,6 +415,7 @@ export const common: Bundle = {
   'dash.home.today.hall': 'Hall',
   'dash.home.today.coach': 'Coach',
   'dash.home.today.noCoach': 'No coach assigned',
+
   // -- §18.1's platform console (#/platform) --------------------------------------
   'platform.title': 'Platform console',
   'platform.nav': 'Platform',

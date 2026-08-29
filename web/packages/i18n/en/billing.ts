@@ -135,6 +135,8 @@ export const billing: Bundle = {
 
   // -- collection and the debt ladder (dashboard 3e) ----------------------------
   'debt.title': 'Payments and collection',
+  'debt.details': 'Charge details',
+  'debt.detailsEmpty': 'No open charges',
   'debt.byHousehold': 'Balance by household',
   'debt.empty': 'Nothing outstanding across the club',
   'debt.total': 'Total outstanding',
@@ -247,7 +249,7 @@ export const billing: Bundle = {
   'debt.household': 'Household',
   'run.confirm': 'Confirm charge generation',
   'export.forAccountant': 'Export for the accountant',
-  'payment.recordCash': 'Record a cash payment',
+  'payment.recordCash': 'Record a payment — cash, cheques or transfer',
   'history.paidThisYear': 'Paid this year',
   'history.openBalance': 'Open balance',
   'product.forWhom': 'For whom',
@@ -286,6 +288,8 @@ export const billing: Bundle = {
   'product.sizesRequired': 'An item with sizes needs at least one',
   'product.sizeDuplicate': 'That size is already on the list',
   'product.chooseSize': 'Choose a size',
+  'product.quantity': 'Quantity',
+  'product.noteLabel': 'Note to the club (optional)',
   'product.chooseSizeFirst': 'Choose a size before ordering',
 
   'product.wizardTitle': 'Items for sale',

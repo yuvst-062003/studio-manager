@@ -34,7 +34,9 @@ const cardsStyle: CSSProperties = {
   marginBlockEnd: 'var(--space-4)',
 }
 
-function CopyButton({ locale, value }: { locale: Locale; value: string }) {
+/** Exported (2026-08-30) for AddStudentScreen's invitation link — one copy affordance,
+ *  not two spellings of one. */
+export function CopyButton({ locale, value }: { locale: Locale; value: string }) {
   const [copied, setCopied] = useState(false)
   return (
     <Button

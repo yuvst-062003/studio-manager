@@ -488,6 +488,10 @@ class StudentCreateResult(BaseModel):
 
     student: StudentOut
     invitation_token: str | None = None
+    #: The token as the parent-app link (`{parent origin}/?invite={token}`), ready to
+    #: send. None when no invitation was minted, or the environment's parent host is
+    #: still a PENDING placeholder.
+    invitation_url: str | None = None
 
 
 class StudentStatusHistoryListResponse(BaseModel):

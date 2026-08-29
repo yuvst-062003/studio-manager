@@ -169,6 +169,9 @@ export const common: Bundle = {
   // §5.1's setup wizard — artboards 5c and 5f. The step names are the canvas's own,
   // and the reassurance line is 5c verbatim: it is the sentence that makes skipping feel
   // safe, which is why every step carries it and not only the first.
+  'setup.stepInDashboard': 'את השלב הזה עורכים בדשבורד הניהול.',
+  'setup.skipForNow': 'דילוג בינתיים',
+  'setup.finishCta': 'סיום — מעבר למסך הניהול',
   'setup.title': 'אשף הקמה',
   // The wizard chrome, from artboards 5c-5f. `saveAndExit` sits in the header on every
   // step but the last; 5f drops it because there is nothing left to save for later.
@@ -309,6 +312,9 @@ export const common: Bundle = {
   'setup.students.changeableLater': 'אפשר לשנות הכול אחר כך בהגדרות — כולל חגורות ומחירים.',
   // Dashboard artboards 3d (צוות) and 3f (הגדרות). §6.4 — desktop-first, but the same
   // components render narrow: a manager checking cover on a phone is a normal case.
+  'dash.home.attendanceChart.title': 'נוכחות — 30 הימים האחרונים',
+  'dash.home.attendanceChart.all': 'לדוח המלא',
+  'dash.home.attendanceChart.noRate': 'אין נתונים',
   'dash.home.title': 'לוח המנהל',
   'dash.home.body': 'בחרו מסך מהתפריט.',
   'dash.nav.staff': 'צוות',
@@ -443,6 +449,7 @@ export const common: Bundle = {
   'dash.home.today.hall': 'אולם',
   'dash.home.today.coach': 'מאמן',
   'dash.home.today.noCoach': 'לא שובץ מאמן',
+
   // -- §18.1's platform console (#/platform) --------------------------------------
   // Operator-facing, not club-facing: this whole block is read by one person, the
   // platform admin, and it is offered only when /auth/me reports is_platform_admin.

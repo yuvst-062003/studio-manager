@@ -27,13 +27,12 @@ export const WIZARD_STEP_ORDER: readonly WizardStepId[] = [
   'groups',
   'belts',
   'prices',
+  // §4.3's sellable items (2026-08-29; moved 2026-08-30, owner request): right after
+  // prices, so the two money questions are answered together. Still one skip away for a
+  // club that sells nothing.
+  'items',
   'staff',
   'students',
-  // §4.3's sellable items (2026-08-29). LAST, because it is the only step nothing else
-  // depends on: a club can run a whole season without ever selling a גי, and putting the
-  // most skippable question in front of the ones that unblock everything else is how an
-  // owner stalls on step 3 of 7.
-  'items',
 ]
 
 export type WizardStep = {
@@ -50,6 +49,9 @@ export type SetupProgress = {
   complete: boolean
   /** The owner chose an exit at step 6. Governs auto-routing, nothing else. */
   dismissed_at: string | null
+  /** Where steps this surface has not built are edited (2026-08-30). Optional so older
+   *  payloads still type-check; None/absent hides the link. */
+  dashboard_url?: string | null
 }
 
 /**

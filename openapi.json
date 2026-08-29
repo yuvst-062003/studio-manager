@@ -5661,6 +5661,18 @@
       },
       "ItemOrderLineIn": {
         "properties": {
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
           "product_id": {
             "format": "uuid",
             "title": "Product Id",
@@ -10614,6 +10626,17 @@
             "title": "Complete",
             "type": "boolean"
           },
+          "dashboard_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dashboard Url"
+          },
           "dismissed_at": {
             "anyOf": [
               {
@@ -11504,6 +11527,17 @@
               }
             ],
             "title": "Invitation Token"
+          },
+          "invitation_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invitation Url"
           },
           "student": {
             "$ref": "#/components/schemas/StudentOut"

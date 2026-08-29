@@ -7552,6 +7552,8 @@ export interface components {
         };
         /** ItemOrderLineIn */
         ItemOrderLineIn: {
+            /** Note */
+            note?: string | null;
             /**
              * Product Id
              * Format: uuid
@@ -9951,6 +9953,8 @@ export interface components {
              * @description Every one of the wizard steps is done.
              */
             complete: boolean;
+            /** Dashboard Url */
+            dashboard_url?: string | null;
             /**
              * Dismissed At
              * @description The owner chose an exit at step 6. Auto-routing stops.
@@ -10288,6 +10292,8 @@ export interface components {
         StudentCreateResult: {
             /** Invitation Token */
             invitation_token?: string | null;
+            /** Invitation Url */
+            invitation_url?: string | null;
             student: components["schemas"]["StudentOut"];
         };
         /**

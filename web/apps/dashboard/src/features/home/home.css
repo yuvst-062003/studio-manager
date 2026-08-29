@@ -78,3 +78,53 @@
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
+/* The board's attendance bars (owner request 2026-08-30). Columns flow with the document
+ * direction — first group on the reading edge — and every bar carries its number above
+ * it, so the colour is never the only carrier (SC 1.4.1). */
+.dash-home__attendance-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-4);
+  margin: 0;
+  padding: var(--space-3) 0 0;
+  list-style: none;
+  overflow-x: auto;
+}
+
+.dash-home__attendance-column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  min-inline-size: 4.5rem;
+}
+
+.dash-home__attendance-value {
+  font-size: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+}
+
+.dash-home__attendance-track {
+  display: flex;
+  align-items: flex-end;
+  block-size: 7rem;
+  inline-size: var(--space-6);
+  border-radius: var(--radius-sm);
+  background: var(--cancelled-tint);
+}
+
+.dash-home__attendance-bar {
+  inline-size: 100%;
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+}
+
+.dash-home__attendance-name {
+  font-size: var(--text-caption);
+  color: var(--fg);
+  text-align: center;
+  overflow-wrap: anywhere;
+  max-inline-size: 7rem;
+}

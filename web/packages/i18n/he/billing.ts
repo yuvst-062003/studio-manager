@@ -172,6 +172,8 @@ export const billing: Bundle = {
 
   // -- collection and the debt ladder (dashboard 3e) ----------------------------
   'debt.title': 'תשלומים וגבייה',
+  'debt.details': 'פירוט חיובים',
+  'debt.detailsEmpty': 'אין חיובים פתוחים',
   'debt.byHousehold': 'חוב לפי משק בית',
   'debt.empty': 'אין חובות פתוחים במועדון',
   'debt.total': 'סה״כ חוב פתוח',
@@ -297,7 +299,7 @@ export const billing: Bundle = {
   'debt.household': 'משק בית',
   'run.confirm': 'אישור הפקת חיובים',
   'export.forAccountant': 'ייצוא לרו״ח',
-  'payment.recordCash': 'רישום תשלום מזומן',
+  'payment.recordCash': 'רישום תשלום — מזומן, צ׳קים או העברה',
   'history.paidThisYear': 'שולם השנה',
   'history.openBalance': 'יתרה פתוחה',
   'product.forWhom': 'למי',
@@ -342,6 +344,8 @@ export const billing: Bundle = {
   'product.sizeDuplicate': 'המידה כבר ברשימה',
   // 12e — the parent's side.
   'product.chooseSize': 'בחירת מידה',
+  'product.quantity': 'כמות',
+  'product.noteLabel': 'הערה למועדון (לא חובה)',
   'product.chooseSizeFirst': 'בחרו מידה לפני ההזמנה',
 
   // The wizard's seventh step.

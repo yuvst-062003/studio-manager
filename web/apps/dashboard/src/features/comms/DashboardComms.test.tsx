@@ -408,3 +408,22 @@ describe('layout', () => {
     }
   })
 })
+
+describe('the preview pane (2026-08-30)', () => {
+  it('sits in its own inline-end column beside the composer, both mocks inside', async () => {
+    // Owner request: the preview on the LEFT of a Hebrew screen (right of an English
+    // one) — which is the inline-end column of a grid whose first child is the composer.
+    render(
+      <AnnouncementsScreen canPublishStudioWide client={makeClient()} locale="he" scopes={SCOPES} />,
+    )
+    const pane = await screen.findByTestId('preview-pane')
+    expect(within(pane).getByTestId('push-preview')).toBeInTheDocument()
+    expect(within(pane).getByTestId('inbox-preview')).toBeInTheDocument()
+    const section = pane.closest('section')
+    expect(section).toHaveStyle({ display: 'grid' })
+    // DOM order IS the direction rule: composer first (inline-start), preview second.
+    expect(pane.previousElementSibling).toContainElement(
+      screen.getByLabelText(t('he', 'comms.announcement.subject')),
+    )
+  })
+})

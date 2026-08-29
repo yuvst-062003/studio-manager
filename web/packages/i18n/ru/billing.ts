@@ -139,6 +139,8 @@ export const billing: Bundle = {
 
   // -- collection and the debt ladder (dashboard 3e) ----------------------------
   'debt.title': 'Платежи и сборы',
+  'debt.details': 'Детали начислений',
+  'debt.detailsEmpty': 'Нет открытых начислений',
   'debt.byHousehold': 'Задолженность по семьям',
   'debt.empty': 'По клубу задолженности нет',
   'debt.total': 'Всего задолженности',
@@ -242,7 +244,7 @@ export const billing: Bundle = {
   'debt.household': 'Семья',
   'run.confirm': 'Подтвердить создание счетов',
   'export.forAccountant': 'Экспорт для бухгалтера',
-  'payment.recordCash': 'Записать оплату наличными',
+  'payment.recordCash': 'Записать платёж — наличные, чеки или перевод',
   'history.paidThisYear': 'Оплачено в этом году',
   'history.openBalance': 'Открытый баланс',
   'product.forWhom': 'Для кого',
@@ -290,6 +292,8 @@ export const billing: Bundle = {
   'product.sizesRequired': 'У товара с размерами должен быть хотя бы один',
   'product.sizeDuplicate': 'Такой размер уже в списке',
   'product.chooseSize': 'Выберите размер',
+  'product.quantity': 'Количество',
+  'product.noteLabel': 'Примечание для клуба (необязательно)',
   'product.chooseSizeFirst': 'Выберите размер перед заказом',
 
   'product.wizardTitle': 'Товары на продажу',

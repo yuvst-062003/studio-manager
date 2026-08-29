@@ -94,6 +94,9 @@ export type DashboardBillingClient = {
   confirmMatch(ipnId: string, payerPersonId: string): Promise<void>
   ignoreIpn(ipnId: string): Promise<void>
   pricePlans(): Promise<PricePlanOut[]>
+  /** The household drill (2026-08-30): a payer's open charges, labels included — the one
+   *  read that shows a parent's shop-order note to a manager. */
+  openCharges(payerPersonId: string): Promise<ChargeOut[]>
   payments(): Promise<PaymentOut[]>
   billingSettings(): Promise<BillingSettingsOut>
   saveBillingSettings(patch: Partial<BillingSettingsOut>): Promise<BillingSettingsOut>
@@ -207,6 +210,16 @@ export function makeDashboardBillingClient(fetcher: Fetcher): DashboardBillingCl
     },
     async pricePlans() {
       return (await json<{ items: PricePlanOut[] }>(await fetcher('/api/v1/price-plans'))).items
+    },
+    /** The household drill (2026-08-30) — a payer's open charges, labels included. The
+     *  label is where a parent's shop-order note rides, and this read is the manager's
+     *  one way to see it. */
+    async openCharges(payerPersonId: string) {
+      return (
+        await json<{ items: ChargeOut[] }>(
+          await fetcher(`/api/v1/charges?payer_person_id=${payerPersonId}&status=open`),
+        )
+      ).items
     },
     async payments() {
       return (await json<{ items: PaymentOut[] }>(await fetcher('/api/v1/payments'))).items

@@ -130,14 +130,16 @@ describe('SetupWizard container', () => {
     expect(labels).toEqual(ALL_IDS.map((id) => `setup-rail-${id}`))
   })
 
-  it('disables a rail entry no lane has registered yet', async () => {
+  it('keeps an unregistered rail entry CLICKABLE, marked as elsewhere (2026-08-30)', async () => {
+    // The reversal of the disable decision: a dead button under "belts" read as "belts
+    // doesn't work" on the surface that had not registered it. The node opens a body
+    // that says where the step is edited and still offers skip.
     registerM1Stubs()
     render(<SetupWizard client={fakeClient()} locale="he" />)
-    // belts is M7's and prices is M6's. Reachable-looking-but-empty is worse than
-    // visibly not ready.
-    expect(await screen.findByTestId('setup-rail-belts')).toBeDisabled()
-    expect(screen.getByTestId('setup-rail-prices')).toBeDisabled()
-    expect(screen.getByTestId('setup-rail-studio')).toBeEnabled()
+    const belts = await screen.findByTestId('setup-rail-belts')
+    expect(belts).toBeEnabled()
+    expect(belts).toHaveAttribute('data-registered', 'false')
+    expect(screen.getByTestId('setup-rail-studio')).not.toHaveAttribute('data-registered')
   })
 
   it('states every step status in words, never by colour alone', async () => {
@@ -945,5 +947,56 @@ describe('every wizard step registers at the position WIZARD_STEP_ORDER gives it
     const orders = entries.map((entry) => entry.order)
     expect(new Set(orders).size).toBe(orders.length)
     expect(orders).not.toContain(WIZARD_STEP_ORDER.indexOf('belts') + 1)
+  })
+})
+
+describe('the finish exit (2026-08-30)', () => {
+  it('offers a way OUT once every step is answered — done and skipped alike', async () => {
+    // 'After I finished there is no finish button to jump into the manager board.' A
+    // wizard that ends with nowhere to go strands the owner on its last panel. Skipped
+    // counts as answered: a club that sells nothing skipped items and is still finished.
+    registerM1Stubs()
+    const answered = progress({
+      studio: 'done',
+      groups: 'done',
+      belts: 'done',
+      prices: 'done',
+      staff: 'done',
+      students: 'done',
+      items: 'skipped',
+    })
+    render(<SetupWizard client={fakeClient(answered)} locale="he" />)
+    const finish = await screen.findByTestId('setup-finish')
+    expect(finish).toHaveAttribute('href', '#/')
+    expect(finish).toHaveTextContent(t('he', 'common.setup.finishCta'))
+  })
+
+  it('offers no exit while a step is still pending', async () => {
+    registerM1Stubs()
+    render(<SetupWizard client={fakeClient(progress({ studio: 'done' }))} locale="he" />)
+    await screen.findByTestId('setup-complete')
+    expect(screen.queryByTestId('setup-finish')).toBeNull()
+  })
+})
+
+describe('a step this surface has not built (2026-08-30)', () => {
+  it('is reachable from the rail, says where it is edited, links there, and can be skipped', async () => {
+    // The staff app registers four of seven steps; a DISABLED rail button for the other
+    // three read as "payments and belts don't work".
+    registerM1Stubs()
+    const client = fakeClient({
+      ...progress(),
+      dashboard_url: 'http://localhost:5175',
+    } as SetupProgress)
+    render(<SetupWizard client={client} locale="he" />)
+    await userEvent.click(await screen.findByTestId('setup-rail-belts'))
+    const body = await screen.findByTestId('setup-step-unbuilt')
+    expect(body).toHaveTextContent(t('he', 'common.setup.stepInDashboard'))
+    expect(screen.getByTestId('setup-unbuilt-dashboard')).toHaveAttribute(
+      'href',
+      'http://localhost:5175/#/setup',
+    )
+    await userEvent.click(screen.getByTestId('setup-skip-unbuilt'))
+    await waitFor(() => expect(client.calls).toContain('belts:skipped'))
   })
 })

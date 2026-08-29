@@ -167,6 +167,9 @@ export const common: Bundle = {
   'dev.noticeIcon': 'внимание',
   // §5.1's setup wizard — artboards 5c and 5f. Machine-translated; HB-ru-review still
   // open, so ru stays on `report` rather than `strict` in i18n-parity.mjs.
+  'setup.stepInDashboard': 'Этот шаг настраивается в панели управления.',
+  'setup.skipForNow': 'Пропустить пока',
+  'setup.finishCta': 'Готово — к панели управления',
   'setup.title': 'Мастер настройки',
   // The wizard chrome, from artboards 5c-5f.
   'setup.saveAndExit': 'Сохранить и выйти',
@@ -288,6 +291,9 @@ export const common: Bundle = {
   'setup.students.changeableLater': 'Всё можно изменить позже в настройках — включая пояса и цены.',
   // Dashboard artboards 3d (персонал) and 3f (настройки). Machine-translated;
   // HB-ru-review is still open.
+  'dash.home.attendanceChart.title': 'Посещаемость — последние 30 дней',
+  'dash.home.attendanceChart.all': 'Полный отчёт',
+  'dash.home.attendanceChart.noRate': 'Нет данных',
   'dash.home.title': 'Панель управления',
   'dash.home.body': 'Выберите экран в меню.',
   'dash.nav.staff': 'Персонал',
@@ -418,6 +424,7 @@ export const common: Bundle = {
   'dash.home.today.hall': 'Зал',
   'dash.home.today.coach': 'Тренер',
   'dash.home.today.noCoach': 'Тренер не назначен',
+
   // -- §18.1's platform console (#/platform) --------------------------------------
   'platform.title': 'Консоль платформы',
   'platform.nav': 'Платформа',

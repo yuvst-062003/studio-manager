@@ -4,7 +4,7 @@
 // appears on this screen** — so the load-bearing assertion is that no flag label and no answer is
 // anywhere in the DOM, on a row whose student has every flag raised. And D11's caveat must be on
 // the editor unconditionally, so the assertion is that it is there before anything is changed.
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { t } from '@studio/i18n'
@@ -280,5 +280,37 @@ describe('the schema edits, without a DOM', () => {
     withNewQuestion(SCHEMA, 'medical')
     withFlag(SCHEMA, 'asthma', false)
     expect(JSON.stringify(SCHEMA)).toBe(before)
+  })
+})
+
+describe('the full-declaration PDF (2026-08-30)', () => {
+  it('opens the PDF through an authenticated fetch, never a bare navigation', async () => {
+    // A plain <a href> to the API carries no bearer token: the read came back 401 and the
+    // SPA fallback landed the manager on the calendar instead of the document. The control
+    // now fetches with the session and hands the browser a blob in a fresh tab.
+    const tab = { location: { replace: vi.fn() }, close: vi.fn(), opener: {} as unknown }
+    vi.stubGlobal('open', vi.fn(() => tab))
+    const createObjectURL = vi.fn(() => 'blob:pdf')
+    Object.assign(URL, { createObjectURL })
+    const client = makeClient({
+      pdf: vi.fn().mockResolvedValue(new Response('%PDF-1.7', { status: 200 })),
+    })
+    render(<DocumentsScreen client={client} locale="he" />)
+    await userEvent.click(await screen.findByTestId('view-full-st2'))
+    await waitFor(() => expect(tab.location.replace).toHaveBeenCalledWith('blob:pdf'))
+    expect(client.pdf).toHaveBeenCalledWith('st2')
+    expect(tab.close).not.toHaveBeenCalled()
+  })
+
+  it('closes the tab and says so when the read fails', async () => {
+    const tab = { location: { replace: vi.fn() }, close: vi.fn(), opener: {} as unknown }
+    vi.stubGlobal('open', vi.fn(() => tab))
+    const client = makeClient({
+      pdf: vi.fn().mockResolvedValue(new Response(null, { status: 404 })),
+    })
+    render(<DocumentsScreen client={client} locale="he" />)
+    await userEvent.click(await screen.findByTestId('view-full-st2'))
+    await waitFor(() => expect(tab.close).toHaveBeenCalled())
+    expect(await screen.findByTestId('pdf-error-st2')).toBeInTheDocument()
   })
 })

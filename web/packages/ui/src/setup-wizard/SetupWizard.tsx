@@ -165,7 +165,11 @@ export function SetupWizard({
           onClick={() => {
             void client.dismiss().then((next) => {
               setProgress(next)
-              onExit?.('later')
+              // NEITHER app passes `onExit` (found 2026-08-30): both exits dismissed and
+              // then went NOWHERE, which read as "there is no finish button". The hash is
+              // home in both apps that mount this, so the default exit actually exits.
+              if (onExit) onExit('later')
+              else globalThis.location.hash = '#/'
             })
           }}
         >
@@ -176,7 +180,8 @@ export function SetupWizard({
           onClick={() => {
             void client.dismiss().then((next) => {
               setProgress(next)
-              onExit?.('dashboard')
+              if (onExit) onExit('dashboard')
+              else globalThis.location.hash = '#/'
             })
           }}
           variant={last || progress.complete ? 'primary' : 'secondary'}
@@ -234,7 +239,43 @@ export function SetupWizard({
               onSkip={() => void report(current, 'skipped')}
             />
           ) : (
-            <p data-testid="setup-step-unbuilt">{t(locale, 'common.setup.stepNotBuilt')}</p>
+            // A step this SURFACE has not built (2026-08-30): the staff app registers
+            // four of seven. Not a dead end any more — the body says where the step is
+            // edited, links there, and still lets the owner skip from here.
+            <div
+              data-testid="setup-step-unbuilt"
+              style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', alignItems: 'start' }}
+            >
+              <p style={{ margin: 0 }}>
+                {t(
+                  locale,
+                  progress.dashboard_url
+                    ? 'common.setup.stepInDashboard'
+                    : 'common.setup.stepNotBuilt',
+                )}
+              </p>
+              {progress.dashboard_url ? (
+                <a
+                  className="studio-btn"
+                  data-variant="secondary"
+                  data-testid="setup-unbuilt-dashboard"
+                  href={`${progress.dashboard_url}/#/setup`}
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  {t(locale, 'common.setup.openDashboard')}
+                </a>
+              ) : null}
+              {current && activeStep?.status === 'pending' ? (
+                <Button
+                  data-testid="setup-skip-unbuilt"
+                  onClick={() => void report(current, 'skipped')}
+                  variant="ghost"
+                >
+                  {t(locale, 'common.setup.skipForNow')}
+                </Button>
+              ) : null}
+            </div>
           )}
         </main>
 
@@ -263,7 +304,10 @@ export function SetupWizard({
                     data-testid={`setup-rail-${step.id}`}
                     data-status={step.status}
                     data-state={state}
-                    disabled={!registered}
+                    data-registered={registered ? undefined : 'false'}
+                    // NOT disabled when unregistered (2026-08-30): a dead rail button
+                    // read as "payments and belts don't work". The body now explains
+                    // where the step is edited and links there.
                     onClick={() => setActiveId(step.id as WizardStepId)}
                   >
                     <span aria-hidden="true" className="setup-rail__dot">
@@ -283,6 +327,21 @@ export function SetupWizard({
               )
             })}
           </ol>
+          {/* The way OUT (2026-08-30) — a wizard whose last step ends with nowhere to go
+              strands the owner on its own panel. Answered means done OR skipped: a club
+              that sells nothing skipped items and is still finished. `#/` is home in both
+              apps that mount this. */}
+          {steps.length > 0 && steps.every((step) => step.status !== 'pending') ? (
+            <a
+              className="studio-btn"
+              data-variant="primary"
+              data-testid="setup-finish"
+              href="#/"
+              style={{ textAlign: 'center' }}
+            >
+              {t(locale, 'common.setup.finishCta')}
+            </a>
+          ) : null}
           <span className="studio-visually-hidden" data-testid="setup-complete">
             {progress.complete
               ? t(locale, 'common.setup.complete')

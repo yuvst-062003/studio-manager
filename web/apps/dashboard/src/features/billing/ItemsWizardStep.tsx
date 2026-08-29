@@ -29,7 +29,7 @@ import { sizesLabel } from './ItemsScreen'
 import type { DashboardBillingClient, ProductOut } from './billingClient'
 
 /** `WIZARD_STEP_ORDER` is studio · groups · belts · prices · staff · students · items. */
-export const ITEMS_WIZARD_ORDER = 7
+export const ITEMS_WIZARD_ORDER = 5
 
 const columnStyle: CSSProperties = {
   display: 'flex',
