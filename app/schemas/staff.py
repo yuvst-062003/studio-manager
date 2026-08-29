@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import uuid
+
 from pydantic import BaseModel, Field
 
 
@@ -51,6 +53,15 @@ class StaffInvitationIn(BaseModel):
     roles: list[str] = Field(min_length=1, max_length=3)
     first_name: str | None = None
     last_name: str | None = None
+    group_ids: list[uuid.UUID] = Field(
+        default_factory=list,
+        description=(
+            "Groups this coach starts on. `invite_staff` creates the Person NOW and "
+            "acceptance only binds a login to it (§5.3), so the assignments are real "
+            "from the moment the invitation is written — nothing waits for the coach to "
+            "sign in. Empty means no group yet, which §3.3 allows."
+        ),
+    )
 
 
 class StaffInvitationOut(BaseModel):

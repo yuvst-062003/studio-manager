@@ -200,7 +200,10 @@ class PricePlanIn(BaseModel):
     """
 
     name: str = Field(min_length=1, max_length=120)
-    sessions_per_week: int = Field(gt=0, le=14)
+    #: NULL is open membership — the column's third state, and the plan most clubs sell
+    #: (`price_plan.sessions_per_week`: "300 → 0, 400 → 1, 550 → NULL = unlimited"). The
+    #: bounds still apply to a counted plan: 0 and 30 remain typing mistakes.
+    sessions_per_week: int | None = Field(default=None, gt=0, le=14)
     monthly_amount_agorot: int = Field(ge=0)
     registration_fee_agorot: int | None = Field(default=None, ge=0)
     active_from: date

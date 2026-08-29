@@ -228,6 +228,16 @@ export const billing: Bundle = {
   'plan.wizardTitle': 'כמה עולה להתאמן אצלכם?',
   'plan.wizardHint': 'מספיק מסלול אחד כדי להתחיל. אפשר להוסיף עוד ולשנות מחירים בכל זמן.',
   'plan.later': 'אקבע מחירים אחר כך',
+  // Step 4, rebuilt 2026-08-29. `plan.appliesTo` ("applies to") was a bare number box
+  // bound to sessions_per_week — no unit, no example, nothing saying what a good answer
+  // was. These name the same quantity as the question a club already asks itself.
+  'plan.howOften': 'כמה פעמים בשבוע מתאמנים במסלול הזה?',
+  'plan.perWeek': '{{count}} אימונים בשבוע',
+  'plan.unlimited': 'ללא הגבלה',
+  'plan.perMonth': 'לחודש',
+  'plan.monthlyHint': 'בשקלים. למשל 400',
+  'plan.nameHint': 'לא חובה — בלי שם נשתמש בכמות האימונים',
+  'plan.moreOptions': 'שם מותאם וקישור להוראת קבע',
   'plan.name': 'שם המסלול',
   'plan.monthlyAmount': 'מחיר חודשי',
   'plan.registrationFee': 'דמי הרשמה',

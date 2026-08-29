@@ -25,8 +25,10 @@ export function RefusalScreen({
   onSignOut,
   locale,
 }: {
-  /** Which app is refusing. `staff` renders §6.1's first screen, `parent` its second. */
-  which: 'staff' | 'parent'
+  /** Which app is refusing. `staff` renders §6.1's first screen, `parent` its second.
+   *  `dashboard` is the third, added 2026-08-29: a person with a record in the club but
+   *  no role at all reached a dashboard whose every panel answered 403. */
+  which: 'staff' | 'parent' | 'dashboard'
   otherAppUrl: string
   onSignOut: () => void
   locale: Locale

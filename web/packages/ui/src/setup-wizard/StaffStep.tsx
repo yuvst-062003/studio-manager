@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react'
 import { t } from '@studio/i18n'
 import { ActionBar } from '../primitives/ActionBar'
 import { Button } from '../primitives/Button'
+import { Checkbox } from '../primitives/Checkbox'
 import { Radio } from '../primitives/Radio'
 import { SectionHeader } from '../primitives/SectionHeader'
 import { StatusChip } from '../primitives/StatusChip'
@@ -14,12 +15,13 @@ import { TextField } from '../primitives/TextField'
 import type { NamedRow } from './GroupsStep'
 import type { WizardStepProps } from './types'
 
-export type StaffInvite = { email: string; role: string }
+export type StaffInvite = { email: string; role: string; groups: string[] }
 
 export type StaffClient = {
   listGroups: () => Promise<NamedRow[]>
   listInvitations: () => Promise<StaffInvite[]>
-  invite: (email: string, role: string, groupId: string | null) => Promise<void>
+  /** Groups the coach starts on. Empty is legal — §3.3 lets a coach exist before a group. */
+  invite: (email: string, role: string, groupIds: string[]) => Promise<void>
 }
 
 //: §3.1's two coach roles. Owner and manager are invited by the platform console (§5.1's
@@ -32,9 +34,15 @@ export function makeStaffStep(client: StaffClient) {
     const [invites, setInvites] = useState<StaffInvite[]>([])
     const [email, setEmail] = useState('')
     const [role, setRole] = useState<string>(COACH_ROLES[0])
-    const [groupId, setGroupId] = useState<string>('')
+    const [picked, setPicked] = useState<readonly string[]>([])
     const [busy, setBusy] = useState(false)
     const [failed, setFailed] = useState(false)
+
+    const allPicked = groups.length > 0 && picked.length === groups.length
+    const toggle = (id: string) =>
+      setPicked((current) =>
+        current.includes(id) ? current.filter((one) => one !== id) : [...current, id],
+      )
 
     useEffect(() => {
       let alive = true
@@ -98,23 +106,56 @@ export function makeStaffStep(client: StaffClient) {
               ))}
             </fieldset>
 
-            <label className="setup-group__legend">
-              {t(locale, 'common.setup.staff.group')}
-              <select
-                data-testid="staff-group"
-                onChange={(event) => setGroupId(event.target.value)}
-                value={groupId}
-              >
-                {/* §3.3 — a coach may exist before any group does, so 'no group yet' is a
-                    real answer rather than a missing one. */}
-                <option value="">{t(locale, 'common.setup.staff.noGroup')}</option>
-                {groups.map((group) => (
-                  <option key={group.id} value={group.id}>
-                    {group.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+            {/* A coach almost always takes more than one group, and this was a single
+                `<select>` — so the honest answer to "which groups?" could not be given.
+                Toggles, with an all/none control, because the common case is "all of
+                them" and the second most common is two of five. §3.3 keeps *none* a real
+                answer: a coach may exist before any group does. */}
+            <fieldset className="setup-teams" data-testid="staff-groups">
+              <legend className="setup-group__legend">
+                {t(locale, 'common.setup.staff.group')}
+              </legend>
+              {groups.length === 0 ? (
+                <p className="setup-panel__empty">{t(locale, 'common.setup.staff.noGroupsYet')}</p>
+              ) : (
+                <>
+                  <div className="setup-teams__bulk">
+                    <Button
+                      data-testid="staff-groups-all"
+                      onClick={() => setPicked(allPicked ? [] : groups.map((group) => group.id))}
+                      variant="ghost"
+                    >
+                      {t(
+                        locale,
+                        allPicked ? 'common.setup.staff.clearAll' : 'common.setup.staff.pickAll',
+                      )}
+                    </Button>
+                    <span className="setup-teams__count" data-testid="staff-groups-count">
+                      {t(locale, 'common.setup.staff.picked')
+                        .replace('{{count}}', String(picked.length))
+                        .replace('{{total}}', String(groups.length))}
+                    </span>
+                  </div>
+                  <ul className="setup-teams__list">
+                    {groups.map((group) => (
+                      <li key={group.id}>
+                        {/* A span, not a label: Checkbox emits its own <label htmlFor>,
+                            and nesting one inside another gives the inner control two
+                            labels and unpredictable click targets. */}
+                        <span className="setup-team" data-selected={picked.includes(group.id)}>
+                          <Checkbox
+                            checked={picked.includes(group.id)}
+                            label={group.name}
+                            onChange={() => toggle(group.id)}
+                          />
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+              <p className="setup-step__meta">{t(locale, 'common.setup.staff.groupHint')}</p>
+            </fieldset>
 
             {failed ? (
               <p className="setup-group-row__failed" role="alert">
@@ -130,10 +171,17 @@ export function makeStaffStep(client: StaffClient) {
                     setBusy(true)
                     setFailed(false)
                     void client
-                      .invite(email.trim(), role, groupId || null)
+                      .invite(email.trim(), role, [...picked])
                       .then(() => {
-                        setInvites((current) => [...current, { email: email.trim(), role }])
+                        const names = groups
+                          .filter((group) => picked.includes(group.id))
+                          .map((group) => group.name)
+                        setInvites((current) => [
+                          ...current,
+                          { email: email.trim(), role, groups: names },
+                        ])
                         setEmail('')
+                        setPicked([])
                       })
                       .catch(() => setFailed(true))
                       .finally(() => setBusy(false))
@@ -162,6 +210,11 @@ export function makeStaffStep(client: StaffClient) {
                         label={t(locale, `common.setup.staff.role.${invite.role}`)}
                         status="planned"
                       />
+                      {/* The groups they were actually put on — the panel used to show
+                          the role alone, which is the half that was never in doubt. */}
+                      {(invite.groups ?? []).map((name) => (
+                        <StatusChip key={name} label={name} status="planned" />
+                      ))}
                     </span>
                     <span className="setup-panel__awaiting">
                       {t(locale, 'common.setup.staff.awaiting')}

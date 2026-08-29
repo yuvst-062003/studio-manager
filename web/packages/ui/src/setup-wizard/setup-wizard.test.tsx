@@ -4,18 +4,19 @@
 // 'setup-wizard' and lands in the right position without SetupWizard.tsx being touched.
 // Without it, "M6 and M7 add a step without reopening the container" is a claim rather
 // than a guarantee — and both of those milestones are waves away from finding out.
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { render, renderHook, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { t } from '@studio/i18n'
-import { clearSlot, registerSlot } from '../slots'
+import { clearSlot, registerSlot, useSlot } from '../slots'
 import { renderIn, DIRECTIONS } from '../testing'
 import { SetupWizard } from './SetupWizard'
 import type { SetupClient } from './SetupWizard'
 import { LOGO_EDGE, makeStudioStep, resizeToSquarePng } from './StudioStep'
 import { defaultSeason, makeGroupsStep } from './GroupsStep'
-import type { Slot } from './GroupsStep'
+import type { GroupRow, Slot } from './GroupsStep'
 import { makeStaffStep } from './StaffStep'
+import type { StaffInvite } from './StaffStep'
 import { makeStudentsStep } from './StudentsStep'
 import { WIZARD_STEP_ORDER } from './types'
 import type { SetupProgress, WizardStepId, WizardStepProps } from './types'
@@ -76,7 +77,7 @@ function stubStep(label: string) {
 
 function registerM1Stubs() {
   registerSlot<WizardStepProps>('setup-wizard', { key: 'studio', order: 1, render: stubStep('studio') })
-  registerSlot<WizardStepProps>('setup-wizard', { key: 'groups', order: 3, render: stubStep('groups') })
+  registerSlot<WizardStepProps>('setup-wizard', { key: 'groups', order: 2, render: stubStep('groups') })
   registerSlot<WizardStepProps>('setup-wizard', { key: 'staff', order: 5, render: stubStep('staff') })
   registerSlot<WizardStepProps>('setup-wizard', {
     key: 'students',
@@ -254,21 +255,30 @@ describe('SetupWizard container', () => {
 
 // ── the seam ────────────────────────────────────────────────────────────────
 describe('the setup-wizard slot is what M6 and M7 register through', () => {
-  it('places a step registered at order 2 between studio and groups, container untouched', async () => {
+  it('places a step registered at order 3 between groups and prices, container untouched', async () => {
     registerM1Stubs()
-    // Exactly what M7 will do: one registerSlot call, one file. Nothing in
-    // SetupWizard.tsx knows this key exists.
+    // Exactly what M7 does: one registerSlot call, one file. Nothing in SetupWizard.tsx
+    // knows this key exists.
+    //
+    // Belts sits at 3 rather than at the canvas's 2 because a ladder hangs off a class
+    // and classes are created in `groups` — see WIZARD_STEP_ORDER. The seam is what this
+    // test is about, and the seam does not care which number it is handed.
     registerSlot<WizardStepProps>('setup-wizard', {
       key: 'belts',
-      order: 2,
+      order: 3,
       render: stubStep('belts'),
     })
 
-    render(<SetupWizard client={fakeClient(progress({ studio: 'done' }))} locale="he" />)
+    render(
+      <SetupWizard
+        client={fakeClient(progress({ studio: 'done', groups: 'done' }))}
+        locale="he"
+      />,
+    )
 
     // It is reachable...
     expect(await screen.findByTestId('setup-rail-belts')).toBeEnabled()
-    // ...and it is where the canvas puts it: resume now lands on belts, not on groups.
+    // ...and it is where the order puts it: resume lands on belts, not on prices.
     expect(await screen.findByTestId('stub-belts')).toBeInTheDocument()
   })
 
@@ -399,13 +409,17 @@ describe('step 1 · פרטי מועדון', () => {
   })
 })
 
-describe('step 3 · קבוצות ולו״ז', () => {
+describe('step 2 · קבוצות ולו״ז', () => {
   const structureClient = () => ({
     listClasses: async () => [{ id: 'c1', name: "ג'ודו" }],
-    listGroups: async () => [],
+    listGroups: async (): Promise<GroupRow[]> => [],
     listLocations: async () => [],
     createClass: vi.fn(async (name: string) => ({ id: 'c2', name })),
-    createGroup: vi.fn(async (_classId: string, name: string) => ({ id: 'g1', name })),
+    createGroup: vi.fn(async (classId: string, name: string) => ({
+      id: 'g1',
+      name,
+      class_id: classId,
+    })),
     createLocation: vi.fn(async (name: string) => ({ id: 'l1', name })),
     ensureTrainingYear: vi.fn<() => Promise<void>>(async () => undefined),
     readSchedule: vi.fn<(groupId: string) => Promise<Slot[]>>(async () => []),
@@ -416,17 +430,75 @@ describe('step 3 · קבוצות ולו״ז', () => {
     ),
   })
 
+  /**
+   * Add one group the way a manager does: press `+`, fill the dialog, save.
+   *
+   * The step used to be a name box and an add button on the page itself, with the hours
+   * expanded inline underneath every group in the club. `extraSlots` presses "add a time"
+   * inside the dialog, which is the only place slots are edited now.
+   */
+  async function addGroup(name: string, extraSlots = 0) {
+    await userEvent.click(await screen.findByTestId('setup-add-group'))
+    await userEvent.type(
+      within(screen.getByTestId('group-dialog')).getByLabelText(
+        t('he', 'common.setup.groups.groupName'),
+      ),
+      name,
+    )
+    for (let i = 0; i < extraSlots; i += 1) {
+      await userEvent.click(screen.getByTestId('dialog-add-time'))
+    }
+    await userEvent.click(screen.getByTestId('group-dialog-save'))
+  }
+
   it('creates a group through the class that already exists', async () => {
     const client = structureClient()
     const Step = makeGroupsStep(client)
     render(<Step locale="he" status="pending" onDone={vi.fn()} onSkip={vi.fn()} />)
-
-    await userEvent.type(
-      await screen.findByLabelText(t('he', 'common.setup.groups.groupName')),
-      'מתחילים',
-    )
-    await userEvent.click(screen.getByText(t('he', 'common.setup.groups.addGroup')))
+    await screen.findByTestId('setup-add-group')
+    await addGroup('מתחילים')
     await waitFor(() => expect(client.createGroup).toHaveBeenCalledWith('c1', 'מתחילים'))
+  })
+
+  it('puts the group in the class the manager SELECTED, not the first one ever made', async () => {
+    // The bug this step was rebuilt around: `createGroup` was called with `classes[0]`
+    // and there was no class picker anywhere on screen, so a club with ג'ודו and קרוספיט
+    // could not put a single group under קרוספיט (reported 2026-08-29).
+    const client = {
+      ...structureClient(),
+      listClasses: async () => [
+        { id: 'c1', name: "ג'ודו" },
+        { id: 'c2', name: 'קרוספיט' },
+      ],
+    }
+    const Step = makeGroupsStep(client)
+    render(<Step locale="he" status="pending" onDone={vi.fn()} onSkip={vi.fn()} />)
+
+    await userEvent.click(await screen.findByTestId('setup-class-c2'))
+    await addGroup('נבחרת')
+    await waitFor(() => expect(client.createGroup).toHaveBeenCalledWith('c2', 'נבחרת'))
+  })
+
+  it('shows only the groups of the selected class', async () => {
+    const client = {
+      ...structureClient(),
+      listClasses: async () => [
+        { id: 'c1', name: "ג'ודו" },
+        { id: 'c2', name: 'קרוספיט' },
+      ],
+      listGroups: async (): Promise<GroupRow[]> => [
+        { id: 'g1', name: 'מתחילים', class_id: 'c1' },
+        { id: 'g2', name: 'בוקר', class_id: 'c2' },
+      ],
+    }
+    const Step = makeGroupsStep(client)
+    render(<Step locale="he" status="pending" onDone={vi.fn()} onSkip={vi.fn()} />)
+
+    expect(await screen.findByTestId('setup-group-g1')).toBeInTheDocument()
+    expect(screen.queryByTestId('setup-group-g2')).toBeNull()
+    await userEvent.click(screen.getByTestId('setup-class-c2'))
+    expect(await screen.findByTestId('setup-group-g2')).toBeInTheDocument()
+    expect(screen.queryByTestId('setup-group-g1')).toBeNull()
   })
 
   it('explains rather than 422s when there is no class to hang a group on', async () => {
@@ -436,7 +508,25 @@ describe('step 3 · קבוצות ולו״ז', () => {
     expect(await screen.findByText(t('he', 'common.setup.groups.needClass'))).toBeInTheDocument()
   })
 
-  it('sets each group\'s weekly times here, and writes them straight away', async () => {
+  it('writes nothing when the dialog is cancelled', async () => {
+    // The slots live in the dialog, so an abandoned one must leave no group and no rules.
+    const client = structureClient()
+    const Step = makeGroupsStep(client)
+    render(<Step locale="he" status="pending" onDone={vi.fn()} onSkip={vi.fn()} />)
+    await userEvent.click(await screen.findByTestId('setup-add-group'))
+    await userEvent.type(
+      within(screen.getByTestId('group-dialog')).getByLabelText(
+        t('he', 'common.setup.groups.groupName'),
+      ),
+      'מתחילים',
+    )
+    await userEvent.click(screen.getByTestId('group-dialog-cancel'))
+    expect(screen.queryByTestId('group-dialog')).toBeNull()
+    expect(client.createGroup).not.toHaveBeenCalled()
+    expect(client.putSchedule).not.toHaveBeenCalled()
+  })
+
+  it("sets each group's weekly times here, and writes them straight away", async () => {
     // This test asserted the OPPOSITE until 2026-08-29: that the step promised no
     // schedule, because the times lived only on the weekly board. The owner's decision is
     // that a club is not set up until its groups have hours, so the promise is kept rather
@@ -445,13 +535,8 @@ describe('step 3 · קבוצות ולו״ז', () => {
     const client = structureClient()
     const Step = makeGroupsStep(client)
     render(<Step locale="he" status="pending" onDone={vi.fn()} onSkip={vi.fn()} />)
-
-    await userEvent.type(
-      await screen.findByLabelText(t('he', 'common.setup.groups.groupName')),
-      'מתחילים',
-    )
-    await userEvent.click(screen.getByText(t('he', 'common.setup.groups.addGroup')))
-    await userEvent.click(await screen.findByTestId('slot-add-g1'))
+    await screen.findByTestId('setup-add-group')
+    await addGroup('מתחילים')
 
     await waitFor(() => expect(client.putSchedule).toHaveBeenCalled())
     const [groupId, sent] = client.putSchedule.mock.calls.at(-1) ?? []
@@ -468,23 +553,15 @@ describe('step 3 · קבוצות ולו״ז', () => {
     const client = structureClient()
     const Step = makeGroupsStep(client)
     render(<Step locale="he" status="pending" onDone={vi.fn()} onSkip={vi.fn()} />)
-    await userEvent.type(
-      await screen.findByLabelText(t('he', 'common.setup.groups.groupName')),
-      'מתחילים',
-    )
-    await userEvent.click(screen.getByText(t('he', 'common.setup.groups.addGroup')))
-    await userEvent.click(await screen.findByTestId('slot-add-g1'))
-    await userEvent.click(await screen.findByTestId('slot-add-g1'))
+    await screen.findByTestId('setup-add-group')
+    await addGroup('מתחילים', 1)
     await waitFor(() => expect(client.putSchedule.mock.calls.at(-1)?.[1]).toHaveLength(2))
   })
 
-
-  it('names the training year when that is why the save failed, and keeps the typing', async () => {
+  it('names the training year when that is why the save failed, and keeps the group', async () => {
     // `apply_schedule_change` reads the active training year BEFORE it writes anything, and
     // no setup step opens one — so during first-run setup this 404 is the normal case, not
-    // a fault the manager can act on. Reported as pending, and the times stay on screen:
-    // losing what they typed to report a server state they cannot change is the worse
-    // failure of the two.
+    // a fault the manager can act on. Reported as pending rather than as a fault.
     const client = {
       ...structureClient(),
       putSchedule: vi.fn<(g: string, s: Slot[], e: string) => Promise<void>>(async () => {
@@ -493,18 +570,14 @@ describe('step 3 · קבוצות ולו״ז', () => {
     }
     const Step = makeGroupsStep(client)
     render(<Step locale="he" status="pending" onDone={vi.fn()} onSkip={vi.fn()} />)
-    await userEvent.type(
-      await screen.findByLabelText(t('he', 'common.setup.groups.groupName')),
-      'מתחילים',
-    )
-    await userEvent.click(screen.getByText(t('he', 'common.setup.groups.addGroup')))
-    await userEvent.click(await screen.findByTestId('slot-add-g1'))
+    await screen.findByTestId('setup-add-group')
+    await addGroup('מתחילים')
 
     const note = await screen.findByTestId('slot-failed-g1')
     expect(note).toHaveTextContent(t('he', 'common.setup.groups.needYear'))
     expect(note).toHaveAttribute('data-status', 'pending')
-    // The row is still there to be edited.
-    expect(screen.getByTestId('slot-from-g1-0')).toHaveValue('17:00')
+    // The group is still on screen to be edited.
+    expect(screen.getByTestId('setup-group-g1')).toBeInTheDocument()
   })
 
   it('still reports a real failure as a failure', async () => {
@@ -516,34 +589,24 @@ describe('step 3 · קבוצות ולו״ז', () => {
     }
     const Step = makeGroupsStep(client)
     render(<Step locale="he" status="pending" onDone={vi.fn()} onSkip={vi.fn()} />)
-    await userEvent.type(
-      await screen.findByLabelText(t('he', 'common.setup.groups.groupName')),
-      'מתחילים',
-    )
-    await userEvent.click(screen.getByText(t('he', 'common.setup.groups.addGroup')))
-    await userEvent.click(await screen.findByTestId('slot-add-g1'))
+    await screen.findByTestId('setup-add-group')
+    await addGroup('מתחילים')
     expect(await screen.findByTestId('slot-failed-g1')).toHaveAttribute('data-status', 'danger')
   })
-
 
   it('opens the season before the first write, and only then', async () => {
     // A weekly rule is not a lesson: it becomes lessons only when generated between two
     // dates, and those dates are the training year's. Nothing in the six steps opened one,
     // so a new club finished setup with a timetable that produced nothing. Opened here on
-    // the first time added — not on mount, which would create a year behind the back of a
+    // the first write — not on mount, which would create a year behind the back of a
     // manager who never touches this.
     const client = structureClient()
     const Step = makeGroupsStep(client)
     render(<Step locale="he" status="pending" onDone={vi.fn()} onSkip={vi.fn()} />)
-    await screen.findByTestId('setup-groups')
+    await screen.findByTestId('setup-add-group')
     expect(client.ensureTrainingYear).not.toHaveBeenCalled()
 
-    await userEvent.type(
-      screen.getByLabelText(t('he', 'common.setup.groups.groupName')),
-      'מתחילים',
-    )
-    await userEvent.click(screen.getByText(t('he', 'common.setup.groups.addGroup')))
-    await userEvent.click(await screen.findByTestId('slot-add-g1'))
+    await addGroup('מתחילים')
     await waitFor(() => expect(client.ensureTrainingYear).toHaveBeenCalled())
     await waitFor(() => expect(client.putSchedule).toHaveBeenCalled())
   })
@@ -566,26 +629,20 @@ describe('step 3 · קבוצות ולו״ז', () => {
     expect(await screen.findByTestId('setup-week')).toHaveTextContent(
       t('he', 'common.setup.groups.weekEmpty'),
     )
-    await userEvent.type(
-      screen.getByLabelText(t('he', 'common.setup.groups.groupName')),
-      'מתחילים',
-    )
-    await userEvent.click(screen.getByText(t('he', 'common.setup.groups.addGroup')))
-    await userEvent.click(await screen.findByTestId('slot-add-g1'))
-    await waitFor(() =>
-      expect(screen.getByTestId('setup-week')).toHaveTextContent('מתחילים'),
-    )
+    await addGroup('מתחילים')
+    await waitFor(() => expect(screen.getByTestId('setup-week')).toHaveTextContent('מתחילים'))
   })
 })
+
 
 describe('step 5 · צוות', () => {
   const staffClient = () => ({
     listGroups: async () => [{ id: 'g1', name: 'מתחילים' }],
-    listInvitations: async () => [],
+    listInvitations: async (): Promise<StaffInvite[]> => [],
     invite: vi.fn(async () => undefined),
   })
 
-  it('invites a coach by email into a group', async () => {
+  it('invites a coach by email into the groups that were ticked', async () => {
     const client = staffClient()
     const Step = makeStaffStep(client)
     render(<Step locale="he" status="pending" onDone={vi.fn()} onSkip={vi.fn()} />)
@@ -594,14 +651,46 @@ describe('step 5 · צוות', () => {
       await screen.findByLabelText(t('he', 'common.setup.staff.email')),
       'coach@example.com',
     )
-    await userEvent.selectOptions(
-      screen.getByLabelText(t('he', 'common.setup.staff.group')),
-      'g1',
-    )
+    await userEvent.click(screen.getByLabelText('מתחילים'))
     await userEvent.click(screen.getByText(t('he', 'common.setup.staff.invite')))
     await waitFor(() =>
-      expect(client.invite).toHaveBeenCalledWith('coach@example.com', 'lead_coach', 'g1'),
+      expect(client.invite).toHaveBeenCalledWith('coach@example.com', 'lead_coach', ['g1']),
     )
+  })
+
+  it('takes every group at once, because that is the commonest answer', async () => {
+    // The group picker was a single `<select>`: a coach who takes all five groups could
+    // be given one of them (reported 2026-08-29).
+    const client = {
+      ...staffClient(),
+      listGroups: async () => [
+        { id: 'g1', name: 'מתחילים' },
+        { id: 'g2', name: 'נבחרת' },
+      ],
+    }
+    const Step = makeStaffStep(client)
+    render(<Step locale="he" status="pending" onDone={vi.fn()} onSkip={vi.fn()} />)
+
+    await userEvent.type(
+      await screen.findByLabelText(t('he', 'common.setup.staff.email')),
+      'coach@example.com',
+    )
+    await userEvent.click(screen.getByTestId('staff-groups-all'))
+    expect(screen.getByTestId('staff-groups-count')).toHaveTextContent('2')
+    await userEvent.click(screen.getByText(t('he', 'common.setup.staff.invite')))
+    await waitFor(() =>
+      expect(client.invite).toHaveBeenCalledWith('coach@example.com', 'lead_coach', ['g1', 'g2']),
+    )
+  })
+
+  it('clears the whole selection with the same control', async () => {
+    const client = staffClient()
+    const Step = makeStaffStep(client)
+    render(<Step locale="he" status="pending" onDone={vi.fn()} onSkip={vi.fn()} />)
+    await userEvent.click(await screen.findByTestId('staff-groups-all'))
+    expect(screen.getByTestId('staff-groups-count')).toHaveTextContent('1')
+    await userEvent.click(screen.getByTestId('staff-groups-all'))
+    expect(screen.getByTestId('staff-groups-count')).toHaveTextContent('0')
   })
 
   it('offers only the two coach roles — owner and manager come from the console', async () => {
@@ -654,7 +743,7 @@ describe('step 5 · צוות', () => {
     )
     await userEvent.click(screen.getByText(t('he', 'common.setup.staff.invite')))
     await waitFor(() =>
-      expect(client.invite).toHaveBeenCalledWith('coach@example.com', 'lead_coach', null),
+      expect(client.invite).toHaveBeenCalledWith('coach@example.com', 'lead_coach', []),
     )
   })
 })
@@ -831,5 +920,30 @@ describe('SetupWizard chrome — artboards 5c–5f (2026-08-29)', () => {
     registerM1Stubs()
     render(<SetupWizard client={fakeClient()} locale="he" />)
     expect(await screen.findByTestId('setup-progress')).toHaveAttribute('data-done', '0')
+  })
+})
+
+// ── the order is a contract in four places ──────────────────────────────────────────
+describe('every wizard step registers at the position WIZARD_STEP_ORDER gives it', () => {
+  it('registers M1 four steps at their own indices, with no two claiming one slot', async () => {
+    // The 2026-08-29 swap (groups before belts, because a belt ladder needs a class) had
+    // to be made in four places: `WIZARD_STEPS` on the server, `WIZARD_STEP_ORDER` here,
+    // `register.ts`, and `BeltsWizardStep.tsx`. Missing one leaves two steps claiming the
+    // same position — which is not a crash, just an owner landing on the wrong panel
+    // after finishing the previous step. This test is that missed edit, caught.
+    const { registerM1WizardSteps } = await import('./register')
+    clearSlot('setup-wizard')
+    registerM1WizardSteps(async () => new Response('{}'))
+
+    const { result } = renderHook(() => useSlot<WizardStepProps>('setup-wizard'))
+    const entries = result.current
+    expect(entries).toHaveLength(4)
+    for (const entry of entries) {
+      expect(entry.order).toBe(WIZARD_STEP_ORDER.indexOf(entry.key as WizardStepId) + 1)
+    }
+    // No duplicates among the positions M1 claims — belts and prices fill the gaps.
+    const orders = entries.map((entry) => entry.order)
+    expect(new Set(orders).size).toBe(orders.length)
+    expect(orders).not.toContain(WIZARD_STEP_ORDER.indexOf('belts') + 1)
   })
 })

@@ -22,6 +22,7 @@ from __future__ import annotations
 import hashlib
 import secrets
 import uuid
+from collections.abc import Sequence
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -32,6 +33,7 @@ from app.core.tenancy import get_current_studio_id
 from app.models.person import Invitation, Person, RoleAssignment
 from app.models.structure import Group, GroupStaff
 from app.services.audit import AuditService
+from app.services.structure.service import NotFoundError, StructureService
 
 #: §3.1 — 'guardian' is not a role. It appears in `invitation.intended_role` and nowhere
 #: on a staff screen.
@@ -231,6 +233,7 @@ def invite_staff(
     roles: list[str],
     first_name: str | None,
     last_name: str | None,
+    group_ids: Sequence[uuid.UUID] = (),
     actor_person_id: uuid.UUID | None,
     at: datetime,
 ) -> tuple[Invitation, str]:
@@ -238,7 +241,13 @@ def invite_staff(
     NOW, unattached to any login, and accepting merely binds an identity to them (§5.3).
     The plaintext token is returned exactly once; only its hash is stored. There is no
     mailer anywhere in this product — the link is handed to the manager to share, the
-    same way the platform's owner invite and §5.4b's onboarding link work."""
+    same way the platform's owner invite and §5.4b's onboarding link work.
+
+    `group_ids` puts the coach on those group rosters immediately, which is only possible
+    *because* the Person exists before acceptance. The wizard's step 5 offered this choice
+    from the day it shipped and dropped it on the floor — there was no field here to
+    receive it (2026-08-29).
+    """
     if not roles or any(role not in GRANTABLE_ROLES for role in roles):
         raise StaffError("bad_roles")
 
@@ -263,6 +272,28 @@ def invite_staff(
                 created_at=at,
             )
         )
+    # The roster rows, before the invitation exists — a bad group id must fail the whole
+    # request rather than leave a coach invited to groups they were never put on.
+    # `assign_staff` is idempotent and adds the group-scoped grant alongside each row; the
+    # studio-scoped grants above are unchanged, so this narrows nothing and breaks no
+    # existing sign-in.
+    for group_id in dict.fromkeys(group_ids):
+        try:
+            StructureService.assign_staff(
+                session,
+                group_id=group_id,
+                person_id=person.id,
+                role=sorted(set(roles))[0],
+                granted_by_person_id=actor_person_id,
+                from_date=at.date(),
+                at=at,
+            )
+        except NotFoundError as exc:
+            # TenantSession already scoped the lookup, so "not found" covers both a group
+            # that does not exist and one belonging to another studio. Neither is a 404
+            # on the invitation itself.
+            raise StaffError("bad_groups") from exc
+
     token = secrets.token_urlsafe(32)
     invitation = Invitation(
         studio_id=person.studio_id,

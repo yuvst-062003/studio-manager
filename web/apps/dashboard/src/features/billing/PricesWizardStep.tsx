@@ -36,14 +36,34 @@ import { t } from '@studio/i18n'
 import type { DashboardBillingClient, PricePlanOut } from './billingClient'
 import { agorotFromShekels } from './money'
 
-/** `WIZARD_STEP_ORDER` is studio · belts · groups · prices · staff · students. */
+/** `WIZARD_STEP_ORDER` is studio · groups · belts · prices · staff · students. */
 export const PRICES_WIZARD_ORDER = 4
+
+/**
+ * How often a plan lets a student train, as a choice rather than a number box.
+ *
+ * `null` is open membership — `price_plan.sessions_per_week` is nullable and its own
+ * docstring gives this club's ladder: "300 → 0, 400 → 1, 550 → NULL = unlimited".
+ *
+ * This was a bare `TextField` labelled חל על ("applies to") bound to `sessionsPerWeek`,
+ * with no unit and no hint of what a good answer looked like. A manager reported the step
+ * as not understandable and described, unprompted, exactly the ladder below — which is
+ * what the field always meant and never said (2026-08-29).
+ */
+const FREQUENCIES: readonly (number | null)[] = [1, 2, 3, 4, 5, null]
 
 const rowStyle: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   gap: 'var(--space-3)',
   flexWrap: 'wrap',
+}
+
+/** "3 אימונים בשבוע", or "מנוי חופשי" for the open plan. */
+function frequencyLabel(locale: WizardStepProps['locale'], perWeek: number | null): string {
+  return perWeek === null
+    ? t(locale, 'billing.plan.unlimited')
+    : t(locale, 'billing.plan.perWeek').replace('{{count}}', String(perWeek))
 }
 
 export function PricesWizardStep({
@@ -54,7 +74,8 @@ export function PricesWizardStep({
 }: WizardStepProps & { client: DashboardBillingClient }) {
   const [plans, setPlans] = useState<PricePlanOut[]>([])
   const [name, setName] = useState('')
-  const [sessions, setSessions] = useState('2')
+  /** `undefined` means "not chosen yet"; `null` is a chosen open membership. */
+  const [perWeek, setPerWeek] = useState<number | null | undefined>(undefined)
   const [monthly, setMonthly] = useState('')
   const [link, setLink] = useState('')
   const [inFlight, setInFlight] = useState(false)
@@ -70,13 +91,16 @@ export function PricesWizardStep({
   useEffect(reload, [reload])
 
   async function create() {
-    if (inFlight || name.trim() === '' || monthly.trim() === '') return
+    if (inFlight || perWeek === undefined || monthly.trim() === '') return
     setInFlight(true)
     setFailed(false)
     try {
       const plan = await client.createPricePlan({
-        name: name.trim(),
-        sessionsPerWeek: Number(sessions),
+        // The frequency already names the plan — "3 אימונים בשבוע" — so a manager who has
+        // no house name for it is not stopped by a required box they must invent an
+        // answer for. Typing one still wins.
+        name: name.trim() || frequencyLabel(locale, perWeek),
+        sessionsPerWeek: perWeek,
         monthlyAmountAgorot: agorotFromShekels(monthly),
         registrationFeeAgorot: null,
         activeFrom: new Date().toISOString().slice(0, 10),
@@ -95,6 +119,7 @@ export function PricesWizardStep({
         }
       }
       setName('')
+      setPerWeek(undefined)
       setMonthly('')
       setLink('')
       reload()
@@ -118,6 +143,11 @@ export function PricesWizardStep({
               <strong style={{ flex: 1, minInlineSize: 0 }}>
                 <bdi>{plan.name}</bdi>
               </strong>
+              {/* What the plan is FOR, beside what it costs. The list showed a name and an
+                  amount, so two plans differing only in training volume looked identical. */}
+              <span className="plan-row__freq">
+                {frequencyLabel(locale, plan.sessions_per_week)}
+              </span>
               <MoneyDisplay agorot={plan.monthly_amount_agorot} label={plan.name} />
               {plan.standing_order_link_url === null ? (
                 <span data-testid="wizard-plan-link-missing">
@@ -130,34 +160,75 @@ export function PricesWizardStep({
       ) : null}
 
       <Card caption={t(locale, 'billing.plan.add')}>
+        {/* ① how often — the question the step is actually about. A plan is priced by
+            training volume (C11), so this is chosen before anything else and every other
+            field reads as a consequence of it. */}
+        <fieldset className="plan-frequency" data-testid="wizard-plan-frequency">
+          <legend className="plan-frequency__legend">
+            {t(locale, 'billing.plan.howOften')}
+          </legend>
+          <div className="plan-frequency__options">
+            {FREQUENCIES.map((option) => (
+              <Button
+                data-selected={perWeek === option}
+                data-testid={`wizard-plan-freq-${option ?? 'open'}`}
+                key={String(option)}
+                onClick={() => setPerWeek(option)}
+                variant={perWeek === option ? 'secondary' : 'ghost'}
+              >
+                {frequencyLabel(locale, option)}
+              </Button>
+            ))}
+          </div>
+        </fieldset>
+
+        {/* ② how much. */}
         <TextField
-          label={t(locale, 'billing.plan.name')}
-          data-testid="wizard-plan-name"
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-        />
-        <TextField
-          label={t(locale, 'billing.plan.appliesTo')}
-          data-testid="wizard-plan-sessions"
-          inputMode="numeric"
-          value={sessions}
-          onChange={(event) => setSessions(event.target.value)}
-        />
-        <TextField
-          label={t(locale, 'billing.plan.monthlyAmount')}
           data-testid="wizard-plan-amount"
+          hint={t(locale, 'billing.plan.monthlyHint')}
           inputMode="decimal"
-          value={monthly}
+          label={t(locale, 'billing.plan.monthlyAmount')}
           onChange={(event) => setMonthly(event.target.value)}
+          value={monthly}
         />
-        <TextField
-          label={t(locale, 'billing.plan.standingOrderLink')}
-          hint={t(locale, 'billing.plan.linkHint')}
-          data-testid="wizard-plan-link"
-          inputMode="url"
-          value={link}
-          onChange={(event) => setLink(event.target.value)}
-        />
+
+        {/* The plan as one sentence, before it is created. "400 – 3 times a week" is how
+            the club talks about it, and it is the only place the two answers meet. */}
+        {perWeek !== undefined && monthly.trim() !== '' ? (
+          <p className="plan-preview" data-testid="wizard-plan-preview">
+            <strong>{name.trim() || frequencyLabel(locale, perWeek)}</strong>
+            <span>·</span>
+            <MoneyDisplay
+              agorot={agorotFromShekels(monthly)}
+              label={t(locale, 'billing.plan.monthlyAmount')}
+            />
+            <span>{t(locale, 'billing.plan.perMonth')}</span>
+          </p>
+        ) : null}
+
+        {/* ③ the two answers most clubs leave alone. Folded away so the step is two
+            questions, not four boxes of equal weight. */}
+        <details className="plan-extras">
+          <summary>{t(locale, 'billing.plan.moreOptions')}</summary>
+          <TextField
+            data-testid="wizard-plan-name"
+            hint={t(locale, 'billing.plan.nameHint')}
+            label={t(locale, 'billing.plan.name')}
+            onChange={(event) => setName(event.target.value)}
+            placeholder={
+              perWeek === undefined ? undefined : frequencyLabel(locale, perWeek)
+            }
+            value={name}
+          />
+          <TextField
+            data-testid="wizard-plan-link"
+            hint={t(locale, 'billing.plan.linkHint')}
+            inputMode="url"
+            label={t(locale, 'billing.plan.standingOrderLink')}
+            onChange={(event) => setLink(event.target.value)}
+            value={link}
+          />
+        </details>
         {failed ? (
           <p role="alert" data-testid="wizard-plan-link-error">
             {t(locale, 'billing.plan.linkRefused')}

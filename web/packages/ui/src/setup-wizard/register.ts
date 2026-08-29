@@ -27,7 +27,11 @@ export function registerM1WizardSteps(fetcher: Fetcher): void {
   })
   registerSlot<WizardStepProps>('setup-wizard', {
     key: 'groups',
-    order: 3,
+    // 2, not 3: belts moved down because a ladder hangs off a class and classes are
+    // created here. These numbers must agree with `WIZARD_STEP_ORDER` and with the
+    // `order: 3` in `BeltsWizardStep.tsx` — two steps claiming one position is how the
+    // owner lands on the wrong panel.
+    order: 2,
     render: makeGroupsStep(makeStructureClient(fetcher)),
   })
   registerSlot<WizardStepProps>('setup-wizard', {

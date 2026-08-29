@@ -47,17 +47,29 @@ def test_a_fresh_studio_has_six_pending_steps(client, as_owner) -> None:
 
 def test_the_six_steps_are_the_canvas_order(client, as_owner) -> None:
     """The canvas fixes six steps, progress running right-to-left. M1 owns 1, 3, 5 and 6;
-    M7 fills belts at 2 and M6 fills prices at 4."""
+    M7 fills belts and M6 fills prices."""
     steps = get_setup(client, as_owner).json()["steps"]
     assert [s["order"] for s in steps] == [1, 2, 3, 4, 5, 6]
     assert [s["id"] for s in steps] == [
         "studio",
-        "belts",
         "groups",
+        "belts",
         "prices",
         "staff",
         "students",
     ]
+
+
+def test_belts_comes_after_groups_because_a_ladder_needs_a_class(client, as_owner) -> None:
+    """The canvas put belts at 2 and groups at 3, and that order cannot be walked.
+
+    `belt_rank.class_id` is NOT NULL and nothing before `groups` creates a class, so on a
+    real first run the belts step rendered an empty class picker and the owner could not
+    finish it — reported from the live wizard, 2026-08-29. This is a data dependency, not
+    a layout preference: whatever else moves, groups precedes belts.
+    """
+    ids = [s["id"] for s in get_setup(client, as_owner).json()["steps"]]
+    assert ids.index("groups") < ids.index("belts")
 
 
 # -- transitions --------------------------------------------------------------

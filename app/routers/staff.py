@@ -52,6 +52,7 @@ def create_staff_invitation(
             roles=body.roles,
             first_name=body.first_name,
             last_name=body.last_name,
+            group_ids=body.group_ids,
             actor_person_id=_person_id(request),
             at=now(),
         )
