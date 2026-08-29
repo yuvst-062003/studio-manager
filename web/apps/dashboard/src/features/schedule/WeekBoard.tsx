@@ -58,35 +58,6 @@ const boardStyle: CSSProperties = {
   inlineSize: '100%',
 }
 
-// A CSS grid flips with `dir` on its own, which is exactly why G12 bans the physical
-// properties that would not.
-const gridStyle: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(7, minmax(0, 1fr))',
-  gap: 'var(--space-2)',
-  overflowX: 'auto',
-}
-
-const columnStyle: CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 'var(--space-2)',
-  minInlineSize: '8rem',
-  paddingBlock: 'var(--space-2)',
-  borderBlockStart: 'var(--border-width-strong) solid var(--border)',
-}
-
-const todayColumnStyle: CSSProperties = {
-  ...columnStyle,
-  borderBlockStart: 'var(--border-width-strong) solid var(--fg)',
-}
-
-const dayHeadingStyle: CSSProperties = {
-  margin: 0,
-  fontSize: 'var(--text-label)',
-  fontWeight: 'var(--weight-medium)' as CSSProperties['fontWeight'],
-}
-
 function SessionBlock({
   locale,
   session,
@@ -403,14 +374,24 @@ export function WeekBoard({
     return last ? { from: String(Number(start.slice(8, 10))), to: String(Number(last.slice(8, 10))) } : null
   }, [days, start])
 
-  const byDay = useMemo(() => {
+  /** Every start time the week actually contains, as Jerusalem `HH:MM`, ascending. One
+   *  grid row each. A club training at 17:00 and 18:30 gets two rows; a club training at
+   *  six different times gets six. */
+  const slots = useMemo(() => {
+    const seen = new Set(sessions.map((row) => formatTimeInStudioZone(row.starts_at, locale)))
+    return [...seen].sort()
+  }, [sessions, locale])
+
+  /** `day|HH:MM` → the sessions in that cell. A cell holds more than one only when a club
+   *  runs two groups in different halls at the same hour, which is real. */
+  const byCell = useMemo(() => {
     const grouped = new Map<string, SessionRow[]>()
     for (const session of sessions) {
-      const key = studioDayKey(session.starts_at)
+      const key = `${studioDayKey(session.starts_at)}|${formatTimeInStudioZone(session.starts_at, locale)}`
       grouped.set(key, [...(grouped.get(key) ?? []), session])
     }
     return grouped
-  }, [sessions])
+  }, [sessions, locale])
 
   return (
     <section aria-labelledby="week-board-title" style={boardStyle}>
@@ -500,41 +481,73 @@ export function WeekBoard({
         />
       ) : null}
 
-      <div role="grid" aria-label={t(locale, 'schedule.week.title')} style={gridStyle}>
-        {days.map((day, index) => {
-          const isToday = day === todayKey
-          return (
-            <div
+      {/* `3a`'s grid: a time gutter, then one column per day, ruled into rows — one row
+          per start time the week actually contains. The shipped board had no axis at all,
+          so blocks floated in unruled columns and two classes an hour apart looked like
+          two classes at the same time.
+
+          The rows are DERIVED from the week rather than fixed at the artboard's
+          16:00/17:00/18:30/20:00. Those four are one club's timetable drawn on one day;
+          hard-coding them would leave every other club's classes with no row to sit in. */}
+      <div
+        role="grid"
+        aria-label={t(locale, 'schedule.week.title')}
+        className="week-grid"
+      >
+        <div role="row" className="week-grid__row">
+          {/* The corner. Empty, but present: a grid row whose cells do not line up with
+              the header above it is a grid in name only. */}
+          <span role="columnheader" className="week-grid__gutter" />
+          {days.map((day, index) => (
+            <span
               key={day}
-              role="gridcell"
-              // Keyed rather than generic: the interesting assertion is WHICH day a
-              // session was filed under, not how many columns there are. The column count
-              // is `getAllByRole('gridcell')`, which asks the accessibility tree the same
-              // question instead of asking a test hook.
+              role="columnheader"
               data-testid={`week-day-${day}`}
               data-day={day}
-              aria-current={isToday ? 'date' : undefined}
-              style={isToday ? todayColumnStyle : columnStyle}
+              aria-current={day === todayKey ? 'date' : undefined}
+              className="week-grid__head"
+              data-today={day === todayKey || undefined}
             >
               {/* `3a` heads each column `א׳ 23`, not a bare weekday name: a manager
                   looking at "next week" has no way to tell which week it is otherwise.
                   The number is the Jerusalem day-of-month, taken from the key the column
                   is already filed under rather than re-derived from an instant. */}
-              <h3 style={dayHeadingStyle}>
-                {t(locale, `schedule.weekday.${index}`)}{' '}
-                <span className="week-day__date">{Number(day.slice(8, 10))}</span>
-              </h3>
-              {(byDay.get(day) ?? []).map((session) => (
-                <SessionBlock
-                  key={session.id}
-                  locale={locale}
-                  onOpen={() => setOpenSessionId(session.id)}
-                  session={session}
-                />
-              ))}
-            </div>
-          )
-        })}
+              {t(locale, `schedule.weekday.${index}`)}{' '}
+              <span className="week-day__date">{Number(day.slice(8, 10))}</span>
+            </span>
+          ))}
+        </div>
+
+        {slots.map((slot) => (
+          <div role="row" className="week-grid__row" key={slot}>
+            <span role="rowheader" className="week-grid__gutter" data-testid={`week-slot-${slot}`}>
+              {slot}
+            </span>
+            {days.map((day) => {
+              const cell = byCell.get(`${day}|${slot}`) ?? []
+              return (
+                <div
+                  key={day}
+                  role="gridcell"
+                  className="week-grid__cell"
+                  data-day={day}
+                  data-slot={slot}
+                  data-today={day === todayKey || undefined}
+                  data-testid={`week-cell-${day}-${slot}`}
+                >
+                  {cell.map((session) => (
+                    <SessionBlock
+                      key={session.id}
+                      locale={locale}
+                      onOpen={() => setOpenSessionId(session.id)}
+                      session={session}
+                    />
+                  ))}
+                </div>
+              )
+            })}
+          </div>
+        ))}
       </div>
 
       {openSession ? (

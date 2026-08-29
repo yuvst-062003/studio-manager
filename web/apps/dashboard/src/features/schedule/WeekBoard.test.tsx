@@ -97,12 +97,19 @@ describe('WeekBoard (3a)', () => {
 
   it('files a session under its Jerusalem day, not its UTC day', async () => {
     // 22:30Z is 00:30 the NEXT day here, and almost every class is in the evening.
-    render(<WeekBoard locale="he" client={stub([LATE_EVENING])} today="2026-11-03T12:00:00Z" />)
-    await waitFor(() =>
-      expect(screen.getByTestId('week-day-2026-11-04')).toContainElement(
-        screen.getByTestId('session-block'),
-      ),
+    // A day is no longer one element — `3a`'s grid rules the week into time rows, so the
+    // day is the CELL's column. `data-day` is what still answers "filed under which day".
+    const { container } = render(
+      <WeekBoard locale="he" client={stub([LATE_EVENING])} today="2026-11-03T12:00:00Z" />,
     )
+    await waitFor(() =>
+      expect(
+        container.querySelector('[role="gridcell"][data-day="2026-11-04"] [data-testid="session-block"]'),
+      ).not.toBeNull(),
+    )
+    expect(
+      container.querySelector('[role="gridcell"][data-day="2026-11-03"] [data-testid="session-block"]'),
+    ).toBeNull()
   })
 
   it('shows the group, the time and the location on the block', async () => {
@@ -474,5 +481,44 @@ describe('WeekBoard · 3a', () => {
     expect(header).toContainElement(screen.getByTestId('session-create-open'))
     // Navigation on one edge, the verb on the other — not six controls at one rank.
     expect(container.querySelector('.studio-actionbar')).toHaveAttribute('data-align', 'between')
+  })
+
+  it('rules the week into one row per start time the week actually contains', async () => {
+    // NOT the artboard's fixed 16:00/17:00/18:30/20:00 — those are one club's timetable
+    // drawn on one day. Derived rows mean a club training at other hours still has a row
+    // for its classes to sit in.
+    const early: SessionRow = { ...TUESDAY_EVENING, id: 'e1', starts_at: '2026-11-03T13:00:00Z', ends_at: '2026-11-03T14:00:00Z' }
+    render(<WeekBoard locale="he" client={stub([TUESDAY_EVENING, early])} today="2026-11-03T12:00:00Z" />)
+    // 13:00Z and 15:00Z are 15:00 and 17:00 in Jerusalem in November.
+    expect(await screen.findByTestId('week-slot-15:00')).toBeInTheDocument()
+    expect(screen.getByTestId('week-slot-17:00')).toBeInTheDocument()
+  })
+
+  it('collapses two classes at the same hour into one row, not two', async () => {
+    const sameHour: SessionRow = { ...TUESDAY_EVENING, id: 'p1', starts_at: '2026-11-05T15:00:00Z', ends_at: '2026-11-05T17:00:00Z' }
+    render(<WeekBoard locale="he" client={stub([TUESDAY_EVENING, sameHour])} today="2026-11-03T12:00:00Z" />)
+    await screen.findByTestId('week-slot-17:00')
+    expect(screen.getAllByRole('rowheader')).toHaveLength(1)
+  })
+
+  it('puts a session in the cell for its day AND its time', async () => {
+    const { container } = render(
+      <WeekBoard locale="he" client={stub()} today="2026-11-03T12:00:00Z" />,
+    )
+    await screen.findByTestId('session-block')
+    const cell = container.querySelector('[data-testid="week-cell-2026-11-03-17:00"]')
+    expect(cell?.querySelector('[data-testid="session-block"]')).not.toBeNull()
+  })
+
+  it('draws an empty cell rather than nothing, so the grid stays a grid', async () => {
+    const { container } = render(
+      <WeekBoard locale="he" client={stub()} today="2026-11-03T12:00:00Z" />,
+    )
+    await screen.findByTestId('session-block')
+    // Seven days, one slot: seven cells, six of them empty.
+    expect(container.querySelectorAll('[role="gridcell"]')).toHaveLength(7)
+    const saturday = container.querySelector('[data-testid="week-cell-2026-11-07-17:00"]')
+    expect(saturday).not.toBeNull()
+    expect(saturday?.children).toHaveLength(0)
   })
 })
