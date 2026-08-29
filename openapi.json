@@ -509,6 +509,41 @@
         "title": "AttendanceOut",
         "type": "object"
       },
+      "AttendanceReportOut": {
+        "description": "`GET /attendance/report?from&to` — artboard `4c`, in one round trip.\n\nBoth halves of the screen come from one request because they are one question asked of\none window: which lessons were not signed, and how are the groups doing. Two endpoints\nwould let a date picker drive them out of step for a frame, and the range is echoed back\nfor the same reason `BootstrapPayload` echoes its own — a client should render what it\nreceived rather than what it asked for.",
+        "properties": {
+          "from_date": {
+            "format": "date",
+            "title": "From Date",
+            "type": "string"
+          },
+          "groups": {
+            "items": {
+              "$ref": "#/components/schemas/GroupAttendanceRate"
+            },
+            "title": "Groups",
+            "type": "array"
+          },
+          "to_date": {
+            "format": "date",
+            "title": "To Date",
+            "type": "string"
+          },
+          "unmarked_sessions": {
+            "items": {
+              "$ref": "#/components/schemas/UnmarkedSessionOut"
+            },
+            "title": "Unmarked Sessions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "from_date",
+          "to_date"
+        ],
+        "title": "AttendanceReportOut",
+        "type": "object"
+      },
       "AudienceQuery": {
         "description": "A scope, before an announcement exists to carry it.\n\n`4f` shows `יגיע ל-{{count}} משפחות` while the manager is still choosing who to write to,\nso the count cannot hang off an announcement id -- there is no row yet, and creating a\ndraft per keystroke to ask \"how many\" would litter the list.",
         "properties": {
@@ -4110,6 +4145,63 @@
           "sessions_created"
         ],
         "title": "GenerateSessionsOut",
+        "type": "object"
+      },
+      "GroupAttendanceRate": {
+        "description": "`4c`'s second card — name · bar · percentage, for one group over the window.\n\n**`rate_percent` is nullable and that is the whole design.** The denominator is the\nmarks somebody actually decided: present + absent_excused + absent_unexcused. §5.14\nmakes `unmarked` a real state so that a coach who forgot the register does not read as\na child who stopped coming, and a rate that counted `unmarked` as absence would undo\nthat in the one number a manager quotes. A group with no decided marks in the window\ntherefore has no rate — `null`, never `0`, because 0% is a claim about children who did\nnot come and \"nobody said\" is not that claim.\n\n`sessions` and `marked_sessions` are carried so the percentage can be read with its\ncoverage beside it: 100% over one marked session out of nine is a different fact from\n100% over nine, and a bar alone cannot tell them apart.",
+        "properties": {
+          "absent": {
+            "title": "Absent",
+            "type": "integer"
+          },
+          "group_id": {
+            "format": "uuid",
+            "title": "Group Id",
+            "type": "string"
+          },
+          "group_name": {
+            "title": "Group Name",
+            "type": "string"
+          },
+          "marked_sessions": {
+            "title": "Marked Sessions",
+            "type": "integer"
+          },
+          "present": {
+            "title": "Present",
+            "type": "integer"
+          },
+          "rate_percent": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rate Percent"
+          },
+          "sessions": {
+            "title": "Sessions",
+            "type": "integer"
+          },
+          "unmarked": {
+            "title": "Unmarked",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "group_id",
+          "group_name",
+          "present",
+          "absent",
+          "unmarked",
+          "rate_percent",
+          "sessions",
+          "marked_sessions"
+        ],
+        "title": "GroupAttendanceRate",
         "type": "object"
       },
       "GroupBeltRangeOut": {
@@ -12375,6 +12467,44 @@
         "title": "TrialSlotOut",
         "type": "object"
       },
+      "UnmarkedSessionOut": {
+        "description": "One row of `4c`'s `ממתין לסימון` list — a lesson that has ended with nothing\ndecided about anybody in it.\n\nDeliberately NOT `SessionOut`. That shape carries the whole session projection and this\nlist is a chase list: an id to act on, a group to recognise, a time to feel bad about.\nA wider shape would also have to be kept invariant-3 clean for no gain.",
+        "properties": {
+          "ends_at": {
+            "format": "date-time",
+            "title": "Ends At",
+            "type": "string"
+          },
+          "group_id": {
+            "format": "uuid",
+            "title": "Group Id",
+            "type": "string"
+          },
+          "group_name": {
+            "title": "Group Name",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "starts_at": {
+            "format": "date-time",
+            "title": "Starts At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "group_id",
+          "group_name",
+          "starts_at",
+          "ends_at"
+        ],
+        "title": "UnmarkedSessionOut",
+        "type": "object"
+      },
       "UpayFormOut": {
         "description": "§5.10 step 2's form, as data. The client builds the POST and auto-submits it.",
         "properties": {
@@ -13628,6 +13758,61 @@
           }
         },
         "summary": "Apply Batch",
+        "tags": [
+          "coach",
+          "attendance"
+        ]
+      }
+    },
+    "/api/v1/attendance/report": {
+      "get": {
+        "description": "Artboard `4c` — the sessions nobody signed, and how each group is doing, in the\nmanager's own window.\n\n**Not `/sync/bootstrap`, which is what this screen used to call.** That endpoint is\n§6.1's offline priming payload and clamps every window to §10.6's two days, so `4c` was\nasking for a week and rendering the two oldest days of it. The screen's date picker\nneeded an endpoint that answers the range it is given; §10.6's bound stays where it\nbelongs, on the phone's cache.\n\n**`ManagerOrOwner`, in a router tagged `coach`.** The tag is about §13's third invariant\n— it makes this response schema subject to the financial-field gate, which is a property\nworth having on any payload this file serves. The *permission* is a separate decision:\nthis is a studio-wide number over every group, which §3.2 grants under `View all students\nin studio` and `Export data` to owner and manager only, and the CSV button sitting beside\nthis data on `4c` is already `ManagerOrOwner`. A screen where half the controls 403 is\nworse than one a coach does not open. A coach's own view of attendance is the register\nitself, which every staff role still reaches through `GET /sessions/{id}/attendance`.\n\n422 on a bad range rather than an empty 200, and with the same bound the CSV export\nenforces — see `MAX_REPORT_DAYS`.",
+        "operationId": "attendance_report_api_v1_attendance_report_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "from",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "title": "From",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "title": "To",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttendanceReportOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Attendance Report",
         "tags": [
           "coach",
           "attendance"

@@ -116,4 +116,11 @@ export const attendance: Bundle = {
   'report.sessionsPlanned': 'Запланировано занятий',
   'report.empty': 'Нет данных о посещаемости за этот период',
   'report.export': 'Экспорт',
+  'report.rangeFrom': 'С даты',
+  'report.rangeTo': 'По дату',
+  'report.rangeInverted': 'Дата окончания раньше даты начала',
+  'report.rangeTooLong': 'Можно выбрать период до {{days}} дней',
+  'report.rateBasis': 'Процент считается только по отмеченным занятиям',
+  'report.noRate': 'В этом периоде нет отметок',
+  'report.markedOfSessions': 'Отмечено занятий: {{counts}}',
 }

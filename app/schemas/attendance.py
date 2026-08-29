@@ -18,7 +18,7 @@ coach at once.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
@@ -199,6 +199,68 @@ class InjuryReportOut(BaseModel):
     #: with no guardian on file and a studio with no manager would otherwise "send" a
     #: report nobody receives.
     notified: int
+
+
+class UnmarkedSessionOut(BaseModel):
+    """One row of `4c`'s `ממתין לסימון` list — a lesson that has ended with nothing
+    decided about anybody in it.
+
+    Deliberately NOT `SessionOut`. That shape carries the whole session projection and this
+    list is a chase list: an id to act on, a group to recognise, a time to feel bad about.
+    A wider shape would also have to be kept invariant-3 clean for no gain.
+    """
+
+    id: uuid.UUID
+    group_id: uuid.UUID
+    group_name: str
+    starts_at: datetime
+    ends_at: datetime
+
+
+class GroupAttendanceRate(BaseModel):
+    """`4c`'s second card — name · bar · percentage, for one group over the window.
+
+    **`rate_percent` is nullable and that is the whole design.** The denominator is the
+    marks somebody actually decided: present + absent_excused + absent_unexcused. §5.14
+    makes `unmarked` a real state so that a coach who forgot the register does not read as
+    a child who stopped coming, and a rate that counted `unmarked` as absence would undo
+    that in the one number a manager quotes. A group with no decided marks in the window
+    therefore has no rate — `null`, never `0`, because 0% is a claim about children who did
+    not come and "nobody said" is not that claim.
+
+    `sessions` and `marked_sessions` are carried so the percentage can be read with its
+    coverage beside it: 100% over one marked session out of nine is a different fact from
+    100% over nine, and a bar alone cannot tell them apart.
+    """
+
+    group_id: uuid.UUID
+    group_name: str
+    present: int
+    #: Excused and unexcused together. The rate asks who was on the mat, and a parent's
+    #: advance notice makes an absence polite rather than attended.
+    absent: int
+    #: Reported, never divided by. See the class docstring.
+    unmarked: int
+    rate_percent: int | None
+    sessions: int
+    marked_sessions: int
+
+
+class AttendanceReportOut(BaseModel):
+    """`GET /attendance/report?from&to` — artboard `4c`, in one round trip.
+
+    Both halves of the screen come from one request because they are one question asked of
+    one window: which lessons were not signed, and how are the groups doing. Two endpoints
+    would let a date picker drive them out of step for a frame, and the range is echoed back
+    for the same reason `BootstrapPayload` echoes its own — a client should render what it
+    received rather than what it asked for.
+    """
+
+    #: Echoed back. Unlike `/sync/bootstrap` this is never clamped; see the router.
+    from_date: date
+    to_date: date
+    unmarked_sessions: list[UnmarkedSessionOut] = Field(default_factory=list)
+    groups: list[GroupAttendanceRate] = Field(default_factory=list)
 
 
 AttendancePage = CursorPage[AttendanceOut]

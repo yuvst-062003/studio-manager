@@ -114,4 +114,11 @@ export const attendance: Bundle = {
   'report.sessionsPlanned': 'Classes planned',
   'report.empty': 'No attendance data for this period',
   'report.export': 'Export',
+  'report.rangeFrom': 'From',
+  'report.rangeTo': 'To',
+  'report.rangeInverted': 'The end date is before the start date',
+  'report.rangeTooLong': 'Pick a range of up to {{days}} days',
+  'report.rateBasis': 'The percentage counts only classes that were marked',
+  'report.noRate': 'Nothing marked in this range',
+  'report.markedOfSessions': '{{counts}} classes marked',
 }

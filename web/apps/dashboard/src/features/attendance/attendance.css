@@ -73,3 +73,55 @@
   padding: 0;
   list-style: none;
 }
+
+/* 4c's header holds three things that are one decision: the title, the range the manager
+ * picked, and the CSV that follows it. Laid out as a wrapping row so the picker's two fields
+ * sit beside the export on a desk and stack above it on a phone (§6, mobile-first). No
+ * physical property: `flex-direction: row` follows the document direction, so in `he` the
+ * title leads from the right and in `en` from the left with no branch. */
+[data-testid='attendance-report'] > header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: flex-end;
+  margin-block-end: var(--space-4);
+}
+
+[data-testid='attendance-report'] > header .studio-date-range {
+  flex: 1 1 18rem;
+}
+
+/* A refused range is an error the manager has to act on, not a hint. Same weight the field
+ * itself uses for an inverted range, because they are the same class of mistake. */
+[data-testid='range-too-long'] {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--danger);
+  font-size: var(--text-caption);
+}
+
+/* The denominator, stated beside the number it belongs to. Same caption treatment as the
+ * unmarked-is-not-absence rule above it, because it is the same rule counted. */
+[data-testid='rate-basis'] {
+  color: var(--text-secondary);
+  font-size: var(--text-caption);
+}
+
+[data-testid='group-rates'] li {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  padding-block: var(--space-2);
+}
+
+[data-testid='group-rates'] li > .studio-progress {
+  flex: 1 1 8rem;
+}
+
+/* Must not mirror, and must not jump: the coverage counts sit beside a bar that animates,
+ * and proportional digits make them slide sideways as the number changes. */
+[data-testid='group-rates'] li > span {
+  color: var(--text-secondary);
+  font-size: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+}

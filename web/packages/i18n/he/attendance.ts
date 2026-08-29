@@ -156,4 +156,18 @@ export const attendance: Bundle = {
   'report.sessionsPlanned': 'שיעורים שתוכננו',
   'report.empty': 'אין נתוני נוכחות לתקופה הזו',
   'report.export': 'ייצוא',
+  // -- the range `4c` never had. `9b`'s DateRangePicker takes both labels and the error --
+  'report.rangeFrom': 'מתאריך',
+  'report.rangeTo': 'עד תאריך',
+  'report.rangeInverted': 'תאריך הסיום מוקדם מתאריך ההתחלה',
+  // The same bound `GET /exports/attendance` enforces, so the table and the CSV refuse the
+  // same ranges. `{{days}}` is filled by the caller — `t()` does no interpolation.
+  'report.rangeTooLong': 'אפשר לבחור טווח של עד {{days}} ימים',
+  // §5.14, applied to the number rather than to the list: the denominator is the registers
+  // somebody actually signed, and a percentage whose denominator is unstated gets misquoted.
+  'report.rateBasis': 'האחוז מחושב מתוך שיעורים שסומנו בלבד',
+  'report.noRate': 'אין סימונים בטווח הזה',
+  // `{{counts}}` is an ltr island the caller substitutes — bare digits in an RTL paragraph
+  // reorder, and `1/9` would render `9/1`.
+  'report.markedOfSessions': 'סומנו {{counts}} שיעורים',
 }
