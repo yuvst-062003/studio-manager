@@ -185,6 +185,9 @@ export const billing: Bundle = {
   // -- prices and plans (dashboard 5a, wizard 5e) --------------------------------
   'plan.title': 'Prices and plans',
   'plan.add': 'New plan',
+  'plan.wizardTitle': 'What does training cost here?',
+  'plan.wizardHint': 'One plan is enough to start. You can add more and change prices at any time.',
+  'plan.later': "I'll set prices later",
   'plan.name': 'Plan name',
   'plan.monthlyAmount': 'Monthly price',
   'plan.registrationFee': 'Registration fee',

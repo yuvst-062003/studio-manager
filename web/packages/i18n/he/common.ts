@@ -256,6 +256,22 @@ export const common: Bundle = {
   'setup.staff.invite': 'שליחת הזמנה',
   'setup.staff.inviteFailed': 'ההזמנה לא נשלחה. בדקו את האימייל ונסו שוב.',
   'setup.staff.pending': 'טרם אישר',
+  // Steps 4-6's house chrome. The footer names where it goes next rather than saying
+  // "continue" — `5e` does, and "continue to staff" tells a manager what they are about
+  // to be asked. Each step's defer link uses its own words for the same reason.
+  'setup.continueTo': 'המשך ל{{step}}',
+  // §3.1's two coach roles, and the difference between them stated where the choice is
+  // made. The step offered a bare select labelled "role": an owner inviting their first
+  // coach had no way to know which one to pick.
+  'setup.staff.role.lead_coachWhat': 'יכול להעביר חניכים בין קבוצות ולפתוח מבחני חגורה',
+  'setup.staff.role.assistant_coachWhat': 'מסמן נוכחות. לא מנהל הרכב קבוצות ולא מבחנים',
+  'setup.staff.pendingTitle': 'הזמנות שנשלחו',
+  'setup.staff.noPending': 'עוד לא נשלחו הזמנות',
+  'setup.staff.awaiting': 'ממתין לכניסה ראשונה',
+  'setup.staff.aloneIsFine': 'אפשר להמשיך גם בלי להזמין אף אחד — מועדון שמאמן לבד הוא מקרה רגיל.',
+  'setup.staff.later': 'אזמין מאמנים אחר כך',
+  'setup.students.later': 'אוסיף חניכים אחר כך',
+  'setup.groups.later': 'אגדיר קבוצות אחר כך',
   'setup.students.ready': 'המועדון מוכן. נשאר להביא את החניכים.',
   'setup.students.summaryTitle': 'מה הוגדר עד כה',
   'setup.students.groupCount': '{groups} קבוצות · {classes} שיעורים',

@@ -46,6 +46,21 @@ export type StructureClient = {
   /** The rules a group already has. A manager returning to this step sees their own work. */
   readSchedule: (groupId: string) => Promise<Slot[]>
   /**
+   * The studio's active training year, opening this season's if there is none.
+   *
+   * A weekly rule is not a lesson. It becomes lessons only when generated between two
+   * dates, and those dates are the training year's — so `PUT .../schedule` reads the
+   * active year BEFORE it writes anything and refuses without one. Nothing in the six
+   * setup steps opened one: §5.15's rollover wizard does, and it exists for a club that
+   * already HAS a year and is moving to the next. A brand-new club has nothing to roll
+   * over, so it finished setup with a timetable that produced no lessons at all.
+   *
+   * Opened without asking (owner decision, 2026-08-29). The dates are derivable, a
+   * first-run owner has no useful opinion about them yet, and every part of the year is
+   * editable afterwards through the rollover wizard.
+   */
+  ensureTrainingYear: () => Promise<void>
+  /**
    * Replace a group's weekly rules.
    *
    * `PUT` replaces the whole set rather than appending, so the caller sends the complete
@@ -65,6 +80,24 @@ const rowStyle: CSSProperties = {
   flexWrap: 'wrap',
 }
 
+
+
+/**
+ * The Israeli season, September to August.
+ *
+ * From August onward the season being set up is the one about to start; before that, the
+ * one already running. The same rule `YearStep` uses for its pre-filled dates — restated
+ * here rather than imported, because `packages/ui` must not reach into an app's feature
+ * folder, and six lines of arithmetic is a cheaper duplication than that inversion.
+ */
+export function defaultSeason(today: Date): { name: string; starts_on: string; ends_on: string } {
+  const startYear = today.getMonth() + 1 >= 8 ? today.getFullYear() : today.getFullYear() - 1
+  return {
+    name: `${startYear}–${startYear + 1}`,
+    starts_on: `${startYear}-09-01`,
+    ends_on: `${startYear + 1}-08-31`,
+  }
+}
 
 /** Sunday-first, matching `group_schedule_rule.weekday` and Israel's working week. */
 const WEEKDAYS = [0, 1, 2, 3, 4, 5, 6] as const
@@ -134,8 +167,12 @@ export function makeGroupsStep(client: StructureClient) {
     const write = (groupId: string, next: Slot[]) => {
       setSlots((current) => ({ ...current, [groupId]: next }))
       setFailedFor(null)
+      // The year is opened HERE and not on mount: a manager who never adds a time should
+      // not have one created behind their back, and this is the first moment the product
+      // actually needs one.
       void client
-        .putSchedule(groupId, next.filter(isComplete), todayKey())
+        .ensureTrainingYear()
+        .then(() => client.putSchedule(groupId, next.filter(isComplete), todayKey()))
         // 404 is the one failure with a cause worth naming: `apply_schedule_change` reads
         // the active training year BEFORE it writes anything, and setup never opens one.
         // The times stay on screen either way — losing a manager's typing to report a

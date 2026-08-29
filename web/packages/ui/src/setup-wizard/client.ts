@@ -7,6 +7,7 @@
 import type { SetupProgress, WizardStepId } from './types'
 import type { SetupClient } from './SetupWizard'
 import type { StudioClient, StudioDetails } from './StudioStep'
+import { defaultSeason } from './GroupsStep'
 import type { NamedRow, Slot, StructureClient } from './GroupsStep'
 import type { StaffClient, StaffInvite } from './StaffStep'
 import type { SetupSummary, StudentsClient } from './StudentsStep'
@@ -74,6 +75,29 @@ export function makeStructureClient(fetcher: Fetcher): StructureClient {
     createClass: (name) => create('/api/v1/classes', { name }),
     createGroup: (classId, name) => create('/api/v1/groups', { class_id: classId, name }),
     createLocation: (name) => create('/api/v1/locations', { name }),
+    ensureTrainingYear: async () => {
+      const years = await fetcher('/api/v1/training-years')
+        .then(json<Listed<{ id: string; status: string }>>)
+        .then((body) => body.items ?? [])
+        .catch(() => [])
+      if (years.some((year) => year.status === 'active')) return
+
+      const season = defaultSeason(new Date())
+      // A draft may already exist from a previous visit to this step; reuse it rather than
+      // colliding with `uq_training_year_studio_id_name`.
+      const draft = years.find((year) => year.status === 'draft')
+      const created: { id: string } =
+        draft ??
+        (await fetcher('/api/v1/training-years', {
+          method: 'POST',
+          headers: JSON_HEADERS,
+          body: JSON.stringify(season),
+        }).then(json<{ id: string }>))
+
+      // Activating is the half that matters: `uq_training_year_one_active` makes "the
+      // active year" a single row, and a draft is invisible to guardians by design.
+      await fetcher(`/api/v1/training-years/${created.id}/activate`, { method: 'POST' })
+    },
     readSchedule: (groupId) =>
       fetcher(`/api/v1/groups/${groupId}/schedule`)
         .then(json<{ rules: Slot[] }>)

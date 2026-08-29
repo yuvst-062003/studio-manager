@@ -431,3 +431,107 @@
   display: flex;
   flex-direction: column;
 }
+
+/* ── Steps 5 and 6 ────────────────────────────────────────────────────────────────────
+ * The same two-column shape the other steps use: what you are doing, beside what it has
+ * produced so far. */
+
+.setup-two-col {
+  display: grid;
+  grid-template-columns: 1fr minmax(0, 17rem);
+  gap: var(--space-5);
+  align-items: start;
+}
+
+@media (width <= 900px) {
+  .setup-two-col {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* §3.1's two coach roles, side by side, each stating what it can and cannot do. The step
+ * offered a select labelled "role": an owner inviting their first coach had no way to
+ * know which to pick, and the difference is a real permission. */
+.setup-roles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.setup-role {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  background: var(--surface);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+}
+
+.setup-role[data-selected="true"] {
+  border-color: var(--fg);
+  border-width: var(--border-width-strong);
+}
+
+.setup-role:has(:focus-visible) {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.setup-role__what {
+  color: var(--text-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--leading-normal);
+}
+
+.setup-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--surface);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.setup-panel__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  font-size: var(--text-label);
+}
+
+.setup-panel__list li {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding-block-end: var(--space-3);
+  border-block-end: var(--border-width-hairline) solid var(--border);
+}
+
+.setup-panel__list li:last-child {
+  border-block-end: 0;
+  padding-block-end: 0;
+}
+
+/* An invitation is pending until the coach signs in. Said in words, and quietly: nothing
+ * has gone wrong, it is simply waiting. */
+.setup-panel__awaiting,
+.setup-panel__empty {
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+  margin: 0;
+}
+
+.setup-panel__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}

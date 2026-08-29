@@ -13,7 +13,7 @@ import { renderIn, DIRECTIONS } from '../testing'
 import { SetupWizard } from './SetupWizard'
 import type { SetupClient } from './SetupWizard'
 import { LOGO_EDGE, makeStudioStep, resizeToSquarePng } from './StudioStep'
-import { makeGroupsStep } from './GroupsStep'
+import { defaultSeason, makeGroupsStep } from './GroupsStep'
 import type { Slot } from './GroupsStep'
 import { makeStaffStep } from './StaffStep'
 import { makeStudentsStep } from './StudentsStep'
@@ -407,6 +407,7 @@ describe('step 3 · קבוצות ולו״ז', () => {
     createClass: vi.fn(async (name: string) => ({ id: 'c2', name })),
     createGroup: vi.fn(async (_classId: string, name: string) => ({ id: 'g1', name })),
     createLocation: vi.fn(async (name: string) => ({ id: 'l1', name })),
+    ensureTrainingYear: vi.fn<() => Promise<void>>(async () => undefined),
     readSchedule: vi.fn<(groupId: string) => Promise<Slot[]>>(async () => []),
     // Typed through the generic rather than by naming parameters the body never reads:
     // `mock.calls` needs the tuple, and unused names are what the lint rule is for.
@@ -524,6 +525,40 @@ describe('step 3 · קבוצות ולו״ז', () => {
     expect(await screen.findByTestId('slot-failed-g1')).toHaveAttribute('data-status', 'danger')
   })
 
+
+  it('opens the season before the first write, and only then', async () => {
+    // A weekly rule is not a lesson: it becomes lessons only when generated between two
+    // dates, and those dates are the training year's. Nothing in the six steps opened one,
+    // so a new club finished setup with a timetable that produced nothing. Opened here on
+    // the first time added — not on mount, which would create a year behind the back of a
+    // manager who never touches this.
+    const client = structureClient()
+    const Step = makeGroupsStep(client)
+    render(<Step locale="he" status="pending" onDone={vi.fn()} onSkip={vi.fn()} />)
+    await screen.findByTestId('setup-groups')
+    expect(client.ensureTrainingYear).not.toHaveBeenCalled()
+
+    await userEvent.type(
+      screen.getByLabelText(t('he', 'common.setup.groups.groupName')),
+      'מתחילים',
+    )
+    await userEvent.click(screen.getByText(t('he', 'common.setup.groups.addGroup')))
+    await userEvent.click(await screen.findByTestId('slot-add-g1'))
+    await waitFor(() => expect(client.ensureTrainingYear).toHaveBeenCalled())
+    await waitFor(() => expect(client.putSchedule).toHaveBeenCalled())
+  })
+
+  it('proposes September to August, which is the Israeli season', async () => {
+    // From August onward the season being set up is the one about to START; before that,
+    // the one already running.
+    expect(defaultSeason(new Date('2026-09-15T12:00:00Z'))).toEqual({
+      name: '2026–2027',
+      starts_on: '2026-09-01',
+      ends_on: '2027-08-31',
+    })
+    expect(defaultSeason(new Date('2026-03-15T12:00:00Z')).name).toBe('2025–2026')
+  })
+
   it('shows the week the times would create, so an empty Wednesday is visible', async () => {
     const client = structureClient()
     const Step = makeGroupsStep(client)
@@ -570,10 +605,42 @@ describe('step 5 · צוות', () => {
   })
 
   it('offers only the two coach roles — owner and manager come from the console', async () => {
+    // The roles were a <select>; they are now two cards. Same rule, asked of the new shape:
+    // a club must not be able to mint its own administrators.
     const Step = makeStaffStep(staffClient())
     render(<Step locale="he" status="pending" onDone={vi.fn()} onSkip={vi.fn()} />)
-    const select = await screen.findByLabelText(t('he', 'common.setup.staff.role'))
-    expect(within(select).getAllByRole('option')).toHaveLength(2)
+    const group = await screen.findByRole('radiogroup', {
+      name: t('he', 'common.setup.staff.role'),
+    })
+    expect(within(group).getAllByRole('radio')).toHaveLength(2)
+    expect(screen.queryByText(t('he', 'common.setup.staff.role.owner'))).toBeNull()
+    expect(screen.queryByText(t('he', 'common.setup.staff.role.manager'))).toBeNull()
+  })
+
+  it('states what each role can and cannot do, where the choice is made', async () => {
+    // A bare select labelled "role" left an owner inviting their first coach with no way
+    // to know which to pick, and the difference is a real permission rather than a title.
+    const Step = makeStaffStep(staffClient())
+    render(<Step locale="he" status="pending" onDone={vi.fn()} onSkip={vi.fn()} />)
+    expect(await screen.findByTestId('staff-role-lead_coach')).toHaveTextContent(
+      t('he', 'common.setup.staff.role.lead_coachWhat'),
+    )
+    expect(screen.getByTestId('staff-role-assistant_coach')).toHaveTextContent(
+      t('he', 'common.setup.staff.role.assistant_coachWhat'),
+    )
+  })
+
+  it('says an invitation is waiting rather than leaving it looking broken', async () => {
+    const client = staffClient()
+    const Step = makeStaffStep(client)
+    render(<Step locale="he" status="pending" onDone={vi.fn()} onSkip={vi.fn()} />)
+    expect(await screen.findByText(t('he', 'common.setup.staff.noPending'))).toBeInTheDocument()
+    await userEvent.type(
+      screen.getByLabelText(t('he', 'common.setup.staff.email')),
+      'coach@example.com',
+    )
+    await userEvent.click(screen.getByText(t('he', 'common.setup.staff.invite')))
+    expect(await screen.findByText(t('he', 'common.setup.staff.awaiting'))).toBeInTheDocument()
   })
 
   it('lets a coach be invited before any group exists', async () => {
