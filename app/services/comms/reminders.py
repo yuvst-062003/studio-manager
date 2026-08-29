@@ -1,4 +1,4 @@
-"""F7a — the four reminders whose buttons shipped dead.
+"""F7a's four reminders whose buttons shipped dead, and the fifth that no button raises.
 
 One service over the existing comms layer, because a second delivery path is how one
 product grows two answers about what was sent. Three rules every reminder obeys:
@@ -14,6 +14,15 @@ product grows two answers about what was sent. Three rules every reminder obeys:
   the payer person, never each child.
 
 Every call writes one audit row with counts, never names.
+
+**The fifth caller is a job, not a button, and that is exactly why it is here.**
+`remind_prepay_ending` is raised by `app/workers/billing.py` on the monthly run day. That
+worker's own debt ladder calls `NotificationService.enqueue` directly, so the three rules
+above do not reach it and its only protection is the cron hour — `infra/railway/jobs.json`
+pins `billing-run` to 08:30 for that reason and says so. A rung that told a family their
+prepayment was ending had the same choice, and took the other one: routed through this
+service, a run moved to 03:00 refuses instead of lighting up a phone at 03:15, and a
+retried job does not say it twice.
 """
 
 from __future__ import annotations
@@ -41,6 +50,12 @@ RATE_LIMIT = timedelta(hours=24)
 DEBT_KIND = "billing.reminder"
 COACH_KIND = "attendance.reminder_unmarked"
 EVENT_KIND = "event.rsvp_reminder"
+#: Its own kind, deliberately not a rung of `billing.overdue.*`. The rate limit above is
+#: per (kind, subject), so sharing `DEBT_KIND` would let a debt reminder sent this morning
+#: swallow the prepayment notice — two messages that mean opposite things about the same
+#: family. `app/services/comms/kinds.py` maps on the prefix, so `billing.` already puts this
+#: under §5.11's `payment` switch with no edit there.
+PREPAY_ENDING_KIND = "billing.prepay_ending"
 
 
 class QuietHoursError(Exception):
@@ -139,6 +154,51 @@ class ReminderService:
             actor_person_id=actor_person_id,
             at=at,
             audit_action="billing.reminder_sent",
+            audit_entity=("payer", first),
+        )
+
+    def remind_prepay_ending(
+        self,
+        payer_person_ids: list[uuid.UUID],
+        *,
+        period: tuple[int, int],
+        actor_person_id: uuid.UUID | None,
+        at: datetime,
+    ) -> dict[str, int]:
+        """The month a family's prepayment stops covering — said before it stops.
+
+        **Addressed to the payer, not to every guardian**, and that is the one place this
+        differs from the debt ladder it precedes. `app/workers/billing.py::_guardians_of`
+        writes to every guardian because a debt is about a child's place in the club and
+        §5.3 says both parents are told. A prepayment is about whose money is in the
+        drawer: `BillingService.payer_credit` is keyed on the payer person and nothing
+        below it is per-child. So this follows `remind_debt`'s §6.3 rule instead — one
+        message per household, to the person who handed the money over.
+
+        `subject` is the period, so the rate limit is exact: a retried run on the same day
+        is silent, and next year's prepayment is a different subject rather than a message
+        the 24-hour window happens to be past.
+
+        The body names no amount. What the family has left is on the payments screen the
+        notification opens, where it renders through `MoneyDisplay` beside the months it
+        covers — and §11.7 keeps money out of a payload that is copied to a push service.
+        """
+        recipients = set(
+            self.session.execute(select(Person.id).where(Person.id.in_(payer_person_ids))).scalars()
+        )
+        first = payer_person_ids[0] if payer_person_ids else uuid.uuid4()
+        year, month = period
+        label = f"{year:04d}-{month:02d}"
+        return self._send(
+            kind=PREPAY_ENDING_KIND,
+            recipients=recipients,
+            subject=label,
+            title="התשלום מראש מסתיים",
+            body="התשלום ששילמתם מראש מכסה את החודש הזה. החיוב לחודש הבא יופיע במסך התשלומים.",
+            payload={"period": label},
+            actor_person_id=actor_person_id,
+            at=at,
+            audit_action="billing.prepay_ending_notified",
             audit_entity=("payer", first),
         )
 
