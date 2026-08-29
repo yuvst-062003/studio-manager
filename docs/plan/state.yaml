@@ -286,6 +286,10 @@ waves:
         title: Lane close — i18n mirrors, the four IPN shapes measured, the handover
         status: shipped
         on: 2026-08-26
+      - id: M6.14
+        title: Rung zero — the prepayment ending is said before the debt ladder speaks
+        status: shipped
+        on: 2026-08-29
       - id: M7.1
         title: Events — create, publish, RSVP, the consent gate and the fee seam
         status: shipped
