@@ -27,6 +27,16 @@ export const schedule: Bundle = {
   'week.today': 'היום',
   'week.previous': 'שבוע קודם',
   'week.next': 'שבוע הבא',
+  // D5 — "Three views only — day, week, month. Week is the default."
+  'week.view.legend': 'תצוגה',
+  'week.view.day': 'יום',
+  'week.view.week': 'שבוע',
+  'week.view.month': 'חודש',
+  'week.view.previousDay': 'יום קודם',
+  'week.view.nextDay': 'יום הבא',
+  'week.view.previousMonth': 'חודש קודם',
+  'week.view.nextMonth': 'חודש הבא',
+  'week.view.sessions': 'שיעורים',
   // `3a`'s coverage strip — מה חסר השבוע. Counts are PARAMETERS, never joined into a
   // sentence. Derived from the week's own sessions, not fetched: SessionRow already
   // carries `staff` and `attendance_taken`.

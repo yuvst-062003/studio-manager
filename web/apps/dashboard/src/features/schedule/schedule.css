@@ -278,3 +278,97 @@
 
 /* The completed counter is the one number in the strip that is not a problem. */
 .week-missing li[data-tone="done"] > b { color: var(--paid); }
+
+/* D5's month view. A month answers "which days are busy", not "when exactly" — thirty
+ * days of ruled hour rows would be mostly blank and unreadably tall — so it is day cells
+ * holding compact pills rather than the time grid the day and week views share. */
+.month-grid {
+  display: grid;
+  gap: 0;
+}
+
+.month-grid__row {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.month-grid__head {
+  padding-block: var(--space-2);
+  padding-inline: var(--space-2);
+  font-size: var(--text-label);
+  font-weight: var(--weight-medium);
+  text-align: start;
+  border-block-end: var(--border-width-strong) solid var(--border);
+}
+
+.month-grid__cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-block-size: 6rem;
+  padding: var(--space-1);
+  border-block-start: var(--border-width-hairline) solid var(--border);
+  border-inline-start: var(--border-width-hairline) solid var(--border);
+}
+
+/* Days of the neighbouring month, kept so the grid stays rectangular. Dimmed rather than
+ * blanked: a manager dragging their eye across the first row needs to see that the month
+ * starts on a Wednesday, not that three cells are broken. */
+.month-grid__cell[data-outside] {
+  background: color-mix(in srgb, var(--fg) 2%, transparent);
+  color: var(--text-muted);
+}
+
+.month-grid__cell[data-today] {
+  background: color-mix(in srgb, var(--fg) 4%, transparent);
+}
+
+.month-grid__date {
+  align-self: flex-start;
+  font-size: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+.month-grid__cell[data-today] .month-grid__date {
+  color: var(--on-fg);
+  background: var(--fg);
+  border-radius: var(--radius-pill);
+  padding-inline: var(--space-2);
+}
+
+/* One line per class. Truncated rather than wrapped: a cell whose height depends on the
+ * longest group name makes every row in the month a different height. */
+.month-grid__pill {
+  display: block;
+  inline-size: 100%;
+  text-align: start;
+  font-family: inherit;
+  font-size: var(--text-micro);
+  line-height: var(--leading-normal);
+  color: var(--fg);
+  background: var(--surface);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-xs);
+  padding-block: 1px;
+  padding-inline: var(--space-1);
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.month-grid__pill[data-coverage="uncovered"] {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.month-grid__pill[data-coverage="cancelled"] {
+  color: var(--cancelled);
+  text-decoration: line-through;
+}
+
+.month-grid__pill:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}

@@ -16,8 +16,22 @@
 // tested at a fixed date, and every assertion about this grid depends on which week it is.
 import { useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { ActionBar, Button, EmptyState, PageHeader, RangeText, TextField } from '@studio/ui'
-import { apiFetch, formatTimeInStudioZone, studioDayKey, studioWallTimeToUtc } from '@studio/core'
+import {
+  ActionBar,
+  Button,
+  EmptyState,
+  PageHeader,
+  RangeText,
+  SegmentedControl,
+  TextField,
+} from '@studio/ui'
+import {
+  STUDIO_TIMEZONE,
+  apiFetch,
+  formatTimeInStudioZone,
+  studioDayKey,
+  studioWallTimeToUtc,
+} from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { makeDashboardAttendanceClient } from '../attendance'
@@ -50,6 +64,37 @@ export function weekStart(iso: string): string {
 /** Seven consecutive Jerusalem day keys, starting at `startKey`. */
 export function weekDays(startKey: string): string[] {
   return Array.from({ length: 7 }, (_, offset) => shiftDayKey(startKey, offset))
+}
+
+
+/** D5's three views. Week is the default, in as many words. */
+export type BoardView = 'day' | 'week' | 'month'
+
+/** The first day of the Jerusalem month `key` falls in. */
+export function monthStart(key: string): string {
+  return `${key.slice(0, 7)}-01`
+}
+
+/** Whole weeks covering the month `key` falls in — Sunday of the first week through
+ *  Saturday of the last, so the month grid is always rectangular. A month that begins on a
+ *  Wednesday leaves three cells of the previous month visible, which is what every
+ *  calendar does and what stops the first row being ragged. */
+export function monthGridDays(key: string): string[] {
+  const first = monthStart(key)
+  const firstOfNext = shiftDayKey(`${first.slice(0, 8)}28`, 5)
+  const lastOfMonth = shiftDayKey(monthStart(firstOfNext), -1)
+  const from = weekStart(`${first}T12:00:00Z`)
+  const to = shiftDayKey(weekStart(`${lastOfMonth}T12:00:00Z`), 6)
+  const days: string[] = []
+  for (let day = from; day <= to; day = shiftDayKey(day, 1)) days.push(day)
+  return days
+}
+
+/** The days a view shows, and the range its fetch has to cover. */
+export function daysFor(view: BoardView, anchor: string): string[] {
+  if (view === 'day') return [anchor]
+  if (view === 'month') return monthGridDays(anchor)
+  return weekDays(weekStart(`${anchor}T12:00:00Z`))
 }
 
 const boardStyle: CSSProperties = {
@@ -350,15 +395,31 @@ export function WeekBoard({
   today: string
 }) {
   const todayKey = useMemo(() => studioDayKey(today), [today])
-  const [start, setStart] = useState(() => weekStart(today))
+  const [view, setView] = useState<BoardView>('week')
+  /** The day the view is anchored on. For `week` it is any day in the week; `daysFor`
+   *  resolves it to the Sunday, so switching views keeps the manager where they were
+   *  rather than snapping them back to today. */
+  const [anchor, setAnchor] = useState(() => studioDayKey(today))
   const [sessions, setSessions] = useState<SessionRow[]>([])
   const [openSessionId, setOpenSessionId] = useState<string | null>(null)
   const [version, setVersion] = useState(0)
   const attendanceClient = useMemo(() => makeDashboardAttendanceClient(apiFetch), [])
-  const days = useMemo(() => weekDays(start), [start])
+  const days = useMemo(() => daysFor(view, anchor), [view, anchor])
   // The create form's disclosure lives here so its TRIGGER can sit in the page header
   // while the form itself opens below the coverage strip.
   const [open, setOpen] = useState(false)
+  /** Previous/next move by the unit the view shows: a day, a week, a month. Three buttons
+   *  that always moved by seven days would be wrong in two of the three views. */
+  const step = (direction: 1 | -1) =>
+    setAnchor((current) => {
+      if (view === 'day') return shiftDayKey(current, direction)
+      if (view === 'week') return shiftDayKey(current, 7 * direction)
+      // A month is not a fixed number of days. Land on the 1st of the next or previous
+      // month by stepping off either end of the current one.
+      const first = monthStart(current)
+      return monthStart(direction === 1 ? shiftDayKey(`${first.slice(0, 8)}28`, 5) : shiftDayKey(first, -1))
+    })
+
   /** `3a` item 7. Empty string means "all" — one falsy check per axis rather than three
    *  nullable ids, because the select's own empty option is a string too. */
   const [filter, setFilter] = useState({ group: '', coach: '', hall: '' })
@@ -373,7 +434,12 @@ export function WeekBoard({
   useEffect(() => {
     let live = true
     void (async () => {
-      const loaded = await client.listSessions({ from: days[0] as string, to: days[6] as string })
+      // The whole span the view shows — `days[6]` was right only for a week, and a month
+      // view asking for seven days would have rendered three weeks of empty cells.
+      const loaded = await client.listSessions({
+        from: days[0] as string,
+        to: days[days.length - 1] as string,
+      })
       if (live) setSessions(loaded)
     })()
     return () => {
@@ -476,12 +542,34 @@ export function WeekBoard({
     return { noCoach, unmarked, cancelled, completed, total: noCoach + unmarked + cancelled }
   }, [visible, today])
 
+  // The buttons name what they actually do. "Previous week" while looking at a month is
+  // a lie the manager finds out about by pressing it.
+  const previousKey =
+    view === 'day' ? 'view.previousDay' : view === 'month' ? 'view.previousMonth' : 'previous'
+  const nextKey = view === 'day' ? 'view.nextDay' : view === 'month' ? 'view.nextMonth' : 'next'
+
   /** `23–29`, as one ltr island. The week the board is showing, which three bare
    *  previous/today/next buttons never said. */
   const weekLabel = useMemo(() => {
+    const first = days[0]
     const last = days[days.length - 1]
-    return last ? { from: String(Number(start.slice(8, 10))), to: String(Number(last.slice(8, 10))) } : null
-  }, [days, start])
+    if (!first || !last) return null
+    // A month is named, not measured. The grid spans whole weeks, so its first and last
+    // days belong to the neighbouring months — labelling the view `2026-11-01–2026-12-05`
+    // would answer a question nobody asked and get the month wrong at both ends.
+    if (view === 'month') {
+      return {
+        text: new Intl.DateTimeFormat(locale, {
+          month: 'long',
+          year: 'numeric',
+          timeZone: STUDIO_TIMEZONE,
+        }).format(new Date(`${monthStart(anchor)}T12:00:00Z`)),
+      }
+    }
+    // A day view has one date, not a range — `23–23` is noise.
+    if (first === last) return { from: first, to: null }
+    return { from: first, to: last }
+  }, [days, view, anchor, locale])
 
   /** Every start time the week actually contains, as Jerusalem `HH:MM`, ascending. One
    *  grid row each. A club training at 17:00 and 18:30 gets two rows; a club training at
@@ -490,6 +578,17 @@ export function WeekBoard({
     const seen = new Set(visible.map((row) => formatTimeInStudioZone(row.starts_at, locale)))
     return [...seen].sort()
   }, [visible, locale])
+
+  /** Sessions per day, for the month view — which asks "which days are busy", not "when". */
+  const byDay = useMemo(() => {
+    const grouped = new Map<string, SessionRow[]>()
+    for (const session of visible) {
+      const key = studioDayKey(session.starts_at)
+      grouped.set(key, [...(grouped.get(key) ?? []), session])
+    }
+    for (const rows of grouped.values()) rows.sort((a, b) => a.starts_at.localeCompare(b.starts_at))
+    return grouped
+  }, [visible])
 
   /** `day|HH:MM` → the sessions in that cell. A cell holds more than one only when a club
    *  runs two groups in different halls at the same hour, which is real. */
@@ -518,32 +617,42 @@ export function WeekBoard({
             }
             start={
               <>
-                <Button
-                  variant="ghost"
-                  data-testid="week-previous"
-                  onClick={() => setStart((current) => shiftDayKey(current, -7))}
-                >
-                  {t(locale, 'schedule.week.previous')}
+                <SegmentedControl
+                  legend={t(locale, 'schedule.week.view.legend')}
+                  onValueChange={(next) => setView(next as BoardView)}
+                  options={[
+                    { value: 'day', label: t(locale, 'schedule.week.view.day') },
+                    { value: 'week', label: t(locale, 'schedule.week.view.week') },
+                    { value: 'month', label: t(locale, 'schedule.week.view.month') },
+                  ]}
+                  value={view}
+                />
+                <Button variant="ghost" data-testid="week-previous" onClick={() => step(-1)}>
+                  {t(locale, `schedule.week.${previousKey}`)}
                 </Button>
                 <Button
                   variant="ghost"
                   data-testid="week-today"
-                  onClick={() => setStart(weekStart(today))}
+                  onClick={() => setAnchor(todayKey)}
                 >
                   {t(locale, 'schedule.week.today')}
                 </Button>
-                <Button
-                  variant="ghost"
-                  data-testid="week-next"
-                  onClick={() => setStart((current) => shiftDayKey(current, 7))}
-                >
-                  {t(locale, 'schedule.week.next')}
+                <Button variant="ghost" data-testid="week-next" onClick={() => step(1)}>
+                  {t(locale, `schedule.week.${nextKey}`)}
                 </Button>
               </>
             }
           />
         }
-        subtitle={weekLabel ? <RangeText from={weekLabel.from} to={weekLabel.to} /> : undefined}
+        subtitle={
+          weekLabel && 'text' in weekLabel ? (
+            weekLabel.text
+          ) : weekLabel?.to ? (
+            <RangeText from={weekLabel.from} to={weekLabel.to} />
+          ) : weekLabel ? (
+            <bdi dir="ltr">{weekLabel.from}</bdi>
+          ) : undefined
+        }
         title={t(locale, 'schedule.week.title')}
       />
 
@@ -696,6 +805,62 @@ export function WeekBoard({
         </p>
       ) : null}
 
+      {view === 'month' ? (
+        /* A month is not a time grid. Thirty days of ruled hour rows would be mostly
+           blank and unreadably tall; every calendar answers a month with day cells, and
+           the question changes with it — "which days are busy", not "when exactly". */
+        <div role="grid" aria-label={t(locale, 'schedule.week.view.month')} className="month-grid">
+          <div role="row" className="month-grid__row">
+            {days.slice(0, 7).map((day, index) => (
+              <span role="columnheader" className="month-grid__head" key={day}>
+                {t(locale, `schedule.weekday.${index}`)}
+              </span>
+            ))}
+          </div>
+          {Array.from({ length: days.length / 7 }, (_, week) => (
+            <div role="row" className="month-grid__row" key={days[week * 7]}>
+              {days.slice(week * 7, week * 7 + 7).map((day) => {
+                const rows = byDay.get(day) ?? []
+                return (
+                  <div
+                    role="gridcell"
+                    className="month-grid__cell"
+                    key={day}
+                    data-day={day}
+                    data-today={day === todayKey || undefined}
+                    /* A day from the neighbouring month, kept so the grid stays
+                       rectangular but dimmed so it is not mistaken for this one. */
+                    data-outside={day.slice(0, 7) !== anchor.slice(0, 7) || undefined}
+                    data-testid={`month-cell-${day}`}
+                  >
+                    <span className="month-grid__date">{Number(day.slice(8, 10))}</span>
+                    {rows.map((session) => (
+                      <button
+                        className="month-grid__pill"
+                        data-coverage={
+                          session.status === 'cancelled'
+                            ? 'cancelled'
+                            : session.staff.length === 0
+                              ? 'uncovered'
+                              : 'ok'
+                        }
+                        data-testid="month-session"
+                        key={session.id}
+                        onClick={() => setOpenSessionId(session.id)}
+                        type="button"
+                      >
+                        <bdi dir="ltr">{formatTimeInStudioZone(session.starts_at, locale)}</bdi>{' '}
+                        {session.group_name}
+                      </button>
+                    ))}
+                  </div>
+                )
+              })}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <>
       {/* `3a`'s grid: a time gutter, then one column per day, ruled into rows — one row
           per start time the week actually contains. The shipped board had no axis at all,
           so blocks floated in unruled columns and two classes an hour apart looked like
@@ -798,6 +963,8 @@ export function WeekBoard({
           </div>
         ))}
       </div>
+        </>
+      )}
 
 
       {slot ? (

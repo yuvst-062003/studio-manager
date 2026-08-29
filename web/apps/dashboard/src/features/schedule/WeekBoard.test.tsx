@@ -702,3 +702,86 @@ describe('WeekBoard · filters (3a item 7)', () => {
     expect(screen.getByTestId('week-missing-completed')).toHaveTextContent('1')
   })
 })
+
+describe('WeekBoard · D5 three views', () => {
+  it('defaults to the week, in as many words', async () => {
+    render(<WeekBoard locale="he" client={stub()} today="2026-11-03T12:00:00Z" />)
+    await screen.findByTestId('session-block')
+    expect(screen.getByRole('radio', { name: t('he', 'schedule.week.view.week') })).toBeChecked()
+    expect(screen.getAllByRole('columnheader')).toHaveLength(8) // the gutter corner plus 7
+  })
+
+  it('narrows to a single day', async () => {
+    render(<WeekBoard locale="he" client={stub()} today="2026-11-03T12:00:00Z" />)
+    await screen.findByTestId('session-block')
+    await userEvent.click(screen.getByRole('radio', { name: t('he', 'schedule.week.view.day') }))
+    await waitFor(() => expect(screen.getAllByRole('columnheader')).toHaveLength(2))
+    expect(screen.getByTestId('week-day-2026-11-03')).toBeInTheDocument()
+  })
+
+  it('answers a month with day cells rather than a time grid', async () => {
+    // Thirty days of ruled hour rows would be mostly blank and unreadably tall. A month
+    // asks which days are busy, not when exactly.
+    render(<WeekBoard locale="he" client={stub()} today="2026-11-03T12:00:00Z" />)
+    await screen.findByTestId('session-block')
+    await userEvent.click(screen.getByRole('radio', { name: t('he', 'schedule.week.view.month') }))
+    await screen.findByTestId('month-cell-2026-11-03')
+    expect(screen.queryByTestId('week-slot-17:00')).toBeNull()
+    expect(screen.getAllByTestId('month-session').length).toBeGreaterThan(0)
+  })
+
+  it('keeps the month grid rectangular, and dims the days that are not this month', async () => {
+    // November 2026 starts on a Sunday and ends on a Monday, so the grid runs to Saturday
+    // 5 December — five whole weeks.
+    render(<WeekBoard locale="he" client={stub()} today="2026-11-03T12:00:00Z" />)
+    await screen.findByTestId('session-block')
+    await userEvent.click(screen.getByRole('radio', { name: t('he', 'schedule.week.view.month') }))
+    const december = await screen.findByTestId('month-cell-2026-12-01')
+    expect(december).toHaveAttribute('data-outside')
+    expect(screen.getByTestId('month-cell-2026-11-03')).not.toHaveAttribute('data-outside')
+  })
+
+  it('names the navigation after what it actually moves', async () => {
+    // "Previous week" while looking at a month is a lie the manager finds out by pressing.
+    render(<WeekBoard locale="he" client={stub()} today="2026-11-03T12:00:00Z" />)
+    await screen.findByTestId('session-block')
+    expect(screen.getByTestId('week-previous')).toHaveTextContent(t('he', 'schedule.week.previous'))
+    await userEvent.click(screen.getByRole('radio', { name: t('he', 'schedule.week.view.month') }))
+    expect(screen.getByTestId('week-previous')).toHaveTextContent(
+      t('he', 'schedule.week.view.previousMonth'),
+    )
+  })
+
+  it('fetches the whole span the view shows, not always seven days', async () => {
+    // `days[6]` was right only for a week; a month asking for seven days would have
+    // rendered three weeks of empty cells.
+    const client = stub()
+    render(<WeekBoard locale="he" client={client} today="2026-11-03T12:00:00Z" />)
+    await screen.findByTestId('session-block')
+    await userEvent.click(screen.getByRole('radio', { name: t('he', 'schedule.week.view.month') }))
+    await waitFor(() =>
+      expect(client.listSessions).toHaveBeenCalledWith({ from: '2026-11-01', to: '2026-12-05' }),
+    )
+  })
+
+  it('stays where the manager was when the view changes', async () => {
+    // Switching to a month from a week in the future must not snap back to today.
+    render(<WeekBoard locale="he" client={stub()} today="2026-11-03T12:00:00Z" />)
+    await screen.findByTestId('session-block')
+    await userEvent.click(screen.getByTestId('week-next'))
+    await userEvent.click(screen.getByRole('radio', { name: t('he', 'schedule.week.view.day') }))
+    await waitFor(() => expect(screen.getByTestId('week-day-2026-11-10')).toBeInTheDocument())
+  })
+
+  it('names the month rather than measuring the grid that draws it', async () => {
+    // The grid spans whole weeks, so its ends belong to the neighbouring months. Labelling
+    // the view `2026-11-01–2026-12-05` answers a question nobody asked and is wrong at both
+    // ends.
+    render(<WeekBoard locale="he" client={stub()} today="2026-11-03T12:00:00Z" />)
+    await screen.findByTestId('session-block')
+    await userEvent.click(screen.getByRole('radio', { name: t('he', 'schedule.week.view.month') }))
+    const header = await screen.findByRole('banner')
+    expect(header).not.toHaveTextContent('2026-12-05')
+    expect(header.textContent).toMatch(/2026/)
+  })
+})

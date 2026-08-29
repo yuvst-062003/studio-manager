@@ -14,6 +14,16 @@ export const schedule: Bundle = {
   'week.today': 'Today',
   'week.previous': 'Previous week',
   'week.next': 'Next week',
+  // D5 — "Three views only — day, week, month. Week is the default."
+  'week.view.legend': 'View',
+  'week.view.day': 'Day',
+  'week.view.week': 'Week',
+  'week.view.month': 'Month',
+  'week.view.previousDay': 'Previous day',
+  'week.view.nextDay': 'Next day',
+  'week.view.previousMonth': 'Previous month',
+  'week.view.nextMonth': 'Next month',
+  'week.view.sessions': 'classes',
   // `3a`'s coverage strip. Counts are PARAMETERS, never joined into a sentence.
   'week.missing.title': "What's missing this week",
   'week.missing.noCoach': 'Classes with no coach',
