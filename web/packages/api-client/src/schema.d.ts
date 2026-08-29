@@ -2691,6 +2691,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/privacy/consents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Consents
+         * @description What §6.1 step 5's blocking gate reads, about the CALLER and nobody else.
+         *
+         *     No `person_id` parameter, deliberately. A consent is a thing a person did, and a route
+         *     that could report anyone's would be a route whose authorisation rule had to be argued
+         *     for. The operator's view of another person's consents belongs on §16's screen, reading
+         *     §11.2's audit trail.
+         */
+        get: operations["read_consents_api_v1_privacy_consents_get"];
+        put?: never;
+        /**
+         * Grant Consents
+         * @description Append §6.1 step 5's acceptance -- one row per consent, never an update.
+         *
+         *     A withdrawal is the same call with `false`, and it puts the gate back in front of the
+         *     app. That is the honest consequence and not a bug: without the privacy consent the
+         *     product may not process the family's data, and "a consent that cannot be withdrawn is
+         *     not consent" (`ConsentRecord`'s docstring).
+         */
+        post: operations["grant_consents_api_v1_privacy_consents_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/privacy/delete": {
         parameters: {
             query?: never;
@@ -2702,12 +2736,12 @@ export interface paths {
         put?: never;
         /**
          * Request Deletion
-         * @description Request deletion of a person's personal data.
+         * @description §11.4 -- the subject, their guardian, or a manager acting for either.
          *
-         *     Enqueues a task to delete data within retention window constraints
-         *     (e.g., financial records retained per Israeli law).
-         *
-         *     Returns a deletion tracking ID for status checks.
+         *     Enqueues a task to delete data within retention window constraints (financial records
+         *     are retained per Israeli law and the person is anonymized rather than deleted). The
+         *     worker's `purge_subject_data` raises until it is built, so this request will end
+         *     `failed` -- which is what `GET /privacy/requests` reports and what the screen shows.
          */
         post: operations["request_deletion_api_v1_privacy_delete_post"];
         delete?: never;
@@ -2725,7 +2759,7 @@ export interface paths {
         };
         /**
          * Get Deletion Status
-         * @description Poll status of a deletion request.
+         * @description Poll status of a deletion request. Authorised against its subject -- see `/export/{id}`.
          */
         get: operations["get_deletion_status_api_v1_privacy_delete__deletion_id__get"];
         put?: never;
@@ -2747,13 +2781,10 @@ export interface paths {
         put?: never;
         /**
          * Request Data Export
-         * @description Request GDPR data export for a person.
+         * @description §11.3 -- the subject, their guardian, or a manager acting for either.
          *
-         *     Returns a job ID. Client polls `/export/{job_id}` to check status.
-         *     Data is available for download when status is 'ready'.
-         *
-         *     Query parameters:
-         *     - include_audit_trail: whether to include audit logs (default: true)
+         *     Returns a job ID. Client polls `/export/{job_id}`, or reads `/privacy/requests`, which
+         *     needs no id kept in browser state.
          */
         post: operations["request_data_export_api_v1_privacy_export_post"];
         delete?: never;
@@ -2772,8 +2803,36 @@ export interface paths {
         /**
          * Get Export Status
          * @description Poll status of a data export job.
+         *
+         *     Authorised against the request's SUBJECT. Opening POST to guardians opens GET too, and
+         *     a UUID is a guess away -- answering with a status to anyone holding the id would make
+         *     the id itself the authorisation.
          */
         get: operations["get_export_status_api_v1_privacy_export__job_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/privacy/requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Requests
+         * @description §11.3's "where is my export", and §16's operator queue, from one route.
+         *
+         *     A manager sees every request in the studio; anyone else sees their own subjects'. Both
+         *     are answering the same question about a different scope, and two routes would be two
+         *     authorisation rules to keep in step.
+         */
+        get: operations["list_requests_api_v1_privacy_requests_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -5808,6 +5867,59 @@ export interface components {
              */
             training_year_id: string;
         };
+        /**
+         * ConsentGrantIn
+         * @description `version` is the one the CLIENT rendered, not a suggestion.
+         *
+         *     A mismatch is a 409: recording the server's current version for a screen that showed
+         *     the previous one is how a consent ledger comes to hold agreements nobody made.
+         */
+        ConsentGrantIn: {
+            /** Grants */
+            grants: {
+                [key: string]: boolean;
+            };
+            /** Version */
+            version: number;
+        };
+        /**
+         * ConsentRecordOut
+         * @description One decision in §11.6's ledger. Never an aggregate: two acceptances are two rows.
+         */
+        ConsentRecordOut: {
+            /** Consent Type */
+            consent_type: string;
+            /** Granted */
+            granted: boolean;
+            /** Granted At */
+            granted_at: string;
+            /** Revoked At */
+            revoked_at: string | null;
+            /** Version */
+            version: number;
+        };
+        /**
+         * ConsentStateOut
+         * @description What §6.1 step 5's gate reads, and what the privacy screen renders.
+         *
+         *     `policy_is_draft` and `policy_version_label` are on the wire rather than hardcoded in
+         *     the client so the draft banner cannot be left behind on a screen after the reviewed
+         *     text lands. The banner is data.
+         */
+        ConsentStateOut: {
+            /** Outstanding */
+            outstanding: string[];
+            /** Policy Is Draft */
+            policy_is_draft: boolean;
+            /** Policy Version */
+            policy_version: number;
+            /** Policy Version Label */
+            policy_version_label: string;
+            /** Records */
+            records: components["schemas"]["ConsentRecordOut"][];
+            /** Required */
+            required: string[];
+        };
         /** CursorPage[AnnouncementOut] */
         CursorPage_AnnouncementOut_: {
             /**
@@ -6109,10 +6221,10 @@ export interface components {
             next_cursor?: string | null;
         };
         /**
-         * DataExportRequest
+         * DataExportRequestIn
          * @description Request to export a person's personal data.
          */
-        DataExportRequest: {
+        DataExportRequestIn: {
             /**
              * Include Audit Trail
              * @default true
@@ -6129,6 +6241,8 @@ export interface components {
          * @description Response with export job status.
          */
         DataExportResponse: {
+            /** Error */
+            error?: string | null;
             /** Expires At */
             expires_at: string | null;
             /**
@@ -6147,10 +6261,10 @@ export interface components {
             payer_person_ids: string[];
         };
         /**
-         * DeletionRequest
+         * DeletionRequestIn
          * @description Request to delete a person's personal data.
          */
-        DeletionRequest: {
+        DeletionRequestIn: {
             /**
              * Person Id
              * Format: uuid
@@ -6169,6 +6283,8 @@ export interface components {
              * Format: uuid
              */
             deletion_id: string;
+            /** Error */
+            error?: string | null;
             /**
              * Person Id
              * Format: uuid
@@ -8338,6 +8454,52 @@ export interface components {
             sessions_per_week: number | null;
             /** Standing Order Link Url */
             standing_order_link_url?: string | null;
+        };
+        /**
+         * PrivacyRequestOut
+         * @description One row of §11.3's "where is my export" list, and of §16's operator queue.
+         *
+         *     `has_bundle` and not `object_key`: §8.1 keeps the bundle in object storage and the key
+         *     is the pointer to a child's complete record. A screen needs to know whether a download
+         *     exists, and the download is authorised per request rather than by holding the key.
+         */
+        PrivacyRequestOut: {
+            /** Completed At */
+            completed_at: string | null;
+            /** Created At */
+            created_at: string;
+            /** Error */
+            error: string | null;
+            /** Has Bundle */
+            has_bundle: boolean;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Reason */
+            reason: string | null;
+            /**
+             * Requested By Person Id
+             * Format: uuid
+             */
+            requested_by_person_id: string;
+            /** Status */
+            status: string;
+            /**
+             * Subject Person Id
+             * Format: uuid
+             */
+            subject_person_id: string;
+        };
+        /** PrivacyRequestsOut */
+        PrivacyRequestsOut: {
+            /** Deletions */
+            deletions: components["schemas"]["PrivacyRequestOut"][];
+            /** Exports */
+            exports: components["schemas"]["PrivacyRequestOut"][];
         };
         /** ProductIn */
         ProductIn: {
@@ -14971,6 +15133,59 @@ export interface operations {
             };
         };
     };
+    read_consents_api_v1_privacy_consents_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConsentStateOut"];
+                };
+            };
+        };
+    };
+    grant_consents_api_v1_privacy_consents_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConsentGrantIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConsentStateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     request_deletion_api_v1_privacy_delete_post: {
         parameters: {
             query?: never;
@@ -14980,7 +15195,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["DeletionRequest"];
+                "application/json": components["schemas"]["DeletionRequestIn"];
             };
         };
         responses: {
@@ -15044,7 +15259,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["DataExportRequest"];
+                "application/json": components["schemas"]["DataExportRequestIn"];
             };
         };
         responses: {
@@ -15095,6 +15310,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_requests_api_v1_privacy_requests_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrivacyRequestsOut"];
                 };
             };
         };

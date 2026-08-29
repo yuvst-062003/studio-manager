@@ -68,6 +68,14 @@ import { ShopSection } from './features/billing'
 // W3 and a guardian with an unsigned declaration still reached home.
 import { HealthGate, firstStudentNeedingDeclaration, makeHealthClient, registerHealthSections } from './features/health'
 import type { GatedStudent } from './features/health'
+// §6.1 step 5 — the OTHER blocking gate, and the one that had never been built.
+// SPEC:1314 puts `5  אישורים  →  terms of service + privacy policy` in the BLOCKING band
+// and SPEC:1327 says steps 5 and 6 are the only hard gates. M4 shipped step 6 and not
+// step 5, so `consent_record` was written by exactly one place in the whole product
+// (`app/services/events/rsvp.py`'s per-event consent) and no guardian had ever accepted a
+// privacy policy. `Resolve.tsx:9` records the handover that dropped it.
+import { ConsentGate, PrivacyScreen, makePrivacyClient } from './features/privacy'
+import type { ConsentGateStatus } from './features/privacy'
 
 // Seam 4 — the student card is a container and knows no section by name. This call was
 // written for "the app's own entry" and the entry never made it: only tests called it,
@@ -226,6 +234,13 @@ function AuthedApp() {
   const commsClient = useMemo(() => makeParentCommsClient(apiFetch), [])
   const healthClient = useMemo(() => makeHealthClient(apiFetch), [])
   const absenceClient = useMemo(() => makeAbsenceClient(apiFetch), [])
+  const privacyClient = useMemo(() => makePrivacyClient(apiFetch), [])
+  // §6.1 step 5's gate reports its own state up, because the TAB BAR has to hide with it
+  // and the bar is a prop of `AppShell`, rendered outside the gate's children. `loading`
+  // until the answer arrives: a bar drawn during the fetch is a bar a fast finger uses
+  // before the gate exists, which is the same reason the shell renders nothing at all
+  // while `gatedChildren` is null.
+  const [consentStatus, setConsentStatus] = useState<ConsentGateStatus>('loading')
   // §6.1 step 6 — which children still owe a declaration. `null` until the answer
   // arrives, and the shell renders NOTHING gated until it does: a home screen that
   // flashes before the gate is a gate a fast finger gets past. On a fetch failure the
@@ -317,6 +332,11 @@ function AuthedApp() {
   const cardStudentId = hash.startsWith('#/student/') ? hash.slice('#/student/'.length) : ''
   // 12i — the profile tab's screen (ship-audit B4: built in W2, mounted by nothing).
   const onProfile = hash === '#/profile'
+  // §11.3/§11.4/§11.6 — the subject's own privacy screen. Linked from the drawer, and
+  // asserted by `routes.reachable.test.ts`: three screens have shipped mounted and
+  // unreachable in this app already, and a privacy screen nobody can find is a subject
+  // access right nobody can exercise.
+  const onPrivacy = hash === '#/privacy'
   // 12e — the item shop (feature pass: built in W4, mounted by nothing).
   const onShop = hash === '#/shop'
   const onDirections = hash === '#/directions'
@@ -374,9 +394,12 @@ function AuthedApp() {
           items={NAV}
           locale={locale}
           tabBar={
-            // 1a draws the four-tab bar on EVERY screen, and it hides while §6.1's gate
-            // holds — "no other screen is reachable" includes the bar that reaches them.
-            gatedChildren !== null && firstStudentNeedingDeclaration(gatedChildren) === null ? (
+            // 1a draws the four-tab bar on EVERY screen, and it hides while EITHER of
+            // §6.1's gates holds — "no other screen is reachable" includes the bar that
+            // reaches them. Step 5 is `consentStatus`, step 6 is `gatedChildren`.
+            consentStatus === 'open' &&
+            gatedChildren !== null &&
+            firstStudentNeedingDeclaration(gatedChildren) === null ? (
               <TabBar
                 label={t(locale, 'common.home.title')}
                 items={[
@@ -435,6 +458,14 @@ function AuthedApp() {
                   ) : null}
                 </div>
               ) : null}
+              {/* §11's screen, in the drawer 2e draws these controls in. A link and not a
+                  NAV entry: NAV is the family's four working surfaces, and privacy is a
+                  settings control — the same place the language and theme switches live.
+                  `routes.reachable.test.ts` requires this to exist somewhere in the app,
+                  because three screens have already shipped mounted and unreachable. */}
+              <p style={{ margin: 0 }}>
+                <a href="#/privacy">{t(locale, 'reports.privacy.title')}</a>
+              </p>
               <AccountDrawerFooter locale={locale} onChooseLocale={setLocale} accountName={session.displayName} />
             </>
           }
@@ -474,6 +505,15 @@ function AuthedApp() {
               this expression. `null` while the children are still loading — see the
               fetch above. */}
           {gatedChildren === null ? null : (
+          /* §6.1 step 5 OUTSIDE step 6, because 5 precedes 6 and the ordering carries an
+             argument: the privacy policy is what permits the club to collect a medical
+             record about a child at all, so asking for the record first and the permission
+             afterwards has the consent doing no work. */
+          <ConsentGate
+            client={privacyClient}
+            locale={locale}
+            onStatusChange={setConsentStatus}
+          >
           <HealthGate
             locale={locale}
             client={healthClient}
@@ -534,6 +574,18 @@ function AuthedApp() {
                 />
               )}
             </section>
+          ) : onPrivacy ? (
+            // No `access.parent` guard and none needed: every route behind this screen
+            // resolves the subject from the session, so a caller with no children sees
+            // their own record and nobody else's.
+            <PrivacyScreen
+              client={privacyClient}
+              locale={locale}
+              personId={
+                session.studios.find((s) => s.studio_id === session.activeStudioId)?.person_id ??
+                null
+              }
+            />
           ) : onProfile ? (
             <ProfileSection locale={locale} />
           ) : addingChild ? (
@@ -585,6 +637,7 @@ function AuthedApp() {
             </>
           )}
           </HealthGate>
+          </ConsentGate>
           )}
         </AppShell>
       ) : null}

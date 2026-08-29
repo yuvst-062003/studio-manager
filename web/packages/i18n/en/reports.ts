@@ -77,7 +77,99 @@ export const reports: Bundle = {
   'atRisk.contacted': 'Contacted',
 
   // -- §11.3's data export ------------------------------------------------------------
+  // ==================================================================================
+  // §6.1 step 5's BLOCKING gate. **The policy and terms below are an UNREVIEWED DRAFT** —
+  // see the long note in `he/reports.ts` for what they were written against and why every
+  // acceptance of them is recorded at `consent_record.version = 0`.
+  // ==================================================================================
+  'privacy.draft.badge': 'Draft',
+  'privacy.draft.notice':
+    'The text below was written by the development team and has not been reviewed by a lawyer. It describes truthfully what the system actually does, but it is not legal advice and it is expected to change. Consents recorded against this text are marked with the current version and can be found again.',
+  'privacy.doc.version': 'Text version',
+
+  // -- terms of service ---------------------------------------------------------------
+  'privacy.terms.title': 'Terms of service',
+  'privacy.terms.s1.title': 'What this service is',
+  'privacy.terms.s1.body':
+    'The app is operated for the club your children are enrolled in, and is used for enrolment, the timetable, attendance, payments, health declarations and messages from the club.',
+  'privacy.terms.s2.title': 'Who may use it',
+  'privacy.terms.s2.body':
+    'The account is for the guardian of an enrolled student, or for an adult student. You sign in with a Google or Apple account; we neither create nor store a password.',
+  'privacy.terms.s3.title': 'Your responsibilities',
+  'privacy.terms.s3.body':
+    'The information you provide — the health declaration above all — must be accurate and current. The coach on the mat sees health flags only, and those flags are derived from your answers. A missing or wrong answer is a safety risk to your child.',
+  'privacy.terms.s4.title': 'Payments',
+  'privacy.terms.s4.body':
+    'The club sets prices and the refund policy. Card payments are processed by uPay, the payment provider, and we do not store card details. A standing order cannot be opened through the app; a payment received that way is marked paid by the club by hand.',
+  'privacy.terms.s5.title': 'Fair use',
+  'privacy.terms.s5.body':
+    'Do not use anyone else’s account, do not attempt to reach data that is not yours, and do not copy information about other students or their families.',
+  'privacy.terms.s6.title': 'Availability and changes',
+  'privacy.terms.s6.body':
+    'The service is provided as is, with no promise of continuous availability. A material change to these terms will show them again and ask you to accept again — agreeing to one version is not agreeing to the next.',
+  'privacy.terms.s7.title': 'Closing your account',
+  'privacy.terms.s7.body':
+    'You can ask for your account to be closed and your details erased at any time from this screen. Records the law requires us to keep — financial records above all — are retained afterwards, without a name.',
+  'privacy.terms.s8.title': 'Governing law',
+  'privacy.terms.s8.body': 'These terms are governed by Israeli law.',
+
+  // -- privacy policy -----------------------------------------------------------------
+  'privacy.policy.title': 'Privacy policy',
+  'privacy.policy.s1.title': 'Who is responsible for your data',
+  'privacy.policy.s1.body':
+    'The club your children are enrolled in is the controller of this data and is responsible for it. The club’s contact details are on the profile screen, and any privacy question goes to the club.',
+  'privacy.policy.s2.title': 'What we collect',
+  'privacy.policy.s2.body':
+    'Student and guardian details — name, date of birth, phone and email; group and timetable assignment; attendance and absence records; charges and payments; the health declaration and the signature on it; the messages sent to you; and a technical record of actions taken in the system.',
+  'privacy.policy.s3.title': 'Mandatory or voluntary',
+  'privacy.policy.s3.body':
+    'Providing student and guardian details and completing the health declaration is a condition of training: without them the club cannot enrol your child and cannot keep them safe on the mat. Consent to publishing photographs is entirely voluntary — refusing does not affect participation, and refusing is not recorded as consent.',
+  'privacy.policy.s4.title': 'What we use it for',
+  'privacy.policy.s4.body':
+    'Managing enrolment and attendance, collecting payment, safety in training, messages from the club to you, and operational reports for the club itself. We do not sell data and we do not use it for advertising.',
+  'privacy.policy.s5.title': 'Health information',
+  'privacy.policy.s5.body':
+    'A health declaration is sensitive data under the law, so it is collected only with the guardian’s explicit consent. The answers and the signature are encrypted in the database and the encryption keys are held outside it. Only a manager may open the full declaration, and every such opening is written to a log that cannot be altered. A coach sees flags only — asthma, allergy — and never the text of an answer.',
+  'privacy.policy.s6.title': 'Who we share it with',
+  'privacy.policy.s6.body':
+    'uPay, the payment provider, for the purpose of taking a payment and nothing else; the infrastructure and storage provider the service runs on; and the sign-in provider you chose, Google or Apple, which verifies who you are. One club’s data is not reachable from another club. We pass data to no one else without your consent, unless the law requires it.',
+  'privacy.policy.s7.title': 'How long we keep it',
+  'privacy.policy.s7.body':
+    'For as long as the student is enrolled, and afterwards for as long as running the club requires. Financial records are kept for about seven years as tax law requires, which is why an erasure request removes the identifying details and leaves the financial record without a name. Automatic deletion after a period of inactivity is planned and is not in service today — until it is, data is deleted only on request.',
+  'privacy.policy.s8.title': 'Your rights',
+  'privacy.policy.s8.body':
+    'To see what is held about you and your children; to correct anything wrong; to have data deleted in the circumstances the law recognises; to object to processing and to have it restricted; to withdraw consent at any time; and to receive your data in a structured, machine-readable file. This screen opens the request; the club is who answers it.',
+  'privacy.policy.s9.title': 'Withdrawing consent',
+  'privacy.policy.s9.body':
+    'A withdrawal is written as a new record and does not erase the consent that preceded it — that is what keeps a record of what was agreed and when. Withdrawing consent to this policy brings the consents screen back and stops your use of the app, because without it there is no basis to continue processing the data.',
+  'privacy.policy.s10.title': 'Security',
+  'privacy.policy.s10.body':
+    'Complete separation between clubs at the database level; permissions by role; encryption of medical answers and of signatures; an action log the system can only append to, never alter or delete; and a record of every opening of a health declaration.',
+  'privacy.policy.s11.title': 'Minors',
+  'privacy.policy.s11.body':
+    'A minor has no legal capacity to consent on their own, so the consent here is given by the guardian. A guardian may exercise any of the rights above on the child’s behalf.',
+  'privacy.policy.s12.title': 'Changes and complaints',
+  'privacy.policy.s12.body':
+    'A change to this text will be shown to you and will ask you to accept again. A privacy question goes to the club first; if you are not answered, you can approach the Privacy Protection Authority at the Ministry of Justice.',
+
+  // -- §6.1 step 5's gate ------------------------------------------------------------
+  'privacy.gate.title': 'Consents',
+  'privacy.gate.body':
+    'Before you can use the app you must accept the terms of service and the privacy policy. Both are required, and each is stored with the date and the version you accepted.',
+  'privacy.gate.acceptTerms': 'I have read and accept the terms of service',
+  'privacy.gate.acceptPrivacy': 'I have read and accept the privacy policy',
+  'privacy.gate.submit': 'Accept and continue',
+  'privacy.gate.working': 'Saving…',
+  'privacy.gate.mustAccept': 'Tick both boxes to continue',
+  'privacy.gate.failed': 'We could not save your acceptance. Please try again.',
+  'privacy.gate.show': 'Show the full text',
+  'privacy.gate.hide': 'Hide the text',
+
   'privacy.title': 'Privacy and personal data',
+  'privacy.screen.subtitle': 'What is held about you and your children, and what you can do about it',
+  'privacy.screen.back': 'Back',
+  'privacy.screen.loadFailed': 'We could not load this. Please try again.',
+  'privacy.screen.documents': 'The text you accepted',
   'privacy.export.title': 'Data export request',
   'privacy.export.description': 'Everything held about your children, in one file',
   'privacy.export.request': 'Request an export',
@@ -91,6 +183,47 @@ export const reports: Bundle = {
   'privacy.export.linkExpires': 'The link is available for a limited time',
   'privacy.export.requestAgain': 'Request again',
   'privacy.export.preparingHint': 'Preparation can take a few minutes',
+  // The status the worker actually produces today (HB-privacy-worker-unbuilt).
+  'privacy.export.failedReason': 'Why it failed',
+  'privacy.export.failedHelp':
+    'Preparing the file is not available right now. Your request was recorded and has not been cancelled — contact the club and they will provide the data.',
+  'privacy.export.none': 'You have not requested an export',
+
+  // -- §11.4's erasure request, and the honest status of it ---------------------------
+  'privacy.delete.title': 'Erasure request',
+  'privacy.delete.request': 'Request erasure',
+  'privacy.delete.confirmTitle': 'Erase this data?',
+  'privacy.delete.confirmBody':
+    'This cannot be undone. Identifying details are erased, health declarations and signatures are destroyed, and access to the app stops.',
+  'privacy.delete.confirm': 'Yes, erase',
+  'privacy.delete.cancel': 'Cancel',
+  'privacy.delete.requested': 'Your erasure request was recorded',
+  'privacy.delete.status.pending': 'Pending',
+  'privacy.delete.status.running': 'In progress',
+  'privacy.delete.status.completed': 'Completed',
+  'privacy.delete.status.failed': 'Erasure failed',
+  // The most important line on the screen — see the note in `he/reports.ts`.
+  'privacy.delete.failedHelp':
+    'The erasure did not run and nothing was deleted. The request was recorded and stays open — contact the club to complete it.',
+  'privacy.delete.none': 'You have not requested erasure',
+
+  // -- the request list both screens read --------------------------------------------
+  'privacy.requests.title': 'Your requests',
+  'privacy.requests.operatorTitle': 'Privacy requests in this club',
+  'privacy.requests.operatorSubtitle': 'Exports and erasures that were asked for, and what became of them',
+  'privacy.requests.empty': 'No requests',
+  'privacy.requests.requestedAt': 'Recorded on',
+  'privacy.requests.subject': 'Subject',
+  'privacy.requests.kind.export': 'Data export',
+  'privacy.requests.kind.deletion': 'Data erasure',
+  'privacy.requests.needsAttention': 'Requests that failed',
+
+  // -- §6.1 step 7's photo consent, off the blocking gate on purpose ------------------
+  'privacy.photo.title': 'Publishing photographs',
+  'privacy.photo.body':
+    'May the club publish photographs of your children from training and competitions? You can change your answer at any time, and giving no answer is kept as no consent.',
+  'privacy.photo.allow': 'May be published',
+  'privacy.photo.disallow': 'May not be published',
 
   // -- §11.4's anonymization -----------------------------------------------------------
   'privacy.anonymize.title': 'Erase personal details',
