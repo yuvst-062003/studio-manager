@@ -480,3 +480,39 @@ class TrialService:
         has_more = len(rows) > limit
         rows = rows[:limit]
         return rows, (rows[-1][0].id if has_more and rows else None)
+
+    @staticmethod
+    def bookings_for_guardian(
+        session: Session, *, person_id: uuid.UUID
+    ) -> list[tuple[TrialBooking, Group, SessionRow | None]]:
+        """§6.3's reduced home needs a lesson to count down to. This is where it comes from.
+
+        **No new column.** `trial_booking.session_id` has pointed at a real `session` since
+        §5.4a's booking flow landed, and `session.starts_at` is the lesson -- what did not
+        exist was a read a guardian could make. `_self_result` already returns the same
+        instant, once, in the 201 that creates the booking; a parent who closes the tab has
+        had no way back to it, and their token has no studio in it at that moment anyway.
+
+        **A LEFT join.** `session_id` is nullable and stays nullable: §5.4a lets a manager
+        log a phone enquiry before any slot is chosen. An inner join would make that family
+        vanish from their own trial home rather than showing them the fallback copy written
+        for exactly their case.
+
+        Ordered soonest-first with the unscheduled last, because that is the order the one
+        caller reads in: `TrialHome` shows the NEXT lesson, and a family whose second child
+        is booked a week later must not see the later date first.
+        """
+        return [
+            (booking, group, session_row)
+            for booking, group, session_row in session.execute(
+                select(TrialBooking, Group, SessionRow)
+                .join(Group, TrialBooking.group_id == Group.id)
+                .outerjoin(SessionRow, SessionRow.id == TrialBooking.session_id)
+                .where(
+                    TrialBooking.student_id.in_(
+                        select(Guardian.student_id).where(Guardian.person_id == person_id)
+                    )
+                )
+                .order_by(SessionRow.starts_at.asc().nulls_last(), TrialBooking.booked_at)
+            )
+        ]

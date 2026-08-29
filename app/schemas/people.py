@@ -494,6 +494,65 @@ class StudentStatusHistoryListResponse(BaseModel):
     items: list[StudentStatusHistoryOut]
 
 
+class MyStudentStatusHistoryOut(BaseModel):
+    """One move through §5.4a's funnel, as the FAMILY reads it.
+
+    `StudentStatusHistoryOut` minus `reason` and minus the row's own id. The omission is
+    the whole point of a second shape, and it is the argument `StudentDetailOut` already
+    makes for `price_plan_id`: a shape that cannot carry the field is cheaper to guarantee
+    than a filter that has to remember to.
+
+    `reason` is the club's note about a family, written for the club. "משפחה נסעה לחו״ל" is
+    innocuous; "stopped paying" and "the mother was abusive to the coach" go in the same
+    column, written by whoever pressed the button. §11.2 already keeps that text out of the
+    audit diff's reach for the same reason — this keeps it off the parent's screen.
+
+    The row id goes too, and not to be coy: a parent has nothing to do with it, and an id a
+    client can see is an id a client eventually addresses. There is no per-row route here
+    and there should not be one.
+    """
+
+    student_id: uuid.UUID
+    from_status: str | None
+    to_status: str
+    changed_at: datetime
+
+
+class MyStudentStatusHistoryListResponse(BaseModel):
+    items: list[MyStudentStatusHistoryOut]
+
+
+class MyTrialBookingOut(BaseModel):
+    """The trial lesson, as the family it was booked for reads it.
+
+    Three fields and a group name, chosen against `TrialBookingRow` — the dashboard's queue
+    row — by asking of each one what a parent does with it:
+
+    * `session_starts_at` is the lesson. Nullable, because `trial_booking.session_id` is:
+      §5.4a lets a manager log a phone enquiry before any slot is chosen, and that family is
+      exactly the one `TrialHome`'s fallback copy exists for. A route that could not say
+      "no lesson yet" would force the client to guess.
+    * `attended` stays **three-state**. `None` is "the lesson has not happened yet", which
+      is not `False`; §5.4a ④'s "איך היה?" must not appear before the lesson.
+    * `group_name` is on the flyer already — `PublicGroupOut` gives it to strangers.
+
+    What is deliberately absent: `coach_note` (§5.4a ③ — a note written for the club, about
+    a child, by somebody who has met them once), `outcome` (§5.4a makes conversion a manager
+    decision, and a family reading `lost` before anyone telephones them is the app breaking
+    the news), `is_override` (that a manager granted a second free trial is the club's
+    business), and the booking id (no per-row route exists for a parent, and none should).
+    """
+
+    student_id: uuid.UUID
+    group_name: str
+    session_starts_at: datetime | None
+    attended: bool | None
+
+
+class MyTrialBookingListResponse(BaseModel):
+    items: list[MyTrialBookingOut]
+
+
 class PublicGroupOut(BaseModel):
     """§7 — `GET /public/studios/{slug}/groups`, unauthenticated.
 

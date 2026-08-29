@@ -9,13 +9,15 @@
 // reads as a financial field, so it never travels on the coach-reachable card.
 import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { BeltBar, Button, Card, PlanBadge, StatusChip } from '@studio/ui'
+import { AttendanceStrip, BeltBar, Button, Card, PlanBadge, StatusChip } from '@studio/ui'
+import type { AttendanceStripItem } from '@studio/ui'
 import { usePlanBadges } from '../billing/usePlanBadges'
 import { formatDateInStudioZone } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { chipToneFor } from './StudentsScreen'
 import type {
+  AttendanceMarkRow,
   DashboardPeopleClient,
   GroupOption,
   EnrollmentOut,
@@ -23,6 +25,26 @@ import type {
   StudentDetail,
   StudentPricePlan,
 } from './peopleClient'
+
+/** §5.7's four states, as the shared strip draws them. Same mapping the parent card and
+ *  the staff roster use — one picture of one child's attendance, on three surfaces. */
+const STRIP_STATE: Record<string, AttendanceStripItem['state']> = {
+  present: 'present',
+  absent_unexcused: 'absent',
+  absent_excused: 'notified',
+  unmarked: 'unmarked',
+}
+
+const STRIP_LABEL: Record<AttendanceStripItem['state'], string> = {
+  present: 'attendance.roster.present',
+  absent: 'attendance.roster.absent',
+  notified: 'attendance.source.preReported',
+  unmarked: 'attendance.roster.unmarked',
+}
+
+/** `4a`'s twelve. `2d` draws eight and the two artboards disagree (2d finding 9), which is
+ *  why `GET /students/{id}/attendance` bakes in neither and the caller trims. */
+const MARKS_ON_THE_CARD = 12
 
 const pageStyle: CSSProperties = {
   display: 'grid',
@@ -47,6 +69,7 @@ export function StudentDetailScreen({
   const [student, setStudent] = useState<StudentDetail | null>(null)
   const [enrollments, setEnrollments] = useState<EnrollmentOut[]>([])
   const [history, setHistory] = useState<StatusHistoryOut[]>([])
+  const [marks, setMarks] = useState<AttendanceMarkRow[]>([])
   const [plan, setPlan] = useState<StudentPricePlan | null>(null)
   // §5.4a step 5 — 'Manager converts → picks group, sets price, status=active, enrollment
   // created. Three decisions in one request, because they are one decision.'
@@ -72,14 +95,18 @@ export function StudentDetailScreen({
       client.statusHistory(studentId),
       client.pricePlan(studentId),
       client.groups().catch(() => ({ items: [] as GroupOption[] })),
+      // Best-effort, like the group list beside it: one section of a composite card, and a
+      // failed read here must not take the guardians and the status history down with it.
+      client.attendance(studentId).catch(() => ({ items: [] as AttendanceMarkRow[] })),
     ])
-      .then(([detail, rows, statuses, pricePlan, groupList]) => {
+      .then(([detail, rows, statuses, pricePlan, groupList, attendance]) => {
         if (!live) return
         setStudent(detail)
         setEnrollments(rows)
         setHistory(statuses.items)
         setPlan(pricePlan)
         setGroups(groupList.items)
+        setMarks(attendance.items)
       })
       .catch(() => undefined)
     return () => {
@@ -110,6 +137,22 @@ export function StudentDetailScreen({
   if (!student) return <p data-testid="student-detail-loading" />
 
   const live = enrollments.filter((enrollment) => enrollment.ended_on == null)
+  // The route answers newest-first — `ORDER BY device_marked_at DESC`, so a queue that
+  // flushed two days late cannot put last Tuesday at the top of the list. A strip is read
+  // the other way round, so the last twelve are taken from the head and then reversed.
+  const strip: AttendanceStripItem[] = marks
+    .slice(0, MARKS_ON_THE_CARD)
+    .reverse()
+    .map((row) => {
+      const state = STRIP_STATE[row.status] ?? 'unmarked'
+      return {
+        id: row.id,
+        state,
+        // The DEVICE clock, which is when the lesson was — `marked_at` is when the queue
+        // reached the server, and for an offline coach those are different days.
+        label: `${formatDateInStudioZone(row.device_marked_at, locale)} · ${t(locale, STRIP_LABEL[state])}`,
+      }
+    })
 
   return (
     <section style={pageStyle} aria-labelledby="detail-title" data-testid="student-detail">
@@ -194,6 +237,29 @@ export function StudentDetailScreen({
             </li>
           ))}
         </ul>
+      </Card>
+
+      <Card>
+        {/* `GET /students/{id}/attendance` was built, manager-scoped and called by nothing.
+            The card had four sections and could not answer the question a manager asks
+            about a child immediately before telephoning their parent.
+
+            No coach note is rendered, and the strip has nowhere to put one: §5.13 makes it
+            a coach's written opinion about a child, and `AttendanceOut` carries it only
+            because the roster it was built for needs it. */}
+        <h2>{t(locale, 'people.student.attendance')}</h2>
+        <div data-testid="detail-attendance">
+          {strip.length === 0 ? (
+            // §5.14 makes `unmarked` a real state so a coach who forgot the register does
+            // not look like a child who stopped coming. A blank strip would say exactly
+            // the thing that state exists to prevent.
+            <p data-testid="detail-attendance-empty">
+              {t(locale, 'people.student.attendanceEmpty')}
+            </p>
+          ) : (
+            <AttendanceStrip items={strip} locale={locale} />
+          )}
+        </div>
       </Card>
 
       <Card>

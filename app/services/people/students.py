@@ -486,6 +486,24 @@ class StudentService:
         return [StudentService._project(session, student, person) for student, person in pairs]
 
     @staticmethod
+    def guardian_student_ids(session: Session, *, person_id: uuid.UUID) -> set[uuid.UUID]:
+        """The ids alone -- §3.3's `EXISTS(guardian WHERE person_id = :me)`, no projection.
+
+        `for_guardian` above builds a full `StudentRow` per child: it resolves the belt, the
+        group names and the freeze window because `/me/students` renders all three. A route
+        that only needs to answer "is this child mine?" pays for none of that, and paying for
+        it anyway is how a membership check turns into a page load.
+
+        A `set`, deliberately: two guardian rows for one child (a parent listed twice by an
+        import) must not make a membership test answer differently.
+        """
+        return set(
+            session.execute(
+                select(Guardian.student_id).where(Guardian.person_id == person_id)
+            ).scalars()
+        )
+
+    @staticmethod
     def viewer_group_ids(
         session: Session, *, person_id: uuid.UUID, roles: set[str]
     ) -> list[uuid.UUID] | None:

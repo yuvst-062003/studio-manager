@@ -1963,6 +1963,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/students/{student_id}/status-history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Student Status History
+         * @description §5.4's funnel, read by the family it happened to.
+         *
+         *     **The gap this closes is asymmetry, not absence.** The rows have been written since M3
+         *     by the single writer in `app/services/people/status.py`, and dashboard `4a` has rendered
+         *     them as a timeline since the same wave. "Joined 2 August, frozen 1 October, returned 1
+         *     November" is the record a parent telephones the club about, and until now the only way
+         *     to answer that call was to read it off the manager's screen and say it out loud.
+         *
+         *     **A second route rather than a widened one.** `GET /students/{id}/status-history` above
+         *     is `AnyStaff` + `ViewerScope` and tagged `coach`; making it guardian-reachable would put
+         *     a §3.2 role check and a §3.3 record check in one dependency chain and would return the
+         *     manager's `reason` to the family. The shape here is `MyStudentStatusHistoryOut`, which
+         *     cannot carry it.
+         *
+         *     No role dependency, for the reason `/me/students` states: §3.1 -- "guardian is not a
+         *     role". A `require_roles` here would refuse every guardian in the product.
+         *
+         *     **404, never 403.** Under `/me/` the collection is "my children", so an id outside it
+         *     does not exist rather than being forbidden -- and a 403 would confirm the child exists
+         *     in this studio, which is the leak this check is for. Same reasoning the module docstring
+         *     gives for a cross-studio reference.
+         */
+        get: operations["my_student_status_history_api_v1_me_students__student_id__status_history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/studio": {
         parameters: {
             query?: never;
@@ -1978,6 +2018,41 @@ export interface paths {
          *     'guardian is not a role'; the shape is the club's shop window, not a settings read.
          */
         get: operations["my_studio_api_v1_me_studio_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/trial-bookings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Trial Bookings
+         * @description §6.3's reduced home, given the lesson it was drawn around.
+         *
+         *     `TrialHome` renders a date, an hour and a countdown, and `Resolve` mounted it with no
+         *     session time at all -- so every trial family fell through to the fallback copy, which
+         *     said the club would be in touch *after the lesson* to a family whose lesson had not been
+         *     booked. The screen was unreachable until recently, so nobody had seen it.
+         *
+         *     **A separate read, not a field on `/me/students`.** `StudentSummaryOut` is the roster
+         *     row dashboard `3b`, staff `9h` and this route's caller all share, and it is
+         *     coach-reachable; a trial-only field there would be carried by every student in the
+         *     product for a state that applies to leads. A booking is also not one field -- `attended`
+         *     is what §5.4a ④'s "איך היה?" branch needs, and `TrialHome` has accepted that prop since
+         *     W3 with nothing to supply it. One read answers both.
+         *
+         *     No role dependency (§3.1 -- 'guardian is not a role'), and no pagination: this is one
+         *     family's trials, and §5.4a makes one free trial the rule.
+         */
+        get: operations["my_trial_bookings_api_v1_me_trial_bookings_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -7502,6 +7577,84 @@ export interface components {
         MyStandingOrderOut: {
             /** Active */
             active: boolean;
+        };
+        /** MyStudentStatusHistoryListResponse */
+        MyStudentStatusHistoryListResponse: {
+            /** Items */
+            items: components["schemas"]["MyStudentStatusHistoryOut"][];
+        };
+        /**
+         * MyStudentStatusHistoryOut
+         * @description One move through §5.4a's funnel, as the FAMILY reads it.
+         *
+         *     `StudentStatusHistoryOut` minus `reason` and minus the row's own id. The omission is
+         *     the whole point of a second shape, and it is the argument `StudentDetailOut` already
+         *     makes for `price_plan_id`: a shape that cannot carry the field is cheaper to guarantee
+         *     than a filter that has to remember to.
+         *
+         *     `reason` is the club's note about a family, written for the club. "משפחה נסעה לחו״ל" is
+         *     innocuous; "stopped paying" and "the mother was abusive to the coach" go in the same
+         *     column, written by whoever pressed the button. §11.2 already keeps that text out of the
+         *     audit diff's reach for the same reason — this keeps it off the parent's screen.
+         *
+         *     The row id goes too, and not to be coy: a parent has nothing to do with it, and an id a
+         *     client can see is an id a client eventually addresses. There is no per-row route here
+         *     and there should not be one.
+         */
+        MyStudentStatusHistoryOut: {
+            /**
+             * Changed At
+             * Format: date-time
+             */
+            changed_at: string;
+            /** From Status */
+            from_status: string | null;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+            /** To Status */
+            to_status: string;
+        };
+        /** MyTrialBookingListResponse */
+        MyTrialBookingListResponse: {
+            /** Items */
+            items: components["schemas"]["MyTrialBookingOut"][];
+        };
+        /**
+         * MyTrialBookingOut
+         * @description The trial lesson, as the family it was booked for reads it.
+         *
+         *     Three fields and a group name, chosen against `TrialBookingRow` — the dashboard's queue
+         *     row — by asking of each one what a parent does with it:
+         *
+         *     * `session_starts_at` is the lesson. Nullable, because `trial_booking.session_id` is:
+         *       §5.4a lets a manager log a phone enquiry before any slot is chosen, and that family is
+         *       exactly the one `TrialHome`'s fallback copy exists for. A route that could not say
+         *       "no lesson yet" would force the client to guess.
+         *     * `attended` stays **three-state**. `None` is "the lesson has not happened yet", which
+         *       is not `False`; §5.4a ④'s "איך היה?" must not appear before the lesson.
+         *     * `group_name` is on the flyer already — `PublicGroupOut` gives it to strangers.
+         *
+         *     What is deliberately absent: `coach_note` (§5.4a ③ — a note written for the club, about
+         *     a child, by somebody who has met them once), `outcome` (§5.4a makes conversion a manager
+         *     decision, and a family reading `lost` before anyone telephones them is the app breaking
+         *     the news), `is_override` (that a manager granted a second free trial is the club's
+         *     business), and the booking id (no per-row route exists for a parent, and none should).
+         */
+        MyTrialBookingOut: {
+            /** Attended */
+            attended: boolean | null;
+            /** Group Name */
+            group_name: string;
+            /** Session Starts At */
+            session_starts_at: string | null;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
         };
         /**
          * NotificationOut
@@ -13619,6 +13772,37 @@ export interface operations {
             };
         };
     };
+    my_student_status_history_api_v1_me_students__student_id__status_history_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyStudentStatusHistoryListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     my_studio_api_v1_me_studio_get: {
         parameters: {
             query?: never;
@@ -13635,6 +13819,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["app__schemas__studio__StudioOut"];
+                };
+            };
+        };
+    };
+    my_trial_bookings_api_v1_me_trial_bookings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyTrialBookingListResponse"];
                 };
             };
         };

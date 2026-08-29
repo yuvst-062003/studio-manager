@@ -12,6 +12,9 @@ export type GuardianOut = components['schemas']['GuardianOut']
 export type StudentDetail = components['schemas']['StudentDetailOut']
 export type EnrollmentOut = components['schemas']['EnrollmentOut']
 export type RegistrationRequestOut = components['schemas']['RegistrationRequestOut']
+/** One move through §5.4a's funnel, in the parent-facing shape — no manager `reason`. */
+export type MyStatusHistoryRow = components['schemas']['MyStudentStatusHistoryOut']
+export type MyTrialBooking = components['schemas']['MyTrialBookingOut']
 
 export type Fetcher = (path: string, init?: RequestInit) => Promise<Response>
 
@@ -42,6 +45,28 @@ export function makePeopleClient(fetcher: Fetcher) {
 
     student: (id: string): Promise<StudentDetail> =>
       fetcher(`/api/v1/students/${id}`).then(json<StudentDetail>),
+
+    /**
+     * §5.4's funnel, for one of MY children.
+     *
+     * `/me/students/{id}/...` and not `/students/{id}/status-history`. The staff route is
+     * `AnyStaff`-scoped — a guardian gets 403 — and it returns the manager's `reason`,
+     * which is the club's own note about a family. Ship-audit B4 was this exact mistake
+     * made once already, against `GET /students/{id}`, and it went unnoticed for as long as
+     * nothing mounted the screen that made it.
+     */
+    myStatusHistory: (studentId: string): Promise<{ items: MyStatusHistoryRow[] }> =>
+      fetcher(`/api/v1/me/students/${studentId}/status-history`).then(
+        json<{ items: MyStatusHistoryRow[] }>,
+      ),
+
+    /**
+     * §6.3's reduced home needs a lesson to count down to, and `StudentSummaryOut` carries
+     * none — it is the coach-reachable roster row every student in the product shares, so a
+     * trial-only field would ride on all of them. This is the separate read instead.
+     */
+    myTrialBookings: (): Promise<{ items: MyTrialBooking[] }> =>
+      fetcher('/api/v1/me/trial-bookings').then(json<{ items: MyTrialBooking[] }>),
 
     enrollments: (studentId: string): Promise<EnrollmentOut[]> =>
       fetcher(`/api/v1/enrollments?student_id=${studentId}`).then(json<EnrollmentOut[]>),
@@ -112,4 +137,47 @@ export function useMyStudents(client: PeopleClient): MyStudents {
  */
 export function everyChildIsOnATrial(students: StudentSummary[]): boolean {
   return students.length > 0 && students.every((student) => student.status === 'trial')
+}
+
+/** What §6.3's reduced home is drawn around: one lesson, and whether it happened. */
+export type TrialLesson = {
+  sessionStartsAt: string | null
+  /** Three-state, like the column. `null` is "it has not happened yet", not "no show". */
+  attended: boolean | null
+}
+
+/**
+ * Which of a family's trial bookings `TrialHome` should show.
+ *
+ * A pure function and not a line inside `Resolve`, because it is the only *decision* in
+ * this wiring and `Resolve` is a mount point this lane touches as little as possible —
+ * the same reason `useMyStudents` lives in this file.
+ *
+ * The rule, in order:
+ *  1. the **soonest lesson still to come**. A family with two children on trials has two
+ *     bookings, §6.3 draws one countdown, and the lesson a parent is getting ready for is
+ *     the next one.
+ *  2. otherwise the **most recent lesson that has happened**, so §5.4a ④'s "איך היה?" has
+ *     something to be about. Returning null here would send a family that has already
+ *     attended back to the "nothing booked yet" copy.
+ *  3. otherwise the first booking with **no session at all** — §5.4a's logged phone
+ *     enquiry. That family has a booking and no lesson, which is a real state and the one
+ *     the fallback copy is written for.
+ *
+ * `null` only when there is no booking of any kind.
+ */
+export function nextTrialLesson(
+  bookings: readonly MyTrialBooking[],
+  now: Date,
+): TrialLesson | null {
+  const nowIso = now.toISOString()
+  const scheduled = bookings
+    .filter((row): row is MyTrialBooking & { session_starts_at: string } =>
+      Boolean(row.session_starts_at),
+    )
+    .sort((a, b) => a.session_starts_at.localeCompare(b.session_starts_at))
+  const upcoming = scheduled.find((row) => row.session_starts_at >= nowIso)
+  const chosen = upcoming ?? scheduled.at(-1) ?? bookings[0]
+  if (!chosen) return null
+  return { sessionStartsAt: chosen.session_starts_at, attended: chosen.attended }
 }

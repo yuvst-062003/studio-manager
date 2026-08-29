@@ -12,6 +12,7 @@ import { registerSlot } from '@studio/ui'
 import { DetailsSection } from './sections/DetailsSection'
 import { EnrollmentsSection } from './sections/EnrollmentsSection'
 import { GuardiansSection } from './sections/GuardiansSection'
+import { StatusHistorySection } from './sections/StatusHistorySection'
 import type { StudentCardSectionProps } from './StudentCard'
 
 export function registerPeopleSections(): void {
@@ -19,6 +20,16 @@ export function registerPeopleSections(): void {
     key: 'people-details',
     order: 10,
     render: DetailsSection,
+  })
+  // Order 15 — directly under the details, above the belt strip (20). The room the
+  // original numbering left is being used for exactly what it was left for. The status
+  // history belongs beside the details because it IS the details over time: a parent
+  // reading "מוקפא" in the header is one line away from when that happened and what came
+  // before it.
+  registerSlot<StudentCardSectionProps>('student-card', {
+    key: 'people-status-history',
+    order: 15,
+    render: StatusHistorySection,
   })
   registerSlot<StudentCardSectionProps>('student-card', {
     key: 'people-enrollments',

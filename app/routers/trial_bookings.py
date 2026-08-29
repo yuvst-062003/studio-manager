@@ -26,6 +26,8 @@ from app.models.studio import Studio
 from app.schemas._pagination import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, IdempotencyKey
 from app.schemas.people import (
     ChildMatchOut,
+    MyTrialBookingListResponse,
+    MyTrialBookingOut,
     RegistrationDecisionIn,
     RegistrationDecisionOut,
     RegistrationRequestDetailOut,
@@ -216,6 +218,46 @@ def list_trial_bookings(
         ],
         next_cursor=next_cursor,
         has_more=next_cursor is not None,
+    )
+
+
+@router.get("/me/trial-bookings", response_model=MyTrialBookingListResponse)
+def my_trial_bookings(request: Request, session: TenantSessionDep) -> MyTrialBookingListResponse:
+    """§6.3's reduced home, given the lesson it was drawn around.
+
+    `TrialHome` renders a date, an hour and a countdown, and `Resolve` mounted it with no
+    session time at all -- so every trial family fell through to the fallback copy, which
+    said the club would be in touch *after the lesson* to a family whose lesson had not been
+    booked. The screen was unreachable until recently, so nobody had seen it.
+
+    **A separate read, not a field on `/me/students`.** `StudentSummaryOut` is the roster
+    row dashboard `3b`, staff `9h` and this route's caller all share, and it is
+    coach-reachable; a trial-only field there would be carried by every student in the
+    product for a state that applies to leads. A booking is also not one field -- `attended`
+    is what §5.4a ④'s "איך היה?" branch needs, and `TrialHome` has accepted that prop since
+    W3 with nothing to supply it. One read answers both.
+
+    No role dependency (§3.1 -- 'guardian is not a role'), and no pagination: this is one
+    family's trials, and §5.4a makes one free trial the rule.
+    """
+    person_id = getattr(request.state, "person_id", None)
+    if not isinstance(person_id, uuid.UUID):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={"code": "unauthenticated", "message": "sign in first"},
+        )
+    return MyTrialBookingListResponse(
+        items=[
+            MyTrialBookingOut(
+                student_id=booking.student_id,
+                group_name=group.name,
+                session_starts_at=session_row.starts_at if session_row else None,
+                attended=booking.attended,
+            )
+            for booking, group, session_row in TrialService.bookings_for_guardian(
+                session, person_id=person_id
+            )
+        ]
     )
 
 

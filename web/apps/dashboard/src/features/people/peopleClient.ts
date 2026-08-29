@@ -9,6 +9,8 @@ export type WeekdayOptions = components['schemas']['EnrollmentWeekdayOptionsOut'
 export type RegistrationRequestOut = components['schemas']['RegistrationRequestOut']
 export type TrialBookingRow = components['schemas']['TrialBookingRow']
 export type StatusHistoryOut = components['schemas']['StudentStatusHistoryOut']
+/** One attendance mark, as `GET /students/{id}/attendance` returns it. */
+export type AttendanceMarkRow = components['schemas']['AttendanceOut']
 /** Only what `3c`'s picker renders. M1 owns `GroupOut`; naming the two fields this screen
  *  reads keeps the form independent of fields another lane may add or move. */
 export type GroupOption = { id: string; name: string }
@@ -57,6 +59,20 @@ export function makeDashboardPeopleClient(fetcher: Fetcher) {
     statusHistory: (studentId: string) =>
       fetcher(`/api/v1/students/${studentId}/status-history`).then(
         json<{ items: StatusHistoryOut[] }>,
+      ),
+
+    /**
+     * `4a`'s attendance strip. Built, manager-scoped, and called by NOTHING until now — the
+     * card carried four sections and could not answer "has she been coming?", which is the
+     * question a manager asks about a child immediately before telephoning their parent.
+     *
+     * The default page is taken as-is rather than asking for `4a`'s twelve: `2d` and `4a`
+     * disagree on the window (2d finding 9) and the route deliberately bakes neither in, so
+     * the screen trims what it draws instead of the server deciding for both surfaces.
+     */
+    attendance: (studentId: string) =>
+      fetcher(`/api/v1/students/${studentId}/attendance`).then(
+        json<{ items: AttendanceMarkRow[]; next_cursor: string | null; has_more: boolean }>,
       ),
 
     /** M1's group list. `3c` needs it because §5.4(a)'s form asks for a group, and the

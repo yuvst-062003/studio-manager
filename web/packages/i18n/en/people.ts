@@ -50,6 +50,10 @@ export const people: Bundle = {
   'status.history': 'Status history',
   'status.changedOn': 'Changed on',
   'status.reason': 'Reason',
+  'status.membershipHistory': 'Membership history',
+  'student.attendance': 'Attendance history',
+  'student.attendanceEmpty': 'No attendance recorded yet',
+  'student.attendanceMarkedOn': 'Marked on',
 
   'guardian.one': 'Guardian',
   'guardian.plural': 'Guardians',
@@ -254,6 +258,8 @@ export const people: Bundle = {
     'Comfortable clothes and a water bottle. Arrive ten minutes early',
   'trialHome.howWasIt': 'How was it?',
   'trialHome.waitingForClub': 'The club will get back to you after the class',
+  'trialHome.noLessonBooked':
+    'No trial class is booked yet. The club will be in touch to arrange one',
 
   'card.title': 'Student card',
   'card.details': 'Details',

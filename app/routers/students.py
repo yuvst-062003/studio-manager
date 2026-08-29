@@ -43,6 +43,7 @@ from app.schemas.people import (
     GuardianCreate,
     GuardianListResponse,
     GuardianOut,
+    MyStudentStatusHistoryListResponse,
     RegistrationRequestOut,
     SiblingRequestIn,
     StudentConvertIn,
@@ -747,6 +748,53 @@ def my_students(request: Request, session: TenantSessionDep) -> StudentSummaryPa
     """
     rows = StudentService.for_guardian(session, person_id=_person_id(request))
     return StudentSummaryPage(items=[_summary(row) for row in rows], has_more=False)
+
+
+@router.get(
+    "/me/students/{student_id}/status-history",
+    response_model=MyStudentStatusHistoryListResponse,
+)
+def my_student_status_history(
+    student_id: uuid.UUID, request: Request, session: TenantSessionDep
+) -> MyStudentStatusHistoryListResponse:
+    """§5.4's funnel, read by the family it happened to.
+
+    **The gap this closes is asymmetry, not absence.** The rows have been written since M3
+    by the single writer in `app/services/people/status.py`, and dashboard `4a` has rendered
+    them as a timeline since the same wave. "Joined 2 August, frozen 1 October, returned 1
+    November" is the record a parent telephones the club about, and until now the only way
+    to answer that call was to read it off the manager's screen and say it out loud.
+
+    **A second route rather than a widened one.** `GET /students/{id}/status-history` above
+    is `AnyStaff` + `ViewerScope` and tagged `coach`; making it guardian-reachable would put
+    a §3.2 role check and a §3.3 record check in one dependency chain and would return the
+    manager's `reason` to the family. The shape here is `MyStudentStatusHistoryOut`, which
+    cannot carry it.
+
+    No role dependency, for the reason `/me/students` states: §3.1 -- "guardian is not a
+    role". A `require_roles` here would refuse every guardian in the product.
+
+    **404, never 403.** Under `/me/` the collection is "my children", so an id outside it
+    does not exist rather than being forbidden -- and a 403 would confirm the child exists
+    in this studio, which is the leak this check is for. Same reasoning the module docstring
+    gives for a cross-studio reference.
+    """
+    from app.schemas.people import MyStudentStatusHistoryOut
+
+    person_id = _person_id(request)
+    if student_id not in StudentService.guardian_student_ids(session, person_id=person_id):
+        raise _not_found()
+    return MyStudentStatusHistoryListResponse(
+        items=[
+            MyStudentStatusHistoryOut(
+                student_id=row.student_id,
+                from_status=row.from_status,
+                to_status=row.to_status,
+                changed_at=row.changed_at,
+            )
+            for row in StudentService.status_history(session, student_id=student_id)
+        ]
+    )
 
 
 @router.get("/me/guardians", response_model=GuardianListResponse)

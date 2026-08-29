@@ -53,6 +53,10 @@ export const people: Bundle = {
   'status.history': 'История статусов',
   'status.changedOn': 'Изменено',
   'status.reason': 'Причина',
+  'status.membershipHistory': 'История занятий в клубе',
+  'student.attendance': 'История посещаемости',
+  'student.attendanceEmpty': 'Посещаемость ещё не отмечалась',
+  'student.attendanceMarkedOn': 'Отмечено',
 
   'guardian.one': 'Родитель',
   'guardian.plural': 'Родители',
@@ -257,6 +261,8 @@ export const people: Bundle = {
     'Удобную одежду и бутылку воды. Приходите за десять минут до начала',
   'trialHome.howWasIt': 'Как прошло?',
   'trialHome.waitingForClub': 'Клуб свяжется с вами после занятия',
+  'trialHome.noLessonBooked':
+    'Пробное занятие ещё не назначено. Клуб свяжется с вами, чтобы договориться',
 
   'card.title': 'Карточка ученика',
   'card.details': 'Данные',

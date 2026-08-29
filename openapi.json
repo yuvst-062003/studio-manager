@@ -6244,6 +6244,121 @@
         "title": "MyStandingOrderOut",
         "type": "object"
       },
+      "MyStudentStatusHistoryListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MyStudentStatusHistoryOut"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "MyStudentStatusHistoryListResponse",
+        "type": "object"
+      },
+      "MyStudentStatusHistoryOut": {
+        "description": "One move through §5.4a's funnel, as the FAMILY reads it.\n\n`StudentStatusHistoryOut` minus `reason` and minus the row's own id. The omission is\nthe whole point of a second shape, and it is the argument `StudentDetailOut` already\nmakes for `price_plan_id`: a shape that cannot carry the field is cheaper to guarantee\nthan a filter that has to remember to.\n\n`reason` is the club's note about a family, written for the club. \"משפחה נסעה לחו״ל\" is\ninnocuous; \"stopped paying\" and \"the mother was abusive to the coach\" go in the same\ncolumn, written by whoever pressed the button. §11.2 already keeps that text out of the\naudit diff's reach for the same reason — this keeps it off the parent's screen.\n\nThe row id goes too, and not to be coy: a parent has nothing to do with it, and an id a\nclient can see is an id a client eventually addresses. There is no per-row route here\nand there should not be one.",
+        "properties": {
+          "changed_at": {
+            "format": "date-time",
+            "title": "Changed At",
+            "type": "string"
+          },
+          "from_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Status"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          },
+          "to_status": {
+            "title": "To Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "student_id",
+          "from_status",
+          "to_status",
+          "changed_at"
+        ],
+        "title": "MyStudentStatusHistoryOut",
+        "type": "object"
+      },
+      "MyTrialBookingListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MyTrialBookingOut"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "MyTrialBookingListResponse",
+        "type": "object"
+      },
+      "MyTrialBookingOut": {
+        "description": "The trial lesson, as the family it was booked for reads it.\n\nThree fields and a group name, chosen against `TrialBookingRow` — the dashboard's queue\nrow — by asking of each one what a parent does with it:\n\n* `session_starts_at` is the lesson. Nullable, because `trial_booking.session_id` is:\n  §5.4a lets a manager log a phone enquiry before any slot is chosen, and that family is\n  exactly the one `TrialHome`'s fallback copy exists for. A route that could not say\n  \"no lesson yet\" would force the client to guess.\n* `attended` stays **three-state**. `None` is \"the lesson has not happened yet\", which\n  is not `False`; §5.4a ④'s \"איך היה?\" must not appear before the lesson.\n* `group_name` is on the flyer already — `PublicGroupOut` gives it to strangers.\n\nWhat is deliberately absent: `coach_note` (§5.4a ③ — a note written for the club, about\na child, by somebody who has met them once), `outcome` (§5.4a makes conversion a manager\ndecision, and a family reading `lost` before anyone telephones them is the app breaking\nthe news), `is_override` (that a manager granted a second free trial is the club's\nbusiness), and the booking id (no per-row route exists for a parent, and none should).",
+        "properties": {
+          "attended": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attended"
+          },
+          "group_name": {
+            "title": "Group Name",
+            "type": "string"
+          },
+          "session_starts_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Starts At"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "student_id",
+          "group_name",
+          "session_starts_at",
+          "attended"
+        ],
+        "title": "MyTrialBookingOut",
+        "type": "object"
+      },
       "NotificationOut": {
         "description": "One inbox row. §5.11: \"the inbox is where the message lives\" — no permission needed\nand it never expires.\n\nThere is no sender. Every one of §5.11's fifteen triggers is the system telling a\nperson something, and a `sender_person_id` here is the field a reply box would be\nbuilt on.",
         "properties": {
@@ -18042,6 +18157,50 @@
         ]
       }
     },
+    "/api/v1/me/students/{student_id}/status-history": {
+      "get": {
+        "description": "§5.4's funnel, read by the family it happened to.\n\n**The gap this closes is asymmetry, not absence.** The rows have been written since M3\nby the single writer in `app/services/people/status.py`, and dashboard `4a` has rendered\nthem as a timeline since the same wave. \"Joined 2 August, frozen 1 October, returned 1\nNovember\" is the record a parent telephones the club about, and until now the only way\nto answer that call was to read it off the manager's screen and say it out loud.\n\n**A second route rather than a widened one.** `GET /students/{id}/status-history` above\nis `AnyStaff` + `ViewerScope` and tagged `coach`; making it guardian-reachable would put\na §3.2 role check and a §3.3 record check in one dependency chain and would return the\nmanager's `reason` to the family. The shape here is `MyStudentStatusHistoryOut`, which\ncannot carry it.\n\nNo role dependency, for the reason `/me/students` states: §3.1 -- \"guardian is not a\nrole\". A `require_roles` here would refuse every guardian in the product.\n\n**404, never 403.** Under `/me/` the collection is \"my children\", so an id outside it\ndoes not exist rather than being forbidden -- and a 403 would confirm the child exists\nin this studio, which is the leak this check is for. Same reasoning the module docstring\ngives for a cross-studio reference.",
+        "operationId": "my_student_status_history_api_v1_me_students__student_id__status_history_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyStudentStatusHistoryListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "My Student Status History",
+        "tags": [
+          "people"
+        ]
+      }
+    },
     "/api/v1/me/studio": {
       "get": {
         "description": "The same public fields, for a GUARDIAN (feature pass 2026-08-27): the parent app's\nהוראות הגעה screen needs the club's address and phone, and the only prior reads were\nstaff-gated or keyed by a slug the parent never holds. No role dependency, §3.1 --\n'guardian is not a role'; the shape is the club's shop window, not a settings read.",
@@ -18061,6 +18220,28 @@
         "summary": "My Studio",
         "tags": [
           "studio"
+        ]
+      }
+    },
+    "/api/v1/me/trial-bookings": {
+      "get": {
+        "description": "§6.3's reduced home, given the lesson it was drawn around.\n\n`TrialHome` renders a date, an hour and a countdown, and `Resolve` mounted it with no\nsession time at all -- so every trial family fell through to the fallback copy, which\nsaid the club would be in touch *after the lesson* to a family whose lesson had not been\nbooked. The screen was unreachable until recently, so nobody had seen it.\n\n**A separate read, not a field on `/me/students`.** `StudentSummaryOut` is the roster\nrow dashboard `3b`, staff `9h` and this route's caller all share, and it is\ncoach-reachable; a trial-only field there would be carried by every student in the\nproduct for a state that applies to leads. A booking is also not one field -- `attended`\nis what §5.4a ④'s \"איך היה?\" branch needs, and `TrialHome` has accepted that prop since\nW3 with nothing to supply it. One read answers both.\n\nNo role dependency (§3.1 -- 'guardian is not a role'), and no pagination: this is one\nfamily's trials, and §5.4a makes one free trial the rule.",
+        "operationId": "my_trial_bookings_api_v1_me_trial_bookings_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyTrialBookingListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "My Trial Bookings",
+        "tags": [
+          "people"
         ]
       }
     },

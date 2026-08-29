@@ -67,6 +67,15 @@ export const people: Bundle = {
   'status.history': 'היסטוריית סטטוס',
   'status.changedOn': 'שונה בתאריך',
   'status.reason': 'סיבה',
+  // The same rows, headed for the family they happened to. "היסטוריית סטטוס" is the word
+  // a manager uses about a record; a parent asking when their child was frozen is asking
+  // about their membership. There is deliberately no parent-side `status.reason`: the
+  // manager's note is not in the shape the parent app reads.
+  'status.membershipHistory': 'היסטוריית החברות',
+  // -- 4a's attendance section (dashboard) ---------------------------------------
+  'student.attendance': 'היסטוריית נוכחות',
+  'student.attendanceEmpty': 'עדיין לא נרשמה נוכחות',
+  'student.attendanceMarkedOn': 'סומן בתאריך',
 
   // -- guardians (§5.3) ----------------------------------------------------------
   'guardian.one': 'הורה',
@@ -284,7 +293,13 @@ export const people: Bundle = {
   'trialHome.whatToBring': 'מה להביא',
   'trialHome.whatToBringHint': 'בגדים נוחים ובקבוק מים. הגיעו עשר דקות לפני',
   'trialHome.howWasIt': 'איך היה?',
+  // Two different waits, and until now one string served both. `waitingForClub` says
+  // *after the lesson*, which is true only once a lesson has happened; it was the only
+  // thing the no-booking branch could say, so a family whose lesson was never booked read
+  // a promise about an event that did not exist. §5.4a lets a manager log a phone enquiry
+  // with no slot chosen, so that family is real and reaches this screen.
   'trialHome.waitingForClub': 'המועדון יחזור אליכם אחרי השיעור',
+  'trialHome.noLessonBooked': 'עדיין לא נקבע שיעור ניסיון. המועדון ייצור אתכם קשר לתיאום',
 
   // -- the containers (parent 2c, dashboard 6c) ---------------------------------
   'card.title': 'כרטיס חניך',

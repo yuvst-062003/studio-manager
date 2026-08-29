@@ -7,5 +7,19 @@ export { TrialHome, daysUntil } from './TrialHome'
 export { AddSibling } from './AddSibling'
 export { ProfileAndLeave, GuardianRow, chipToneFor } from './ProfileAndLeave'
 export { ProfileSection } from './ProfileSection'
-export { makePeopleClient, useMyStudents, everyChildIsOnATrial } from './peopleClient'
-export type { PeopleClient, StudentSummary, GuardianOut, MyStudents } from './peopleClient'
+export { StatusHistorySection } from './sections/StatusHistorySection'
+export {
+  makePeopleClient,
+  useMyStudents,
+  everyChildIsOnATrial,
+  nextTrialLesson,
+} from './peopleClient'
+export type {
+  PeopleClient,
+  StudentSummary,
+  GuardianOut,
+  MyStudents,
+  MyStatusHistoryRow,
+  MyTrialBooking,
+  TrialLesson,
+} from './peopleClient'

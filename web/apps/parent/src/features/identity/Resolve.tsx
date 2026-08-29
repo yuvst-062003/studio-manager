@@ -19,7 +19,8 @@ import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { ParentHome } from '../home/ParentHome'
 import type { HomeLesson } from '../home/ParentHome'
-import { everyChildIsOnATrial, makePeopleClient, useMyStudents } from '../people'
+import { everyChildIsOnATrial, makePeopleClient, nextTrialLesson, useMyStudents } from '../people'
+import type { TrialLesson } from '../people'
 import { TrialHome } from '../people'
 import { makeParentScheduleClient } from '../schedule/client'
 
@@ -44,6 +45,26 @@ export function Resolve({ session, locale }: { session: Session; locale: Locale 
   const [attendance, setAttendance] = useState<
     readonly { session_id: string; student_id: string; status: string }[]
   >([])
+  // §6.3's reduced home is drawn around a lesson, and `TrialHome` was mounted below with
+  // no `sessionStartsAt` at all — so every trial family fell through to the fallback copy.
+  // `null` means "not asked yet or nothing booked", which is the same thing to the screen.
+  const [trialLesson, setTrialLesson] = useState<TrialLesson | null>(null)
+  useEffect(() => {
+    if (!session.access.parent) return
+    let live = true
+    // Only when every child is on a trial: this is the one screen that reads it, and a
+    // family already using the full app has no use for the request. `mine.status` gates
+    // it rather than a length check, so nothing fires while the children are loading.
+    if (mine.status !== 'ready' || !everyChildIsOnATrial(mine.students)) return
+    peopleClient
+      .myTrialBookings()
+      .then((body) => live && setTrialLesson(nextTrialLesson(body.items, new Date())))
+      // A failed read leaves the fallback copy standing, which now says the honest thing.
+      .catch(() => undefined)
+    return () => {
+      live = false
+    }
+  }, [mine, peopleClient, session.access.parent])
   useEffect(() => {
     if (!session.access.parent) return
     let live = true
@@ -131,7 +152,19 @@ export function Resolve({ session, locale }: { session: Session; locale: Locale 
   // Once a manager converts them "the full app appears with no further action from the
   // parent", which is this condition simply ceasing to hold.
   if (mine.status === 'ready' && everyChildIsOnATrial(mine.students)) {
-    return <TrialHome students={mine.students} locale={locale} />
+    return (
+      <TrialHome
+        students={mine.students}
+        locale={locale}
+        // `StudentSummary` carries no session time and should not: it is the coach-reachable
+        // roster row every student in the product shares. The lesson comes from
+        // `GET /me/trial-bookings` above — see `nextTrialLesson` for which booking wins.
+        sessionStartsAt={trialLesson?.sessionStartsAt ?? null}
+        // §5.4a ④ — three-state in the column and three-state here. `attended === true` is
+        // "the lesson happened"; `null` is "not yet", which must not ask "איך היה?".
+        attended={trialLesson?.attended === true}
+      />
+    )
   }
 
   // §6.1 step 4 — 'only shown if she belongs to more than one studio'. StudioSwitcher

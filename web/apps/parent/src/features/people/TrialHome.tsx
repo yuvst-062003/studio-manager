@@ -76,15 +76,27 @@ export function TrialHome({
               {formatTimeInStudioZone(sessionStartsAt, locale)}
             </p>
             <p data-testid="trial-home-countdown">
-              {days !== null && days <= 0
-                ? t(locale, 'people.trialHome.today')
-                : days === 1
-                  ? t(locale, 'people.trialHome.tomorrow')
-                  : t(locale, 'people.trialHome.countdown').replace('{n}', String(days))}
+              {/* Four branches, and the first one is the correction. `days < 0` is a lesson
+                  that has already happened, and a countdown cannot count down to it —
+                  "היום" was what it said, for a lesson three days ago. That is the branch
+                  `waitingForClub` was written for and never reached: *after the lesson* is
+                  true exactly here. `days === 0` is still today, and a parent opening the
+                  app on the morning of the lesson is this screen's likeliest reader. */}
+              {days !== null && days < 0
+                ? t(locale, 'people.trialHome.waitingForClub')
+                : days !== null && days <= 0
+                  ? t(locale, 'people.trialHome.today')
+                  : days === 1
+                    ? t(locale, 'people.trialHome.tomorrow')
+                    : t(locale, 'people.trialHome.countdown').replace('{n}', String(days))}
             </p>
           </>
         ) : (
-          <p data-testid="trial-home-waiting">{t(locale, 'people.trialHome.waitingForClub')}</p>
+          // No lesson booked at all — §5.4a's logged phone enquiry, and every family
+          // reaching this screen before `Resolve` had a booking to hand it. This said
+          // "המועדון יחזור אליכם אחרי השיעור" — *after the lesson* — to a family whose
+          // lesson does not exist, describing an event that had not been arranged.
+          <p data-testid="trial-home-waiting">{t(locale, 'people.trialHome.noLessonBooked')}</p>
         )}
       </Card>
 

@@ -3,7 +3,7 @@
 // Two things are asserted harder than the rest: the payment column on `3b` is EXPLICITLY
 // empty rather than invented, and `6c` hardcodes no alert this lane does not own. Both are
 // failures that look like features until somebody acts on them.
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { clearSlot, registerSlot } from '@studio/ui'
@@ -16,6 +16,7 @@ import { AlertCentre } from './AlertCentre'
 import type { AlertSectionProps } from './AlertCentre'
 import { registerPeopleAlerts } from './register'
 import type {
+  AttendanceMarkRow,
   DashboardPeopleClient,
   RegistrationRequestOut,
   StudentSummary,
@@ -64,6 +65,21 @@ const booking = (over: Partial<TrialBookingRow> = {}): TrialBookingRow =>
     is_override: false,
     ...over,
   }) as TrialBookingRow
+
+const mark = (over: Partial<AttendanceMarkRow> = {}): AttendanceMarkRow =>
+  ({
+    id: 'a1',
+    session_id: 's1',
+    student_id: 'st1',
+    status: 'present',
+    source: 'coach',
+    marked_by_person_id: 'p9',
+    marked_at: '2026-09-06T15:05:00Z',
+    device_marked_at: '2026-09-06T15:00:00Z',
+    client_mark_id: 'c1',
+    note: null,
+    ...over,
+  }) as AttendanceMarkRow
 
 function makeClient(over: Partial<DashboardPeopleClient> = {}): DashboardPeopleClient {
   return {
@@ -117,6 +133,19 @@ function makeClient(over: Partial<DashboardPeopleClient> = {}): DashboardPeopleC
             changed_at: '2026-09-01T09:00:00Z',
           },
         ],
+      }),
+    ),
+    // `4a`'s twelve marks, newest first — the order `GET /students/{id}/attendance`
+    // returns them in (`ORDER BY device_marked_at DESC`).
+    attendance: vi.fn(() =>
+      Promise.resolve({
+        items: [
+          mark({ id: 'a3', status: 'absent_unexcused', device_marked_at: '2026-09-15T15:00:00Z' }),
+          mark({ id: 'a2', status: 'absent_excused', device_marked_at: '2026-09-10T15:00:00Z' }),
+          mark({ id: 'a1', status: 'present', device_marked_at: '2026-09-06T15:00:00Z' }),
+        ],
+        next_cursor: null,
+        has_more: false,
       }),
     ),
     groups: vi.fn(() =>
@@ -445,6 +474,89 @@ describe('StudentDetailScreen — 4a', () => {
     // §6.4 — 'a manager checking cover from a phone is a normal case rather than an error.'
     render(<StudentDetailScreen studentId="st1" locale="he" client={makeClient()} />)
     expect(await screen.findByTestId('student-detail')).toHaveStyle({ display: 'grid' })
+  })
+
+  // -- 4a's attendance section --------------------------------------------------
+  //
+  // `GET /students/{id}/attendance` has been manager-scoped and built since M5 and was
+  // called by NOTHING. The card had four sections — groups, price plan, guardians, status
+  // history — and the one question a manager asks about a child before phoning their
+  // parent ("has she been coming?") had no answer on the screen.
+
+  it('shows the student’s attendance history, through the shared strip', async () => {
+    const client = makeClient()
+    render(<StudentDetailScreen studentId="st1" locale="he" client={client} />)
+
+    expect(await screen.findByTestId('detail-attendance')).toBeInTheDocument()
+    // The SAME primitive parent `2c` and staff `9c` render, so the three surfaces cannot
+    // drift into three different pictures of one child's attendance.
+    expect(screen.getByTestId('attendance-strip')).toBeInTheDocument()
+    expect(client.attendance).toHaveBeenCalledWith('st1')
+  })
+
+  it('renders the marks oldest-first, because time flows one way', async () => {
+    // The endpoint answers newest-first (`ORDER BY device_marked_at DESC` — a queue that
+    // flushed two days late must not put last Tuesday at the top). A strip read left to
+    // right is the opposite order, so the screen reverses it rather than drawing a
+    // history that runs backwards.
+    render(<StudentDetailScreen studentId="st1" locale="he" client={makeClient()} />)
+    const section = await screen.findByTestId('detail-attendance')
+
+    // `role="img"` with an accessible name is what `AttendanceMark` renders; the legend's
+    // copies of it are `aria-hidden`, so they are not in this list. Scoped to the section
+    // because the belt bar in the header is a labelled `img` too.
+    const labels = within(section)
+      .getAllByRole('img')
+      .map((node) => node.getAttribute('aria-label') ?? '')
+    expect(labels).toHaveLength(3)
+    expect(labels[0]).toContain(t('he', 'attendance.roster.present'))
+    expect(labels[2]).toContain(t('he', 'attendance.roster.absent'))
+  })
+
+  it('says so when nothing has been marked, rather than drawing an empty strip', async () => {
+    // §5.14 makes `unmarked` a real state precisely so a coach who forgot the register does
+    // not look like a child who stopped coming. A blank strip beside a heading would say
+    // the second thing.
+    const client = makeClient({
+      attendance: vi.fn(() => Promise.resolve({ items: [], next_cursor: null, has_more: false })),
+    } as unknown as Partial<DashboardPeopleClient>)
+    render(<StudentDetailScreen studentId="st1" locale="he" client={client} />)
+
+    expect(await screen.findByTestId('detail-attendance-empty')).toHaveTextContent(
+      t('he', 'people.student.attendanceEmpty'),
+    )
+    expect(screen.queryByTestId('attendance-strip')).toBeNull()
+  })
+
+  it('renders no coach note beside the marks', async () => {
+    // §5.13 — a coach's written opinion about a child. `AttendanceOut` carries one and the
+    // strip has nowhere to put it; putting it here would surface a note written for the
+    // register on the screen a manager reads before telephoning the family.
+    const client = makeClient({
+      attendance: vi.fn(() =>
+        Promise.resolve({
+          items: [mark({ note: 'הגיעה עצובה, לברר בבית' })],
+          next_cursor: null,
+          has_more: false,
+        }),
+      ),
+    } as unknown as Partial<DashboardPeopleClient>)
+    render(<StudentDetailScreen studentId="st1" locale="he" client={client} />)
+    await screen.findByTestId('detail-attendance')
+
+    expect(document.body.textContent ?? '').not.toContain('הגיעה עצובה')
+  })
+
+  it('survives an attendance read that fails, without losing the rest of the card', async () => {
+    // One section of a composite screen. A 500 here must not take the guardians and the
+    // status history down with it.
+    const client = makeClient({
+      attendance: vi.fn(() => Promise.reject(new Error('500'))),
+    } as unknown as Partial<DashboardPeopleClient>)
+    render(<StudentDetailScreen studentId="st1" locale="he" client={client} />)
+
+    expect(await screen.findByTestId('detail-history')).toBeInTheDocument()
+    expect(screen.getByTestId('detail-attendance-empty')).toBeInTheDocument()
   })
 })
 
