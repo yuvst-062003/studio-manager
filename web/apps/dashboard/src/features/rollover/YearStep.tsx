@@ -106,7 +106,15 @@ export function YearStep({
 
       {year ? (
         <Card caption={t(locale, 'schedule.rollover.year.dates')}>
-          <p data-testid="rollover-year-name">{year.name}</p>
+          {/* `dir="auto"`, not RangeText: the name is whatever the manager typed, and this
+              is not a range. But `defaultSeason` proposes `2026–2027`, and a string whose
+              only characters are digits and a dash has no strong direction — so an RTL
+              paragraph rendered it `2027–2026`. `auto` reads the first STRONG character:
+              absent one it lays out ltr and the digits stay in order, while a Hebrew name
+              like `שנת תשפ״ז` still lays out rtl. Hard-coding ltr would break that name. */}
+          <p data-testid="rollover-year-name">
+            <bdi dir="auto">{year.name}</bdi>
+          </p>
           {/* Was a template literal, and on staging it printed `2027-09-01 – 2026-09-01`:
               two ltr date runs with a neutral dash between them, inside an RTL paragraph,
               are free to be reordered. RangeText is the one ltr island that prevents it. */}
