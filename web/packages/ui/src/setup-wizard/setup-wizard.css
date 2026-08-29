@@ -1,0 +1,98 @@
+/* §5.1's wizard — the layout its steps share.
+ *
+ * Every step was written as a flat run of headings, fields and buttons with no layer
+ * between them: a `<fieldset>` with the UA's own border, choices abutting because JSX
+ * strips the whitespace between elements, and a footer of loose siblings. This file is
+ * that missing layer. Logical properties only (D10).
+ */
+
+.setup-step {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+
+  /* A reading measure, not the width of whatever contains it. Two things go wrong without
+   * it on a 1440px dashboard: a text field stretches to 850px for a club name of twenty
+   * characters, and the footer's two buttons end up 890px apart — which is far enough that
+   * they stop reading as a pair and become two unrelated controls, the exact defect this
+   * pass exists to remove. */
+  max-inline-size: 44rem;
+}
+
+/* A named group of related controls. `border: 0` first: a fieldset carries a browser
+ * border and 2px of inline padding by default, and an undesigned box around a designed
+ * one reads as a rendering fault rather than a grouping. */
+.setup-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.setup-group__legend {
+  padding: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-tight);
+}
+
+/* Choices along a row. `.studio-choice` already spaces a box from its OWN label; nothing
+ * spaced one choice from the NEXT, so `עברית✓English☐Русский✓` ran together. */
+.setup-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-5);
+}
+
+/* The fields grid. `minmax(0, …)` and not `1fr`: a grid child's min-width is auto, so a
+ * long club name would widen the column past a 390px viewport. */
+.setup-fields {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fit, minmax(min(18rem, 100%), 1fr));
+}
+
+/* The logo drop zone. Square, and no wider than it is tall — it was `max-inline-size:
+ * 16rem` inside a full-width column, so it hugged one edge with a void beside it. */
+.setup-logo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  aspect-ratio: 1 / 1;
+  max-inline-size: 14rem;
+  padding: var(--space-4);
+  border: var(--border-width-hairline) dashed var(--border-strong);
+  border-radius: var(--radius-xl);
+  text-align: center;
+}
+
+.setup-logo__hint {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+}
+
+.setup-logo img {
+  max-inline-size: 100%;
+  block-size: auto;
+  border-radius: var(--radius-md);
+}
+
+.setup-logo__error {
+  margin: 0;
+  color: var(--danger);
+  font-size: var(--text-caption);
+}
+
+/* The step's own state, below its actions and never among them: it describes the step,
+ * it is not something to press. Same rule the rollover wizard's footer follows. */
+.setup-step__meta {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-caption);
+}

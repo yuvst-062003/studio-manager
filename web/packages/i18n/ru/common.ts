@@ -201,6 +201,7 @@ export const common: Bundle = {
   'setup.studio.locale.en': 'Английский',
   'setup.studio.locale.ru': 'Русский',
   'setup.studio.logoDrop': 'Перетащите логотип 512×512',
+  'setup.studio.logoChoose': 'Выбрать файл',
   'setup.studio.logoAlt': 'Логотип клуба',
   'setup.studio.logoRejected': 'Файл не принят. Нужен PNG, JPEG или WebP до 2 МБ — SVG не поддерживается.',
   'setup.groups.className': 'Название занятия',

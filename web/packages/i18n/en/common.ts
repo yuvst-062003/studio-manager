@@ -192,6 +192,7 @@ export const common: Bundle = {
   'setup.studio.locale.en': 'English',
   'setup.studio.locale.ru': 'Russian',
   'setup.studio.logoDrop': 'Drop a 512×512 logo',
+  'setup.studio.logoChoose': 'Choose a file',
   'setup.studio.logoAlt': 'Club logo',
   'setup.studio.logoRejected': 'That file was not accepted. PNG, JPEG or WebP up to 2MB — SVG is never accepted.',
   'setup.groups.className': 'Class name',

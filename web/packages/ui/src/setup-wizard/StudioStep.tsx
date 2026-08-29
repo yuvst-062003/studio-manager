@@ -7,10 +7,11 @@
 // the alternative is Pillow and an image-decoding attack surface inside the API process,
 // bought to fix a defect (a logo that is not exactly square) that is cosmetic.
 import { useEffect, useRef, useState } from 'react'
-import type { CSSProperties } from 'react'
 import { t } from '@studio/i18n'
+import { ActionBar } from '../primitives/ActionBar'
 import { Button } from '../primitives/Button'
 import { Checkbox } from '../primitives/Checkbox'
+import { SectionHeader } from '../primitives/SectionHeader'
 import { TextField } from '../primitives/TextField'
 import type { WizardStepProps } from './types'
 
@@ -35,27 +36,6 @@ const PARENT_LOCALES = ['he', 'en', 'ru'] as const
 
 //: The canvas draws the drop-zone at 512×512, and that is what gets uploaded.
 export const LOGO_EDGE = 512
-
-const formStyle: CSSProperties = {
-  display: 'grid',
-  gap: 'var(--space-3)',
-  // `minmax(0, …)` and not `1fr`: a grid child's min-width is auto, so a long club name
-  // would otherwise widen the column past the viewport at 390.
-  gridTemplateColumns: 'repeat(auto-fit, minmax(min(18rem, 100%), 1fr))',
-}
-
-const dropZoneStyle: CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  alignItems: 'center',
-  justifyContent: 'center',
-  gap: 'var(--space-2)',
-  aspectRatio: '1 / 1',
-  maxInlineSize: '16rem',
-  border: 'var(--border-width-hairline) dashed var(--border)',
-  borderRadius: 'var(--radius-xl)',
-  padding: 'var(--space-4)',
-}
 
 /**
  * Draw onto a square canvas and re-encode as PNG.
@@ -125,10 +105,14 @@ export function makeStudioStep(client: StudioClient) {
     }
 
     return (
-      <section aria-labelledby="setup-studio-title" data-testid="setup-step-studio">
-        <h3 id="setup-studio-title">{t(locale, 'common.setup.step.studio')}</h3>
+      <section
+        aria-labelledby="setup-studio-title"
+        className="setup-step"
+        data-testid="setup-step-studio"
+      >
+        <SectionHeader level={3} title={t(locale, 'common.setup.step.studio')} />
 
-        <div style={formStyle}>
+        <div className="setup-fields">
           <TextField
             label={t(locale, 'common.setup.studio.name')}
             value={details.name}
@@ -152,65 +136,98 @@ export function makeStudioStep(client: StudioClient) {
           />
         </div>
 
-        <fieldset>
-          <legend>{t(locale, 'common.setup.studio.parentLocales')}</legend>
-          {PARENT_LOCALES.map((code) => (
-            <Checkbox
-              key={code}
-              label={t(locale, `common.setup.studio.locale.${code}`)}
-              checked={details.parent_locales.includes(code)}
-              onChange={(event) => toggleLocale(code, event.target.checked)}
-            />
-          ))}
+        {/* The three choices ran together — `.studio-choice` spaces a box from its own
+            label, and nothing spaced one choice from the next. */}
+        <fieldset className="setup-group">
+          <legend className="setup-group__legend">
+            {t(locale, 'common.setup.studio.parentLocales')}
+          </legend>
+          <div className="setup-choices">
+            {PARENT_LOCALES.map((code) => (
+              <Checkbox
+                key={code}
+                label={t(locale, `common.setup.studio.locale.${code}`)}
+                checked={details.parent_locales.includes(code)}
+                onChange={(event) => toggleLocale(code, event.target.checked)}
+              />
+            ))}
+          </div>
         </fieldset>
 
-        <div style={dropZoneStyle} data-testid="setup-logo-dropzone">
-          {details.logo_url ? (
-            <img
-              src={details.logo_url}
-              alt={t(locale, 'common.setup.studio.logoAlt')}
-              width={LOGO_EDGE / 4}
-              height={LOGO_EDGE / 4}
-              style={{ maxInlineSize: '100%', height: 'auto' }}
+        <fieldset className="setup-group">
+          <legend className="setup-group__legend">
+            {t(locale, 'common.setup.studio.logoAlt')}
+          </legend>
+          <div className="setup-logo" data-testid="setup-logo-dropzone">
+            {details.logo_url ? (
+              <img
+                src={details.logo_url}
+                alt={t(locale, 'common.setup.studio.logoAlt')}
+                width={LOGO_EDGE / 4}
+                height={LOGO_EDGE / 4}
+              />
+            ) : (
+              <p className="setup-logo__hint">{t(locale, 'common.setup.studio.logoDrop')}</p>
+            )}
+            {/* The native control is kept — it is the accessible name, the keyboard target
+                and what a file drop lands on — but taken out of the visual flow, because
+                the UA renders it as an English "Choose File / No file chosen" in the middle
+                of an RTL Hebrew screen. `clip-path`, not `display: none`: hiding it that way
+                would take it out of the accessibility tree along with the layout. */}
+            <input
+              ref={fileInput}
+              className="studio-visually-hidden"
+              type="file"
+              accept="image/png, image/jpeg, image/webp"
+              aria-label={t(locale, 'common.setup.studio.logoDrop')}
+              onChange={(event) => {
+                const file = event.target.files?.[0]
+                if (file) void pickLogo(file)
+              }}
             />
-          ) : (
-            <p>{t(locale, 'common.setup.studio.logoDrop')}</p>
-          )}
-          <input
-            ref={fileInput}
-            type="file"
-            accept="image/png, image/jpeg, image/webp"
-            aria-label={t(locale, 'common.setup.studio.logoDrop')}
-            onChange={(event) => {
-              const file = event.target.files?.[0]
-              if (file) void pickLogo(file)
-            }}
-          />
-          {logoError ? <p role="alert">{logoError}</p> : null}
-        </div>
+            <Button variant="secondary" onClick={() => fileInput.current?.click()}>
+              {t(locale, 'common.setup.studio.logoChoose')}
+            </Button>
+            {logoError ? (
+              <p className="setup-logo__error" role="alert">
+                {logoError}
+              </p>
+            ) : null}
+          </div>
+        </fieldset>
 
-        <Button
-          disabled={saving || details.name.trim() === ''}
-          onClick={() => {
-            setSaving(true)
-            void client
-              .update({
-                name: details.name.trim(),
-                sport: details.sport,
-                address: details.address,
-                phone: details.phone,
-                parent_locales: details.parent_locales,
-              })
-              .then(() => onDone())
-              .finally(() => setSaving(false))
-          }}
-        >
-          {t(locale, 'common.setup.continue')}
-        </Button>
-        <Button variant="ghost" onClick={onSkip}>
-          {t(locale, 'common.setup.skip')}
-        </Button>
-        <p data-testid="setup-studio-status">{t(locale, `common.setup.status.${status}`)}</p>
+        {/* Skip leaves the step, continue moves it forward — opposite edges, and the
+            step's own state on its own line rather than among the controls. */}
+        <ActionBar
+          end={
+            <Button
+              disabled={saving || details.name.trim() === ''}
+              onClick={() => {
+                setSaving(true)
+                void client
+                  .update({
+                    name: details.name.trim(),
+                    sport: details.sport,
+                    address: details.address,
+                    phone: details.phone,
+                    parent_locales: details.parent_locales,
+                  })
+                  .then(() => onDone())
+                  .finally(() => setSaving(false))
+              }}
+            >
+              {t(locale, 'common.setup.continue')}
+            </Button>
+          }
+          start={
+            <Button variant="ghost" onClick={onSkip}>
+              {t(locale, 'common.setup.skip')}
+            </Button>
+          }
+        />
+        <p className="setup-step__meta" data-testid="setup-studio-status">
+          {t(locale, `common.setup.status.${status}`)}
+        </p>
       </section>
     )
   }

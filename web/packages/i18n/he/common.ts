@@ -201,6 +201,7 @@ export const common: Bundle = {
   'setup.studio.locale.en': 'English',
   'setup.studio.locale.ru': 'Русский',
   'setup.studio.logoDrop': 'גררו לוגו 512×512',
+  'setup.studio.logoChoose': 'בחירת קובץ',
   'setup.studio.logoAlt': 'לוגו המועדון',
   'setup.studio.logoRejected': 'הקובץ לא התקבל. נדרש PNG, JPEG או WebP עד 2MB — SVG לא נתמך.',
   'setup.groups.className': 'שם השיעור',

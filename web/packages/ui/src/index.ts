@@ -1,6 +1,7 @@
 import './fonts.css'
 import './tokens.css'
 import './primitives/primitives.css'
+import './setup-wizard/setup-wizard.css'
 
 export { HelloProof } from './HelloProof'
 export { ThemeProvider, useTheme } from './ThemeProvider'
