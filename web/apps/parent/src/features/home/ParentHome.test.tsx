@@ -79,6 +79,41 @@ describe('ParentHome', () => {
     expect(screen.getAllByRole('heading', { level: 3 })).toHaveLength(2)
   })
 
+  it('shows only lessons a child of this family actually attends', async () => {
+    // The `dev+both` case — a parent who also coaches. `GET /sessions` returns the whole
+    // studio to anyone holding a staff role (app/routers/sessions.py `_visible_groups`
+    // returns None for staff, whichever app asked), so this list arrived carrying groups
+    // no child of theirs is in. With no child chip selected nothing filtered them out, and
+    // the row then had no child to name: `childrenOf(lesson) || lesson.groupName` printed
+    // the GROUP where every other row shows a child, so "השיעורים הקרובים" listed the
+    // club's timetable as if it were this family's.
+    render(
+      <ParentHome
+        locale="he"
+        students={CHILDREN}
+        upcoming={[...LESSONS, { id: 'se9', startsAt: '2026-08-30T16:00:00Z', groupName: 'קבוצה אחרת' }]}
+      />,
+    )
+    expect(screen.getAllByTestId('parent-home-lesson')).toHaveLength(2)
+    expect(screen.queryByText('קבוצה אחרת')).toBeNull()
+  })
+
+  it('skips the family layer for a family with one child', () => {
+    // §19.3 gives `dev+parent1` exactly one job — "the single-child path that skips the
+    // family layer" — and the layer was not skipped: a parent of one child got an "הכל"
+    // chip and a chip naming their only child, a filter with one thing to filter and
+    // nothing to filter it from.
+    render(<ParentHome locale="he" students={[CHILDREN[0]!]} upcoming={LESSONS} />)
+    expect(screen.queryByTestId('parent-home-chip-all')).toBeNull()
+    // The way to the child's card survives — it is the row's point, not the filter's.
+    expect(screen.getByTestId(`parent-home-card-${CHILDREN[0]!.id}`)).toBeInTheDocument()
+  })
+
+  it('keeps the family layer for a family with more than one child', () => {
+    render(<ParentHome locale="he" students={CHILDREN} upcoming={LESSONS} />)
+    expect(screen.getByTestId('parent-home-chip-all')).toBeInTheDocument()
+  })
+
   it('filters the lessons through the child chips, and releases on a second tap', async () => {
     render(<ParentHome locale="he" students={CHILDREN} upcoming={LESSONS} />)
     const chips = screen.getAllByTestId('parent-home-child')

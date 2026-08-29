@@ -14,7 +14,7 @@ from datetime import date
 import pytest
 from app.models.identity import AuthIdentity
 from app.models.people import Enrollment, Student
-from app.models.person import Guardian, Person
+from app.models.person import Guardian, Person, RoleAssignment
 from app.models.schedule import Session
 from app.models.structure import Class, Group
 from sqlalchemy import select
@@ -194,6 +194,117 @@ def test_a_guardian_sees_only_the_groups_their_children_are_enrolled_in(
         f"{API}/sessions?from=2026-11-01&to=2026-11-30&group_id={stranger.id}", headers=headers
     )
     assert refused.json()["items"] == []
+
+
+def test_scope_mine_narrows_a_coach_who_is_also_a_parent_to_their_own_children(
+    client, fake_provider, app_session, studio, a_group, a_session
+):
+    """§19.3's `dev+both` -- "the dual-role case: two apps, one identity".
+
+    `_visible_groups` returns None (the whole studio) for anyone holding a staff role,
+    whichever app asked, so a lead coach who is also a guardian received the club's entire
+    timetable into the PARENT app. `web/apps/parent/src/features/schedule/client.ts` states
+    the opposite in its own header -- "GET /sessions narrows a guardian to the groups their
+    own children are enrolled in, server-side" -- and that contract silently did not hold
+    for exactly this person.
+
+    `scope=mine` is the parent app asking for the guardian narrowing explicitly. It can only
+    ever REMOVE rows, so it is safe for any caller to send and needs no authorization of its
+    own; a coach with no children gets an empty list, which is the honest answer to "my
+    children's lessons" for someone who has none.
+    """
+    subject = f"both-{uuid.uuid4()}"
+    code = f"code-{subject}"
+    fake_provider.register(code=code, subject=subject, email=f"{subject}@example.invalid")
+    sign_in(client, code=code, app_name="parent")
+    identity_id = app_session.execute(
+        select(AuthIdentity.id).where(AuthIdentity.provider_subject == subject)
+    ).scalar_one()
+
+    person = Person(
+        studio_id=studio.id, auth_identity_id=identity_id, first_name="אורי", last_name="כפול"
+    )
+    child_person = Person(studio_id=studio.id, first_name="אלון", last_name="כפול")
+    app_session.add_all([person, child_person])
+    app_session.flush()
+    # A lead coach AND a guardian -- one identity, both hats.
+    app_session.add(
+        RoleAssignment(
+            studio_id=studio.id,
+            person_id=person.id,
+            role="lead_coach",
+            scope_type="studio",
+            granted_at=T0,
+        )
+    )
+    child = Student(studio_id=studio.id, person_id=child_person.id, status="active")
+    app_session.add(child)
+    app_session.flush()
+
+    # A group the coach teaches and no child of theirs attends.
+    other_class = Class(studio_id=studio.id, name="קראטה")
+    app_session.add(other_class)
+    app_session.flush()
+    theirs_to_teach = Group(studio_id=studio.id, class_id=other_class.id, name="זרים")
+    app_session.add(theirs_to_teach)
+    app_session.flush()
+    app_session.add_all(
+        [
+            Guardian(
+                studio_id=studio.id,
+                student_id=child.id,
+                person_id=person.id,
+                is_primary=True,
+                relation="parent",
+            ),
+            Enrollment(
+                studio_id=studio.id,
+                student_id=child.id,
+                group_id=a_group,
+                status="active",
+                started_on=date(2026, 9, 1),
+            ),
+            Session(
+                studio_id=studio.id,
+                group_id=theirs_to_teach.id,
+                training_year_id=app_session.execute(
+                    select(Session.training_year_id).limit(1)
+                ).scalar_one(),
+                starts_at=T0,
+                ends_at=T0.replace(hour=T0.hour + 1),
+                status="scheduled",
+            ),
+        ]
+    )
+    app_session.commit()
+
+    token = sign_in(client, code=code, app_name="parent").json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}", "X-Dev-Now": T0.isoformat()}
+    window = "from=2026-11-01&to=2026-11-30"
+
+    # The staff view is unchanged: they teach there, so they may see it.
+    everything = client.get(f"{API}/sessions?{window}", headers=headers)
+    assert everything.status_code == 200, everything.text
+    assert str(theirs_to_teach.id) in {s["group_id"] for s in everything.json()["items"]}
+
+    # The parent view is their own children and nothing else.
+    mine = client.get(f"{API}/sessions?{window}&scope=mine", headers=headers)
+    assert mine.status_code == 200, mine.text
+    assert {s["group_id"] for s in mine.json()["items"]} == {str(a_group)}
+
+
+def test_scope_mine_gives_a_childless_coach_an_empty_list_not_the_club(
+    client, as_lead_coach, a_session
+):
+    """The fail-closed half. A coach with no `guardian` row has no children, and "my
+    children's lessons" for them is empty -- never a fallback to the whole studio, which is
+    the shape the guardian path already guards against for a signed-in stranger."""
+    headers = {**as_lead_coach.headers, "X-Dev-Now": T0.isoformat()}
+    response = client.get(
+        f"{API}/sessions?from=2026-11-01&to=2026-11-30&scope=mine", headers=headers
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["items"] == []
 
 
 def test_a_signed_in_stranger_with_no_children_sees_nothing_rather_than_everything(

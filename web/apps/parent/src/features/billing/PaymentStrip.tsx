@@ -6,9 +6,23 @@
 // **Parent app only.** §3.2 gives a coach no financial read, and invariant 3 enforces that
 // against the router tag; this component simply does not exist in the staff app, which is
 // the same shape of guarantee `HealthGate` relies on for §5.5's parent-only block.
+import type { CSSProperties } from 'react'
 import { Button, MoneyDisplay } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
+
+// A label, an amount and a button on one line. Laid out rather than left to flow: the three
+// were adjacent inline elements with nothing between them, so the strip rendered as
+// "סה״כ חוב1,250₪" with the button jammed against it.
+const stripStyle: CSSProperties = {
+  alignItems: 'center',
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: 'var(--space-2)',
+}
+
+//: The button sits at the far end of the line, not against the amount.
+const spacerStyle: CSSProperties = { marginInlineStart: 'auto' }
 
 export type PaymentStripProps = {
   locale: Locale
@@ -23,12 +37,14 @@ export function PaymentStrip({ locale, balanceAgorot, onOpenPayments }: PaymentS
     return null
   }
   return (
-    <div data-testid="payment-strip">
+    <div data-testid="payment-strip" style={stripStyle}>
       <span>{t(locale, 'billing.openDebts.total')}</span>
       <MoneyDisplay agorot={balanceAgorot} tone="debt" label={t(locale, 'billing.openDebts.total')} />
-      <Button variant="secondary" onClick={onOpenPayments}>
-        {t(locale, 'billing.card.pay')}
-      </Button>
+      <span style={spacerStyle}>
+        <Button variant="secondary" onClick={onOpenPayments}>
+          {t(locale, 'billing.card.pay')}
+        </Button>
+      </span>
     </div>
   )
 }

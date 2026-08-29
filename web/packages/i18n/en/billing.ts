@@ -81,6 +81,8 @@ export const billing: Bundle = {
   'receipt.cardOnly': 'A tax receipt is issued for card payments only',
   'receipt.externalNumber': 'External receipt number',
   'history.title': 'Payments made',
+  'history.back': 'Back to payments',
+  'history.filterLegend': 'Filter by type',
   'history.empty': 'No payments recorded yet',
 
   // -- a charge -----------------------------------------------------------------

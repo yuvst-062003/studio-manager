@@ -11,9 +11,23 @@
 // in the staff app, and there is deliberately no `block_attendance_without_health` setting for
 // either to read.
 //
-// **`trial_signed` is still gated.** §5.5's gate is about the full declaration: a family who
-// signed §5.4a's short trial form has answered three questions on a phone, and the gate exists
-// because the club needs the whole record before a child trains regularly.
+// **`trial_signed` gates once the child is no longer on a trial, and not before.** §5.5 names
+// the condition twice — "if any linked student has `health_status = missing`" (SPEC:688) and
+// "one per child with health_status = missing" (SPEC:1315) — and SPEC:626 supplies the other
+// half: "The trial declaration is not sufficient for enrollment … converting requires the full
+// form." So a converted child holding the short form is gated, which is the case the gate is
+// for; a child who is still ON the trial is not, because three questions on a phone is exactly
+// what §5.4a asked of them an hour ago.
+//
+// This used to gate everything short of `signed`, which is stricter than either sentence, and
+// the extra strictness had a concrete cost: §5.4a's booking funnel writes `status='trial'` +
+// `health_status='trial_signed'` (app/services/people/trials.py), and §6.3's reduced trial home
+// renders only when every child is `status: 'trial'`. The two conditions could never both hold,
+// so `TrialHome` was unreachable in a running app — the `dev+trial` persona walked into a full
+// declaration form instead of the screen it exists to exercise.
+//
+// Chasing is a different question from blocking, and `app/workers/health_reminders.py` is right
+// to keep nagging a `trial_signed` family for the full form.
 import { useMemo } from 'react'
 import type { ReactNode } from 'react'
 import type { CSSProperties } from 'react'
@@ -33,6 +47,11 @@ const gateStyle: CSSProperties = {
 export type GatedStudent = {
   id: string
   display_name: string
+  /** §5.4a's funnel state. `'trial'` is the one value that changes what the gate does with
+   *  a short-form declaration — see the header. Optional so a caller that genuinely has no
+   *  status (a test fixture, a shape from before this field) is treated as enrolled, which
+   *  is the safe direction: it gates. */
+  status?: string
   health_status: HealthStatus
 }
 
@@ -43,8 +62,15 @@ export type GatedStudent = {
  * for three children's declarations at once is a screen nobody finishes. The gate reappears for
  * the next child on submit, which is the same routing decision made again.
  */
+export function needsFullDeclaration(student: GatedStudent): boolean {
+  if (student.health_status === 'signed') return false
+  // The short form covers a child for as long as they are still trying the club out.
+  if (student.health_status === 'trial_signed' && student.status === 'trial') return false
+  return true
+}
+
 export function firstStudentNeedingDeclaration(students: readonly GatedStudent[]): GatedStudent | null {
-  return students.find((student) => student.health_status !== 'signed') ?? null
+  return students.find(needsFullDeclaration) ?? null
 }
 
 export type HealthGateProps = {

@@ -204,6 +204,7 @@ export const schedule: Bundle = {
   'calendar.nextMonth': 'Next month',
   'calendar.upcoming': 'Upcoming sessions',
   'calendar.past': 'Past sessions',
+  'calendar.pastCount': '{n} past lessons',
   'calendar.empty': 'No sessions this month',
   'calendar.emptyHint': 'The club sets the lesson schedule',
 

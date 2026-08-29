@@ -29,6 +29,7 @@ export type Locale = 'he' | 'en' | 'ru'
  */
 const timeFormatters = new Map<string, Intl.DateTimeFormat>()
 const dateFormatters = new Map<string, Intl.DateTimeFormat>()
+const monthFormatters = new Map<string, Intl.DateTimeFormat>()
 
 function timeFormatter(locale: Locale): Intl.DateTimeFormat {
   let formatter = timeFormatters.get(locale)
@@ -61,6 +62,19 @@ function dateFormatter(locale: Locale): Intl.DateTimeFormat {
   return formatter
 }
 
+function monthFormatter(locale: Locale): Intl.DateTimeFormat {
+  let formatter = monthFormatters.get(locale)
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat(locale, {
+      timeZone: STUDIO_TIMEZONE,
+      month: 'long',
+      year: 'numeric',
+    })
+    monthFormatters.set(locale, formatter)
+  }
+  return formatter
+}
+
 function toDate(iso: string | Date): Date {
   const date = iso instanceof Date ? iso : new Date(iso)
   if (Number.isNaN(date.getTime())) {
@@ -82,6 +96,22 @@ export function formatTimeInStudioZone(iso: string | Date, locale: Locale): stri
 /** A UTC instant → a localized date label, still in the studio's zone. */
 export function formatDateInStudioZone(iso: string | Date, locale: Locale): string {
   return dateFormatter(locale).format(toDate(iso))
+}
+
+/**
+ * A calendar month → its localized name, e.g. `'אוגוסט 2026'`.
+ *
+ * Takes `(year, month)` rather than an instant because that is what a month picker holds,
+ * and **`month` is 1-based** like `charge.period_month`, `group_schedule_rule.weekday`'s
+ * neighbours and the parent calendar's own state — every month value in this codebase
+ * except JS `Date`'s, which is the one this signature keeps callers away from.
+ *
+ * Built at midday UTC: an instant at midnight on the 1st is still the previous month in a
+ * negative-offset zone, and a heading that disagreed with the grid under it would be a
+ * one-day-a-month bug nobody could reproduce on demand.
+ */
+export function formatMonthLabel(year: number, month: number, locale: Locale): string {
+  return monthFormatter(locale).format(new Date(Date.UTC(year, month - 1, 1, 12)))
 }
 
 /**

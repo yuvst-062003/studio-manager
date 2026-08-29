@@ -97,7 +97,7 @@ const chipRowStyle: CSSProperties = {
 }
 
 const chipStyle: CSSProperties = {
-  minBlockSize: '40px',
+  minBlockSize: '44px',
   paddingInline: 'var(--space-4)',
   borderRadius: 'var(--radius-xl)',
   border: 'var(--border-width-hairline) solid var(--border-strong)',
@@ -112,6 +112,31 @@ const chipActiveStyle: CSSProperties = {
   background: 'var(--fg)',
   color: 'var(--on-fg)',
   borderColor: 'var(--fg)',
+}
+
+//: The two links that sit in a header row. Text-sized, but tappable: both rendered 19px
+//: tall, under WCAG 2.2 SC 2.5.8's 24x24 floor and well under a thumb.
+const headerLinkStyle: CSSProperties = {
+  alignItems: 'center',
+  display: 'inline-flex',
+  gap: 'var(--space-1)',
+  minBlockSize: '44px',
+}
+
+//: A chip and its card link travel together, so the link is visibly THIS child's.
+const childRowStyle: CSSProperties = {
+  alignItems: 'center',
+  display: 'flex',
+  gap: 'var(--space-1)',
+}
+
+//: The route to `2c`, sized like a control rather than like a footnote. It was 56×14.
+const cardLinkStyle: CSSProperties = {
+  alignItems: 'center',
+  borderRadius: 'var(--radius-xl)',
+  display: 'inline-flex',
+  minBlockSize: '44px',
+  paddingInline: 'var(--space-3)',
 }
 
 /** Today / tomorrow get their names; further out, the studio-zone date carries the row. */
@@ -150,9 +175,20 @@ export function ParentHome({
       selectedDay === todayKey
         ? rows.filter((lesson) => studioDayKey(lesson.startsAt) >= todayKey)
         : rows.filter((lesson) => studioDayKey(lesson.startsAt) === selectedDay)
-    if (childFilter === null || students === null) return rows
+    // `null` and not `rows`: the children decide which lessons belong on this screen, so
+    // rendering the list before they arrive shows rows this family may not own. `byDay`
+    // already renders nothing for `null`, which is the correct loading state anyway.
+    if (students === null) return null
+    // "הכל" means every one of MY children, never every group in the club. `GET /sessions`
+    // hands the whole studio to anyone holding a staff role — `_visible_groups` in
+    // app/routers/sessions.py returns None for staff whichever app asked — so a parent who
+    // also coaches received the club's whole timetable here. Without this filter those rows
+    // survived, and `childrenOf` had no child to name them with, so they rendered with the
+    // GROUP name sitting in the slot every other row uses for a child.
+    const mine = new Set(students.flatMap((s) => s.groupNames))
+    if (childFilter === null) return rows.filter((lesson) => mine.has(lesson.groupName))
     const child = students.find((s) => s.id === childFilter)
-    if (!child) return rows
+    if (!child) return rows.filter((lesson) => mine.has(lesson.groupName))
     return rows.filter((lesson) => child.groupNames.includes(lesson.groupName))
   }, [upcoming, childFilter, students, selectedDay, todayKey])
 
@@ -201,7 +237,7 @@ export function ParentHome({
         <a
           href="#/profile"
           data-testid="parent-home-settings"
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-1)' }}
+          style={headerLinkStyle}
         >
           <Icon name="settings" size={16} />
           {t(locale, 'common.home.settings')}
@@ -247,7 +283,7 @@ export function ParentHome({
           </h2>
           {/* `12a`'s entry from home (P1): the pre-report belongs beside the lessons it
               is about. A link, not a button — it navigates. */}
-          <a data-testid="parent-home-absence" href="#/absence">
+          <a data-testid="parent-home-absence" href="#/absence" style={headerLinkStyle}>
             {t(locale, 'attendance.absence.title')}
           </a>
         </div>
@@ -295,8 +331,12 @@ export function ParentHome({
                       <Card>
                         <div style={lessonRowStyle}>
                           <div style={{ flex: 1, minInlineSize: 0 }}>
+                            {/* No `|| lesson.groupName` fallback. Every row reaching here
+                                belongs to a child of this family — `filtered` guarantees
+                                it — and the fallback is what made the leak above look like
+                                an ordinary lesson instead of a bug. */}
                             <strong>
-                              <bdi>{childrenOf(lesson) || lesson.groupName}</bdi>
+                              <bdi>{childrenOf(lesson)}</bdi>
                             </strong>
                             <div
                               style={{ color: 'var(--text-muted)', fontSize: 'var(--text-caption)' }}
@@ -342,41 +382,60 @@ export function ParentHome({
         )}
       </section>
 
-      {/* 1a's child filter chips — הכל first, then one per child, reading edge first. */}
+      {/* 1a's child list.
+
+          **The filter chip appears only for a family with more than one child.** §19.3's
+          `dev+parent1` exists to walk "the single-child path that skips the family layer",
+          and the layer was not being skipped: a parent of one child was given an "הכל" chip
+          and a chip naming their only child — a filter with one thing to filter, and
+          nothing to filter it away from.
+
+          The card LINK is per child either way: it is what the row is for, and it is the
+          only route to `2c` anywhere in the app. It used to render as bare caption-sized
+          text — 56×14 CSS px, well under WCAG 2.2 SC 2.5.8's 24×24 floor, and visually
+          detached from the chip it belonged to, so three identical "כרטיס חניך" links
+          floated between the chips with nothing saying which was whose. */}
       {students !== null && students.length > 0 ? (
         <ul style={chipRowStyle} aria-label={t(locale, 'common.home.title')}>
-          <li>
-            <button
-              type="button"
-              style={childFilter === null ? chipActiveStyle : chipStyle}
-              aria-pressed={childFilter === null}
-              data-testid="parent-home-chip-all"
-              onClick={() => setChildFilter(null)}
-            >
-              {t(locale, 'common.home.allChildren')}
-            </button>
-          </li>
-          {students.map((student) => (
-            <li key={student.id} data-testid="parent-home-child">
+          {students.length > 1 ? (
+            <li>
               <button
                 type="button"
-                style={childFilter === student.id ? chipActiveStyle : chipStyle}
-                aria-pressed={childFilter === student.id}
-                onClick={() => setChildFilter(childFilter === student.id ? null : student.id)}
+                style={childFilter === null ? chipActiveStyle : chipStyle}
+                aria-pressed={childFilter === null}
+                data-testid="parent-home-chip-all"
+                onClick={() => setChildFilter(null)}
               >
-                <bdi>{student.displayName}</bdi>
+                {t(locale, 'common.home.allChildren')}
               </button>
-              {/* 2c's entry (P1/P2): the chip filters, the link opens the card — two
-                  affordances because `1c`'s lesson holds for rows everywhere: one tap,
-                  one meaning. Named per child, or a screen reader hears three
-                  identical links. */}
+            </li>
+          ) : null}
+          {students.map((student) => (
+            <li key={student.id} data-testid="parent-home-child" style={childRowStyle}>
+              {students.length > 1 ? (
+                <button
+                  type="button"
+                  style={childFilter === student.id ? chipActiveStyle : chipStyle}
+                  aria-pressed={childFilter === student.id}
+                  onClick={() => setChildFilter(childFilter === student.id ? null : student.id)}
+                >
+                  <bdi>{student.displayName}</bdi>
+                </button>
+              ) : null}
+              {/* 2c's entry (P1/P2). Named per child, or a screen reader hears three
+                  identical links; and it carries the child's name when there is no chip
+                  beside it to supply one. */}
               <a
                 aria-label={`${t(locale, 'people.card.open')} · ${student.displayName}`}
                 data-testid={`parent-home-card-${student.id}`}
                 href={`#/student/${student.id}`}
-                style={{ marginInlineStart: 'var(--space-1)', fontSize: 'var(--text-caption)' }}
+                style={cardLinkStyle}
               >
-                {t(locale, 'people.card.open')}
+                {students.length > 1 ? (
+                  t(locale, 'people.card.open')
+                ) : (
+                  <bdi>{student.displayName}</bdi>
+                )}
               </a>
             </li>
           ))}

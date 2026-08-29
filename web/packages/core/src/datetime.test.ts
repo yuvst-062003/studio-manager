@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   STUDIO_TIMEZONE,
   formatDateInStudioZone,
+  formatMonthLabel,
   formatTimeInStudioZone,
   studioDayKey,
   studioWallTimeToUtc,
@@ -99,6 +100,32 @@ describe('formatDateInStudioZone', () => {
     // …but both must name the 15th, because that is the Jerusalem day.
     expect(he).toContain('15')
     expect(en).toContain('15')
+  })
+})
+
+describe('formatMonthLabel', () => {
+  it('names the month in the reader\'s language rather than as an ISO key', () => {
+    // The parent calendar (`12b`) printed its heading as `${year}-${pad(month)}` — a
+    // Hebrew-speaking parent read "2026-08" where every other date on the screen is words.
+    expect(formatMonthLabel(2026, 8, 'he')).toContain('אוגוסט')
+    expect(formatMonthLabel(2026, 8, 'he')).toContain('2026')
+    expect(formatMonthLabel(2026, 8, 'en')).toContain('August')
+    expect(formatMonthLabel(2026, 8, 'ru')).toContain('2026')
+  })
+
+  it('takes a 1-based month, matching every other month value in this codebase', () => {
+    // `charge.period_month`, `group_schedule_rule` and the calendar's own state are all
+    // 1-based; JS `Date` months are not, and that mismatch is the bug this signature exists
+    // to make impossible.
+    expect(formatMonthLabel(2026, 1, 'en')).toContain('January')
+    expect(formatMonthLabel(2026, 12, 'en')).toContain('December')
+  })
+
+  it('does not slip a month at the studio-zone boundary', () => {
+    // Built at midday rather than midnight: a UTC-midnight instant for the 1st is still the
+    // previous month in some zones, and the label must never disagree with the grid.
+    expect(formatMonthLabel(2026, 3, 'en')).toContain('March')
+    expect(formatMonthLabel(2027, 1, 'en')).toContain('January')
   })
 })
 

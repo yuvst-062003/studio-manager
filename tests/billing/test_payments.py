@@ -107,6 +107,26 @@ def test_an_unallocated_payment_is_recorded_and_reported_as_surplus(
     assert body["amount_agorot"] - allocated == 5_000
 
 
+def test_an_allocation_names_the_kind_of_charge_it_settled(
+    client, as_manager, a_priced_student, an_open_charge
+):
+    """`12f`'s filter chips read this.
+
+    The parent history screen offers שכר לימוד / חיוב ידני / אירוע, and a PAYMENT has a
+    method, not a kind -- its kind is the kind of the charges it settled. With only
+    `charge_id` on the allocation the screen could not tell them apart, so its filter
+    collapsed to `filter === 'tuition'` and two of the four chips matched nothing at all,
+    ever. Carrying the kind on the row the parent already receives is what makes the
+    control real rather than removing it.
+    """
+    body = client.post(
+        "/api/v1/payments",
+        json=_body(a_priced_student.payer_person_id, [an_open_charge]),
+        headers=as_manager.headers,
+    ).json()
+    assert [row["kind"] for row in body["allocations"]] == ["tuition"]
+
+
 def test_a_payment_for_another_family_s_charge_is_refused(
     client, as_manager, a_priced_student, an_open_charge, a_two_child_family
 ):

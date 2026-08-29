@@ -97,6 +97,11 @@ const NAV = [
   // existed and was tested but was never imported by anything, so the whole screen was
   // unreachable in a running app. Same defect and same correction as `/payments`.
   { key: 'announcements', labelKey: 'common.nav.announcements', href: '#/announcements' },
+  // 12h's list. Mounted below since W4 and linked from NOWHERE: the only `#/events` in the
+  // app was the per-child invite hash that this screen itself writes, so a parent could
+  // reach an invite from a push notification and never find the list it came from. Same
+  // defect and same correction as `/payments` and `/announcements` above.
+  { key: 'events', labelKey: 'events.title', href: '#/events' },
   { key: 'shop', labelKey: 'billing.shop.title', href: '#/shop' },
   { key: 'addChild', labelKey: 'people.sibling.title', href: '#/add-child' },
   // NO settings entry. `/settings` matched no route in either app, so the link fell
@@ -236,7 +241,13 @@ function AuthedApp() {
       .then((response) =>
         response.ok
           ? (response.json() as Promise<{
-              items: { id: string; first_name: string; last_name: string; health_status: GatedStudent['health_status'] }[]
+              items: {
+                id: string
+                first_name: string
+                last_name: string
+                status: string
+                health_status: GatedStudent['health_status']
+              }[]
             }>)
           : { items: [] },
       )
@@ -246,6 +257,9 @@ function AuthedApp() {
           data.items.map((student) => ({
             id: student.id,
             display_name: `${student.first_name} ${student.last_name}`,
+            // Carried through because the gate reads it: a child still on a trial is not
+            // held for the full declaration (§5.4a / §6.3 — see HealthGate's header).
+            status: student.status,
             health_status: student.health_status,
           })),
         )

@@ -16,7 +16,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { Card, EmptyState, SegmentedControl, StatusChip } from '@studio/ui'
-import { apiFetch, formatDateInStudioZone, formatTimeInStudioZone, studioDayKey } from '@studio/core'
+import {
+  apiFetch,
+  formatDateInStudioZone,
+  formatMonthLabel,
+  formatTimeInStudioZone,
+  studioDayKey,
+} from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { cancelReasonLabel } from './client'
@@ -38,6 +44,23 @@ function monthGrid(year: number, month: number): string[] {
 
 type AttendanceRow = { session_id: string; student_id: string; status: string; starts_at: string }
 type Child = { id: string; first_name: string; last_name: string }
+
+//: The `<summary>` carries the count, so the h2 would repeat it out loud. Kept for the
+//: landmark structure, hidden from sight.
+const visuallyHidden: CSSProperties = {
+  blockSize: '1px',
+  clipPath: 'inset(50%)',
+  inlineSize: '1px',
+  overflow: 'hidden',
+  position: 'absolute',
+  whiteSpace: 'nowrap',
+}
+
+const pastSummaryStyle: CSSProperties = {
+  cursor: 'pointer',
+  minBlockSize: '44px',
+  paddingBlock: 'var(--space-3)',
+}
 
 //: The day's single word, worst-first: an absence outranks a presence on the same day
 //: (two children, one missed), a pre-report outranks unmarked.
@@ -311,7 +334,7 @@ export function ChildCalendar({
         <button type="button" data-testid="calendar-previous" onClick={() => step(-1)}>
           {t(locale, 'schedule.calendar.previousMonth')}
         </button>
-        <span data-testid="calendar-month">{`${year}-${pad(month)}`}</span>
+        <span data-testid="calendar-month">{formatMonthLabel(year, month, locale)}</span>
         <button type="button" data-testid="calendar-next" onClick={() => step(1)}>
           {t(locale, 'schedule.calendar.nextMonth')}
         </button>
@@ -447,20 +470,35 @@ export function ChildCalendar({
       ) : null}
 
       {past.length > 0 ? (
+        // **Folded away, with the count on the summary.** A busy month is thirty-odd rows,
+        // and they were all rendered open, below the two sections a parent came for — the
+        // longest thing on the screen was the part nobody navigated here for. The month
+        // grid above already carries every one of these days as a coloured dot, so this
+        // list is the detail you go looking for rather than the page itself.
+        //
+        // `<details>`, not a `useState` toggle: it is disclosure, the element exists for it,
+        // and it is keyboard-operable and announced correctly with no code of ours.
         <section aria-labelledby="past-title">
-          <h2 id="past-title">{t(locale, 'schedule.calendar.past')}</h2>
-          <Card>
-            <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-              {past.map((session) => (
-                <SessionLine
-                  key={session.id}
-                  locale={locale}
-                  session={session}
-                  testId="past-session"
-                />
-              ))}
-            </ul>
-          </Card>
+          <h2 id="past-title" style={visuallyHidden}>
+            {t(locale, 'schedule.calendar.past')}
+          </h2>
+          <details>
+            <summary data-testid="past-toggle" style={pastSummaryStyle}>
+              {t(locale, 'schedule.calendar.pastCount').replace('{n}', String(past.length))}
+            </summary>
+            <Card>
+              <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+                {past.map((session) => (
+                  <SessionLine
+                    key={session.id}
+                    locale={locale}
+                    session={session}
+                    testId="past-session"
+                  />
+                ))}
+              </ul>
+            </Card>
+          </details>
         </section>
       ) : null}
     </section>

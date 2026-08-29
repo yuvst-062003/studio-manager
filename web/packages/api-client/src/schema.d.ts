@@ -7625,6 +7625,8 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /** Kind */
+            kind: string;
             /**
              * Payment Id
              * Format: uuid
@@ -15818,6 +15820,7 @@ export interface operations {
                 to: string;
                 group_id?: string | null;
                 coach_person_id?: string | null;
+                scope?: "mine" | null;
                 cursor?: string | null;
                 limit?: number;
             };

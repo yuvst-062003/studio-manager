@@ -262,6 +262,43 @@ describe('ProfileAndLeave — 12i', () => {
     expect(screen.getAllByTestId('guardian-call')).toHaveLength(2)
   })
 
+  it('offers no call link to a guardian with no phone number', () => {
+    // `href={`tel:${phone ?? ''}`}` rendered a live "חיוג" link to the bare string `tel:`
+    // for every guardian the club holds no number for — a control that looks identical to
+    // the working one and dials nothing. §19.3's personas carry no phone, so every guardian
+    // row in the demo studio had one.
+    render(
+      <ProfileAndLeave
+        students={[active]}
+        guardians={[{ ...GUARDIANS[0]!, phone: null }]}
+        locale="he"
+        client={makeClient()}
+      />,
+    )
+    expect(screen.queryByTestId('guardian-call')).toBeNull()
+  })
+
+  it('keeps the name and the primary badge from running together', () => {
+    // `<bdi>{name}</bdi><span>{primary}</span>` with nothing between them rendered
+    // "שירה הורההורה ראשי" — one word, two facts. A chip is the separation, and it is the
+    // primitive the rest of the app already uses for exactly this.
+    render(
+      <ProfileAndLeave
+        students={[active]}
+        guardians={GUARDIANS}
+        locale="he"
+        client={makeClient()}
+      />,
+    )
+    // Asserted on the LAYOUT, not on `textContent` — `textContent` concatenates whatever
+    // the CSS does, so it reads "יעל לויהורה ראשי" either way and can never tell the bug
+    // from the fix. What went wrong was two adjacent inline elements with no separator
+    // between them; what fixes it is a flex row with a gap, and a chip with its own border.
+    const badge = screen.getByTestId('guardian-primary')
+    expect(badge.firstElementChild).toHaveClass('studio-chip')
+    expect(getComputedStyle(badge.parentElement!).display).toBe('flex')
+  })
+
   it('explains what is_primary decides, and nothing more', () => {
     render(
       <ProfileAndLeave

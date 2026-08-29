@@ -14,6 +14,7 @@
 import { useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { Button, Card, EmptyState, MoneyDisplay, SegmentedControl } from '@studio/ui'
+import { formatDateInStudioZone } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import type { ChargeOut, PaymentOut } from './billingClient'
@@ -30,6 +31,25 @@ const rowStyle: CSSProperties = {
   alignItems: 'center',
   justifyContent: 'space-between',
   gap: 'var(--space-3)',
+}
+
+const headerStyle: CSSProperties = {
+  alignItems: 'baseline',
+  display: 'flex',
+  gap: 'var(--space-3)',
+  justifyContent: 'space-between',
+}
+
+//: The method and the date stack: the method is what a parent scans for, the date qualifies it.
+const methodStyle: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 'var(--space-1)',
+}
+
+const dateStyle: CSSProperties = {
+  color: 'var(--text-muted)',
+  fontSize: 'var(--text-caption)',
 }
 
 //: D-M6-3 — one axis, one enum. `all` plus the three kinds a parent ever sees; `registration`
@@ -68,6 +88,15 @@ export function PaymentHistoryScreen({
 
   return (
     <div style={columnStyle} data-testid="payment-history">
+      {/* A heading and a way back. This screen had neither: it opened on a summary card,
+          with the תשלומים tab still lit, and nothing saying it was a sub-screen or how to
+          leave it. Its one title string was being spent on a visually hidden legend. */}
+      <div style={headerStyle}>
+        <h2 style={{ margin: 0 }}>{t(locale, 'billing.history.title')}</h2>
+        <a data-testid="history-back" href="#/payments">
+          {t(locale, 'billing.history.back')}
+        </a>
+      </div>
       <Card>
         <div style={rowStyle}>
           <span>{t(locale, 'billing.history.paidThisYear')}</span>
@@ -83,7 +112,8 @@ export function PaymentHistoryScreen({
 
       <div data-testid="history-filters">
         <SegmentedControl
-          legend={t(locale, 'billing.history.title')}
+          legend={t(locale, 'billing.history.filterLegend')}
+          legendVisible
           value={filter}
           options={FILTERS.map((value) => ({ value, label: filterLabel(locale, value) }))}
           onValueChange={(next) => setFilter(next as Filter)}
@@ -97,7 +127,15 @@ export function PaymentHistoryScreen({
         <Card>
           {visible.map((payment) => (
             <div key={payment.id} style={rowStyle} data-testid="payment-row">
-              <span>{t(locale, `billing.method.${methodKey(payment.method)}`)}</span>
+              <span style={methodStyle}>
+                <span>{t(locale, `billing.method.${methodKey(payment.method)}`)}</span>
+                {/* A history of amounts with no dates is not a history. `received_at` was on
+                    the wire the whole time; the row simply never rendered it. G3 — stored
+                    UTC, shown in the studio's zone. */}
+                <span data-testid="payment-date" style={dateStyle}>
+                  {formatDateInStudioZone(payment.received_at, locale)}
+                </span>
+              </span>
               <MoneyDisplay agorot={payment.amount_agorot} tone="paid" />
               {/* ▲ D9.3's structural half. Card rows only, because those are the only
                   payments uPay issues a document for. */}
@@ -131,10 +169,20 @@ export function PaymentHistoryScreen({
 
 function matches(payment: PaymentOut, filter: Filter): boolean {
   if (filter === 'all') return true
-  // A payment has a method, not a kind; its kind is the kind of the charges it settled. With
-  // no allocations there is nothing to classify it by, so it shows only under `all` -- which
-  // is honest: an unallocated payment is precisely one nobody has decided the meaning of yet.
-  return (payment.allocations?.length ?? 0) > 0 && filter === 'tuition'
+  // A payment has a method, not a kind; its kind is the kind of the charges it settled, which
+  // `PaymentAllocationOut.kind` now carries. This used to read
+  // `allocations.length > 0 && filter === 'tuition'` — a constant wearing a predicate's
+  // clothes: שכר לימוד matched every allocated payment whatever it had settled, and חיוב ידני
+  // and אירוע matched nothing at all, so two of the four chips were dead controls.
+  //
+  // An unallocated payment still shows only under `all`, which is honest — it is precisely a
+  // payment nobody has decided the meaning of yet. `registration` folds into `manual` for the
+  // reason FILTERS gives above.
+  return (payment.allocations ?? []).some((allocation) =>
+    filter === 'manual'
+      ? allocation.kind === 'manual' || allocation.kind === 'registration'
+      : allocation.kind === filter,
+  )
 }
 
 function filterLabel(locale: Locale, filter: Filter): string {

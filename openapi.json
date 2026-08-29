@@ -6640,6 +6640,10 @@
             "title": "Id",
             "type": "string"
           },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
           "payment_id": {
             "format": "uuid",
             "title": "Payment Id",
@@ -6650,7 +6654,8 @@
           "id",
           "payment_id",
           "charge_id",
-          "amount_agorot"
+          "amount_agorot",
+          "kind"
         ],
         "title": "PaymentAllocationOut",
         "type": "object"
@@ -21813,6 +21818,23 @@
                 }
               ],
               "title": "Coach Person Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "scope",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "const": "mine",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Scope"
             }
           },
           {

@@ -58,4 +58,26 @@ describe('Checkbox', () => {
       screen.getByRole('checkbox', { name: 'ב' }).id,
     )
   })
+
+  it('takes a rich label, so a row with a price can still be one control', () => {
+    // The shop (`12e`) lists a product name and a `MoneyDisplay` beside each box. With a
+    // string-only label it could not use this primitive at all, so it hand-rolled a bare
+    // `<input type="checkbox">` — which renders at the browser default 13x13 with no focus
+    // ring, in a mobile-first app, on the only control that screen has.
+    renderIn(
+      <Checkbox
+        label={
+          <>
+            <span>חגורה צהובה</span>
+            <span>35₪</span>
+          </>
+        }
+      />,
+    )
+    // Matched loosely: the accessible name is the label's text content, and how the
+    // parts are joined is the caller's layout problem, not this primitive's.
+    const box = screen.getByRole('checkbox', { name: /חגורה צהובה/ })
+    expect(box).toHaveClass('studio-choice__input')
+    expect(box).toHaveAccessibleName(/35₪/)
+  })
 })

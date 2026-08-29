@@ -206,6 +206,7 @@ export const schedule: Bundle = {
   'calendar.nextMonth': 'Следующий месяц',
   'calendar.upcoming': 'Ближайшие занятия',
   'calendar.past': 'Прошедшие занятия',
+  'calendar.pastCount': 'Прошедших занятий: {n}',
   'calendar.empty': 'В этом месяце занятий нет',
   'calendar.emptyHint': 'Расписание занятий устанавливает клуб',
 

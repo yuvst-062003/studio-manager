@@ -41,6 +41,7 @@ export { AGOROT_PER_SHEKEL, MoneyFormatError, formatAgorot, parseShekels } from 
 export {
   STUDIO_TIMEZONE,
   formatDateInStudioZone,
+  formatMonthLabel,
   formatTimeInStudioZone,
   studioDayKey,
   studioWallTimeToUtc,

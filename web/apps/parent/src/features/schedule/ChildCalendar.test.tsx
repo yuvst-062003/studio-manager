@@ -123,6 +123,8 @@ describe('ChildCalendar (12b)', () => {
     // the future reads 18:00 — and the family seeing that is what makes the change real.
     render(calendar())
     expect(await screen.findByTestId('upcoming-session')).toHaveTextContent('18:00')
+    // The past list is folded away by default — a month of it is thirty-odd rows.
+    await userEvent.click(screen.getByTestId('past-toggle'))
     expect(screen.getByTestId('past-session')).toHaveTextContent('17:00')
     expect(screen.getByTestId('past-session')).not.toHaveTextContent('18:00')
   })
@@ -137,6 +139,15 @@ describe('ChildCalendar (12b)', () => {
       await screen.findByText(t('he', 'schedule.session.cancelReason.closure')),
     ).toBeInTheDocument()
     expect(screen.queryByText('system:closure')).toBeNull()
+  })
+
+  it('names the month in words rather than as an ISO key', async () => {
+    // The heading was `${year}-${pad(month)}`, so a Hebrew-speaking parent read "2026-11"
+    // sitting above a grid whose every other date is spelled out. It is also the one string
+    // on the screen that never changed with the language picker.
+    render(calendar({ client: stub() }))
+    await waitFor(() => expect(screen.getByTestId('calendar-month')).toHaveTextContent('נובמבר'))
+    expect(screen.getByTestId('calendar-month')).not.toHaveTextContent('2026-11')
   })
 
   it('moves month by month and refetches the month it lands on', async () => {
@@ -162,6 +173,22 @@ describe('ChildCalendar (12b)', () => {
     for (const call of vi.mocked(client.listSessions).mock.calls) {
       expect(Object.keys(call[0] ?? {}).sort()).toEqual(['from', 'to'])
     }
+  })
+
+  it('folds the month of past lessons away, and says how many there are', async () => {
+    // A busy month is thirty-odd rows, and they were all rendered open, below the two
+    // sections a parent actually came for. The month grid already carries every one of
+    // these days as a dot; the list is the detail you go looking for, not the page.
+    render(calendar({ client: stub() }))
+    await waitFor(() => expect(screen.getByTestId('past-toggle')).toBeInTheDocument())
+    // Not `queryAllByTestId(...).toHaveLength(0)`: jsdom keeps the children of a CLOSED
+    // `<details>` in the DOM, so that assertion would pass whether or not it was folded.
+    // `toBeVisible` knows about `details` and is the assertion that can actually fail.
+    expect(screen.getByTestId('past-session')).not.toBeVisible()
+    // The count is on the summary, so it is answerable without opening it.
+    expect(screen.getByTestId('past-toggle')).toHaveTextContent('1')
+    await userEvent.click(screen.getByTestId('past-toggle'))
+    expect(screen.getAllByTestId('past-session').length).toBeGreaterThan(0)
   })
 
   it('says the month is empty and why', async () => {

@@ -23,7 +23,7 @@ import type {
   PaymentPromiseOut,
   PromiseMethod,
 } from './billingClient'
-import { instalmentSplit, oldestMonths, selectionTotal } from './billingClient'
+import { distinctMonths, instalmentSplit, oldestMonths, selectionTotal } from './billingClient'
 
 //: §5.10's own chip groups: `[1] [2] [3] [6]` months, `[1] [2] [3]` instalments.
 const MONTH_OPTIONS = [1, 2, 3, 6]
@@ -133,7 +133,7 @@ export function PaymentsScreen({
   onOrderOpened,
   onOpenHistory,
 }: PaymentsScreenProps) {
-  const [months, setMonths] = useState(2)
+  const [requestedMonths, setMonths] = useState(2)
   const [instalments, setInstalments] = useState(1)
   const [inFlight, setInFlight] = useState(false)
   const [promiseInFlight, setPromiseInFlight] = useState(false)
@@ -148,9 +148,18 @@ export function PaymentsScreen({
   // reason a covered row still RENDERS: hiding it would leave a parent looking for a month
   // they can see they owe.
   const selectable = useMemo(() => debts.filter((row) => !row.coveredElsewhere), [debts])
+  const selectableCharges = useMemo(() => selectable.map((row) => row.charge), [selectable])
+  // How many months the chips may offer. Counting CHARGES here offered "3 months" to a
+  // three-child family that owed exactly one month, and the third chip then bought nothing
+  // the second had not already bought.
+  const availableMonths = useMemo(() => distinctMonths(selectableCharges), [selectableCharges])
+  // The chips offer at most `availableMonths`, so the state has to be read through the same
+  // ceiling: the default is 2, and a family owing a single month would otherwise hold
+  // `months = 2` against a control whose only option is `1` and render nothing selected.
+  const months = Math.min(requestedMonths, Math.max(1, availableMonths))
   const chosen = useMemo(
-    () => oldestMonths(selectable.map((row) => row.charge), months),
-    [selectable, months],
+    () => oldestMonths(selectableCharges, months),
+    [selectableCharges, months],
   )
   const total = selectionTotal(chosen)
   const split = instalmentSplit(total, instalments)
@@ -267,11 +276,15 @@ export function PaymentsScreen({
             </p>
           ) : (
             <>
-              <div data-max={String(selectable.length)} data-testid="months-control">
+              <div data-max={String(availableMonths)} data-testid="months-control">
                 <SegmentedControl
                   legend={t(locale, 'billing.card.selectMonths')}
+                  // Two stacked pickers that both render as [1] [2] [3]. Without the
+                  // legends on screen they are indistinguishable to anyone not using a
+                  // screen reader.
+                  legendVisible
                   value={String(months)}
-                  options={MONTH_OPTIONS.filter((n) => n <= selectable.length).map((n) => ({
+                  options={MONTH_OPTIONS.filter((n) => n <= availableMonths).map((n) => ({
                     value: String(n),
                     label: String(n),
                   }))}
@@ -281,6 +294,7 @@ export function PaymentsScreen({
               <div data-testid="instalments-control">
                 <SegmentedControl
                   legend={t(locale, 'billing.card.installments')}
+                  legendVisible
                   value={String(instalments)}
                   options={INSTALMENT_OPTIONS.map((n) => ({
                     value: String(n),
@@ -361,7 +375,14 @@ export function PaymentsScreen({
           instructions={method === 'cash' ? cashInstructions : null}
           promises={promises}
           pending={pending}
-          chosen={chosen}
+          // EVERY selectable charge, not the card route's month selection. These cards have
+          // no month chips of their own, so they used to inherit whatever the card chips
+          // happened to hold — 2 by default — and a family with three children was shown
+          // "חיובים פתוחים 850₪" beside a summary card reading "סה״כ חוב 1,250₪", then
+          // handed the coach cash for a promise covering two of their three children.
+          // "Settle what is owed" is the only thing a card with no selector can honestly
+          // mean.
+          charges={selectableCharges}
           inFlight={promiseInFlight}
           // `months x monthly` is the ONE product this screen computes, and it is integer
           // arithmetic on two integers the server sent (G2). A term of 0, or a payer with
@@ -398,7 +419,7 @@ function PromiseCard({
   instructions,
   promises,
   pending,
-  chosen,
+  charges,
   inFlight,
   forwardMonths,
   monthlyTotalAgorot,
@@ -409,7 +430,7 @@ function PromiseCard({
   instructions: string | null
   promises: readonly PaymentPromiseOut[]
   pending: PaymentPromiseOut | null
-  chosen: readonly ChargeOut[]
+  charges: readonly ChargeOut[]
   inFlight: boolean
   forwardMonths: number
   monthlyTotalAgorot: number
@@ -427,7 +448,7 @@ function PromiseCard({
   // and a card offering to sell a year of a subscription the family does not have is worse
   // than a card that simply settles what is owed.
   const forwardAgorot = forwardMonths * monthlyTotalAgorot
-  const openAgorot = selectionTotal(chosen)
+  const openAgorot = selectionTotal(charges)
 
   return (
     <Card>
@@ -469,7 +490,9 @@ function PromiseCard({
                 </p>
                 <div style={totalRowStyle}>
                   <span>{t(locale, 'billing.prepay.openCharges')}</span>
-                  <MoneyDisplay agorot={openAgorot} tone="debt" />
+                  <span data-testid="promise-open-total">
+                    <MoneyDisplay agorot={openAgorot} tone="debt" />
+                  </span>
                 </div>
                 <div style={totalRowStyle}>
                   <span>{t(locale, 'billing.prepay.forward')}</span>
@@ -486,14 +509,14 @@ function PromiseCard({
                 <p>{t(locale, 'billing.prepay.note')}</p>
               </div>
             ) : null}
-            {onPaymentPromise && (chosen.length > 0 || forwardAgorot > 0) ? (
+            {onPaymentPromise && (charges.length > 0 || forwardAgorot > 0) ? (
               <Button
                 variant="secondary"
                 data-testid={`promise-button-${method}`}
                 disabled={inFlight}
                 onClick={() =>
                   onPaymentPromise(
-                    chosen.map((charge) => charge.id),
+                    charges.map((charge) => charge.id),
                     forwardAgorot > 0 ? forwardMonths : 0,
                   )
                 }

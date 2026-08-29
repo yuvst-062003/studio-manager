@@ -237,6 +237,7 @@ export const schedule: Bundle = {
   'calendar.nextMonth': 'חודש הבא',
   'calendar.upcoming': 'שיעורים קרובים',
   'calendar.past': 'שיעורים שהיו',
+  'calendar.pastCount': '{n} שיעורים שהיו',
   'calendar.empty': 'אין שיעורים בחודש הזה',
   'calendar.emptyHint': 'לוח השיעורים נקבע על ידי המועדון',
 

@@ -100,6 +100,18 @@ class LandingService:
 
         `training_weekdays` is here because parent `13a` shows "מתאמנים בימים" beside each
         group, and it comes through the seam (L5) like every other schedule fact.
+
+        **Only groups a new child may actually join.** Three conditions, not one:
+
+        * `Class.is_active` / `Group.is_active` -- a club stopped running it.
+        * `kind == 'base'` -- an `extra` group is the supplementary session an already
+          enrolled student books on top (`group_eligibility` names which base groups may
+          reach it), and `private` is one-to-one coaching. Neither is a first enrollment,
+          and offering them here put "אימון תחרותי" at the top of the add-a-child form for
+          a six-year-old who has never trained.
+        * not `is_invite_only` -- the Girls Team's mechanism (see `Group.is_invite_only`).
+          A hand-picked squad listed on a public page invites a stranger to book into a
+          group nobody may join by asking.
         """
         rows = list(
             session.execute(
@@ -109,6 +121,8 @@ class LandingService:
                     Class.studio_id == studio_id,
                     Class.is_active.is_(True),
                     Group.is_active.is_(True),
+                    Group.kind == "base",
+                    Group.is_invite_only.is_(False),
                 )
                 .order_by(Group.name)
             ).scalars()

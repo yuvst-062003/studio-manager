@@ -193,6 +193,11 @@ class PaymentAllocationOut(BaseModel):
     payment_id: uuid.UUID
     charge_id: uuid.UUID
     amount_agorot: int
+    #: The kind of the charge this settled. A payment has a METHOD, not a kind -- `12f`'s
+    #: filter chips are `charge.kind` (D-M6-3), and without this the parent history screen
+    #: had no way to classify a payment at all: its filter degenerated to a constant and
+    #: two of its four chips could never match anything.
+    kind: str
 
 
 class PaymentOut(BaseModel):

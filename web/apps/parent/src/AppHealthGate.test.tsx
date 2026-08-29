@@ -31,7 +31,10 @@ vi.mock('@studio/core', async (importOriginal) => {
   }
 })
 
-function stubChildren(healthStatus: 'missing' | 'trial_signed' | 'signed') {
+function stubChildren(
+  healthStatus: 'missing' | 'trial_signed' | 'signed',
+  status: 'trial' | 'active' = 'active',
+) {
   vi.stubGlobal(
     'fetch',
     vi.fn(async (input: RequestInfo | URL) => {
@@ -44,6 +47,7 @@ function stubChildren(healthStatus: 'missing' | 'trial_signed' | 'signed') {
                 id: 'st-1',
                 first_name: 'נועה',
                 last_name: 'לוי',
+                status,
                 health_status: healthStatus,
               },
             ],
@@ -67,10 +71,23 @@ describe('the §6.1 health gate, mounted in the shell', () => {
     expect(screen.queryByTestId('parent-home')).toBeNull()
   })
 
-  it('still gates a trial-signed child: §5.5 wants the full declaration', async () => {
-    stubChildren('trial_signed')
+  it('gates a trial-signed child who has been converted: §5.5 wants the full declaration', async () => {
+    stubChildren('trial_signed', 'active')
     render(<App />)
     await waitFor(() => expect(screen.getByTestId('health-gate')).toBeInTheDocument())
+  })
+
+  it('lets a family still on a trial reach the app — §6.3 draws them a home', async () => {
+    // The pair §5.4a's booking funnel actually writes. While the gate blocked it, §6.3's
+    // reduced trial home was unreachable: `Resolve` renders `TrialHome` only when every
+    // child is `status: 'trial'`, and every such child arrives holding the short form.
+    stubChildren('trial_signed', 'trial')
+    render(<App />)
+    // Waits for a POSITIVE signal first. `queryBy(...).toBeNull()` inside `waitFor` passes
+    // on the first tick, while `gatedChildren` is still null and the shell is deliberately
+    // rendering nothing at all — so on its own it asserts nothing about the gate.
+    await waitFor(() => expect(screen.getByTestId('tab-bar')).toBeInTheDocument())
+    expect(screen.queryByTestId('health-gate')).toBeNull()
   })
 
   it('stands aside once every child is signed', async () => {

@@ -5,7 +5,7 @@
 // charge already covered by an open order is not selectable but still shown, the receipt
 // email is a card-row affordance and nowhere else (D9.3's structural half), and no screen
 // ever builds a `₪` string by hand (G2).
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { t } from '@studio/i18n'
@@ -375,6 +375,32 @@ describe('1b — prepayment and credit', () => {
     expect(within(cash).getByTestId('promise-grand-total')).toHaveTextContent('1,400')
   })
 
+  it('settles EVERY open charge, not the card route\'s month selection', () => {
+    // A three-child family owing one month. The cash and cheque cards carry no month chips,
+    // so they used to inherit whatever the card route's chips held — 2 by default — and
+    // reported "חיובים פתוחים" as two of the three children's charges. The parent then
+    // handed the coach cash against a promise that left the third child owed, while the
+    // summary card at the top of the same screen showed the true total.
+    renderPay({
+      debts: [debt('sep-a', 9), debt('sep-b', 9), debt('sep-c', 9)],
+      prepayTerms: TERMS,
+      onPaymentPromise: vi.fn(),
+    })
+    const cash = screen.getByTestId('route-cash')
+    // 3 × 250 owed, plus three months forward at 300.
+    expect(within(cash).getByTestId('promise-open-total')).toHaveTextContent('750')
+    expect(within(cash).getByTestId('promise-grand-total')).toHaveTextContent('1,650')
+  })
+
+  it('offers only as many month chips as there are months to buy', () => {
+    // Three children owing one month is three charges and ONE month. Counting charges
+    // offered a [3] chip that bought nothing the [1] chip had not already bought.
+    renderPay({ debts: [debt('sep-a', 9), debt('sep-b', 9), debt('sep-c', 9)] })
+    const control = screen.getByTestId('months-control')
+    expect(control).toHaveAttribute('data-max', '1')
+    expect(within(control).getAllByRole('radio')).toHaveLength(1)
+  })
+
   it('prices each route at its own term', () => {
     // Cash three months forward, twelve cheques. The club's two rules are different
     // numbers, and a card that showed one of them on both would collect the wrong amount
@@ -456,7 +482,46 @@ describe('the selection arithmetic', () => {
   it('breaks due-date ties by id so a re-render selects the same months', () => {
     const twin = { ...charge('z', 9), id: 'a2' }
     const charges = [twin, charge('a1', 9), charge('b', 10)]
-    expect(oldestMonths(charges, 2).map((c) => c.id)).toEqual(['a1', 'a2'])
+    expect(oldestMonths(charges, 1).map((c) => c.id)).toEqual(['a1', 'a2'])
+  })
+
+  it("takes every child's charge for each month — §5.10's own worked example", () => {
+    // §5.10 draws a family with two children owing September and October, and states the
+    // card total for [2] months as 1,280₪ — all FOUR charges. Selecting by charge COUNT
+    // returns two of them: September settles for דנה and stays owed for יוסי, and the
+    // parent has no way to see which of their children they just half-paid for.
+    //
+    // A month is the unit the chip names, so a month is the unit this selects.
+    const charges = [
+      charge('sep-dana', 9, 32_000),
+      charge('sep-yossi', 9, 32_000),
+      charge('oct-dana', 10, 32_000),
+      charge('oct-yossi', 10, 32_000),
+    ]
+    expect(oldestMonths(charges, 2).map((c) => c.id)).toEqual([
+      'sep-dana',
+      'sep-yossi',
+      'oct-dana',
+      'oct-yossi',
+    ])
+    expect(selectionTotal(oldestMonths(charges, 2))).toBe(128_000)
+  })
+
+  it('one month buys the whole month, for every child', () => {
+    const charges = [charge('sep-dana', 9), charge('sep-yossi', 9), charge('oct-dana', 10)]
+    expect(oldestMonths(charges, 1).map((c) => c.id)).toEqual(['sep-dana', 'sep-yossi'])
+  })
+
+  it('counts DISTINCT months, so asking for more months than exist takes what there is', () => {
+    const charges = [charge('sep-dana', 9), charge('sep-yossi', 9)]
+    expect(oldestMonths(charges, 6)).toHaveLength(2)
+  })
+
+  it('groups by the due month and not by the row order', () => {
+    // Two children whose charges arrive interleaved and shuffled. One month must still be
+    // exactly one month.
+    const charges = [charge('oct-b', 10), charge('sep-b', 9), charge('oct-a', 10), charge('sep-a', 9)]
+    expect(oldestMonths(charges, 1).map((c) => c.id)).toEqual(['sep-a', 'sep-b'])
   })
 
   it('sums in agorot', () => {
@@ -490,6 +555,15 @@ describe('12f — payment history', () => {
       reversed_at: null,
       reversal_reason: null,
       allocations: [],
+    }
+  }
+
+  function settling(id: string, method: PaymentOut['method'], kind: string): PaymentOut {
+    return {
+      ...payment(id, method),
+      allocations: [
+        { id: `a-${id}`, payment_id: id, charge_id: `c-${id}`, amount_agorot: 25_000, kind },
+      ],
     }
   }
 
@@ -553,6 +627,44 @@ describe('12f — payment history', () => {
     expect(
       within(filters).getByLabelText(t(LOCALE, 'billing.charge.kind.event')),
     ).toBeInTheDocument()
+  })
+
+  it('says which screen this is, and how to get back to paying', () => {
+    // The screen had NO heading of any kind and no way back: a parent who tapped
+    // "היסטוריה" from the payments screen landed somewhere with the same tab highlighted,
+    // no title, and a summary card. Its one title string was being spent on a hidden
+    // fieldset legend.
+    renderHistory()
+    expect(
+      screen.getByRole('heading', { name: t(LOCALE, 'billing.history.title') }),
+    ).toBeInTheDocument()
+    expect(screen.getByTestId('history-back')).toHaveAttribute('href', '#/payments')
+  })
+
+  it('dates every payment', () => {
+    // A history of amounts with no dates is not a history. `received_at` was on the wire
+    // the whole time and the row simply never rendered it.
+    renderHistory()
+    expect(screen.getAllByTestId('payment-date')[0]).toHaveTextContent('2026')
+  })
+
+  it('filters on the kind of charge each payment settled', () => {
+    // The filter was `(payment.allocations?.length ?? 0) > 0 && filter === 'tuition'` — a
+    // constant dressed as a predicate. שכר לימוד matched every allocated payment whatever
+    // it settled, and חיוב ידני and אירוע matched NOTHING, ever: two of the four chips were
+    // dead controls. A payment has a method, not a kind, so `PaymentAllocationOut.kind` now
+    // carries the kind of the charge each allocation settled.
+    renderHistory({
+      payments: [
+        settling('p1', 'upay_card', 'tuition'),
+        settling('p2', 'cash', 'event'),
+      ],
+    })
+    expect(screen.getAllByTestId('payment-row')).toHaveLength(2)
+    fireEvent.click(screen.getByLabelText(t(LOCALE, 'billing.charge.kind.event')))
+    const rows = screen.getAllByTestId('payment-row')
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toHaveTextContent('מזומן')
   })
 
   it('renders the empty state for a family in their first month', () => {

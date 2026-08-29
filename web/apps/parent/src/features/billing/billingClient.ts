@@ -72,22 +72,48 @@ export type BillingClient = {
 // import autocomplete reaches for first.
 
 /**
+ * The month a charge belongs to. `period_year`/`period_month` when the charge has one —
+ * that is the month the chip names and the month the parent thinks in — and the due date's
+ * month otherwise, so a registration or event charge still lands in exactly one bucket
+ * rather than in none.
+ */
+export function chargeMonthKey(charge: ChargeOut): string {
+  if (charge.period_year !== null && charge.period_month !== null) {
+    return `${charge.period_year}-${String(charge.period_month).padStart(2, '0')}`
+  }
+  return charge.due_date.slice(0, 7)
+}
+
+/** The distinct months a set of charges spans. What `[1] [2] [3] [6]` may legally offer. */
+export function distinctMonths(charges: readonly ChargeOut[]): number {
+  return new Set(charges.map(chargeMonthKey)).size
+}
+
+/**
  * §5.10's card route: 'Choosing N months selects the N oldest unpaid tuition charges across
  * every student this person is the payer for.'
+ *
+ * **A month, not a charge.** §5.10's own worked example is a two-child family owing
+ * September and October, and it states the card total for `[2]` months as 1,280₪ — all
+ * four rows. This used to be `.slice(0, months)` over the charge list, which is the same
+ * thing only while a family has exactly one child: with three children, "2 months" bought
+ * two of September's three charges and left the third child owed, and nothing on the screen
+ * said which one. That also made the summary card ("סה״כ חוב 1,250₪") and the cash card
+ * ("חיובים פתוחים 850₪") disagree with each other on the same screen.
  */
 export function oldestMonths(charges: readonly ChargeOut[], months: number): ChargeOut[] {
   // Sorted here even though `/me/charges` now orders by (due_date, id) server-side
-  // (ship-audit B5): this slice decides which months a family's money settles, and a
-  // bare slice turns any upstream reordering — a cache, a merge, a regression — into
+  // (ship-audit B5): this decides which months a family's money settles, and trusting an
+  // upstream ordering turns any reordering — a cache, a merge, a regression — into
   // silently paying the wrong months. ISO dates compare lexicographically; the id
-  // breaks ties so a re-render selects the same rows.
-  return [...charges]
-    .sort((a, b) =>
-      a.due_date === b.due_date
-        ? a.id.localeCompare(b.id)
-        : a.due_date.localeCompare(b.due_date),
-    )
-    .slice(0, months)
+  // breaks ties so a re-render selects the same rows in the same order.
+  const sorted = [...charges].sort((a, b) =>
+    a.due_date === b.due_date ? a.id.localeCompare(b.id) : a.due_date.localeCompare(b.due_date),
+  )
+  // The oldest N month keys, in the order the sort met them. A Set preserves insertion
+  // order, so this is "the first N distinct months" without a second sort.
+  const wanted = new Set([...new Set(sorted.map(chargeMonthKey))].slice(0, Math.max(0, months)))
+  return sorted.filter((charge) => wanted.has(chargeMonthKey(charge)))
 }
 
 /** The total a selection comes to, in agorot. Integers throughout (G2). */

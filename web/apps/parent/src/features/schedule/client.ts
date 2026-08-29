@@ -7,6 +7,13 @@
 // the server would have no way to tell the difference. A test asserts the screen never
 // sends one.
 //
+// **`scope=mine` is sent on every call, and is not an exception to that.** It names no
+// group and no student — it asks the server to apply the guardian narrowing above to
+// whoever is calling. Without it the paragraph above was false for one person: a parent who
+// also coaches matches `STAFF_ROLES` in `app/routers/sessions.py::_visible_groups`, which
+// returns "the whole studio" whichever app asked, so §19.3's `dev+both` opened the parent
+// app onto the club's entire timetable. The parameter can only ever remove rows.
+//
 // The types duplicate the dashboard's and the staff app's for the reason those files give:
 // `web/packages/core` is not this lane's to extend, and a cross-app import would couple two
 // separately deployed bundles. All three collapse into `@studio/api-client` once `main`
@@ -51,7 +58,7 @@ const API = '/api/v1'
 export function makeParentScheduleClient(fetcher: Fetcher): ParentScheduleClient {
   return {
     async listSessions({ from, to }) {
-      const params = new URLSearchParams({ from, to })
+      const params = new URLSearchParams({ from, to, scope: 'mine' })
       const response = await fetcher(`${API}/sessions?${params.toString()}`)
       if (!response.ok) throw new Error(String(response.status))
       const body = (await response.json()) as { items: SessionRow[] }

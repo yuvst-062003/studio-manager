@@ -333,9 +333,10 @@ describe('HealthGate', () => {
     expect(screen.queryByTestId('the-app')).toBeNull()
   })
 
-  it('a trial-signed declaration is still gated', () => {
-    // §5.5's gate is about the FULL declaration. Three questions on a phone during a trial
-    // funnel is not the record the club needs before a child trains regularly.
+  it('gates a trial-signed child who is no longer on a trial', () => {
+    // SPEC line 626 — "The trial declaration is not sufficient for enrollment … converting
+    // requires the full form." A converted child on the short form is exactly the case the
+    // gate exists for.
     render(
       <HealthGate
         client={makeClient()}
@@ -344,7 +345,58 @@ describe('HealthGate', () => {
           {
             id: 'st1',
             display_name: 'נועה לוי',
+            status: 'active',
             health_status: 'trial_signed',
+          },
+        ]}
+      >
+        {app}
+      </HealthGate>,
+    )
+    expect(screen.queryByTestId('the-app')).toBeNull()
+  })
+
+  it('lets a child who is STILL on a trial through on the short form', () => {
+    // §5.5 names the gate condition twice — SPEC lines 688 and 1315 — and both times it is
+    // `health_status = missing`. Gating everything short of `signed` is stricter than that,
+    // and the extra strictness had one concrete consequence: §5.4a's booking funnel writes
+    // `status='trial'` + `health_status='trial_signed'` (app/services/people/trials.py),
+    // which is precisely the pair §6.3's reduced trial home renders for. The two rules
+    // could never both hold, so `TrialHome` was unreachable in a running app and the
+    // `dev+trial` persona walked into a full declaration form instead of the screen it
+    // exists to exercise.
+    render(
+      <HealthGate
+        client={makeClient()}
+        locale="he"
+        students={[
+          {
+            id: 'st1',
+            display_name: 'רותם ניסיון',
+            status: 'trial',
+            health_status: 'trial_signed',
+          },
+        ]}
+      >
+        {app}
+      </HealthGate>,
+    )
+    expect(screen.getByTestId('the-app')).toBeInTheDocument()
+  })
+
+  it('gates a trial child who signed nothing at all', () => {
+    // `missing` is `missing` whatever the student's status. A trial booked by a manager
+    // rather than through the funnel has no declaration of any kind.
+    render(
+      <HealthGate
+        client={makeClient()}
+        locale="he"
+        students={[
+          {
+            id: 'st1',
+            display_name: 'רותם ניסיון',
+            status: 'trial',
+            health_status: 'missing',
           },
         ]}
       >

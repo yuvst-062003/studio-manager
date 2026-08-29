@@ -120,6 +120,23 @@ class PaymentService:
             ).scalars()
         )
 
+    def allocated_kinds(self, payment_id: uuid.UUID) -> dict[uuid.UUID, str]:
+        """`allocation.id -> charge.kind`, for the payment's own allocations.
+
+        A payment has a METHOD; its kind is the kind of the charges it settled. `12f`'s
+        filter chips are `charge.kind` (D-M6-3), so without this join the parent history
+        screen had nothing to filter on and its two non-tuition chips matched nothing.
+
+        One query rather than a lazy relationship walk per row: a family's history is a
+        page of payments, and this is called once per payment already.
+        """
+        rows = self._session.execute(
+            select(PaymentAllocation.id, Charge.kind)
+            .join(Charge, Charge.id == PaymentAllocation.charge_id)
+            .where(PaymentAllocation.payment_id == payment_id)
+        ).all()
+        return {allocation_id: kind for allocation_id, kind in rows}
+
     # -- allocation ------------------------------------------------------------
     def allocate(
         self, payment_id: uuid.UUID, charge_ids: list[uuid.UUID]

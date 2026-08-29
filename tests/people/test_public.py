@@ -87,6 +87,50 @@ def test_only_active_groups_are_offered(client, app_session, studio, a_group, a_
     assert "קבוצה שנסגרה" not in names
 
 
+def test_only_base_groups_are_offered(client, app_session, studio, a_group, a_class, with_slots):
+    """`kind` decides what a group IS, and only `base` is a group you JOIN.
+
+    An `extra` group is the supplementary session a student already enrolled in a base group
+    may book on top -- `group_eligibility` exists precisely to say which base groups may
+    reach which extra one -- and a `private` group is one-to-one coaching. Offering either as
+    a first enrollment puts a brand-new child into a group whose whole definition is that
+    they are not eligible for it yet, on the public landing page a stranger sees and in the
+    parent app's add-a-child form.
+    """
+    app_session.add_all(
+        [
+            Group(studio_id=studio.id, class_id=a_class, name="אימון תחרותי", kind="extra"),
+            Group(studio_id=studio.id, class_id=a_class, name="שיעור פרטי", kind="private"),
+        ]
+    )
+    app_session.commit()
+
+    names = [
+        group["name"]
+        for group in client.get(f"/api/v1/public/studios/{studio.slug}/groups").json()["items"]
+    ]
+    assert "אימון תחרותי" not in names
+    assert "שיעור פרטי" not in names
+
+
+def test_an_invite_only_group_is_not_offered(
+    client, app_session, studio, a_group, a_class, with_slots
+):
+    """`is_invite_only` is the Girls Team's mechanism (see `Group.is_invite_only`): a squad
+    the manager hand-picks. A public page that lists it invites strangers to book into a
+    group nobody may join by asking."""
+    app_session.add(
+        Group(studio_id=studio.id, class_id=a_class, name="נבחרת בנות", is_invite_only=True)
+    )
+    app_session.commit()
+
+    names = [
+        group["name"]
+        for group in client.get(f"/api/v1/public/studios/{studio.slug}/groups").json()["items"]
+    ]
+    assert "נבחרת בנות" not in names
+
+
 def test_a_group_carries_its_age_range_so_the_page_can_filter_by_the_childs_age(
     client, studio, a_group, with_slots
 ):

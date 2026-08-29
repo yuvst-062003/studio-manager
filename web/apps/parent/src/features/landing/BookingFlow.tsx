@@ -17,7 +17,7 @@
 // attend; the manager decides membership later (§5.4).
 import { useEffect, useState } from 'react'
 import type { CSSProperties, FormEvent } from 'react'
-import { Alert, Button, Checkbox, SlotChips, TextField } from '@studio/ui'
+import { Alert, Button, Checkbox, SelectField, SlotChips, TextField } from '@studio/ui'
 import { formatDateInStudioZone, formatTimeInStudioZone } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
@@ -181,27 +181,29 @@ export function BookingFlow({
                 value={child.birthdate}
                 onChange={(event) => setChild(index, { birthdate: event.target.value })}
               />
-              <label>
-                {t(locale, 'people.landing.chooseGroup')}
-                <select
-                  value={child.group_id}
-                  onChange={(event) => setChild(index, { group_id: event.target.value })}
-                  data-testid={`booking-group-${index}`}
-                >
-                  <option value="">—</option>
-                  {groups.map((group) => {
-                    const fits = groupFitsAge(group, child.birthdate, today)
-                    return (
-                      <option key={group.id} value={group.id} disabled={!fits}>
-                        {/* Shown but disabled, with the reason. A group a parent cannot
-                            see is one they cannot ask about. */}
-                        {group.name}
-                        {fits ? '' : ` — ${t(locale, 'people.landing.tooYoung')}`}
-                      </option>
-                    )
-                  })}
-                </select>
-              </label>
+              {/* `SelectField`, not a bare `<select>` in a bare `<label>`. This one sat
+                  directly under three `TextField`s and rendered at the user agent's own
+                  size beside them — the precise mismatch that primitive was extracted to
+                  end (see its header; the dashboard had twenty-five of these). */}
+              <SelectField
+                label={t(locale, 'people.landing.chooseGroup')}
+                value={child.group_id}
+                onChange={(event) => setChild(index, { group_id: event.target.value })}
+                data-testid={`booking-group-${index}`}
+              >
+                <option value="">—</option>
+                {groups.map((group) => {
+                  const fits = groupFitsAge(group, child.birthdate, today)
+                  return (
+                    <option key={group.id} value={group.id} disabled={!fits}>
+                      {/* Shown but disabled, with the reason. A group a parent cannot
+                          see is one they cannot ask about. */}
+                      {group.name}
+                      {fits ? '' : ` — ${t(locale, 'people.landing.tooYoung')}`}
+                    </option>
+                  )
+                })}
+              </SelectField>
               {children.length > 1 ? (
                 <Button
                   variant="ghost"

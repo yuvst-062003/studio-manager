@@ -90,4 +90,30 @@ describe('SegmentedControl', () => {
     await user.keyboard('{ArrowRight}')
     expect(onValueChange).toHaveBeenCalledWith('week')
   })
+
+  it('hides the legend by default, so a self-describing switcher stays compact', () => {
+    // 4h's שבוע / חודש switcher names itself: the options ARE the label.
+    renderIn(<SegmentedControl legend="תצוגה" onValueChange={vi.fn()} options={OPTIONS} value="day" />)
+    // Asserted on the attribute the stylesheet keys off, not on `getComputedStyle`:
+    // jsdom never loads primitives.css, so every computed value here would be the initial
+    // one and the assertion would pass whatever the CSS said.
+    expect(screen.getByText('תצוגה')).toHaveAttribute('data-visible', 'false')
+  })
+
+  it('shows the legend when asked, for a control whose options do not name it', () => {
+    // The payments screen stacks two of these — "בחר חודשים" and "תשלומים בכרטיס" — and
+    // both render as an identical row of [1] [2] [3]. With the legend visually hidden, a
+    // sighted parent saw two identical controls and no way at all to tell which was which;
+    // only a screen-reader user got the distinction the markup already carried.
+    renderIn(
+      <SegmentedControl
+        legend="תשלומים בכרטיס"
+        legendVisible
+        onValueChange={vi.fn()}
+        options={OPTIONS}
+        value="day"
+      />,
+    )
+    expect(screen.getByText('תשלומים בכרטיס')).toHaveAttribute('data-visible', 'true')
+  })
 })

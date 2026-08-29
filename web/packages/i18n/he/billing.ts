@@ -116,6 +116,8 @@ export const billing: Bundle = {
   'receipt.cardOnly': 'קבלה ממוחשבת מונפקת לתשלומי כרטיס אשראי בלבד',
   'receipt.externalNumber': 'מספר קבלה חיצוני',
   'history.title': 'תשלומים שבוצעו',
+  'history.back': 'חזרה לתשלומים',
+  'history.filterLegend': 'סינון לפי סוג',
   'history.empty': 'עדיין לא נרשמו תשלומים',
 
   // -- a charge -----------------------------------------------------------------

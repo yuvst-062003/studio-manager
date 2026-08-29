@@ -114,16 +114,28 @@ def _out(service: PaymentService, payment: Payment) -> PaymentOut:
         external_receipt_number=payment.external_receipt_number,
         reversed_at=payment.reversed_at,
         reversal_reason=payment.reversal_reason,
-        allocations=[
-            PaymentAllocationOut(
-                id=row.id,
-                payment_id=row.payment_id,
-                charge_id=row.charge_id,
-                amount_agorot=row.amount_agorot,
-            )
-            for row in service.allocations_of(payment.id)
-        ],
+        allocations=_allocations_out(service, payment.id),
     )
+
+
+def _allocations_out(service: PaymentService, payment_id: uuid.UUID) -> list[PaymentAllocationOut]:
+    """The allocations, each naming the kind of charge it settled — see
+    `PaymentAllocationOut.kind`."""
+    kinds = service.allocated_kinds(payment_id)
+    return [
+        PaymentAllocationOut(
+            id=row.id,
+            payment_id=row.payment_id,
+            charge_id=row.charge_id,
+            amount_agorot=row.amount_agorot,
+            # A charge an allocation points at always exists — `payment_allocation.charge_id`
+            # is a foreign key — so the fallback is unreachable rather than a real default.
+            # It is here because a KeyError inside a response projection is a 500 on a screen
+            # about somebody's money.
+            kind=kinds.get(row.id, "manual"),
+        )
+        for row in service.allocations_of(payment_id)
+    ]
 
 
 @router.get("/payments", response_model=PaymentPage)

@@ -237,6 +237,69 @@ describe('12h — the parent event list', () => {
     ).toBeInTheDocument()
   })
 
+  it('shows a studio-wide event ONCE, with a row per child', async () => {
+    // §19.3's `dev+parent3` — three children. A club event targets the studio, so the API
+    // returns one registration per child, and the screen rendered one whole CARD per
+    // registration: the same title, location, fee, deadline and status three times over,
+    // separated only by a small name beside the type chip. The event happens once; the
+    // answer is per child.
+    renderList([
+      row(),
+      row({
+        registration: {
+          ...row().registration,
+          id: 'r2',
+          student_id: 's2',
+          student_display_name: 'איתי',
+        },
+      }),
+      row({
+        registration: {
+          ...row().registration,
+          id: 'r3',
+          student_id: 's3',
+          student_display_name: 'מאיה',
+          rsvp: 'yes',
+        },
+        confirmed: true,
+      }),
+    ])
+    expect(await screen.findAllByRole('article', { name: 'אליפות החורף' })).toHaveLength(1)
+    const card = screen.getByRole('article', { name: 'אליפות החורף' })
+    // The event's own facts, once each.
+    expect(within(card).getAllByText(/היכל הספורט/)).toHaveLength(1)
+    // The three children, each with their own answer and their own way to give it.
+    expect(within(card).getAllByTestId('event-child-row')).toHaveLength(3)
+    expect(within(card).getByText('מאיה').closest('[data-testid="event-child-row"]')).toHaveTextContent(
+      t('he', 'events.rsvp.youConfirmed'),
+    )
+  })
+
+  it('still answers per child from the grouped card', async () => {
+    const onOpen = vi.fn()
+    render(
+      <ParentEventsScreen
+        client={makeClient([
+          row(),
+          row({
+            registration: {
+              ...row().registration,
+              id: 'r2',
+              student_id: 's2',
+              student_display_name: 'איתי',
+            },
+          }),
+        ])}
+        locale="he"
+        now={NOW}
+        onOpen={onOpen}
+      />,
+    )
+    const rows = await screen.findAllByTestId('event-child-row')
+    within(rows[1]!).getByRole('button').click()
+    expect(onOpen).toHaveBeenCalledWith('e1', 's2')
+  })
+
   it('speaks to the parent in the second person', async () => {
     // 12h finding 7 — every rsvp.* key is third-person and every screen string is second.
     renderList([row()])

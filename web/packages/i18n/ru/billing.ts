@@ -85,6 +85,8 @@ export const billing: Bundle = {
   'receipt.cardOnly': 'Налоговая квитанция выдаётся только для платежей картой',
   'receipt.externalNumber': 'Внешний номер квитанции',
   'history.title': 'Совершённые платежи',
+  'history.back': 'Назад к платежам',
+  'history.filterLegend': 'Фильтр по типу',
   'history.empty': 'Платежи ещё не записаны',
 
   // -- a charge -----------------------------------------------------------------

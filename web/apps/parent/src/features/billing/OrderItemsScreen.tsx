@@ -11,7 +11,7 @@
 // builds an order, and it is the one with the double-payment guard in it.
 import { useState } from 'react'
 import type { CSSProperties } from 'react'
-import { Button, Card, EmptyState, MoneyDisplay } from '@studio/ui'
+import { Button, Card, Checkbox, EmptyState, MoneyDisplay } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 /** What the screen renders — the payer-side catalogue read (`/me/products`) serves
@@ -30,6 +30,13 @@ const rowStyle: CSSProperties = {
   alignItems: 'center',
   justifyContent: 'space-between',
   gap: 'var(--space-3)',
+}
+
+//: Each row is a full-width tap target: the label stretches so the whole line toggles,
+//: not just the 20px box.
+const itemRowStyle: CSSProperties = {
+  display: 'flex',
+  paddingBlock: 'var(--space-2)',
 }
 
 export type OrderItemsScreenProps = {
@@ -58,11 +65,21 @@ export function OrderItemsScreen({ locale, products, onOrder }: OrderItemsScreen
     <div style={columnStyle} data-testid="order-items">
       <h2>{t(locale, 'billing.product.order')}</h2>
       <Card>
+        {/* `Checkbox`, not a bare `<input type="checkbox">`. The hand-rolled one rendered at
+            the browser default 13x13 with no focus ring — the only control on this screen,
+            in a mobile-first app. The primitive is 20x20 with `accent-color` and a
+            `:focus-visible` ring, and it was exported all along. */}
         {products.map((product) => (
-          <label key={product.id} style={rowStyle} data-testid="product-row">
-            <input
-              type="checkbox"
+          <div key={product.id} style={itemRowStyle} data-testid="product-row">
+            <Checkbox
+              block
               checked={chosen.includes(product.id)}
+              label={
+                <span style={rowStyle}>
+                  <span>{product.name}</span>
+                  <MoneyDisplay agorot={product.price_agorot} />
+                </span>
+              }
               onChange={(event) =>
                 setChosen((previous) =>
                   event.target.checked
@@ -71,9 +88,7 @@ export function OrderItemsScreen({ locale, products, onOrder }: OrderItemsScreen
                 )
               }
             />
-            <span>{product.name}</span>
-            <MoneyDisplay agorot={product.price_agorot} />
-          </label>
+          </div>
         ))}
       </Card>
       {/* §5.10 on the screen, because a parent choosing the last גי will otherwise expect

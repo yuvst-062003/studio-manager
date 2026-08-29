@@ -54,21 +54,40 @@ export function chipToneFor(status: string): 'paid' | 'pending' | 'cancelled' | 
   return 'pending'
 }
 
+const guardianNameRowStyle: CSSProperties = {
+  alignItems: 'center',
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: 'var(--space-2)',
+}
+
 export function GuardianRow({ guardian, locale }: { guardian: GuardianOut; locale: Locale }) {
   return (
     <li data-testid="guardian-row">
-      <bdi>{guardian.display_name}</bdi>
+      {/* A flex row with a gap, and the badge through `StatusChip`. These were two adjacent
+          inline elements with nothing between them, so the name and the badge rendered as
+          one word: "שירה הורההורה ראשי". */}
+      <div style={guardianNameRowStyle}>
+        <bdi>{guardian.display_name}</bdi>
+        {guardian.is_primary ? (
+          <span data-testid="guardian-primary">
+            <StatusChip status="planned" label={t(locale, 'people.guardian.primary')} />
+          </span>
+        ) : null}
+      </div>
+      {/* §5.3 — the hint says both consequences and stops. Nothing branches on it. */}
       {guardian.is_primary ? (
-        <>
-          <span data-testid="guardian-primary">{t(locale, 'people.guardian.primary')}</span>
-          {/* §5.3 — the hint says both consequences and stops. Nothing branches on it. */}
-          <p data-testid="guardian-primary-hint">{t(locale, 'people.guardian.primaryHint')}</p>
-        </>
+        <p data-testid="guardian-primary-hint">{t(locale, 'people.guardian.primaryHint')}</p>
       ) : null}
-      {/* Identical affordances on every row — L8. */}
-      <a href={`tel:${guardian.phone ?? ''}`} data-testid="guardian-call">
-        {t(locale, 'people.guardian.call')}
-      </a>
+      {/* Identical affordances on every row — L8 — but only affordances that DO something.
+          `tel:${phone ?? ''}` rendered a live link to the bare string `tel:` for every
+          guardian with no number on file, which looks exactly like the working one and
+          dials nothing. */}
+      {guardian.phone ? (
+        <a href={`tel:${guardian.phone}`} data-testid="guardian-call">
+          {t(locale, 'people.guardian.call')}
+        </a>
+      ) : null}
     </li>
   )
 }

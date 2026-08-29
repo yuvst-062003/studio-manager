@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import date
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 
@@ -52,6 +52,11 @@ ManagerOrLeadCoach = Annotated[None, Depends(require_roles("owner", "manager", "
 
 STAFF_ROLES = {"owner", "manager", "lead_coach", "assistant_coach"}
 
+#: `?scope=mine` — see `_visible_groups`. A module-level alias and not an inline
+#: `Literal["mine"]`: this module has `from __future__ import annotations`, so an inline one
+#: reaches Pydantic as the string `Literal[mine]` and fails to resolve `mine` at startup.
+SessionScope = Literal["mine"]
+
 
 def _not_found() -> HTTPException:
     return HTTPException(
@@ -82,15 +87,24 @@ def _signed_in(request: Request) -> None:
 SignedIn = Annotated[None, Depends(_signed_in)]
 
 
-def _visible_groups(request: Request, service: ScheduleService) -> set[uuid.UUID] | None:
+def _visible_groups(
+    request: Request, service: ScheduleService, *, guardian_only: bool = False
+) -> set[uuid.UUID] | None:
     """`None` for staff — the whole studio. A set for a guardian.
 
     An **empty** set is a real answer, not a missing one: a signed-in parent whose children
     are not enrolled anywhere sees nothing, and returning `None` for them would show them
     the entire club's calendar. That is why the type is `set | None` and not just `set`.
+
+    `guardian_only` is `?scope=mine` — the caller asking for the guardian narrowing whatever
+    else they hold. §19.3's `dev+both` is why it exists: a lead coach who is also a parent
+    matched `STAFF_ROLES` here, so the PARENT app received the club's entire timetable, and
+    `web/apps/parent/src/features/schedule/client.ts` documents the opposite contract in its
+    own header. The flag only ever narrows, so no caller can reach anything with it that
+    they could not reach without it, and it needs no authorization of its own.
     """
     roles = set(getattr(request.state, "roles", ()) or ())
-    if roles & STAFF_ROLES:
+    if roles & STAFF_ROLES and not guardian_only:
         return None
     person_id = _person_id(request)
     if person_id is None:
@@ -109,6 +123,10 @@ def list_sessions(
     to_date: Annotated[date, Query(alias="to")],
     group_id: uuid.UUID | None = None,
     coach_person_id: uuid.UUID | None = None,
+    # `mine` = "the groups my own children are enrolled in", for a caller who may also be
+    # staff. See `_visible_groups`. A Literal so the only other value is a 422 rather than a
+    # silently ignored typo that hands back the whole studio.
+    scope: SessionScope | None = None,
     cursor: uuid.UUID | None = None,
     limit: int = Query(default=DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
 ) -> SessionPage:
@@ -118,7 +136,7 @@ def list_sessions(
         to_date=to_date,
         group_id=group_id,
         coach_person_id=coach_person_id,
-        visible_group_ids=_visible_groups(request, service),
+        visible_group_ids=_visible_groups(request, service, guardian_only=scope == "mine"),
         cursor=cursor,
         limit=limit,
     )

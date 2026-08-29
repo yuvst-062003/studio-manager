@@ -346,6 +346,17 @@
   font-size: var(--text-label);
 }
 
+/* `block` — the whole row is the tap target, not just the box and the words. A list of
+ * options on a phone; see Checkbox.tsx. */
+.studio-choice[data-block='true'] {
+  display: flex;
+  inline-size: 100%;
+}
+
+.studio-choice[data-block='true'] .studio-choice__label {
+  flex: 1;
+}
+
 .studio-switch {
   align-items: center;
   display: inline-flex;
@@ -426,13 +437,23 @@
 }
 
 /* The legend names the group for assistive tech; 4h shows the control bare. */
-.studio-segmented__legend {
+.studio-segmented__legend[data-visible='false'] {
   block-size: 1px;
   clip-path: inset(50%);
   inline-size: 1px;
   overflow: hidden;
   position: absolute;
   white-space: nowrap;
+}
+
+/* Opted in by `legendVisible` — see SegmentedControl.tsx for when that is right. Reads as
+ * a field label, because that is what it is. */
+.studio-segmented__legend[data-visible='true'] {
+  color: var(--text-secondary);
+  display: block;
+  font-size: var(--text-caption);
+  padding-block-end: var(--space-1);
+  padding-inline: 0;
 }
 
 .studio-segmented__track {
