@@ -1,29 +1,55 @@
 // `4c` נוכחות — מה לא סומן, mounted. Nothing imported `AttendanceReport`, so §5.14's
 // "unmarked is a real state and is not absence" had no screen in a running app.
 //
-// The window is the last week and the next day: `4c` is a chase list, so it is about
-// sessions that have already happened and not yet been signed. Tomorrow's cannot be late.
-import { useMemo } from 'react'
-import { apiFetch } from '@studio/core'
+// **The range is state now, not a constant.** It used to be `useMemo(() => windowAround(new
+// Date()), [])` — the last seven days plus tomorrow, with no control anywhere to change it.
+// A chase list whose window a manager cannot move is a chase list that answers one question
+// and refuses every follow-up, and the CSV button beside it exported that same fixed window.
+// This component owns the range; `AttendanceReport` renders `9b`'s `DateRangePicker` over it
+// and reads both the table and the export off it.
+import { useMemo, useState } from 'react'
+import { apiFetch, studioDayKey } from '@studio/core'
 import type { Locale } from '@studio/i18n'
 import { AttendanceReport } from './AttendanceReport'
 import { makeDashboardAttendanceClient } from './client'
 
-function windowAround(today: Date): { from: string; to: string } {
+/** The default window: the seven days that have already happened, ending today.
+ *
+ * **Tomorrow is gone from it, deliberately.** The old default reached a day into the future
+ * and the comment beside it said "tomorrow's cannot be late" — which was true and was
+ * exactly why including it did nothing. `GET /attendance/report` now says so on the server
+ * (`ends_at <= now`), so a window that still claimed to cover tomorrow would be advertising
+ * a day it can never return a row for.
+ *
+ * **The day is read in Asia/Jerusalem** (G3). `toISOString().slice(0, 10)`, which this used
+ * to do, is the UTC day: between 22:00 and midnight Israel time it puts the manager a day
+ * behind their own club, every night. `studioDayKey` is the same conversion the roster
+ * strips and `DateRangePicker`'s ISO value format already agree on.
+ */
+export function defaultWindow(todayIso: string): { from: string; to: string } {
   const day = 24 * 60 * 60 * 1000
+  const today = Date.parse(todayIso)
   return {
-    from: new Date(today.getTime() - 7 * day).toISOString().slice(0, 10),
-    to: new Date(today.getTime() + day).toISOString().slice(0, 10),
+    from: studioDayKey(new Date(today - 7 * day).toISOString()),
+    to: studioDayKey(new Date(today).toISOString()),
   }
 }
 
-export function AttendanceSection({ locale }: { locale: Locale }) {
+export function AttendanceSection({ locale, today }: { locale: Locale; today?: string }) {
   const client = useMemo(() => makeDashboardAttendanceClient(apiFetch), [])
-  const window = useMemo(() => windowAround(new Date()), [])
+  // `today` is optional so a test can pin the clock; the app passes nothing and gets now.
+  const [window, setWindow] = useState(() => defaultWindow(today ?? new Date().toISOString()))
 
   // `onMarkNow` is deliberately absent. §5.14's chase ends on the register, which lives in
   // the STAFF app on another origin — and this app has no business knowing that hostname:
   // `infra/railway/domains.json` is the one place a hostname is written, and it is read
   // server-side. Offering a link built from a guessed origin would be the second place.
-  return <AttendanceReport locale={locale} client={client} window={window} />
+  return (
+    <AttendanceReport
+      client={client}
+      locale={locale}
+      onWindowChange={setWindow}
+      window={window}
+    />
+  )
 }

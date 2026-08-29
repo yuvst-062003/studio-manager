@@ -227,6 +227,45 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/attendance/report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Attendance Report
+         * @description Artboard `4c` — the sessions nobody signed, and how each group is doing, in the
+         *     manager's own window.
+         *
+         *     **Not `/sync/bootstrap`, which is what this screen used to call.** That endpoint is
+         *     §6.1's offline priming payload and clamps every window to §10.6's two days, so `4c` was
+         *     asking for a week and rendering the two oldest days of it. The screen's date picker
+         *     needed an endpoint that answers the range it is given; §10.6's bound stays where it
+         *     belongs, on the phone's cache.
+         *
+         *     **`ManagerOrOwner`, in a router tagged `coach`.** The tag is about §13's third invariant
+         *     — it makes this response schema subject to the financial-field gate, which is a property
+         *     worth having on any payload this file serves. The *permission* is a separate decision:
+         *     this is a studio-wide number over every group, which §3.2 grants under `View all students
+         *     in studio` and `Export data` to owner and manager only, and the CSV button sitting beside
+         *     this data on `4c` is already `ManagerOrOwner`. A screen where half the controls 403 is
+         *     worse than one a coach does not open. A coach's own view of attendance is the register
+         *     itself, which every staff role still reaches through `GET /sessions/{id}/attendance`.
+         *
+         *     422 on a bad range rather than an empty 200, and with the same bound the CSV export
+         *     enforces — see `MAX_REPORT_DAYS`.
+         */
+        get: operations["attendance_report_api_v1_attendance_report_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/accept-invitation": {
         parameters: {
             query?: never;
@@ -4900,6 +4939,32 @@ export interface components {
             student_id: string;
         };
         /**
+         * AttendanceReportOut
+         * @description `GET /attendance/report?from&to` — artboard `4c`, in one round trip.
+         *
+         *     Both halves of the screen come from one request because they are one question asked of
+         *     one window: which lessons were not signed, and how are the groups doing. Two endpoints
+         *     would let a date picker drive them out of step for a frame, and the range is echoed back
+         *     for the same reason `BootstrapPayload` echoes its own — a client should render what it
+         *     received rather than what it asked for.
+         */
+        AttendanceReportOut: {
+            /**
+             * From Date
+             * Format: date
+             */
+            from_date: string;
+            /** Groups */
+            groups?: components["schemas"]["GroupAttendanceRate"][];
+            /**
+             * To Date
+             * Format: date
+             */
+            to_date: string;
+            /** Unmarked Sessions */
+            unmarked_sessions?: components["schemas"]["UnmarkedSessionOut"][];
+        };
+        /**
          * AudienceQuery
          * @description A scope, before an announcement exists to carry it.
          *
@@ -6503,6 +6568,43 @@ export interface components {
              * Format: uuid
              */
             training_year_id: string;
+        };
+        /**
+         * GroupAttendanceRate
+         * @description `4c`'s second card — name · bar · percentage, for one group over the window.
+         *
+         *     **`rate_percent` is nullable and that is the whole design.** The denominator is the
+         *     marks somebody actually decided: present + absent_excused + absent_unexcused. §5.14
+         *     makes `unmarked` a real state so that a coach who forgot the register does not read as
+         *     a child who stopped coming, and a rate that counted `unmarked` as absence would undo
+         *     that in the one number a manager quotes. A group with no decided marks in the window
+         *     therefore has no rate — `null`, never `0`, because 0% is a claim about children who did
+         *     not come and "nobody said" is not that claim.
+         *
+         *     `sessions` and `marked_sessions` are carried so the percentage can be read with its
+         *     coverage beside it: 100% over one marked session out of nine is a different fact from
+         *     100% over nine, and a bar alone cannot tell them apart.
+         */
+        GroupAttendanceRate: {
+            /** Absent */
+            absent: number;
+            /**
+             * Group Id
+             * Format: uuid
+             */
+            group_id: string;
+            /** Group Name */
+            group_name: string;
+            /** Marked Sessions */
+            marked_sessions: number;
+            /** Present */
+            present: number;
+            /** Rate Percent */
+            rate_percent: number | null;
+            /** Sessions */
+            sessions: number;
+            /** Unmarked */
+            unmarked: number;
         };
         /** GroupBeltRangeOut */
         GroupBeltRangeOut: {
@@ -10231,6 +10333,39 @@ export interface components {
             starts_at: string;
         };
         /**
+         * UnmarkedSessionOut
+         * @description One row of `4c`'s `ממתין לסימון` list — a lesson that has ended with nothing
+         *     decided about anybody in it.
+         *
+         *     Deliberately NOT `SessionOut`. That shape carries the whole session projection and this
+         *     list is a chase list: an id to act on, a group to recognise, a time to feel bad about.
+         *     A wider shape would also have to be kept invariant-3 clean for no gain.
+         */
+        UnmarkedSessionOut: {
+            /**
+             * Ends At
+             * Format: date-time
+             */
+            ends_at: string;
+            /**
+             * Group Id
+             * Format: uuid
+             */
+            group_id: string;
+            /** Group Name */
+            group_name: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Starts At
+             * Format: date-time
+             */
+            starts_at: string;
+        };
+        /**
          * UpayFormOut
          * @description §5.10 step 2's form, as data. The client builds the POST and auto-submits it.
          */
@@ -10846,6 +10981,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BatchResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    attendance_report_api_v1_attendance_report_get: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttendanceReportOut"];
                 };
             };
             /** @description Validation Error */

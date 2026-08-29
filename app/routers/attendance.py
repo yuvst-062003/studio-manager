@@ -27,12 +27,13 @@ entry points and three copies is three chances to get the exception wrong.
 from __future__ import annotations
 
 import uuid
+from datetime import date
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import select
 
-from app.core.auth_context import AnyStaff
+from app.core.auth_context import AnyStaff, ManagerOrOwner
 from app.core.clock import now
 from app.core.tenancy import TenantSessionDep
 from app.models.person import Guardian
@@ -42,6 +43,7 @@ from app.schemas.attendance import (
     AbsenceReportOut,
     AttendanceOut,
     AttendancePage,
+    AttendanceReportOut,
     BatchAttendanceIn,
     BulkPresentIn,
     InjuryReportIn,
@@ -49,6 +51,7 @@ from app.schemas.attendance import (
     SessionRosterOut,
 )
 from app.services.attendance.errors import ForbiddenError, NotFoundError, PreconditionError
+from app.services.attendance.report import BadRangeError, build_report
 from app.services.attendance.schemas import BatchResult
 from app.services.attendance.service import AttendanceService
 
@@ -291,6 +294,43 @@ def cancel_absence_report(
             detail={"code": "already_marked", "message": str(exc)},
         ) from exc
     session.commit()
+
+
+@router.get("/attendance/report", response_model=AttendanceReportOut)
+def attendance_report(
+    _: ManagerOrOwner,
+    session: TenantSessionDep,
+    from_date: Annotated[date, Query(alias="from")],
+    to_date: Annotated[date, Query(alias="to")],
+) -> AttendanceReportOut:
+    """Artboard `4c` — the sessions nobody signed, and how each group is doing, in the
+    manager's own window.
+
+    **Not `/sync/bootstrap`, which is what this screen used to call.** That endpoint is
+    §6.1's offline priming payload and clamps every window to §10.6's two days, so `4c` was
+    asking for a week and rendering the two oldest days of it. The screen's date picker
+    needed an endpoint that answers the range it is given; §10.6's bound stays where it
+    belongs, on the phone's cache.
+
+    **`ManagerOrOwner`, in a router tagged `coach`.** The tag is about §13's third invariant
+    — it makes this response schema subject to the financial-field gate, which is a property
+    worth having on any payload this file serves. The *permission* is a separate decision:
+    this is a studio-wide number over every group, which §3.2 grants under `View all students
+    in studio` and `Export data` to owner and manager only, and the CSV button sitting beside
+    this data on `4c` is already `ManagerOrOwner`. A screen where half the controls 403 is
+    worse than one a coach does not open. A coach's own view of attendance is the register
+    itself, which every staff role still reaches through `GET /sessions/{id}/attendance`.
+
+    422 on a bad range rather than an empty 200, and with the same bound the CSV export
+    enforces — see `MAX_REPORT_DAYS`.
+    """
+    try:
+        return build_report(session, from_date=from_date, to_date=to_date, now=now())
+    except BadRangeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={"code": "bad_range", "message": str(exc)},
+        ) from exc
 
 
 @router.get("/students/{student_id}/attendance", response_model=AttendancePage)
