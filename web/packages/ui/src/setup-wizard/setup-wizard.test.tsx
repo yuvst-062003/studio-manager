@@ -315,12 +315,29 @@ describe('step 1 · פרטי מועדון', () => {
     }
   })
 
-  it('offers the three languages §9 ships and no more', async () => {
+  it('does not ask which languages parents see — a club offers all three', async () => {
+    // Owner request, 2026-08-29: "this should not be a choice but a default." Asking a
+    // first-run owner to pick was asking them to guess which languages their future
+    // parents read, and the server's default is now all three rather than one.
     const Step = makeStudioStep(studioClient())
     render(<Step locale="he" status="pending" onDone={vi.fn()} onSkip={vi.fn()} />)
-    await screen.findByLabelText(t('he', 'common.setup.studio.locale.he'))
-    const group = screen.getByRole('group', { name: t('he', 'common.setup.studio.parentLocales') })
-    expect(within(group).getAllByRole('checkbox')).toHaveLength(3)
+    await screen.findByLabelText(t('he', 'common.setup.studio.name'))
+    expect(
+      screen.queryByRole('group', { name: t('he', 'common.setup.studio.parentLocales') }),
+    ).toBeNull()
+    expect(screen.queryByRole('checkbox')).toBeNull()
+  })
+
+  it('does not write parent_locales, so a club that narrowed it keeps its choice', async () => {
+    // The step used to send the checkbox column on every save. Now that it has no opinion,
+    // sending the field at all would blank a deliberate narrowing made in the settings
+    // panel — `exclude_unset` on the server only helps if the client omits it.
+    const client = studioClient()
+    const Step = makeStudioStep(client)
+    render(<Step locale="he" status="pending" onDone={vi.fn()} onSkip={vi.fn()} />)
+    await userEvent.click(await screen.findByText(t('he', 'common.setup.continue')))
+    await waitFor(() => expect(client.update).toHaveBeenCalled())
+    expect(client.update.mock.calls[0]?.[0]).not.toHaveProperty('parent_locales')
   })
 
   it('saves and reports itself done — the container never infers it', async () => {
@@ -526,4 +543,69 @@ describe('F6 — going back', () => {
     await userEvent.click(await screen.findByTestId('setup-back'))
     expect(screen.getByTestId('setup-rail-studio')).toHaveAttribute('aria-current', 'step')
   })
+})
+
+describe('setup step 1 · what the Stitch pass added (2026-08-29)', () => {
+  const details = {
+    name: '',
+    sport: null,
+    address: null,
+    phone: null,
+    parent_locales: ['he'],
+    logo_url: null,
+  }
+  const studioClient = () => ({
+    read: vi.fn(async () => details),
+    update: vi.fn(async () => details),
+    uploadLogo: vi.fn(),
+  })
+
+  it('says which field is required rather than only disabling the button', async () => {
+    // The continue button disabling on an empty name told an owner THAT something was
+    // wrong and never WHICH field. The hint is wired through aria-describedby, so it is
+    // announced with the field rather than read out as "club name star".
+    const Step = makeStudioStep(studioClient() as never)
+    render(<Step locale="he" status="pending" onDone={vi.fn()} onSkip={vi.fn()} />)
+    const name = await screen.findByLabelText(t('he', 'common.setup.studio.name'))
+    expect(name).toBeRequired()
+    expect(name).toHaveAccessibleDescription(t('he', 'common.setup.studio.requiredHint'))
+  })
+
+  it('marks the fields that can be left empty', async () => {
+    const Step = makeStudioStep(studioClient() as never)
+    render(<Step locale="he" status="pending" onDone={vi.fn()} onSkip={vi.fn()} />)
+    const phone = await screen.findByLabelText(t('he', 'common.setup.studio.phone'))
+    expect(phone).toHaveAccessibleDescription(t('he', 'common.setup.studio.optionalHint'))
+    expect(phone).not.toBeRequired()
+  })
+
+  it('shows an example in each field, because a first-run form is one people hesitate over', async () => {
+    const Step = makeStudioStep(studioClient() as never)
+    render(<Step locale="he" status="pending" onDone={vi.fn()} onSkip={vi.fn()} />)
+    expect(await screen.findByPlaceholderText(t('he', 'common.setup.studio.namePlaceholder'))).toBeInTheDocument()
+    expect(screen.getByPlaceholderText(t('he', 'common.setup.studio.sportPlaceholder'))).toBeInTheDocument()
+  })
+
+  it('keeps the native file input reachable while hiding the UA control', async () => {
+    // The browser renders it as an English "Choose File / No file chosen" in the middle of
+    // an RTL Hebrew screen. Hidden with clip-path, NOT display:none — the latter would take
+    // it out of the accessibility tree along with the layout.
+    const Step = makeStudioStep(studioClient() as never)
+    render(<Step locale="he" status="pending" onDone={vi.fn()} onSkip={vi.fn()} />)
+    const input = await screen.findByLabelText(t('he', 'common.setup.studio.logoDrop'))
+    expect(input).toBeInTheDocument()
+    expect(input).toHaveClass('studio-visually-hidden')
+    expect(screen.getByRole('button', { name: t('he', 'common.setup.studio.logoChoose') })).toBeInTheDocument()
+  })
+
+  it('ranks the footer instead of leaving continue, skip and a status line at one rank', async () => {
+    const Step = makeStudioStep(studioClient() as never)
+    const { container } = render(<Step locale="he" status="pending" onDone={vi.fn()} onSkip={vi.fn()} />)
+    await screen.findByTestId('setup-step-studio')
+    const bar = container.querySelector('.studio-actionbar')
+    expect(bar).toHaveAttribute('data-align', 'between')
+    // The status describes the step; it is not something to press.
+    expect(bar).not.toContainElement(screen.getByTestId('setup-studio-status'))
+  })
+
 })

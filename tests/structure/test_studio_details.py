@@ -19,7 +19,11 @@ def test_get_returns_the_merged_column_and_settings_view(client, as_owner) -> No
     assert body["name"]
     assert body["default_locale"] == "he"
     assert body["logo_url"] is None
-    assert body["parent_locales"] == ["he"]
+    # All three, not `[default_locale]` -- owner request, 2026-08-29: "this should not be a
+    # choice but a default. The 3 languages should be available in the app." A club that
+    # never opened the setting used to offer parents Hebrew only, so the Russian-speaking
+    # parent of a Hebrew-speaking club got a Hebrew app with no way to say otherwise.
+    assert body["parent_locales"] == ["he", "en", "ru"]
 
 
 def test_name_lands_on_the_column_and_the_rest_in_settings(client, as_owner, app_session) -> None:
@@ -158,3 +162,15 @@ def test_the_public_landing_falls_back_to_the_settings_the_panel_already_writes(
     if public.status_code == 200:
         assert public.json()["address"] == "הרצל 12, רעננה"
         assert public.json()["phone"] == "052-1234567"
+
+
+def test_a_club_that_narrowed_the_languages_keeps_its_choice(client, as_owner) -> None:
+    """The new default is for a row that never set one, not an override of one that did.
+
+    The setup wizard no longer asks, but the הגדרות panel still narrows on purpose -- a
+    club with no Russian-speaking families can still turn Russian off, and the default
+    must not undo that on the next read.
+    """
+    client.patch(STUDIO, json={"parent_locales": ["he"]}, headers=as_owner.headers)
+    body = client.get(STUDIO, headers=as_owner.headers).json()
+    assert body["parent_locales"] == ["he"]

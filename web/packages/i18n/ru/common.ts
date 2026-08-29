@@ -202,6 +202,13 @@ export const common: Bundle = {
   'setup.studio.locale.ru': 'Русский',
   'setup.studio.logoDrop': 'Перетащите логотип 512×512',
   'setup.studio.logoChoose': 'Выбрать файл',
+  // Which field must be filled, and what a good answer looks like.
+  'setup.studio.requiredHint': 'Обязательно',
+  'setup.studio.optionalHint': 'Необязательно',
+  'setup.studio.namePlaceholder': 'например: клуб Кодокан',
+  'setup.studio.sportPlaceholder': 'например: дзюдо',
+  'setup.studio.addressPlaceholder': 'Улица, город',
+  'setup.studio.phonePlaceholder': '03-0000000',
   'setup.studio.logoAlt': 'Логотип клуба',
   'setup.studio.logoRejected': 'Файл не принят. Нужен PNG, JPEG или WebP до 2 МБ — SVG не поддерживается.',
   'setup.groups.className': 'Название занятия',

@@ -202,6 +202,15 @@ export const common: Bundle = {
   'setup.studio.locale.ru': 'Русский',
   'setup.studio.logoDrop': 'גררו לוגו 512×512',
   'setup.studio.logoChoose': 'בחירת קובץ',
+  // Which field must be filled, and what a good answer looks like. From the Stitch pass
+  // on 5c (2026-08-29): an owner who cannot tell required from optional fills all of them
+  // or none, and a first-run form with no examples is a form they hesitate over.
+  'setup.studio.requiredHint': 'חובה',
+  'setup.studio.optionalHint': 'לא חובה',
+  'setup.studio.namePlaceholder': 'לדוגמה: מועדון קודוקאן',
+  'setup.studio.sportPlaceholder': 'לדוגמה: ג׳ודו',
+  'setup.studio.addressPlaceholder': 'רחוב, עיר',
+  'setup.studio.phonePlaceholder': '03-0000000',
   'setup.studio.logoAlt': 'לוגו המועדון',
   'setup.studio.logoRejected': 'הקובץ לא התקבל. נדרש PNG, JPEG או WebP עד 2MB — SVG לא נתמך.',
   'setup.groups.className': 'שם השיעור',

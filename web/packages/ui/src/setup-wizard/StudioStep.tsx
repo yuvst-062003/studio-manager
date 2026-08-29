@@ -1,7 +1,7 @@
 // Step 1 · פרטי מועדון — artboard 5c. Fully M1; no later lane extends this file.
 //
-// Name, ענף, address, phone, which languages parents see, and the 512×512 logo drop-zone
-// M1.8's object-storage seam made possible.
+// Name, ענף, address, phone, and the 512×512 logo drop-zone M1.8's object-storage seam
+// made possible. It no longer asks which languages parents see: all three are offered.
 //
 // The resize happens HERE, on a canvas, and never on the backend. §2.4 of the design doc:
 // the alternative is Pillow and an image-decoding attack surface inside the API process,
@@ -10,7 +10,6 @@ import { useEffect, useRef, useState } from 'react'
 import { t } from '@studio/i18n'
 import { ActionBar } from '../primitives/ActionBar'
 import { Button } from '../primitives/Button'
-import { Checkbox } from '../primitives/Checkbox'
 import { SectionHeader } from '../primitives/SectionHeader'
 import { TextField } from '../primitives/TextField'
 import type { WizardStepProps } from './types'
@@ -31,8 +30,11 @@ export type StudioClient = {
   uploadLogo: (file: Blob) => Promise<{ logo_url: string }>
 }
 
-//: §9 ships three. A fourth would render raw keys at a parent.
-const PARENT_LOCALES = ['he', 'en', 'ru'] as const
+//: §9 ships three, and a club offers all three. This step no longer asks which — owner
+//: request, 2026-08-29: "this should not be a choice but a default." The server's default
+//: is now all of them (`studio_public_fields`), and the הגדרות panel is where a club that
+//: genuinely wants to narrow the set still can. Asking a first-run owner to pick was
+//: asking them to guess which languages their future parents read.
 
 //: The canvas draws the drop-zone at 512×512, and that is what gets uploaded.
 export const LOGO_EDGE = 512
@@ -82,15 +84,6 @@ export function makeStudioStep(client: StudioClient) {
     const set = <K extends keyof StudioDetails>(key: K, value: StudioDetails[K]) =>
       setDetails({ ...details, [key]: value })
 
-    const toggleLocale = (locale_: string, on: boolean) => {
-      const next = on
-        ? PARENT_LOCALES.filter((l) => l === locale_ || details.parent_locales.includes(l))
-        : details.parent_locales.filter((l) => l !== locale_)
-      // Never empty: the server refuses it, and refusing here means the owner is told
-      // before they lose the checkbox they just cleared.
-      set('parent_locales', next.length > 0 ? [...next] : details.parent_locales)
-    }
-
     const pickLogo = async (file: File) => {
       setLogoError(null)
       try {
@@ -113,46 +106,44 @@ export function makeStudioStep(client: StudioClient) {
         <SectionHeader level={3} title={t(locale, 'common.setup.step.studio')} />
 
         <div className="setup-fields">
+          {/* Which field is required, and what a good answer looks like. Both from the
+              Stitch pass on `5c`: the continue button disabling on an empty name told an
+              owner *that* something was wrong but never *which* field, and a first-run
+              form with no examples is one they hesitate over.
+
+              `hint` rather than an asterisk in the label — TextField already wires it
+              through `aria-describedby`, so it is announced rather than read out as
+              "club name star". */}
           <TextField
+            hint={t(locale, 'common.setup.studio.requiredHint')}
             label={t(locale, 'common.setup.studio.name')}
+            placeholder={t(locale, 'common.setup.studio.namePlaceholder')}
+            required
             value={details.name}
             onChange={(event) => set('name', event.target.value)}
           />
           <TextField
             label={t(locale, 'common.setup.studio.sport')}
+            placeholder={t(locale, 'common.setup.studio.sportPlaceholder')}
             value={details.sport ?? ''}
             onChange={(event) => set('sport', event.target.value)}
           />
           <TextField
+            hint={t(locale, 'common.setup.studio.optionalHint')}
             label={t(locale, 'common.setup.studio.address')}
+            placeholder={t(locale, 'common.setup.studio.addressPlaceholder')}
             value={details.address ?? ''}
             onChange={(event) => set('address', event.target.value)}
           />
           <TextField
+            hint={t(locale, 'common.setup.studio.optionalHint')}
             label={t(locale, 'common.setup.studio.phone')}
+            placeholder={t(locale, 'common.setup.studio.phonePlaceholder')}
             type="tel"
             value={details.phone ?? ''}
             onChange={(event) => set('phone', event.target.value)}
           />
         </div>
-
-        {/* The three choices ran together — `.studio-choice` spaces a box from its own
-            label, and nothing spaced one choice from the next. */}
-        <fieldset className="setup-group">
-          <legend className="setup-group__legend">
-            {t(locale, 'common.setup.studio.parentLocales')}
-          </legend>
-          <div className="setup-choices">
-            {PARENT_LOCALES.map((code) => (
-              <Checkbox
-                key={code}
-                label={t(locale, `common.setup.studio.locale.${code}`)}
-                checked={details.parent_locales.includes(code)}
-                onChange={(event) => toggleLocale(code, event.target.checked)}
-              />
-            ))}
-          </div>
-        </fieldset>
 
         <fieldset className="setup-group">
           <legend className="setup-group__legend">
@@ -210,8 +201,7 @@ export function makeStudioStep(client: StudioClient) {
                     sport: details.sport,
                     address: details.address,
                     phone: details.phone,
-                    parent_locales: details.parent_locales,
-                  })
+                          })
                   .then(() => onDone())
                   .finally(() => setSaving(false))
               }}

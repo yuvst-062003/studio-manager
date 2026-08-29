@@ -193,6 +193,13 @@ export const common: Bundle = {
   'setup.studio.locale.ru': 'Russian',
   'setup.studio.logoDrop': 'Drop a 512×512 logo',
   'setup.studio.logoChoose': 'Choose a file',
+  // Which field must be filled, and what a good answer looks like.
+  'setup.studio.requiredHint': 'Required',
+  'setup.studio.optionalHint': 'Optional',
+  'setup.studio.namePlaceholder': 'e.g. Kodokan Judo Club',
+  'setup.studio.sportPlaceholder': 'e.g. Judo',
+  'setup.studio.addressPlaceholder': 'Street, city',
+  'setup.studio.phonePlaceholder': '03-0000000',
   'setup.studio.logoAlt': 'Club logo',
   'setup.studio.logoRejected': 'That file was not accepted. PNG, JPEG or WebP up to 2MB — SVG is never accepted.',
   'setup.groups.className': 'Class name',
