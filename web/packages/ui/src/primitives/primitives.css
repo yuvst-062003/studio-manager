@@ -1099,9 +1099,15 @@ a {
 
 /* ── Screen header + sign-in card, same pass ────────────────────────────────────── */
 
+/* Two markup shapes share this rule, on purpose. Six screens predate the primitive and
+ * write `<div class="studio-page-header"><h1>…</h1>…</div>`, pushing their actions away
+ * with the auto margin below; `PageHeader` nests its heading in `__titles` so it can
+ * carry a subtitle. `space-between` is what makes the nested shape align — and it is a
+ * no-op for the older one, whose auto margin has already eaten the free space. */
 .studio-page-header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: var(--space-3);
   margin-block-end: var(--space-4);
 }
@@ -1325,4 +1331,121 @@ a {
   display: flex;
   align-items: center;
   gap: var(--space-1);
+}
+
+/* ── Composition layer (manager-home proposal, 2026-08-29) ─────────────────────────────
+ * The layer between a primitive and a screen: how controls sit next to each other. Its
+ * absence is why the apps carry 178 inline `style={{ }}` blocks, each one re-deciding a
+ * gap and an alignment locally, and why two buttons 8px apart read as unrelated.
+ *
+ * Logical properties throughout. A physical `justify-content: flex-end` here would put
+ * every primary action on the wrong edge in Hebrew, and an LTR reviewer would never see
+ * it — which is the whole reason D10's lint rule exists. */
+
+.studio-actionbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+/* One rule, three cases. `between` is the two-group form; the single-group forms align to
+ * their own edge so a lone primary does not drift into the middle of the row. */
+.studio-actionbar[data-align="between"] { justify-content: space-between; }
+.studio-actionbar[data-align="start"] { justify-content: flex-start; }
+.studio-actionbar[data-align="end"] { justify-content: flex-end; }
+
+.studio-actionbar__group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.studio-section-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-block-end: var(--space-3);
+}
+
+.studio-section-header__title {
+  color: var(--fg);
+  font-size: var(--text-title);
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-snug);
+  margin: 0;
+}
+
+.studio-section-header__action {
+  font-size: var(--text-label);
+
+  /* Never shrinks below its content: a trailing "full week ←" that wraps to two lines is
+   * worse than a title that truncates. */
+  flex: 0 0 auto;
+}
+
+/* No base rule here: `.studio-page-header` is defined once, above, and shared with the six
+ * screens that predate this primitive. Nor a `__title` rule — the `.studio-page-header h1`
+ * selector above already sizes it, and a second declaration would win on specificity in
+ * one shape and lose in the other, which is how one component becomes two. */
+
+.studio-page-header__subtitle {
+  color: var(--text-muted);
+  font-size: var(--text-label);
+  line-height: var(--leading-normal);
+  margin-block: var(--space-1) 0;
+}
+
+.studio-page-header__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 0 0 auto;
+}
+
+.studio-stat-tile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  background: var(--surface);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-lg);
+  padding-block: var(--space-4);
+  padding-inline: var(--space-5);
+  text-decoration: none;
+  color: inherit;
+}
+
+.studio-stat-tile__label {
+  color: var(--text-secondary);
+  font-size: var(--text-label);
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-tight);
+}
+
+.studio-stat-tile__value {
+  color: var(--fg);
+  font-size: var(--text-display);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-tight);
+}
+
+.studio-stat-tile__hint {
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+  line-height: var(--leading-normal);
+}
+
+/* Tone recolours the VALUE only. The label and hint stay neutral so the tile reads as one
+ * fact with a state, not as a block of coloured text — and so the semantic token keeps
+ * carrying meaning rather than becoming decoration (D3). */
+.studio-stat-tile[data-tone="debt"] .studio-stat-tile__value { color: var(--debt); }
+.studio-stat-tile[data-tone="paid"] .studio-stat-tile__value { color: var(--paid); }
+.studio-stat-tile[data-tone="pending"] .studio-stat-tile__value { color: var(--pending); }
+
+a.studio-stat-tile:hover { border-color: var(--border-strong); }
+
+a.studio-stat-tile:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
 }

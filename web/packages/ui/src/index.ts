@@ -44,6 +44,13 @@ export type { SlotChipOption } from './primitives/SlotChips'
 export { Button } from './primitives/Button'
 export type { ButtonVariant } from './primitives/Button'
 export { Card } from './primitives/Card'
+// The composition layer — how primitives sit next to each other. See
+// docs/design/proposals/manager-home.md; ActionBar is the fix for RolloverWizard.tsx:366.
+export { ActionBar } from './primitives/ActionBar'
+export { PageHeader } from './primitives/PageHeader'
+export { SectionHeader } from './primitives/SectionHeader'
+export { StatTile } from './primitives/StatTile'
+export type { StatTone } from './primitives/StatTile'
 export { DateRangePicker } from './primitives/DateRangePicker'
 export { Checkbox } from './primitives/Checkbox'
 export { EmptyState } from './primitives/EmptyState'
