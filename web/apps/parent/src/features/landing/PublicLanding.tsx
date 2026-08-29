@@ -210,8 +210,12 @@ const photoStyle: CSSProperties = {
   objectFit: 'cover',
 }
 
-const mapPlaceholderStyle: CSSProperties = {
-  blockSize: '8rem',
+// The real map (2026-08-30) — the keyless Google embed, addressed by the same string the
+// ניווט button carries. `background` stays: it is what shows while the frame loads.
+const mapStyle: CSSProperties = {
+  blockSize: '12rem',
+  inlineSize: '100%',
+  border: 0,
   borderRadius: 'var(--radius-md)',
   background: 'var(--disabled-surface)',
 }
@@ -585,7 +589,12 @@ export function PublicLanding({
             <Card>
               <h2 id="landing-where">{t(locale, 'people.landing.whereTitle')}</h2>
               <p data-testid="landing-address">{landing.address}</p>
-              <div style={mapPlaceholderStyle} aria-hidden="true" />
+              <iframe
+                title={t(locale, 'people.landing.mapTitle')}
+                src={`https://maps.google.com/maps?q=${encodeURIComponent(landing.address)}&output=embed&hl=${locale}`}
+                style={mapStyle}
+                loading="lazy"
+              />
               <div style={buttonRowStyle}>
                 <a
                   className="studio-btn"

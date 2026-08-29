@@ -53,23 +53,28 @@ type StudioDetails = {
   landing_photos?: LandingPhoto[]
 }
 
-//: 3f's own left rail, in its own order. The five M1 does not own are listed rather than
-//: hidden: a manager who cannot find מחירים concludes it is missing, not that it is next.
-const SECTIONS = [
-  { key: 'studio', owned: true },
+//: 3f's own left rail, in its own order. An entry with an `href` is a section whose
+//: editor lives on its own screen — the rail LINKS there rather than stubbing a panel.
+//: These six spent two waves disabled under "עדיין לא זמין" while their screens shipped
+//: one by one; a settings rail promising a screen that already exists is the stale kind
+//: of promise the cockpit rule exists to prevent (closed 2026-08-30).
+const SECTIONS: readonly { key: string; href?: string }[] = [
+  { key: 'studio' },
   // F4.3 — classes and halls. Settings-cadence edits live here; #/groups stays the
   // weekly working screen.
-  { key: 'structure', owned: true },
-  { key: 'prices', owned: false },
+  { key: 'structure' },
+  { key: 'prices', href: '#/prices' },
   // Owned since the 2026-08-27 payment-routes pass: this is where the הוראת קבע link per
   // price plan is set. One screen answers "how may a family pay this club".
-  { key: 'payments', owned: true },
-  { key: 'documents', owned: false },
-  { key: 'attendance', owned: false },
-  { key: 'notifications', owned: false },
-  { key: 'users', owned: false },
-  { key: 'belts', owned: false },
-] as const
+  { key: 'payments' },
+  { key: 'documents', href: '#/documents' },
+  { key: 'attendance', href: '#/attendance' },
+  // 'התראות ותבניות' — the alert centre is where the notification templates and the
+  // reminder ladder surface today.
+  { key: 'notifications', href: '#/alerts' },
+  { key: 'users', href: '#/staff' },
+  { key: 'belts', href: '#/belts' },
+]
 
 const PARENT_LOCALES = ['he', 'en', 'ru'] as const
 
@@ -280,23 +285,25 @@ export function SettingsScreen({ locale }: { locale: Locale }) {
           <ul style={railStyle}>
             {SECTIONS.map((entry) => (
               <li key={entry.key}>
-                <button
-                  aria-current={entry.key === section ? 'page' : undefined}
-                  className="settings-rail__button"
-                  data-testid={`settings-section-${entry.key}`}
-                  disabled={!entry.owned}
-                  onClick={() => setSection(entry.key)}
-                  type="button"
-                >
-                  {t(locale, `common.settings.section.${entry.key}`)}
-                  {/* Under the name rather than trailing it on the same line, which is
-                      what made the unbuilt sections the widest entries in the column. */}
-                  {entry.owned ? null : (
-                    <span className="settings-rail__soon">
-                      {t(locale, 'common.settings.notYetAvailable')}
-                    </span>
-                  )}
-                </button>
+                {entry.href ? (
+                  <a
+                    className="settings-rail__button"
+                    data-testid={`settings-section-${entry.key}`}
+                    href={entry.href}
+                  >
+                    {t(locale, `common.settings.section.${entry.key}`)}
+                  </a>
+                ) : (
+                  <button
+                    aria-current={entry.key === section ? 'page' : undefined}
+                    className="settings-rail__button"
+                    data-testid={`settings-section-${entry.key}`}
+                    onClick={() => setSection(entry.key)}
+                    type="button"
+                  >
+                    {t(locale, `common.settings.section.${entry.key}`)}
+                  </button>
+                )}
               </li>
             ))}
           </ul>

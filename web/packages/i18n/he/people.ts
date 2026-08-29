@@ -275,6 +275,7 @@ export const people: Bundle = {
   'landing.bookTrial': 'קביעת שיעור ניסיון',
   'landing.changeGroup': 'שינוי',
   'landing.closeBooking': 'סגירה',
+  'landing.mapTitle': 'מפת הגעה למועדון',
 
   // §5.4a step 3 — the SHORT trial form, against the seeded kind='trial' template.
   'trialHealth.title': 'הצהרת בריאות לשיעור ניסיון',

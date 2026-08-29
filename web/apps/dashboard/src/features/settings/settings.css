@@ -30,17 +30,17 @@
   background: var(--surface-raised);
 }
 
+/* The rail's linked entries (2026-08-30) — same box as the buttons, or the column reads
+   as two kinds of thing. */
+a.settings-rail__button {
+  display: block;
+  text-decoration: none;
+}
+
 /* The section being read. A weight and a background, never colour alone (SC 1.4.1). */
 .settings-rail__button[aria-current='page'] {
   background: var(--surface-raised);
   font-weight: 600;
-}
-
-/* "not yet available", small and under the name rather than trailing it on one line —
-   which is what made those entries the widest things in the column. */
-.settings-rail__soon {
-  display: block;
-  font-size: var(--text-caption);
 }
 
 .settings-row__label {

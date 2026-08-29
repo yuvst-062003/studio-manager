@@ -384,3 +384,14 @@ describe('redesign 2026-08-29 — the group picker and the one CTA', () => {
     )
   })
 })
+
+describe('the location map (2026-08-30)', () => {
+  it('embeds a real map for the address, not a grey box', async () => {
+    // Region 6 shipped with `mapPlaceholderStyle` — a grey rectangle where 13a draws a
+    // map. The keyless Google embed finishes it: same address the ניווט button uses.
+    render(<PublicLanding slug="x" locale="he" client={clientReturning(LANDING)} />)
+    const map = await screen.findByTitle(t('he', 'people.landing.mapTitle'))
+    expect(map.tagName).toBe('IFRAME')
+    expect(map).toHaveAttribute('src', expect.stringContaining(encodeURIComponent('הרצל 12')))
+  })
+})

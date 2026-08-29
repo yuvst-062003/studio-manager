@@ -54,13 +54,26 @@ describe('SettingsScreen', () => {
     expect(screen.getByTestId('standing-order-links')).toBeInTheDocument()
   })
 
-  it('disables the sections that are not built yet and labels them', async () => {
+  it('links each section to the screen that owns it — nothing reads "not yet available" (2026-08-30)', async () => {
+    // The rail's six stubs outlived their screens: prices, documents, attendance, alerts,
+    // staff and belts all exist as routes, so a disabled button under each name was a
+    // stale promise. A settings section whose editor lives on its own screen is a LINK to
+    // that screen, the same hash navigation the shell uses.
     stub()
     render(<SettingsScreen locale="he" />)
-    expect(await screen.findByTestId('settings-section-prices')).toBeDisabled()
-    expect(screen.getByTestId('settings-section-prices')).toHaveTextContent(
-      t('he', 'common.settings.notYetAvailable'),
-    )
+    const expected: Record<string, string> = {
+      prices: '#/prices',
+      documents: '#/documents',
+      attendance: '#/attendance',
+      notifications: '#/alerts',
+      users: '#/staff',
+      belts: '#/belts',
+    }
+    for (const [key, hash] of Object.entries(expected)) {
+      const entry = await screen.findByTestId(`settings-section-${key}`)
+      expect(entry).toHaveAttribute('href', hash)
+      expect(entry).not.toHaveTextContent(t('he', 'common.settings.notYetAvailable'))
+    }
     expect(screen.getByTestId('settings-section-studio')).toBeEnabled()
   })
 

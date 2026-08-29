@@ -240,6 +240,7 @@ export const people: Bundle = {
   'landing.bookTrial': 'Book a trial lesson',
   'landing.changeGroup': 'Change',
   'landing.closeBooking': 'Close',
+  'landing.mapTitle': 'Map of the club location',
 
   'trialHealth.title': 'Health declaration for the trial class',
   'trialHealth.subtitle':

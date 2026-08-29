@@ -243,6 +243,7 @@ export const people: Bundle = {
   'landing.bookTrial': 'Записаться на пробное занятие',
   'landing.changeGroup': 'Изменить',
   'landing.closeBooking': 'Закрыть',
+  'landing.mapTitle': 'Карта проезда к клубу',
 
   'trialHealth.title': 'Декларация о здоровье для пробного занятия',
   'trialHealth.subtitle':
