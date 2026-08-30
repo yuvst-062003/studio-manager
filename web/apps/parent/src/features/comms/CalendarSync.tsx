@@ -10,10 +10,12 @@
 // empty calendar slot as proof a lesson is on, and §5.11's push is what actually carries the
 // cancellation.
 //
-// **Rotation warns first.** §5.12: "rotating invalidates the old URL immediately." A parent
-// who presses it to tidy up and silently loses their family calendar has been failed by the
-// button rather than by the API — `calendar.rotateWarning` says what will happen before it
-// happens.
+// **Rotation, and the lag sentence, are a coach's half of this panel.** §5.12 wrote both
+// for a feed URL treated as a secret. The club's ruling (2026-08-30) is that a parent's
+// timetable is not one, so for a guardian the panel is the three subscribe buttons and
+// nothing else — see the JSX. Where it still renders, rotation warns first: §5.12's
+// "rotating invalidates the old URL immediately" means a coach who presses it to tidy up
+// and silently loses their calendar has been failed by the button rather than by the API.
 import { useCallback, useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { Button, Card, LoadFailed } from '@studio/ui'
@@ -165,40 +167,62 @@ export function CalendarSync({
 
       {copied ? <p style={hintStyle}>{t(locale, 'comms.calendar.linkCopied')}</p> : null}
 
-      <p style={hintStyle}>{t(locale, 'comms.calendar.refreshDelay')}</p>
-
-      <Card>
-        <div style={sectionStyle}>
-          {rotated ? (
-            <p style={hintStyle} data-testid="calendar-rotated">
-              {t(locale, 'comms.calendar.rotated')}
-            </p>
-          ) : null}
-          {feed.rotated_at ? (
-            <p style={hintStyle}>
-              {t(locale, 'comms.calendar.lastRotated')}{' '}
-              {formatDateInStudioZone(feed.rotated_at, locale)}
-            </p>
-          ) : null}
-          {confirmingRotate ? (
-            <>
-              <p style={hintStyle} data-testid="rotate-warning">
-                {t(locale, 'comms.calendar.rotateWarning')}
-              </p>
-              <div style={actionsStyle}>
-                <Button onClick={() => void rotate()}>{t(locale, 'comms.calendar.rotate')}</Button>
-                <Button variant="secondary" onClick={() => setConfirmingRotate(false)}>
-                  {t(locale, 'comms.calendar.rotateKeep')}
+      {/* **The rotate control and the lag sentence are a COACH's, not a parent's** (owner
+          decision, 2026-08-30).
+          
+          Both existed to protect a secret. `rotateWarning` and `refreshDelay` were written
+          on the premise that the feed URL is sensitive and that a parent needs telling not
+          to trust a stale calendar — and the club's answer to the first is that the
+          timetable is not a secret: "so what if someone sees the schedule. It is already
+          public." A control whose only purpose is to revoke access to public information
+          is a button that can only ever break a working calendar by accident.
+          
+          The sentence goes with it for the same reason. §5.11's push is what actually
+          carries a cancellation, the app itself is where a parent checks tonight, and a
+          caveat about a stale mirror is a caveat about a risk the family does not run.
+          
+          A coach's feed is a different object: it carries who is teaching what and where,
+          it is not published anywhere, and `subjectType` is the seam that already told the
+          two apart. So the panel keeps both — for coaches. */}
+      {subjectType === 'coach' ? (
+        <>
+          <p style={hintStyle}>{t(locale, 'comms.calendar.refreshDelay')}</p>
+          <Card>
+            <div style={sectionStyle}>
+              {rotated ? (
+                <p style={hintStyle} data-testid="calendar-rotated">
+                  {t(locale, 'comms.calendar.rotated')}
+                </p>
+              ) : null}
+              {feed.rotated_at ? (
+                <p style={hintStyle}>
+                  {t(locale, 'comms.calendar.lastRotated')}{' '}
+                  {formatDateInStudioZone(feed.rotated_at, locale)}
+                </p>
+              ) : null}
+              {confirmingRotate ? (
+                <>
+                  <p style={hintStyle} data-testid="rotate-warning">
+                    {t(locale, 'comms.calendar.rotateWarning')}
+                  </p>
+                  <div style={actionsStyle}>
+                    <Button onClick={() => void rotate()}>
+                      {t(locale, 'comms.calendar.rotate')}
+                    </Button>
+                    <Button variant="secondary" onClick={() => setConfirmingRotate(false)}>
+                      {t(locale, 'comms.calendar.rotateKeep')}
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <Button variant="secondary" onClick={() => setConfirmingRotate(true)}>
+                  {t(locale, 'comms.calendar.rotate')}
                 </Button>
-              </div>
-            </>
-          ) : (
-            <Button variant="secondary" onClick={() => setConfirmingRotate(true)}>
-              {t(locale, 'comms.calendar.rotate')}
-            </Button>
-          )}
-        </div>
-      </Card>
+              )}
+            </div>
+          </Card>
+        </>
+      ) : null}
     </section>
   )
 }

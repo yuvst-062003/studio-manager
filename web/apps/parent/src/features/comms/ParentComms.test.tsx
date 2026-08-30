@@ -310,41 +310,43 @@ describe('the calendar panel', () => {
     expect(google.getAttribute('href')).toContain('calendar.google.com')
   })
 
-  it('says the feed is slow, where the parent can read it', async () => {
-    // §5.12 — Google refreshes a subscribed calendar up to ~24h behind. The feed answers
-    // "where do I need to be next Tuesday", never "tonight is cancelled". A parent who does
-    // not know that will read an unchanged calendar as proof a lesson is on.
+  it('shows a parent the three buttons and nothing else', async () => {
+    // Owner decision, 2026-08-30. The rotate control revoked access to a timetable the
+    // club publishes anyway, so its only reachable outcome was a parent breaking their own
+    // synced calendar; the ~24h lag sentence was a caveat about a risk that goes with it,
+    // on a screen where §5.11's push is what actually carries a cancellation.
     render(<CalendarSync client={feedClient()} locale="he" />)
-    expect(await screen.findByText(t('he', 'comms.calendar.refreshDelay'))).toBeInTheDocument()
+    await screen.findByRole('link', { name: t('he', 'comms.calendar.addGoogle') })
+    expect(screen.queryByRole('button', { name: t('he', 'comms.calendar.rotate') })).toBeNull()
+    expect(screen.queryByText(t('he', 'comms.calendar.refreshDelay'))).toBeNull()
   })
 
-  it('warns before rotating, because rotation disconnects every synced calendar', async () => {
-    const rotateFeed = vi.fn().mockResolvedValue({ ...feed, rotated_at: '2026-11-12T09:00:00Z' })
-    render(<CalendarSync client={feedClient({ rotateFeed })} locale="he" />)
+  it('keeps rotation for a coach, and warns before it happens', async () => {
+    // A coach's feed carries who is teaching what and where, and is published nowhere.
+    // §5.12's "rotating invalidates the old URL immediately" still holds there, so the
+    // warning is a gate rather than a toast after the fact.
+    const coachFeed = { ...feed, subject_type: 'coach' as const }
+    const rotateFeed = vi.fn().mockResolvedValue({ ...coachFeed, rotated_at: '2026-11-12T09:00:00Z' })
+    render(
+      <CalendarSync
+        client={makeClient({
+          calendarFeeds: vi.fn().mockResolvedValue({ feeds: [coachFeed] }),
+          rotateFeed,
+        })}
+        locale="he"
+        subjectType="coach"
+      />,
+    )
 
     await userEvent.click(
       await screen.findByRole('button', { name: t('he', 'comms.calendar.rotate') }),
     )
     expect(screen.getByTestId('rotate-warning')).toBeInTheDocument()
-    // Nothing has happened yet — the warning is a gate, not a toast after the fact.
     expect(rotateFeed).not.toHaveBeenCalled()
 
     await userEvent.click(screen.getByRole('button', { name: t('he', 'comms.calendar.rotate') }))
     await waitFor(() => expect(rotateFeed).toHaveBeenCalledWith('f1'))
     expect(screen.getByTestId('calendar-rotated')).toBeInTheDocument()
-  })
-
-  it('lets the parent keep the link they already have', async () => {
-    const rotateFeed = vi.fn()
-    render(<CalendarSync client={feedClient({ rotateFeed })} locale="he" />)
-    await userEvent.click(
-      await screen.findByRole('button', { name: t('he', 'comms.calendar.rotate') }),
-    )
-    await userEvent.click(
-      screen.getByRole('button', { name: t('he', 'comms.calendar.rotateKeep') }),
-    )
-    expect(rotateFeed).not.toHaveBeenCalled()
-    expect(screen.queryByTestId('rotate-warning')).toBeNull()
   })
 
   it('copies the subscription URL', async () => {

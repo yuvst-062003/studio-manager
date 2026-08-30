@@ -27,10 +27,49 @@ import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { cancelReasonLabel } from './client'
 import type { ParentScheduleClient, SessionRow } from './client'
+import { SessionAttendanceDialog, reportedKey } from './SessionAttendanceDialog'
+import type { AttendanceChild } from './SessionAttendanceDialog'
 
 const pad = (value: number): string => String(value).padStart(2, '0')
 const dayKey = (year: number, month: number, day: number): string =>
   `${year}-${pad(month)}-${pad(day)}`
+
+/** How far past today שיעורים קרובים looks, in days. Two months, so a family who opens the
+ *  app in the last week of the summer still sees the term start. */
+const HORIZON_DAYS = 60
+
+/** `2026-08-30` + n days, as another day key. Pure UTC arithmetic on a date-only string —
+ *  the studio-zone conversion already happened in `studioDayKey`, and doing it twice is how
+ *  a lesson lands on the wrong side of midnight. */
+function addDays(key: string, days: number): string {
+  const at = new Date(`${key}T00:00:00Z`)
+  at.setUTCDate(at.getUTCDate() + days)
+  return at.toISOString().slice(0, 10)
+}
+
+/** D5's three, now the parent's too (owner request, 2026-08-30): "in the calendar screen
+ *  the parent can choose between the month and the week and the day like in the admin". */
+type BoardView = 'day' | 'week' | 'month'
+
+/** The Sunday-first week `key` falls in, as seven day keys. */
+function weekOf(key: string): string[] {
+  const weekday = new Date(`${key}T00:00:00Z`).getUTCDay()
+  const sunday = addDays(key, -weekday)
+  return Array.from({ length: 7 }, (_, index) => addDays(sunday, index))
+}
+
+/** `key` moved by whole months, clamped to the target month's length so 31 January + 1
+ *  lands on 28 February rather than rolling into March. */
+function addMonths(key: string, delta: number): string {
+  const year = Number(key.slice(0, 4))
+  const month = Number(key.slice(5, 7))
+  const day = Number(key.slice(8, 10))
+  const target = new Date(Date.UTC(year, month - 1 + delta, 1))
+  const daysInTarget = new Date(
+    Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0),
+  ).getUTCDate()
+  return dayKey(target.getUTCFullYear(), target.getUTCMonth() + 1, Math.min(day, daysInTarget))
+}
 
 /** One month, Sunday-first, padded to whole weeks with `''`. */
 function monthGrid(year: number, month: number): string[] {
@@ -78,6 +117,13 @@ function dayState(rows: AttendanceRow[]): DayState {
     }
   }
   return 'unmarked'
+}
+
+//: Which i18n suffix the arrows take, per view. `schedule.calendar.previousDay` etc.
+const STRIDE: Record<BoardView, 'Day' | 'Week' | 'Month'> = {
+  day: 'Day',
+  week: 'Week',
+  month: 'Month',
 }
 
 const DAY_TONE: Record<DayState, string> = {
@@ -140,6 +186,22 @@ const trainingDayStyle: CSSProperties = {
   fontWeight: 'var(--weight-semibold)' as CSSProperties['fontWeight'],
 }
 
+//: Day view is one column, not seven with six blanks beside it.
+const dayViewGridStyle: CSSProperties = { ...gridStyle, gridTemplateColumns: 'minmax(0, 1fr)' }
+
+//: Fills the cell so the whole square is the target — §6.2's 44px is the cell's own
+//: min-block-size, and a smaller button inside it would undo that on a phone.
+const dayButtonStyle: CSSProperties = {
+  background: 'none',
+  border: 'none',
+  blockSize: '100%',
+  color: 'inherit',
+  cursor: 'pointer',
+  font: 'inherit',
+  inlineSize: '100%',
+  padding: 0,
+}
+
 const rowStyle: CSSProperties = {
   display: 'flex',
   flexWrap: 'wrap',
@@ -152,17 +214,34 @@ const rowStyle: CSSProperties = {
 
 const noteStyle: CSSProperties = { color: 'var(--text-secondary)', fontSize: 'var(--text-caption)' }
 
+//: The whole row is the target, so the row's own layout moves onto the button.
+const sessionButtonStyle: CSSProperties = {
+  ...rowStyle,
+  background: 'none',
+  borderInline: 'none',
+  borderBlockStart: 'none',
+  color: 'inherit',
+  cursor: 'pointer',
+  font: 'inherit',
+  inlineSize: '100%',
+  textAlign: 'start',
+}
+
 function SessionLine({
   locale,
   session,
   testId,
+  onPress,
 }: {
   locale: Locale
   session: SessionRow
   testId: string
+  /** Opens the attendance popup on this lesson's day. Absent on a past lesson, and on any
+   *  mount with no absence client — a row that cannot answer must not look like it can. */
+  onPress?: () => void
 }) {
-  return (
-    <li data-testid={testId} style={rowStyle}>
+  const body = (
+    <>
       <span>{formatDateInStudioZone(session.starts_at, locale)}</span>
       <span>
         {formatTimeInStudioZone(session.starts_at, locale)}
@@ -180,6 +259,17 @@ function SessionLine({
       {session.cancel_reason ? (
         <span style={noteStyle}>{cancelReasonLabel(locale, session.cancel_reason)}</span>
       ) : null}
+    </>
+  )
+  return (
+    <li data-testid={testId} style={onPress ? undefined : rowStyle}>
+      {onPress ? (
+        <button onClick={onPress} style={sessionButtonStyle} type="button">
+          {body}
+        </button>
+      ) : (
+        body
+      )}
     </li>
   )
 }
@@ -188,22 +278,49 @@ export function ChildCalendar({
   locale,
   client,
   today,
+  absence,
 }: {
   locale: Locale
   client: ParentScheduleClient
   /** An ISO instant. A prop, not `new Date()` — upcoming-vs-past is decided against it. */
   today: string
+  /**
+   * The absence pre-report writes, for the popup a lesson opens (owner request,
+   * 2026-08-30). Optional so a mount that predates the popup still renders a calendar —
+   * without it a lesson is not pressable and nothing else changes.
+   */
+  absence?: {
+    report(input: { studentId: string; sessionId: string; reason: string | null }): Promise<unknown>
+    cancel(sessionId: string, studentId: string): Promise<void>
+  }
 }) {
   const todayKey = useMemo(() => studioDayKey(today), [today])
-  const [year, setYear] = useState(() => Number(todayKey.slice(0, 4)))
-  const [month, setMonth] = useState(() => Number(todayKey.slice(5, 7)))
+  /**
+   * **The focused DAY, not a year and a month.**
+   *
+   * The two-number version could only step by months, so week view filtered the grid to
+   * `week.includes(todayKey)` — navigate to any other month and the week view rendered a
+   * header row and nothing else, because no week of March contains today. A single day key
+   * is what lets one control move by a day, a week or a month and stay correct in all
+   * three.
+   */
+  const [anchor, setAnchor] = useState(todayKey)
+  const year = Number(anchor.slice(0, 4))
+  const month = Number(anchor.slice(5, 7))
   const [sessions, setSessions] = useState<SessionRow[]>([])
   const [loaded, setLoaded] = useState(false)
+  // **The next lessons are not a property of the open month.** See `horizonBounds`.
+  const [horizon, setHorizon] = useState<SessionRow[]>([])
   // P3 — the attendance layer and its per-child switcher.
   const [attendance, setAttendance] = useState<AttendanceRow[]>([])
   const [children, setChildren] = useState<Child[]>([])
   const [childFilter, setChildFilter] = useState<string | null>(null)
-  const [view, setView] = useState<'month' | 'week'>('month')
+  const [view, setView] = useState<BoardView>('month')
+  /** The pressed day. The popup's open state, and the day whose lessons it answers for. */
+  const [openDay, setOpenDay] = useState<string | null>(null)
+  /** Bumped after a pre-report is filed or withdrawn, so the dots and the popup re-read
+   *  rather than showing the family the state from before their own press. */
+  const [refresh, setRefresh] = useState(0)
 
   const cells = useMemo(() => monthGrid(year, month), [year, month])
   // `monthGrid` already pads to a whole number of sevens, so every chunk is a full week.
@@ -215,6 +332,24 @@ export function ChildCalendar({
     const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate()
     return { from: dayKey(year, month, 1), to: dayKey(year, month, daysInMonth) }
   }, [year, month])
+
+  /**
+   * **`שיעורים קרובים` is bounded by today, not by the month on screen.**
+   *
+   * Every list here used to read from the month grid's own fetch, which made "when does my
+   * child next train" answerable only if the answer happened to fall before the 31st. A
+   * club whose training year starts on 1 September opened the app on 30 August to an empty
+   * August, `אין שיעורים בחודש הזה`, and no sign at all that the first lesson was three
+   * days away — which is exactly how the first real club read this screen.
+   *
+   * Keyed on `today` and nothing else, so paging through months never refetches it. That
+   * makes this *fewer* requests than the old arrangement, not more: the upcoming list
+   * stopped being re-read on every press of חודש הבא.
+   */
+  const horizonBounds = useMemo(
+    () => ({ from: todayKey, to: addDays(todayKey, HORIZON_DAYS) }),
+    [todayKey],
+  )
 
   useEffect(() => {
     let live = true
@@ -232,11 +367,36 @@ export function ChildCalendar({
 
   useEffect(() => {
     let live = true
-    // Well inside the endpoint's 62-day cap: one month is at most 31.
-    void apiFetch(`/api/v1/me/attendance?from=${bounds.from}&to=${bounds.to}`)
-      .then(async (r) => (r.ok ? ((await r.json()) as { items: AttendanceRow[] }).items : []))
-      .then((items) => live && setAttendance(items))
-      .catch(() => undefined)
+    void (async () => {
+      const rows = await client.listSessions(horizonBounds).catch(() => [])
+      if (live) setHorizon(rows)
+    })()
+    return () => {
+      live = false
+    }
+  }, [horizonBounds, client])
+
+  useEffect(() => {
+    let live = true
+    const read = (from: string, to: string) =>
+      // Well inside the endpoint's 62-day cap: a month is at most 31 and the horizon is 60.
+      apiFetch(`/api/v1/me/attendance?from=${from}&to=${to}`)
+        .then(async (r) => (r.ok ? ((await r.json()) as { items: AttendanceRow[] }).items : []))
+        .catch(() => [] as AttendanceRow[])
+    // Both ranges, because an absence the family already pre-reported decides what the
+    // popup offers — and the popup opens on upcoming lessons, which now reach past the
+    // open month. Merged by (session, student): the ranges overlap on the current month.
+    void Promise.all([
+      read(bounds.from, bounds.to),
+      read(horizonBounds.from, horizonBounds.to),
+    ]).then(([monthRows, horizonRows]) => {
+      if (!live) return
+      const byPair = new Map<string, AttendanceRow>()
+      for (const row of [...monthRows, ...horizonRows]) {
+        byPair.set(`${row.session_id}:${row.student_id}`, row)
+      }
+      setAttendance([...byPair.values()])
+    })
     void apiFetch('/api/v1/me/students')
       .then(async (r) => (r.ok ? ((await r.json()) as { items: Child[] }).items : []))
       .then((items) => live && setChildren(items))
@@ -244,7 +404,7 @@ export function ChildCalendar({
     return () => {
       live = false
     }
-  }, [bounds.from, bounds.to])
+  }, [bounds.from, bounds.to, horizonBounds.from, horizonBounds.to, refresh])
 
   const filteredAttendance = useMemo(
     () => (childFilter ? attendance.filter((row) => row.student_id === childFilter) : attendance),
@@ -272,33 +432,87 @@ export function ChildCalendar({
     }
   }, [attendanceByDay, sessions, today])
 
+  // Both reads: a week view sitting across a month boundary draws days the month fetch
+  // never covered, and an undotted lesson day is a lesson the family cannot press.
   const trainingDays = useMemo(
-    () => new Set(sessions.map((session) => studioDayKey(session.starts_at))),
-    [sessions],
+    () => new Set([...sessions, ...horizon].map((session) => studioDayKey(session.starts_at))),
+    [sessions, horizon],
   )
 
   const { upcoming, past } = useMemo(() => {
-    const sorted = [...sessions].sort((left, right) => left.starts_at.localeCompare(right.starts_at))
+    // The two reads overlap whenever the open month is the current one, so the union is
+    // taken by id. A lesson listed twice is a lesson a parent counts twice.
+    const byId = new Map<string, SessionRow>()
+    for (const session of [...sessions, ...horizon]) byId.set(session.id, session)
+    const sorted = [...byId.values()].sort((left, right) =>
+      left.starts_at.localeCompare(right.starts_at),
+    )
     return {
       upcoming: sorted.filter((session) => session.starts_at > today),
-      past: sorted.filter((session) => session.starts_at <= today).reverse(),
+      // שיעורים שהיו stays a property of the OPEN month — it sits under a month grid and
+      // is how a parent reads back a month they navigated to on purpose.
+      past: [...sessions]
+        .sort((left, right) => left.starts_at.localeCompare(right.starts_at))
+        .filter((session) => session.starts_at <= today)
+        .reverse(),
     }
-  }, [sessions, today])
+  }, [sessions, horizon, today])
 
-  const step = useCallback((delta: number) => {
-    setMonth((currentMonth) => {
-      const next = currentMonth + delta
-      if (next < 1) {
-        setYear((currentYear) => currentYear - 1)
-        return 12
+  /** One control, three strides. The arrows move by whatever is on screen — a day in day
+   *  view, a week in week view, a month in month view — which is what "like in the admin"
+   *  means and what the dashboard's board already does. */
+  const step = useCallback(
+    (delta: number) => {
+      setAnchor((current) =>
+        view === 'day'
+          ? addDays(current, delta)
+          : view === 'week'
+            ? addDays(current, delta * 7)
+            : addMonths(current, delta),
+      )
+    },
+    [view],
+  )
+
+  /** The cells the open view actually draws. `weeks` stays the month's — week view picks
+   *  the one containing the anchor, and day view draws a single cell. */
+  const visibleWeeks = useMemo(() => {
+    if (view === 'month') return weeks
+    if (view === 'week') return [weekOf(anchor)]
+    return [[anchor]]
+  }, [view, weeks, anchor])
+
+  /** Every lesson on the pressed day, from both reads. */
+  const sessionsOn = useCallback(
+    (key: string) => {
+      const byId = new Map<string, SessionRow>()
+      for (const session of [...sessions, ...horizon]) {
+        if (studioDayKey(session.starts_at) === key) byId.set(session.id, session)
       }
-      if (next > 12) {
-        setYear((currentYear) => currentYear + 1)
-        return 1
-      }
-      return next
-    })
-  }, [])
+      return [...byId.values()].sort((left, right) => left.starts_at.localeCompare(right.starts_at))
+    },
+    [sessions, horizon],
+  )
+
+  /** The (session, student) pairs already pre-reported absent. §5.7 lands a pre-report as
+   *  an `absent_excused` attendance row, so this read is the same one the dots use — there
+   *  is no second source to disagree with. */
+  const reportedAbsences = useMemo(
+    () =>
+      new Set(
+        attendance
+          .filter((row) => row.status === 'absent_excused')
+          .map((row) => reportedKey(row.session_id, row.student_id)),
+      ),
+    [attendance],
+  )
+
+  const attendanceChildren = useMemo<AttendanceChild[]>(
+    () => children.map(({ id, first_name, last_name }) => ({ id, first_name, last_name })),
+    [children],
+  )
+
+  const openSessions = openDay ? sessionsOn(openDay) : []
 
   return (
     <section aria-labelledby="child-calendar-title" data-testid="child-calendar" style={pageStyle}>
@@ -331,19 +545,33 @@ export function ChildCalendar({
       ) : null}
 
       <div style={toolbarStyle}>
+        {/* The arrows name their own stride. "חודש קודם" on a control that moves a single
+            day is the label lying about what the button does. */}
         <button type="button" data-testid="calendar-previous" onClick={() => step(-1)}>
-          {t(locale, 'schedule.calendar.previousMonth')}
+          {t(locale, `schedule.calendar.previous${STRIDE[view]}`)}
         </button>
-        <span data-testid="calendar-month">{formatMonthLabel(year, month, locale)}</span>
+        <span data-testid="calendar-month">
+          {view === 'month'
+            ? formatMonthLabel(year, month, locale)
+            : formatDateInStudioZone(`${anchor}T12:00:00Z`, locale)}
+        </span>
         <button type="button" data-testid="calendar-next" onClick={() => step(1)}>
-          {t(locale, 'schedule.calendar.nextMonth')}
+          {t(locale, `schedule.calendar.next${STRIDE[view]}`)}
         </button>
+        {/* Navigating three months out and losing the way back is the complaint every
+            calendar with arrows and no home key eventually gets. */}
+        {anchor !== todayKey ? (
+          <button type="button" data-testid="calendar-today" onClick={() => setAnchor(todayKey)}>
+            {t(locale, 'schedule.calendar.today')}
+          </button>
+        ) : null}
         <SegmentedControl
-          legend={t(locale, 'schedule.view.month')}
-          onValueChange={(next) => setView(next as 'month' | 'week')}
+          legend={t(locale, 'schedule.week.view.legend')}
+          onValueChange={(next) => setView(next as BoardView)}
           options={[
-            { value: 'month', label: t(locale, 'schedule.view.month') },
+            { value: 'day', label: t(locale, 'schedule.view.day') },
             { value: 'week', label: t(locale, 'schedule.view.week') },
+            { value: 'month', label: t(locale, 'schedule.view.month') },
           ]}
           value={view}
         />
@@ -373,61 +601,92 @@ export function ChildCalendar({
           as a direct child of a table, so the old markup was invalid as well as
           over-promising. `display: contents` gives the rows no box of their own, so the flat
           CSS grid that lays the month out is completely unaffected. */}
-      <div style={gridStyle} role="table" aria-label={t(locale, 'schedule.view.month')}>
-        <div role="row" style={weekRowStyle}>
-          {[0, 1, 2, 3, 4, 5, 6].map((weekday) => (
-            <div key={weekday} style={headerCellStyle} role="columnheader">
-              {t(locale, `schedule.weekday.${weekday}`)}
-            </div>
-          ))}
-        </div>
-        {weeks
-          .filter((week) => view === 'month' || week.includes(todayKey))
-          .map((week, weekIndex) => (
-          <div key={`week-${weekIndex}`} role="row" style={weekRowStyle}>
-        {week.map((cell, index) =>
-          cell === '' ? (
-            <div key={`pad-${index}`} style={dayStyle} aria-hidden="true" />
-          ) : (
-            <div
-              key={cell}
-              role="cell"
-              // Keyed only; the month's length is `getAllByRole('cell')`. The pads are
-              // aria-hidden divs, so the cells ARE the days.
-              data-testid={`calendar-day-${cell}`}
-              data-has-sessions={trainingDays.has(cell) ? 'true' : 'false'}
-              data-state={
-                attendanceByDay.has(cell)
-                  ? dayState(attendanceByDay.get(cell)!)
-                  : trainingDays.has(cell) && cell > todayKey
-                    ? 'planned'
-                    : undefined
-              }
-              aria-current={cell === todayKey ? 'date' : undefined}
-              style={trainingDays.has(cell) ? trainingDayStyle : dayStyle}
-            >
-              {Number(cell.slice(8))}
-              {attendanceByDay.has(cell) || (trainingDays.has(cell) && cell > todayKey) ? (
-                // Never colour alone (SC 1.4.1): the dot carries the state colour, and
-                // the legend below names every state in words.
-                <span
-                  aria-hidden="true"
-                  style={{
-                    display: 'block',
-                    inlineSize: '6px',
-                    blockSize: '6px',
-                    borderRadius: '50%',
-                    marginInline: 'auto',
-                    background:
-                      DAY_TONE[
-                        attendanceByDay.has(cell) ? dayState(attendanceByDay.get(cell)!) : 'planned'
-                      ],
-                  }}
-                />
-              ) : null}
-            </div>
-          ),
+      <div
+        style={view === 'day' ? dayViewGridStyle : gridStyle}
+        role="table"
+        aria-label={t(locale, `schedule.view.${view}`)}
+      >
+        {/* A single day is a single column, so seven weekday headers over it would label
+            six columns that are not there. */}
+        {view === 'day' ? null : (
+          <div role="row" style={weekRowStyle}>
+            {[0, 1, 2, 3, 4, 5, 6].map((weekday) => (
+              <div key={weekday} style={headerCellStyle} role="columnheader">
+                {t(locale, `schedule.weekday.${weekday}`)}
+              </div>
+            ))}
+          </div>
         )}
+        {visibleWeeks.map((week, weekIndex) => (
+          <div key={`week-${weekIndex}`} role="row" style={weekRowStyle}>
+            {week.map((cell, index) => {
+              if (cell === '') return <div key={`pad-${index}`} style={dayStyle} aria-hidden="true" />
+              const has = trainingDays.has(cell)
+              const state = attendanceByDay.has(cell)
+                ? dayState(attendanceByDay.get(cell)!)
+                : has && cell > todayKey
+                  ? 'planned'
+                  : undefined
+              const dot =
+                attendanceByDay.has(cell) || (has && cell > todayKey) ? (
+                  // Never colour alone (SC 1.4.1): the dot carries the state colour, and
+                  // the legend below names every state in words.
+                  <span
+                    aria-hidden="true"
+                    style={{
+                      display: 'block',
+                      inlineSize: '6px',
+                      blockSize: '6px',
+                      borderRadius: '50%',
+                      marginInline: 'auto',
+                      background: DAY_TONE[state ?? 'planned'],
+                    }}
+                  />
+                ) : null
+              return (
+                <div
+                  key={cell}
+                  role="cell"
+                  // Keyed only; the month's length is `getAllByRole('cell')`. The pads are
+                  // aria-hidden divs, so the cells ARE the days.
+                  data-testid={`calendar-day-${cell}`}
+                  data-has-sessions={has ? 'true' : 'false'}
+                  data-state={state}
+                  aria-current={cell === todayKey ? 'date' : undefined}
+                  style={has ? trainingDayStyle : dayStyle}
+                >
+                  {/* **A day with a lesson is pressable; a day without one is not.**
+                      (Owner request, 2026-08-30: "when a user presses the session on the
+                      calendar a popup should open and ask for attendance".) A button
+                      inside the cell rather than an operable cell: `role="table"` promises
+                      no arrow-key traversal and must not start claiming one, and a real
+                      <button> is what puts the day in the tab order with a name and a
+                      focus ring for free. */}
+                  {has && absence ? (
+                    <button
+                      // The day number alone names nothing out loud. The date and the
+                      // question together are what a screen reader needs to hear.
+                      aria-label={`${formatDateInStudioZone(`${cell}T12:00:00Z`, locale)} — ${t(
+                        locale,
+                        'schedule.calendar.attend.title',
+                      )}`}
+                      data-testid={`calendar-open-${cell}`}
+                      onClick={() => setOpenDay(cell)}
+                      style={dayButtonStyle}
+                      type="button"
+                    >
+                      {Number(cell.slice(8))}
+                      {dot}
+                    </button>
+                  ) : (
+                    <>
+                      {Number(cell.slice(8))}
+                      {dot}
+                    </>
+                  )}
+                </div>
+              )
+            })}
           </div>
         ))}
       </div>
@@ -444,7 +703,11 @@ export function ChildCalendar({
         ))}
       </ul>
 
-      {loaded && sessions.length === 0 ? (
+      {/* An empty month with lessons coming is not an empty screen — the upcoming list
+          below is carrying it, and repeating `אין שיעורים בחודש הזה` above real lessons
+          reads as a contradiction. The state survives for the club that genuinely has
+          nothing scheduled. */}
+      {loaded && sessions.length === 0 && upcoming.length === 0 ? (
         <EmptyState
           title={t(locale, 'schedule.calendar.empty')}
           description={t(locale, 'schedule.calendar.emptyHint')}
@@ -460,6 +723,9 @@ export function ChildCalendar({
                 <SessionLine
                   key={session.id}
                   locale={locale}
+                  onPress={
+                    absence ? () => setOpenDay(studioDayKey(session.starts_at)) : undefined
+                  }
                   session={session}
                   testId="upcoming-session"
                 />
@@ -500,6 +766,25 @@ export function ChildCalendar({
             </Card>
           </details>
         </section>
+      ) : null}
+
+      {openDay && absence ? (
+        <SessionAttendanceDialog
+          children={attendanceChildren}
+          locale={locale}
+          now={today}
+          onCancelReport={async (sessionId, studentId) => {
+            await absence.cancel(sessionId, studentId)
+            setRefresh((n) => n + 1)
+          }}
+          onClose={() => setOpenDay(null)}
+          onReport={async (sessionId, studentId, reason) => {
+            await absence.report({ sessionId, studentId, reason })
+            setRefresh((n) => n + 1)
+          }}
+          reported={reportedAbsences}
+          sessions={openSessions}
+        />
       ) : null}
     </section>
   )

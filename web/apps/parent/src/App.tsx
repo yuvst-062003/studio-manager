@@ -539,6 +539,10 @@ function AuthedApp() {
                 client={scheduleClient}
                 hash={hash}
                 today={today}
+                // The popup a lesson opens writes through `12a`'s client, not a second
+                // one: the deadline, the refusal codes and the no-queue rule are all
+                // already correct there, and two clients is two places for them to drift.
+                absence={absenceClient}
               />
               {/* §5.12 — the feed subscription lives under the calendar it feeds, which
                   is where a parent thinking about calendars already is (P1). */}
