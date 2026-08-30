@@ -638,7 +638,10 @@ def render_declaration_pdf(
         page.gap(SIGNATURE_BOX[1])
 
     page.text_rtl(f"{signed_by} · {local:%d.%m.%Y}", SIZE_SMALL, grey=0.35)
-    page.text_rtl(f"גרסת שאלון {template_version}", SIZE_SMALL, grey=0.5)
+    # `גרסת שאלון N` used to print here. It is bookkeeping, not part of the agreement: the
+    # version is on the row (`health_declaration.template_version`) where the audit trail
+    # needs it, and a family handed their signed form has no use for it. `template_version`
+    # stays a parameter because the caller still identifies the document by it.
     # The club's own sentence from `טופס הרשמה` block 6 -- "אני, ..., מאשר בזאת שקראתי את
     # הצהרת הבריאות ותקנון של מועדון ... ומתחייב לפעול עפ"י הנהלים הרשומים בו".
     #
@@ -677,7 +680,7 @@ def render_declaration_pdf(
         # terms would set with visibly wrong spacing -- on the page a family signs.
         for paragraph in section.paragraphs:
             used.update(font.glyph(c) for c in paragraph)
-    used.update(font.glyph(c) for c in "0123456789.:·עבורגרסתשאלוןחתימה ")
+    used.update(font.glyph(c) for c in "0123456789.:·עבורחתימה ")
     widths = " ".join(
         f"{glyph} [{int(font.advance(glyph) * 1000 / font.units_per_em)}]"
         for glyph in sorted(used)

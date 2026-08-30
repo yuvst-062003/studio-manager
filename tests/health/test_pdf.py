@@ -252,3 +252,11 @@ def test_the_rendered_pdf_matches_the_golden_fixture():
         pytest.skip("golden fixture regenerated — review the diff before committing")
     assert GOLDEN.exists(), "run REGENERATE_GOLDEN=1 pytest tests/health/test_pdf.py"
     assert produced == GOLDEN.read_bytes()
+
+
+def test_the_questionnaire_version_is_not_printed_on_the_document():
+    """`גרסת שאלון N` was bookkeeping on a page a family keeps. The version still lives on
+    `health_declaration.template_version`, where the audit trail needs it."""
+    produced = render_declaration_pdf(**GOLDEN_INPUT)
+    other = render_declaration_pdf(**{**GOLDEN_INPUT, "template_version": 99})
+    assert produced == other, "the version cannot be on the page if changing it changes nothing"

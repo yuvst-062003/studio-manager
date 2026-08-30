@@ -548,6 +548,13 @@ def build_pdf_sections(
             if not isinstance(question, Mapping) or not question.get("id"):
                 continue
             question_id = str(question["id"])
+            # **The clause is prose, not a row.** Its stored value is an id — `none` /
+            # `limited` — and rendering it as an answer printed the literal word "none" beside
+            # "אני מאשר/ת את ההצהרה שלמעלה" on the signed document. The sentence the family
+            # actually confirmed is rendered in full by `build_terms_sections`; this row was
+            # a duplicate of it, showing the internal id instead of the words.
+            if question_id == CLAUSE_QUESTION_ID:
+                continue
             condition = question.get("visible_if")
             if isinstance(condition, Mapping) and not all(
                 answers.get(key) == value for key, value in condition.items()

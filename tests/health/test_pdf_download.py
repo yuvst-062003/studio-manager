@@ -241,3 +241,27 @@ def test_no_disclaimer_string_survives_anywhere_in_the_pipeline():
     prose = " ".join(p for section in sections for p in section.paragraphs)
     assert "נקודת פתיחה" not in prose
     assert "אינו מסמך עמידה ברגולציה" not in prose
+
+
+def test_the_clause_id_never_appears_as_an_answer_on_the_document():
+    """Reported from staging: the signed form read "אני מאשר/ת את ההצהרה שלמעלה  none".
+
+    `clause_confirmed` stores an ID, not a word. Rendered through the answer table it printed
+    the internal value beside its label, on the page a family signs — while the sentence they
+    actually confirmed was already set out in full further down. The row was a duplicate that
+    said less than nothing.
+    """
+    from app.services.structure.health_templates import FULL_TEMPLATE_SCHEMA
+
+    sections = build_pdf_sections(
+        FULL_TEMPLATE_SCHEMA, {"asthma": False, "clause_confirmed": "none"}, "he"
+    )
+    rows = [row for section in sections for row in section.rows]
+    assert not any(answer == "none" for _, answer in rows)
+    assert not any("clause" in question for question, _ in rows)
+
+    # And the sentence itself is still on the document, in words.
+    prose = " ".join(
+        p for s in build_terms_sections({"clause_confirmed": "none"}, "he") for p in s.paragraphs
+    )
+    assert "אין מגבלות רפואיות" in prose
