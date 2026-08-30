@@ -5,6 +5,6 @@
 // `setup-wizard` slot from its own file — SetupWizard.tsx is never reopened, and neither is
 // packages/ui/src/setup-wizard/register.ts, which registers M1's own four steps.
 export { BeltSystemScreen, moved } from './BeltSystemScreen'
-export { BeltsWizardStep, SCRATCH, registerBeltsWizardStep } from './BeltsWizardStep'
+export { SCRATCH, registerBeltsWizardStep } from './BeltsWizardStep'
 export { BELT_PALETTE, makeDashboardBeltsClient } from './client'
 export type { BeltPresetOut, DashboardBeltsClient, LadderRankOut, StudentBeltOut } from './client'

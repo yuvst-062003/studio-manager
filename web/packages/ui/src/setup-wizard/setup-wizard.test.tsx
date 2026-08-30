@@ -1000,3 +1000,16 @@ describe('a step this surface has not built (2026-08-30)', () => {
     await waitFor(() => expect(client.calls).toContain('belts:skipped'))
   })
 })
+
+describe('cross-app freshness (2026-08-30)', () => {
+  it('re-reads progress when the window regains focus — a step finished on the other app appears', async () => {
+    registerM1Stubs()
+    const base = fakeClient()
+    const read = vi.fn(base.read)
+    render(<SetupWizard client={{ ...base, read }} locale="he" />)
+    await screen.findByTestId('setup-wizard')
+    const before = read.mock.calls.length
+    window.dispatchEvent(new Event('focus'))
+    await waitFor(() => expect(read.mock.calls.length).toBeGreaterThan(before))
+  })
+})

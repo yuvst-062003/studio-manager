@@ -37,7 +37,7 @@ export * from './offline'
 
 // -- pure helpers every lane imports (the foundations session) -----------------
 // Nothing in this block touches storage, the network or React.
-export { AGOROT_PER_SHEKEL, MoneyFormatError, formatAgorot, parseShekels } from './money'
+export { AGOROT_PER_SHEKEL, MoneyFormatError, agorotFromShekels, formatAgorot, parseShekels } from './money'
 export {
   STUDIO_TIMEZONE,
   formatDateInStudioZone,

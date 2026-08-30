@@ -27,7 +27,7 @@ import {
 } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
-import { BLANK_ITEM, ItemForm, draftFrom, toInput, validateItem } from './ItemForm'
+import { BLANK_ITEM, ItemForm, draftFrom, sizesLabel, toInput, validateItem } from './ItemForm'
 import type { ItemDraft, ItemErrors } from './ItemForm'
 import type { DashboardBillingClient, ProductOut } from './billingClient'
 
@@ -59,10 +59,8 @@ const hintStyle: CSSProperties = {
 
 /** The sizes as a row reads them. Empty is a real answer — a חגורה — and it is said in
  *  words rather than left blank, because a blank cell reads as "nobody filled this in". */
-export function sizesLabel(product: ProductOut, locale: Locale): string {
-  const sizes = product.sizes ?? []
-  return sizes.length === 0 ? t(locale, 'billing.product.sizesNone') : sizes.join(' · ')
-}
+// `sizesLabel` moved beside the form (2026-08-30); re-exported for this lane's importers.
+export { sizesLabel }
 
 export function ItemsScreen({
   client,

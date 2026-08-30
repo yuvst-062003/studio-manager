@@ -26,6 +26,12 @@ import {
   UpdateToast,
   makeSetupClient,
   registerM1WizardSteps,
+  makeWizardBeltsClient,
+  makeWizardItemsClient,
+  makeWizardPricesClient,
+  registerBeltsWizardStep,
+  registerItemsWizardStep,
+  registerPricesWizardStep,
   useDocumentLocale,
 } from '@studio/ui'
 import { DevBar } from '@studio/ui/dev-bar'
@@ -81,6 +87,13 @@ import './features/attendance/attendance.css'
 // at module load so the slot is populated before anything renders, and `apiFetch` is
 // passed in because @studio/ui must not depend on @studio/core.
 registerM1WizardSteps(apiFetch)
+// The other three (2026-08-30): belts, prices and items lived in the DASHBOARD's feature
+// directories, so this app's wizard showed them as dead rail entries — the owner read
+// that as "payments and belts don't work". They live beside the container now, and both
+// apps register the same components.
+registerBeltsWizardStep(makeWizardBeltsClient(apiFetch))
+registerPricesWizardStep(makeWizardPricesClient(apiFetch))
+registerItemsWizardStep(makeWizardItemsClient(apiFetch))
 
 // §19.4's `📴 offline` and `🐌 slow` toggles, plus the `student-card` attendance strip and
 // the `staff-alerts` conflict cards. Registered at module load for the same reason the

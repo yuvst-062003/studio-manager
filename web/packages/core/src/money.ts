@@ -107,3 +107,19 @@ export function parseShekels(text: string): number {
   const agorot = Number(whole) * AGOROT_PER_SHEKEL + Number(fraction.padEnd(2, '0') || '0')
   return sign === '-' ? -agorot : agorot
 }
+
+/**
+ * The LENIENT shekels → agorot parse, for form inputs (moved home from the dashboard's
+ * billing lane, 2026-08-30 — its header said this was owed back to core).
+ *
+ * `parseShekels` above THROWS, which is right for wire data and wrong for a half-typed
+ * box: a manager mid-keystroke is not an error. This one answers 0 for anything unusable
+ * and accepts a decimal comma. `Math.round` on the product, not on the input: 3.2 * 100
+ * is 320.00000000000006 in binary floating point, and truncating it would charge a
+ * family one agora less.
+ */
+export function agorotFromShekels(input: string | number): number {
+  const value = typeof input === 'number' ? input : Number(input.trim().replace(',', '.'))
+  if (!Number.isFinite(value)) return 0
+  return Math.round(value * 100)
+}

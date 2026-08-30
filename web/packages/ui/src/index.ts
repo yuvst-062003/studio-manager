@@ -120,6 +120,41 @@ export { SetupWizard } from './setup-wizard/SetupWizard'
 export { SetupIncompleteBanner } from './setup-wizard/SetupIncompleteBanner'
 export type { SetupClient } from './setup-wizard/SetupWizard'
 export { registerM1WizardSteps } from './setup-wizard/register'
+// The belts / prices / items steps, moved beside the container (2026-08-30) so BOTH apps
+// register them — the staff app had three dead rail entries while they lived in the
+// dashboard's feature directories. The dashboard passes its full feature clients (they
+// satisfy the minimal shapes structurally); the staff app uses the makeWizard* factories.
+export { BeltsWizardStep, SCRATCH, registerBeltsWizardStep } from './setup-wizard/BeltsWizardStep'
+export {
+  PRICES_WIZARD_ORDER,
+  PricesWizardStep,
+  registerPricesWizardStep,
+} from './setup-wizard/PricesWizardStep'
+export {
+  ITEMS_WIZARD_ORDER,
+  ItemsWizardStep,
+  registerItemsWizardStep,
+} from './setup-wizard/ItemsWizardStep'
+export {
+  makeWizardBeltsClient,
+  makeWizardItemsClient,
+  makeWizardPricesClient,
+} from './setup-wizard/step-clients'
+export type {
+  WizardBeltsClient,
+  WizardItemsClient,
+  WizardPricesClient,
+} from './setup-wizard/step-clients'
+export { PlanFrequencyPicker, PlanPreview, frequencyLabel } from './setup-wizard/PlanFrequency'
+export {
+  BLANK_ITEM,
+  ItemForm,
+  draftFrom,
+  sizesLabel,
+  toInput,
+  validateItem,
+} from './setup-wizard/ItemForm'
+export type { ItemDraft, ItemErrors } from './setup-wizard/ItemForm'
 export {
   makeSetupClient,
   makeStaffClient,

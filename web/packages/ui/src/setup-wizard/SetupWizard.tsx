@@ -65,6 +65,15 @@ export function SetupWizard({
     }
   }, [client, attempt])
 
+  // Same studio, two apps: a step reported done on the dashboard must show done on the
+  // phone without a full reload (owner report, 2026-08-30). Focus re-asks the server;
+  // the manager's own place in the wizard (`activeId`) is untouched by the refresh.
+  useEffect(() => {
+    const onFocus = () => setAttempt((n) => n + 1)
+    globalThis.addEventListener('focus', onFocus)
+    return () => globalThis.removeEventListener('focus', onFocus)
+  }, [])
+
   const steps = useMemo(() => progress?.steps ?? [], [progress])
 
   // §5.1 — 'progress is persisted so the wizard survives a closed app'. Resuming means

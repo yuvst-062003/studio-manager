@@ -28,6 +28,7 @@ export function SetupIncompleteBanner({
   onOpen: () => void
 }) {
   const [progress, setProgress] = useState<SetupProgress | null>(null)
+  const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
     let live = true
@@ -41,7 +42,16 @@ export function SetupIncompleteBanner({
     return () => {
       live = false
     }
-  }, [client])
+  }, [client, attempt])
+
+  // Progress is per STUDIO and server-side, but each app read it once and never again —
+  // so finishing the wizard on the dashboard left the staff app's banner standing until
+  // a full reload (owner report, 2026-08-30). A window regaining focus re-asks.
+  useEffect(() => {
+    const onFocus = () => setAttempt((n) => n + 1)
+    globalThis.addEventListener('focus', onFocus)
+    return () => globalThis.removeEventListener('focus', onFocus)
+  }, [])
 
   // `complete`, not `dismissed_at`: dismissing the wizard is exactly the state this
   // banner exists for — the owner left early, and the way back should be one tap.
