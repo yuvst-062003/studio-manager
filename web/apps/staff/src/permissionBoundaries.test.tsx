@@ -134,7 +134,10 @@ describe('the setup nudge and its door (2026-08-28)', () => {
     await waitFor(() => expect(screen.getByTestId('setup-incomplete')).toBeInTheDocument(), {
       timeout: 3000,
     })
-    await userEvent.click(screen.getByTestId('setup-incomplete-resume'))
+    // findBy, not getBy: the banner re-keys as the session settles (and since
+    // 2026-08-30 re-reads on focus), so the node the waitFor saw can be replaced
+    // before the click lands. Query fresh, retrying, at the click itself.
+    await userEvent.click(await screen.findByTestId('setup-incomplete-resume'))
     await waitFor(() => expect(globalThis.location.hash).toBe('#/setup'))
   })
 

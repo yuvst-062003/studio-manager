@@ -346,7 +346,7 @@ describe('RolloverWizard · groups', () => {
   it('gives the table a caption and every control an accessible name', async () => {
     await renderWizard(stub(atGroups))
     await screen.findByTestId('rollover-step-groups')
-    expect(screen.getByRole('table')).toHaveAccessibleName(
+    expect(await screen.findByRole('table')).toHaveAccessibleName(
       t('he', 'schedule.rollover.groups.caption'),
     )
     for (const box of screen.getAllByRole('textbox')) {
@@ -377,7 +377,7 @@ describe('RolloverWizard · students', () => {
   it('sends the moves a human chose, keyed by enrollment and not by student', async () => {
     const client = await renderWizard(stub(atStudents))
     await screen.findByTestId('rollover-step-students')
-    await userEvent.selectOptions(screen.getByTestId('rollover-student-move-e1'), 'g2')
+    await userEvent.selectOptions(await screen.findByTestId('rollover-student-move-e1'), 'g2')
     await userEvent.click(screen.getByTestId('rollover-students-apply'))
 
     await waitFor(() => expect(client.applyStudents).toHaveBeenCalled())
@@ -390,7 +390,7 @@ describe('RolloverWizard · students', () => {
   it('puts "not returning" behind the same modal confirmation a retire gets', async () => {
     const client = await renderWizard(stub(atStudents))
     await screen.findByTestId('rollover-step-students')
-    await userEvent.click(screen.getByTestId('rollover-student-leaving-e2'))
+    await userEvent.click(await screen.findByTestId('rollover-student-leaving-e2'))
     await userEvent.click(screen.getByTestId('rollover-students-apply'))
 
     const dialog = await screen.findByRole('dialog')
@@ -423,7 +423,7 @@ describe('RolloverWizard · prices', () => {
     // new year with parents who cannot find the link they were told to use.
     await renderWizard(stub(atPrices))
     await screen.findByTestId('rollover-step-prices')
-    expect(screen.getByTestId('rollover-plan-link-missing-p1')).toHaveTextContent(
+    expect(await screen.findByTestId('rollover-plan-link-missing-p1')).toHaveTextContent(
       t('he', 'billing.plan.linkMissing'),
     )
   })
@@ -432,7 +432,7 @@ describe('RolloverWizard · prices', () => {
     // G2 at the one boundary where a human types money.
     const client = await renderWizard(stub(atPrices))
     await screen.findByTestId('rollover-step-prices')
-    expect(screen.getByTestId('rollover-plan-current-p1')).toHaveTextContent('280₪')
+    expect(await screen.findByTestId('rollover-plan-current-p1')).toHaveTextContent('280₪')
 
     await userEvent.type(screen.getByTestId('rollover-plan-amount-p1'), '300')
     await userEvent.click(screen.getByTestId('rollover-prices-apply'))
@@ -449,7 +449,7 @@ describe('RolloverWizard · prices', () => {
     // money, and sending 0 for a blank box would quietly waive every studio's fee.
     const client = await renderWizard(stub(atPrices))
     await screen.findByTestId('rollover-step-prices')
-    await userEvent.type(screen.getByTestId('rollover-plan-amount-p1'), '300')
+    await userEvent.type(await screen.findByTestId('rollover-plan-amount-p1'), '300')
     await userEvent.click(screen.getByTestId('rollover-prices-apply'))
     await userEvent.click(await screen.findByTestId('rollover-prices-confirm-confirm'))
 
@@ -461,7 +461,7 @@ describe('RolloverWizard · prices', () => {
   it('refuses an unparseable amount before asking the server', async () => {
     const client = await renderWizard(stub(atPrices))
     await screen.findByTestId('rollover-step-prices')
-    await userEvent.type(screen.getByTestId('rollover-plan-amount-p1'), 'שלוש מאות')
+    await userEvent.type(await screen.findByTestId('rollover-plan-amount-p1'), 'שלוש מאות')
     await userEvent.click(screen.getByTestId('rollover-prices-apply'))
     expect(await screen.findByTestId('rollover-prices-error')).toHaveTextContent(
       t('he', 'schedule.rollover.prices.badAmount'),
