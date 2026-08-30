@@ -572,7 +572,8 @@ waves:
         on: 2026-08-27
       - id: P8
         title: Parent — recovery on a phone network
-        status: pending
+        status: shipped
+        on: 2026-08-30
       - id: P9
         title: Parent — two-club guardian
         status: shipped
