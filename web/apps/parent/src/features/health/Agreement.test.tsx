@@ -210,7 +210,9 @@ describe('DeclarationForm and the club’s clause', () => {
     const clause = await screen.findByTestId('declaration-clause')
     expect(clause).toHaveTextContent(t('he', 'health.declaration.clause.none'))
 
-    await userEvent.click(screen.getAllByRole('radio', { name: t('he', 'health.declaration.yes') })[0])
+    await userEvent.click(
+      screen.getAllByRole('radio', { name: t('he', 'health.declaration.yes') })[0]!,
+    )
     await waitFor(() =>
       expect(screen.getByTestId('declaration-clause')).toHaveTextContent(
         t('he', 'health.declaration.clause.limited'),
@@ -235,7 +237,9 @@ describe('DeclarationForm and the club’s clause', () => {
     await userEvent.click(confirm)
     expect(confirm).toBeChecked()
 
-    await userEvent.click(screen.getAllByRole('radio', { name: t('he', 'health.declaration.yes') })[0])
+    await userEvent.click(
+      screen.getAllByRole('radio', { name: t('he', 'health.declaration.yes') })[0]!,
+    )
     await waitFor(() =>
       expect(
         screen.getByRole('checkbox', { name: t('he', 'health.declaration.clause.confirm') }),
@@ -276,7 +280,7 @@ describe('RegistrationStep', () => {
       <RegistrationStep locale="he" onSubmit={onSubmit} studentName="נועה לוי" />,
     )
     const ids = screen.getAllByLabelText(t('he', 'health.registration.nationalId'))
-    await userEvent.type(ids[0], '123456789')
+    await userEvent.type(ids[0]!, '123456789')
     await userEvent.click(screen.getByRole('button', { name: t('he', 'health.agreement.next') }))
 
     expect(onSubmit).not.toHaveBeenCalled()
@@ -290,15 +294,15 @@ describe('RegistrationStep', () => {
     render(<RegistrationStep locale="he" onSubmit={onSubmit} studentName="נועה לוי" />)
 
     const ids = screen.getAllByLabelText(t('he', 'health.registration.nationalId'))
-    await userEvent.type(ids[0], '100000009')
-    await userEvent.type(ids[1], '100000017')
+    await userEvent.type(ids[0]!, '100000009')
+    await userEvent.type(ids[1]!, '100000017')
     await userEvent.type(screen.getByLabelText(t('he', 'health.registration.grade')), "ג'")
     await userEvent.type(screen.getByLabelText(t('he', 'health.registration.address')), 'הרצל 12')
     await userEvent.type(screen.getByLabelText(t('he', 'health.registration.city')), 'נתניה')
     await userEvent.click(screen.getByRole('button', { name: t('he', 'health.agreement.next') }))
 
     expect(onSubmit).toHaveBeenCalledTimes(1)
-    const body = onSubmit.mock.calls[0][0]
+    const body = onSubmit.mock.calls[0]![0]
     expect(body.child.national_id).toBe('100000009')
     expect(body.child.city).toBe('נתניה')
     expect(body.signer.national_id).toBe('100000017')
@@ -309,14 +313,14 @@ describe('RegistrationStep', () => {
     const onSubmit = vi.fn()
     render(<RegistrationStep locale="he" onSubmit={onSubmit} studentName="נועה לוי" />)
     const ids = screen.getAllByLabelText(t('he', 'health.registration.nationalId'))
-    await userEvent.type(ids[0], '100000009')
-    await userEvent.type(ids[1], '100000017')
+    await userEvent.type(ids[0]!, '100000009')
+    await userEvent.type(ids[1]!, '100000017')
     await userEvent.type(screen.getByLabelText(t('he', 'health.registration.grade')), "ג'")
     await userEvent.type(screen.getByLabelText(t('he', 'health.registration.address')), 'הרצל 12')
     await userEvent.type(screen.getByLabelText(t('he', 'health.registration.city')), 'נתניה')
     await userEvent.click(screen.getByRole('button', { name: t('he', 'health.agreement.next') }))
 
-    expect(onSubmit.mock.calls[0][0].pickup_contacts).toEqual([])
+    expect(onSubmit.mock.calls[0]![0].pickup_contacts).toEqual([])
   })
 
   it("refuses a second parent's ת.ז. that is wrong, even though giving one is optional", async () => {
@@ -325,8 +329,8 @@ describe('RegistrationStep', () => {
     const onSubmit = vi.fn()
     render(<RegistrationStep locale="he" onSubmit={onSubmit} studentName="נועה לוי" />)
     const ids = screen.getAllByLabelText(t('he', 'health.registration.nationalId'))
-    await userEvent.type(ids[0], '100000009')
-    await userEvent.type(ids[1], '100000017')
+    await userEvent.type(ids[0]!, '100000009')
+    await userEvent.type(ids[1]!, '100000017')
     await userEvent.type(screen.getByLabelText(t('he', 'health.registration.grade')), "ג'")
     await userEvent.type(screen.getByLabelText(t('he', 'health.registration.address')), 'הרצל 12')
     await userEvent.type(screen.getByLabelText(t('he', 'health.registration.city')), 'נתניה')

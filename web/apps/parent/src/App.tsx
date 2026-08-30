@@ -75,6 +75,9 @@ import { ShopSection } from './features/billing'
 // W3 and a guardian with an unsigned declaration still reached home.
 import { HealthGate, firstStudentNeedingDeclaration, makeHealthClient, registerHealthSections } from './features/health'
 import type { GatedStudent } from './features/health'
+// The same predicate the gate uses. Two spellings of "does this child still owe
+// something" is how a drawer comes to disagree with the screen it links to.
+import { needsFullDeclaration } from './features/health/HealthGate'
 // §6.1 step 5 — the OTHER blocking gate, and the one that had never been built.
 // SPEC:1314 puts `5  אישורים  →  terms of service + privacy policy` in the BLOCKING band
 // and SPEC:1327 says steps 5 and 6 are the only hard gates. M4 shipped step 6 and not
@@ -324,6 +327,7 @@ function AuthedApp() {
                 last_name: string
                 status: string
                 health_status: GatedStudent['health_status']
+                agreement_complete?: boolean | null
               }[]
             }>)
           : { items: [] },
@@ -343,6 +347,12 @@ function AuthedApp() {
             // held for the full declaration (§5.4a / §6.3 — see HealthGate's header).
             status: student.status,
             health_status: student.health_status,
+            // **Carried through, and the gate is useless without it.** `הסכם הרשמה` is
+            // three conditions — registration, health, the club's terms — and only the
+            // server knows all three. Dropping it here made every child whose v1
+            // declaration was already `signed` look finished to the gate, so the families
+            // who most needed re-asking were exactly the ones never asked.
+            agreement_complete: student.agreement_complete,
           })),
         )
       })
@@ -498,14 +508,12 @@ function AuthedApp() {
                   <p style={{ margin: 0 }}>
                     {t(locale, 'common.nav.myChildren')} · {gatedChildren.length}
                   </p>
-                  {gatedChildren.some((child) => child.health_status !== 'signed') ? (
+                  {gatedChildren.some(needsFullDeclaration) ? (
                     <p style={{ margin: 0 }}>
                       {t(locale, 'health.declaration.title')} ·{' '}
                       {t(locale, 'people.document.missingCount').replace(
                         '{n}',
-                        String(
-                          gatedChildren.filter((child) => child.health_status !== 'signed').length,
-                        ),
+                        String(gatedChildren.filter(needsFullDeclaration).length),
                       )}
                     </p>
                   ) : null}

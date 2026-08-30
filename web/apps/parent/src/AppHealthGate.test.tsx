@@ -40,6 +40,14 @@ function stubChildren(
   healthStatus: 'missing' | 'trial_signed' | 'signed',
   status: 'trial' | 'active' = 'active',
   unread: ReturnType<typeof note>[] = [],
+  /**
+   * `הסכם הרשמה`, as `/me/students` reports it.
+   *
+   * `undefined` is a real wire state, not a test convenience: a response from before this
+   * field existed omits it. The default stays `undefined` so every case below keeps
+   * exercising the health-only fallback it was written for.
+   */
+  agreementComplete?: boolean,
 ) {
   vi.stubGlobal(
     'fetch',
@@ -55,6 +63,7 @@ function stubChildren(
                 last_name: 'לוי',
                 status,
                 health_status: healthStatus,
+                agreement_complete: agreementComplete,
               },
             ],
           }),
@@ -137,5 +146,40 @@ describe('the tab bar, in the shell where 1a draws it', () => {
     render(<App />)
     await waitFor(() => expect(screen.getByTestId('health-gate')).toBeInTheDocument())
     expect(screen.queryByTestId('tab-bar')).toBeNull()
+  })
+})
+
+// ---------------------------------------------------------------------------------
+// `הסכם הרשמה` — the SEAM between /me/students and the gate.
+//
+// **This is the case that shipped broken.** Every test above builds its expectation from
+// `health_status`, and the gate's own unit tests construct `GatedStudent` objects by hand
+// — so nothing exercised `App.tsx`'s mapping of the response, and it dropped
+// `agreement_complete` on the floor. The gate then fell back to the health-only rule and
+// decided a family who signed the v1 declaration owed nothing, which is precisely the
+// family the club's new form exists to re-ask.
+//
+// The component was right, the API was right, and the ten lines between them were not.
+// These assert the wire, not the component.
+// ---------------------------------------------------------------------------------
+describe('the registration agreement reaches the gate', () => {
+  it('gates a child whose declaration is signed but whose agreement is not complete', async () => {
+    stubChildren('signed', 'active', [], false)
+    render(<App />)
+    expect(await screen.findByTestId('health-gate')).toBeInTheDocument()
+  })
+
+  it('lets a family through once the whole agreement is complete', async () => {
+    stubChildren('signed', 'active', [], true)
+    render(<App />)
+    await waitFor(() => expect(screen.queryByTestId('health-gate')).not.toBeInTheDocument())
+  })
+
+  it('still gates an unsigned child when the field is absent', async () => {
+    // The fallback, asserted rather than assumed: a response that predates the field must
+    // not open the gate for somebody who has signed nothing at all.
+    stubChildren('missing', 'active', [], undefined)
+    render(<App />)
+    expect(await screen.findByTestId('health-gate')).toBeInTheDocument()
   })
 })
