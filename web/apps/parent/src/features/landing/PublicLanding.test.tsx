@@ -5,7 +5,7 @@
 // The tests that matter are the ones about what a STRANGER sees: this is the only screen
 // in the product somebody reaches with no account, and §5.4a calls it "the club's shop
 // window, not a form".
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ReactElement } from 'react'
@@ -512,5 +512,26 @@ describe('the designed Gladiator page (Stitch, hardcoded content)', () => {
     render(<PublicLanding slug="gladiator" locale="he" client={clientReturning(GLADIATOR)} />)
     const footer = await screen.findByTestId('landing-footer')
     expect(footer).toHaveTextContent('© 2026')
+  })
+
+  // §6.1 puts the language choice BEFORE login, so the landing page has to carry it: a
+  // Russian-speaking parent cannot read a Hebrew offer. It was reaching the page as a
+  // bare, unstyled sibling ABOVE the header — a stray "שפה" heading and three naked
+  // buttons floating over the hero (2026-08-31). It belongs in the header's end slot,
+  // beside the nav, which is also the only place the design has room for it.
+  it('carries the language picker inside the header, not loose above the page', async () => {
+    render(
+      <PublicLanding
+        slug="gladiator"
+        locale="he"
+        client={clientReturning(GLADIATOR)}
+        // A stand-in node, not the real control: this asserts WHERE the slot puts what
+        // it is given. App.test.tsx mounts the actual picker through the real route.
+        languagePicker={<span data-testid="lang-stub" />}
+      />,
+    )
+    const header = await screen.findByTestId('landing-header')
+    const slot = within(header).getByTestId('landing-lang')
+    expect(within(slot).getByTestId('lang-stub')).toBeInTheDocument()
   })
 })

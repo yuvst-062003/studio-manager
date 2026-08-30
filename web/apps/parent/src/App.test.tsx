@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { t } from '@studio/i18n'
 import App from './App'
@@ -157,6 +157,42 @@ describe('L6 — the anonymous landing touches no session', () => {
     // me-reads, nothing carrying credentials — the public read only.
     expect(calls.every((url) => url.includes('/public/'))).toBe(true)
     expect(calls.some((url) => url.includes('/auth/refresh'))).toBe(false)
+    globalThis.history.pushState({}, '', '/')
+  })
+
+  // The seam, not the prop: PublicLanding's own test hands the picker in by name, which
+  // would still pass if App stopped passing it. This mounts the real route, so it fails
+  // if §6.1's control goes missing OR drifts back out of the header — the shape of the
+  // bug it was written for (it rendered loose above the hero, unstyled).
+  it('mounts the language picker inside the landing header, from the real route', async () => {
+    globalThis.history.pushState({}, '', '/t/gladiator')
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              studio_name: 'גלדיאטור',
+              slug: 'gladiator',
+              logo_url: null,
+              default_locale: 'he',
+              headline: null,
+              about: null,
+              address: null,
+              photo_urls: [],
+              groups: [],
+            }),
+            { status: 200 },
+          ),
+      ),
+    )
+    render(<App />)
+    const header = await screen.findByTestId('landing-header')
+    const picker = within(header).getByTestId('landing-lang')
+    // Each language named in its own language (ENDONYM) — someone who cannot read the
+    // current locale still has to find theirs.
+    expect(within(picker).getByRole('button', { name: 'Русский' })).toBeInTheDocument()
+    expect(within(picker).getByRole('button', { name: 'עברית' })).toBeInTheDocument()
     globalThis.history.pushState({}, '', '/')
   })
 

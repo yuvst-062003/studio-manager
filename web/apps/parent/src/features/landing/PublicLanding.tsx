@@ -20,7 +20,7 @@
 // G12 — logical properties only. This page renders right-to-left in Hebrew and
 // left-to-right in English, and it is the one screen in the product a stranger sees first.
 import { useEffect, useState } from 'react'
-import type { CSSProperties } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import { apiUrl } from '@studio/core'
 import { Button, EmptyState, LoadFailed, MoneyDisplay, RangeText } from '@studio/ui'
 import { t } from '@studio/i18n'
@@ -238,12 +238,17 @@ export function PublicLanding({
   locale,
   client,
   signedIn = false,
+  languagePicker,
 }: {
   slug: string
   locale: Locale
   client: LandingClient
   /** §5.4a step 1 — sign-in-first. The flow renders the wall until this is true. */
   signedIn?: boolean
+  /** §6.1's language-before-login control, rendered into the header's end slot. Passed
+   *  in rather than imported so this file keeps no dependency on the app's shell — the
+   *  same reason `SignIn` takes it as a node. */
+  languagePicker?: ReactNode
 }) {
   const [state, setState] = useState<LoadState>({ kind: 'loading' })
   // Bumped by LoadFailed's retry — a real re-fetch, never location.reload() (P8).
@@ -395,6 +400,11 @@ export function PublicLanding({
               <a className="gl-phone" href={`tel:${phoneDigits}`} data-testid="landing-phone">
                 <bdi dir="ltr">{landing.phone}</bdi>
               </a>
+            ) : null}
+            {languagePicker ? (
+              <div className="gl-lang" data-testid="landing-lang">
+                {languagePicker}
+              </div>
             ) : null}
             <button type="button" className="gl-btn gl-btn--navy" onClick={openFlow} data-testid="landing-join">
               {t(locale, 'people.landing.joinNow')}

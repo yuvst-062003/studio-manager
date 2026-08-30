@@ -184,12 +184,13 @@ function LandingShell({ slug }: { slug: string }) {
     <ThemeProvider>
       <AccessibilityMenu locale={locale} />
       {/* Language before login (§6.1): a Russian-speaking parent cannot read a Hebrew
-          offer any more than a Hebrew consent screen. */}
-      <LanguagePicker locale={locale} onChoose={setLocale} />
+          offer any more than a Hebrew consent screen. It goes INTO the page's header
+          rather than above it — loose here it rendered unstyled over the hero. */}
       <PublicLanding
         slug={slug}
         locale={locale}
         client={landingClient}
+        languagePicker={<LanguagePicker locale={locale} onChoose={setLocale} />}
         // Passive: the in-memory token, never a request. A cold anonymous load is
         // simply not signed in, and the booking flow's own first step signs in.
         signedIn={getAccessToken() !== null}

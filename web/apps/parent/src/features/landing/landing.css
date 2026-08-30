@@ -170,6 +170,59 @@
   gap: var(--space-4);
 }
 
+/* §6.1's language choice, in the header's end slot. `LanguagePicker` is a shared
+ * component that carries no classes of its own — it is styled from here, by descendant,
+ * so the picker stays identical on the sign-in screen that also uses it. Its <h2> repeats
+ * the section's own aria-label, so it is hidden from sight and kept for a screen reader:
+ * without this the landing page wore a stray "שפה" heading above the hero (2026-08-31). */
+.gl-lang > section > h2 {
+  block-size: 1px;
+  clip-path: inset(50%);
+  inline-size: 1px;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+}
+
+.gl-lang button {
+  background: transparent;
+  border: 1px solid var(--gl-outline);
+  border-radius: 999px;
+  color: var(--gl-ink-2);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8125rem;
+  line-height: 1;
+  padding: 0.375rem 0.625rem;
+}
+
+.gl-lang button:hover {
+  border-color: var(--gl-outline-strong);
+  color: var(--gl-ink);
+}
+
+/* The chosen language, marked the same way the control announces itself. Filled with the
+ * same pair as `.gl-btn--navy`, including its dark override: in dark `--gl-primary` is a
+ * light FOREGROUND blue, so filling with it and writing `--gl-on-primary` (white) on top
+ * measured 1.7:1 — IS 5568 wants 4.5:1. The navy button already solved this; reusing its
+ * two colours keeps one answer in the file instead of two. */
+.gl-lang button[aria-pressed='true'] {
+  background: var(--gl-primary);
+  border-color: var(--gl-primary);
+  color: var(--gl-surface);
+}
+
+[data-theme='dark'] .landing-root .gl-lang button[aria-pressed='true'] {
+  background: #d6e3ff;
+  border-color: #d6e3ff;
+  color: #0e2a52;
+}
+
+.gl-lang button:focus-visible {
+  outline: 2px solid var(--gl-primary);
+  outline-offset: 2px;
+}
+
 .gl-nav a {
   color: var(--gl-ink-2);
   font-weight: var(--weight-medium);
