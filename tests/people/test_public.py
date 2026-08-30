@@ -156,9 +156,7 @@ def test_a_group_carries_the_times_it_trains(client, studio, a_group, with_slots
     assert group["training_times"] == ["17:00"]
 
 
-def test_the_landing_carries_the_clubs_phone_from_settings(
-    client, app_session, studio, with_slots
-):
+def test_the_landing_carries_the_clubs_phone_from_settings(client, app_session, studio, with_slots):
     """L1 -- the hero brand row, 13c's top bar, both WhatsApp affordances and the footer.
     Read from `studio.settings.landing` beside headline/about/address; a club that has not
     filled it in gets null, never a placeholder."""

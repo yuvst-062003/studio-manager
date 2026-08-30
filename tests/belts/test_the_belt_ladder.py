@@ -263,8 +263,6 @@ def test_a_guardian_reads_the_ladder_their_child_climbs(
     """P7 — 12d renders the same ladder, and the staff-only guard this route carried
     meant the routed parent screen answered 403 for every guardian."""
     guardian = as_guardian_of(a_student)
-    response = client.get(
-        f"/api/v1/belt-ranks?class_id={a_class}", headers=guardian.headers
-    )
+    response = client.get(f"/api/v1/belt-ranks?class_id={a_class}", headers=guardian.headers)
     assert response.status_code == 200, response.text
     assert len(response.json()["items"]) > 0

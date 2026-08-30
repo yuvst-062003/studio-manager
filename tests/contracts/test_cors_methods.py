@@ -34,18 +34,14 @@ def _methods_the_clients_use() -> dict[str, set[str]]:
             if ".test." in path.name or "node_mod" in str(path):
                 continue
             for match in _METHOD.finditer(path.read_text(encoding="utf-8")):
-                used.setdefault(match.group("verb"), set()).add(
-                    str(path.relative_to(ROOT))
-                )
+                used.setdefault(match.group("verb"), set()).add(str(path.relative_to(ROOT)))
     return used
 
 
 def test_every_client_verb_is_cors_allowed():
     allowed = _allowed_methods()
     used = _methods_the_clients_use()
-    missing = {
-        verb: sorted(files) for verb, files in used.items() if verb not in allowed
-    }
+    missing = {verb: sorted(files) for verb, files in used.items() if verb not in allowed}
     assert missing == {}, (
         f"{sorted(missing)} are used by frontend clients but absent from app/main.py's "
         f"allow_methods — a browser will block them at preflight while every test "

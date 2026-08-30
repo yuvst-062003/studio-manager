@@ -642,8 +642,7 @@ def test_the_bulk_price_plan_route_is_manager_only(client, as_manager, as_lead_c
     tag_list = app.openapi()["paths"]["/api/v1/students/price-plans"]["get"]["tags"]
     assert "coach" not in tag_list
     assert (
-        client.get("/api/v1/students/price-plans", headers=as_lead_coach.headers).status_code
-        == 403
+        client.get("/api/v1/students/price-plans", headers=as_lead_coach.headers).status_code == 403
     )
 
 
