@@ -67,12 +67,49 @@ def test_a_placeholder_host_never_becomes_an_allowed_origin():
         assert origin.startswith("https://"), origin
 
 
+def test_the_custom_domains_are_allowed_while_production_migrates_hostnames():
+    """The outage this closed: `staff.gladiatorclub.co.il` went live the moment its
+    certificate issued, but CORS still only knew the Railway hostname -- so the app
+    rendered a sign-in screen with NO sign-in buttons, because `/auth/providers` was
+    refused. A blank-looking screen, with nothing in it naming the cause.
+
+    Both hostnames are allowed until every certificate has issued. See
+    domains.json's `$transitional_comment` for the removal condition.
+    """
+    origins = allowed_origins("production")
+    for host in ("staff", "app", "admin"):
+        assert f"https://{host}.gladiatorclub.co.il" in origins, host
+
+
+def test_a_transitional_entry_cannot_resurrect_an_unknown_environment():
+    """The widening must not undo the fail-closed rule above it: an environment with no
+    app hosts stays empty, whatever else is listed against its name."""
+    assert allowed_origins("nowhere") == []
+
+
+def test_app_origin_still_names_exactly_one_host_per_app():
+    """`app_origin` decides where OAuth sends a freshly signed-in user. The transitional
+    list widens what the API ACCEPTS and must never widen where it SENDS people -- a
+    redirect to a host whose certificate has not issued is a dead end at the one moment a
+    user has just proved who they are."""
+    from app.core.cors import app_origin
+
+    for app in ("staff", "parent", "dashboard"):
+        origin = app_origin(app, "production")
+        assert origin is not None and origin.startswith("https://"), app
+
+
 def test_production_allowlists_its_three_apps_and_not_the_api():
     """Each app gets its own origin (they must not share origin-scoped IndexedDB), and
-    the api is not among them -- an origin list is about who may CALL this server."""
+    the api is not among them -- an origin list is about who may CALL this server.
+
+    This asserted `== 3` until production began migrating hostnames and the transitional
+    list took it to six. A count is the wrong assertion anyway: what matters is that no
+    origin repeats and that the API's own host is absent, and both survive the widening.
+    """
     origins = allowed_origins("production")
-    assert len(origins) == len(set(origins)) == 3, origins
-    assert not any("api-" in origin for origin in origins), origins
+    assert len(origins) == len(set(origins)), f"duplicate origin: {origins}"
+    assert not any("api" in origin.split("//")[1].split(".")[0] for origin in origins), origins
 
 
 def test_no_environment_allows_a_wildcard():

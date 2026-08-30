@@ -22,5 +22,13 @@
       "parent": "https://parent-production-57a2.up.railway.app",
       "dashboard": "https://dashboard-production-0c3f.up.railway.app"
     }
-  }
+  },
+  "transitional_origins": {
+    "production": [
+      "https://staff.gladiatorclub.co.il",
+      "https://app.gladiatorclub.co.il",
+      "https://admin.gladiatorclub.co.il"
+    ]
+  },
+  "$transitional_comment": "TEMPORARY, and it has a removal condition. Production's custom domains come alive one at a time as Let's Encrypt issues each certificate, so for a while the three apps are split across two hostnames: `staff` reachable ONLY at gladiatorclub.co.il, `parent` and `dashboard` ONLY at their Railway hosts. Switching `environments.production` wholesale would refuse the two that still work; leaving it alone refuses the one that does -- which is what happened, and it renders a sign-in screen with no sign-in buttons, because the app cannot fetch /auth/providers. So both sets are allowed until every certificate has issued. DELETE this key and `transitional_origins` at that point, and move the four hosts in `environments.production` to the custom domains in the same commit -- app_origin() reads those and decides where OAuth returns a signed-in user, so it must not name a host that cannot serve."
 }

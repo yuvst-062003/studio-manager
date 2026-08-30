@@ -62,6 +62,28 @@ def app_origin(app: str, env: str) -> str | None:
     return origin
 
 
+@lru_cache(maxsize=1)
+def _transitional() -> dict[str, list[str]]:
+    """Extra origins allowed while an environment is mid-migration between hostnames.
+
+    **Temporary by construction, and domains.json carries the removal condition.** A
+    custom domain goes live only when its certificate issues, and certificates issue one
+    at a time -- so for a while production's three apps are split across two hostnames.
+    Switching `environments` wholesale refuses the apps still on the old host; leaving it
+    alone refuses the one already on the new host. Both are outages, and the second one is
+    what happened: the staff app rendered a sign-in screen with no buttons, because CORS
+    refused its `/auth/providers` call.
+
+    This list is deliberately NOT part of the per-app mapping above. `app_origin` must
+    keep naming exactly one reachable host per app -- it decides where OAuth returns a
+    signed-in user, and a redirect to a host without a certificate is a dead end. Widening
+    what the API *accepts* is safe; widening where it *sends people* is not.
+    """
+    data: dict[str, Any] = json.loads(DOMAINS_PATH.read_text(encoding="utf-8"))
+    transitional: dict[str, list[str]] = data.get("transitional_origins", {})
+    return transitional
+
+
 def allowed_origins(env: str) -> list[str]:
     """The origins the API answers credentialed cross-origin requests from.
 
@@ -72,5 +94,15 @@ def allowed_origins(env: str) -> list[str]:
     An unknown environment yields an empty list. Failing closed: a name nobody wrote down
     should reach no client, not every client.
     """
-    hosts = _environments().get("development" if env == "test" else env, {})
-    return [origin for app in _APPS if (origin := hosts.get(app)) and _PLACEHOLDER not in origin]
+    resolved = "development" if env == "test" else env
+    hosts = _environments().get(resolved, {})
+    origins = [origin for app in _APPS if (origin := hosts.get(app)) and _PLACEHOLDER not in origin]
+    # Only for an environment that HAS app hosts. An unknown environment stays empty even
+    # if somebody adds a transitional entry for it -- failing closed survives this widening.
+    if origins:
+        origins += [
+            origin
+            for origin in _transitional().get(resolved, [])
+            if _PLACEHOLDER not in origin and origin not in origins
+        ]
+    return origins
