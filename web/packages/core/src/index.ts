@@ -1,4 +1,5 @@
 export { getDisplayMode, isInstalled, useDisplayMode } from './useDisplayMode'
+export { useAuthedImage } from './useAuthedImage'
 export type { DisplayMode } from './useDisplayMode'
 export {
   PERSISTENCE_STORAGE_KEY,

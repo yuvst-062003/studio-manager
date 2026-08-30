@@ -23,6 +23,7 @@
 // left-to-right in English, and it is the one screen in the product a stranger sees first.
 import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
+import { apiUrl } from '@studio/core'
 import { BeltLadder, Button, Card, EmptyState, LoadFailed } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
@@ -465,9 +466,12 @@ export function PublicLanding({
         <div style={brandRowStyle}>
           {landing.logo_url ? (
             // The club's own logo, from the unauthenticated public route — the
-            // tenant-scoped one needs a token a stranger does not have.
+            // tenant-scoped one needs a token a stranger does not have. Through
+            // `apiUrl`, because the API hands back a relative path and the browser would
+            // otherwise resolve it against THIS app's host: on split origins that is a
+            // 404 and a broken crest on the club's public page (2026-08-30).
             <img
-              src={landing.logo_url}
+              src={apiUrl(landing.logo_url)}
               alt={landing.studio_name}
               style={logoStyle}
               data-testid="landing-logo"

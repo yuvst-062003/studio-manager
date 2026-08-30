@@ -26,7 +26,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { useEffect, useMemo, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
-import { apiFetch } from '@studio/core'
+import { apiFetch, useAuthedImage } from '@studio/core'
 import { Card, PageHeader, SectionHeader, Switch, TextField } from '@studio/ui'
 import { StructurePanel } from './StructurePanel'
 import { t } from '@studio/i18n'
@@ -184,6 +184,7 @@ export function SettingsScreen({ locale }: { locale: Locale }) {
   const [details, setDetails] = useState<StudioDetails | null>(null)
   const [saveState, setSaveState] = useState<'idle' | 'saved' | 'failed'>('idle')
   const [photoError, setPhotoError] = useState<string | null>(null)
+  const logoUrl = useAuthedImage(details?.logo_url ?? null)
 
   useEffect(() => {
     let alive = true
@@ -326,9 +327,12 @@ export function SettingsScreen({ locale }: { locale: Locale }) {
             <div data-testid="settings-panel-studio">
               <SectionHeader level={3} title={t(locale, 'common.settings.section.studio')} />
 
-              {details.logo_url ? (
+              {/* `logo_url` is a token-guarded API path, so the bytes come through
+                  `useAuthedImage` rather than straight off the attribute — a bare src
+                  resolved against this app's host and sent no header (2026-08-30). */}
+              {logoUrl ? (
                 <img
-                  src={details.logo_url}
+                  src={logoUrl}
                   alt={t(locale, 'common.setup.studio.logoAlt')}
                   width={128}
                   height={128}

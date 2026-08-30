@@ -10,7 +10,7 @@
 // in a new tab, the lot — without adding a dependency, which
 // .claude/rules/ui-rtl-a11y.md says not to do without asking.
 import { useEffect, useMemo, useState } from 'react'
-import { apiFetch, useSession, switchStudio } from '@studio/core'
+import { apiFetch, useAuthedImage, useSession, switchStudio } from '@studio/core'
 import {
   AccessibilityMenu,
   AppShell,
@@ -602,7 +602,7 @@ export default function App() {
 
   // The club's logo, for the header beside its name. Keyed on the active studio so a
   // switch swaps the crest with the title; a 403 or a club with no logo is just no image.
-  const [studioLogoUrl, setStudioLogoUrl] = useState<string | null>(null)
+  const [studioLogoPath, setStudioLogoPath] = useState<string | null>(null)
   const signedInWithRole = session.status === 'signed-in' && !hasNoRole
   useEffect(() => {
     if (!signedInWithRole) return
@@ -613,12 +613,16 @@ export default function App() {
       )
       // A club with no logo resolves to null, which also clears the previous club's
       // crest after a studio switch — no synchronous reset needed.
-      .then((url) => alive && setStudioLogoUrl(url))
+      .then((path) => alive && setStudioLogoPath(path))
       .catch(() => undefined)
     return () => {
       alive = false
     }
   }, [signedInWithRole, session.activeStudioId])
+  // `logo_url` is an API PATH behind the session token, not a public URL — see
+  // `useAuthedImage`. An <img> pointed straight at it resolved against the dashboard's
+  // own host and sent no Authorization header, so the header stayed blank (2026-08-30).
+  const studioLogoUrl = useAuthedImage(studioLogoPath)
 
   // §6.5 deliberately does NOT gate the dashboard on standalone mode the way the two
   // phone apps are gated. It is the desktop surface: a manager opens it in a browser tab
