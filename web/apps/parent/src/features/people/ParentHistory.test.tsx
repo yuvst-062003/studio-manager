@@ -33,6 +33,7 @@ const student = (over: Partial<StudentSummary> = {}): StudentSummary =>
 
 const booking = (over: Partial<MyTrialBooking> = {}): MyTrialBooking => ({
   student_id: 'st1',
+  group_id: 'g1',
   group_name: 'מתחילים',
   session_starts_at: '2026-09-06T14:00:00Z',
   attended: null,

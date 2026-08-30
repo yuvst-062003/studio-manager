@@ -52,6 +52,7 @@ from app.schemas.people import (
     StudentCreateResult,
     StudentDetailOut,
     StudentFreezeIn,
+    StudentJoinIn,
     StudentLeaveIn,
     StudentMarkLostIn,
     StudentOut,
@@ -64,7 +65,12 @@ from app.schemas.people import (
     StudentUpdate,
 )
 from app.services.health.agreement import agreement_status
-from app.services.people.errors import ConflictError, NotFoundError, RefusedError
+from app.services.people.errors import (
+    ConflictError,
+    DuplicateStudentError,
+    NotFoundError,
+    RefusedError,
+)
 from app.services.people.errors import NotFoundError as OnboardingNotFound
 from app.services.people.errors import RefusedError as OnboardingRefused
 from app.services.people.group_days import ScheduleReader
@@ -851,6 +857,56 @@ def my_guardians(request: Request, session: TenantSessionDep) -> GuardianListRes
     return GuardianListResponse(items=items)
 
 
+@router.post("/me/students/{student_id}/join", response_model=StudentSummaryOut)
+def join_the_club(
+    student_id: uuid.UUID,
+    body: StudentJoinIn,
+    request: Request,
+    session: TenantSessionDep,
+    idempotency_key: IdempotencyKey = None,
+) -> StudentSummaryOut:
+    """Entrance A — the destination §5.4a ④'s "איך היה?" never had.
+
+    The worker has asked a trial family how their lesson went on days 1, 3 and 7 since M3,
+    with no link and no action, and written them off as `lost` after 21 days. The only route
+    in was a manager opening the student card. This is the other entrance; both end on the
+    same sequence — health declaration → payment method per child → pay.
+
+    **It cannot reuse `POST /students/{id}/convert`.** That route is `ManagerOrOwner`, takes
+    a single `group_id`, and takes a manager-chosen `price_plan_id`. This one is reached by
+    a guardian, takes the groups they ticked, and derives the price from them.
+
+    **No role dependency**, for the reason `/me/students` gives: §3.1 — "guardian is not a
+    role", so `require_roles` here would refuse every guardian in the product. The check
+    that matters is the record one, and it is the same as `/me/students/{id}/status-history`
+    makes: **404, never 403.** Under `/me/` the collection is "my children", so an id outside
+    it does not exist — and a 403 would confirm the child is in this studio.
+    """
+    person_id = _person_id(request)
+    if student_id not in StudentService.guardian_student_ids(session, person_id=person_id):
+        raise _not_found()
+    try:
+        StudentService.join_from_trial(
+            session,
+            student_id=student_id,
+            group_ids=list(body.group_ids),
+            at=now(),
+            actor_person_id=person_id,
+            schedule=schedule_reader(session),
+        )
+    except NotFoundError as exc:
+        raise _not_found() from exc
+    except ConflictError as exc:
+        raise _conflict(str(exc)) from exc
+    except RefusedError as exc:
+        raise _refused("refused", str(exc)) from exc
+    except NotImplementedError as exc:
+        raise _schedule_unavailable() from exc
+    session.commit()
+    student, person = StudentService.get(session, student_id=student_id)
+    return _summary(StudentService._project(session, student, person))  # noqa: SLF001
+
+
 @router.post(
     "/me/students",
     response_model=StudentSummaryOut,
@@ -903,6 +959,23 @@ def add_a_child(
             # enrollment this creates validates against the schedule.
             schedule=schedule_reader(session),
         )
+    except DuplicateStudentError as exc:
+        # **Refuse rather than accept, because accepting creates a dead end.** Two students
+        # for one child is a correction only the office can make and nothing on either
+        # screen reveals; a 422 that names the problem costs one round trip.
+        #
+        # **The id is disclosed only to a guardian of that child** (§11.1). The refusal is
+        # the same code either way, but naming a student this caller has no relationship
+        # with would tell them that a child of that name trains here -- which is the whole
+        # of what a stranger would need the endpoint for.
+        mine = StudentService.guardian_student_ids(session, person_id=parent.id)
+        detail: dict[str, object] = {"code": "duplicate_student", "message": str(exc)}
+        if exc.student_id in mine:
+            detail["student_id"] = str(exc.student_id)
+            detail["display_name"] = exc.display_name
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=detail
+        ) from exc
     except OnboardingNotFound as exc:
         raise _not_found() from exc
     except OnboardingRefused as exc:

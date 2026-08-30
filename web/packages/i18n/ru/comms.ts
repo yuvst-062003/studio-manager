@@ -127,4 +127,5 @@ export const comms: Bundle = {
   'atRisk.empty': 'Нет учеников в зоне риска',
 
   'calendar.coachSubtitle': 'Занятия, которые вы ведёте, появятся в вашем календаре',
+  'inbox.joinClub': 'Вступить в клуб',
 }

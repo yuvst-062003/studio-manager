@@ -301,4 +301,13 @@ export const billing: Bundle = {
   'product.wizardHint': 'Skippable — a club that sells nothing does not need this step',
   'product.wizardDone': 'Finish this step',
   'product.required': 'Required',
+
+  // -- the children nobody can bill (2026-08-30) --------------------------------
+  'unpriced.title': 'Students with no price',
+  'unpriced.hint': 'They have no price plan, so the monthly run skips them.',
+  'unpriced.empty': 'Every active student has a price plan',
+  'unpriced.payer': 'Payer',
+  'unpriced.noPayer': 'No paying guardian',
+  'unpriced.since': 'Joined {date}',
+  'unpriced.open': 'Open their card',
 }

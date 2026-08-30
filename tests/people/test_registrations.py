@@ -48,31 +48,60 @@ def trains_sundays(monkeypatch, studio, a_group, a_second_group, a_training_year
 
 
 def _submit(client, guardian_caller, group_id=None, *, first_name=None, last_name=None) -> dict:
-    """Seed one pending request, through the SERVICE rather than a route.
+    """Seed one row the way the ONLY remaining producer does — §5.4a's trial funnel.
 
-    `POST /me/students` used to be this door and now enrols directly (owner decision,
-    2026-08-30), so the queue tests below seed the way the remaining producer does. What
-    they cover — the payload never leaving, the duplicate warning, approve and reject — is
-    the MANAGER's half, and it is still reached by §5.4a's trial funnel.
+    **The approval queue is gone** (2026-08-30). `RegistrationService.submit_from_parent`
+    had no producer left once `POST /me/students` started enrolling directly, and the approve
+    and reject routes went with it; the one useful thing the queue did — the duplicate check
+    — moved to the doors parents actually use (`tests/people/test_onboarding.py`).
+
+    **The TABLE stays**, and this is why. `registration_request.payload_encrypted` is the
+    only column in the schema built to hold a minor's data at rest (§11.1), so the trial
+    funnel writes the trial health answers there: `status="approved"`, `reviewed_at` set, no
+    reviewer, so the row is a holding pen and never a pending decision. What the tests below
+    cover is the MANAGER's read of it — the payload never leaving in a list, the full read
+    being audit-logged, the duplicate warning — and all three are still reachable.
     """
+    from datetime import date
+
     from app.core.db import get_engine
     from app.core.tenancy import TenantSession, use_studio
+    from app.models.people import RegistrationRequest
     from app.services.people.registrations import RegistrationService
 
     tag = uuid.uuid4().hex[:6]
+    at = datetime(2026, 9, 1, 9, 0, tzinfo=UTC)
     with (
         use_studio(guardian_caller.studio_id),
         TenantSession(bind=get_engine(), expire_on_commit=False) as scoped,
     ):
-        row = RegistrationService.submit_from_parent(
-            scoped,
-            submitter_person_id=guardian_caller.person_id,
-            first_name=first_name or f"נועה{tag}",
-            last_name=last_name or f"כהן{tag}",
-            birthdate=None,
-            preferred_group_id=group_id,
-            at=datetime(2026, 9, 1, 9, 0, tzinfo=UTC),
+        parent = scoped.get(Person, guardian_caller.person_id)
+        row = RegistrationRequest(
+            source="public_link",
+            payload_encrypted={
+                "guardian": {
+                    "person_id": str(parent.id),
+                    "display_name": f"{parent.first_name} {parent.last_name}",
+                },
+                "children": [
+                    {
+                        "first_name": first_name or f"נועה{tag}",
+                        "last_name": last_name or f"כהן{tag}",
+                        "birthdate": date(2020, 3, 4).isoformat(),
+                        "trial_declaration": {"answers": {"q1": "לא"}},
+                    }
+                ],
+                "preferred_group_id": str(group_id) if group_id else None,
+            },
+            matched_person_id=parent.id,
+            status="approved",
+            submitted_at=at,
+            reviewed_at=at,
+            reviewed_by_person_id=None,
+            created_at=at,
         )
+        scoped.add(row)
+        scoped.flush()
         summary = RegistrationService.summarize(scoped, row)
         scoped.commit()
         return {
@@ -218,7 +247,12 @@ def test_the_queue_never_returns_the_encrypted_payload(client, as_guardian, as_m
     """L10 and `RegistrationRequestOut`'s docstring: 'A list endpoint that decrypted every
     row would defeat the encryption for the cost of one page load.'"""
     _submit(client, as_guardian, a_group)
-    body = client.get("/api/v1/registration-requests", headers=as_manager.headers).json()
+    # `?status=approved`: the funnel's holding-pen rows are written reviewed, so the
+    # default pending view is correctly empty. The RULE under test is the same either way —
+    # no list response ever decrypts a payload.
+    body = client.get(
+        "/api/v1/registration-requests?status=approved", headers=as_manager.headers
+    ).json()
     assert body["items"]
     serialized = str(body)
     assert "payload" not in serialized
@@ -287,222 +321,3 @@ def test_a_genuinely_new_child_raises_no_warning(client, as_guardian, as_manager
         f"/api/v1/registration-requests/{body['id']}", headers=as_manager.headers
     ).json()
     assert detail["possible_duplicate_students"] == []
-
-
-# -- the decision --------------------------------------------------------------
-
-
-def test_approving_creates_the_student_the_guardian_and_the_enrollment(
-    client, app_session, as_guardian, as_manager, a_group, trains_sundays
-):
-    """§5.4a's approval transaction, minus the two tables W2 does not have."""
-    body = _submit(client, as_guardian, a_group)
-    approved = client.post(
-        f"/api/v1/registration-requests/{body['id']}/approve",
-        json={"group_id": str(a_group)},
-        headers=as_manager.headers,
-    )
-    assert approved.status_code == 200, approved.text
-    student_id = uuid.UUID(approved.json()["student_ids"][0])
-
-    student = app_session.get(Student, student_id)
-    assert student.status == "active"
-    # §5.4a -- HealthDeclaration and consent records are M4's (C3), so the app gate collects
-    # the full form. `missing` is the honest state, not an oversight.
-    assert student.health_status == "missing"
-
-    guardian = app_session.execute(
-        select(Guardian).where(Guardian.student_id == student_id)
-    ).scalar_one()
-    assert guardian.person_id == as_guardian.person_id
-    assert guardian.is_primary is True
-
-    enrollment = app_session.execute(
-        select(Enrollment).where(Enrollment.student_id == student_id)
-    ).scalar_one()
-    assert enrollment.group_id == a_group
-
-
-def test_approving_uses_the_group_from_the_decision_and_not_from_the_submission(
-    client, app_session, as_guardian, as_manager, a_group, a_second_group, trains_sundays
-):
-    """§5.4 -- 'Approving is where the group is chosen, which is why group_id lives on the
-    decision and not on the submission.'"""
-    body = _submit(client, as_guardian, a_group)  # the parent asked for a_group
-    approved = client.post(
-        f"/api/v1/registration-requests/{body['id']}/approve",
-        json={"group_id": str(a_second_group)},  # the manager decided otherwise
-        headers=as_manager.headers,
-    )
-    student_id = uuid.UUID(approved.json()["student_ids"][0])
-    enrollment = app_session.execute(
-        select(Enrollment).where(Enrollment.student_id == student_id)
-    ).scalar_one()
-    assert enrollment.group_id == a_second_group
-
-
-def test_approving_attaches_to_the_matched_parent_and_issues_no_second_invitation(
-    client, app_session, as_guardian, as_manager, a_group, trains_sundays
-):
-    """§5.4a -- 'A matched parent is never duplicated: approval attaches the new children to
-    their existing Person... No second invitation, no second account, no second login.'"""
-    from app.models.person import Invitation
-
-    body = _submit(client, as_guardian, a_group)
-    approved = client.post(
-        f"/api/v1/registration-requests/{body['id']}/approve",
-        json={"group_id": str(a_group)},
-        headers=as_manager.headers,
-    )
-    student_id = uuid.UUID(approved.json()["student_ids"][0])
-    assert (
-        app_session.execute(select(Invitation).where(Invitation.student_id == student_id)).first()
-        is None
-    )
-
-
-def test_approving_a_matched_parent_who_carries_no_address_of_their_own(
-    client, app_session, as_guardian, as_manager, a_group, trains_sundays
-):
-    """The matched parent is known by ID, so approval must not go looking for them by email.
-
-    §5.4a's matching rule is that an address is a key only when a signed-in identity
-    carries it and the provider verified it — `matching.py`: "person.email alone is
-    therefore never a key". A `Person` row's own email is a manager's typing, and it is
-    perfectly normal for it to be empty: every §19.3 persona is exactly this shape, with
-    the verified address on `auth_identity` and nothing on `person`.
-
-    `approve()` resolved the parent by id and then handed `parent.email` down to
-    `StudentService.create`, which matched on it again. With nothing there the second
-    lookup found nobody, invented a duplicate parent, and issued them an invitation with
-    no recipient — violating `ck_invitation_invitation_has_a_recipient`, so the whole
-    approval 500'd. In the demo studio that was every parent-app registration there is.
-    """
-    from app.models.person import Invitation
-
-    guardian = app_session.get(Person, as_guardian.person_id)
-    assert guardian is not None
-    # The identity keeps its verified address; the Person row has none. This is the shape
-    # `seed_personas` produces, and the one the fixtures happened never to produce.
-    guardian.email = None
-    guardian.phone = None
-    app_session.commit()
-
-    body = _submit(client, as_guardian, a_group)
-    approved = client.post(
-        f"/api/v1/registration-requests/{body['id']}/approve",
-        json={"group_id": str(a_group)},
-        headers=as_manager.headers,
-    )
-
-    assert approved.status_code == 200, approved.text
-    student_id = uuid.UUID(approved.json()["student_ids"][0])
-
-    # Attached to the parent who asked, not to a copy of them.
-    guardians = (
-        app_session.execute(select(Guardian).where(Guardian.student_id == student_id))
-        .scalars()
-        .all()
-    )
-    assert [row.person_id for row in guardians] == [as_guardian.person_id]
-
-    # §5.4a — 'No second invitation, no second account, no second login.'
-    assert (
-        app_session.execute(select(Invitation).where(Invitation.student_id == student_id)).first()
-        is None
-    )
-
-
-def test_approving_with_no_group_is_refused(client, as_guardian, as_manager, a_group):
-    """§5.4 -- the group is the decision. An approval without one would create a student in
-    no group, which is a `lead` with extra steps."""
-    body = _submit(client, as_guardian, a_group)
-    response = client.post(
-        f"/api/v1/registration-requests/{body['id']}/approve",
-        json={},
-        headers=as_manager.headers,
-    )
-    assert response.status_code == 422
-    assert response.json()["detail"]["code"] == "group_required"
-
-
-def test_a_failed_approval_rolls_the_whole_thing_back(
-    client, app_session, as_guardian, as_manager, a_group, trains_sundays
-):
-    """Atomic means atomic. An approval that created a Student and then failed on the
-    enrollment would leave a child in the club with no group and no way to notice."""
-    body = _submit(client, as_guardian, a_group)
-    before = len(list(app_session.execute(select(Student)).scalars()))
-
-    response = client.post(
-        f"/api/v1/registration-requests/{body['id']}/approve",
-        json={"group_id": str(uuid.uuid4())},  # a group that does not exist
-        headers=as_manager.headers,
-    )
-    assert response.status_code == 404
-    assert len(list(app_session.execute(select(Student)).scalars())) == before
-    assert app_session.get(RegistrationRequest, uuid.UUID(body["id"])).status == "pending"
-
-
-def test_approving_twice_is_refused(client, as_guardian, as_manager, a_group, trains_sundays):
-    """A second approval would create a second Student for the same submission -- the
-    duplicate §5.4a's whole matching section exists to prevent."""
-    body = _submit(client, as_guardian, a_group)
-    first = client.post(
-        f"/api/v1/registration-requests/{body['id']}/approve",
-        json={"group_id": str(a_group)},
-        headers=as_manager.headers,
-    )
-    assert first.status_code == 200
-    second = client.post(
-        f"/api/v1/registration-requests/{body['id']}/approve",
-        json={"group_id": str(a_group)},
-        headers=as_manager.headers,
-    )
-    assert second.status_code == 409
-    assert second.json()["detail"]["code"] == "already_reviewed"
-
-
-def test_a_coach_may_not_approve(client, as_guardian, as_lead_coach, a_group):
-    """§3.2 -- 'Approve registration requests' is owner and manager only."""
-    body = _submit(client, as_guardian, a_group)
-    assert (
-        client.post(
-            f"/api/v1/registration-requests/{body['id']}/approve",
-            json={"group_id": str(a_group)},
-            headers=as_lead_coach.headers,
-        ).status_code
-        == 403
-    )
-
-
-def test_rejecting_records_the_reviewer_and_the_reason(
-    client, app_session, as_guardian, as_manager, a_group
-):
-    """`ck_registration_request_review_recorded` -- a non-pending row must carry
-    `reviewed_at`. The service sets it, so the constraint is satisfied rather than worked
-    around."""
-    body = _submit(client, as_guardian, a_group)
-    rejected = client.post(
-        f"/api/v1/registration-requests/{body['id']}/reject",
-        json={"reason": "מלא"},
-        headers=as_manager.headers,
-    )
-    assert rejected.status_code == 200
-
-    row = app_session.get(RegistrationRequest, uuid.UUID(body["id"]))
-    app_session.refresh(row)
-    assert row.status == "rejected"
-    assert row.reviewed_at is not None
-    assert row.reviewed_by_person_id == as_manager.person_id
-
-
-def test_rejecting_creates_no_student(client, app_session, as_guardian, as_manager, a_group):
-    body = _submit(client, as_guardian, a_group)
-    before = len(list(app_session.execute(select(Student)).scalars()))
-    client.post(
-        f"/api/v1/registration-requests/{body['id']}/reject",
-        json={"reason": "מלא"},
-        headers=as_manager.headers,
-    )
-    assert len(list(app_session.execute(select(Student)).scalars())) == before

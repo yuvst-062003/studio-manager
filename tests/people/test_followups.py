@@ -222,6 +222,33 @@ def test_a_no_show_gets_a_different_message_from_an_attender(tenant_session, a_g
     assert [call["kind"] for call in sent] == ["trial.no_show"]
 
 
+def test_the_follow_up_carries_a_route_to_the_join_screen(tenant_session, a_group, sent):
+    """'איך היה?' has been sent on days 1, 3 and 7 since M3 with no link and no action --
+    the product asking a family whether they enjoyed themselves, three times, and offering
+    them no way to answer. The payload is what makes the inbox row pressable."""
+    student = _trial_student(tenant_session)
+    _booking(tenant_session, student, a_group, attended=True, booked_at=T0 - timedelta(days=1))
+    tenant_session.commit()
+
+    followups.run_for_studio(tenant_session, at=T0, tally=followups.Tally())
+    assert [call["kind"] for call in sent] == ["trial.followup"]
+    assert sent[0]["payload"]["route"] == followups.JOIN_ROUTE
+
+
+def test_a_no_show_is_offered_no_join_action(tenant_session, a_group, sent):
+    """`trial.no_show` is untouched, and deliberately: the worker already sends that family
+    a different message on the stated ground that 'איך היה?' to somebody who did not come is
+    worse than silence. Offering them a join button is the same mistake with money attached.
+    """
+    student = _trial_student(tenant_session)
+    _booking(tenant_session, student, a_group, attended=False, booked_at=T0 - timedelta(days=1))
+    tenant_session.commit()
+
+    followups.run_for_studio(tenant_session, at=T0, tally=followups.Tally())
+    assert [call["kind"] for call in sent] == ["trial.no_show"]
+    assert "route" not in sent[0]["payload"]
+
+
 # -- §5.4a ⑤: the sweep --------------------------------------------------------
 
 

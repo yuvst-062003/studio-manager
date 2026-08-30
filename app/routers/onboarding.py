@@ -91,8 +91,13 @@ class OnboardingRegisterIn(BaseModel):
 
 class OnboardingRegisterOut(BaseModel):
     person_id: uuid.UUID
+    #: What THIS submission created. A child already on the account is skipped rather than
+    #: duplicated, so a resubmission can return fewer ids than it was given children.
     student_ids: list[uuid.UUID]
     charges_created: int
+    #: The parent already had a Person in this studio and was adopted rather than created --
+    #: a trial family, almost always. It no longer means "and so nothing was done": the
+    #: missing children are created either way.
     already_registered: bool
 
 
@@ -251,25 +256,17 @@ def register(
         use_studio(link.studio_id),
         TenantSession(bind=get_engine(), expire_on_commit=False) as scoped,
     ):
+        # **Whether this identity already has a Person here, NOT whether to refuse.**
+        #
+        # This used to short-circuit: an existing Person meant `already_registered: true`,
+        # zero children created, and a family sent away. Booking a trial creates exactly
+        # that Person, so the club's most natural funnel -- try it, like it, get sent the
+        # link -- silently did nothing for every trial family it was aimed at. The service
+        # now adopts the existing parent and adds the missing children; a child already on
+        # the account is skipped by the duplicate check rather than duplicated.
         existing = OnboardingService.existing_registration(
             scoped, studio_id=link.studio_id, identity_id=identity_id
         )
-        if existing is not None:
-            from sqlalchemy import select
-
-            from app.models.person import Guardian
-
-            student_ids = list(
-                scoped.execute(
-                    select(Guardian.student_id).where(Guardian.person_id == existing.id)
-                ).scalars()
-            )
-            return OnboardingRegisterOut(
-                person_id=existing.id,
-                student_ids=student_ids,
-                charges_created=0,
-                already_registered=True,
-            )
         try:
             parent, student_ids, charged = OnboardingService.register(
                 scoped,
@@ -307,5 +304,5 @@ def register(
             person_id=parent.id,
             student_ids=student_ids,
             charges_created=charged,
-            already_registered=False,
+            already_registered=existing is not None,
         )

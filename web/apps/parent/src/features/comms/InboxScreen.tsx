@@ -230,6 +230,42 @@ export function InboxScreen({
           </Card>
         ))}
 
+      {/* §5.4a ④'s "איך היה?", with the destination it never had. The worker has sent this
+          on days 1, 3 and 7 since M3 carrying a booking id and a day number and nothing to
+          press — the product asking a family whether they enjoyed themselves, three times,
+          and offering them no way to answer.
+
+          Keyed on `payload.route` rather than on the kind, so the pin follows what the
+          message can actually DO. `trial.no_show` carries no route and is deliberately not
+          given one: offering a family who did not come a join button is the same mistake as
+          asking them how it was. */}
+      {rows
+        .filter(
+          (row) =>
+            row.read_at === null && typeof (row.payload as { route?: unknown })?.route === 'string',
+        )
+        .map((row) => (
+          <Card key={`route-${row.id}`}>
+            <div data-testid={`inbox-route-${row.id}`} style={prePromptStyle}>
+              <p style={rowTitleStyle}>{row.title}</p>
+              <p style={bodyStyle}>{row.body}</p>
+              <div style={promptActionsStyle}>
+                <Button
+                  data-testid={`inbox-route-go-${row.id}`}
+                  onClick={() => {
+                    globalThis.location.hash = String((row.payload as { route: string }).route)
+                  }}
+                >
+                  {t(locale, 'comms.inbox.joinClub')}
+                </Button>
+                <Button onClick={() => void open(row)} variant="secondary">
+                  {t(locale, 'comms.inbox.later')}
+                </Button>
+              </div>
+            </div>
+          </Card>
+        ))}
+
       {rows.map((row) => (
         <Card key={row.id}>
           {/* A button and not a div: the row is interactive, so it has to be reachable by

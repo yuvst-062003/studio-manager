@@ -48,7 +48,7 @@ import {
 import { BeltProgressScreen, makeParentBeltsClient, registerBeltSections } from './features/belts'
 import { BeltRouteResolver } from './features/belts/BeltRouteResolver'
 import { InboxScreen, makeParentCommsClient } from './features/comms'
-import { AddSibling, ProfileSection, makePeopleClient, registerPeopleSections } from './features/people'
+import { AddSibling, JoinClubSection, ProfileSection, makePeopleClient, registerPeopleSections } from './features/people'
 // `2c` behind `#/student/<id>` — the composite card the slot system was built for (P2).
 import { StudentCardSection } from './features/people/StudentCardSection'
 import { registerBillingSections } from './features/billing/StudentCardBillingSection'
@@ -291,6 +291,10 @@ function AuthedApp() {
     }
   }, [])
   const [declarationsSigned, setDeclarationsSigned] = useState(0)
+  // Bumped when a trial family joins the club. The child goes `trial` -> `active` while
+  // still holding the short health form, so §5.5's gate must fire on the very next
+  // render — and `gatedChildren` is read once per this counter, not per route change.
+  const [familyJoined, setFamilyJoined] = useState(0)
   // `2a` §7's unread badge. Fetched by the SHELL and not by `InboxScreen`, because a badge
   // that appeared only after the inbox had been opened would announce news the parent had
   // just finished reading. `notificationsRead` bumps to re-fetch after the inbox marks
@@ -362,7 +366,7 @@ function AuthedApp() {
     return () => {
       alive = false
     }
-  }, [session.status, declarationsSigned])
+  }, [session.status, declarationsSigned, familyJoined])
   const hash = useHash()
   const today = useToday()
   // §5.4(c)'s add-a-sibling is one hash away from home. Hash and not a path: it is an
@@ -373,6 +377,9 @@ function AuthedApp() {
   // screen would change only when something else happened to re-render App. One
   // subscription serves both lanes' routes.
   const addingChild = hash === '#/add-child'
+  // Entrance A — §5.4a ④'s "איך היה?" finally leads somewhere, and `trial.followup`'s
+  // payload names this same hash so the inbox row is pressable too.
+  const joiningClub = hash === '#/join'
   // §5.10's payments tab, and `12f`'s history one hash below it.
   const onPayments = hash === '#/payments'
   const onPaymentsHistory = hash === '#/payments/history'
@@ -668,6 +675,15 @@ function AuthedApp() {
             />
           ) : onProfile ? (
             <ProfileSection locale={locale} />
+          ) : joiningClub ? (
+            // INSIDE the gates, like every other branch: a trial family passes both today
+            // (§5.5 does not hold `trial_signed` while the child is still on a trial), and
+            // the moment the join lands they stop passing — which is the point.
+            <JoinClubSection
+              client={peopleClient}
+              locale={locale}
+              onJoined={() => setFamilyJoined((n) => n + 1)}
+            />
           ) : addingChild ? (
             <AddSibling locale={locale} client={peopleClient} />
           ) : belts.length === 2 ? (

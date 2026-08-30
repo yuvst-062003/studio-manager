@@ -9,15 +9,15 @@ creates belongs to the submitting parent, and nothing here touches an existing f
 from __future__ import annotations
 
 import uuid
-from datetime import timedelta
+from datetime import date, timedelta
 
 import pytest
 from app.models.billing import Charge, PricePlan
 from app.models.people import Enrollment, Student
-from app.models.person import Guardian
-from app.services.people.errors import NotFoundError, RefusedError
+from app.models.person import Guardian, Person
+from app.services.people.errors import DuplicateStudentError, NotFoundError, RefusedError
 from app.services.people.onboarding import OnboardingService
-from sqlalchemy import select
+from sqlalchemy import func, select
 from tests.people.conftest import T0, make_session
 
 SUNDAY = T0.replace(hour=14)
@@ -264,3 +264,260 @@ def test_registration_requires_a_signed_in_identity(client, as_manager):
         },
     )
     assert response.status_code == 401
+
+
+# -- the two defects the self-enrolment change created -------------------------
+def test_a_trial_parent_using_the_join_link_gets_their_children_created(
+    tenant_session, app_session, studio, a_group, twice_weekly, a_live_plan
+):
+    """Defect 1. `existing_registration` answers "does this identity already have a Person
+    here", and `register` treated that as "this family is already registered". Those are
+    different questions, and the difference is exactly a trial family: booking a trial
+    creates a Person for the parent, so the club's most natural funnel — try it, like it,
+    get sent the link — returned `already_registered: true` and created nothing.
+    """
+    from app.models.identity import AuthIdentity
+
+    identity_row = AuthIdentity(
+        provider="google",
+        provider_subject=f"trial-{uuid.uuid4().hex[:8]}",
+        email="trialparent@example.invalid",
+        email_verified=True,
+        is_private_relay=False,
+        is_developer=False,
+    )
+    app_session.add(identity_row)
+    app_session.commit()
+
+    # The Person a trial booking left behind: signed in, no children on the account yet.
+    existing = Person(
+        studio_id=studio.id,
+        auth_identity_id=identity_row.id,
+        first_name="שירה",
+        last_name="לוי",
+    )
+    tenant_session.add(existing)
+    tenant_session.flush()
+
+    parent, student_ids, charged = OnboardingService.register(
+        tenant_session,
+        studio_id=studio.id,
+        identity_id=identity_row.id,
+        first_name="שירה",
+        last_name="לוי",
+        phone="050-7654321",
+        email="trialparent@example.invalid",
+        children=[
+            {
+                "first_name": "נועה",
+                "last_name": "לוי",
+                "birthdate": None,
+                "group_ids": [a_group],
+                "self": False,
+            }
+        ],
+        at=T0,
+        schedule=twice_weekly,
+    )
+
+    assert parent.id == existing.id, "the parent was duplicated instead of adopted"
+    assert len(student_ids) == 1
+    assert charged == 1
+    assert tenant_session.get(Student, student_ids[0]).status == "active"
+
+
+def test_a_child_who_matches_an_existing_student_is_refused_and_creates_nothing(
+    tenant_session, studio, a_group, twice_weekly, a_live_plan
+):
+    """Defect 2. The duplicate check ran only on the registration-request detail view,
+    whose sole producer was removed — so `+ הוסף ילד` created a SECOND student for a child
+    already on the roster: one `trial`, one `active`, both on the register.
+    """
+    parent = Person(studio_id=studio.id, first_name="שירה", last_name="לוי")
+    tenant_session.add(parent)
+    tenant_session.flush()
+    child = {
+        "first_name": "נועה",
+        "last_name": "לוי",
+        "birthdate": date(2016, 4, 1),
+        "group_ids": [a_group],
+        "self": False,
+    }
+    first = OnboardingService.add_child(
+        tenant_session, studio_id=studio.id, parent=parent, child=child, at=T0,
+        schedule=twice_weekly,
+    )
+    tenant_session.flush()
+    before = tenant_session.execute(select(func.count(Student.id))).scalar_one()
+
+    with pytest.raises(DuplicateStudentError) as raised:
+        OnboardingService.add_child(
+            tenant_session, studio_id=studio.id, parent=parent, child=child, at=T0,
+            schedule=twice_weekly,
+        )
+    assert raised.value.student_id == first
+    assert tenant_session.execute(select(func.count(Student.id))).scalar_one() == before
+
+
+def test_a_different_birthdate_is_a_different_child(
+    tenant_session, studio, a_group, twice_weekly, a_live_plan
+):
+    """Two children with the same name and different birthdays are two children — §5.4a's
+    own rule, and the reason a refusal keyed on the name alone would be wrong."""
+    parent = Person(studio_id=studio.id, first_name="שירה", last_name="לוי")
+    tenant_session.add(parent)
+    tenant_session.flush()
+    base = {"first_name": "נועה", "last_name": "לוי", "group_ids": [a_group], "self": False}
+    OnboardingService.add_child(
+        tenant_session, studio_id=studio.id, parent=parent,
+        child={**base, "birthdate": date(2016, 4, 1)}, at=T0, schedule=twice_weekly,
+    )
+    tenant_session.flush()
+    second = OnboardingService.add_child(
+        tenant_session, studio_id=studio.id, parent=parent,
+        child={**base, "birthdate": date(2018, 9, 9)}, at=T0, schedule=twice_weekly,
+    )
+    assert tenant_session.get(Student, second).status == "active"
+
+
+def test_resubmitting_the_link_adds_the_missing_child_and_skips_the_existing_one(
+    tenant_session, app_session, studio, a_group, twice_weekly, a_live_plan
+):
+    """'A resubmission of children who are already on the account remains a no-op' — and
+    the child who is NOT on it is still created. Refusing the whole submission would make
+    the second half of a family unreachable through the club's own link."""
+    from app.models.identity import AuthIdentity
+
+    identity_row = AuthIdentity(
+        provider="google",
+        provider_subject=f"resubmit-{uuid.uuid4().hex[:8]}",
+        email="resubmit@example.invalid",
+        email_verified=True,
+        is_private_relay=False,
+        is_developer=False,
+    )
+    app_session.add(identity_row)
+    app_session.commit()
+
+    common = dict(
+        studio_id=studio.id,
+        identity_id=identity_row.id,
+        first_name="שירה",
+        last_name="לוי",
+        phone=None,
+        email="resubmit@example.invalid",
+        at=T0,
+        schedule=twice_weekly,
+    )
+    noa = {
+        "first_name": "נועה",
+        "last_name": "לוי",
+        "birthdate": date(2016, 4, 1),
+        "group_ids": [a_group],
+        "self": False,
+    }
+    itay = {
+        "first_name": "איתי",
+        "last_name": "לוי",
+        "birthdate": date(2019, 2, 2),
+        "group_ids": [a_group],
+        "self": False,
+    }
+    parent, first_ids, _ = OnboardingService.register(tenant_session, children=[noa], **common)
+    tenant_session.flush()
+
+    again_parent, second_ids, _ = OnboardingService.register(
+        tenant_session, children=[noa, itay], **common
+    )
+    assert again_parent.id == parent.id
+    assert len(second_ids) == 1, "the child already on the account was created a second time"
+    assert second_ids[0] not in first_ids
+
+
+def test_the_add_a_child_route_names_the_existing_child_for_its_own_guardian(
+    client, as_guardian, tenant_session, studio, a_group, monkeypatch
+):
+    """'offering the parent the existing child instead of a second copy' — a machine-readable
+    code, and the id only because this caller is already that child's guardian."""
+    from app.routers import students as students_router
+
+    class _TwiceWeekly:
+        def materialize_sessions(self, group_id, from_date, to_date):
+            return [
+                make_session(
+                    studio_id=studio.id,
+                    group_id=group_id,
+                    training_year_id=uuid.uuid4(),
+                    starts_at=SUNDAY,
+                )
+            ]
+
+    monkeypatch.setattr(students_router, "schedule_reader", lambda session: _TwiceWeekly())
+    body = {
+        "first_name": "נועה",
+        "last_name": "לוי",
+        "birthdate": "2016-04-01",
+        "group_ids": [str(a_group)],
+    }
+    first = client.post("/api/v1/me/students", headers=as_guardian.headers, json=body)
+    assert first.status_code == 201, first.text
+
+    again = client.post("/api/v1/me/students", headers=as_guardian.headers, json=body)
+    assert again.status_code == 422, again.text
+    detail = again.json()["detail"]
+    assert detail["code"] == "duplicate_student"
+    assert detail["student_id"] == first.json()["id"]
+
+
+def test_the_route_does_not_disclose_another_familys_child(
+    client, as_guardian, tenant_session, studio, a_group, monkeypatch
+):
+    """§11.1. The refusal is the same code either way, but naming a student this caller has
+    no relationship with would tell them a child of that name trains here."""
+    from app.routers import students as students_router
+
+    class _TwiceWeekly:
+        def materialize_sessions(self, group_id, from_date, to_date):
+            return [
+                make_session(
+                    studio_id=studio.id,
+                    group_id=group_id,
+                    training_year_id=uuid.uuid4(),
+                    starts_at=SUNDAY,
+                )
+            ]
+
+    monkeypatch.setattr(students_router, "schedule_reader", lambda session: _TwiceWeekly())
+    stranger = Person(studio_id=studio.id, first_name="הורה", last_name="אחר")
+    tenant_session.add(stranger)
+    tenant_session.flush()
+    OnboardingService.add_child(
+        tenant_session,
+        studio_id=studio.id,
+        parent=stranger,
+        child={
+            "first_name": "יעל",
+            "last_name": "כהן",
+            "birthdate": date(2015, 3, 3),
+            "group_ids": [a_group],
+            "self": False,
+        },
+        at=T0,
+        schedule=_TwiceWeekly(),
+    )
+    tenant_session.commit()
+
+    response = client.post(
+        "/api/v1/me/students",
+        headers=as_guardian.headers,
+        json={
+            "first_name": "יעל",
+            "last_name": "כהן",
+            "birthdate": "2015-03-03",
+            "group_ids": [str(a_group)],
+        },
+    )
+    assert response.status_code == 422, response.text
+    detail = response.json()["detail"]
+    assert detail["code"] == "duplicate_student"
+    assert "student_id" not in detail or detail["student_id"] is None

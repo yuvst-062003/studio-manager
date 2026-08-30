@@ -1,20 +1,23 @@
-"""§5.4(c) and §5.4a's approval queue.
+"""§5.4a's `registration_request` rows, and the manager's read of them.
 
-**A request, not an enrollment** (L6). §5.4: "This creates a `registration_request` with
-`source = 'parent_app'` and `matched_person_id` set -- a request, not an enrollment. The
-manager approves it, consistent with (b): conversion is always a human decision."
+**The approval queue is gone** (2026-08-30). `submit_from_parent` was its only producer of
+pending rows and it was removed when `+ הוסף ילד` started enrolling directly -- so the
+queue's approve and reject went with it rather than standing as buttons over a list that
+could never fill. The one genuinely valuable thing it did, the duplicate-child check, moved
+to the doors parents actually use: `app/services/people/matching.py`'s `duplicate_student`,
+called from `OnboardingService.add_child`.
+
+**The TABLE stays, and this is what it is for now.** §5.4a's trial funnel writes a row here
+-- `status="approved"`, `reviewed_at` set, no reviewer -- as an encrypted holding pen for a
+trial's health answers, because `payload_encrypted` is the only column in the schema built
+to hold a minor's data at rest (§11.1). That is a different use of the same table, and it
+is untouched. What remains here is the manager's side of it: a list of two display names,
+and one audit-logged read of the whole thing.
 
 **The payload is a stranger's personal data about a minor** (§11.1, L10). It never appears
-in a list response, never in a log, never in an audit `diff`. The queue renders two display
-names -- §5.4a's own mock-up shows the parent's name and each child's, and a queue that
-showed neither would be a list of timestamps -- and reading the full submission is a
-separate, audit-logged fetch.
-
-**The group comes from the DECISION, not the submission.** §5.4: "Approving is where the
-group is chosen, which is why `group_id` lives on the decision and not on the submission --
-the public link's only job is a first lesson." The group a parent picked in the form is a
-*preference* the queue renders; the manager may override it and the payload does not argue
-back.
+in a list response, never in a log, never in an audit `diff`. The list renders two display
+names -- a list that showed neither would be a list of timestamps -- and reading the full
+submission is a separate, audit-logged fetch.
 """
 
 from __future__ import annotations
@@ -28,11 +31,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.people import RegistrationRequest
-from app.models.person import Person
 from app.services.audit import AuditService
-from app.services.people.errors import ConflictError, NotFoundError, RefusedError
-from app.services.people.group_days import ScheduleReader
-from app.services.people.matching import ChildMatch, match_children, match_person
+from app.services.people.errors import NotFoundError
+from app.services.people.matching import ChildMatch, match_children
 
 
 @dataclass
@@ -58,70 +59,6 @@ class RequestDetail:
 
 
 class RegistrationService:
-    # -- intake ----------------------------------------------------------------
-    @staticmethod
-    def submit_from_parent(
-        session: Session,
-        *,
-        submitter_person_id: uuid.UUID,
-        first_name: str,
-        last_name: str,
-        birthdate: date | None,
-        preferred_group_id: uuid.UUID | None,
-        at: datetime,
-    ) -> RegistrationRequest:
-        """§5.4(c) -- parent artboard `12g`, `+ הוסף ילד`.
-
-        `matched_person_id` is the submitter's own person id, not a guess: they are signed
-        in, so the match is certain rather than probable. That is the one case in §5.4a's
-        matching where the queue shows no ambiguity.
-
-        **No enrollment, and no student.** L6 -- if this created either, a parent would have
-        enrolled themselves. The row is a request, and approving it is what creates rows.
-        """
-        submitter = session.get(Person, submitter_person_id)
-        if submitter is None:
-            raise NotFoundError(str(submitter_person_id))
-
-        row = RegistrationRequest(
-            source="parent_app",
-            payload_encrypted={
-                "guardian": {
-                    "person_id": str(submitter.id),
-                    "display_name": f"{submitter.first_name} {submitter.last_name}",
-                },
-                "children": [
-                    {
-                        "first_name": first_name.strip(),
-                        "last_name": last_name.strip(),
-                        "birthdate": birthdate.isoformat() if birthdate else None,
-                    }
-                ],
-                # A preference the queue renders, never the decision. §5.4 puts the group on
-                # the approval.
-                "preferred_group_id": str(preferred_group_id) if preferred_group_id else None,
-            },
-            matched_person_id=submitter.id,
-            status="pending",
-            submitted_at=at,
-            created_at=at,
-        )
-        session.add(row)
-        session.flush()
-        AuditService.record(
-            session,
-            action="registration_request.submitted",
-            entity_type="registration_request",
-            entity_id=row.id,
-            studio_id=row.studio_id,
-            actor_person_id=submitter.id,
-            # L10 -- the source and the submitter, never the child. `audit_log` is
-            # append-only, so a child's name written here is beyond anonymization's reach.
-            diff={"source": "parent_app", "children": 1},
-        )
-        session.flush()
-        return row
-
     # -- the queue -------------------------------------------------------------
     @staticmethod
     def summarize(session: Session, row: RegistrationRequest) -> RequestSummary:
@@ -222,149 +159,3 @@ class RegistrationService:
             preferred_group_id=uuid.UUID(preferred) if preferred else None,
             possible_duplicate_students=duplicates,
         )
-
-    # -- the decision ----------------------------------------------------------
-    @staticmethod
-    def approve(
-        session: Session,
-        *,
-        request_id: uuid.UUID,
-        group_id: uuid.UUID | None,
-        actor_person_id: uuid.UUID | None,
-        at: datetime,
-        schedule: ScheduleReader,
-    ) -> list[uuid.UUID]:
-        """§5.4a's approval transaction, atomic. Returns the student ids created.
-
-        Per child in the payload: Person -> Student -> Guardian(`is_primary` on the
-        submitting parent) -> Enrollment. On the parent: the matched Person, or a new one
-        plus an Invitation if they have no login yet.
-
-        **`group_id` comes from the decision**, not the submission (§5.4). The group the
-        parent picked is a preference the queue renders; the manager may override it.
-
-        **What is NOT created, and why.** §5.4a's list ends "HealthDeclaration -> consent
-        records". Both are M4's tables (C3) and do not exist in W2, so `health_status` stays
-        `missing` and §5.5's app gate collects the full declaration from the parent -- which
-        is what §5.4(b) prescribes for the manager path anyway. Recorded here so the
-        omission is a known seam rather than a forgotten line.
-
-        One transaction, no commit: the router commits. An approval that created a Student
-        and then failed on the enrollment would leave a child in the club with no group and
-        nothing to notice it by.
-        """
-        from app.services.people.students import StudentService
-
-        row = session.get(RegistrationRequest, request_id)
-        if row is None:
-            raise NotFoundError(str(request_id))
-        if row.status != "pending":
-            raise ConflictError(f"this request was already {row.status}")
-        if group_id is None:
-            raise RefusedError(
-                "approving is where the group is chosen (§5.4); the decision needs one"
-            )
-
-        payload = row.payload_encrypted or {}
-        guardian_blob = payload.get("guardian") or {}
-        parent = session.get(Person, row.matched_person_id) if row.matched_person_id else None
-        if parent is None:
-            matched = match_person(
-                session,
-                email=guardian_blob.get("email"),
-                phone=guardian_blob.get("phone"),
-            )
-            parent = session.get(Person, matched.person_id) if matched else None
-
-        created: list[uuid.UUID] = []
-        for child in payload.get("children") or []:
-            birthdate = child.get("birthdate")
-            result = StudentService.create(
-                session,
-                first_name=child.get("first_name", ""),
-                last_name=child.get("last_name", ""),
-                birthdate=date.fromisoformat(birthdate) if birthdate else None,
-                guardian_first_name=(guardian_blob.get("display_name") or "הורה").split(" ")[0],
-                guardian_last_name=" ".join(
-                    (guardian_blob.get("display_name") or "הורה").split(" ")[1:]
-                ),
-                # L7 -- if the queue already matched a Person, hand `StudentService.create`
-                # their ID so it links rather than duplicates. §5.4a: "No second invitation,
-                # no second account, no second login."
-                #
-                # The ID and not the address. This passed `parent.email` once, meaning to
-                # "reuse their VERIFIED address" -- but `person.email` is not that address:
-                # §5.4a matches on what `auth_identity` holds, and `matching.py` says
-                # "person.email alone is therefore never a key". So for any matched parent
-                # whose Person row carried no address -- every §19.3 persona, and anyone a
-                # manager created without typing one -- the match found nobody, a duplicate
-                # parent was created, and they were issued an invitation with neither an
-                # email nor a phone on it. The check constraint refused, and the whole
-                # approval 500'd.
-                guardian_person_id=parent.id if parent else None,
-                guardian_email=guardian_blob.get("email"),
-                guardian_phone=guardian_blob.get("phone"),
-                at=at,
-                actor_person_id=actor_person_id,
-                status="pending_approval",
-                source=row.source,
-            )
-            StudentService.convert(
-                session,
-                student_id=result.student.id,
-                group_id=group_id,
-                started_on=at.date(),
-                price_plan_id=None,
-                attends_weekdays=None,
-                reason="approved from the queue",
-                at=at,
-                actor_person_id=actor_person_id,
-                schedule=schedule,
-            )
-            created.append(result.student.id)
-
-        row.status = "approved"
-        row.reviewed_at = at
-        row.reviewed_by_person_id = actor_person_id
-        AuditService.record(
-            session,
-            action="registration_request.approved",
-            entity_type="registration_request",
-            entity_id=row.id,
-            studio_id=row.studio_id,
-            actor_person_id=actor_person_id,
-            diff={"group_id": str(group_id), "students_created": len(created)},
-        )
-        session.flush()
-        return created
-
-    @staticmethod
-    def reject(
-        session: Session,
-        *,
-        request_id: uuid.UUID,
-        reason: str | None,
-        actor_person_id: uuid.UUID | None,
-        at: datetime,
-    ) -> RegistrationRequest:
-        """`ck_registration_request_review_recorded` -- a non-pending row must carry
-        `reviewed_at`. Set here, so the constraint is satisfied rather than worked around."""
-        row = session.get(RegistrationRequest, request_id)
-        if row is None:
-            raise NotFoundError(str(request_id))
-        if row.status != "pending":
-            raise ConflictError(f"this request was already {row.status}")
-        row.status = "rejected"
-        row.reviewed_at = at
-        row.reviewed_by_person_id = actor_person_id
-        AuditService.record(
-            session,
-            action="registration_request.rejected",
-            entity_type="registration_request",
-            entity_id=row.id,
-            studio_id=row.studio_id,
-            actor_person_id=actor_person_id,
-            diff={"reason": reason},
-        )
-        session.flush()
-        return row

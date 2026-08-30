@@ -63,6 +63,7 @@ function stub(overrides: Partial<DashboardBillingClient> = {}): DashboardBilling
     settlePlanChange: vi.fn().mockResolvedValue(undefined),
     confirmPromise: vi.fn().mockResolvedValue(undefined),
     declinePromise: vi.fn().mockResolvedValue(undefined),
+    unpricedStudents: vi.fn().mockResolvedValue([]),
     ...overrides,
   } as DashboardBillingClient
 }
@@ -104,6 +105,59 @@ function renderCollections(props: Record<string, unknown> = {}) {
     />,
   )
 }
+
+describe('3e — the children nobody can bill', () => {
+  const unpriced = {
+    student_id: 'st9',
+    display_name: 'עומר שגיא',
+    joined_on: '2026-09-01',
+    payer_person_id: 'p9',
+    payer_display_name: 'הורה שגיא',
+  }
+
+  it('lists an active student with no plan, beside the debts', async () => {
+    // §5.10's run has appended these to `tally.unpriced` since M6; the tally lands in
+    // `billing_run.log` and no router, worker or screen has ever read it. A child whose
+    // groups total three sessions a week in a club with no plan labelled 3 trained all
+    // year for nothing, recorded only in a JSON blob nobody opens.
+    renderCollections({
+      client: stub({ unpricedStudents: vi.fn().mockResolvedValue([unpriced]) }),
+    })
+    const row = await screen.findByTestId('unpriced-row')
+    expect(row).toHaveTextContent('עומר שגיא')
+    expect(screen.getByTestId('unpriced-payer')).toHaveTextContent('הורה שגיא')
+    // The plan is set on the student card, which is the one screen that closes the gap.
+    expect(screen.getByTestId('unpriced-open')).toHaveAttribute('href', '#/students/st9')
+  })
+
+  it('shows no money on the row, because there is none to show', async () => {
+    // The whole point of the row is that no plan says what this family owes. A number here
+    // would be an invention, and invariant 1 would be the least of its problems.
+    renderCollections({
+      client: stub({ unpricedStudents: vi.fn().mockResolvedValue([unpriced]) }),
+    })
+    const row = await screen.findByTestId('unpriced-row')
+    expect(row.textContent ?? '').not.toContain('₪')
+  })
+
+  it('renders nothing at all when every active student is priced', async () => {
+    // The goal state. A permanent empty panel on the club's busiest screen is a panel
+    // people learn to skip past, and then do not see when it fills.
+    renderCollections()
+    await screen.findByTestId('collections')
+    expect(screen.queryByTestId('unpriced-students')).toBeNull()
+  })
+
+  it('leaves the debt table standing when the unpriced read fails', async () => {
+    // A secondary list on a screen whose primary job is the debt table. A broken box above
+    // it would read as the debt being broken.
+    renderCollections({
+      client: stub({ unpricedStudents: vi.fn().mockRejectedValue(new Error('offline')) }),
+    })
+    expect(await screen.findByTestId('collections')).toBeInTheDocument()
+    expect(screen.getAllByTestId('household-row').length).toBeGreaterThan(0)
+  })
+})
 
 describe('3e — collections', () => {
   it('records a cash payment through a dialogue and reports what it settled', async () => {

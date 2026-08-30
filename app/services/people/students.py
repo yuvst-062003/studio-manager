@@ -41,6 +41,7 @@ from app.models.people import (
 from app.models.person import Guardian, Invitation, Person
 from app.models.structure import Group, GroupStaff
 from app.services.audit import AuditService
+from app.services.people.attendance_pattern import weekly_volume
 from app.services.people.enrollments import EnrollmentService
 from app.services.people.errors import ConflictError, NotFoundError, RefusedError
 from app.services.people.group_days import ScheduleReader
@@ -905,6 +906,114 @@ class StudentService:
         )
         StudentService._close_open_trials(session, student_id=student.id, outcome="converted")
         session.flush()
+        StudentService._raise_first_charge(session, student=student, on=started_on)
+        return student
+
+    @staticmethod
+    def _raise_first_charge(session: Session, *, student: Student, on: date) -> int:
+        """The first month, immediately, on every path that makes a student active.
+
+        **Conversion used to raise nothing, and that broke the manager's own sentence.**
+        §5.4b's join link charges the first month at signup; `convert` did not. A child a
+        manager converted on the 12th -- priced, enrolled, with the plan already chosen for
+        the family -- owed nothing until the 1st, so §6.1's payment step had no charge to
+        show, stood itself down, and the parent was never asked for money. Both entrances
+        now call `BillingRunService.charge_first_month`, which is the run's own first-month
+        machinery: it prorates by the sessions remaining in the period and writes the
+        idempotency key that makes the next monthly run a no-op for it.
+
+        Unpriced is not an error here. A club that has not set its prices up must not be
+        able to refuse a family who pressed join; they land on the manager's unpriced list
+        instead (`GET /billing/unpriced-students`).
+        """
+        from app.services.billing.run import BillingRunService
+
+        return BillingRunService(session).charge_first_month(
+            student.studio_id, student.id, student.price_plan_id, on=on
+        )
+
+    @staticmethod
+    def join_from_trial(
+        session: Session,
+        *,
+        student_id: uuid.UUID,
+        group_ids: list[uuid.UUID],
+        at: datetime,
+        actor_person_id: uuid.UUID | None,
+        schedule: ScheduleReader,
+    ) -> Student:
+        """Entrance A -- a trial family joining the club from their own app.
+
+        §5.4a ④ has asked "איך היה?" on days 1, 3 and 7 since M3 with nothing to press, and
+        after 21 days the same worker writes the family off as `lost`. This is the
+        destination that prompt never had, and it ends on the same finishing line every
+        other route does: health declaration → payment method per child → pay.
+
+        **It converts the student who already exists**, and that is the load-bearing
+        decision. Reusing `OnboardingService.add_child` would create a second record for a
+        child already on the roster -- one `trial`, one `active`, both on the register --
+        which is the duplicate defect the self-enrolment change created and this spec
+        closes.
+
+        **The parent chooses groups; the server derives the price.** How much is never a
+        parent's choice: `plan_for_volume` reads the weekly volume across the groups they
+        ticked. How to PAY is always theirs, and that is §6.1's payment step, untouched
+        here. There is deliberately no `price_plan_id` in this method's signature -- the
+        manager's `convert` has one and this must not, or the price becomes a field a
+        client can post.
+
+        **`health_status` is not promoted.** §5.4a: "the trial declaration is not sufficient
+        for enrollment -- converting requires the full form." §5.5's gate collects it, which
+        is the first step of the finishing line.
+
+        The transition runs FIRST, so an illegal move refuses before an enrolment is
+        written: a refused join must not leave the student in a group they were never put
+        in. One transaction, no commit -- the router commits.
+        """
+        from app.services.billing.catalogue import plan_for_volume
+
+        group_ids = list(dict.fromkeys(group_ids))
+        if not group_ids:
+            raise RefusedError("joining the club needs at least one group")
+        student, _person = StudentService.get(session, student_id=student_id)
+        StudentStatusService.transition(
+            session,
+            student=student,
+            to_status="active",
+            at=at,
+            actor_person_id=actor_person_id,
+            reason="joined from the trial",
+        )
+        started_on = at.date()
+        student.joined_on = student.joined_on or started_on
+
+        volume_pairs: list[tuple[list[int] | None, frozenset[int]]] = []
+        for group_id in group_ids:
+            # `is_invite_only` and `is_active` are enforced HERE, as on every other
+            # self-service door, and not by the picker hiding the group.
+            weekdays = EnrollmentService.self_service_weekdays(
+                session, group_id=group_id, since=started_on, schedule=schedule
+            )
+            EnrollmentService.create(
+                session,
+                student_id=student.id,
+                group_id=group_id,
+                started_on=started_on,
+                attends_weekdays=None,
+                at=at,
+                actor_person_id=actor_person_id,
+                schedule=schedule,
+                status="active",
+            )
+            volume_pairs.append((None, weekdays))
+
+        plan = plan_for_volume(
+            session, studio_id=student.studio_id, volume=weekly_volume(volume_pairs)
+        )
+        student.price_plan_id = plan.id if plan is not None else None
+        StudentService._close_open_trials(session, student_id=student.id, outcome="converted")
+        session.flush()
+        StudentService._raise_first_charge(session, student=student, on=started_on)
         return student
 
     @staticmethod

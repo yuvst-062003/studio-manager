@@ -169,3 +169,33 @@ def match_children(
         for student, person in rows
         if person.birthdate is None or birthdate is None or person.birthdate == birthdate
     ]
+
+
+def duplicate_student(
+    session: Session,
+    *,
+    first_name: str,
+    last_name: str,
+    birthdate: date | None,
+) -> ChildMatch | None:
+    """The one child a self-service write would duplicate, or None.
+
+    **This is the one genuinely valuable thing the approval queue did**, moved to where
+    parents actually are. `match_children` above has run since M3 on the registration-request
+    detail view — a screen whose sole producer was removed when `+ הוסף ילד` started enrolling
+    directly — so from that day a parent adding a child the club already had created a second
+    student for them, silently.
+
+    A WARNING is the right shape for a manager reading a queue and a refusal is the right
+    shape here, because there is no manager: accepting produces two students for one child,
+    which only the office can undo and which nothing on either screen reveals.
+
+    Same rule as `match_children`, single-valued: name equal, and a birthdate on file that
+    differs is what makes two same-named children two children. A candidate with no birthdate
+    recorded still matches, because a club that never recorded one has the names as its
+    strongest signal and a duplicate is the more expensive mistake.
+    """
+    matches = match_children(
+        session, first_name=first_name, last_name=last_name, birthdate=birthdate
+    )
+    return matches[0] if matches else None

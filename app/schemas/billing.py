@@ -64,6 +64,28 @@ IpnMatchStatus = Literal["auto", "manual", "unmatched", "ignored"]
 SubscriptionStatus = Literal["active", "cancelled"]
 
 
+class UnpricedStudentOut(BaseModel):
+    """One active student nobody can bill — collections screen, §5.10.
+
+    **No money on this shape, deliberately.** There is no amount to report: the whole point
+    of the row is that no plan says what this family owes. It carries names and a date, so
+    the manager can find the child and see how long it has been true.
+    """
+
+    student_id: uuid.UUID
+    display_name: str
+    joined_on: date | None
+    payer_person_id: uuid.UUID | None
+    payer_display_name: str | None
+
+
+class UnpricedStudentListOut(BaseModel):
+    """Not paginated. A club with more unpriced children than one page holds has a problem
+    a cursor would not help with, and the number itself is the signal."""
+
+    items: list[UnpricedStudentOut] = Field(default_factory=list)
+
+
 # -- catalogue ----------------------------------------------------------------
 class PricePlanOut(BaseModel):
     """§5.10 step 1 prices from here. `active_to` is null for the current plan, which is

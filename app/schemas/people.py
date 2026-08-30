@@ -317,18 +317,6 @@ class RegistrationRequestOut(BaseModel):
     guardian_display_name: str
 
 
-class RegistrationDecisionIn(BaseModel):
-    """`POST /registration-requests/{id}/{approve|reject}`.
-
-    §5.4: **enrollment is always a manager decision.** Approving is where the group is
-    chosen, which is why `group_id` lives on the decision and not on the submission — the
-    public link's only job is a first lesson.
-    """
-
-    group_id: uuid.UUID | None = None
-    reason: str | None = Field(default=None, max_length=200)
-
-
 StudentPage = CursorPage[StudentOut]
 EnrollmentPage = CursorPage[EnrollmentOut]
 RegistrationRequestPage = CursorPage[RegistrationRequestOut]
@@ -555,6 +543,14 @@ class MyTrialBookingOut(BaseModel):
     """
 
     student_id: uuid.UUID
+    #: The group they trialled in, so entrance A's picker opens with it already ticked.
+    #:
+    #: An ID in a parent-facing shape, and it is the same id `PublicGroupOut` hands to
+    #: strangers on the landing page — the join picker is built from that very list, so
+    #: without this the screen could not tell which of those cards the family has already
+    #: been to. Nothing else about the group is added: `group_name` was, and remains, what
+    #: the screen renders.
+    group_id: uuid.UUID
     group_name: str
     session_starts_at: datetime | None
     attended: bool | None
@@ -777,17 +773,20 @@ class SiblingRequestIn(BaseModel):
     group_ids: list[uuid.UUID] = Field(min_length=1, max_length=8)
 
 
+class StudentJoinIn(BaseModel):
+    """Entrance A — `POST /me/students/{student_id}/join`.
+
+    **`group_ids` and no price.** How much a family pays is derived from the weekly volume
+    across the groups they tick (§5.10); how they PAY is chosen on §6.1's payment step. A
+    `price_plan_id` here would be a price a client can post.
+
+    Plural for the same reason `SiblingRequestIn.group_ids` is: one group id cannot price a
+    child who trains twice a week.
+    """
+
+    group_ids: list[uuid.UUID] = Field(min_length=1, max_length=8)
+
+
 RegistrationRequestPageOut = CursorPage[RegistrationRequestOut]
 
 
-class RegistrationDecisionOut(BaseModel):
-    """The result of approving or rejecting one submission.
-
-    One shape for both verbs: a rejection creates no students and returns an empty list,
-    which is a truer answer than a second shape that cannot express the difference.
-    """
-
-    request_id: uuid.UUID
-    status: str = Field(pattern=REGISTRATION_STATUS_PATTERN)
-    #: §5.4a's worked example approves two children at once, so this is a list.
-    student_ids: list[uuid.UUID] = Field(default_factory=list)

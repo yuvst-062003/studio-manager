@@ -87,11 +87,22 @@ export function AddSibling({
   const [sending, setSending] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [failed, setFailed] = useState(false)
+  // 422 `duplicate_student` — this child is already on the roster (2026-08-30). Held apart
+  // from `failed` because it is not a failure the parent should retry: the useful answer is
+  // the child they already have, not the same form again. `studentId` and `displayName` are
+  // present only when the server may name them — a caller who is not that child's guardian
+  // is told the same thing without the name, because naming them would disclose that a
+  // child of that name trains here (§11.1).
+  const [duplicate, setDuplicate] = useState<{
+    studentId: string | null
+    displayName: string | null
+  } | null>(null)
 
   const submit = (event: FormEvent) => {
     event.preventDefault()
     setSending(true)
     setFailed(false)
+    setDuplicate(null)
     client
       .requestSibling({
         first_name: firstName,
@@ -99,11 +110,26 @@ export function AddSibling({
         birthdate: birthdate || null,
         group_ids: groupIds,
       })
-      .then((response) => {
-        if (response.ok) setSubmitted(true)
+      .then(async (response) => {
+        if (response.ok) {
+          setSubmitted(true)
+          return
+        }
+        if (response.status === 422) {
+          const body = (await response.json().catch(() => null)) as {
+            detail?: { code?: string; student_id?: string; display_name?: string }
+          } | null
+          if (body?.detail?.code === 'duplicate_student') {
+            setDuplicate({
+              studentId: body.detail.student_id ?? null,
+              displayName: body.detail.display_name ?? null,
+            })
+            return
+          }
+        }
         // The typed values stay. A parent who already hesitated should not have to start
         // again because the network did.
-        else setFailed(true)
+        setFailed(true)
       })
       .catch(() => setFailed(true))
       .finally(() => setSending(false))
@@ -113,7 +139,9 @@ export function AddSibling({
     return (
       <section aria-labelledby="sibling-done" data-testid="sibling-submitted">
         <h2 id="sibling-done">{t(locale, 'people.sibling.title')}</h2>
-        {/* L6 — the promise is REVIEW, never a place. */}
+        {/* A PLACE, not a review (2026-08-30). The child is enrolled, priced and
+            charged already; what is left is the health form and the payment method,
+            which is what the copy names. */}
         <p data-testid="sibling-pending-hint">{t(locale, 'people.sibling.pendingHint')}</p>
       </section>
     )
@@ -212,6 +240,26 @@ export function AddSibling({
           <li>{t(locale, 'people.sibling.steps.billing')}</li>
         </ol>
       </section>
+
+      {duplicate ? (
+        <span data-testid="sibling-duplicate">
+          {/* `pending` and not `danger`: the parent did nothing wrong and nothing is broken
+              — the child is already here. */}
+          <Alert tone="pending" iconLabel={t(locale, 'people.sibling.duplicate')}>
+            {duplicate.displayName
+              ? t(locale, 'people.sibling.duplicateNamed').replace(
+                  '{name}',
+                  duplicate.displayName,
+                )
+              : t(locale, 'people.sibling.duplicate')}
+          </Alert>
+          {duplicate.studentId ? (
+            <a href={`#/student/${duplicate.studentId}`} data-testid="sibling-duplicate-open">
+              {t(locale, 'people.sibling.duplicateOpen')}
+            </a>
+          ) : null}
+        </span>
+      ) : null}
 
       {failed ? (
         <span data-testid="sibling-error">

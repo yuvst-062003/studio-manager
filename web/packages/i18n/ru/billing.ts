@@ -305,4 +305,13 @@ export const billing: Bundle = {
   'product.wizardHint': 'Можно пропустить — клубу, который ничего не продаёт, этот шаг не нужен',
   'product.wizardDone': 'Завершить шаг',
   'product.required': 'Обязательное поле',
+
+  // -- the children nobody can bill (2026-08-30) --------------------------------
+  'unpriced.title': 'Ученики без тарифа',
+  'unpriced.hint': 'У них нет тарифного плана, поэтому месячный расчёт их пропускает.',
+  'unpriced.empty': 'У всех активных учеников есть тариф',
+  'unpriced.payer': 'Плательщик',
+  'unpriced.noPayer': 'Нет плательщика',
+  'unpriced.since': 'Присоединились {date}',
+  'unpriced.open': 'Открыть карточку',
 }

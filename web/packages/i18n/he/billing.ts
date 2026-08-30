@@ -358,4 +358,16 @@ export const billing: Bundle = {
   'product.wizardHint': 'אפשר לדלג — מועדון שאינו מוכר פריטים אינו צריך את השלב הזה',
   'product.wizardDone': 'סיום השלב',
   'product.required': 'שדה חובה',
+
+  // -- the children nobody can bill (2026-08-30) --------------------------------
+  // §5.10's run has appended these to `tally.unpriced` since M6; the tally lands in
+  // `billing_run.log` and nothing reads it. A child nobody can bill belongs in the same
+  // view as a child who has not paid.
+  'unpriced.title': 'חניכים ללא מחיר',
+  'unpriced.hint': 'לא משויכת להם תוכנית מחיר, ולכן החיוב החודשי מדלג עליהם.',
+  'unpriced.empty': 'לכל החניכים הפעילים יש תוכנית מחיר',
+  'unpriced.payer': 'משלם',
+  'unpriced.noPayer': 'אין הורה משלם',
+  'unpriced.since': 'הצטרפו ב־{date}',
+  'unpriced.open': 'לכרטיס החניך',
 }

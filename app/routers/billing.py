@@ -61,12 +61,14 @@ from app.schemas.billing import (
     ProductPage,
     RecurringSubscriptionOut,
     RecurringSubscriptionPage,
+    UnpricedStudentListOut,
+    UnpricedStudentOut,
     UpayIpnRecordOut,
     UpayIpnRecordPage,
 )
 from app.services.audit import AuditService
 from app.services.billing import BillingService
-from app.services.billing.catalogue import MAX_SIZES, CatalogueService
+from app.services.billing.catalogue import MAX_SIZES, CatalogueService, unpriced_students
 from app.services.billing.errors import ConflictError, NotFoundError, RefusedError
 from app.services.billing.orders import OrderService
 from app.services.billing.payment_promise import PaymentPromiseService
@@ -950,6 +952,32 @@ def _settings_of(session: TenantSessionDep, studio_id: uuid.UUID) -> tuple[Studi
     if studio is None:  # pragma: no cover -- the tenant resolver would have refused first
         raise _not_found("studio")
     return studio, dict(studio.settings or {}).get(SETTINGS_KEY, {})
+
+
+@router.get("/billing/unpriced-students", response_model=UnpricedStudentListOut)
+def list_unpriced_students(_: ManagerOrOwner, session: TenantSessionDep) -> UnpricedStudentListOut:
+    """§5.10's silent gap, made visible on the screen a manager already opens to ask
+    "who owes what".
+
+    The run has appended these to `tally.unpriced` since M6; the tally lands in
+    `billing_run.log` and no router, worker or screen reads that column. So a child whose
+    groups total three sessions a week in a club with no plan labelled 3 trained all year
+    for nothing, and the only record of it was a JSON blob nobody opens.
+
+    A child nobody can bill belongs in the same view as a child who has not paid.
+    """
+    return UnpricedStudentListOut(
+        items=[
+            UnpricedStudentOut(
+                student_id=row.student_id,
+                display_name=row.display_name,
+                joined_on=row.joined_on,
+                payer_person_id=row.payer_person_id,
+                payer_display_name=row.payer_display_name,
+            )
+            for row in unpriced_students(session)
+        ]
+    )
 
 
 @router.get("/billing/settings", response_model=BillingSettingsOut)

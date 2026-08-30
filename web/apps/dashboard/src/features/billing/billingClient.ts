@@ -123,7 +123,20 @@ export type DashboardBillingClient = {
   settlePlanChange(changeId: string): Promise<void>
   confirmPromise(promiseId: string): Promise<void>
   declinePromise(promiseId: string): Promise<void>
+  /** §5.10's silent gap — active students with no price plan, so the run skips them. */
+  unpricedStudents(): Promise<UnpricedStudentOut[]>
 }
+
+/**
+ * One active student nobody can bill.
+ *
+ * The billing run has appended these to `tally.unpriced` since M6; the tally lands in
+ * `billing_run.log` and no router, worker or screen has ever read it — so a child whose
+ * groups total three sessions a week in a club with no plan labelled 3 trained all year for
+ * nothing, recorded only in a JSON blob. There is no money on this shape and there cannot
+ * be: the whole point of the row is that no plan says what the family owes.
+ */
+export type UnpricedStudentOut = components['schemas']['UnpricedStudentOut']
 
 /** The two routes a family hands money over by. Mirrors `PROMISE_METHODS` on the server. */
 export type PromiseMethod = 'cash' | 'cheque' | 'standing_order'
@@ -190,6 +203,10 @@ export function makeDashboardBillingClient(fetcher: Fetcher): DashboardBillingCl
         allocated: payment.allocations.length,
         unallocatedAgorot: payment.amount_agorot - allocated,
       }
+    },
+    async unpricedStudents() {
+      const response = await fetcher('/api/v1/billing/unpriced-students')
+      return (await json<{ items: UnpricedStudentOut[] }>(response)).items
     },
     async unmatched() {
       const response = await fetcher('/api/v1/reconciliation/unmatched')

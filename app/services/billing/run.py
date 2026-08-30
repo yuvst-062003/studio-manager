@@ -158,6 +158,41 @@ class BillingRunService:
         self._session.flush()
         return run
 
+    def charge_first_month(
+        self,
+        studio_id: uuid.UUID,
+        student_id: uuid.UUID,
+        price_plan_id: uuid.UUID | None,
+        *,
+        on: date,
+        tally: _Tally | None = None,
+    ) -> int:
+        """One student's first tuition charge, raised the moment they are enrolled.
+
+        **Every enrolment path calls this and none of them reaches into `_charge_one`.**
+        §5.4b's join link raised the first month immediately and `StudentService.convert`
+        raised nothing, so a child a manager converted on the 12th was active, enrolled and
+        priced with nothing to pay until the 1st -- and §6.1's payment step, which has
+        something to show only when a charge exists, stood itself down and never asked the
+        family for money. Two doors into the same room, one of which skipped the till.
+
+        Returns the number of charges created: 1, or 0 when the student is unpriced, has no
+        primary guardian, or was already charged for this period. The run's own idempotency
+        key makes the next monthly run a no-op for the period this covers, which is what
+        lets both the immediate charge and the monthly run exist.
+        """
+        counter = tally if tally is not None else _Tally()
+        before = counter.charged
+        self._charge_one(
+            studio_id,
+            student_id,
+            price_plan_id,
+            on.replace(day=1),
+            period_end(on.year, on.month),
+            counter,
+        )
+        return counter.charged - before
+
     # -- internals ------------------------------------------------------------
     def _apply_credit(self, tally: _Tally) -> None:
         """**Step 7 -- spend money that has already arrived.**

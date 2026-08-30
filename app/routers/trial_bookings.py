@@ -28,8 +28,6 @@ from app.schemas.people import (
     ChildMatchOut,
     MyTrialBookingListResponse,
     MyTrialBookingOut,
-    RegistrationDecisionIn,
-    RegistrationDecisionOut,
     RegistrationRequestDetailOut,
     RegistrationRequestOut,
     RegistrationRequestPageOut,
@@ -43,7 +41,7 @@ from app.schemas.people import (
     TrialBookingSelfResult,
     TrialBookingUpdate,
 )
-from app.services.people.errors import ConflictError, NotFoundError, RefusedError
+from app.services.people.errors import ConflictError, NotFoundError
 from app.services.people.group_days import ScheduleReader
 from app.services.people.landing import LandingService
 from app.services.people.rate_limit import (
@@ -250,6 +248,7 @@ def my_trial_bookings(request: Request, session: TenantSessionDep) -> MyTrialBoo
         items=[
             MyTrialBookingOut(
                 student_id=booking.student_id,
+                group_id=group.id,
                 group_name=group.name,
                 session_starts_at=session_row.starts_at if session_row else None,
                 attended=booking.attended,
@@ -369,12 +368,18 @@ def grant_override(
     return TrialBookingOut.model_validate(booking, from_attributes=True)
 
 
-# -- §5.4a's approval queue ----------------------------------------------------
-# The queue lives beside the intake it watches: a `registration_request` and a
-# `trial_booking` are the two ways somebody enters the funnel, and dashboard `6c` renders
-# both. §7 lists `/registration-requests` separately; the file it lands in is this lane's
-# choice, and splitting the funnel across two routers would put the queue further from the
-# thing it queues.
+# -- §5.4a's registration_request rows -----------------------------------------
+# **The approval queue is gone** (2026-08-30) and these two reads are what is left. Nothing
+# produces a `pending` row any more: `+ הוסף ילד` enrols directly, and the queue's approve
+# and reject went with its producer rather than standing as buttons over a list that could
+# never fill. The duplicate check they were worth keeping for now runs on the doors parents
+# use -- see `OnboardingService.add_child`.
+#
+# What still writes here is §5.4a's trial funnel, which parks a trial's health answers in
+# `payload_encrypted` (`status="approved"`, `reviewed_at` set, no reviewer) because it is
+# the only column in the schema built to hold a minor's data at rest. Reading those back is
+# what these two routes are for, and the rows live beside the `trial_booking` that created
+# them -- which is why they are in this file.
 
 
 @router.get("/registration-requests", response_model=RegistrationRequestPageOut)
@@ -451,81 +456,3 @@ def read_registration_request(
             for match in detail.possible_duplicate_students
         ],
     )
-
-
-@router.post(
-    "/registration-requests/{request_id}/approve",
-    response_model=RegistrationDecisionOut,
-)
-def approve_registration_request(
-    _: ManagerOrOwner,
-    request_id: uuid.UUID,
-    body: RegistrationDecisionIn,
-    request: Request,
-    session: TenantSessionDep,
-    idempotency_key: IdempotencyKey = None,
-) -> RegistrationDecisionOut:
-    """§5.4a's approval transaction.
-
-    **The group comes from the body, not the payload** (§5.4): "Approving is where the group
-    is chosen, which is why group_id lives on the decision and not on the submission."
-    """
-    try:
-        created = RegistrationService.approve(
-            session,
-            request_id=request_id,
-            group_id=body.group_id,
-            actor_person_id=getattr(request.state, "person_id", None),
-            at=now(),
-            schedule=schedule_reader(session),
-        )
-    except NotFoundError as exc:
-        raise _not_found("registration request or group") from exc
-    except ConflictError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail={"code": "already_reviewed", "message": str(exc)},
-        ) from exc
-    except RefusedError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail={"code": "group_required", "message": str(exc)},
-        ) from exc
-    except NotImplementedError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail={
-                "code": "schedule_unavailable",
-                "message": "the club's schedule has not been built yet",
-            },
-        ) from exc
-    session.commit()
-    return RegistrationDecisionOut(request_id=request_id, status="approved", student_ids=created)
-
-
-@router.post("/registration-requests/{request_id}/reject", response_model=RegistrationDecisionOut)
-def reject_registration_request(
-    _: ManagerOrOwner,
-    request_id: uuid.UUID,
-    body: RegistrationDecisionIn,
-    request: Request,
-    session: TenantSessionDep,
-    idempotency_key: IdempotencyKey = None,
-) -> RegistrationDecisionOut:
-    try:
-        RegistrationService.reject(
-            session,
-            request_id=request_id,
-            reason=body.reason,
-            actor_person_id=getattr(request.state, "person_id", None),
-            at=now(),
-        )
-    except NotFoundError as exc:
-        raise _not_found("registration request") from exc
-    except ConflictError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail={"code": "already_reviewed", "message": str(exc)},
-        ) from exc
-    session.commit()
-    return RegistrationDecisionOut(request_id=request_id, status="rejected")

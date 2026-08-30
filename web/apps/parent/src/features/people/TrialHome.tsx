@@ -113,9 +113,27 @@ export function TrialHome({
       </section>
 
       {attended ? (
-        // §5.4a ④ — 'After the lesson the home shows "איך היה?"'. The conversion decision
-        // is the manager's; this asks nothing of the parent but an opinion.
-        <p data-testid="trial-home-how-was-it">{t(locale, 'people.trialHome.howWasIt')}</p>
+        // §5.4a ④ — 'After the lesson the home shows "איך היה?"', and it now leads somewhere.
+        //
+        // **The question was a dead end for as long as it has existed.** The conversion
+        // decision used to be the manager's alone: this screen asked a family whether they
+        // enjoyed themselves and offered them nothing to press, the follow-up worker asked
+        // the same thing on days 1, 3 and 7 with no link, and day 21 marked the student
+        // `lost`. Both entrances exist now, and this is the parent's.
+        //
+        // **Only after the lesson, and only for somebody who came.** `attended` is
+        // three-state and this branch is `=== true`: the no-show is shown neither the
+        // question nor the button, which is the same rule the worker follows for the same
+        // reason — offering a family who did not turn up a join button is "איך היה?" with
+        // money attached.
+        <>
+          <p data-testid="trial-home-how-was-it">{t(locale, 'people.trialHome.howWasIt')}</p>
+          {/* A link and not a button: it is navigation, the hash survives the back button,
+              and every other in-app route in this shell is reached the same way. */}
+          <a href="#/join" data-testid="trial-home-join">
+            {t(locale, 'people.joinClub.cta')}
+          </a>
+        </>
       ) : null}
     </section>
   )

@@ -670,6 +670,34 @@ export interface paths {
         patch: operations["update_billing_settings_api_v1_billing_settings_patch"];
         trace?: never;
     };
+    "/api/v1/billing/unpriced-students": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Unpriced Students
+         * @description §5.10's silent gap, made visible on the screen a manager already opens to ask
+         *     "who owes what".
+         *
+         *     The run has appended these to `tally.unpriced` since M6; the tally lands in
+         *     `billing_run.log` and no router, worker or screen reads that column. So a child whose
+         *     groups total three sessions a week in a club with no plan labelled 3 trained all year
+         *     for nothing, and the only record of it was a JSON blob nobody opens.
+         *
+         *     A child nobody can bill belongs in the same view as a child who has not paid.
+         */
+        get: operations["list_unpriced_students_api_v1_billing_unpriced_students_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/calendar-feeds": {
         parameters: {
             query?: never;
@@ -2013,6 +2041,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/students/{student_id}/join": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Join The Club
+         * @description Entrance A — the destination §5.4a ④'s "איך היה?" never had.
+         *
+         *     The worker has asked a trial family how their lesson went on days 1, 3 and 7 since M3,
+         *     with no link and no action, and written them off as `lost` after 21 days. The only route
+         *     in was a manager opening the student card. This is the other entrance; both end on the
+         *     same sequence — health declaration → payment method per child → pay.
+         *
+         *     **It cannot reuse `POST /students/{id}/convert`.** That route is `ManagerOrOwner`, takes
+         *     a single `group_id`, and takes a manager-chosen `price_plan_id`. This one is reached by
+         *     a guardian, takes the groups they ticked, and derives the price from them.
+         *
+         *     **No role dependency**, for the reason `/me/students` gives: §3.1 — "guardian is not a
+         *     role", so `require_roles` here would refuse every guardian in the product. The check
+         *     that matters is the record one, and it is the same as `/me/students/{id}/status-history`
+         *     makes: **404, never 403.** Under `/me/` the collection is "my children", so an id outside
+         *     it does not exist — and a 403 would confirm the child is in this studio.
+         */
+        post: operations["join_the_club_api_v1_me_students__student_id__join_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/students/{student_id}/status-history": {
         parameters: {
             query?: never;
@@ -3283,46 +3346,6 @@ export interface paths {
         get: operations["read_registration_request_api_v1_registration_requests__request_id__get"];
         put?: never;
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/registration-requests/{request_id}/approve": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Approve Registration Request
-         * @description §5.4a's approval transaction.
-         *
-         *     **The group comes from the body, not the payload** (§5.4): "Approving is where the group
-         *     is chosen, which is why group_id lives on the decision and not on the submission."
-         */
-        post: operations["approve_registration_request_api_v1_registration_requests__request_id__approve_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/registration-requests/{request_id}/reject": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Reject Registration Request */
-        post: operations["reject_registration_request_api_v1_registration_requests__request_id__reject_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -8239,6 +8262,11 @@ export interface components {
         MyTrialBookingOut: {
             /** Attended */
             attended: boolean | null;
+            /**
+             * Group Id
+             * Format: uuid
+             */
+            group_id: string;
             /** Group Name */
             group_name: string;
             /** Session Starts At */
@@ -9284,38 +9312,6 @@ export interface components {
             /** Confirmed */
             confirmed: boolean;
             registration: components["schemas"]["EventRegistrationOut"];
-        };
-        /**
-         * RegistrationDecisionIn
-         * @description `POST /registration-requests/{id}/{approve|reject}`.
-         *
-         *     §5.4: **enrollment is always a manager decision.** Approving is where the group is
-         *     chosen, which is why `group_id` lives on the decision and not on the submission — the
-         *     public link's only job is a first lesson.
-         */
-        RegistrationDecisionIn: {
-            /** Group Id */
-            group_id?: string | null;
-            /** Reason */
-            reason?: string | null;
-        };
-        /**
-         * RegistrationDecisionOut
-         * @description The result of approving or rejecting one submission.
-         *
-         *     One shape for both verbs: a rejection creates no students and returns an empty list,
-         *     which is a truer answer than a second shape that cannot express the difference.
-         */
-        RegistrationDecisionOut: {
-            /**
-             * Request Id
-             * Format: uuid
-             */
-            request_id: string;
-            /** Status */
-            status: string;
-            /** Student Ids */
-            student_ids?: string[];
         };
         /**
          * RegistrationIn
@@ -10619,6 +10615,21 @@ export interface components {
             to_date?: string | null;
         };
         /**
+         * StudentJoinIn
+         * @description Entrance A — `POST /me/students/{student_id}/join`.
+         *
+         *     **`group_ids` and no price.** How much a family pays is derived from the weekly volume
+         *     across the groups they tick (§5.10); how they PAY is chosen on §6.1's payment step. A
+         *     `price_plan_id` here would be a price a client can post.
+         *
+         *     Plural for the same reason `SiblingRequestIn.group_ids` is: one group id cannot price a
+         *     child who trains twice a week.
+         */
+        StudentJoinIn: {
+            /** Group Ids */
+            group_ids: string[];
+        };
+        /**
          * StudentLeaveIn
          * @description §7 — `POST /students/{id}/leave`.
          *
@@ -11305,6 +11316,38 @@ export interface components {
              * Format: date-time
              */
             starts_at: string;
+        };
+        /**
+         * UnpricedStudentListOut
+         * @description Not paginated. A club with more unpriced children than one page holds has a problem
+         *     a cursor would not help with, and the number itself is the signal.
+         */
+        UnpricedStudentListOut: {
+            /** Items */
+            items?: components["schemas"]["UnpricedStudentOut"][];
+        };
+        /**
+         * UnpricedStudentOut
+         * @description One active student nobody can bill — collections screen, §5.10.
+         *
+         *     **No money on this shape, deliberately.** There is no amount to report: the whole point
+         *     of the row is that no plan says what this family owes. It carries names and a date, so
+         *     the manager can find the child and see how long it has been true.
+         */
+        UnpricedStudentOut: {
+            /** Display Name */
+            display_name: string;
+            /** Joined On */
+            joined_on: string | null;
+            /** Payer Display Name */
+            payer_display_name: string | null;
+            /** Payer Person Id */
+            payer_person_id: string | null;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
         };
         /**
          * UpayFormOut
@@ -12577,6 +12620,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_unpriced_students_api_v1_billing_unpriced_students_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnpricedStudentListOut"];
                 };
             };
         };
@@ -14727,6 +14790,44 @@ export interface operations {
             };
         };
     };
+    join_the_club_api_v1_me_students__student_id__join_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StudentJoinIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudentSummaryOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     my_student_status_history_api_v1_me_students__student_id__status_history_get: {
         parameters: {
             query?: never;
@@ -16606,82 +16707,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RegistrationRequestDetailOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    approve_registration_request_api_v1_registration_requests__request_id__approve_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
-                "Idempotency-Key"?: string | null;
-            };
-            path: {
-                request_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RegistrationDecisionIn"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RegistrationDecisionOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    reject_registration_request_api_v1_registration_requests__request_id__reject_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
-                "Idempotency-Key"?: string | null;
-            };
-            path: {
-                request_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RegistrationDecisionIn"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RegistrationDecisionOut"];
                 };
             };
             /** @description Validation Error */
