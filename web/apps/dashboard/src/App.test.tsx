@@ -270,6 +270,28 @@ describe('an account with no role in the active studio (2026-08-29)', () => {
     expect(screen.queryByRole('link', { name: t('he', 'common.dash.nav.weekly') })).toBeNull()
   })
 
+  it('refuses somebody who belongs to NO studio at all', async () => {
+    // The case the original fix missed, found in production on 2026-08-30. `hasNoRole`
+    // was `membership !== undefined && membership.roles.length === 0`, so it caught a
+    // person WITH a membership and no role -- and let a person with no membership at all
+    // straight through, because `membership` is then `undefined` and the guard is false.
+    //
+    // Signing in is not access: §6.1 says "there is no path from I downloaded the app to
+    // I have a studio", so any Google account can authenticate and belong to nothing. On
+    // a fresh production that is EVERY first visitor, including the owner before their
+    // club exists -- and what they got was the whole dashboard shell with every panel
+    // failing, which reads as a broken deployment rather than an empty account.
+    const NO_STUDIO = { ...SESSION, studios: [], active_studio_id: null }
+    stubApi({
+      '/auth/refresh': { access_token: 'tok', expires_in: 900, ...NO_STUDIO },
+      '/auth/me': NO_STUDIO,
+      '/api/v1/sessions': { items: [] },
+    })
+    render(<App />)
+    expect(await screen.findByTestId('dashboard-refusal')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: t('he', 'common.dash.nav.weekly') })).toBeNull()
+  })
+
   it('still renders the shell for a role that HAS access', async () => {
     // The refusal must key on "no role at all", not on "not an owner" — a lead coach has
     // a genuine, narrower dashboard and must keep it.

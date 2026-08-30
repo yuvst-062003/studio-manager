@@ -128,6 +128,7 @@ export const common: Bundle = {
   'auth.continueWithApple': 'продолжить с Apple',
   'auth.signingIn': 'вход…',
   'auth.notFound': 'мы вас не нашли',
+  'auth.joining': 'Подключаем вас к клубу…',
   'auth.haveInviteCode': 'у меня есть код приглашения',
   'auth.registerToStudio': 'записаться в студию',
   'auth.inviteCodeLabel': 'код приглашения',

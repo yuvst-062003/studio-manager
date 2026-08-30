@@ -117,6 +117,30 @@ describe('the invitation LINK (2026-08-30)', () => {
     window.history.replaceState(null, '', '/')
   })
 
+  it('does not accuse an invited parent of having no access while the redeem runs', async () => {
+    // A parent who followed the manager's link is not refused -- they are mid-join. The
+    // refusal screen renders on `!access.parent`, which is true for the whole round trip,
+    // so the first thing the invited parent saw was "you do not have access here". That
+    // is the one audience it must never show to: they are holding the club's own link.
+    window.history.replaceState(null, '', '/?invite=tok-123')
+    let release: (r: Response) => void = () => {}
+    const pending = new Promise<Response>((resolve) => {
+      release = resolve
+    })
+    vi.stubGlobal('fetch', vi.fn(() => pending))
+    const s = session({ access: { staff: false, parent: false } })
+    render(<Resolve session={s} locale="he" />)
+
+    // While the redeem is in flight: no refusal, and something that says what is going on.
+    await waitFor(() => expect(screen.getByTestId('parent-joining')).toBeInTheDocument())
+    expect(screen.queryByTestId('parent-refusal')).toBeNull()
+
+    release(new Response('{}', { status: 200 }))
+    await waitFor(() => expect(s.reload).toHaveBeenCalled())
+    vi.unstubAllGlobals()
+    window.history.replaceState(null, '', '/')
+  })
+
   it('leaves the pre-filled manual path standing when the redeem fails', async () => {
     window.history.replaceState(null, '', '/?invite=tok-bad')
     const fetchMock = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>(

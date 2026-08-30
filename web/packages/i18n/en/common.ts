@@ -120,6 +120,7 @@ export const common: Bundle = {
   'auth.continueWithApple': 'continue with Apple',
   'auth.signingIn': 'signing in…',
   'auth.notFound': "we couldn't find you",
+  'auth.joining': 'Joining you to the club…',
   'auth.haveInviteCode': 'I have an invitation code',
   'auth.registerToStudio': 'register with a studio',
   'auth.inviteCodeLabel': 'invitation code',

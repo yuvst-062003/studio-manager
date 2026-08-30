@@ -47,10 +47,21 @@ export function Resolve({ session, locale }: { session: Session; locale: Locale 
   // already said yes. A failed redeem leaves the pre-filled field on screen, which is
   // the manual path with the typing already done.
   const arrivedWithInvite = code !== '' && !session.access.parent
+  // Whether that redeem is still in flight. The refusal below keys on `!access.parent`,
+  // which stays true for the whole round trip -- so an invited parent's FIRST screen was
+  // "you do not have access here", from the club's own link. They are mid-join, not
+  // refused, and they are the one audience that message must never reach.
+  const [joining, setJoining] = useState(arrivedWithInvite)
   useEffect(() => {
     if (!arrivedWithInvite) return
-    const wanted = new URLSearchParams(globalThis.location?.search ?? '').get('invite')
-    if (wanted) void redeem(wanted)
+    // `code` was initialised from this same `?invite=` param and nothing has had a chance
+    // to edit it yet, so re-reading the URL here would be a second source for one value.
+    // `arrivedWithInvite` already guarantees it is non-empty.
+    //
+    // `finally` and not `then`: a failed redeem must also stop claiming to be joining, or
+    // a parent whose token expired waits on a spinner for ever instead of reaching the
+    // pre-filled manual path below.
+    void redeem(code).finally(() => setJoining(false))
     // eslint-disable-next-line react-hooks/exhaustive-deps -- one shot, on arrival only.
   }, [])
   // Memoised: `useMyStudents` reads through this in an effect keyed on the client, so a
@@ -133,6 +144,15 @@ export function Resolve({ session, locale }: { session: Session; locale: Locale 
 
   // §3.1 — the parent app asks 'do you have any guardian rows?', which is what
   // `access.parent` reports. A role check here would let a manager with no children in.
+  // Mid-join, not refused. See `joining` above.
+  if (joining) {
+    return (
+      <section aria-busy="true" data-testid="parent-joining">
+        <p>{t(locale, 'common.auth.joining')}</p>
+      </section>
+    )
+  }
+
   if (!session.access.parent) {
     return (
       <>

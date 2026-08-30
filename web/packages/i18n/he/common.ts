@@ -123,6 +123,7 @@ export const common: Bundle = {
   'auth.continueWithApple': 'המשך עם Apple',
   'auth.signingIn': 'מתחבר…',
   'auth.notFound': 'לא מצאנו אותך',
+  'auth.joining': 'מצרפים אתכם למועדון…',
   'auth.haveInviteCode': 'יש לי קוד הזמנה',
   'auth.registerToStudio': 'הרשמה לסטודיו',
   'auth.inviteCodeLabel': 'קוד הזמנה',

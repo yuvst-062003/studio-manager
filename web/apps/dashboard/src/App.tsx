@@ -563,8 +563,26 @@ export default function App() {
    *
    * Keyed on "no role at all", never on "not an owner": a lead coach has a genuine,
    * narrower dashboard and must keep it.
+   *
+   * **And somebody who belongs to NO studio at all, which this missed until 2026-08-30.**
+   * The test above it was written for a person WITH a membership and no role, and the
+   * condition said so: `membership !== undefined && ...`. A person with no membership
+   * makes `membership` undefined, so the guard was false and they fell through into the
+   * full shell — the same broken-looking dashboard, one step further out.
+   *
+   * That is not an exotic case. §6.1 is explicit that "there is no path from I downloaded
+   * the app to I have a studio", so ANY Google account can authenticate and belong to
+   * nothing; authentication is identity, never access. On a freshly provisioned
+   * environment it is every first visitor — including the owner, before their own club
+   * exists — and what they saw was every panel failing at once, which reads as a broken
+   * deployment rather than an empty account. Found in production, by exactly that person,
+   * drawing exactly that conclusion.
+   *
+   * `studios.length === 0` and not `membership === undefined`: a person who HAS clubs but
+   * whose active one has not resolved yet is mid-switch, not refused.
    */
-  const hasNoRole = membership !== undefined && membership.roles.length === 0
+  const hasNoRole =
+    session.studios.length === 0 || (membership !== undefined && membership.roles.length === 0)
   // Memoised: SetupWizard reads through this in an effect keyed on the client, so a fresh
   // object every render would re-fetch progress forever.
   const setupClient = useMemo(() => makeSetupClient(apiFetch), [])
