@@ -116,6 +116,7 @@ export type { SwUpdateDetail } from './sw-update/swUpdate'
 //
 // It lives in @studio/ui and not in an app feature directory because §5.1 says "the staff
 // app and dashboard route them into" it: both mount the same wizard in place.
+export { AccessibilityMenu, applyA11ySettings } from './primitives/AccessibilityMenu'
 export { SetupWizard } from './setup-wizard/SetupWizard'
 export { SetupIncompleteBanner } from './setup-wizard/SetupIncompleteBanner'
 export type { SetupClient } from './setup-wizard/SetupWizard'

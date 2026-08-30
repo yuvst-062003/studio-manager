@@ -12,6 +12,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { apiFetch, useSession, switchStudio } from '@studio/core'
 import {
+  AccessibilityMenu,
   AppShell,
   EmptyState,
   Icon,
@@ -335,6 +336,7 @@ function sideNavGroups(
           // defect the canvas audit found twelve times and this screen was meant to avoid.
           key: 'home',
           label: t(locale, 'common.dash.home.title'),
+          hint: t(locale, 'common.dash.hint.home'),
           href: '#/home',
           icon: <Icon name="home" />,
           active: route === 'home',
@@ -342,6 +344,7 @@ function sideNavGroups(
         {
           key: 'schedule',
           label: t(locale, 'common.dash.nav.weekly'),
+          hint: t(locale, 'common.dash.hint.schedule'),
           href: '#/schedule',
           icon: <Icon name="calendar" />,
           active: route === 'schedule' && !onGroups,
@@ -349,6 +352,7 @@ function sideNavGroups(
         {
           key: 'attendance',
           label: t(locale, 'common.nav.attendance'),
+          hint: t(locale, 'common.dash.hint.attendance'),
           href: '#/attendance',
           icon: <Icon name="attendance" />,
           active: route === 'attendance',
@@ -356,6 +360,7 @@ function sideNavGroups(
         {
           key: 'comms',
           label: t(locale, 'common.nav.announcements'),
+          hint: t(locale, 'common.dash.hint.comms'),
           href: '#/comms',
           icon: <Icon name="messages" />,
           active: route === 'comms',
@@ -369,6 +374,7 @@ function sideNavGroups(
         {
           key: 'students',
           label: t(locale, 'people.student.plural'),
+          hint: t(locale, 'common.dash.hint.students'),
           href: '#/students',
           icon: <Icon name="students" />,
           active: route === 'students',
@@ -376,6 +382,7 @@ function sideNavGroups(
         {
           key: 'groups',
           label: t(locale, 'common.dash.nav.groups'),
+          hint: t(locale, 'common.dash.hint.groups'),
           href: '#/groups',
           icon: <Icon name="groups" />,
           active: onGroups,
@@ -383,6 +390,7 @@ function sideNavGroups(
         {
           key: 'events',
           label: t(locale, 'events.title'),
+          hint: t(locale, 'common.dash.hint.events'),
           href: '#/events',
           icon: <Icon name="events" />,
           active: route === 'events',
@@ -390,6 +398,7 @@ function sideNavGroups(
         {
           key: 'belts',
           label: t(locale, 'common.dash.nav.beltsExams'),
+          hint: t(locale, 'common.dash.hint.belts'),
           href: '#/belts',
           icon: <Icon name="belts" />,
           active: route === 'belts' || route === 'exams',
@@ -402,6 +411,7 @@ function sideNavGroups(
       {
         key: 'staff',
         label: t(locale, 'common.dash.nav.staff'),
+        hint: t(locale, 'common.dash.hint.staff'),
         href: '#/staff',
         icon: <Icon name="profile" />,
         active: route === 'staff',
@@ -409,6 +419,7 @@ function sideNavGroups(
       {
         key: 'rollover',
         label: t(locale, 'common.dash.nav.rollover'),
+        hint: t(locale, 'common.dash.hint.rollover'),
         href: '#/rollover',
         icon: <Icon name="sync" />,
         active: route === 'rollover',
@@ -423,6 +434,7 @@ function sideNavGroups(
         {
           key: 'billing',
           label: t(locale, 'billing.debt.title'),
+          hint: t(locale, 'common.dash.hint.billing'),
           href: '#/billing',
           icon: <Icon name="payments" />,
           active: route === 'billing',
@@ -434,6 +446,7 @@ function sideNavGroups(
         {
           key: 'prices',
           label: t(locale, 'common.dash.nav.prices'),
+          hint: t(locale, 'common.dash.hint.prices'),
           href: '#/prices',
           icon: <Icon name="belts" />,
           active: route === 'prices',
@@ -443,6 +456,7 @@ function sideNavGroups(
           // and `12e`'s shop both read this catalogue, and both create charges from it.
           key: 'items',
           label: t(locale, 'billing.product.title'),
+          hint: t(locale, 'common.dash.hint.items'),
           href: '#/items',
           icon: <Icon name="payments" />,
           active: route === 'items',
@@ -450,6 +464,7 @@ function sideNavGroups(
         {
           key: 'documents',
           label: t(locale, 'common.dash.nav.documents'),
+          hint: t(locale, 'common.dash.hint.documents'),
           href: '#/documents',
           icon: <Icon name="documents" />,
           active: route === 'documents',
@@ -461,6 +476,7 @@ function sideNavGroups(
         {
           key: 'reports',
           label: t(locale, 'common.dash.nav.reports'),
+          hint: t(locale, 'common.dash.hint.reports'),
           href: '#/reports',
           icon: <Icon name="reports" />,
           active: route === 'reports',
@@ -573,6 +589,7 @@ export default function App() {
 
   return (
     <ThemeProvider>
+      <AccessibilityMenu locale={locale} />
       {/* New-build toast — floats over whatever is open, in every session state. */}
       <UpdateToast locale={locale} />
       {session.status === 'anonymous' ? (

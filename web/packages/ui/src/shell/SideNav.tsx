@@ -16,6 +16,9 @@ export type SideNavItem = {
   icon: ReactNode
   active?: boolean
   badge?: SideNavBadge
+  /** One short sentence on what the screen is for (owner request 2026-08-30) — surfaces
+   *  as the native hover tooltip and as the item's accessible description. */
+  hint?: string
 }
 
 export type SideNavGroup = { key: string; label: string; items: SideNavItem[] }
@@ -24,6 +27,8 @@ function Item({ item }: { item: SideNavItem }) {
   return (
     <a
       href={item.href}
+      title={item.hint}
+      aria-description={item.hint}
       aria-current={item.active ? 'page' : undefined}
       data-testid={`sidenav-${item.key}`}
       className={item.active ? 'studio-sidenav__item studio-sidenav__item--active' : 'studio-sidenav__item'}

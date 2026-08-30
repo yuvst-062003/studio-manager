@@ -11,6 +11,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { apiFetch, useDisplayMode, useSession, switchStudio } from '@studio/core'
 import {
+  AccessibilityMenu,
   AccountDrawerFooter,
   AppShell,
   EmptyState,
@@ -263,6 +264,7 @@ export default function App() {
 
   return (
     <ThemeProvider>
+      <AccessibilityMenu locale={locale} />
       {/* New-build toast — floats over whatever is open, in every session state. */}
       <UpdateToast locale={locale} />
       {session.status === 'anonymous' ? (

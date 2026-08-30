@@ -10,6 +10,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { apiFetch, getAccessToken, refresh, useDisplayMode, useSession, switchStudio } from '@studio/core'
 import {
+  AccessibilityMenu,
   AccountDrawerFooter,
   AppShell,
   Icon,
@@ -175,6 +176,7 @@ function LandingShell({ slug }: { slug: string }) {
   if (restoring) return null
   return (
     <ThemeProvider>
+      <AccessibilityMenu locale={locale} />
       {/* Language before login (§6.1): a Russian-speaking parent cannot read a Hebrew
           offer any more than a Hebrew consent screen. */}
       <LanguagePicker locale={locale} onChoose={setLocale} />
@@ -195,6 +197,7 @@ function JoinShell({ token }: { token: string }) {
   useDocumentLocale(locale)
   return (
     <ThemeProvider>
+      <AccessibilityMenu locale={locale} />
       <LanguagePicker locale={locale} onChoose={setLocale} />
       <JoinFlow locale={locale} token={token} />
     </ThemeProvider>
@@ -377,6 +380,7 @@ function AuthedApp() {
   // install wall between the tap and the form is where a migration cohort evaporates.
   return (
     <ThemeProvider>
+      <AccessibilityMenu locale={locale} />
       {/* New-build toast — floats over whatever is open, in every session state. */}
       <UpdateToast locale={locale} />
       {session.status === 'anonymous' ? (
