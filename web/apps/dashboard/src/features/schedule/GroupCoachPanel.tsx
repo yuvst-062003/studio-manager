@@ -56,8 +56,15 @@ export function GroupCoachPanel({ groupId, locale }: { groupId: string; locale: 
         </ul>
       )}
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)', alignItems: 'end' }}>
-        <label>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-3)', alignItems: 'end' }}>
+        <label
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 'var(--space-1)',
+            fontSize: 'var(--text-label)',
+          }}
+        >
           {t(locale, 'schedule.group.coaches.person')}
           <select
             data-testid="assign-coach-person"

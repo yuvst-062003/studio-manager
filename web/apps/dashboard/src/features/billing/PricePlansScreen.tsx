@@ -12,6 +12,7 @@ import { useState } from 'react'
 import type { CSSProperties } from 'react'
 import { Button, Card, EmptyState, MoneyDisplay, StatusChip, TextField } from '@studio/ui'
 import { PlanFrequencyPicker, PlanPreview, frequencyLabel } from './PlanFrequency'
+import { StandingOrderLinksPanel } from './StandingOrderLinksPanel'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import type { DashboardBillingClient, PricePlanOut } from './billingClient'
@@ -24,10 +25,28 @@ const columnStyle: CSSProperties = {
   padding: 'var(--space-5)',
 }
 
+// One plan, two lines: the facts a manager scans for (name, volume, price, since when)
+// on the first, the long strong-LTR payment URL alone on the second — inline in one flex
+// row it dragged the amount off screen and interleaved with the Hebrew around it
+// (2026-08-30).
+const planStyle: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 'var(--space-1)',
+  paddingBlock: 'var(--space-3)',
+  borderBlockEnd: 'var(--border-width-hairline) solid var(--border)',
+}
+
 const rowStyle: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   gap: 'var(--space-3)',
+  flexWrap: 'wrap',
+}
+
+const mutedStyle: CSSProperties = {
+  color: 'var(--text-secondary)',
+  fontSize: 'var(--text-caption)',
 }
 
 //: A URL is long and strong-LTR. `min-inline-size: 0` plus the ellipsis keeps it from
@@ -90,19 +109,30 @@ export function PricePlansScreen({ locale, client, plans, onChanged }: PricePlan
           {plans.map((plan) => (
             <div
               key={plan.id}
-              style={rowStyle}
+              style={planStyle}
               data-testid="plan-row"
               onClick={() => setOpenPlanId(plan.id)}
             >
-              <span>{plan.name}</span>
-              {/* C11 — the volume the club prices by. Not a group. */}
-              <span data-testid="plan-volume">{plan.sessions_per_week}</span>
-              <MoneyDisplay agorot={plan.monthly_amount_agorot} label={plan.name} />
-              {plan.active_to ? (
-                <span data-testid="plan-closed">{plan.active_to}</span>
-              ) : (
-                <span data-testid="plan-current">{plan.active_from}</span>
-              )}
+              <div style={rowStyle}>
+                <strong style={{ flex: 1, minInlineSize: 0 }}>
+                  <bdi>{plan.name}</bdi>
+                </strong>
+                {/* C11 — the volume the club prices by, as a sentence rather than a bare
+                    number. Not a group. */}
+                <span data-testid="plan-volume">
+                  {frequencyLabel(locale, plan.sessions_per_week)}
+                </span>
+                <MoneyDisplay agorot={plan.monthly_amount_agorot} label={plan.name} />
+                {plan.active_to ? (
+                  <span data-testid="plan-closed" style={mutedStyle}>
+                    {t(locale, 'billing.plan.activeTo')} {plan.active_to}
+                  </span>
+                ) : (
+                  <span data-testid="plan-current" style={mutedStyle}>
+                    {t(locale, 'billing.plan.activeFrom')} {plan.active_from}
+                  </span>
+                )}
+              </div>
               {/* §4 -- the FULL url, never a "link set" tick: a typo in a payment page has
                   to be visible without clicking it. And the missing case is badged only on
                   an ACTIVE plan; a closed plan's link is dead by definition, so badging it
@@ -178,6 +208,11 @@ export function PricePlansScreen({ locale, client, plans, onChanged }: PricePlan
           {t(locale, 'billing.plan.add')}
         </Button>
       </Card>
+
+      {/* The canonical link editor, mounted where the links are read. It lived only under
+          Settings → Payments, and a manager staring at their plans had no way to fix a
+          link from here (2026-08-30). Same component both places, one design. */}
+      <StandingOrderLinksPanel locale={locale} client={client} />
     </div>
   )
 }

@@ -57,6 +57,13 @@ const sessionRowStyle: CSSProperties = {
   borderBlockEnd: 'var(--border-width-hairline) solid var(--border)',
 }
 
+/* A season is ~100 rows per group; unscrolled they made this page a kilometre long and
+   buried the schedule editor above them (2026-08-30). */
+const sessionListStyle: CSSProperties = {
+  maxBlockSize: '24rem',
+  overflowY: 'auto',
+}
+
 const noteStyle: CSSProperties = { color: 'var(--text-secondary)', fontSize: 'var(--text-caption)' }
 
 const errorStyle: CSSProperties = { color: 'var(--danger)' }
@@ -195,13 +202,20 @@ export function GroupSchedulePage({
 
       {/* What this group IS, for a training plan: base, extra or private, and whether it
           is an invite list. Here rather than on the groups index because the manager is
-          already looking at ONE group, and the eligibility checklist is about this one. */}
-      <GroupTrainingPanel locale={locale} groupId={groupId} />
+          already looking at ONE group, and the eligibility checklist is about this one.
+          Carded, like every sibling section: unfenced, the page read as one loose run of
+          controls (2026-08-30). */}
+      <Card>
+        <GroupTrainingPanel locale={locale} groupId={groupId} />
+      </Card>
 
       {/* F4.1 — coach assignment lives on the group page; the staff screen's uncovered
           alert links here. */}
-      <GroupCoachPanel groupId={groupId} locale={locale} />
+      <Card>
+        <GroupCoachPanel groupId={groupId} locale={locale} />
+      </Card>
 
+      <Card>
       <section aria-labelledby="rules-title">
         <h3 id="rules-title">{t(locale, 'schedule.rules.title')}</h3>
         {loaded && rules.length === 0 ? <p>{t(locale, 'schedule.rules.empty')}</p> : null}
@@ -280,10 +294,12 @@ export function GroupSchedulePage({
           {t(locale, 'schedule.group.reviewChange')}
         </Button>
       </section>
+      </Card>
 
       <section aria-labelledby="sessions-title">
         <h3 id="sessions-title">{t(locale, 'schedule.group.sessions')}</h3>
         <Card>
+          <div style={sessionListStyle}>
           {sessions.map((session) => (
             <div key={session.id} data-testid="session-row" style={sessionRowStyle}>
               <span>{formatDateInStudioZone(session.starts_at, locale)}</span>
@@ -309,6 +325,7 @@ export function GroupSchedulePage({
               ) : null}
             </div>
           ))}
+          </div>
         </Card>
       </section>
 

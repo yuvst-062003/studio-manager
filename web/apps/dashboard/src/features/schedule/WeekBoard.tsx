@@ -298,10 +298,21 @@ function CreateSessionForm({
     )
   }
 
+  const createFieldStyle: CSSProperties = {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 'var(--space-1)',
+    fontSize: 'var(--text-label)',
+  }
   return (
     <form
       data-testid="session-create-form"
-      style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)', alignItems: 'end' }}
+      style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+        gap: 'var(--space-3)',
+        alignItems: 'end',
+      }}
       onSubmit={(event) => {
         event.preventDefault()
         if (!groupId || !yearId) return
@@ -333,7 +344,7 @@ function CreateSessionForm({
           .finally(() => setSending(false))
       }}
     >
-      <label>
+      <label style={{ ...createFieldStyle, gridColumn: '1 / -1' }}>
         {t(locale, 'schedule.session.createGroup')}
         <select
           data-testid="session-create-group"
@@ -348,12 +359,14 @@ function CreateSessionForm({
           ))}
         </select>
       </label>
-      <TextField
-        label={t(locale, 'schedule.session.adHocDate')}
-        type="date"
-        value={day}
-        onChange={(event) => setDay(event.target.value)}
-      />
+      <div style={{ gridColumn: '1 / -1' }}>
+        <TextField
+          label={t(locale, 'schedule.session.adHocDate')}
+          type="date"
+          value={day}
+          onChange={(event) => setDay(event.target.value)}
+        />
+      </div>
       <TextField
         label={t(locale, 'schedule.session.adHocStart')}
         type="time"
@@ -366,7 +379,7 @@ function CreateSessionForm({
         value={endTime}
         onChange={(event) => setEndTime(event.target.value)}
       />
-      <label>
+      <label style={createFieldStyle}>
         {t(locale, 'schedule.session.createCoach')}
         <select
           data-testid="session-create-coach"
@@ -381,7 +394,7 @@ function CreateSessionForm({
           ))}
         </select>
       </label>
-      <label>
+      <label style={createFieldStyle}>
         {t(locale, 'schedule.session.location')}
         <select
           data-testid="session-create-location"
@@ -396,18 +409,22 @@ function CreateSessionForm({
           ))}
         </select>
       </label>
-      <Button
-        type="submit"
-        data-testid="session-create-submit"
-        disabled={!groupId || sending || endTime <= startTime}
-      >
-        {t(locale, 'schedule.session.create')}
-      </Button>
-      <Button variant="ghost" onClick={() => setOpen(false)}>
-        {t(locale, 'common.cancel')}
-      </Button>
+      <div style={{ display: 'flex', gap: 'var(--space-2)', gridColumn: '1 / -1' }}>
+        <Button
+          type="submit"
+          data-testid="session-create-submit"
+          disabled={!groupId || sending || endTime <= startTime}
+        >
+          {t(locale, 'schedule.session.create')}
+        </Button>
+        <Button variant="ghost" onClick={() => setOpen(false)}>
+          {t(locale, 'common.cancel')}
+        </Button>
+      </div>
       {failed ? (
-        <p data-testid="session-create-failed">{t(locale, 'common.loadFailed.body')}</p>
+        <p data-testid="session-create-failed" style={{ gridColumn: '1 / -1' }}>
+          {t(locale, 'common.loadFailed.body')}
+        </p>
       ) : null}
     </form>
   )
@@ -1019,7 +1036,15 @@ export function WeekBoard({
                           return
                         }
                         const box = event.currentTarget.getBoundingClientRect()
-                        setSlot({ day, time, x: box.left + box.width / 2, y: box.bottom })
+                        // Clamped so the popover stays on screen: in RTL the first
+                        // columns hug the right edge and an unclamped centre point put
+                        // half the form outside the viewport (2026-08-30).
+                        setSlot({
+                          day,
+                          time,
+                          x: Math.min(Math.max(box.left + box.width / 2, 190), window.innerWidth - 190),
+                          y: Math.max(Math.min(box.bottom, window.innerHeight - 460), 8),
+                        })
                       }}
                       type="button"
                     >
@@ -1068,7 +1093,13 @@ export function WeekBoard({
           <div
             className="week-slot-popover"
             data-testid="week-slot-popover"
-            style={{ insetInlineStart: `${slot.x}px`, insetBlockStart: `${slot.y + 8}px` }}
+            // Physical `left`, deliberately: `slot.x` comes from getBoundingClientRect,
+            // which measures from the LEFT edge regardless of direction, and the CSS
+            // centres with translateX(-50%) on the same assumption. `insetInlineStart`
+            // resolves to `right` in RTL, which put the popover on the mirror side of
+            // the board (2026-08-30). D10 governs layout, not viewport measurements.
+            // eslint-disable-next-line no-restricted-syntax
+            style={{ left: `${slot.x}px`, top: `${slot.y + 8}px` }}
           >
             <div className="week-slot-popover__head">
               <span>

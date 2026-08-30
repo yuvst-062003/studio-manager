@@ -199,11 +199,9 @@ export function ItemsScreen({
         ))
       )}
 
-      {/* Both rules the screen embodies, said on it: no stock counts (§5.10), and no
-          delete (§11.4's shape). A manager looking for either needs to know why it is
-          missing rather than assume it is somewhere else. */}
-      <p style={hintStyle}>{t(locale, 'billing.product.noStockHint')}</p>
-      <p style={hintStyle}>{t(locale, 'billing.product.noDeleteHint')}</p>
+      {/* The no-stock and no-delete rules used to be spelled out here in two hint lines;
+          the owner asked for them gone (2026-08-30) — the screen's own shape already
+          shows both. */}
     </div>
   )
 }

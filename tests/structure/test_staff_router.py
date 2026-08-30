@@ -134,6 +134,29 @@ def test_an_unaccepted_coach_invitation_is_a_row_with_status_invited(
     assert invited["person_id"] is None
 
 
+def test_an_invited_coach_row_carries_the_pre_created_person_and_name(client, as_manager) -> None:
+    """F5 pre-creates the Person at invite time, so the pending row can name them. Without
+    this, every screen resolving names through GET /staff renders the invited coach's raw
+    person UUID — which is what the group page did (2026-08-30)."""
+    email = f"named-coach-{uuid.uuid4().hex[:8]}@example.invalid"
+    created = client.post(
+        f"{STAFF}/invitations",
+        json={"email": email, "roles": ["lead_coach"], "first_name": "לביא", "last_name": "טמיר"},
+        headers=as_manager.headers,
+    )
+    assert created.status_code == 201, created.text
+
+    row = next(
+        r
+        for r in client.get(STAFF, headers=as_manager.headers).json()["items"]
+        if r["email"] == email
+    )
+    assert row["status"] == "invited"
+    assert row["person_id"] is not None
+    assert row["first_name"] == "לביא"
+    assert row["last_name"] == "טמיר"
+
+
 def test_an_accepted_invitation_is_not_listed_twice(client, as_manager, app_session) -> None:
     app_session.add(
         Invitation(

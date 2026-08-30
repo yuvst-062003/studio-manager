@@ -145,7 +145,9 @@ export function OpsHealthPanel({ health, locale }: { health: OpsHealth; locale: 
         </Alert>
       )}
 
-      <Card caption={t(locale, 'common.ops.jobs.title')}>
+      {/* The Card carries no caption of its own: the Table's <caption> is the visible
+          title, and the pair rendered the same heading twice, stacked (2026-08-30). */}
+      <Card>
         <Table
           caption={t(locale, 'common.ops.jobs.title')}
           columns={jobColumns}

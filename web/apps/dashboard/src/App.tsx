@@ -600,6 +600,26 @@ export default function App() {
   const today = useToday()
   const badges = useSideNavBadges(session.status === 'signed-in' && canSeeMoney)
 
+  // The club's logo, for the header beside its name. Keyed on the active studio so a
+  // switch swaps the crest with the title; a 403 or a club with no logo is just no image.
+  const [studioLogoUrl, setStudioLogoUrl] = useState<string | null>(null)
+  const signedInWithRole = session.status === 'signed-in' && !hasNoRole
+  useEffect(() => {
+    if (!signedInWithRole) return
+    let alive = true
+    void apiFetch('/api/v1/studio')
+      .then(async (response) =>
+        response.ok ? ((await response.json()) as { logo_url: string | null }).logo_url : null,
+      )
+      // A club with no logo resolves to null, which also clears the previous club's
+      // crest after a studio switch — no synchronous reset needed.
+      .then((url) => alive && setStudioLogoUrl(url))
+      .catch(() => undefined)
+    return () => {
+      alive = false
+    }
+  }, [signedInWithRole, session.activeStudioId])
+
   // §6.5 deliberately does NOT gate the dashboard on standalone mode the way the two
   // phone apps are gated. It is the desktop surface: a manager opens it in a browser tab
   // beside their accounting software, and blocking that would be an install requirement
@@ -637,6 +657,7 @@ export default function App() {
       {session.status === 'signed-in' && !hasNoRole ? (
         <AppShell
           title={session.activeStudioName ?? ''}
+          logoUrl={studioLogoUrl}
           items={canSeeMoney ? NAV : NAV.filter((entry) => !MANAGER_ONLY_KEYS.has(entry.key))}
           locale={locale}
           // F9 — one search, every screen, keyboard-reachable ('/'). Manager-only, like the

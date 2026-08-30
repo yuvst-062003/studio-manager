@@ -224,7 +224,7 @@ def get_group_schedule(
         service.require_group(group_id)
     except NotFoundError as exc:
         raise _not_found() from exc
-    rows = service.live_rules(group_id, on=jerusalem_date(now()))
+    rows = service.displayed_rules(group_id, on=jerusalem_date(now()))
     return ScheduleRulesOut(
         group_id=group_id,
         rules=[ScheduleRuleOut.model_validate(r, from_attributes=True) for r in rows],

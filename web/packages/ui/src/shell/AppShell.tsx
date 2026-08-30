@@ -36,6 +36,17 @@ const titleStyle: CSSProperties = {
   fontWeight: 600,
 }
 
+/* Sized to the title line, never the image: an uploaded logo arrives in any aspect
+   ratio, and `object-fit: contain` inside a fixed box is what keeps a tall crest and a
+   wide wordmark from moving the header's height. */
+const logoStyle: CSSProperties = {
+  blockSize: '1.75rem',
+  inlineSize: '1.75rem',
+  objectFit: 'contain',
+  borderRadius: 'var(--radius-sm)',
+  flexShrink: 0,
+}
+
 const mainStyle: CSSProperties = {
   padding: 'var(--space-4)',
   flex: 1,
@@ -52,6 +63,7 @@ const spacerStyle: CSSProperties = {
 
 export function AppShell({
   title,
+  logoUrl = null,
   items,
   studios = [],
   activeStudioId = null,
@@ -65,6 +77,9 @@ export function AppShell({
   children,
 }: {
   title: string
+  /** The club's logo, shown beside the title. Decorative — the title IS the name, so the
+   *  img carries an empty alt rather than repeating it to a screen reader. */
+  logoUrl?: string | null
   items: NavItem[]
   studios?: SwitchableStudio[]
   activeStudioId?: string | null
@@ -123,6 +138,9 @@ export function AppShell({
               <Icon name="menu" size={20} />
               {t(locale, 'common.nav.menu')}
             </button>
+            {logoUrl ? (
+              <img alt="" data-testid="shell-logo" src={logoUrl} style={logoStyle} />
+            ) : null}
             <h1 style={titleStyle}>{title}</h1>
             <span style={spacerStyle}>
               {headerEnd}

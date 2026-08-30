@@ -215,10 +215,10 @@ describe('the items screen', () => {
     expect(client.updateProduct).toHaveBeenCalledWith('p3', { isActive: true })
   })
 
-  it('says there is no stock count and no delete, on the screen that has neither', () => {
+  it('carries neither rule-explainer line — the owner asked for them gone (2026-08-30)', () => {
     renderScreen(makeClient(), [GI])
-    expect(screen.getByText(t('he', 'billing.product.noStockHint'))).toBeInTheDocument()
-    expect(screen.getByText(t('he', 'billing.product.noDeleteHint'))).toBeInTheDocument()
+    expect(screen.queryByText(t('he', 'billing.product.noStockHint'))).not.toBeInTheDocument()
+    expect(screen.queryByText(t('he', 'billing.product.noDeleteHint'))).not.toBeInTheDocument()
   })
 })
 

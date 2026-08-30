@@ -67,17 +67,6 @@ const hintStyle: CSSProperties = {
 
 const lineStyle: CSSProperties = { color: 'var(--fg)', margin: 0 }
 
-const lockScreenStyle: CSSProperties = {
-  background: 'var(--surface-raised, var(--surface))',
-  border: 'var(--border-width-hairline) solid var(--border)',
-  borderRadius: 'var(--radius-md)',
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 'var(--space-1)',
-  padding: 'var(--space-3)',
-  textAlign: 'start',
-}
-
 /**
  * What a lock screen actually shows. iOS and Android both truncate a push, and the numbers
  * differ per device — so this is a representative bound rather than a promise, and its job is
@@ -284,23 +273,10 @@ export function AnnouncementsScreen({
           ) : null}
         </div>
 
-        {/* -- תצוגה מקדימה — its own inline-end column (owner request 2026-08-30):
-            left of a Hebrew composer, right of an English one, under it on a phone. -- */}
-        <aside style={sectionStyle} data-testid="preview-pane" aria-labelledby="preview-title">
-          <h3 id="preview-title" style={titleStyle}>
-            {t(locale, 'comms.preview.title')}
-          </h3>
-          <p style={hintStyle}>{t(locale, 'comms.preview.pushLine')}</p>
-          <div style={lockScreenStyle} data-testid="push-preview">
-            <strong style={lineStyle}>{truncateForLockScreen(title)}</strong>
-            <span style={hintStyle}>{truncateForLockScreen(body, 60)}</span>
-          </div>
-          <p style={hintStyle}>{t(locale, 'comms.preview.asParent')}</p>
-          <div style={lockScreenStyle} data-testid="inbox-preview">
-            <strong style={lineStyle}>{title}</strong>
-            <span style={lineStyle}>{body}</span>
-          </div>
-        </aside>
+        {/* The תצוגה מקדימה pane lived here — beside the composer since the morning's
+            owner request — and was removed entirely on a second owner request the same
+            day (2026-08-30). `truncateForLockScreen` stays exported: the truncation rule
+            it encodes is still true of every push the server sends. */}
         </section>
       </Card>
 

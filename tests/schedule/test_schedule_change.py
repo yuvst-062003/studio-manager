@@ -348,6 +348,17 @@ def test_get_returns_only_the_rules_still_in_force(client, as_manager, a_schedul
     assert [r["weekday"] for r in body["rules"]] == [TUESDAY]
 
 
+def test_get_shows_the_upcoming_schedule_when_none_is_live_yet(
+    client, as_manager, a_group, an_active_year
+):
+    """A schedule set before it takes effect is still the group's schedule. A club that
+    bootstraps in late August with rules effective 1/9 must not read 'no weekly schedule'
+    on every group until the season starts (2026-08-30)."""
+    put(client, as_manager, a_group, [rule(WEDNESDAY)], apply=True, effective_from="2026-12-01")
+    body = client.get(f"{API}/groups/{a_group}/schedule", headers=as_manager.headers).json()
+    assert [r["weekday"] for r in body["rules"]] == [WEDNESDAY]
+
+
 # -- C12 ----------------------------------------------------------------------
 def test_c12_counts_the_students_the_change_leaves_expecting_nothing(
     client, as_manager, a_scheduled_group, app_session, studio

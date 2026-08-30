@@ -131,31 +131,58 @@ def _people(session: Session) -> list[dict[str, Any]]:
 
 def _pending_invitations(session: Session, *, at: datetime) -> list[dict[str, Any]]:
     """An invitation is not a coach yet, and a table that omitted it would make a manager
-    invite the same person a second time."""
-    rows = session.execute(
-        select(Invitation)
-        .where(
-            Invitation.accepted_at.is_(None),
-            Invitation.expires_at > at,
-            Invitation.intended_role.in_(STAFF_ROLES),
+    invite the same person a second time.
+
+    The row carries the pre-created Person when one exists: F5 creates them at invite time
+    (§5.3's binding), so their id and name are real — and every screen that resolves names
+    through this payload would otherwise render the invited coach's raw UUID, which is
+    what the group page did (2026-08-30). An invitation written without a Person (the
+    pre-F5 shape) still lists, with nulls.
+    """
+    rows = list(
+        session.execute(
+            select(Invitation)
+            .where(
+                Invitation.accepted_at.is_(None),
+                Invitation.expires_at > at,
+                Invitation.intended_role.in_(STAFF_ROLES),
+            )
+            .order_by(Invitation.created_at)
+        ).scalars()
+    )
+    emails = {invitation.email for invitation in rows}
+    person_by_email: dict[str, Person] = {}
+    if emails:
+        # Oldest first, so the earliest pre-created Person wins for a re-invited address —
+        # the same row a re-run of the invite flow would have bound.
+        for person in session.execute(
+            select(Person)
+            .where(
+                Person.email.in_(emails),
+                Person.auth_identity_id.is_(None),
+                Person.anonymized_at.is_(None),
+            )
+            .order_by(Person.created_at)
+        ).scalars():
+            person_by_email.setdefault(person.email or "", person)
+    out = []
+    for invitation in rows:
+        matched = person_by_email.get(invitation.email or "")
+        out.append(
+            {
+                "person_id": str(matched.id) if matched else None,
+                "invitation_id": str(invitation.id),
+                "first_name": matched.first_name if matched else None,
+                "last_name": matched.last_name if matched else None,
+                "email": invitation.email,
+                "roles": [invitation.intended_role],
+                "groups": [],
+                "weekly_hours": None,
+                "permissions": permissions_for([invitation.intended_role]),
+                "status": "invited",
+            }
         )
-        .order_by(Invitation.created_at)
-    ).scalars()
-    return [
-        {
-            "person_id": None,
-            "invitation_id": str(invitation.id),
-            "first_name": None,
-            "last_name": None,
-            "email": invitation.email,
-            "roles": [invitation.intended_role],
-            "groups": [],
-            "weekly_hours": None,
-            "permissions": permissions_for([invitation.intended_role]),
-            "status": "invited",
-        }
-        for invitation in rows
-    ]
+    return out
 
 
 def _uncovered_groups(session: Session) -> list[dict[str, Any]]:

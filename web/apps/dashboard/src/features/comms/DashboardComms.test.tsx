@@ -130,9 +130,7 @@ describe('the composer (4f)', () => {
     expect(screen.queryByLabelText(t('he', 'comms.audience.studio'))).toBeNull()
   })
 
-  it('previews the lock-screen line as well as the inbox row', async () => {
-    // The OS truncates a push title. A manager who has never seen that writes a title nobody
-    // can read on the one screen it matters on.
+  it('carries no preview pane — removed on the owner request of 2026-08-30', () => {
     render(
       <AnnouncementsScreen
         canPublishStudioWide
@@ -141,12 +139,9 @@ describe('the composer (4f)', () => {
         scopes={SCOPES}
       />,
     )
-    await userEvent.type(
-      screen.getByLabelText(t('he', 'comms.announcement.subject')),
-      'ביטול שיעור',
-    )
-    expect(screen.getByTestId('push-preview')).toHaveTextContent('ביטול שיעור')
-    expect(screen.getByTestId('inbox-preview')).toHaveTextContent('ביטול שיעור')
+    expect(screen.queryByTestId('preview-pane')).toBeNull()
+    expect(screen.queryByTestId('push-preview')).toBeNull()
+    expect(screen.queryByTestId('inbox-preview')).toBeNull()
   })
 
   it('truncates a title that a lock screen would cut', () => {
@@ -409,21 +404,3 @@ describe('layout', () => {
   })
 })
 
-describe('the preview pane (2026-08-30)', () => {
-  it('sits in its own inline-end column beside the composer, both mocks inside', async () => {
-    // Owner request: the preview on the LEFT of a Hebrew screen (right of an English
-    // one) — which is the inline-end column of a grid whose first child is the composer.
-    render(
-      <AnnouncementsScreen canPublishStudioWide client={makeClient()} locale="he" scopes={SCOPES} />,
-    )
-    const pane = await screen.findByTestId('preview-pane')
-    expect(within(pane).getByTestId('push-preview')).toBeInTheDocument()
-    expect(within(pane).getByTestId('inbox-preview')).toBeInTheDocument()
-    const section = pane.closest('section')
-    expect(section).toHaveStyle({ display: 'grid' })
-    // DOM order IS the direction rule: composer first (inline-start), preview second.
-    expect(pane.previousElementSibling).toContainElement(
-      screen.getByLabelText(t('he', 'comms.announcement.subject')),
-    )
-  })
-})

@@ -482,6 +482,19 @@ class ScheduleService:
             for r in rules
         ]
 
+    def displayed_rules(self, group_id: uuid.UUID, *, on: date) -> list[GroupScheduleRule]:
+        """What a manager means by "the group's weekly schedule": the rules live on `on`,
+        or — when none have taken effect yet — the upcoming set. A schedule created before
+        the season opens is still the schedule; a club that bootstraps in late August with
+        rules effective 1/9 must not read "לא נקבע לו״ז" on every group (2026-08-30).
+        During a transition the live rules alone are the answer, which is what keeps
+        test_get_returns_only_the_rules_still_in_force true."""
+        live = self.live_rules(group_id, on=on)
+        if live:
+            return live
+        upcoming = [r for r in self.rules_not_closed_before(group_id, on) if r.effective_from > on]
+        return sorted(upcoming, key=lambda r: (r.weekday, r.start_time))
+
     def rules_not_closed_before(self, group_id: uuid.UUID, on: date) -> list[GroupScheduleRule]:
         """Every rule still in force on `on` **or starting after it**.
 
