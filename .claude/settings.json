@@ -27,7 +27,13 @@
       "Bash(.venv/bin/alembic revision:*)",
       "Bash(railway status)",
       "Bash(railway variables:*)",
-      "Bash(node web/scripts/i18n-parity.mjs:*)"
+      "Bash(node web/scripts/i18n-parity.mjs:*)",
+      "Bash(railway logs:*)",
+      "Bash(railway environment:*)",
+      "Bash(railway up:*)",
+      "Bash(railway whoami)",
+      "Bash(npx tsc:*)",
+      "Bash(npm run generate:api-client)"
     ],
     "deny": [
       "Read(./.env)",
@@ -71,6 +77,18 @@
           {
             "type": "command",
             "command": ".claude/hooks/block-protected.sh"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/verify-types.sh",
+            "timeout": 180,
+            "statusMessage": "Verifying types before finishing\u2026"
           }
         ]
       }

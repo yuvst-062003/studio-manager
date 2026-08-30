@@ -92,6 +92,34 @@ a bare `python3`/`pytest` resolves to an old 3.8 interpreter earlier on PATH.
 - Typecheck and lint after a series of edits.
 - Prefer running a single test file over the whole suite.
 
+## Verification
+Every rule here was written after it went wrong in a real session, and each names the
+failure so the next reader can tell whether it still applies.
+
+- **Scope a test run to what the change can reach.** Run the suites the diff touches, not
+  the whole suite, and never re-run a suite that already passed to feel sure. When you need
+  a baseline for a pre-existing failure, get it ONCE on `main` — not on both branches.
+- **A verification claim expires the moment you edit again.** "Typecheck clean" is true of
+  the tree you ran it on. If you write a file afterwards, you have not checked that file.
+  `.claude/hooks/verify-types.sh` is the backstop, not the plan.
+- **Test the seam, not just the component.** A field added to an API is not proven by a test
+  that constructs the component's props by hand. Assert the mapping that carries it —
+  `fetch → state → component` — or a field silently dropped in between passes every test.
+  This is how a hard gate shipped never firing.
+- **A new rule that compares against a canonical value obliges you to find every producer of
+  it.** Grep for who chooses that value before you make it decisive. A version check landed
+  while one client still picked its template by list position, and the mismatch became an
+  infinite loop with no error on screen.
+- **Refuse rather than accept, when accepting creates a dead end.** A write that succeeds and
+  then fails a downstream check leaves a user repeating themselves with nothing to read. A
+  422 that names the problem costs one round trip.
+- **If it renders, render it and look.** A PDF, a screen, a document. Two defects reached
+  production — an internal id printed as an answer, and a version number nobody wanted —
+  that one look at the output would have caught.
+- **When something you shipped misbehaves, read your own diff before theorising.** Service
+  workers, caches and account roles are interesting and were not the cause. The bug was in
+  ten lines written an hour earlier.
+
 ## Compact instructions
 When compacting, always preserve: the list of modified files, the current plan or
 SPEC.md section being implemented, and any test commands established this session.
