@@ -23,7 +23,7 @@
  * different screens, not one person with two sessions.
  */
 
-import type { BrowserContext } from '@playwright/test'
+import type { BrowserContext, Page } from '@playwright/test'
 
 import { ORIGINS } from '../origins'
 import type { AppName } from '../origins'
@@ -52,4 +52,26 @@ export async function signInAs(
         `${(await response.text()).slice(0, 400)}`,
     )
   }
+}
+
+
+/**
+ * §6.1's payment step, stood down the way the screen offers — `אחר כך`.
+ *
+ * It sits inside the two hard gates and in front of every routed branch, so a family with an
+ * open charge who has not said how they will pay reaches no other screen. Pressed rather than
+ * seeded: that button is the product's own answer to "not now", and a spec that bypassed it
+ * would not notice it breaking.
+ *
+ * Tolerant of absence, because whether a family owes anything depends on the scenario —
+ * `months: 0` raises no charge and the gate never appears. Awaited rather than probed with
+ * `isVisible()`: the gate renders after `/me/students` resolves, so an immediate probe
+ * answers "not there" and the caller then waits out its own timeout on a covered screen.
+ */
+export async function dismissPaymentSetup(page: Page): Promise<void> {
+  const later = page.getByTestId('setup-later')
+  await later
+    .waitFor({ state: 'visible', timeout: 5_000 })
+    .then(() => later.click())
+    .catch(() => undefined)
 }

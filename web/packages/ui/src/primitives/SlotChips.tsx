@@ -56,7 +56,19 @@ export function SlotChips({
                 onChange={() => onValueChange(option.id)}
                 type="radio"
               />
-              <label className="studio-slot-chips__label" htmlFor={inputId}>
+              {/* **The label is the tap target, and the radio is 1×1 and clipped.** The
+                  label carries the whole visible pill — border, radius, §6.2's 44px — so a
+                  finger always lands here and never on the input. Named, because a
+                  synthetic click aimed at the input is intercepted by the wrapping span
+                  (the label is `htmlFor`-associated, not an ancestor, so a test runner's
+                  label exception does not apply) — and the alternatives are a test forcing
+                  past actionability, which would also force past `disabled` and quietly
+                  book a cancelled slot. */}
+              <label
+                className="studio-slot-chips__label"
+                data-testid="slot-chip"
+                htmlFor={inputId}
+              >
                 {option.label}
               </label>
             </span>

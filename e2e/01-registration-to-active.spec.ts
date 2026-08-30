@@ -2,7 +2,12 @@ import { expect, test } from '@playwright/test'
 
 import { ORIGINS } from './origins'
 import { signInAs } from './fixtures/auth'
-import { buildScenario, signAllDeclarations } from './fixtures/scenario'
+import {
+  acceptPlatformConsents,
+  buildScenario,
+  completeAgreementsForGuardian,
+  signAllDeclarations,
+} from './fixtures/scenario'
 
 /**
  * SPEC §13, flow 1 — "Public registration → health declaration → manager approval →
@@ -76,12 +81,35 @@ test.describe('E2E-1 · registration to active student', () => {
       // The club's own name, not `landing-headline` — that one renders only when a studio
       // has set a headline, and it is the club the stranger came to see either way.
       await expect(stranger.getByRole('heading', { name: 'מועדון הדגמה' })).toBeVisible()
-      await expect(stranger.getByTestId('landing-group-name').first()).toBeVisible()
-      await expect(stranger.getByTestId('landing-group-days').first()).toBeVisible()
+      // §5.4a ① — 'groups with schedules'. Asserted on the PICKER row, which is where the
+      // phone publishes them.
+      //
+      // This used to assert `landing-group-name` and `landing-group-days`, and those live
+      // in `.landing-groups-detail` — the desktop column's furniture, which `landing.css`
+      // sets to `display: none` under 64rem. This project runs on a Pixel 7, so both
+      // elements resolved and both were correctly hidden, and the test had been red since
+      // the 2026-08-29 landing redesign split one group list into two renderings. The
+      // product was right; the assertion was written against the markup that redesign
+      // replaced.
+      const pick = stranger.getByTestId(`landing-pick-${scenario.groupId}`)
+      await expect(pick).toBeVisible()
+      await expect(pick.getByTestId('landing-pick-meta')).toBeVisible()
 
       // §5.3 — sign-in first. The form does not exist for an anonymous visitor, because a
       // registration nobody can be matched to is a row the manager cannot action.
-      await stranger.getByTestId('landing-start-booking').click()
+      //
+      // **`landing-start-booking` does not exist and has not since 2026-08-29.** The
+      // redesign made the offer one picker and ONE call to action, so the entry is now:
+      // choose a group, then press the CTA. `.click()` on a testid that matches nothing
+      // does not fail fast — it waits for the element until the whole test times out,
+      // which is why this read as a 60s timeout naming no locator.
+      //
+      // The STICKY bar is the phone's button (`landing.css` hides it at desk widths and
+      // hides the in-column `landing-cta` behind a scroll), and this project runs on a
+      // Pixel 7. Pressing the control the reader would actually press is also what keeps
+      // the sticky bar from silently ceasing to work.
+      await pick.click()
+      await stranger.getByTestId('landing-sticky-cta').click()
       await expect(stranger.getByTestId('booking-sign-in')).toBeVisible()
       await expect(stranger.getByTestId('booking-children')).toBeHidden()
 
@@ -91,8 +119,19 @@ test.describe('E2E-1 · registration to active student', () => {
 
       // -- the funnel (12j) ------------------------------------------------------
       const parent = await familyContext.newPage()
-      await parent.goto(`${ORIGINS.parent}/t/demo`)
-      await parent.getByTestId('landing-start-booking').click()
+      // `?signed_in=1`, because that is where a real sign-in lands the browser.
+      //
+      // `LandingShell` fires no `/auth/refresh` for an anonymous visitor (L6/P4 — a
+      // stranger must not take a 401 on the first page they ever see), so a fresh page
+      // load has an empty in-memory token and `signedIn` is false however good the cookie
+      // is. The OAuth callback appends this marker for exactly that reason
+      // (`app/routers/identity.py`); `signInAs` above sets the cookie over the API and
+      // never navigates, so the marker has to come from here. Without it the freshly
+      // signed-in parent was shown the sign-in step again — forever, which is the loop the
+      // marker was invented to break.
+      await parent.goto(`${ORIGINS.parent}/t/demo?signed_in=1`)
+      await parent.getByTestId(`landing-pick-${scenario.groupId}`).click()
+      await parent.getByTestId('landing-sticky-cta').click()
       await expect(parent.getByTestId('booking-children')).toBeVisible()
 
       await parent.getByLabel('שם פרטי').first().fill('דנה')
@@ -110,7 +149,13 @@ test.describe('E2E-1 · registration to active student', () => {
 
       // §5.4a step 4 — one pick per child, from that child's own group.
       await expect(parent.getByTestId('booking-slot')).toBeVisible()
-      await parent.getByTestId('booking-slot-child-0').getByRole('radio').first().check()
+      // Press the CHIP, not the radio inside it. `SlotChips` hides the real
+      // `<input type=radio>` at 1×1 with `clip-path` and puts the whole visible pill on the
+      // `<label>`, so a click aimed at the input is intercepted by the wrapping span —
+      // "…studio-slot-chips__chip intercepts pointer events", retried until the test timed
+      // out. `check({ force: true })` would get past it and would also get past `disabled`,
+      // which is how a test comes to book one of §5.4's cancelled slots and stay green.
+      await parent.getByTestId('booking-slot-child-0').getByTestId('slot-chip').first().click()
       await parent.getByTestId('booking-submit').click()
 
       // -- after the send (13b) --------------------------------------------------
@@ -131,14 +176,21 @@ test.describe('E2E-1 · registration to active student', () => {
       await manager.goto(`${ORIGINS.dashboard}/#/students`)
       await expect(manager.getByTestId('students-screen')).toBeVisible()
 
-      const student = manager.getByTestId('students-row').filter({ hasText: 'דנה לוי' })
+      // **`students-row` never existed.** The roster is `Table`, which names the table and
+      // the card fallback and no individual row, so this filtered on a testid that matches
+      // nothing and could only ever report 0. Found the way a manager finds one child
+      // instead — the search box — which also settles the question of which page they are
+      // on: the demo studio has enough students to paginate.
+      await manager.getByTestId('students-search').fill('דנה')
+      const roster = manager.getByTestId('students-table')
+      const student = roster.getByRole('button', { name: 'דנה לוי' })
       await expect(student).toHaveCount(1)
       // Booked, not joined. The distinction is the whole funnel: §5.10's billing run
       // charges `active` enrollments, so a trial that counted as active would put a
       // stranger in debt for a club they have not joined.
-      await expect(student).toContainText('שיעור ניסיון')
+      await expect(roster).toContainText('שיעור ניסיון')
 
-      await student.getByRole('button').first().click()
+      await student.click()
       await expect(manager.getByTestId('student-detail')).toBeVisible()
 
       await manager.getByTestId('detail-convert').click()
@@ -164,6 +216,17 @@ test.describe('E2E-1 · registration to active student', () => {
       // rather than against a component nothing mounted (HB-w6-health-gate-unmounted).
       const calendar = await familyContext.newPage()
       await calendar.goto(`${ORIGINS.parent}/#/calendar`)
+
+      // §6.1 step 5 comes FIRST, and it is a hard gate too. `ConsentGate` wraps every routed
+      // branch and sits outside the health gate, because the privacy policy is what permits
+      // the club to hold a medical record about a child at all — asking for the record first
+      // would have the consent doing no work. This spec predates that gate, which is why it
+      // has been asserting `health-gate` against the `אישורים` screen.
+      await expect(calendar.getByTestId('consent-gate')).toBeVisible()
+      await expect(calendar.getByTestId('health-gate')).toHaveCount(0)
+      await acceptPlatformConsents(request, 'none')
+      await calendar.reload()
+
       await expect(calendar.getByTestId('health-gate')).toBeVisible()
       await expect(calendar.getByTestId('child-calendar')).not.toBeVisible()
 
@@ -205,8 +268,28 @@ test.describe('E2E-1 · registration to active student', () => {
     const managerContext = await browser.newContext()
     try {
       await signInAs(familyContext, scenario.parentPersona, 'parent')
+      // §6.1 step 5, satisfied before the screen this test is about. The gate itself is
+      // asserted in the first test and walking it twice would only make this one longer —
+      // but without it `#/add-child` renders `אישורים`, which is what had this test red.
+      await acceptPlatformConsents(request, scenario.parentPersona)
+      // §6.1 step 6, the same way the first test satisfies it: the scenario's child holds
+      // no declaration, and §5.5 is a hard gate — "no other screen is reachable" — so
+      // `#/add-child` is one of the screens it makes unreachable.
+      await signAllDeclarations(request)
+      await completeAgreementsForGuardian(request, scenario.parentPersona)
       const parent = await familyContext.newPage()
       await parent.goto(`${ORIGINS.parent}/#/add-child`)
+
+      // §6.1's payment step, stood down the way the screen offers — `אחר כך`. It sits
+      // inside the two hard gates and in front of every routed branch, so a family who has
+      // not yet said how they will pay reaches no other screen; this test is about the door
+      // BEHIND it. Pressed rather than seeded, because that button is the product's own
+      // answer to "not now" and a test that bypassed it would not notice it breaking.
+      // Awaited, not probed. `isVisible()` answers about the DOM as it is right now, and
+      // this gate renders after `/me/students` resolves — so the probe said "not there",
+      // skipped the click, and the assertion below then waited ten seconds on a screen the
+      // gate was covering. A family with an open charge always meets it.
+      await parent.getByTestId('setup-later').click()
 
       await expect(parent.getByTestId('add-sibling')).toBeVisible()
       await parent.getByLabel('שם פרטי').fill('יונתן')
@@ -233,13 +316,15 @@ test.describe('E2E-1 · registration to active student', () => {
       await expect(manager.getByTestId('alert-pending-requests')).toHaveCount(0)
 
       await manager.goto(`${ORIGINS.dashboard}/#/students`)
-      const student = manager.getByTestId('students-row').filter({ hasText: 'יונתן לוי' })
+      await manager.getByTestId('students-search').fill('יונתן')
+      const roster = manager.getByTestId('students-table')
+      const student = roster.getByRole('button', { name: 'יונתן לוי' })
       // ONE row. The duplicate check is what keeps it at one — a second submission of the
       // same child is refused rather than creating a second student.
       await expect(student).toHaveCount(1)
-      await expect(student).toContainText('פעיל')
+      await expect(roster).toContainText('פעיל')
 
-      await student.getByRole('button').first().click()
+      await student.click()
       await expect(manager.getByTestId('student-detail')).toBeVisible()
       // §5.4a: 'No second invitation, no second account, no second login.' One guardian,
       // and she is the one who is signed in on the other context.

@@ -291,7 +291,16 @@ function GroupPicker({
               <span style={{ fontWeight: selected ? 'var(--weight-semibold)' : 'var(--weight-medium)' }}>
                 <bdi>{group.name}</bdi>
               </span>
-              {meta ? <span style={pickRowMetaStyle}>{meta}</span> : null}
+              {/* The phone's ONLY rendering of a group's ages and weekly days: `.landing-
+                  groups-detail` below — which carries `landing-group-ages` and
+                  `landing-group-days` — is `display: none` under 64rem, so on a phone this
+                  span is where §5.4a's "groups with schedules" is actually published. Named
+                  so a test can assert it there rather than against desktop furniture. */}
+              {meta ? (
+                <span data-testid="landing-pick-meta" style={pickRowMetaStyle}>
+                  {meta}
+                </span>
+              ) : null}
             </span>
           </label>
         )

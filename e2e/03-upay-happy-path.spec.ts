@@ -2,9 +2,10 @@ import { expect, test } from '@playwright/test'
 
 import { ORIGINS } from './origins'
 import { simulateIpn } from './fixtures/api'
-import { signInAs } from './fixtures/auth'
+import { dismissPaymentSetup, signInAs } from './fixtures/auth'
 import {
   buildScenario,
+  passFirstRunGates,
   readCharge,
   readOrder,
   recordStandingOrder,
@@ -70,7 +71,11 @@ test.describe('E2E-3 · uPay happy path', () => {
     expect(scenario.chargeIds).toHaveLength(3)
 
     await signInAs(context, scenario.parentPersona, 'parent')
+      // §6.1 steps 5 and 6 wrap every routed branch of the parent app, and both
+      // landed after this spec was written — without this it opens on `אישורים`.
+      await passFirstRunGates(request, scenario.parentPersona)
     await page.goto(`${ORIGINS.parent}/#/payments`)
+    await dismissPaymentSetup(page)
 
     // -- the parent payments screen (1b / 12f) -----------------------------------
     await expect(page.getByTestId('payments-screen')).toBeVisible()
@@ -163,7 +168,11 @@ test.describe('E2E-3 · uPay happy path', () => {
     const scenario = await buildScenario(request, { parent: 'parent1', months: 1 })
 
     await signInAs(context, scenario.parentPersona, 'parent')
+      // §6.1 steps 5 and 6 wrap every routed branch of the parent app, and both
+      // landed after this spec was written — without this it opens on `אישורים`.
+      await passFirstRunGates(request, scenario.parentPersona)
     await page.goto(`${ORIGINS.parent}/#/payments`)
+    await dismissPaymentSetup(page)
     await expect(page.getByTestId('debt-row').filter({ hasText: scenario.tag })).toHaveCount(1)
 
     const first = page.waitForResponse(
@@ -203,7 +212,11 @@ test.describe('E2E-3 · uPay happy path', () => {
     await recordStandingOrder(request, scenario.payerPersonId, scenario.monthlyAmountAgorot)
 
     await signInAs(context, scenario.parentPersona, 'parent')
+      // §6.1 steps 5 and 6 wrap every routed branch of the parent app, and both
+      // landed after this spec was written — without this it opens on `אישורים`.
+      await passFirstRunGates(request, scenario.parentPersona)
     await page.goto(`${ORIGINS.parent}/#/payments`)
+    await dismissPaymentSetup(page)
 
     await expect(page.getByTestId('payments-screen')).toBeVisible()
     await expect(page.getByText('רשומה הוראת קבע פעילה — ודא שאינך משלם פעמיים')).toBeVisible()

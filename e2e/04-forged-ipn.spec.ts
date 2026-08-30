@@ -2,8 +2,8 @@ import { expect, test } from '@playwright/test'
 
 import { ORIGINS } from './origins'
 import { simulateIpn } from './fixtures/api'
-import { signInAs } from './fixtures/auth'
-import { buildScenario, openOrderFor, readOrder } from './fixtures/scenario'
+import { dismissPaymentSetup, signInAs } from './fixtures/auth'
+import { buildScenario, openOrderFor, passFirstRunGates, readOrder } from './fixtures/scenario'
 
 /**
  * SPEC §13, flow 4 — "Forged/tampered IPN → `amount_mismatch` → charges **not** settled →
@@ -70,7 +70,11 @@ test.describe('E2E-4 · forged and tampered IPN', () => {
     expect(after.paid_at).toBeNull()
 
     await signInAs(context, scenario.parentPersona, 'parent')
+      // §6.1 steps 5 and 6 wrap every routed branch of the parent app, and both
+      // landed after this spec was written — without this it opens on `אישורים`.
+      await passFirstRunGates(request, scenario.parentPersona)
     await page.goto(`${ORIGINS.parent}/#/payments`)
+    await dismissPaymentSetup(page)
     // Still owed, and still offered. A family whose payment was rejected must be able to
     // try again; a screen that hid the month would strand them. Filtered to this family's
     // rows — the payer personas are shared between tests and `/me/charges` is per payer.
