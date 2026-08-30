@@ -324,3 +324,102 @@ def test_a_nameless_contact_never_reaches_the_door(
         f"/api/v1/students/{a_student}/registration", headers=as_lead_coach.headers
     ).json()
     assert body["pickup_contacts"] == []
+
+
+# -- the stall this feature shipped with -------------------------------------------------
+def test_signing_a_superseded_template_is_refused_rather_than_accepted(
+    client, as_guardian_of, a_student, a_full_template, app_session, as_manager
+):
+    """**Reported from staging: "stuck on שלב 2/3".**
+
+    A studio holds every version it has published — v1 from the bundled questionnaire, v2 from
+    the club's own form. The parent client took `items[0]` off a list ordered only by `kind`,
+    so it could hand a family the SUPERSEDED form. They signed it, `health_status` became
+    `signed`, and `agreement_status` — which counts a declaration only at the current version —
+    still said no. Step 2 asked again, forever, with nothing on screen to explain why.
+
+    Accepting the signature is what makes it a dead end, so the server refuses it and says
+    which version is current. A loop with no error is the one outcome a hard gate cannot have.
+    """
+    from app.models.health import HealthFormTemplate
+    from app.services.structure.health_templates import FULL_TEMPLATE_SCHEMA
+    from tests.health.test_declarations import ANSWERS, SIGNATURE_B64
+
+    superseded = app_session.get(HealthFormTemplate, a_full_template)
+    newer = HealthFormTemplate(
+        studio_id=as_manager.studio_id,
+        kind="full",
+        version=superseded.version + 1,
+        schema={**FULL_TEMPLATE_SCHEMA, "version": superseded.version + 1},
+        published_at=superseded.published_at,
+    )
+    app_session.add(newer)
+    app_session.commit()
+
+    parent = as_guardian_of(a_student)
+    response = client.post(
+        f"/api/v1/students/{a_student}/health-declaration",
+        json={
+            "template_id": str(a_full_template),
+            "answers": ANSWERS,
+            "signature_image_base64": SIGNATURE_B64,
+        },
+        headers=parent.headers,
+    )
+    assert response.status_code == 422
+    assert response.json()["detail"]["code"] == "template_superseded"
+
+
+def test_the_template_list_puts_the_current_version_first(
+    client, as_guardian_of, a_student, a_full_template, app_session, as_manager
+):
+    """The other half. The client picks the highest version itself now, but a list whose order
+    depends on the query planner is a trap for the next caller that trusts `items[0]`."""
+    from app.models.health import HealthFormTemplate
+    from app.services.structure.health_templates import FULL_TEMPLATE_SCHEMA
+
+    superseded = app_session.get(HealthFormTemplate, a_full_template)
+    app_session.add(
+        HealthFormTemplate(
+            studio_id=as_manager.studio_id,
+            kind="full",
+            version=superseded.version + 1,
+            schema={**FULL_TEMPLATE_SCHEMA, "version": superseded.version + 1},
+            published_at=superseded.published_at,
+        )
+    )
+    app_session.commit()
+
+    parent = as_guardian_of(a_student)
+    items = client.get(
+        "/api/v1/health-templates?kind=full", headers=parent.headers
+    ).json()["items"]
+    assert items[0]["version"] == superseded.version + 1
+
+
+def test_signing_the_current_template_opens_the_gate(
+    client, as_guardian_of, a_student, a_full_template
+):
+    """The happy path, asserted end to end: the thing that was supposed to happen on staging."""
+    from tests.health.test_declarations import ANSWERS, SIGNATURE_B64
+
+    parent = as_guardian_of(a_student)
+    _put(client, parent, a_student)
+    client.post(
+        f"/api/v1/students/{a_student}/agreement/club-terms",
+        json={"accepted": True, "version": CLUB_TERMS_VERSION},
+        headers=parent.headers,
+    )
+    assert (
+        client.post(
+            f"/api/v1/students/{a_student}/health-declaration",
+            json={
+                "template_id": str(a_full_template),
+                "answers": ANSWERS,
+                "signature_image_base64": SIGNATURE_B64,
+            },
+            headers=parent.headers,
+        ).status_code
+        == 201
+    )
+    assert _status(client, parent, a_student).json()["complete"] is True

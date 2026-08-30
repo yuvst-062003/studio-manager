@@ -254,7 +254,15 @@ def list_health_templates(
 
     from app.models.health import HealthFormTemplate
 
-    stmt = select(HealthFormTemplate).order_by(HealthFormTemplate.kind)
+    # **Ordered so `items[0]` of a kind is the CURRENT one.** Ordering by kind alone left the
+    # row order to the planner, and a parent client taking the first `full` row could be handed
+    # a superseded version to sign -- which the gate then refuses to count, with no error and no
+    # way forward. Published first, then highest version.
+    stmt = select(HealthFormTemplate).order_by(
+        HealthFormTemplate.kind,
+        HealthFormTemplate.published_at.is_(None),
+        HealthFormTemplate.version.desc(),
+    )
     if kind is not None:
         stmt = stmt.where(HealthFormTemplate.kind == kind)
     return HealthTemplateListResponse(

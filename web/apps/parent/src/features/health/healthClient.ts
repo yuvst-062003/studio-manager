@@ -118,11 +118,23 @@ export function makeHealthClient(fetcher: Fetcher) {
      */
     template: (): Promise<HealthFormTemplateOut> =>
       fetcher('/api/v1/health-templates?kind=full')
-        .then(json<{ items: { id: string }[] }>)
+        .then(json<{ items: { id: string; version: number }[] }>)
         .then((list) => {
-          const first = list.items[0]
-          if (!first) throw new Error('no full health template in this studio')
-          return fetcher(`/api/v1/health-templates/${first.id}`).then(json<HealthFormTemplateOut>)
+          // **The highest version, never `items[0]`.** A studio holds every version it has
+          // ever published — v1 from the bundled questionnaire, v2 from the club's own form —
+          // and taking the first row handed a parent a SUPERSEDED template to sign. The gate
+          // counts a declaration only when its version is the current one, so that signature
+          // satisfied nothing and step 2 asked again forever, with no error to explain it.
+          //
+          // The list is ordered server-side now and the server refuses a superseded template
+          // outright. This is the third guard, and it is the cheapest: whichever order the
+          // rows arrive in, the client picks the newest.
+          const current = list.items.reduce<{ id: string; version: number } | null>(
+            (best, item) => (best === null || item.version > best.version ? item : best),
+            null,
+          )
+          if (!current) throw new Error('no full health template in this studio')
+          return fetcher(`/api/v1/health-templates/${current.id}`).then(json<HealthFormTemplateOut>)
         }),
 
     declaration: (studentId: string): Promise<HealthDeclarationOut | null> =>

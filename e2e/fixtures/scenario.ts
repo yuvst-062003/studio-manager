@@ -581,11 +581,15 @@ export async function openOrderFor(
  * see `signing_person_id` in app/services/health/agreement.py.
  */
 async function signOutstandingDeclarations(manager: Api): Promise<void> {
-  const templates = await manager.send<{ items: { id: string }[] }>(
+  const templates = await manager.send<{ items: { id: string; version: number }[] }>(
     'get',
     '/health-templates?kind=full',
   )
-  const templateId = templates.items[0]!.id
+  // The highest version, not the first row: a studio holds every version it has published,
+  // and the server refuses a declaration signed against a superseded one.
+  const templateId = templates.items.reduce((best, item) =>
+    item.version > best.version ? item : best,
+  ).id
   const template = await manager.send<{
     schema: { sections: { questions: { id: string; type: string }[] }[] }
   }>('get', `/health-templates/${templateId}`)

@@ -77,6 +77,21 @@ class SignatureNotAPngError(Exception):
     served from our own origin (app/core/storage.py §2.4)."""
 
 
+class TemplateSupersededError(Exception):
+    """Signing a version of the questions the studio has stopped asking.
+
+    **This is refused rather than accepted, because accepting it is a dead end.**
+    `agreement_status` counts a declaration as current only when its `template_version`
+    matches the published one -- so a signature against a superseded template satisfies
+    nothing, the gate stays shut, and the family is asked to sign the same form again
+    forever with no error to explain why. That is exactly how it shipped: the parent client
+    took `items[0]` from an unordered list, which in a studio holding both v1 and v2 could be
+    v1.
+
+    Refusing costs the caller a 422 that names the versions. It cannot cost anybody a loop.
+    """
+
+
 class AnswersIncompleteError(Exception):
     """A required question was not answered.
 
@@ -242,6 +257,27 @@ class HealthDeclarationService:
         template = session.get(HealthFormTemplate, template_id)
         if template is None:
             raise DeclarationNotFoundError(str(template_id))
+
+        # A `full` declaration must be signed against the questions the studio asks TODAY.
+        # `trial` is exempt: conflict C3 gives it its own single-version form, and it is not
+        # what the gate measures.
+        if template.kind == "full":
+            current = (
+                session.execute(
+                    select(HealthFormTemplate)
+                    .where(
+                        HealthFormTemplate.kind == "full",
+                        HealthFormTemplate.published_at.is_not(None),
+                    )
+                    .order_by(HealthFormTemplate.version.desc())
+                )
+                .scalars()
+                .first()
+            )
+            if current is not None and template.version != current.version:
+                raise TemplateSupersededError(
+                    f"template version {template.version} is superseded by {current.version}"
+                )
 
         signature = decode_signature(signature_image_base64)
 
