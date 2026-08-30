@@ -107,6 +107,8 @@ export const billing: Bundle = {
   'promise.manager.method': 'אמצעי תשלום',
   'promise.manager.filterAll': 'הכול',
   'promise.manager.forPlan': 'עבור מסלול',
+  'promise.manager.saysPaid': 'מדווח ששילם',
+  'promise.manager.saysWillPay': 'עומד לשלם',
   'shop.title': 'חנות המועדון',
   'shop.empty': 'אין פריטים למכירה כרגע.',
   'shop.order': 'הזמנה',

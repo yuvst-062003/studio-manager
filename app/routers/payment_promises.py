@@ -64,6 +64,7 @@ def _out(service: PaymentPromiseService, row: PaymentPromise) -> PaymentPromiseO
         total_agorot=row.total_agorot,
         prepay_months=row.prepay_months,
         claimed_plan_id=row.claimed_plan_id,
+        already_paid=row.already_paid,
         charge_ids=service.charge_ids_of(row.id),
         created_at=row.created_at,
         decided_at=row.decided_at,
@@ -92,6 +93,7 @@ def raise_payment_promise(
             method=body.method,
             prepay_months=body.prepay_months,
             claimed_plan_id=body.claimed_plan_id,
+            already_paid=body.already_paid,
         )
     except (NotFoundError, ConflictError, RefusedError) as exc:
         raise _refusal(exc) from exc
@@ -117,6 +119,7 @@ def _manager_out(
         total_agorot=row.total_agorot,
         prepay_months=row.prepay_months,
         claimed_plan_name=claimed_plan_name,
+        already_paid=row.already_paid,
         payer_person_id=row.payer_person_id,
         payer_name=payer_name,
         charge_count=charge_count,

@@ -29,9 +29,20 @@ export type TrainingPlanClient = {
   release(bookingId: string): Promise<void>
   requestPlan(studentId: string, planId: string): Promise<void>
   cancelChange(studentId: string, changeId: string): Promise<void>
-  /** The plan picker's "already paid" — a payment promise claiming this program, priced
-   *  by the server from the plan row. The manager confirms or declines it. */
-  claimPaid(planId: string, method: 'cash' | 'cheque' | 'standing_order'): Promise<void>
+  /**
+   * A payment promise claiming this program, priced by the server from the plan row. The
+   * manager confirms or declines it.
+   *
+   * `alreadyPaid` is the tense, and it is what makes the plan step's two buttons under
+   * each route mean different things: true is "the money is already in your drawer, go
+   * and look", false is "it is coming". Neither settles anything — a claim is not a
+   * payment until a human says it arrived.
+   */
+  claimPaid(
+    planId: string,
+    method: 'cash' | 'cheque' | 'standing_order',
+    alreadyPaid?: boolean,
+  ): Promise<void>
 }
 
 export function makeTrainingPlanClient(fetcher: Fetcher): TrainingPlanClient {
@@ -73,12 +84,16 @@ export function makeTrainingPlanClient(fetcher: Fetcher): TrainingPlanClient {
         }),
       )
     },
-    async claimPaid(planId, method) {
+    async claimPaid(planId, method, alreadyPaid = false) {
       await json(
         await fetcher('/api/v1/me/payment-promises', {
           method: 'POST',
           headers: JSON_HEADERS,
-          body: JSON.stringify({ claimed_plan_id: planId, method }),
+          body: JSON.stringify({
+            claimed_plan_id: planId,
+            method,
+            already_paid: alreadyPaid,
+          }),
         }),
       )
     },

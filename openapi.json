@@ -6153,6 +6153,10 @@
       },
       "ManagerPaymentPromiseOut": {
         "properties": {
+          "already_paid": {
+            "title": "Already Paid",
+            "type": "boolean"
+          },
           "charge_count": {
             "title": "Charge Count",
             "type": "integer"
@@ -6211,6 +6215,7 @@
           "total_agorot",
           "prepay_months",
           "claimed_plan_name",
+          "already_paid",
           "payer_person_id",
           "payer_name",
           "charge_count",
@@ -7646,6 +7651,11 @@
       },
       "PaymentPromiseCreateIn": {
         "properties": {
+          "already_paid": {
+            "default": false,
+            "title": "Already Paid",
+            "type": "boolean"
+          },
           "charge_ids": {
             "items": {
               "format": "uuid",
@@ -7706,6 +7716,10 @@
       },
       "PaymentPromiseOut": {
         "properties": {
+          "already_paid": {
+            "title": "Already Paid",
+            "type": "boolean"
+          },
           "charge_ids": {
             "items": {
               "format": "uuid",
@@ -7772,6 +7786,7 @@
           "total_agorot",
           "prepay_months",
           "claimed_plan_id",
+          "already_paid",
           "charge_ids",
           "created_at",
           "decided_at"

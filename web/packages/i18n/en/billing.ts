@@ -73,6 +73,8 @@ export const billing: Bundle = {
   'promise.manager.method': 'Method',
   'promise.manager.filterAll': 'All',
   'promise.manager.forPlan': 'For plan',
+  'promise.manager.saysPaid': 'Says already paid',
+  'promise.manager.saysWillPay': 'Says will pay',
   'shop.title': 'Club shop',
   'shop.empty': 'Nothing is on sale right now.',
   'shop.order': 'Order',

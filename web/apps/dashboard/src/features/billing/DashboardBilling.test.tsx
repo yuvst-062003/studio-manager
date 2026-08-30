@@ -78,6 +78,7 @@ function managerPromise(
     method,
     total_agorot: 90_000,
     claimed_plan_name: null,
+    already_paid: false,
     payer_person_id: 'payer-1',
     payer_name: 'משפחת כהן',
     charge_count: 3,
@@ -542,6 +543,27 @@ describe('the payment-promise queue', () => {
     const rows = await screen.findAllByTestId('payment-promise-row')
     expect(within(rows[0]!).getByTestId('promise-method')).toHaveTextContent('מזומן')
     expect(within(rows[1]!).getByTestId('promise-method')).toHaveTextContent('צ׳קים')
+  })
+
+  it('says whether the money is already in the drawer or still coming', async () => {
+    // The signup plan step offers both tenses under every hand-carried route (owner
+    // correction, 2026-08-30), and they need different actions here: money the family says
+    // they have already handed over can be checked right now, money that is coming cannot.
+    // Until the flag existed the queue showed one indistinguishable pending row for both,
+    // which made the parent's two buttons mean nothing.
+    renderPanel({
+      client: stub({
+        paymentPromises: vi.fn().mockResolvedValue([
+          managerPromise('r1', 'cash', { already_paid: true }),
+          managerPromise('r2', 'cheque', { already_paid: false }),
+        ]),
+      }),
+    })
+    const rows = await screen.findAllByTestId('payment-promise-row')
+    expect(rows[0]!).toHaveTextContent(t(LOCALE, 'billing.promise.manager.saysPaid'))
+    expect(rows[1]!).toHaveTextContent(t(LOCALE, 'billing.promise.manager.saysWillPay'))
+    // Neither is a settlement: both still wait for the manager's ✓.
+    expect(within(rows[0]!).getByTestId('promise-confirm')).toBeInTheDocument()
   })
 
   it('asks the server for one method when the filter is set, never filters in the browser', async () => {

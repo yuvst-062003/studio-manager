@@ -68,6 +68,7 @@ import { TrainingPlanSection } from './features/billing/TrainingPlanSection'
 // the first-run sequence reached it, so a family finished signup with no plan at all.
 import { PlanGate } from './features/billing/PlanGate'
 import { makeTrainingPlanClient } from './features/billing/trainingPlanClient'
+import { makeParentBillingClient, submitUpayForm } from './features/billing/PaymentsSection'
 import { ShopSection } from './features/billing'
 // §6.1 step 6 — the BLOCKING declaration. Mounted here because nothing imported it
 // (HB-w6-health-gate-unmounted): the gate, the form and the pad were built and tested in
@@ -237,6 +238,22 @@ function AuthedApp() {
   // month for 12b, the club for 13a.
   const scheduleClient = useMemo(() => makeParentScheduleClient(apiFetch), [])
   const trainingPlanClient = useMemo(() => makeTrainingPlanClient(apiFetch), [])
+  const billingClient = useMemo(() => makeParentBillingClient(apiFetch), [])
+  // This payer's own monthly total, so the plan step can quote what the card will really
+  // charge. A family with two children is quoted for both, because that is what the order
+  // is priced at and what credit is measured in. Zero until it loads, and the step falls
+  // back to the chosen plan's own price — right for the one-child family, which is most.
+  const [prepayMonthlyTotalAgorot, setPrepayMonthlyTotal] = useState(0)
+  useEffect(() => {
+    let live = true
+    void apiFetch('/api/v1/me/prepay-terms')
+      .then(async (r) => (r.ok ? ((await r.json()) as { monthly_total_agorot: number }) : null))
+      .then((row) => live && row && setPrepayMonthlyTotal(row.monthly_total_agorot))
+      .catch(() => undefined)
+    return () => {
+      live = false
+    }
+  }, [])
   const peopleClient = useMemo(() => makePeopleClient(apiFetch), [])
   const eventsClient = useMemo(() => makeParentEventsClient(apiFetch), [])
   const beltsClient = useMemo(() => makeParentBeltsClient(apiFetch), [])
@@ -545,8 +562,14 @@ function AuthedApp() {
           <PlanGate
             client={trainingPlanClient}
             locale={locale}
-            onGoToPayments={() => {
-              globalThis.location.hash = '#/payments'
+            monthlyTotalAgorot={prepayMonthlyTotalAgorot}
+            // The card route, end to end. At signup there is no charge to settle — the
+            // billing run has not reached this family — so the order names no charge and
+            // buys N months FORWARD, which the server prices from this payer's own monthly
+            // total and which lands as credit against their first bill.
+            onPayByCard={async (monthsForward) => {
+              const order = await billingClient.createOrder([], 1, monthsForward)
+              submitUpayForm(await billingClient.orderForm(order.public_ref))
             }}
             students={(gatedChildren ?? []).map(({ id, display_name, status }) => ({
               id,

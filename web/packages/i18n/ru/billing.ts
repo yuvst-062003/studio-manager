@@ -77,6 +77,8 @@ export const billing: Bundle = {
   'promise.manager.method': 'Способ оплаты',
   'promise.manager.filterAll': 'Все',
   'promise.manager.forPlan': 'За тариф',
+  'promise.manager.saysPaid': 'Говорит, что оплатил',
+  'promise.manager.saysWillPay': 'Собирается оплатить',
   'shop.title': 'Магазин клуба',
   'shop.empty': 'Сейчас ничего не продаётся.',
   'shop.order': 'Заказать',

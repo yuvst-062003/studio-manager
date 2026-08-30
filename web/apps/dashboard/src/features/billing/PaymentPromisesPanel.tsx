@@ -11,7 +11,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { formatDateInStudioZone } from '@studio/core'
-import { Button, Card, MoneyDisplay, SegmentedControl } from '@studio/ui'
+import { Button, Card, MoneyDisplay, SegmentedControl, StatusChip } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import type {
@@ -125,6 +125,21 @@ export function PaymentPromisesPanel({
               </span>
             ) : null}
             <MoneyDisplay agorot={promise.total_agorot} tone="pending" />
+            {/* **What to do next, in one chip.** The signup plan step offers "לשלם עכשיו"
+                and "כבר שילמתי" under every hand-carried route (owner correction,
+                2026-08-30), and the two need different actions from this screen: money the
+                family says is already in the drawer can be checked right now, money that is
+                coming cannot. Both still need the ✓ — a claim is never a settlement (G8) —
+                so this changes what a manager DOES first, never what is true. */}
+            <StatusChip
+              status={promise.already_paid ? 'pending' : 'planned'}
+              label={t(
+                locale,
+                promise.already_paid
+                  ? 'billing.promise.manager.saysPaid'
+                  : 'billing.promise.manager.saysWillPay',
+              )}
+            />
             {/* Why the number is large. 3,600 ₪ with no explanation is what a manager
                 phones the office about; "12 months forward" is the answer, and it is what
                 they are being handed a bundle of cheques for. */}

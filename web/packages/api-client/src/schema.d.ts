@@ -7744,6 +7744,8 @@ export interface components {
         };
         /** ManagerPaymentPromiseOut */
         ManagerPaymentPromiseOut: {
+            /** Already Paid */
+            already_paid: boolean;
             /** Charge Count */
             charge_count: number;
             /** Claimed Plan Name */
@@ -8467,6 +8469,11 @@ export interface components {
         };
         /** PaymentPromiseCreateIn */
         PaymentPromiseCreateIn: {
+            /**
+             * Already Paid
+             * @default false
+             */
+            already_paid: boolean;
             /** Charge Ids */
             charge_ids?: string[];
             /** Claimed Plan Id */
@@ -8490,6 +8497,8 @@ export interface components {
         };
         /** PaymentPromiseOut */
         PaymentPromiseOut: {
+            /** Already Paid */
+            already_paid: boolean;
             /** Charge Ids */
             charge_ids: string[];
             /** Claimed Plan Id */

@@ -73,6 +73,7 @@ class PaymentPromiseService:
         method: str = "cash",
         prepay_months: int = 0,
         claimed_plan_id: uuid.UUID | None = None,
+        already_paid: bool = False,
     ) -> PaymentPromise:
         """§5.10's human-recorded routes, said out loud. Every refusal is reachable from
         a client.
@@ -87,6 +88,11 @@ class PaymentPromiseService:
         the plan picker, priced HERE from the plan row so a client can never name its own
         amount. Any may be empty, but a promise that is none of them is a promise about
         nothing.
+
+        `already_paid` is a TENSE, not a fourth half. It changes no arithmetic and settles
+        nothing -- it says whether the manager should go and look for this money now or
+        wait for it, which is the difference between the two buttons the signup plan step
+        offers under every route (owner correction, 2026-08-30).
         """
         if method not in PROMISE_METHODS:
             raise RefusedError(f"method must be one of {', '.join(PROMISE_METHODS)}")
@@ -149,6 +155,7 @@ class PaymentPromiseService:
             prepay_months=prepay_months,
             claimed_plan_id=claimed_plan_id,
             claimed_agorot=claimed,
+            already_paid=already_paid,
         )
         self._session.add(row)
         self._session.flush()

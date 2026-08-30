@@ -21,24 +21,40 @@
 // mode of nagging: a club that has not configured its plans yet would lock every parent out
 // of an app they can otherwise use. The banner is the nag, and it does not go away.
 //
-// **The five ways to pay are four routes and a tense.** The owner listed "cash or chechs or
-// card or הוראת קבע or mark already paid", and the fifth is not a fifth route — it is any of
-// the four in the past tense. Rendering it as a peer would raise a promise that cannot say
-// how the money arrived, which is the one thing the manager reconciling it needs. So it is a
-// checkbox over the four, which is also the shape `TrainingPlanScreen`'s confirm step
-// already uses.
+// **Four routes, and entering one shows what that route can do** (owner correction,
+// 2026-08-30: "It should be 4 payments option and when you enter each he can actually pay
+// or choose already paid"). A first pass put "already paid" beside the routes as a fifth
+// peer and then as a checkbox floating over them; both were wrong, because what "pay now"
+// MEANS is different in each route and only the route knows:
+//
+//   card              pays. There is no charge to settle yet — the billing run has not
+//                     reached this family — so the money goes forward: 1/2/3/6 months,
+//                     opened at uPay, landing as credit that covers the first charge the
+//                     moment it is raised. There is no "already paid" here, because a card
+//                     payment through the app confirms itself through the IPN.
+//   cash / cheque /   cannot pay, ever: no money moves through software on these routes.
+//   הוראת קבע          Both answers are the same promise object with a different TENSE, and
+//                     the tense is what the manager acts on — look in the drawer now, or
+//                     wait. `already_paid` carries it (migration 0017); without it two
+//                     buttons produced one indistinguishable row and meant nothing.
+//
+// Neither answer on the three human routes settles anything. G8: money is real when a
+// human says it arrived, which is the whole reason the promise object exists.
 import { useEffect, useMemo, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
-import { Alert, Button, Card, Checkbox, MoneyDisplay, Radio } from '@studio/ui'
+import { Alert, Button, Card, MoneyDisplay, SegmentedControl } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import type { PromiseMethod } from './billingClient'
 import type { PlanOption, TrainingPlanClient } from './trainingPlanClient'
 
-/** §5.10's routes, plus the card. The first four are `PromiseMethod`; `card` is not a
- *  promise at all — it is the app's own payment flow, so it sends the family to `1b`. */
+/** The four routes, in the order §5.10's payments screen lists them. `card` is the only
+ *  one the app can actually take money on; the other three are `PromiseMethod`. */
 const METHODS = ['card', 'cash', 'cheque', 'standing_order'] as const
 export type GateMethod = (typeof METHODS)[number]
+
+/** The card's own chips, matching the payments screen's (`MONTH_OPTIONS` there). */
+const MONTHS = [1, 2, 3, 6] as const
 
 export type PlanGateStudent = { id: string; display_name: string; status?: string }
 
@@ -76,8 +92,20 @@ export type PlanGateProps = {
   locale: Locale
   client: TrainingPlanClient
   students: readonly PlanGateStudent[]
-  /** Where the card route goes. Injected so a test asserts it without a real location. */
-  onGoToPayments?: () => void
+  /**
+   * The card route: opens an order for N months forward and hands back uPay's form.
+   * Injected rather than reached through `apiFetch` here, so a test drives the whole
+   * flow without a server and without a real form submission.
+   */
+  onPayByCard?: (months: number) => Promise<void>
+  /**
+   * This payer's monthly total in agorot, from `GET /me/prepay-terms`. **The payer's, not
+   * the plan's**: a parent with two children is quoted "three months for both", because
+   * that is what the card will charge and what credit is measured in. Falls back to the
+   * chosen plan's own price when the read failed, which is right for the one-child family
+   * that is nearly every family here.
+   */
+  monthlyTotalAgorot?: number
   /** Bumped by the caller's own reload after a plan is set. */
   onChosen?: () => void
   children: ReactNode
@@ -87,7 +115,8 @@ export function PlanGate({
   locale,
   client,
   students,
-  onGoToPayments,
+  onPayByCard,
+  monthlyTotalAgorot,
   onChosen,
   children,
 }: PlanGateProps) {
@@ -99,11 +128,13 @@ export function PlanGate({
   const [skipped, setSkipped] = useState(false)
   const [reopened, setReopened] = useState(0)
   const [chosen, setChosen] = useState<PlanOption | null>(null)
-  const [method, setMethod] = useState<GateMethod>('card')
-  const [paidAlready, setPaidAlready] = useState(false)
+  /** `null` until the family enters a route. Entering one is a step, not a radio: what the
+   *  route can do is different in each, so the actions belong inside it. */
+  const [method, setMethod] = useState<GateMethod | null>(null)
+  const [months, setMonths] = useState<number>(1)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [done, setDone] = useState<'card' | 'claimed' | null>(null)
+  const [done, setDone] = useState<'card' | 'claimed' | 'promised' | null>(null)
 
   // One id list, stable across renders, so the effect below does not re-run on every
   // parent render just because `students` is a fresh array literal.
@@ -157,36 +188,37 @@ export function PlanGate({
     )
   }
 
-  async function confirm(plan: PlanOption) {
+  /**
+   * Set the plan, then do whatever this route does.
+   *
+   * The plan is written FIRST and on its own. It is what the family came to choose, it
+   * applies immediately, and a claim raised before it that then failed would leave the
+   * manager confirming money against no plan at all.
+   */
+  async function act(plan: PlanOption, run: () => Promise<'card' | 'claimed' | 'promised'>) {
     if (busy) return
     setBusy(true)
     setError(null)
     try {
-      // Order matters. The plan is what the family came to set, and it applies on its own —
-      // a claim raised first and a plan that then failed would leave the manager confirming
-      // money against nothing.
       await client.requestPlan(missing!.student.id, plan.id)
-      if (method === 'card' && !paidAlready) {
-        setDone('card')
-        onChosen?.()
-        onGoToPayments?.()
-        return
-      }
-      // Everything else is a promise the manager settles — including "already paid by
-      // card", which the app cannot confirm any more than it can confirm a cheque.
-      // `card` has no `PromiseMethod`, so a card that was already paid is recorded by the
-      // route the money will actually be reconciled from: the club's own bank statement,
-      // which is what `standing_order` already means here.
-      await client.claimPaid(plan.id, promiseMethodFor(method))
-      setDone('claimed')
-      setChosen(null)
+      const outcome = await run()
+      setDone(outcome)
       onChosen?.()
+      // The card leaves the page for uPay, so its step stays as it is; the two promise
+      // outcomes come back here, and the family reads the confirmation.
+      if (outcome !== 'card') setChosen(null)
     } catch {
       setError(t(locale, 'common.error.generic'))
     } finally {
       setBusy(false)
     }
   }
+
+  /** What the card will actually charge. `months x monthly` on two integers (G2) — and the
+   *  server prices the order itself, so this is a quote rather than an instruction. */
+  const monthly = monthlyTotalAgorot && monthlyTotalAgorot > 0
+    ? monthlyTotalAgorot
+    : (chosen?.monthly_amount_agorot ?? 0)
 
   return (
     <div data-testid="plan-gate" style={gateStyle}>
@@ -211,7 +243,9 @@ export function PlanGate({
               locale,
               done === 'card'
                 ? 'schedule.plan.gate.cardNext'
-                : 'schedule.plan.gate.claimSent',
+                : done === 'claimed'
+                  ? 'schedule.plan.gate.claimSent'
+                  : 'schedule.plan.gate.willPaySent',
             )}
           </span>
         </Alert>
@@ -242,6 +276,8 @@ export function PlanGate({
                 data-testid="plan-gate-choose"
                 onClick={() => {
                   setDone(null)
+                  setMethod(null)
+                  setMonths(1)
                   setChosen(plan)
                 }}
                 variant="secondary"
@@ -251,53 +287,139 @@ export function PlanGate({
             </div>
           </Card>
         ))
-      ) : (
+      ) : method === null ? (
+        // **Four routes, and each is a way IN.** Not a radio group with one confirm
+        // button: "pay now" means something different in every one of them, and only the
+        // route knows what.
         <Card>
           <div data-testid="plan-gate-pay">
             <h2>
               {t(locale, 'schedule.plan.gate.payHow')} — <bdi>{chosen.name}</bdi>
             </h2>
             <MoneyDisplay agorot={chosen.monthly_amount_agorot} label={chosen.name} />
-            <fieldset style={{ border: 'none', margin: 0, padding: 0 }}>
-              <legend>{t(locale, 'schedule.plan.gate.payHow')}</legend>
+            <span style={mutedStyle}>{t(locale, 'schedule.plan.monthly')}</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
               {METHODS.map((option) => (
-                <Radio
-                  checked={method === option}
+                <Button
+                  data-testid={`plan-gate-method-${option}`}
                   key={option}
-                  label={t(locale, `schedule.plan.gate.method.${option}`)}
-                  name="plan-gate-method"
-                  onChange={() => setMethod(option)}
-                  value={option}
-                />
+                  onClick={() => {
+                    setDone(null)
+                    setMethod(option)
+                  }}
+                  variant="secondary"
+                >
+                  {t(locale, `schedule.plan.gate.method.${option}`)}
+                </Button>
               ))}
-            </fieldset>
-            <Checkbox
-              checked={paidAlready}
-              data-testid="plan-gate-paid-already"
-              label={t(locale, 'schedule.plan.gate.paidAlready')}
-              onChange={(event) => setPaidAlready(event.target.checked)}
-            />
-            {method !== 'card' || paidAlready ? (
-              <p style={mutedStyle}>{t(locale, 'schedule.plan.claimHint')}</p>
-            ) : null}
-            <div style={rowStyle}>
-              <Button
-                data-testid="plan-gate-confirm"
-                disabled={busy}
-                onClick={() => void confirm(chosen)}
-                variant="primary"
-              >
-                {t(locale, 'schedule.plan.gate.confirm')}
-              </Button>
-              <Button
-                data-testid="plan-gate-back"
-                disabled={busy}
-                onClick={() => setChosen(null)}
-                variant="ghost"
-              >
-                {t(locale, 'schedule.plan.gate.back')}
-              </Button>
             </div>
+            <Button
+              data-testid="plan-gate-back"
+              disabled={busy}
+              onClick={() => setChosen(null)}
+              variant="ghost"
+            >
+              {t(locale, 'schedule.plan.gate.back')}
+            </Button>
+          </div>
+        </Card>
+      ) : (
+        <Card>
+          <div data-testid={`plan-gate-route-${method}`}>
+            <h2>{t(locale, `schedule.plan.gate.method.${method}`)}</h2>
+
+            {method === 'card' ? (
+              // **The card is the only route that can actually take money**, and at signup
+              // there is nothing to settle: the billing run has not reached this family, so
+              // their basket is empty. The months are therefore bought FORWARD, which lands
+              // as credit and covers the first charge the moment it is raised. No "already
+              // paid" here — a card payment through the app confirms itself via the IPN.
+              <>
+                <SegmentedControl
+                  legend={t(locale, 'schedule.plan.gate.months')}
+                  legendVisible
+                  onValueChange={(next) => setMonths(Number(next))}
+                  options={MONTHS.map((n) => ({ value: String(n), label: String(n) }))}
+                  value={String(months)}
+                />
+                <p style={rowStyle}>
+                  <span>{t(locale, 'schedule.plan.gate.cardTotal')}</span>
+                  <MoneyDisplay
+                    agorot={monthly * months}
+                    label={t(locale, 'schedule.plan.gate.cardTotal')}
+                  />
+                </p>
+                <p style={mutedStyle}>{t(locale, 'schedule.plan.gate.cardHint')}</p>
+                <div style={rowStyle}>
+                  <Button
+                    data-testid="plan-gate-pay-now"
+                    disabled={busy || onPayByCard === undefined}
+                    onClick={() =>
+                      void act(chosen, async () => {
+                        await onPayByCard!(months)
+                        return 'card'
+                      })
+                    }
+                    variant="primary"
+                  >
+                    {t(locale, 'schedule.plan.gate.payNow')}
+                  </Button>
+                  <Button
+                    data-testid="plan-gate-back"
+                    disabled={busy}
+                    onClick={() => setMethod(null)}
+                    variant="ghost"
+                  >
+                    {t(locale, 'schedule.plan.gate.back')}
+                  </Button>
+                </div>
+              </>
+            ) : (
+              // Cash, cheques and standing orders move no money through software. Both
+              // buttons raise the SAME promise; what differs is the tense, and the tense is
+              // what tells the manager whether to go and look now or wait.
+              <>
+                <MoneyDisplay agorot={chosen.monthly_amount_agorot} label={chosen.name} />
+                <div style={rowStyle}>
+                  <Button
+                    data-testid="plan-gate-pay-now"
+                    disabled={busy}
+                    onClick={() =>
+                      void act(chosen, async () => {
+                        await client.claimPaid(chosen.id, method as PromiseMethod, false)
+                        return 'promised'
+                      })
+                    }
+                    variant="primary"
+                  >
+                    {t(locale, 'schedule.plan.gate.payNow')}
+                  </Button>
+                  <Button
+                    data-testid="plan-gate-paid-already"
+                    disabled={busy}
+                    onClick={() =>
+                      void act(chosen, async () => {
+                        await client.claimPaid(chosen.id, method as PromiseMethod, true)
+                        return 'claimed'
+                      })
+                    }
+                    variant="secondary"
+                  >
+                    {t(locale, 'schedule.plan.gate.paidAlready')}
+                  </Button>
+                  <Button
+                    data-testid="plan-gate-back"
+                    disabled={busy}
+                    onClick={() => setMethod(null)}
+                    variant="ghost"
+                  >
+                    {t(locale, 'schedule.plan.gate.back')}
+                  </Button>
+                </div>
+                <p style={mutedStyle}>{t(locale, 'schedule.plan.gate.willPayHint')}</p>
+                <p style={mutedStyle}>{t(locale, 'schedule.plan.gate.paidHint')}</p>
+              </>
+            )}
           </div>
         </Card>
       )}
@@ -309,8 +431,8 @@ export function PlanGate({
           data-testid="plan-gate-continue"
           onClick={() => {
             setDone(null)
-            setMethod('card')
-            setPaidAlready(false)
+            setMethod(null)
+            setMonths(1)
             setReopened((n) => n + 1)
           }}
           variant="primary"
@@ -329,14 +451,13 @@ export function PlanGate({
 }
 
 /**
- * Which promise method records money that arrived by `choice`.
+ * The three routes that raise a promise — every route except the card.
  *
- * `card` has no `PromiseMethod` of its own and must not gain one: a promise is a claim a
- * MANAGER settles by hand, and a card payment through the app settles itself through the
- * IPN. A card the family paid somewhere else is money that will show up on the club's
- * statement rather than in anyone's hand, which is exactly what `standing_order` already
- * means in this queue (G8 — the provider cannot confirm it either).
+ * **The card is not in this set and must not join it.** A promise is a claim a MANAGER
+ * settles by hand; a card payment through the app settles itself through the IPN, so a
+ * card promise would be a pending item nobody ever has to act on. That is also why the
+ * card step offers no "already paid": there is nothing for a human to confirm.
  */
-export function promiseMethodFor(choice: GateMethod): PromiseMethod {
-  return choice === 'card' ? 'standing_order' : choice
+export function isPromiseRoute(choice: GateMethod): choice is PromiseMethod {
+  return choice !== 'card'
 }

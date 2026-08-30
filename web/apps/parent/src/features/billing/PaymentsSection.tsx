@@ -50,6 +50,30 @@ async function json<T>(response: Response): Promise<T> {
 export const DEMO_SIMULATOR: UpayForm = { action: 'demo:ipn-simulator', fields: {} }
 
 /**
+ * §5.10 step 2 — the client builds the POST and auto-submits it. **Fields, not HTML**: the
+ * server sends values and this builds the form, so nothing server-authored is ever
+ * injected into the document.
+ *
+ * Exported because §6.1's plan step now opens uPay too (owner correction, 2026-08-30) and
+ * a second hand-rolled copy of this is a second place for the hidden-input handling to
+ * drift from the one the payments screen uses.
+ */
+export function submitUpayForm(form: UpayForm): void {
+  const el = document.createElement('form')
+  el.method = 'POST'
+  el.action = form.action
+  for (const [name, value] of Object.entries(form.fields)) {
+    const input = document.createElement('input')
+    input.type = 'hidden'
+    input.name = name
+    input.value = value
+    el.append(input)
+  }
+  document.body.append(el)
+  el.submit()
+}
+
+/**
  * The same shape as `makeBillingClient`, against the routes a PAYER may call.
  *
  * The manager-facing reads take `?payer_person_id=`; these take nobody, because the payer
@@ -289,19 +313,7 @@ export function PaymentsSection({ locale }: { locale: Locale }) {
           refresh()
           return
         }
-        // §5.10 step 2 — the client builds the POST and auto-submits it. Fields, not HTML.
-        const el = document.createElement('form')
-        el.method = 'POST'
-        el.action = form.action
-        for (const [name, value] of Object.entries(form.fields)) {
-          const input = document.createElement('input')
-          input.type = 'hidden'
-          input.name = name
-          input.value = value
-          el.append(input)
-        }
-        document.body.append(el)
-        el.submit()
+        submitUpayForm(form)
       }}
       onOpenHistory={() => {
         globalThis.location.hash = '#/payments/history'

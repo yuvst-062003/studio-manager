@@ -480,3 +480,44 @@ def test_a_manager_may_record_a_cheque_by_hand():
         }
     )
     assert body.method == "cheque"
+
+
+# -- "I will pay" and "I already paid" are different sentences ------------------
+#
+# Owner correction, 2026-08-30: the signup plan step offers four routes, and "when you enter
+# each he can actually pay or choose already paid". Both raise a promise and both end at a
+# manager confirming by hand — but the manager's NEXT ACTION differs, and until this flag
+# existed the queue could not tell them apart. "I already handed the coach cash" means go
+# and look in the drawer now; "I will pay this week" means wait. One pending row that means
+# either is a row a manager has to phone the family about to read.
+
+
+def test_a_promise_says_whether_the_money_has_already_moved(
+    tenant_session, studio, a_priced_student, a_price_plan
+):
+    claimed = PaymentPromiseService(tenant_session).create(
+        studio.id,
+        payer_person_id=a_priced_student.payer_person_id,
+        charge_ids=[],
+        claimed_plan_id=a_price_plan,
+        already_paid=True,
+        method="cash",
+        at=T0,
+    )
+    assert claimed.already_paid is True
+
+
+def test_a_promise_to_pay_later_is_the_default(
+    tenant_session, studio, a_priced_student, a_price_plan
+):
+    """The safe direction. A promise that silently claimed the money had arrived would put
+    a manager in front of an empty drawer."""
+    promised = PaymentPromiseService(tenant_session).create(
+        studio.id,
+        payer_person_id=a_priced_student.payer_person_id,
+        charge_ids=[],
+        claimed_plan_id=a_price_plan,
+        method="cash",
+        at=T0,
+    )
+    assert promised.already_paid is False

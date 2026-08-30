@@ -29,6 +29,10 @@ class PaymentPromiseCreateIn(BaseModel):
     #: says they already paid for, from the plan picker. Priced by the SERVER from the
     #: plan row -- the body names a plan, never an amount.
     claimed_plan_id: uuid.UUID | None = None
+    #: Whether the money has ALREADY changed hands, rather than being about to. The signup
+    #: plan step offers both under every route (owner correction, 2026-08-30). It settles
+    #: nothing -- it tells the manager whether to go and look for this money now or wait.
+    already_paid: bool = False
 
 
 class PaymentPromiseOut(BaseModel):
@@ -40,6 +44,8 @@ class PaymentPromiseOut(BaseModel):
     #: Which program the claim half is about, or null. The payments screen uses it to
     #: tell a plan claim from a settle-my-charges promise without inferring from emptiness.
     claimed_plan_id: uuid.UUID | None
+    #: What the parent said about the money: already handed over, or about to be.
+    already_paid: bool
     charge_ids: list[uuid.UUID]
     created_at: datetime.datetime
     decided_at: datetime.datetime | None
@@ -60,6 +66,11 @@ class ManagerPaymentPromiseOut(BaseModel):
     #: The program a plan claim is about, by name -- "which plan is this money for" is the
     #: first thing the manager asks before marking it received. Null for ordinary promises.
     claimed_plan_name: str | None
+    #: **The manager's next action, in one boolean.** True means this family says the
+    #: money is already in the drawer or on the statement, so it can be checked right now;
+    #: false means it is coming. Both are still confirmed by hand -- a claim is never a
+    #: settlement (G8).
+    already_paid: bool
     payer_person_id: uuid.UUID
     payer_name: str
     charge_count: int

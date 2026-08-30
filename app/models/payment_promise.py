@@ -36,6 +36,7 @@ import datetime
 import uuid
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     DateTime,
     ForeignKey,
@@ -95,6 +96,14 @@ class PaymentPromise(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
     #: the ordinary settle-what-is-owed promise, and is what a studio with a term of 0
     #: configured can raise at all.
     prepay_months: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    #: Whether the parent says the money has ALREADY changed hands, rather than that they
+    #: are about to hand it over. Both are promises and both end at a manager confirming by
+    #: hand; what differs is what the manager does next -- look in the drawer now, or wait.
+    #:
+    #: **It settles nothing.** A claim that money arrived is not the money arriving: no
+    #: payment is recorded and no charge closes until a human confirms, which is G8 and the
+    #: entire reason this object exists.
+    already_paid: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     #: The payment a confirmed promise produced, or null while it is pending or declined.
     #:
     #: Recorded so a surplus can be RECOGNISED. §5.10 already surfaces an unallocated

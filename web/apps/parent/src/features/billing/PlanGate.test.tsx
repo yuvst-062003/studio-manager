@@ -7,8 +7,7 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
-import { t } from '@studio/i18n'
-import { PlanGate, promiseMethodFor } from './PlanGate'
+import { PlanGate, isPromiseRoute } from './PlanGate'
 import type { TrainingPlanClient, TrainingPlanView } from './trainingPlanClient'
 
 const PLANS = [
@@ -87,38 +86,85 @@ describe('the plan step (§6.1)', () => {
     expect(read).not.toHaveBeenCalled()
   })
 
-  it('sets the plan and sends the family to pay by card', async () => {
+  it('takes money by card at signup, forward, because nothing is owed yet', async () => {
+    // The card is the only route that can actually charge, and at signup the billing run
+    // has not reached this family — so their basket is empty and the months go FORWARD.
+    // The money lands as credit and covers the first charge the moment it is raised.
     const requestPlan = vi.fn(async () => undefined)
     const claimPaid = vi.fn(async () => undefined)
-    const onGoToPayments = vi.fn()
-    gate({ client: client({ requestPlan, claimPaid }), onGoToPayments })
+    const onPayByCard = vi.fn(async () => undefined)
+    gate({
+      client: client({ requestPlan, claimPaid }),
+      monthlyTotalAgorot: 40_000,
+      onPayByCard,
+    })
 
     await userEvent.click(await chooseIn('p400'))
-    // Card is the default route, so this is one press away.
-    await userEvent.click(screen.getByTestId('plan-gate-confirm'))
+    await userEvent.click(screen.getByTestId('plan-gate-method-card'))
+    await userEvent.click(screen.getByRole('radio', { name: '3' }))
+    // 3 x 400 quoted before the family leaves the app.
+    expect(screen.getByTestId('plan-gate-route-card')).toHaveTextContent('1,200')
+    await userEvent.click(screen.getByTestId('plan-gate-pay-now'))
 
     await waitFor(() => expect(requestPlan).toHaveBeenCalledWith('s1', 'p400'))
-    expect(onGoToPayments).toHaveBeenCalled()
+    expect(onPayByCard).toHaveBeenCalledWith(3)
     // Nothing for a manager to confirm: the card settles itself through the IPN.
     expect(claimPaid).not.toHaveBeenCalled()
   })
 
-  it('raises a claim the manager confirms when the money moves by hand', async () => {
+  it('never offers "already paid" on the card', async () => {
+    // There would be nothing for a human to confirm — which is the same reason the card is
+    // not a `PromiseMethod`.
+    gate({ onPayByCard: vi.fn(async () => undefined) })
+    await userEvent.click(await chooseIn('p300'))
+    await userEvent.click(screen.getByTestId('plan-gate-method-card'))
+    expect(screen.getByTestId('plan-gate-pay-now')).toBeInTheDocument()
+    expect(screen.queryByTestId('plan-gate-paid-already')).toBeNull()
+  })
+
+  it('offers both tenses on every route the club takes by hand', async () => {
+    // Owner correction, 2026-08-30: "when you enter each he can actually pay or choose
+    // already paid". Cash, cheques and standing orders move no money through software, so
+    // both answers are the same promise with a different tense.
+    gate()
+    await userEvent.click(await chooseIn('p300'))
+    for (const route of ['cash', 'cheque', 'standing_order']) {
+      await userEvent.click(screen.getByTestId(`plan-gate-method-${route}`))
+      expect(screen.getByTestId(`plan-gate-route-${route}`)).toBeInTheDocument()
+      expect(screen.getByTestId('plan-gate-pay-now')).toBeInTheDocument()
+      expect(screen.getByTestId('plan-gate-paid-already')).toBeInTheDocument()
+      await userEvent.click(screen.getByTestId('plan-gate-back'))
+    }
+  })
+
+  it('tells the manager the money is already in the drawer', async () => {
     const requestPlan = vi.fn(async () => undefined)
     const claimPaid = vi.fn(async () => undefined)
     gate({ client: client({ requestPlan, claimPaid }) })
 
     await userEvent.click(await chooseIn('p300'))
-    await userEvent.click(
-      screen.getByRole('radio', { name: t('he', 'schedule.plan.gate.method.cash') }),
-    )
+    await userEvent.click(screen.getByTestId('plan-gate-method-cash'))
     await userEvent.click(screen.getByTestId('plan-gate-paid-already'))
-    await userEvent.click(screen.getByTestId('plan-gate-confirm'))
 
     // The plan applies on its own; only the MONEY waits for the manager.
     await waitFor(() => expect(requestPlan).toHaveBeenCalledWith('s1', 'p300'))
-    expect(claimPaid).toHaveBeenCalledWith('p300', 'cash')
+    expect(claimPaid).toHaveBeenCalledWith('p300', 'cash', true)
     expect(screen.getByTestId('plan-gate-claimed')).toBeInTheDocument()
+  })
+
+  it('tells the manager to expect money that has not moved yet', async () => {
+    // The same promise object, the other tense. Without the distinction both buttons
+    // produced one indistinguishable pending row and the manager could not tell "look in
+    // the drawer now" from "wait for them".
+    const claimPaid = vi.fn(async () => undefined)
+    gate({ client: client({ claimPaid }) })
+
+    await userEvent.click(await chooseIn('p550'))
+    await userEvent.click(screen.getByTestId('plan-gate-method-cheque'))
+    await userEvent.click(screen.getByTestId('plan-gate-pay-now'))
+
+    await waitFor(() => expect(claimPaid).toHaveBeenCalledWith('p550', 'cheque', false))
+    expect(screen.getByTestId('plan-gate-promised')).toBeInTheDocument()
   })
 
   it('lets the family past, and keeps asking', async () => {
@@ -139,13 +185,14 @@ describe('the plan step (§6.1)', () => {
     expect(screen.getByTestId('plan-gate-later')).toBeInTheDocument()
   })
 
-  it('records a card that was paid elsewhere by the route it will reconcile from', () => {
-    // A promise is a claim a MANAGER settles by hand. `card` has no `PromiseMethod` and
-    // must not gain one — money paid by card outside the app arrives on the club's
-    // statement, which is what `standing_order` already means in this queue (G8).
-    expect(promiseMethodFor('card')).toBe('standing_order')
-    expect(promiseMethodFor('cash')).toBe('cash')
-    expect(promiseMethodFor('cheque')).toBe('cheque')
+  it('keeps the card out of the promise queue', () => {
+    // A promise is a claim a MANAGER settles by hand. A card payment through the app
+    // settles itself through the IPN, so a card promise would be a pending item nobody
+    // ever has to act on.
+    expect(isPromiseRoute('card')).toBe(false)
+    expect(isPromiseRoute('cash')).toBe(true)
+    expect(isPromiseRoute('cheque')).toBe(true)
+    expect(isPromiseRoute('standing_order')).toBe(true)
   })
 
   it('gives every control an accessible name, on both steps', async () => {
@@ -161,9 +208,11 @@ describe('the plan step (§6.1)', () => {
       }
     }
     named()
-    // The radios and the "כבר שילמתי" box exist only on the second step, so a single
-    // sweep of the first would check the half that has no inputs in it.
+    // Three steps, and only the last has inputs in it — a single sweep of the first would
+    // check the half with no controls to check.
     await userEvent.click(await chooseIn('p300'))
+    named()
+    await userEvent.click(screen.getByTestId('plan-gate-method-card'))
     expect(screen.getAllByRole('radio')).toHaveLength(4)
     named()
   })

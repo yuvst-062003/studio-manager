@@ -143,6 +143,10 @@ export type ManagerPaymentPromiseOut = {
   /** The program a plan claim ("כבר שילמתי" from the plan picker) is about, by name.
    *  Null for ordinary settle-my-charges promises. */
   claimed_plan_name: string | null
+  /** What the parent said about the money: already handed over, or about to be. It decides
+   *  the manager's NEXT action — look in the drawer now, or wait — and never whether the
+   *  money is real, which only their ✓ decides. */
+  already_paid: boolean
   payer_person_id: string
   payer_name: string
   charge_count: number
