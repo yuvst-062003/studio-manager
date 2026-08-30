@@ -1,9 +1,11 @@
-// Parent artboards 13a (mobile) and 13c (desktop). One component, two widths.
+// The public landing page, in its two modes: the designed Gladiator page (the user's
+// Stitch screens, hardcoded content — clubContent.ts) and the data-driven page every
+// other slug gets.
 //
-// The tests that matter are the ones about what a STRANGER sees: this is the only screen in
-// the product somebody reaches with no account, and §5.4a calls it "the club's shop window,
-// not a form".
-import { render, screen, waitFor } from '@testing-library/react'
+// The tests that matter are the ones about what a STRANGER sees: this is the only screen
+// in the product somebody reaches with no account, and §5.4a calls it "the club's shop
+// window, not a form".
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ReactElement } from 'react'
@@ -67,7 +69,7 @@ function renderIn(
   return render(<ThemeProvider>{ui}</ThemeProvider>)
 }
 
-describe('PublicLanding — 13a / 13c', () => {
+describe('PublicLanding — the shop window', () => {
   it('renders the club’s own name as the heading', async () => {
     // The club's name is DATA, not a translated string: it is what the club calls itself.
     render(<PublicLanding slug="judo-tel-aviv" locale="he" client={clientReturning(LANDING)} />)
@@ -76,11 +78,11 @@ describe('PublicLanding — 13a / 13c', () => {
     ).toBeInTheDocument()
   })
 
-  it('renders the one offer §5.4a allows', async () => {
+  it('offers the free trial as the hero’s one ask', async () => {
     render(<PublicLanding slug="judo-tel-aviv" locale="he" client={clientReturning(LANDING)} />)
-    expect(
-      await screen.findByRole('heading', { name: t('he', 'people.landing.title') }),
-    ).toBeInTheDocument()
+    expect(await screen.findByTestId('landing-hero-cta')).toHaveTextContent(
+      t('he', 'people.landing.freeTrial'),
+    )
   })
 
   it('shows the club and its groups with NO session at all', async () => {
@@ -88,32 +90,46 @@ describe('PublicLanding — 13a / 13c', () => {
     // of *booking*, never in front of *reading*, and a wall here is a marketing asset
     // nobody can read.
     render(<PublicLanding slug="judo-tel-aviv" locale="he" client={clientReturning(LANDING)} />)
-    expect(await screen.findByTestId('landing-group-name')).toHaveTextContent('מתחילים')
+    const names = await screen.findAllByTestId('landing-group-name')
+    expect(names[0]).toHaveTextContent('מתחילים')
     expect(screen.getByTestId('landing-headline')).toBeInTheDocument()
     expect(screen.getByTestId('landing-address')).toBeInTheDocument()
   })
 
-  it('renders each group’s training days', async () => {
+  it('places each group in every day column it trains on', async () => {
     render(<PublicLanding slug="judo-tel-aviv" locale="he" client={clientReturning(LANDING)} />)
-    const days = await screen.findByTestId('landing-group-days')
-    expect(days).toHaveTextContent(t('he', 'people.weekdays.0'))
-    expect(days).toHaveTextContent(t('he', 'people.weekdays.3'))
-  })
-
-  it('says a group has no timetable rather than rendering a blank line', async () => {
-    const noSchedule: Landing = {
-      ...LANDING,
-      groups: [{ ...LANDING.groups![0]!, training_weekdays: [] }],
+    const week = await screen.findByTestId('landing-schedule')
+    expect(week).toHaveTextContent(t('he', 'people.weekdays.0'))
+    expect(week).toHaveTextContent(t('he', 'people.weekdays.3'))
+    for (const day of [0, 3]) {
+      const slot = screen.getByTestId(`landing-slot-${day}-g1`)
+      expect(slot).toHaveTextContent('16:00')
+      expect(slot).toHaveTextContent('מתחילים')
     }
-    render(<PublicLanding slug="judo-tel-aviv" locale="he" client={clientReturning(noSchedule)} />)
-    expect(await screen.findByTestId('landing-group-no-schedule')).toHaveTextContent(
-      t('he', 'people.weekdays.noSchedule'),
-    )
+    // A day nobody trains on is not a column — the phone pager has no empty pages.
+    expect(week).not.toHaveTextContent(t('he', 'people.weekdays.1'))
   })
 
-  it('renders each group’s age range so the page can filter by the child’s age', async () => {
+  it('renders no schedule section when no group has a timetable yet', async () => {
+    render(
+      <PublicLanding
+        slug="judo-tel-aviv"
+        locale="he"
+        client={clientReturning({
+          ...LANDING,
+          groups: [{ ...LANDING.groups![0]!, training_weekdays: [] }],
+        })}
+      />,
+    )
+    await screen.findByTestId('landing-hero')
+    expect(screen.queryByTestId('landing-schedule')).toBeNull()
+  })
+
+  it('renders each group’s age range low-first, so the page can filter by the child’s age', async () => {
     render(<PublicLanding slug="judo-tel-aviv" locale="he" client={clientReturning(LANDING)} />)
-    expect(await screen.findByTestId('landing-group-ages')).toHaveTextContent('5')
+    const ages = await screen.findAllByTestId('landing-group-ages')
+    // RangeText's LTR island — bidi must not reorder 5–8 into 8–5.
+    expect(ages[0]!.querySelector('bdi[dir="ltr"]')).toHaveTextContent('5–8')
   })
 
   it('tells an unknown slug apart from a club with no timetable', async () => {
@@ -142,14 +158,11 @@ describe('PublicLanding — 13a / 13c', () => {
     ).toBeInTheDocument()
   })
 
-  it('keeps the flow closed on load: the picker is the centre of gravity (redesign 2026-08-29)', async () => {
-    // The 2026-08-29 redesign supersedes the open-on-load decision: the page leads with a
-    // compact single-select group picker and ONE call to action; the flow (whose first step
-    // is still §5.4a's sign-in wall) opens when the CTA is pressed.
+  it('keeps the flow closed on load — reading first, booking on request', async () => {
     render(<PublicLanding slug="judo-tel-aviv" locale="he" client={clientReturning(LANDING)} />)
-    expect(await screen.findByTestId('landing-group-picker')).toBeInTheDocument()
+    await screen.findByTestId('landing-hero')
+    expect(screen.queryByTestId('booking-dialog')).toBeNull()
     expect(screen.queryByTestId('booking-sign-in')).toBeNull()
-    expect(screen.queryByTestId('booking-children')).toBeNull()
   })
 
   it('gives the logo an accessible name when the club has one', async () => {
@@ -184,30 +197,54 @@ describe('PublicLanding — 13a / 13c', () => {
   })
 
   it('is one component at both widths, not two trees', async () => {
-    // 13a and 13c differ by a CSS grid that collapses. Two components would be two places
-    // to change the club's copy, and the desktop one would rot first.
+    // The phone and the desk differ by CSS that collapses. Two components would be two
+    // places to change the club's copy, and the desktop one would rot first.
     render(<PublicLanding slug="judo-tel-aviv" locale="he" client={clientReturning(LANDING)} />)
     const page = await screen.findByTestId('public-landing')
     expect(page).toHaveStyle({ display: 'grid' })
   })
 })
 
-
-describe('L4 — the seven regions', () => {
-  it('renders the hero band: brand row with the phone, the headline, the ladder and its caption', async () => {
+describe('the header and footer chrome', () => {
+  it('carries the brand row — name, phone — and one way in that opens the flow', async () => {
+    const user = userEvent.setup()
     render(<PublicLanding slug="judo-tel-aviv" locale="he" client={clientReturning(LANDING)} />)
-    const hero = await screen.findByTestId('landing-hero')
+    const header = await screen.findByTestId('landing-header')
+    expect(header).toHaveTextContent(LANDING.studio_name)
     expect(screen.getByTestId('landing-phone')).toHaveAttribute('href', 'tel:0521234567')
-    expect(screen.getByTestId('landing-headline')).toHaveTextContent('ג׳ודו לילדים מגיל 5')
-    // The ladder comes from DATA — belt_rank colours — never from the canvas palette.
-    expect(hero.querySelectorAll('.studio-belt-ladder [role="img"]')).toHaveLength(2)
-    expect(screen.getByText(t('he', 'people.landing.beltCaption'))).toBeInTheDocument()
+    await user.click(screen.getByTestId('landing-join'))
+    expect(screen.getByTestId('booking-dialog')).toBeInTheDocument()
   })
 
+  it('links only the sections that exist — a club with no address gets no dead anchor', async () => {
+    render(
+      <PublicLanding
+        slug="judo-tel-aviv"
+        locale="he"
+        client={clientReturning({ ...LANDING, address: null })}
+      />,
+    )
+    const nav = await screen.findByRole('navigation', {
+      name: t('he', 'people.landing.siteNav'),
+    })
+    expect(nav).toHaveTextContent(t('he', 'people.landing.aboutTitle'))
+    expect(nav).not.toHaveTextContent(t('he', 'people.landing.whereTitle'))
+  })
+
+  it('renders the footer band with the one-free-trial line and the link row', async () => {
+    render(<PublicLanding slug="judo-tel-aviv" locale="he" client={clientReturning(LANDING)} />)
+    const footer = await screen.findByTestId('landing-footer')
+    expect(footer).toHaveTextContent(t('he', 'people.landing.footerOffer'))
+    expect(footer).toHaveTextContent(LANDING.studio_name)
+    expect(footer).toHaveTextContent(t('he', 'people.landing.aboutTitle'))
+  })
+})
+
+describe('the data-driven sections', () => {
   it('falls back to the chrome offer when the club wrote no headline', async () => {
     render(
       <PublicLanding
-        slug="x"
+        slug="judo-tel-aviv"
         locale="he"
         client={clientReturning({ ...LANDING, headline: null })}
       />,
@@ -218,7 +255,7 @@ describe('L4 — the seven regions', () => {
   })
 
   it("renders the club's own trial steps under the chrome heading", async () => {
-    render(<PublicLanding slug="x" locale="he" client={clientReturning(LANDING)} />)
+    render(<PublicLanding slug="judo-tel-aviv" locale="he" client={clientReturning(LANDING)} />)
     const steps = await screen.findByTestId('landing-steps')
     expect(steps).toHaveTextContent(t('he', 'people.landing.stepsTitle'))
     expect(steps.querySelectorAll('li')).toHaveLength(3)
@@ -227,7 +264,7 @@ describe('L4 — the seven regions', () => {
   it('hides the steps region for a club that wrote none — no shared sentence is right for every club', async () => {
     render(
       <PublicLanding
-        slug="x"
+        slug="judo-tel-aviv"
         locale="he"
         client={clientReturning({ ...LANDING, trial_steps: [] })}
       />,
@@ -236,17 +273,8 @@ describe('L4 — the seven regions', () => {
     expect(screen.queryByTestId('landing-steps')).toBeNull()
   })
 
-  it('renders region 4 as ONE card of rows, each with days AND time', async () => {
-    render(<PublicLanding slug="x" locale="he" client={clientReturning(LANDING)} />)
-    const card = await screen.findByTestId('landing-group-card')
-    expect(card).toHaveTextContent('16:00')
-    expect(screen.getByTestId('landing-group-days')).toHaveTextContent(
-      `${t('he', 'people.weekdays.0')} · ${t('he', 'people.weekdays.3')} · 16:00`,
-    )
-  })
-
   it('renders the location card with navigate and WhatsApp', async () => {
-    render(<PublicLanding slug="x" locale="he" client={clientReturning(LANDING)} />)
+    render(<PublicLanding slug="judo-tel-aviv" locale="he" client={clientReturning(LANDING)} />)
     const location = await screen.findByTestId('landing-location')
     expect(location).toHaveTextContent('הרצל 12, תל אביב')
     expect(screen.getByTestId('landing-navigate')).toHaveAttribute(
@@ -261,24 +289,21 @@ describe('L4 — the seven regions', () => {
 
   it('offers no WhatsApp button when the club has no phone', async () => {
     render(
-      <PublicLanding slug="x" locale="he" client={clientReturning({ ...LANDING, phone: null })} />,
+      <PublicLanding
+        slug="judo-tel-aviv"
+        locale="he"
+        client={clientReturning({ ...LANDING, phone: null })}
+      />,
     )
     await screen.findByTestId('landing-location')
     expect(screen.queryByTestId('landing-whatsapp')).toBeNull()
     expect(screen.queryByTestId('landing-phone')).toBeNull()
   })
 
-  it('renders the footer band with the one-free-trial line', async () => {
-    render(<PublicLanding slug="x" locale="he" client={clientReturning(LANDING)} />)
-    const footer = await screen.findByTestId('landing-footer')
-    expect(footer).toHaveTextContent(t('he', 'people.landing.footerOffer'))
-    expect(footer).toHaveTextContent(LANDING.studio_name)
-  })
-
   it('renders the photos the API already sends, and nothing when it sends none', async () => {
     render(
       <PublicLanding
-        slug="x"
+        slug="judo-tel-aviv"
         locale="he"
         client={clientReturning({ ...LANDING, photo_urls: ['/p/1.jpg', '/p/2.jpg'] })}
       />,
@@ -288,13 +313,20 @@ describe('L4 — the seven regions', () => {
   })
 
   it('renders no photo strip when the API sends an empty list', async () => {
-    render(<PublicLanding slug="x" locale="he" client={clientReturning(LANDING)} />)
+    render(<PublicLanding slug="judo-tel-aviv" locale="he" client={clientReturning(LANDING)} />)
     await screen.findByTestId('landing-hero')
     expect(screen.queryByTestId('landing-photos')).toBeNull()
   })
+
+  it('embeds a real map for the address, not a grey box', async () => {
+    render(<PublicLanding slug="judo-tel-aviv" locale="he" client={clientReturning(LANDING)} />)
+    const map = await screen.findByTitle(t('he', 'people.landing.mapTitle'))
+    expect(map.tagName).toBe('IFRAME')
+    expect(map).toHaveAttribute('src', expect.stringContaining(encodeURIComponent('הרצל 12')))
+  })
 })
 
-describe('redesign 2026-08-29 — the group picker and the one CTA', () => {
+describe('booking — every call to action reaches the flow', () => {
   const TWO_GROUPS: Landing = {
     ...LANDING,
     groups: [
@@ -315,27 +347,10 @@ describe('redesign 2026-08-29 — the group picker and the one CTA', () => {
     window.history.replaceState(null, '', '/')
   })
 
-  it('renders one radio per group with the first pre-selected', async () => {
-    render(<PublicLanding slug="x" locale="he" client={clientReturning(TWO_GROUPS)} />)
-    const picker = await screen.findByTestId('landing-group-picker')
-    const radios = picker.querySelectorAll('input[type="radio"]')
-    expect(radios).toHaveLength(2)
-    expect(screen.getByRole('radio', { name: /מתחילים/ })).toBeChecked()
-  })
-
-  it('the CTA names the chosen group, and follows the selection', async () => {
+  it('the hero CTA opens the flow as a dialog, sign-in first, with the first group carried in', async () => {
     const user = userEvent.setup()
-    render(<PublicLanding slug="x" locale="he" client={clientReturning(TWO_GROUPS)} />)
-    const cta = await screen.findByTestId('landing-cta')
-    expect(cta).toHaveTextContent('מתחילים')
-    await user.click(screen.getByRole('radio', { name: /נוער/ }))
-    expect(cta).toHaveTextContent('נוער')
-  })
-
-  it('the CTA opens the flow as a dialog, sign-in first, with the group carried in', async () => {
-    const user = userEvent.setup()
-    render(<PublicLanding slug="x" locale="he" client={clientReturning(TWO_GROUPS)} />)
-    await user.click(await screen.findByTestId('landing-cta'))
+    render(<PublicLanding slug="judo-tel-aviv" locale="he" client={clientReturning(TWO_GROUPS)} />)
+    await user.click(await screen.findByTestId('landing-hero-cta'))
     const dialog = screen.getByTestId('booking-dialog')
     expect(dialog).toHaveAttribute('role', 'dialog')
     expect(screen.getByTestId('booking-sign-in')).toBeInTheDocument()
@@ -345,20 +360,31 @@ describe('redesign 2026-08-29 — the group picker and the one CTA', () => {
     )
   })
 
-  it('the change button drops back to the picker', async () => {
+  it('each derived week-grid slot books THAT group', async () => {
     const user = userEvent.setup()
-    render(<PublicLanding slug="x" locale="he" client={clientReturning(TWO_GROUPS)} />)
-    await user.click(await screen.findByTestId('landing-cta'))
-    await user.click(screen.getByTestId('booking-dialog-change'))
-    expect(screen.queryByTestId('booking-dialog')).toBeNull()
-    expect(screen.getByTestId('landing-group-picker')).toBeInTheDocument()
+    render(<PublicLanding slug="judo-tel-aviv" locale="he" client={clientReturning(TWO_GROUPS)} />)
+    await user.click(await screen.findByTestId('landing-slot-1-g2'))
+    expect(screen.getByTestId('booking-dialog')).toBeInTheDocument()
+    expect(screen.getByTestId('booking-sign-in-link')).toHaveAttribute(
+      'href',
+      expect.stringContaining(encodeURIComponent('book=g2')),
+    )
   })
 
-  it('the sticky bar mirrors the CTA and disappears while the flow is open', async () => {
+  it('the change button closes the flow back to the page', async () => {
     const user = userEvent.setup()
-    render(<PublicLanding slug="x" locale="he" client={clientReturning(TWO_GROUPS)} />)
+    render(<PublicLanding slug="judo-tel-aviv" locale="he" client={clientReturning(TWO_GROUPS)} />)
+    await user.click(await screen.findByTestId('landing-hero-cta'))
+    await user.click(screen.getByTestId('booking-dialog-change'))
+    expect(screen.queryByTestId('booking-dialog')).toBeNull()
+    expect(screen.getByTestId('landing-hero')).toBeInTheDocument()
+  })
+
+  it('the sticky bar opens the flow and disappears while it is open', async () => {
+    const user = userEvent.setup()
+    render(<PublicLanding slug="judo-tel-aviv" locale="he" client={clientReturning(TWO_GROUPS)} />)
     const bar = await screen.findByTestId('landing-sticky-cta')
-    expect(bar).toHaveTextContent('מתחילים')
+    expect(bar).toHaveTextContent(t('he', 'people.landing.freeTrial'))
     await user.click(bar)
     expect(screen.getByTestId('booking-dialog')).toBeInTheDocument()
     expect(screen.queryByTestId('landing-sticky-cta')).toBeNull()
@@ -367,31 +393,124 @@ describe('redesign 2026-08-29 — the group picker and the one CTA', () => {
   it('?book= reopens the flow after the sign-in round trip, group intact', async () => {
     // The return_path carries the choice; landing on it signed-in must resume the booking,
     // not drop the parent back on the shop window to start again.
-    window.history.replaceState(null, '', '/t/x?book=g2')
-    render(<PublicLanding slug="x" locale="he" client={clientReturning(TWO_GROUPS)} signedIn />)
+    window.history.replaceState(null, '', '/t/judo-tel-aviv?book=g2')
+    render(
+      <PublicLanding slug="judo-tel-aviv" locale="he" client={clientReturning(TWO_GROUPS)} signedIn />,
+    )
     expect(await screen.findByTestId('booking-dialog')).toBeInTheDocument()
     expect(screen.getByTestId('booking-group-0')).toHaveValue('g2')
   })
-
-  it('each desktop group card books THAT group', async () => {
-    const user = userEvent.setup()
-    render(<PublicLanding slug="x" locale="he" client={clientReturning(TWO_GROUPS)} />)
-    await user.click(await screen.findByTestId('landing-group-book-g2'))
-    expect(screen.getByTestId('booking-dialog')).toBeInTheDocument()
-    expect(screen.getByTestId('booking-sign-in-link')).toHaveAttribute(
-      'href',
-      expect.stringContaining(encodeURIComponent('book=g2')),
-    )
-  })
 })
 
-describe('the location map (2026-08-30)', () => {
-  it('embeds a real map for the address, not a grey box', async () => {
-    // Region 6 shipped with `mapPlaceholderStyle` — a grey rectangle where 13a draws a
-    // map. The keyless Google embed finishes it: same address the ניווט button uses.
-    render(<PublicLanding slug="x" locale="he" client={clientReturning(LANDING)} />)
-    const map = await screen.findByTitle(t('he', 'people.landing.mapTitle'))
-    expect(map.tagName).toBe('IFRAME')
-    expect(map).toHaveAttribute('src', expect.stringContaining(encodeURIComponent('הרצל 12')))
+describe('the designed Gladiator page (Stitch, hardcoded content)', () => {
+  const GLADIATOR: Landing = { ...LANDING, slug: 'gladiator', studio_name: 'מועדון גלדיאטור' }
+
+  it('renders the hero as designed: the season badge and the crimson accent', async () => {
+    render(<PublicLanding slug="gladiator" locale="he" client={clientReturning(GLADIATOR)} />)
+    const hero = await screen.findByTestId('landing-hero')
+    expect(hero).toHaveTextContent('עונת 2026-2027 החלה')
+    expect(screen.getByTestId('landing-headline')).toHaveTextContent('כבוד ומשמעת')
+  })
+
+  it('renders the coach with his credentials', async () => {
+    render(<PublicLanding slug="gladiator" locale="he" client={clientReturning(GLADIATOR)} />)
+    const coach = await screen.findByTestId('landing-coach')
+    expect(coach).toHaveTextContent('סנסאי לביא תמיר')
+    expect(coach).toHaveTextContent('20 שנות ניסיון')
+    expect(coach).toHaveTextContent('בוגר וינגייט')
+  })
+
+  it('renders the designed timetable cell-for-cell, times low-first, with the legend', async () => {
+    render(<PublicLanding slug="gladiator" locale="he" client={clientReturning(GLADIATOR)} />)
+    const week = await screen.findByTestId('landing-schedule')
+    // All seven days are designed columns.
+    for (const day of [0, 1, 2, 3, 4, 5, 6]) {
+      expect(week).toHaveTextContent(t('he', `people.weekdays.${day}`))
+    }
+    expect(week).toHaveTextContent("אימון ג'ודו קבוצה 1")
+    expect(week).toHaveTextContent("נבחרת ג'ודו בנות")
+    // RangeText's LTR island: 16:00–17:00, never 17:00–16:00.
+    const range = week.querySelector('bdi[dir="ltr"]')
+    expect(range).toHaveTextContent('16:00–17:00')
+    // The legend names the five categories.
+    expect(week).toHaveTextContent("קרוספיט לג'ודו")
+    expect(week).toHaveTextContent('אימון אישי')
+  })
+
+  it('renders the three plans with shekel prices, and their buttons open the flow', async () => {
+    const user = userEvent.setup()
+    render(<PublicLanding slug="gladiator" locale="he" client={clientReturning(GLADIATOR)} />)
+    const plans = await screen.findByTestId('landing-plans')
+    expect(plans).toHaveTextContent('מסלול יסוד')
+    expect(plans).toHaveTextContent('מסלול לוחם')
+    expect(plans).toHaveTextContent('מסלול גלדיאטור')
+    expect(plans).toHaveTextContent('מסלול מתקדם')
+    // Agorot through MoneyDisplay — 30000 renders as ₪300, never a float.
+    expect(plans).toHaveTextContent('300')
+    expect(plans).toHaveTextContent('550')
+    await user.click(screen.getByRole('button', { name: 'הצטרף עכשיו' }))
+    expect(screen.getByTestId('booking-dialog')).toBeInTheDocument()
+  })
+
+  it('renders the voices from the dojo', async () => {
+    render(<PublicLanding slug="gladiator" locale="he" client={clientReturning(GLADIATOR)} />)
+    const voices = await screen.findByTestId('landing-voices')
+    expect(voices).toHaveTextContent('אמא של יונתן')
+    expect(voices).toHaveTextContent('נבחרת גלדיאטור')
+  })
+
+  it('falls back to the bundled club mark when nothing is uploaded', async () => {
+    // Staging carries no uploaded logo, and a landing page with no mark on it is not
+    // something to hand a manager.
+    render(
+      <PublicLanding
+        slug="gladiator"
+        locale="he"
+        client={clientReturning({ ...GLADIATOR, logo_url: null })}
+      />,
+    )
+    expect(await screen.findByTestId('landing-logo')).toHaveAttribute(
+      'src',
+      '/clubs/gladiator-logo.png',
+    )
+  })
+
+  it('lets an uploaded logo beat the bundled one', async () => {
+    render(
+      <PublicLanding
+        slug="gladiator"
+        locale="he"
+        client={clientReturning({ ...GLADIATOR, logo_url: '/api/v1/public/studios/gladiator/logo' })}
+      />,
+    )
+    expect(await screen.findByTestId('landing-logo')).toHaveAttribute(
+      'src',
+      '/api/v1/public/studios/gladiator/logo',
+    )
+  })
+
+  it('falls back to the bundled mark when the uploaded logo 404s', async () => {
+    // Staging's object store is the api container's own filesystem, so a redeploy drops
+    // the bytes while the key survives. A torn-page icon on the shop window is worse than
+    // the bundled mark.
+    render(
+      <PublicLanding
+        slug="gladiator"
+        locale="he"
+        client={clientReturning({ ...GLADIATOR, logo_url: '/api/v1/public/studios/gladiator/logo' })}
+      />,
+    )
+    const logo = await screen.findByTestId('landing-logo')
+    fireEvent.error(logo)
+    expect(await screen.findByTestId('landing-logo')).toHaveAttribute(
+      'src',
+      '/clubs/gladiator-logo.png',
+    )
+  })
+
+  it('signs the footer with the club’s line', async () => {
+    render(<PublicLanding slug="gladiator" locale="he" client={clientReturning(GLADIATOR)} />)
+    const footer = await screen.findByTestId('landing-footer')
+    expect(footer).toHaveTextContent('© 2026')
   })
 })

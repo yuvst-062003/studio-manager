@@ -228,6 +228,11 @@ export const people: Bundle = {
   'funnel.conversionRate': 'Конверсия',
 
   'landing.aboutTitle': 'О клубе',
+  'landing.scheduleTitle': 'Недельное расписание тренировок',
+  'landing.joinNow': 'Присоединяйтесь',
+  'landing.learnMore': 'Подробнее',
+  'landing.freeTrial': 'Бесплатная пробная тренировка',
+  'landing.siteNav': 'Навигация по странице',
   'landing.stepsTitle': 'Как проходит пробная тренировка',
   'landing.beltCaption': 'Лестница поясов клуба',
   'landing.navigate': 'Маршрут',

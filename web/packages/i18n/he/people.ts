@@ -262,6 +262,13 @@ export const people: Bundle = {
 
   // -- the landing page's remaining copy (parent 13a, 13c) -----------------------
   'landing.aboutTitle': 'על המועדון',
+  // Stitch adjudication 2026-08-30 — the sticky header, the hero's second CTA and the
+  // week-grid schedule heading. Chrome, not club copy.
+  'landing.scheduleTitle': 'מערכת אימונים שבועית',
+  'landing.joinNow': 'הצטרפו עכשיו',
+  'landing.learnMore': 'למידה נוספת',
+  'landing.freeTrial': 'אימון ניסיון חינם',
+  'landing.siteNav': 'ניווט בעמוד',
   'landing.stepsTitle': 'איך נראה שיעור ניסיון',
   'landing.beltCaption': 'מסלול החגורות במועדון',
   'landing.navigate': 'ניווט',

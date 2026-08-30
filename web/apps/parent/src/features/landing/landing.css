@@ -1,13 +1,812 @@
-/* Redesign 2026-08-29 — the responsive half of the landing page.
+/* The landing page's own theme — the user's Stitch design ("דף נחיתה סופי", 2026-08-30),
+ * carried as scoped `--gl-` variables and `gl-` classes on `.landing-root`. This page
+ * deliberately does NOT wear the app's tokens: the user rejected the token-dressed
+ * version and asked for the page they designed. The palette is Stitch's — navy #003874,
+ * crimson #ba1a1a, the zen-dot ground — with a dark equivalent under [data-theme='dark'],
+ * and every rule here is logical-property only (G12).
  *
- * Everything that is the same at both widths stays as inline styles in the components,
- * like the rest of the app. This file holds ONLY what a media query can express and an
- * inline style cannot: the 13c two-column grid, the mobile-only sticky CTA bar, the
- * desktop-only groups detail, and the booking dialog's sheet-vs-centered shape. An inline
- * style would beat these overrides, so the properties written here must not also be
- * written inline. */
+ * The booking dialog is app UI, not marketing: `.landing-scrim` and
+ * `.landing-booking-dialog` keep the app's tokens, and the flow inside them is unchanged.
+ */
 
-/* -- the booking dialog: a bottom sheet in the hand, a centered card at a desk -------- */
+.landing-root {
+  --gl-primary: #003874;
+  --gl-primary-strong: #1a4f95;
+  --gl-on-primary: #fff;
+  --gl-red: #ba1a1a;
+  --gl-on-red: #fff;
+  --gl-surface: #fcf9f8;
+  --gl-surface-low: #f6f3f2;
+  --gl-card: #fff;
+  --gl-zen: #f7f5f0;
+  --gl-ink: #1c1b1b;
+  --gl-ink-2: #424751;
+  --gl-outline: #c3c6d2;
+  --gl-outline-strong: #737782;
+  --gl-heading: var(--gl-primary);
+  --gl-dot: rgb(0 56 116 / 7%);
+
+  /* The timetable's category tints — Stitch used the stock blue/green/orange/teal/purple
+   * 50-and-200 pairs; the values are transcribed, not invented. */
+  --gl-cat-judo-bg: #eff6ff;
+  --gl-cat-judo-edge: #bfdbfe;
+  --gl-cat-team-bg: #f0fdf4;
+  --gl-cat-team-edge: #bbf7d0;
+  --gl-cat-crossfit-bg: #fff7ed;
+  --gl-cat-crossfit-edge: #fed7aa;
+  --gl-cat-girls-bg: #f0fdfa;
+  --gl-cat-girls-edge: #99f6e4;
+  --gl-cat-personal-bg: #faf5ff;
+  --gl-cat-personal-edge: #e9d5ff;
+
+  background: var(--gl-surface);
+  color: var(--gl-ink);
+}
+
+[data-theme='dark'] .landing-root {
+  --gl-primary: #aac7ff;
+  --gl-primary-strong: #0e2a52;
+  --gl-on-primary: #fff;
+  --gl-red: #ff9d93;
+  --gl-on-red: #40100c;
+  --gl-surface: #141519;
+  --gl-surface-low: #1b1d22;
+  --gl-card: #202329;
+  --gl-zen: #17181c;
+  --gl-ink: #e8e6e3;
+  --gl-ink-2: #b0b4bd;
+  --gl-outline: #3a3f4a;
+  --gl-outline-strong: #6a707c;
+  --gl-heading: #d6e3ff;
+  --gl-dot: rgb(170 199 255 / 8%);
+  --gl-cat-judo-bg: #1b2537;
+  --gl-cat-judo-edge: #3b5b8f;
+  --gl-cat-team-bg: #16261c;
+  --gl-cat-team-edge: #2f6b45;
+  --gl-cat-crossfit-bg: #2b2118;
+  --gl-cat-crossfit-edge: #8a5a2b;
+  --gl-cat-girls-bg: #132a27;
+  --gl-cat-girls-edge: #2b6b60;
+  --gl-cat-personal-bg: #251d31;
+  --gl-cat-personal-edge: #6b4a8f;
+}
+
+/* -- buttons: squared, heavy, Stitch's three kinds ------------------------------------ */
+.gl-btn {
+  align-items: center;
+  border: 2px solid transparent;
+  border-radius: 2px;
+  cursor: pointer;
+  display: inline-flex;
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: var(--weight-semibold);
+  gap: var(--space-2);
+  justify-content: center;
+  line-height: 1.2;
+  padding: var(--space-3) var(--space-5);
+  text-decoration: none;
+}
+
+.gl-btn--navy {
+  background: var(--gl-primary);
+  color: var(--gl-surface);
+}
+
+[data-theme='dark'] .landing-root .gl-btn--navy {
+  background: #d6e3ff;
+  color: #0e2a52;
+}
+
+.gl-btn--red {
+  background: var(--gl-red);
+  color: var(--gl-on-red);
+}
+
+.gl-btn--outline {
+  border-color: var(--gl-primary);
+  color: var(--gl-primary);
+}
+
+.gl-btn--full {
+  inline-size: 100%;
+}
+
+.gl-btn:hover {
+  filter: brightness(1.08);
+}
+
+.gl-btn:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* -- the sticky header ---------------------------------------------------------------- */
+.gl-header {
+  backdrop-filter: blur(6px);
+  background: color-mix(in srgb, var(--gl-surface) 92%, transparent);
+  border-block-end: 2px solid color-mix(in srgb, var(--gl-primary) 12%, transparent);
+  inset-block-start: 0;
+  position: sticky;
+  z-index: 30;
+}
+
+.gl-header-inner {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-inline: auto;
+  max-inline-size: 80rem;
+  padding: var(--space-2) var(--space-4);
+}
+
+.gl-logo {
+  block-size: auto;
+  max-block-size: 3rem;
+  max-inline-size: 3rem;
+}
+
+.gl-brand {
+  color: var(--gl-heading);
+  font-size: 1.35rem;
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.02em;
+  margin: 0;
+}
+
+.gl-header-end {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin-inline-start: auto;
+}
+
+/* The nav's display lives ONLY here, where the phone can take it away. */
+.landing-header-nav {
+  align-items: center;
+  display: flex;
+  gap: var(--space-4);
+}
+
+.gl-nav a {
+  color: var(--gl-ink-2);
+  font-weight: var(--weight-medium);
+  text-decoration: none;
+}
+
+.gl-nav a:hover {
+  color: var(--gl-primary);
+}
+
+.gl-phone {
+  color: var(--gl-ink-2);
+  font-weight: var(--weight-medium);
+  text-decoration: none;
+}
+
+/* -- shared section furniture --------------------------------------------------------- */
+.gl-section {
+  padding: var(--space-8) var(--space-4);
+}
+
+.gl-section--zen {
+  background-color: var(--gl-zen);
+  background-image: radial-gradient(var(--gl-dot) 1.5px, transparent 1.5px);
+  background-size: 26px 26px;
+  border-block: 1px solid color-mix(in srgb, var(--gl-primary) 10%, transparent);
+}
+
+.gl-section-inner {
+  margin-inline: auto;
+  max-inline-size: 80rem;
+}
+
+.gl-title {
+  border-block-end: 2px solid var(--gl-red);
+  color: var(--gl-heading);
+  display: inline-block;
+  font-size: clamp(1.75rem, 3.5vw, 2rem);
+  font-weight: var(--weight-bold);
+  line-height: 1.2;
+  margin: 0 0 var(--space-3);
+  padding-block-end: var(--space-2);
+}
+
+.gl-title--stacked span {
+  color: var(--gl-red);
+  display: block;
+}
+
+.gl-lead {
+  color: var(--gl-ink-2);
+  font-size: 1.1rem;
+  line-height: 1.6;
+  margin: 0 0 var(--space-6);
+  max-inline-size: 42rem;
+}
+
+.gl-accent {
+  color: var(--gl-red);
+}
+
+.gl-cta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+/* -- the hero ------------------------------------------------------------------------- */
+.gl-hero {
+  background-color: var(--gl-surface);
+  background-image: radial-gradient(var(--gl-dot) 1.5px, transparent 1.5px);
+  background-size: 26px 26px;
+  padding: var(--space-8) var(--space-4);
+}
+
+.gl-hero-inner {
+  align-items: center;
+  display: grid;
+  gap: var(--space-6);
+  grid-template-columns: minmax(0, 1fr);
+  margin-inline: auto;
+  max-inline-size: 80rem;
+}
+
+.gl-badge {
+  border-inline-start: 4px solid var(--gl-red);
+  margin-block-end: var(--space-3);
+  padding-inline-start: var(--space-3);
+}
+
+.gl-badge span {
+  color: var(--gl-red);
+  font-size: 0.8rem;
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.08em;
+}
+
+.gl-display {
+  color: var(--gl-heading);
+  font-size: clamp(2.25rem, 5vw, 3.25rem);
+  font-weight: var(--weight-bold);
+  letter-spacing: -0.02em;
+  line-height: 1.12;
+  margin: 0 0 var(--space-4);
+}
+
+.gl-hero .gl-lead {
+  margin-block-end: var(--space-5);
+}
+
+.gl-hero-visual {
+  display: none;
+}
+
+/* -- the coach ------------------------------------------------------------------------ */
+.gl-coach {
+  display: grid;
+  gap: var(--space-6);
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.gl-coach-bio {
+  border-inline-start: 3px solid var(--gl-red);
+  color: var(--gl-ink-2);
+  font-size: 1.05rem;
+  line-height: 1.7;
+  margin: 0 0 var(--space-5);
+  padding-inline-start: var(--space-4);
+}
+
+.gl-cred-row {
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+}
+
+.gl-cred {
+  background: var(--gl-card);
+  border: 1px solid var(--gl-outline);
+  padding: var(--space-4);
+}
+
+.gl-cred-icon {
+  block-size: 2rem;
+  color: var(--gl-red);
+  inline-size: 2rem;
+}
+
+.gl-cred-title {
+  color: var(--gl-heading);
+  font-size: 1.05rem;
+  margin: var(--space-2) 0 var(--space-1);
+}
+
+.gl-cred-text {
+  color: var(--gl-ink-2);
+  line-height: 1.55;
+  margin: 0;
+}
+
+.gl-coach-visual {
+  position: relative;
+}
+
+.gl-coach-photo {
+  aspect-ratio: 4 / 3;
+  border-radius: 50% 50% 4px 4px / 40% 40% 4px 4px;
+  inline-size: 100%;
+  object-fit: cover;
+}
+
+.gl-coach-photo--empty {
+  align-items: center;
+  background: color-mix(in srgb, var(--gl-primary) 7%, var(--gl-card));
+  border: 1px solid var(--gl-outline);
+  display: flex;
+  justify-content: center;
+  padding: var(--space-6);
+}
+
+.gl-coach-photo--empty img {
+  max-block-size: 70%;
+  max-inline-size: 70%;
+  opacity: 0.9;
+}
+
+.gl-coach-card {
+  background: var(--gl-card);
+  border-inline-start: 4px solid var(--gl-red);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 10%);
+  inset-block-end: var(--space-4);
+  inset-inline-end: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  position: absolute;
+}
+
+.gl-coach-card h3 {
+  color: var(--gl-heading);
+  font-size: 1.05rem;
+  margin: 0;
+}
+
+.gl-coach-card p {
+  color: var(--gl-red);
+  font-size: 0.85rem;
+  font-weight: var(--weight-semibold);
+  margin: var(--space-1) 0 0;
+}
+
+.gl-photos {
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+}
+
+.gl-photo {
+  block-size: 11rem;
+  border-radius: 4px;
+  object-fit: cover;
+}
+
+/* -- the week: a snap pager in the hand, the full table at a desk --------------------- */
+.gl-week {
+  display: grid;
+  gap: var(--space-2);
+  grid-auto-columns: min(16rem, 82%);
+  grid-auto-flow: column;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  padding-block-end: var(--space-2);
+  scroll-snap-type: inline mandatory;
+}
+
+.gl-day {
+  background: var(--gl-card);
+  border: 1px solid var(--gl-outline);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  scroll-snap-align: start;
+}
+
+.gl-day-name {
+  background: var(--gl-primary-strong);
+  color: var(--gl-on-primary);
+  font-size: 0.9rem;
+  font-weight: var(--weight-semibold);
+  margin: 0;
+  padding: var(--space-2);
+  text-align: center;
+}
+
+[data-theme='dark'] .landing-root .gl-day-name {
+  background: #0e2a52;
+}
+
+.gl-day-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.gl-slot {
+  background: var(--gl-cat-judo-bg);
+  border-inline-start: 4px solid var(--gl-cat-judo-edge);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-block-size: 4.5rem;
+  justify-content: center;
+  padding: var(--space-2) var(--space-3);
+  text-align: start;
+}
+
+.gl-slot--team {
+  background: var(--gl-cat-team-bg);
+  border-inline-start-color: var(--gl-cat-team-edge);
+}
+
+.gl-slot--crossfit {
+  background: var(--gl-cat-crossfit-bg);
+  border-inline-start-color: var(--gl-cat-crossfit-edge);
+}
+
+.gl-slot--girls {
+  background: var(--gl-cat-girls-bg);
+  border-inline-start-color: var(--gl-cat-girls-edge);
+}
+
+.gl-slot--personal {
+  background: var(--gl-cat-personal-bg);
+  border-inline-start-color: var(--gl-cat-personal-edge);
+}
+
+.gl-slot--button {
+  border-block: 0;
+  border-inline-end: 0;
+  cursor: pointer;
+  font: inherit;
+  inline-size: 100%;
+}
+
+.gl-slot--button:hover {
+  filter: brightness(0.97);
+}
+
+.gl-slot--button:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.gl-slot-time {
+  color: var(--gl-heading);
+  font-weight: var(--weight-bold);
+}
+
+.gl-slot-title {
+  color: var(--gl-ink);
+  font-size: 0.9rem;
+  font-weight: var(--weight-medium);
+}
+
+.gl-slot-note {
+  color: var(--gl-ink-2);
+  font-size: 0.78rem;
+}
+
+.gl-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  justify-content: center;
+  list-style: none;
+  margin: var(--space-4) 0 0;
+  padding: 0;
+}
+
+.gl-legend-item {
+  align-items: center;
+  color: var(--gl-ink-2);
+  display: flex;
+  font-size: 0.85rem;
+  gap: var(--space-2);
+}
+
+.gl-legend-dot {
+  block-size: 12px;
+  border: 0;
+  border-radius: 50%;
+  display: inline-block;
+  inline-size: 12px;
+  min-block-size: 0;
+  padding: 0;
+}
+
+.gl-legend-dot.gl-slot--judo {
+  background: var(--gl-cat-judo-edge);
+}
+
+.gl-legend-dot.gl-slot--team {
+  background: var(--gl-cat-team-edge);
+}
+
+.gl-legend-dot.gl-slot--crossfit {
+  background: var(--gl-cat-crossfit-edge);
+}
+
+.gl-legend-dot.gl-slot--girls {
+  background: var(--gl-cat-girls-edge);
+}
+
+.gl-legend-dot.gl-slot--personal {
+  background: var(--gl-cat-personal-edge);
+}
+
+/* -- the pricing tiers ---------------------------------------------------------------- */
+.gl-plans {
+  align-items: stretch;
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.gl-plan {
+  background: var(--gl-card);
+  border: 1px solid var(--gl-outline);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-5);
+  position: relative;
+}
+
+.gl-plan--highlight {
+  background: var(--gl-primary-strong);
+  border-color: var(--gl-primary-strong);
+  color: var(--gl-on-primary);
+}
+
+.gl-plan-badge {
+  background: var(--gl-red);
+  color: var(--gl-on-red);
+  font-size: 0.75rem;
+  font-weight: var(--weight-bold);
+  inset-block-start: 0;
+  inset-inline-start: 50%;
+  letter-spacing: 0.06em;
+  margin: 0;
+  padding: var(--space-1) var(--space-3);
+  position: absolute;
+  transform: translate(-50%, -50%);
+}
+
+[dir='rtl'] .gl-plan-badge {
+  transform: translate(50%, -50%);
+}
+
+.gl-plan-name {
+  color: var(--gl-heading);
+  font-size: 1.15rem;
+  letter-spacing: 0.02em;
+  margin: var(--space-2) 0 0;
+}
+
+.gl-plan--highlight .gl-plan-name {
+  color: var(--gl-on-primary);
+}
+
+.gl-plan-cadence {
+  color: var(--gl-ink-2);
+  margin: 0;
+}
+
+.gl-plan--highlight .gl-plan-cadence {
+  color: color-mix(in srgb, var(--gl-on-primary) 80%, transparent);
+}
+
+.gl-price {
+  align-items: baseline;
+  display: flex;
+  gap: var(--space-2);
+  margin: var(--space-2) 0;
+}
+
+.gl-price .studio-money {
+  font-size: 2.25rem;
+  font-weight: var(--weight-bold);
+}
+
+.gl-price-per {
+  color: var(--gl-ink-2);
+  font-size: 0.9rem;
+}
+
+.gl-plan--highlight .gl-price-per {
+  color: color-mix(in srgb, var(--gl-on-primary) 80%, transparent);
+}
+
+.gl-plan-features {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-2);
+  list-style: none;
+  margin: 0 0 var(--space-4);
+  padding: 0;
+}
+
+.gl-plan-features li {
+  align-items: center;
+  display: flex;
+  gap: var(--space-2);
+  line-height: 1.4;
+}
+
+.gl-check {
+  block-size: 1.1rem;
+  color: var(--gl-red);
+  flex: none;
+  inline-size: 1.1rem;
+}
+
+.gl-plan--highlight .gl-check {
+  color: #ffb4ab;
+}
+
+.gl-plan--highlight .gl-btn--red {
+  background: var(--gl-red);
+}
+
+.gl-plan .gl-btn--outline {
+  margin-block-start: auto;
+}
+
+/* -- the voices ----------------------------------------------------------------------- */
+.gl-voices {
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.gl-voice {
+  background: var(--gl-card);
+  border: 1px solid var(--gl-outline);
+  border-inline-start: 4px solid var(--gl-red);
+  margin: 0;
+  padding: var(--space-5);
+}
+
+.gl-voice-mark {
+  color: var(--gl-red);
+  display: block;
+  font-size: 3rem;
+  line-height: 0.6;
+}
+
+.gl-voice blockquote {
+  color: var(--gl-ink);
+  font-size: 1.05rem;
+  line-height: 1.7;
+  margin: var(--space-3) 0 var(--space-4);
+}
+
+.gl-voice figcaption {
+  align-items: center;
+  display: flex;
+  gap: var(--space-3);
+}
+
+.gl-voice-initial {
+  align-items: center;
+  background: var(--gl-primary-strong);
+  border-radius: 50%;
+  block-size: 2.5rem;
+  color: var(--gl-on-primary);
+  display: inline-flex;
+  flex: none;
+  font-weight: var(--weight-bold);
+  inline-size: 2.5rem;
+  justify-content: center;
+}
+
+.gl-voice strong {
+  color: var(--gl-heading);
+  display: block;
+}
+
+.gl-voice small {
+  color: var(--gl-ink-2);
+  display: block;
+}
+
+/* -- steps, location ------------------------------------------------------------------ */
+.gl-steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding-inline-start: var(--space-5);
+}
+
+.gl-map {
+  background: var(--gl-surface-low);
+  block-size: 14rem;
+  border: 1px solid var(--gl-outline);
+  inline-size: 100%;
+  margin-block: var(--space-3) var(--space-4);
+}
+
+/* -- the footer ----------------------------------------------------------------------- */
+.gl-footer {
+  align-items: center;
+  background: var(--gl-primary);
+  border-block-start: 4px solid var(--gl-red);
+  color: var(--gl-on-primary);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-8) var(--space-4) var(--space-6);
+  text-align: center;
+}
+
+[data-theme='dark'] .landing-root .gl-footer {
+  background: #0e2a52;
+}
+
+.gl-footer-logo {
+  block-size: auto;
+  max-block-size: 3.5rem;
+  max-inline-size: 3.5rem;
+}
+
+.gl-footer-brand {
+  font-size: 1.4rem;
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.04em;
+  margin: 0;
+}
+
+.gl-footer-offer {
+  margin: 0;
+  opacity: 0.85;
+}
+
+.gl-footer-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  justify-content: center;
+}
+
+.gl-footer-navlink {
+  color: color-mix(in srgb, var(--gl-on-primary) 82%, transparent);
+  text-decoration: none;
+}
+
+.gl-footer-navlink:hover {
+  color: var(--gl-on-primary);
+}
+
+.gl-footer-phone {
+  color: var(--gl-on-primary);
+}
+
+.gl-footer-line {
+  border-block-start: 1px solid color-mix(in srgb, var(--gl-on-primary) 20%, transparent);
+  font-size: 0.85rem;
+  margin: var(--space-3) 0 0;
+  opacity: 0.7;
+  padding-block-start: var(--space-3);
+}
+
+/* -- the booking dialog: app UI, app tokens (unchanged) ------------------------------- */
 .landing-scrim {
   background: var(--scrim);
   inset-block: 0;
@@ -35,9 +834,9 @@
 
 /* -- the mobile sticky CTA bar -------------------------------------------------------- */
 .landing-sticky-bar {
-  background: var(--surface);
-  border-block-start: var(--border-width-hairline) solid var(--border);
-  box-shadow: 0 -6px 16px rgb(23 21 15 / 6%);
+  background: var(--gl-card);
+  border-block-start: 1px solid var(--gl-outline);
+  box-shadow: 0 -6px 16px rgb(0 0 0 / 8%);
   inset-block-end: 0;
   inset-inline: 0;
   padding: var(--space-3) var(--space-4) var(--space-5);
@@ -45,87 +844,57 @@
   z-index: 30;
 }
 
-/* -- the group picker rows (SlotChips' accessibility shape, row-shaped) --------------- */
-.landing-pick-row {
-  align-items: center;
-  cursor: pointer;
-  display: flex;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-
-  /* §6.2's thumb rule — a row is a tap target. */
-  min-block-size: 44px;
-}
-
-.landing-pick-row + .landing-pick-row {
-  border-block-start: var(--border-width-hairline) solid var(--border);
-}
-
-.landing-pick-row[data-selected='true'] {
-  background: color-mix(in srgb, var(--accent) 9%, var(--surface));
-}
-
-.landing-pick-row:has(.landing-pick-input:focus-visible) {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: -2px;
-}
-
-.landing-pick-input {
-  block-size: 1px;
-  clip-path: inset(50%);
-  inline-size: 1px;
-  overflow: hidden;
-  position: absolute;
-  white-space: nowrap;
-}
-
-.landing-pick-dot {
-  background: var(--surface);
-  block-size: 20px;
-  border: var(--border-width-hairline) solid var(--border-strong);
-  border-radius: var(--radius-circle);
-  flex: none;
-  inline-size: 20px;
-}
-
-.landing-pick-row[data-selected='true'] .landing-pick-dot {
-  border: 6px solid var(--accent);
-}
-
-/* -- one component, two widths -------------------------------------------------------- */
+/* -- one page, two widths ------------------------------------------------------------- */
 @media (width <= 63.9375rem) {
-  /* 13a — the sticky bar floats over the page end; without this it covers the footer. */
+  /* The sticky bar floats over the page end; without this it covers the footer. */
   .landing-page {
     padding-block-end: 6rem;
   }
 
-  /* The picker rows already carry every group's ages and schedule; the detail cards are
-   * the desktop column's furniture. */
-  .landing-groups-detail {
+  /* The header nav is desktop furniture: on the phone the brand and the way in are the
+   * whole chrome, and the sections are one swipe away anyway. */
+  .landing-header-nav {
     display: none;
   }
 }
 
 @media (width >= 64rem) {
-  .landing-page {
-    grid-template-columns: minmax(0, 1fr) 25rem;
-    grid-template-rows: auto 1fr;
+  .gl-hero {
+    padding-block: calc(var(--space-8) * 1.5);
   }
 
-  .landing-hero-area {
-    grid-area: 1 / 1;
+  .gl-hero-inner {
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
   }
 
-  .landing-rest-area {
-    grid-area: 2 / 1;
+  .gl-hero-visual {
+    display: flex;
+    justify-content: center;
   }
 
-  /* 13c's sticky offer column, spanning both content rows. */
-  .landing-offer-area {
-    align-self: start;
-    grid-area: 1 / 2 / 3 / 3;
-    inset-block-start: var(--space-4);
-    position: sticky;
+  .gl-hero-visual img {
+    filter: drop-shadow(0 12px 32px rgb(0 0 0 / 15%));
+    max-block-size: 22rem;
+    max-inline-size: 100%;
+  }
+
+  .gl-coach {
+    align-items: center;
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  }
+
+  /* The full week at a glance — the pager unrolls into equal columns. */
+  .gl-week {
+    grid-auto-columns: minmax(0, 1fr);
+    overflow-x: visible;
+  }
+
+  .gl-plans {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .gl-voices {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .landing-sticky-bar {

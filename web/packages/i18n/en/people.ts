@@ -225,6 +225,11 @@ export const people: Bundle = {
   'funnel.conversionRate': 'Conversion rate',
 
   'landing.aboutTitle': 'About the club',
+  'landing.scheduleTitle': 'Weekly training schedule',
+  'landing.joinNow': 'Join now',
+  'landing.learnMore': 'Learn more',
+  'landing.freeTrial': 'Free trial session',
+  'landing.siteNav': 'Page navigation',
   'landing.stepsTitle': 'What a trial lesson looks like',
   'landing.beltCaption': 'The club’s belt ladder',
   'landing.navigate': 'Navigate',
