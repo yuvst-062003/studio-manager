@@ -4,7 +4,7 @@
 // Stitch's navy `#003874`, its crimson accent, squared buttons, the zen-dot ground, the
 // colored week timetable with its legend, pricing tiers and testimonials.
 //
-// **Two content sources, one tree.** `clubContentFor(slug)` returns the club's designed
+// **Two content sources, one tree.** `clubContentFor(slug, locale)` returns the club's designed
 // marketing content (today: hardcoded Gladiator, transcribed from the Stitch screens —
 // see clubContent.ts for the debt note). A slug without content renders the same page
 // minus the content-only sections, with the schedule derived from the API's groups — so
@@ -320,9 +320,11 @@ export function PublicLanding({
   }
 
   const { landing } = state
-  const content = clubContentFor(slug)
+  const content = clubContentFor(slug, locale)
   const groups = landing.groups ?? []
-  const steps = landing.trial_steps ?? []
+  // The designed page prefers its own steps: `trial_steps` is a single-language column, so
+  // on a club with designed content an English reader was shown the manager's Hebrew.
+  const steps = content?.steps ?? landing.trial_steps ?? []
   const photos = landing.photo_urls ?? []
   // The affordances the phone unlocks — both stripped to digits for the URL schemes.
   const phoneDigits = landing.phone ? landing.phone.replace(/[^\d+]/g, '') : null

@@ -402,6 +402,65 @@ describe('booking — every call to action reaches the flow', () => {
   })
 })
 
+// The bug this file did not catch (2026-08-31): the designed content was Hebrew-only, so
+// choosing English translated the chrome — the nav, the buttons — and left every word of
+// the club's own content in Hebrew, laid out left-to-right. §6.1 puts the language choice
+// before login exactly so a parent who does not read Hebrew can read the offer.
+describe('the designed page speaks the chosen language', () => {
+  const GLADIATOR: Landing = { ...LANDING, slug: 'gladiator', studio_name: 'מועדון גלדיאטור' }
+
+  // A Hebrew letter anywhere in the club's own sections means untranslated content. The
+  // club's NAME is excluded on purpose: "מועדון גלדיאטור" is data in the club's own
+  // language, and translating a proper name is not what this asserts.
+  const HEBREW = /[֐-׿]/
+
+  it.each([
+    { locale: 'en' as const, coach: 'Leadership', plans: 'Training plans', slot: 'Judo — group 1' },
+    { locale: 'ru' as const, coach: 'Лидерство', plans: 'Тарифы тренировок', slot: 'Дзюдо — группа 1' },
+  ])('renders the club content in $locale, with no Hebrew left behind', async (row) => {
+    render(<PublicLanding slug="gladiator" locale={row.locale} client={clientReturning(GLADIATOR)} />)
+    const coach = await screen.findByTestId('landing-coach')
+    expect(coach).toHaveTextContent(row.coach)
+    expect(screen.getByTestId('landing-plans')).toHaveTextContent(row.plans)
+    // The timetable is the easiest place for an untranslated string to hide: the same
+    // lesson repeats across days, so one missed key shows up on half the grid.
+    expect(screen.getByTestId('landing-schedule')).toHaveTextContent(row.slot)
+    for (const section of ['landing-coach', 'landing-schedule', 'landing-plans', 'landing-voices']) {
+      expect(screen.getByTestId(section).textContent ?? '').not.toMatch(HEBREW)
+    }
+  })
+
+  it('keeps the prices and the hours identical in every language', async () => {
+    // The reason the timetable and the prices are declared ONCE and only the words are
+    // per-locale: three parallel copies would let ₪400 become ₪450 in Russian, and no
+    // test would be looking.
+    const readFacts = async (locale: Locale) => {
+      const view = render(
+        <PublicLanding slug="gladiator" locale={locale} client={clientReturning(GLADIATOR)} />,
+      )
+      const week = await screen.findByTestId('landing-schedule')
+      const times = [...week.querySelectorAll('.gl-slot-time')].map((n) => n.textContent)
+      // The amount only — `.gl-price` also holds "/ month", which SHOULD differ by locale.
+      const prices = [...screen.getByTestId('landing-plans').querySelectorAll('.gl-price')].map(
+        (node) => {
+          const per = node.querySelector('.gl-price-per')
+          return (node.textContent ?? '').replace(per?.textContent ?? '', '').trim()
+        },
+      )
+      view.unmount()
+      return { times, prices }
+    }
+    const he = await readFacts('he')
+    expect(he.times.length).toBeGreaterThan(0)
+    expect(he.prices.length).toBeGreaterThan(0)
+    for (const locale of ['en', 'ru'] as const) {
+      const other = await readFacts(locale)
+      expect(other.times).toEqual(he.times)
+      expect(other.prices).toEqual(he.prices)
+    }
+  })
+})
+
 describe('the designed Gladiator page (Stitch, hardcoded content)', () => {
   const GLADIATOR: Landing = { ...LANDING, slug: 'gladiator', studio_name: 'מועדון גלדיאטור' }
 
