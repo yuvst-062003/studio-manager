@@ -377,3 +377,60 @@ def test_the_dev_simulator_drives_a_real_settlement_end_to_end(client, an_order,
     assert record.source_ip == IPN_SOURCE_IP
     for charge_id in an_order.charge_ids:
         assert tenant_session.get(Charge, charge_id).status == "settled"
+
+
+def test_months_bought_forward_settle_the_debt_and_leave_the_rest_as_credit(
+    client, app_session, studio, a_priced_student, an_open_charge, tenant_session
+):
+    """**The whole point of the card's month chips** (owner request, 2026-08-30).
+
+    A family owes one month and hands the club three by card. The debt settles, and the two
+    months they bought forward are simply the part of the payment nothing allocated -- which
+    is what credit IS in this ledger (`PaymentAllocation`, and the 2026-08-27 prepayment
+    spec §2). There is no "prepayment" row and no second mechanism to keep in step: the
+    billing run's step 7 spends the surplus oldest-first as the next months are billed, so
+    the family reads as paid at every instant and the debt ladder never fires at them.
+    """
+    from app.core.db import get_engine
+    from app.core.tenancy import TenantSession, use_studio
+    from app.services.billing import BillingService
+    from app.services.billing.orders import OrderService
+    from tests.billing.conftest import MONTHLY_AGOROT
+
+    with (
+        use_studio(studio.id),
+        TenantSession(bind=get_engine(), expire_on_commit=False) as scoped,
+    ):
+        order = OrderService(scoped).create(
+            studio.id,
+            payer_person_id=a_priced_student.payer_person_id,
+            charge_ids=[an_open_charge],
+            max_payments=1,
+            prepay_months=2,
+            at=T0,
+        )
+        scoped.commit()
+        scoped.refresh(order)
+        scoped.expunge(order)
+
+    # uPay is asked for all three months at once, never for the debt alone.
+    assert order.expected_amount_agorot == MONTHLY_AGOROT * 3
+
+    assert _deliver(client, order, IpnShape.SUCCESS).status_code == 200
+    tenant_session.expire_all()
+
+    assert tenant_session.get(Charge, an_open_charge).status == "settled"
+    payment = tenant_session.execute(select(Payment)).scalars().one()
+    assert payment.amount_agorot == MONTHLY_AGOROT * 3
+    # One allocation, for the one month that had a charge. The other two months have none
+    # yet -- that is the definition of buying them forward.
+    allocated = tenant_session.execute(
+        select(func.coalesce(func.sum(PaymentAllocation.amount_agorot), 0)).where(
+            PaymentAllocation.payment_id == payment.id
+        )
+    ).scalar_one()
+    assert allocated == MONTHLY_AGOROT
+    assert (
+        BillingService(tenant_session).payer_credit(a_priced_student.payer_person_id)
+        == MONTHLY_AGOROT * 2
+    )

@@ -37,9 +37,15 @@ from app.integrations.upay.form import MAX_INSTALLMENTS, upay_form_fields
 from app.models.billing import Charge, PaymentOrder, PaymentOrderCharge, RecurringSubscription
 from app.models.studio import Studio
 from app.services.billing.errors import ConflictError, NotFoundError, RefusedError
+from app.services.billing.payment_promise import PaymentPromiseService
 
 #: §5.10's "IPN never arrives" row: 'a nightly job flags orders pending for more than 24h'.
 ORDER_TTL_HOURS = 24
+
+#: How far forward one card order may buy. The screen's chips stop at 6; this is the
+#: backstop against a client posting a year and a half, and it matches the CHECK on
+#: `payment_order.prepay_months`.
+MAX_PREPAY_MONTHS = 12
 
 #: The statuses that still hold a claim on a charge. `failed` and `expired` release theirs.
 #: `amount_mismatch` KEEPS its claim: real money arrived against that order, and offering
@@ -160,16 +166,43 @@ class OrderService:
         payer_person_id: uuid.UUID,
         charge_ids: list[uuid.UUID],
         max_payments: int,
+        prepay_months: int = 0,
         at: datetime,
     ) -> PaymentOrder:
-        """§5.10 step 1 -- one order over N charges, priced server-side.
+        """§5.10 step 1 -- one order over N charges and M months forward, priced server-side.
 
         Every refusal here is reachable from a client, because `charge_ids` arrives from
         one: a charge somebody else owes, a charge already covered, a settled charge, an
-        empty list, an instalment count the merchant account does not offer.
+        empty basket, an instalment count the merchant account does not offer.
+
+        **`prepay_months` buys months that have no charge yet** (owner request,
+        2026-08-30: "user can pay with card 3 month ahead"). Until it existed the card
+        route could only settle debt, so the month chips were capped at the number of
+        months the family happened to OWE -- a family in good standing was offered "1"
+        and could not hand the club a term by card at all, while cash and cheques had
+        been able to since the 2026-08-27 prepayment wave.
+
+        It introduces no new ledger shape. The months are priced here into
+        `expected_amount_agorot` at the payer's own monthly total, and on settlement the
+        payment allocates to this order's charges only -- the remainder stays unallocated,
+        and that surplus IS the credit (`PaymentAllocation`'s docstring, and the promise
+        flow's `confirm`). The billing run's step 7 spends it oldest-first, so the months
+        bought here are covered as they are billed and the debt ladder never fires at a
+        family who paid.
+
+        Integer arithmetic throughout (G2): `prepay_months x monthly` is a product of two
+        integers the server holds, and the client sends no amount at all.
         """
-        if not charge_ids:
-            raise RefusedError("an order needs at least one charge")
+        if prepay_months < 0:
+            # It would subtract from what the family owes and open uPay for less than the
+            # debt, leaving charges half-covered by a payment nobody could explain.
+            raise RefusedError("prepay_months cannot be negative")
+        if prepay_months > MAX_PREPAY_MONTHS:
+            raise RefusedError(
+                f"prepay_months={prepay_months}: at most {MAX_PREPAY_MONTHS} may be bought forward"
+            )
+        if not charge_ids and prepay_months == 0:
+            raise RefusedError("an order needs at least one charge or a month bought forward")
         if not 1 <= max_payments <= MAX_INSTALLMENTS:
             # Round two A1: the dashboard's instalment dropdown stops at 12, and what uPay
             # does with a larger `maxpayments` posted straight to the form was never tested.
@@ -207,6 +240,17 @@ class OrderService:
                 )
             charges.append(charge)
             total += charge.amount_agorot
+        if prepay_months > 0:
+            # The SAME monthly total the cash and cheque cards price their forward months
+            # at, and the same one `GET /me/prepay-terms` sends the screen -- one function,
+            # so two routes cannot round the same family's month differently.
+            monthly = PaymentPromiseService(self._session).monthly_total_agorot(payer_person_id)
+            if monthly <= 0:
+                # A payer with no priced active student prices "3 months" at nothing.
+                # Refusing beats opening uPay for the charges alone and silently dropping
+                # the months the family believed they were buying.
+                raise RefusedError("this payer has no monthly price, so no month can be bought")
+            total += prepay_months * monthly
         if total <= 0:
             # `payment_order_amount_positive` is the CHECK; this is the same rule with a
             # message, and it catches a selection that is all credits.
@@ -218,6 +262,7 @@ class OrderService:
             public_ref=uuid.uuid4(),
             expected_amount_agorot=total,
             max_payments=max_payments,
+            prepay_months=prepay_months,
             status="pending",
             expires_at=at + timedelta(hours=ORDER_TTL_HOURS),
         )

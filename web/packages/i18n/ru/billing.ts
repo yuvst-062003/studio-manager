@@ -29,6 +29,7 @@ export const billing: Bundle = {
   'card.coveredElsewhere': 'Уже включено в начатый платёж',
   'card.nothingSelectable': 'Нет начислений, доступных к оплате картой',
   'card.oldestFirst': 'Выбираются самые старые начисления по всем детям, за которых вы платите',
+  'card.monthsForward': 'Включая {{count}} мес. вперёд — зачтутся в будущие начисления',
 
   'standingOrder.link': 'Оформить постоянное поручение',
   'standingOrder.linkFor': 'Оформить постоянное поручение для {{name}}',

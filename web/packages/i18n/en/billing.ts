@@ -25,6 +25,7 @@ export const billing: Bundle = {
   'card.coveredElsewhere': 'Already covered by a payment in progress',
   'card.nothingSelectable': 'No charges are available to pay by card',
   'card.oldestFirst': 'The oldest charges are selected, across every child you pay for',
+  'card.monthsForward': 'Includes {{count}} months paid ahead, credited against future charges',
 
   'standingOrder.link': 'Set up a standing order',
   'standingOrder.linkFor': 'Set up a standing order for {{name}}',

@@ -5,7 +5,7 @@
 // charge already covered by an open order is not selectable but still shown, the receipt
 // email is a card-row affordance and nowhere else (D9.3's structural half), and no screen
 // ever builds a `₪` string by hand (G2).
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { t } from '@studio/i18n'
@@ -895,5 +895,77 @@ describe('quantity and the parent’s note (2026-08-30)', () => {
     render(<OrderItemsScreen locale={LOCALE} products={PRODUCTS} onOrder={vi.fn()} />)
     expect(screen.queryByLabelText(t(LOCALE, 'billing.product.quantity'))).toBeNull()
     expect(screen.queryByLabelText(t(LOCALE, 'billing.product.noteLabel'))).toBeNull()
+  })
+})
+
+// -- the card buys months forward (owner request, 2026-08-30) -----------------
+//
+// "when want to pay with card should have an option to choose number of month; there is
+// only one available. user can pay with card 3 month ahead and the payment will be
+// nummonth * payment options."
+describe('1b — the card route pays months forward', () => {
+  const TERMS = { cashMonths: 3, chequeMonths: 12, monthlyTotalAgorot: 30_000 }
+
+  /** The months picker, scoped. Two stacked pickers on this card both render as
+   *  [1] [2] [3] — the instalment one is the other, and an unscoped `getByRole('radio')`
+   *  finds whichever comes first in the DOM. */
+  const monthChip = (label: string) =>
+    within(screen.getByTestId('months-control')).getByRole('radio', { name: label })
+
+  it('offers every chip, not only the months the family happens to owe', () => {
+    // The bug. `availableMonths` capped the chips at the debt, so a family owing one month
+    // was offered `[1]` and there was no way to hand the club a term by card.
+    renderPay({ debts: [debt('c1', 9)], prepayTerms: TERMS })
+    expect(screen.getByTestId('months-control')).toHaveAttribute('data-max', '6')
+    for (const n of ['1', '2', '3', '6']) expect(monthChip(n)).toBeInTheDocument()
+  })
+
+  it('prices the debt at its own amount and the rest at the monthly total', async () => {
+    // One month owed at 250₪, two bought forward at the payer's 300₪ — NOT three months of
+    // either figure. The two halves are different money and the screen does not average
+    // them.
+    renderPay({ debts: [debt('c1', 9)], prepayTerms: TERMS })
+    await userEvent.click(monthChip('3'))
+    expect(screen.getByTestId('card-prepay-note')).toHaveTextContent('2')
+    // 250 owed + two months at 300 = 850, rendered by `MoneyDisplay`.
+    expect(screen.getByTestId('route-card')).toHaveTextContent('850')
+  })
+
+  it('sends the months forward as a count, never as an amount', async () => {
+    // §5.10 compares the IPN against the SERVER's sum. A client-supplied price would be
+    // the very thing it is compared to.
+    const createOrder = vi.fn().mockResolvedValue({ public_ref: 'ref-1' })
+    renderPay({ client: stubClient({ createOrder }), debts: [debt('c1', 9)], prepayTerms: TERMS })
+    await userEvent.click(monthChip('3'))
+    await userEvent.click(screen.getByTestId('pay-button'))
+    await waitFor(() => expect(createOrder).toHaveBeenCalledWith(['c1'], 1, 2))
+  })
+
+  it('lets a family who owes nothing selectable pay a term up front', async () => {
+    // Every charge covered by an open order — which is the state that used to render
+    // "אין חיובים זמינים לתשלום בכרטיס" and take the whole route off the screen.
+    const createOrder = vi.fn().mockResolvedValue({ public_ref: 'ref-1' })
+    renderPay({
+      client: stubClient({ createOrder }),
+      debts: [debt('c1', 9, { coveredElsewhere: true })],
+      prepayTerms: TERMS,
+    })
+    expect(screen.queryByTestId('nothing-selectable')).toBeNull()
+    await userEvent.click(monthChip('3'))
+    await userEvent.click(screen.getByTestId('pay-button'))
+    // No charge ids at all — three months, priced by the server.
+    await waitFor(() => expect(createOrder).toHaveBeenCalledWith([], 1, 3))
+  })
+
+  it('keeps the old ceiling for a payer with no monthly price', () => {
+    // No priced active student means a month forward costs nothing, and the server refuses
+    // it. Offering the chip would be offering a refusal.
+    renderPay({
+      debts: [debt('c1', 9)],
+      prepayTerms: { cashMonths: 3, chequeMonths: 3, monthlyTotalAgorot: 0 },
+    })
+    const control = screen.getByTestId('months-control')
+    expect(control).toHaveAttribute('data-max', '1')
+    expect(within(control).queryByRole('radio', { name: '3' })).toBeNull()
   })
 })

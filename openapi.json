@@ -7388,21 +7388,17 @@
         "type": "object"
       },
       "PaymentOrderCreateIn": {
-        "description": "The parent picks charges; the server prices them. `expected_amount_agorot` is\nabsent on purpose -- §5.10 compares the IPN against a server-side sum, and a\nclient-supplied expected amount would be the thing it is compared to.",
+        "description": "The parent picks charges; the server prices them. `expected_amount_agorot` is\nabsent on purpose -- §5.10 compares the IPN against a server-side sum, and a\nclient-supplied expected amount would be the thing it is compared to.\n\n**The list may be empty, and the emptiness is not the schema's business.** An order\nover no charges used to be a 422 here, which made \"pay a term up front by card\" a\nrequest the server rejected before any rule about it could run: a family in good\nstanding owes nothing, so their basket has no charge ids in it at all. What is refused\nis an order that buys NOTHING -- no charges and no months forward -- and that rule\nneeds `prepay_months` to decide, so it lives in `OrderService.create` where both halves\nare in scope. One authority, not two that can disagree.",
         "properties": {
           "charge_ids": {
             "items": {
               "format": "uuid",
               "type": "string"
             },
-            "minItems": 1,
             "title": "Charge Ids",
             "type": "array"
           }
         },
-        "required": [
-          "charge_ids"
-        ],
         "title": "PaymentOrderCreateIn",
         "type": "object"
       },
@@ -7451,6 +7447,11 @@
             "format": "uuid",
             "title": "Payer Person Id",
             "type": "string"
+          },
+          "prepay_months": {
+            "default": 0,
+            "title": "Prepay Months",
+            "type": "integer"
           },
           "public_ref": {
             "format": "uuid",
@@ -19834,7 +19835,7 @@
         ]
       },
       "post": {
-        "description": "§5.10 step 1. **The payer is always the caller** and never a field in the body.\n\n`PaymentOrderCreateIn` carries only `charge_ids`, and that is the contract shape making\nthe decision: an order is created by the person who is about to stand in front of uPay's\nhosted page with their own card. A manager settling a family's debt uses\n`POST /payments`, which is the flow for money that arrives by every other route.\n\nTaking the payer from the request rather than the body also closes the obvious hole --\na body-supplied payer would let anyone open an order over anyone's charges.\n\n**`max_payments` is a query parameter, not a body field**, because\n`PaymentOrderCreateIn` is W4's contract shape and carries only `charge_ids`. `1b` draws\nan instalments chip group, so the count has to reach the server somehow; widening a\nshape another wave authored is the one way it must not. Capped at `MAX_INSTALLMENTS`\nhere and again in `OrderService.create`, because the dashboard's dropdown stops at 12\nand behaviour above it was never tested against this account.",
+        "description": "§5.10 step 1. **The payer is always the caller** and never a field in the body.\n\n`PaymentOrderCreateIn` carries only `charge_ids`, and that is the contract shape making\nthe decision: an order is created by the person who is about to stand in front of uPay's\nhosted page with their own card. A manager settling a family's debt uses\n`POST /payments`, which is the flow for money that arrives by every other route.\n\nTaking the payer from the request rather than the body also closes the obvious hole --\na body-supplied payer would let anyone open an order over anyone's charges.\n\n**`max_payments` is a query parameter, not a body field**, because\n`PaymentOrderCreateIn` is W4's contract shape and carries only `charge_ids`. `1b` draws\nan instalments chip group, so the count has to reach the server somehow; widening a\nshape another wave authored is the one way it must not. Capped at `MAX_INSTALLMENTS`\nhere and again in `OrderService.create`, because the dashboard's dropdown stops at 12\nand behaviour above it was never tested against this account.\n\n**`prepay_months` is a query parameter for the same reason**, and it is how the card\nroute reaches months that have no charge yet (owner request, 2026-08-30). It carries a\ncount, never a price: the server multiplies it by the payer's own monthly total, which\nis the one place that arithmetic happens for cash, cheques and cards alike.",
         "operationId": "create_payment_order_api_v1_payment_orders_post",
         "parameters": [
           {
@@ -19846,6 +19847,18 @@
               "maximum": 12,
               "minimum": 1,
               "title": "Max Payments",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "prepay_months",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "maximum": 12,
+              "minimum": 0,
+              "title": "Prepay Months",
               "type": "integer"
             }
           },

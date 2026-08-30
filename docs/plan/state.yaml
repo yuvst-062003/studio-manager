@@ -590,6 +590,12 @@ waves:
         title: Parent — audit log and functional dimension
         status: shipped
         on: 2026-08-27
+      - id: P13
+        title: >-
+          Parent — the seven the first real club found: calendar horizon, attendance popup,
+          day/week/month, plan step at signup, card months forward, calendar-sync cleanup
+        status: shipped
+        on: 2026-08-30
       - id: S1
         title: Staff — call the registration functions; slot guard tests
         status: shipped

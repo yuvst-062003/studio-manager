@@ -63,7 +63,14 @@ export type BillingClient = {
   balance(payerPersonId: string): Promise<PayerBalanceOut>
   payments(payerPersonId: string): Promise<PaymentOut[]>
   products(): Promise<ProductOut[]>
-  createOrder(chargeIds: string[], maxPayments: number): Promise<PaymentOrderOut>
+  /** `prepayMonths` buys months that have no charge yet — the card's half of the
+   *  prepayment the cash and cheque cards have offered since 2026-08-27. Priced by the
+   *  SERVER from the payer's monthly total; nothing here sends an amount. */
+  createOrder(
+    chargeIds: string[],
+    maxPayments: number,
+    prepayMonths?: number,
+  ): Promise<PaymentOrderOut>
   orderForm(publicRef: string): Promise<UpayForm>
   orderStatus(publicRef: string): Promise<PaymentOrderOut>
 }

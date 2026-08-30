@@ -44,7 +44,10 @@ const scrimStyle: CSSProperties = {
 const dialogStyle: CSSProperties = {
   background: 'var(--surface)',
   borderRadius: 'var(--radius-lg)',
-  boxShadow: 'var(--shadow-lg, 0 10px 40px rgba(0,0,0,.25))',
+  // A literal, like `landing.css`'s sheet: there is no elevation token in the system yet,
+  // and `tools/__tests__/tokens-are-defined` fails the build on a `var()` nothing defines
+  // — correctly, since a fallback that always fires is a token that does not exist.
+  boxShadow: '0 12px 32px rgb(23 21 15 / 24%)',
   display: 'flex',
   flexDirection: 'column',
   gap: 'var(--space-4)',

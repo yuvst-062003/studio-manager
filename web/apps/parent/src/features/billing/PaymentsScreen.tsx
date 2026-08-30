@@ -157,23 +157,55 @@ export function PaymentsScreen({
   // three-child family that owed exactly one month, and the third chip then bought nothing
   // the second had not already bought.
   const availableMonths = useMemo(() => distinctMonths(selectableCharges), [selectableCharges])
-  // The chips offer at most `availableMonths`, so the state has to be read through the same
-  // ceiling: the default is 2, and a family owing a single month would otherwise hold
-  // `months = 2` against a control whose only option is `1` and render nothing selected.
-  const months = Math.min(requestedMonths, Math.max(1, availableMonths))
+  /**
+   * **What "3 months" means on the card, and why the chips no longer stop at the debt.**
+   *
+   * The ceiling used to be `availableMonths` — the number of months the family happened to
+   * OWE — so a family in good standing was offered `[1]` and a family billed once this
+   * month was offered `[1]`, and there was no way to hand the club a term by card at all.
+   * Cash and cheques have been able to since the 2026-08-27 prepayment wave; this is the
+   * card's half of it (owner request, 2026-08-30).
+   *
+   * A month chip now means a month of training covered, whether or not a charge exists for
+   * it yet. The oldest open months settle first, and the rest are bought forward: the
+   * server prices them at the payer's monthly total, the settling payment allocates only
+   * to the charges, and the surplus IS the credit the billing run spends as those months
+   * are billed. So the family is never shown as owing a month they have already paid, and
+   * the debt ladder never fires at them.
+   *
+   * The ceiling that remains is `prepayTerms.monthlyTotalAgorot > 0`: a payer with no
+   * priced active student has no monthly price, so a month forward costs nothing and the
+   * server refuses it. For them the chips mean what they always meant.
+   */
+  const canPrepay = prepayTerms.monthlyTotalAgorot > 0
+  const monthCeiling = canPrepay
+    ? Math.max(...MONTH_OPTIONS)
+    : Math.max(1, availableMonths)
+  const months = Math.min(requestedMonths, monthCeiling)
+  // Debt first, always. `oldestMonths` caps itself at what exists, so asking it for six
+  // months of a family that owes one returns that one.
   const chosen = useMemo(
     () => oldestMonths(selectableCharges, months),
     [selectableCharges, months],
   )
-  const total = selectionTotal(chosen)
+  const settledMonths = Math.min(months, availableMonths)
+  const prepayMonths = Math.max(0, months - settledMonths)
+  // The ONE product this screen computes, and it is `months x monthly` on two integers the
+  // server sent (G2) — the same arithmetic the cash and cheque cards do, deliberately not
+  // a second rounding of the same money.
+  const total = selectionTotal(chosen) + prepayMonths * prepayTerms.monthlyTotalAgorot
   const split = instalmentSplit(total, instalments)
 
   async function pay() {
-    if (inFlight || chosen.length === 0) return
+    if (inFlight || total <= 0) return
     setInFlight(true)
     setError(null)
     try {
-      const order = await client.createOrder(chosen.map((charge) => charge.id), instalments)
+      const order = await client.createOrder(
+        chosen.map((charge) => charge.id),
+        instalments,
+        prepayMonths,
+      )
       onOrderOpened(await client.orderForm(order.public_ref))
     } catch {
       setError(t(locale, 'common.error.generic'))
@@ -274,13 +306,17 @@ export function PaymentsScreen({
               {t(locale, 'billing.standingOrder.activeWarning')}
             </Alert>
           ) : null}
-          {selectable.length === 0 ? (
+          {selectable.length === 0 && !canPrepay ? (
+            // Nothing owed and no monthly price to buy a month at. The card genuinely has
+            // nothing to do — which is NOT the same as "this family owes nothing", the
+            // state that used to land here and hid the pay-ahead route from every family
+            // in good standing.
             <p data-testid="nothing-selectable">
               {t(locale, 'billing.card.nothingSelectable')}
             </p>
           ) : (
             <>
-              <div data-max={String(availableMonths)} data-testid="months-control">
+              <div data-max={String(monthCeiling)} data-testid="months-control">
                 <SegmentedControl
                   legend={t(locale, 'billing.card.selectMonths')}
                   // Two stacked pickers that both render as [1] [2] [3]. Without the
@@ -288,13 +324,24 @@ export function PaymentsScreen({
                   // screen reader.
                   legendVisible
                   value={String(months)}
-                  options={MONTH_OPTIONS.filter((n) => n <= availableMonths).map((n) => ({
+                  options={MONTH_OPTIONS.filter((n) => n <= monthCeiling).map((n) => ({
                     value: String(n),
                     label: String(n),
                   }))}
                   onValueChange={(value) => setMonths(Number(value))}
                 />
               </div>
+              {/* **What the money is actually buying, said out loud.** A total that jumps
+                  when a family who owes one month presses [3] is a total they will read as
+                  a bug unless the screen names the two halves. */}
+              {prepayMonths > 0 ? (
+                <p data-testid="card-prepay-note">
+                  {t(locale, 'billing.card.monthsForward').replace(
+                    '{{count}}',
+                    String(prepayMonths),
+                  )}
+                </p>
+              ) : null}
               <div data-testid="instalments-control">
                 <SegmentedControl
                   legend={t(locale, 'billing.card.installments')}

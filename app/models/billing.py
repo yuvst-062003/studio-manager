@@ -432,6 +432,9 @@ class PaymentOrder(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
         # Round two A1: the merchant dashboard's installment dropdown stops at 12, and
         # `MAX_INSTALLMENTS` in upay/form.py clamps to it.
         CheckConstraint("max_payments BETWEEN 1 AND 12", name="payment_order_max_payments"),
+        # The chips offer 1/2/3/6; the ceiling is a backstop against a client posting a
+        # year and a half, not the product rule.
+        CheckConstraint("prepay_months BETWEEN 0 AND 12", name="payment_order_prepay_months"),
         Index("uq_payment_order_public_ref", "public_ref", unique=True),
         # §5.10's "IPN never arrives" row: a nightly job flags orders pending over 24h.
         Index("ix_payment_order_status_created_at", "status", "created_at"),
@@ -448,6 +451,17 @@ class PaymentOrder(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
     expected_amount_agorot: Mapped[int] = mapped_column(Integer, nullable=False)
     #: A count of instalments, not money. Listed in invariant 1's `NOT_MONEY`.
     max_payments: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    #: How many months of tuition this order buys **beyond** the charges it names -- a
+    #: count, not money, and listed in invariant 1's `NOT_MONEY` for the same reason
+    #: `max_payments` is. Owner request 2026-08-30: "user can pay with card 3 month ahead".
+    #:
+    #: **It holds no price.** The surplus is priced into `expected_amount_agorot` at
+    #: creation, from the payer's own monthly total, and the ledger shape is the one
+    #: prepayment already has: the settling payment allocates to the order's charges and
+    #: the remainder stays unallocated, which IS the credit (see `PaymentAllocation`). A
+    #: stored per-month price here would be a second source able to disagree with the
+    #: amount uPay actually charged.
+    prepay_months: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     paid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

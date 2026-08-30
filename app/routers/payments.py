@@ -48,7 +48,11 @@ from app.schemas.billing import (
 )
 from app.services.audit import AuditService
 from app.services.billing.errors import ConflictError, NotFoundError, RefusedError
-from app.services.billing.orders import MerchantEmailMissingError, OrderService
+from app.services.billing.orders import (
+    MAX_PREPAY_MONTHS,
+    MerchantEmailMissingError,
+    OrderService,
+)
 from app.services.billing.payments import PaymentService
 
 
@@ -276,6 +280,7 @@ def _order_out(service: OrderService, order: PaymentOrder) -> PaymentOrderOut:
         public_ref=order.public_ref,
         expected_amount_agorot=order.expected_amount_agorot,
         max_payments=order.max_payments,
+        prepay_months=order.prepay_months,
         status=order.status,
         expires_at=order.expires_at,
         paid_at=order.paid_at,
@@ -388,6 +393,7 @@ def create_payment_order(
     request: Request,
     session: TenantSessionDep,
     max_payments: int = Query(default=1, ge=1, le=MAX_INSTALLMENTS),
+    prepay_months: int = Query(default=0, ge=0, le=MAX_PREPAY_MONTHS),
     idempotency_key: IdempotencyKey = None,
 ) -> PaymentOrderOut:
     """§5.10 step 1. **The payer is always the caller** and never a field in the body.
@@ -406,6 +412,11 @@ def create_payment_order(
     shape another wave authored is the one way it must not. Capped at `MAX_INSTALLMENTS`
     here and again in `OrderService.create`, because the dashboard's dropdown stops at 12
     and behaviour above it was never tested against this account.
+
+    **`prepay_months` is a query parameter for the same reason**, and it is how the card
+    route reaches months that have no charge yet (owner request, 2026-08-30). It carries a
+    count, never a price: the server multiplies it by the payer's own monthly total, which
+    is the one place that arithmetic happens for cash, cheques and cards alike.
     """
     studio_id = require_current_studio_id()
     service = OrderService(session)
@@ -415,6 +426,7 @@ def create_payment_order(
             payer_person_id=_caller(request),
             charge_ids=list(body.charge_ids),
             max_payments=max_payments,
+            prepay_months=prepay_months,
             at=now(),
         )
     except NotFoundError as exc:

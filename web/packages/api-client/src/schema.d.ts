@@ -2342,6 +2342,11 @@ export interface paths {
          *     shape another wave authored is the one way it must not. Capped at `MAX_INSTALLMENTS`
          *     here and again in `OrderService.create`, because the dashboard's dropdown stops at 12
          *     and behaviour above it was never tested against this account.
+         *
+         *     **`prepay_months` is a query parameter for the same reason**, and it is how the card
+         *     route reaches months that have no charge yet (owner request, 2026-08-30). It carries a
+         *     count, never a price: the server multiplies it by the payer's own monthly total, which
+         *     is the one place that arithmetic happens for cash, cheques and cards alike.
          */
         post: operations["create_payment_order_api_v1_payment_orders_post"];
         delete?: never;
@@ -8344,10 +8349,18 @@ export interface components {
          * @description The parent picks charges; the server prices them. `expected_amount_agorot` is
          *     absent on purpose -- §5.10 compares the IPN against a server-side sum, and a
          *     client-supplied expected amount would be the thing it is compared to.
+         *
+         *     **The list may be empty, and the emptiness is not the schema's business.** An order
+         *     over no charges used to be a 422 here, which made "pay a term up front by card" a
+         *     request the server rejected before any rule about it could run: a family in good
+         *     standing owes nothing, so their basket has no charge ids in it at all. What is refused
+         *     is an order that buys NOTHING -- no charges and no months forward -- and that rule
+         *     needs `prepay_months` to decide, so it lives in `OrderService.create` where both halves
+         *     are in scope. One authority, not two that can disagree.
          */
         PaymentOrderCreateIn: {
             /** Charge Ids */
-            charge_ids: string[];
+            charge_ids?: string[];
         };
         /**
          * PaymentOrderOut
@@ -8378,6 +8391,11 @@ export interface components {
              * Format: uuid
              */
             payer_person_id: string;
+            /**
+             * Prepay Months
+             * @default 0
+             */
+            prepay_months: number;
             /**
              * Public Ref
              * Format: uuid
@@ -14881,6 +14899,7 @@ export interface operations {
         parameters: {
             query?: {
                 max_payments?: number;
+                prepay_months?: number;
             };
             header?: {
                 /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */

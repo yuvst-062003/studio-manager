@@ -63,6 +63,11 @@ import { PaymentCompleteSection } from './features/billing/PaymentCompleteSectio
 // carries ids: a family with two children has two plans and two upgrade decisions, and a
 // screen that summed them could not mark anything — a booking names a student.
 import { TrainingPlanSection } from './features/billing/TrainingPlanSection'
+// §6.1's plan step — 300 / 400 / 550 and how the money moves, asked once, right after the
+// health declaration. Every piece of it existed behind `#/plan/<studentId>` and nothing in
+// the first-run sequence reached it, so a family finished signup with no plan at all.
+import { PlanGate } from './features/billing/PlanGate'
+import { makeTrainingPlanClient } from './features/billing/trainingPlanClient'
 import { ShopSection } from './features/billing'
 // §6.1 step 6 — the BLOCKING declaration. Mounted here because nothing imported it
 // (HB-w6-health-gate-unmounted): the gate, the form and the pad were built and tested in
@@ -231,6 +236,7 @@ function AuthedApp() {
   // keyed on the client, so a fresh object every render would re-fetch forever — the
   // month for 12b, the club for 13a.
   const scheduleClient = useMemo(() => makeParentScheduleClient(apiFetch), [])
+  const trainingPlanClient = useMemo(() => makeTrainingPlanClient(apiFetch), [])
   const peopleClient = useMemo(() => makePeopleClient(apiFetch), [])
   const eventsClient = useMemo(() => makeParentEventsClient(apiFetch), [])
   const beltsClient = useMemo(() => makeParentBeltsClient(apiFetch), [])
@@ -532,6 +538,22 @@ function AuthedApp() {
             students={gatedChildren}
             onSigned={() => setDeclarationsSigned((count) => count + 1)}
           >
+          {/* §6.1's plan step, and it sits HERE for the reason the sequence gives: a family
+              picks what they are paying for after the club is allowed to hold the child's
+              record, never before. Unlike the two gates above it this one renders the app
+              behind it — see `PlanGate`'s header on why nagging beats blocking. */}
+          <PlanGate
+            client={trainingPlanClient}
+            locale={locale}
+            onGoToPayments={() => {
+              globalThis.location.hash = '#/payments'
+            }}
+            students={(gatedChildren ?? []).map(({ id, display_name, status }) => ({
+              id,
+              display_name,
+              status,
+            }))}
+          >
           {session.access.parent && isCalendarRoute(hash) ? (
             <>
               <ScheduleSection
@@ -652,6 +674,7 @@ function AuthedApp() {
               <Resolve session={session} locale={locale} />
             </>
           )}
+          </PlanGate>
           </HealthGate>
           </ConsentGate>
           )}

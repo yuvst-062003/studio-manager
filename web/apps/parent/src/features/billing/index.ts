@@ -7,3 +7,6 @@ export { PaymentStrip } from './PaymentStrip'
 export { instalmentSplit, oldestMonths, selectionTotal } from './billingClient'
 export type { BillingClient, ChargeOut, PaymentOut, UpayForm } from './billingClient'
 export { ShopSection } from './ShopSection'
+// §6.1's plan step, between the health declaration and home.
+export { PlanGate, needsPlan, promiseMethodFor } from './PlanGate'
+export type { GateMethod, PlanGateProps, PlanGateStudent } from './PlanGate'

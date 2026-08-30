@@ -45,6 +45,7 @@ export const billing: Bundle = {
   'card.coveredElsewhere': 'החיוב כלול בתשלום שכבר נפתח',
   'card.nothingSelectable': 'אין חיובים זמינים לתשלום בכרטיס',
   'card.oldestFirst': 'נבחרים החיובים הוותיקים ביותר, לכל הילדים שאתם משלמים עבורם',
+  'card.monthsForward': 'כולל {{count}} חודשים מראש, שיקוזזו מהחיובים הבאים',
 
   'standingOrder.link': 'קישור להקמת הוראת קבע',
   // One link per child, so the anchor text repeats — this is the accessible name that

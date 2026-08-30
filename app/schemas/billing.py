@@ -255,8 +255,14 @@ class PaymentOrderOut(BaseModel):
     payer_person_id: uuid.UUID
     public_ref: uuid.UUID
     expected_amount_agorot: int
-    #: How many months this order covers. A count, not money.
+    #: How many INSTALMENTS uPay splits the charge into -- the merchant account offers
+    #: 1..12. A count, not money, and not a number of months: the comment here said
+    #: "months" until `prepay_months` arrived beside it and made the two impossible to
+    #: read as the same thing.
     max_payments: int
+    #: How many months of tuition this order buys beyond the charges it names. A count,
+    #: not money; the price is already inside `expected_amount_agorot`.
+    prepay_months: int = 0
     status: PaymentOrderStatus
     expires_at: datetime
     paid_at: datetime | None
@@ -266,9 +272,18 @@ class PaymentOrderOut(BaseModel):
 class PaymentOrderCreateIn(BaseModel):
     """The parent picks charges; the server prices them. `expected_amount_agorot` is
     absent on purpose -- §5.10 compares the IPN against a server-side sum, and a
-    client-supplied expected amount would be the thing it is compared to."""
+    client-supplied expected amount would be the thing it is compared to.
 
-    charge_ids: list[uuid.UUID] = Field(min_length=1)
+    **The list may be empty, and the emptiness is not the schema's business.** An order
+    over no charges used to be a 422 here, which made "pay a term up front by card" a
+    request the server rejected before any rule about it could run: a family in good
+    standing owes nothing, so their basket has no charge ids in it at all. What is refused
+    is an order that buys NOTHING -- no charges and no months forward -- and that rule
+    needs `prepay_months` to decide, so it lives in `OrderService.create` where both halves
+    are in scope. One authority, not two that can disagree.
+    """
+
+    charge_ids: list[uuid.UUID] = Field(default_factory=list)
 
 
 class UpayIpnRecordOut(BaseModel):

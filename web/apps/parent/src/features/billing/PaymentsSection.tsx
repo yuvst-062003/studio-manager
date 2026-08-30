@@ -93,12 +93,20 @@ export function makeParentBillingClient(fetcher: Fetcher): BillingClient {
       // empty list rather than a 403 the screen would have to know how to survive.
       return []
     },
-    async createOrder(chargeIds, maxPayments) {
-      // `max_payments` is a query parameter and `charge_ids` the body. The payer is never
-      // sent: the server takes it from the session, because a body-supplied payer would
-      // let anyone open an order over anyone's charges.
+    async createOrder(chargeIds, maxPayments, prepayMonths = 0) {
+      // `max_payments` and `prepay_months` are query parameters and `charge_ids` the body.
+      // The payer is never sent: the server takes it from the session, because a
+      // body-supplied payer would let anyone open an order over anyone's charges.
+      //
+      // `prepay_months` is a COUNT. The price of those months is the payer's monthly
+      // total, which only the server holds — this screen never posts an amount, and §5.10
+      // compares the IPN against the server's own sum for exactly that reason.
+      const query = new URLSearchParams({
+        max_payments: String(maxPayments),
+        prepay_months: String(prepayMonths),
+      })
       return json<PaymentOrderOut>(
-        await fetcher(`/api/v1/payment-orders?max_payments=${maxPayments}`, {
+        await fetcher(`/api/v1/payment-orders?${query.toString()}`, {
           method: 'POST',
           headers: JSON_HEADERS,
           body: JSON.stringify({ charge_ids: chargeIds }),

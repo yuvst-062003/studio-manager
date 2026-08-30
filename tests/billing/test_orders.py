@@ -11,6 +11,7 @@ import uuid
 from datetime import timedelta
 
 import pytest
+from app.models.person import Person
 from app.services.billing.errors import ConflictError, NotFoundError, RefusedError
 from app.services.billing.orders import OrderService
 from tests.billing.conftest import MONTHLY_AGOROT, T0
@@ -272,3 +273,104 @@ def test_an_active_subscription_is_reported_and_never_blocks(
         at=T0,
     )
     assert order.status == "pending"
+
+
+# -- paying months forward by card (owner request, 2026-08-30) -----------------
+#
+# "when want to pay with card should have an option to choose number of month; there is
+# only one available. user can pay with card 3 month ahead and the payment will be
+# nummonth * payment options."
+#
+# The chips were capped at the number of months the family HAPPENED to owe, so a family in
+# good standing was offered `[1]` and a family who had just been billed once was offered
+# `[1]` — there was no way to hand the club a term up front by card at all, while cash and
+# cheques had been able to since the prepayment wave. This is that route, on the card, and
+# it reuses the ledger shape prepayment already has rather than inventing a second one: the
+# order is priced above its charges, and the surplus the payment does not allocate IS the
+# credit the billing run spends.
+
+
+def test_an_order_can_buy_months_that_have_no_charge_yet(
+    tenant_session, studio, a_priced_student, an_open_charge
+):
+    """One open month plus two bought forward, priced at the payer's own monthly total.
+
+    Integer arithmetic on two integers the server holds (G2) — the client never sends an
+    amount, exactly as `PaymentOrderCreateIn`'s docstring requires.
+    """
+    order = OrderService(tenant_session).create(
+        studio.id,
+        payer_person_id=a_priced_student.payer_person_id,
+        charge_ids=[an_open_charge],
+        max_payments=1,
+        prepay_months=2,
+        at=T0,
+    )
+    assert order.expected_amount_agorot == MONTHLY_AGOROT * 3
+    assert order.prepay_months == 2
+
+
+def test_a_family_who_owes_nothing_can_still_pay_a_term_up_front(
+    tenant_session, studio, a_priced_student
+):
+    """**The state the whole request is about.** A family in good standing has no open
+    charge, so the old `charge_ids` minimum of one refused them outright — the card route
+    was reachable only by families already in arrears."""
+    order = OrderService(tenant_session).create(
+        studio.id,
+        payer_person_id=a_priced_student.payer_person_id,
+        charge_ids=[],
+        max_payments=1,
+        prepay_months=3,
+        at=T0,
+    )
+    assert order.expected_amount_agorot == MONTHLY_AGOROT * 3
+
+
+def test_an_order_that_buys_nothing_at_all_is_still_refused(
+    tenant_session, studio, a_priced_student
+):
+    """No charges and no months forward is an order for zero shekels, which is what
+    `payment_order_amount_positive` forbids and what would open uPay on an empty basket."""
+    with pytest.raises(RefusedError):
+        OrderService(tenant_session).create(
+            studio.id,
+            payer_person_id=a_priced_student.payer_person_id,
+            charge_ids=[],
+            max_payments=1,
+            prepay_months=0,
+            at=T0,
+        )
+
+
+def test_months_forward_are_refused_for_a_payer_with_no_plan(tenant_session, app_session, studio):
+    """A payer with no priced active student has a monthly total of zero, so "3 months"
+    prices at nothing. Refusing beats opening uPay for the charges alone and silently
+    dropping the months the family thought they were buying."""
+    stranger = Person(studio_id=studio.id, first_name="לא", last_name="משלם")
+    app_session.add(stranger)
+    app_session.commit()
+    with pytest.raises(RefusedError):
+        OrderService(tenant_session).create(
+            studio.id,
+            payer_person_id=stranger.id,
+            charge_ids=[],
+            max_payments=1,
+            prepay_months=3,
+            at=T0,
+        )
+
+
+def test_a_negative_month_count_is_refused(
+    tenant_session, studio, a_priced_student, an_open_charge
+):
+    """It would subtract from what the family owes and open uPay for less than the debt."""
+    with pytest.raises(RefusedError):
+        OrderService(tenant_session).create(
+            studio.id,
+            payer_person_id=a_priced_student.payer_person_id,
+            charge_ids=[an_open_charge],
+            max_payments=1,
+            prepay_months=-1,
+            at=T0,
+        )
