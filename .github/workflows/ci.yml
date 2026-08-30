@@ -37,6 +37,19 @@ jobs:
     env:
       DATABASE_URL: postgresql+psycopg://studio_app@127.0.0.1:55433/studio_manager
       MIGRATION_DATABASE_URL: postgresql+psycopg://studio_migrator@127.0.0.1:55433/studio_manager
+      # **A throwaway key, and it has to be HERE rather than in a secret.**
+      #
+      # `EncryptedJSON`/`EncryptedBytes` refuse to write without one, so every test that
+      # touches the demo studio -- persona switching, demo reset, §19.3's nine seeded
+      # people -- errored in setup with "ENCRYPTION_KEYS is empty". Locally they pass
+      # because a developer has a .env; CI has none, and nothing said so.
+      #
+      # This is the same all-zero value .env.example ships and is deliberately not a
+      # GitHub secret: a secret would make CI unrunnable from a fork and would imply
+      # these bytes protect something. They protect fixtures. Real keys live in Railway
+      # and never in a file (app/core/encryption.py, CLAUDE.md § Core mechanisms).
+      ENCRYPTION_KEYS: '{"1":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="}'
+      ENCRYPTION_ACTIVE_KEY_VERSION: 1
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

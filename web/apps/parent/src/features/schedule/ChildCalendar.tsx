@@ -355,9 +355,16 @@ export function ChildCalendar({
     let live = true
     void (async () => {
       // No group, no student. See the module header.
-      const loaded_ = await client.listSessions({ from: bounds.from, to: bounds.to })
-      if (!live) return
-      setSessions(loaded_)
+      //
+      // **Caught, and `loaded` stays false on a failure.** An uncaught rejection here is a
+      // floating promise that outlives the screen — it surfaced as an unhandled error in
+      // CI, attributed to whichever unrelated test happened to be running when a teardown
+      // pulled `fetch` out from under an in-flight read. It is also the honest shape: this
+      // flag is what licenses `אין שיעורים בחודש הזה`, and a read that FAILED has not
+      // established that the month is empty. Not knowing renders as not knowing.
+      const rows = await client.listSessions({ from: bounds.from, to: bounds.to }).catch(() => null)
+      if (!live || rows === null) return
+      setSessions(rows)
       setLoaded(true)
     })()
     return () => {
