@@ -16,13 +16,21 @@ from __future__ import annotations
 import uuid
 
 from fastapi import APIRouter, HTTPException, Request, status
+from sqlalchemy import select
 
-from app.core.auth_context import require_roles
+from app.core.auth_context import AnyStaff
 from app.core.clock import now
 from app.core.tenancy import TenantSessionDep
-from app.models.people import Student
+from app.models.people import Student, StudentPickupContact
+from app.models.person import Guardian, Person
 from app.routers.health_templates import client_ip
-from app.schemas.agreement import AgreementStatusOut, ClubTermsIn, RegistrationIn
+from app.schemas.agreement import (
+    AgreementStatusOut,
+    ClubTermsIn,
+    PickupContactOut,
+    RegistrationIn,
+    StudentRegistrationOut,
+)
 from app.services.health.agreement import (
     AgreementService,
     NationalIdInvalidError,
@@ -223,4 +231,46 @@ def accept_club_terms(
     )
 
 
-__all__ = ["router", "require_roles"]
+@router.get("/students/{student_id}/registration", response_model=StudentRegistrationOut)
+def read_student_registration(
+    _: AnyStaff, request: Request, student_id: uuid.UUID, session: TenantSessionDep
+) -> StudentRegistrationOut:
+    """Who may collect this child, and (for a manager) the עמותה's aliyah figures.
+
+    **`AnyStaff`, which includes coaches, and that is the whole point of the field.** A
+    pickup contact only does its job if the person at the door can read it; storing it
+    behind a manager-only rule would have made it write-only data. This is why the contacts
+    live on their own table rather than inside `health_declaration.answers_encrypted` --
+    §11.1's boundary is right for medical answers and wrong for "who is allowed to take this
+    child home".
+
+    `aliyah_years` is the opposite call: national-origin data, for the funding return, and a
+    coach at the door has no use for it. Withheld below manager.
+    """
+    student = _student(session, student_id)
+    contacts = [
+        PickupContactOut(
+            name=str((row.contact_encrypted or {}).get("name") or ""),
+            phone=str((row.contact_encrypted or {}).get("phone") or ""),
+            relation=(row.contact_encrypted or {}).get("relation"),
+        )
+        for row in session.execute(
+            select(StudentPickupContact)
+            .where(StudentPickupContact.student_id == student.id)
+            .order_by(StudentPickupContact.created_at)
+        ).scalars()
+    ]
+    contacts = [c for c in contacts if c.name]
+
+    roles = set(getattr(request.state, "roles", ()) or ())
+    aliyah: list[str] | None = None
+    if roles & {"owner", "manager"}:
+        aliyah = []
+        for guardian in session.execute(
+            select(Guardian).where(Guardian.student_id == student.id)
+        ).scalars():
+            person = session.get(Person, guardian.person_id)
+            if person is not None and person.aliyah_year_encrypted:
+                aliyah.append(str(person.aliyah_year_encrypted))
+
+    return StudentRegistrationOut(pickup_contacts=contacts, aliyah_years=aliyah)

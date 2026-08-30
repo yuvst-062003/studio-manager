@@ -142,6 +142,7 @@ export const health: Bundle = {
   'registration.pickup': 'Authorised for collection',
   'registration.pickupHint':
     'People other than the parents who may collect the child from the class',
+  'registration.pickupNone': 'No additional people are authorised to collect',
   'registration.pickupAdd': 'Add a person',
   'registration.pickupRemove': 'Remove',
   'registration.nationalId': 'ID number',

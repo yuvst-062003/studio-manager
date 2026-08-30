@@ -168,7 +168,7 @@ def test_a_manager_filing_writes_the_parents_id_not_their_own(
     assert parent_row.national_id_encrypted is not None
 
 
-def test_a_manager_accepting_the_terms_unblocks_the_FAMILY(
+def test_a_manager_accepting_the_terms_unblocks_the_family(
     client, as_manager, as_guardian_of, a_student
 ):
     """**The other half of the same bug.** The gate checks whether the PARENT holds the club's
@@ -240,3 +240,87 @@ def test_the_gate_opens_only_when_all_three_have_landed(
     body = _status(client, parent, a_student).json()
     assert body["health_signed"] is True
     assert body["complete"] is True
+
+
+# -- who may collect the child, and who may read the funding figures ---------------------
+def _with_pickups(client, caller, student_id):
+    return client.put(
+        f"/api/v1/students/{student_id}/agreement/registration",
+        json=_registration(
+            pickup_contacts=[
+                {"name": "סבתא רותי", "phone": "050-1111111", "relation": "סבתא"},
+                {"name": "דוד יוסי", "phone": "050-2222222"},
+            ],
+            signer={"national_id": VALID_PARENT_ID, "aliyah_year": "2019"},
+        ),
+        headers=caller.headers,
+    )
+
+
+def test_a_coach_can_read_who_may_collect_the_child(
+    client, as_guardian_of, as_lead_coach, a_student
+):
+    """**The reason this field exists at all.** A pickup contact only does its job if the
+    person at the door can read it. Storing it behind the manager-only health rule would have
+    made it write-only data -- which is exactly why it lives on its own table rather than in
+    `health_declaration.answers_encrypted`."""
+    parent = as_guardian_of(a_student)
+    assert _with_pickups(client, parent, a_student).status_code == 200
+
+    response = client.get(
+        f"/api/v1/students/{a_student}/registration", headers=as_lead_coach.headers
+    )
+    assert response.status_code == 200
+    names = [c["name"] for c in response.json()["pickup_contacts"]]
+    assert names == ["סבתא רותי", "דוד יוסי"]
+
+
+def test_a_coach_is_not_shown_the_aliyah_year(
+    client, as_guardian_of, as_lead_coach, a_student
+):
+    """National-origin data, collected for the עמותה's funding return. A coach at the door
+    has no use for it. `None` rather than `[]`, so "not shown to you" stays distinguishable
+    from "this family gave none"."""
+    parent = as_guardian_of(a_student)
+    _with_pickups(client, parent, a_student)
+    body = client.get(
+        f"/api/v1/students/{a_student}/registration", headers=as_lead_coach.headers
+    ).json()
+    assert body["aliyah_years"] is None
+
+
+def test_a_manager_sees_the_aliyah_year(client, as_guardian_of, as_manager, a_student):
+    parent = as_guardian_of(a_student)
+    _with_pickups(client, parent, a_student)
+    body = client.get(
+        f"/api/v1/students/{a_student}/registration", headers=as_manager.headers
+    ).json()
+    assert body["aliyah_years"] == ["2019"]
+
+
+def test_a_guardian_may_not_read_it_through_the_staff_route(
+    client, as_guardian_of, a_student
+):
+    """`AnyStaff`. A parent reads their own family through the agreement flow, not through
+    the door surface -- and a route a guardian could call is a route that would need its own
+    'is this your child' check to stop it becoming a directory."""
+    parent = as_guardian_of(a_student)
+    assert (
+        client.get(f"/api/v1/students/{a_student}/registration", headers=parent.headers).status_code
+        == 403
+    )
+
+
+def test_a_nameless_contact_never_reaches_the_door(
+    client, as_guardian_of, as_lead_coach, a_student
+):
+    parent = as_guardian_of(a_student)
+    client.put(
+        f"/api/v1/students/{a_student}/agreement/registration",
+        json=_registration(pickup_contacts=[{"name": "  ", "phone": "050-9999999"}]),
+        headers=parent.headers,
+    )
+    body = client.get(
+        f"/api/v1/students/{a_student}/registration", headers=as_lead_coach.headers
+    ).json()
+    assert body["pickup_contacts"] == []

@@ -48,7 +48,8 @@ def _save(tenant_session, student, person_id, **overrides):
         "signer": {"national_id": VALID_PARENT_ID},
         "other_parent": None,
         "pickup_contacts": [],
-        "signed_by_person_id": person_id,
+        "subject_person_id": person_id,
+        "actor_person_id": person_id,
         "at": T0,
     }
     kwargs.update(overrides)
@@ -363,3 +364,76 @@ def test_an_anonymous_reader_sees_the_terms_as_unaccepted(tenant_session, studen
     exactly the caller least entitled to it."""
     status = agreement_status(tenant_session, student_row, signer_person_id=None)
     assert not status.terms_accepted
+
+
+# -- publishing new questions re-gates every family --------------------------------------
+def test_publishing_a_new_template_version_forces_everyone_to_sign_again(
+    tenant_session, student_row, signer, studio, app_session
+):
+    """**The rule the whole gate turns on once a manager edits the form.**
+
+    `student.health_status` only records that a declaration exists. A manager who publishes a
+    new version has changed what the club asks, and every signature on file answered a
+    different form. §11.6 already says this about consent -- "agreeing to v1 is not agreeing
+    to v2" -- and questions are no different: an attestation to wording nobody agreed to is
+    not an attestation.
+    """
+    from app.models.health import HealthDeclaration, HealthFormTemplate
+    from app.services.structure.health_templates import (
+        FULL_TEMPLATE_SCHEMA,
+        ensure_full_template,
+    )
+
+    template = ensure_full_template(tenant_session, studio.id, at=T0)
+    tenant_session.add(
+        HealthDeclaration(
+            studio_id=studio.id,
+            student_id=student_row.id,
+            template_id=template.id,
+            template_version=template.version,
+            answers_encrypted={"asthma": False},
+            derived_flags={},
+            signed_by_person_id=signer.id,
+            signed_at=T0,
+        )
+    )
+    student_row.health_status = "signed"
+    tenant_session.flush()
+
+    assert agreement_status(
+        tenant_session, student_row, signer_person_id=signer.id
+    ).health_signed, "signed against the current questions"
+
+    # The manager publishes a new version. Nothing about the declaration row changes.
+    tenant_session.add(
+        HealthFormTemplate(
+            studio_id=studio.id,
+            kind="full",
+            version=FULL_TEMPLATE_SCHEMA["version"] + 1,
+            schema={**FULL_TEMPLATE_SCHEMA, "version": FULL_TEMPLATE_SCHEMA["version"] + 1},
+            published_at=T0,
+            created_at=T0,
+        )
+    )
+    tenant_session.flush()
+
+    status = agreement_status(tenant_session, student_row, signer_person_id=signer.id)
+    assert not status.health_signed, "the old signature answered questions nobody asks now"
+    assert not status.complete, "and the gate closes again"
+    assert student_row.health_status == "signed", (
+        "without rewriting history: the row still records that they DID sign, and the PDF "
+        "still renders against the template they signed"
+    )
+
+
+def test_a_studio_with_no_published_template_does_not_open_the_gate(
+    tenant_session, student_row, signer, app_session
+):
+    """The fault direction. If there is no published template there is nothing to have signed
+    against, and defaulting to `True` would let everybody through on the one failure where
+    nobody can sign at all."""
+    student_row.health_status = "signed"
+    tenant_session.flush()
+    assert not agreement_status(
+        tenant_session, student_row, signer_person_id=signer.id
+    ).health_signed

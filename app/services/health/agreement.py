@@ -36,7 +36,7 @@ from sqlalchemy import select
 
 from app.core.national_id import InvalidNationalIdError, normalize_national_id
 from app.core.tenancy import TenantSession
-from app.models.health import ConsentRecord
+from app.models.health import ConsentRecord, HealthDeclaration, HealthFormTemplate
 from app.models.people import Student, StudentPickupContact
 from app.models.person import Guardian, Person
 from app.services.audit import AuditService
@@ -171,10 +171,51 @@ def agreement_status(
         )
 
     return AgreementStatus(
-        health_signed=student.health_status == "signed",
+        health_signed=_signed_against_current_questions(session, student),
         registration_complete=bool(registration_complete),
         terms_accepted=terms_accepted,
     )
+
+
+def _signed_against_current_questions(session: TenantSession, student: Student) -> bool:
+    """Signed, **and signed against the questions being asked today**.
+
+    `student.health_status` only records that a declaration exists. A manager who publishes a
+    new template version has changed what the club asks -- added a question, reworded one --
+    and every signature already on file answered a different form. Treating those as current
+    would leave the club holding attestations to wording nobody agreed to.
+
+    This is the same rule §11.6 already applies to consent: "agreeing to v1 of a privacy policy
+    is not agreeing to v2". `ConsentService.outstanding` enforces it for the club's terms; this
+    enforces it for the questions. Publishing therefore re-gates every family, which is what
+    publishing MEANS.
+
+    **A missing published template does not open the gate.** If the lookup fails there is
+    nothing to have signed against, and defaulting to `True` would let everyone through on the
+    one fault where nobody can sign at all.
+    """
+    if student.health_status != "signed":
+        return False
+    declaration = session.execute(
+        select(HealthDeclaration).where(HealthDeclaration.student_id == student.id)
+    ).scalar_one_or_none()
+    if declaration is None:
+        return False
+    current = (
+        session.execute(
+            select(HealthFormTemplate)
+            .where(
+                HealthFormTemplate.kind == "full",
+                HealthFormTemplate.published_at.is_not(None),
+            )
+            .order_by(HealthFormTemplate.version.desc())
+        )
+        .scalars()
+        .first()
+    )
+    if current is None:
+        return False
+    return declaration.template_version == current.version
 
 
 def _set_national_id(person: Person, raw: str | None, *, field: str) -> None:

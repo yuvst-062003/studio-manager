@@ -92,3 +92,30 @@ class AgreementStatusOut(BaseModel):
     complete: bool
     #: What the terms step must echo back if it renders. Sent so the client never hard-codes it.
     club_terms_version: int
+
+
+class PickupContactOut(BaseModel):
+    """One authorised collector, as a coach at the door reads it.
+
+    Name and phone, nothing else. The point of the field is that somebody can check who is
+    standing there, and a coach who cannot read it is a coach the field does not help.
+    """
+
+    name: str
+    phone: str
+    relation: str | None = None
+
+
+class StudentRegistrationOut(BaseModel):
+    """`טופס הרשמה` blocks 3 and 4, for staff.
+
+    **Two access levels in one response, deliberately.** `pickup_contacts` is safety
+    information a coach needs at the door. `aliyah_years` is national-origin data collected
+    for the עמותה's funding return, which a coach has no reason to see -- it is `None` for
+    anyone below manager rather than a second endpoint, so the door surface stays one call.
+    """
+
+    pickup_contacts: list[PickupContactOut] = Field(default_factory=list)
+    #: Manager and owner only. `None` (not `[]`) for a coach, so "not shown to you" is
+    #: distinguishable from "this family gave none".
+    aliyah_years: list[str] | None = None

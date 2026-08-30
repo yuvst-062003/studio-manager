@@ -187,6 +187,7 @@ export const health: Bundle = {
   'registration.parents': 'פרטי ההורים',
   'registration.pickup': 'מורשי איסוף',
   'registration.pickupHint': 'אנשים נוספים (חוץ מההורים) שרשאים לאסוף את הילד/ה מהחוג',
+  'registration.pickupNone': 'לא צוינו מורשי איסוף נוספים',
   'registration.pickupAdd': 'הוספת מורשה איסוף',
   'registration.pickupRemove': 'הסרה',
   'registration.nationalId': 'ת.ז.',

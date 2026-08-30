@@ -4606,6 +4606,36 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/students/{student_id}/registration": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Student Registration
+         * @description Who may collect this child, and (for a manager) the עמותה's aliyah figures.
+         *
+         *     **`AnyStaff`, which includes coaches, and that is the whole point of the field.** A
+         *     pickup contact only does its job if the person at the door can read it; storing it
+         *     behind a manager-only rule would have made it write-only data. This is why the contacts
+         *     live on their own table rather than inside `health_declaration.answers_encrypted` --
+         *     §11.1's boundary is right for medical answers and wrong for "who is allowed to take this
+         *     child home".
+         *
+         *     `aliyah_years` is the opposite call: national-origin data, for the funding return, and a
+         *     coach at the door has no use for it. Withheld below manager.
+         */
+        get: operations["read_student_registration_api_v1_students__student_id__registration_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/students/{student_id}/status-history": {
         parameters: {
             query?: never;
@@ -8715,6 +8745,21 @@ export interface components {
             /** Relation */
             relation?: string | null;
         };
+        /**
+         * PickupContactOut
+         * @description One authorised collector, as a coach at the door reads it.
+         *
+         *     Name and phone, nothing else. The point of the field is that somebody can check who is
+         *     standing there, and a coach who cannot read it is a coach the field does not help.
+         */
+        PickupContactOut: {
+            /** Name */
+            name: string;
+            /** Phone */
+            phone: string;
+            /** Relation */
+            relation?: string | null;
+        };
         /** PlanChangeIn */
         PlanChangeIn: {
             /**
@@ -10713,6 +10758,21 @@ export interface components {
             /** Items */
             items: components["schemas"]["StudentPricePlanRow"][];
         };
+        /**
+         * StudentRegistrationOut
+         * @description `טופס הרשמה` blocks 3 and 4, for staff.
+         *
+         *     **Two access levels in one response, deliberately.** `pickup_contacts` is safety
+         *     information a coach needs at the door. `aliyah_years` is national-origin data collected
+         *     for the עמותה's funding return, which a coach has no reason to see -- it is `None` for
+         *     anyone below manager rather than a second endpoint, so the door surface stays one call.
+         */
+        StudentRegistrationOut: {
+            /** Aliyah Years */
+            aliyah_years?: string[] | null;
+            /** Pickup Contacts */
+            pickup_contacts?: components["schemas"]["PickupContactOut"][];
+        };
         /** StudentStatusHistoryListResponse */
         StudentStatusHistoryListResponse: {
             /** Items */
@@ -10751,6 +10811,8 @@ export interface components {
          *     `3b`'s column shows what a manager reads rather than what a client would have to join.
          */
         StudentSummaryOut: {
+            /** Agreement Complete */
+            agreement_complete?: boolean | null;
             /** Attendance Percent */
             attendance_percent?: number | null;
             /** Birthdate */
@@ -18812,6 +18874,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StudentPricePlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_student_registration_api_v1_students__student_id__registration_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudentRegistrationOut"];
                 };
             };
             /** @description Validation Error */

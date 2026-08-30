@@ -8082,6 +8082,36 @@
         "title": "PickupContactIn",
         "type": "object"
       },
+      "PickupContactOut": {
+        "description": "One authorised collector, as a coach at the door reads it.\n\nName and phone, nothing else. The point of the field is that somebody can check who is\nstanding there, and a coach who cannot read it is a coach the field does not help.",
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "phone": {
+            "title": "Phone",
+            "type": "string"
+          },
+          "relation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Relation"
+          }
+        },
+        "required": [
+          "name",
+          "phone"
+        ],
+        "title": "PickupContactOut",
+        "type": "object"
+      },
       "PlanChangeIn": {
         "properties": {
           "to_price_plan_id": {
@@ -12359,6 +12389,34 @@
         "title": "StudentPricePlansPage",
         "type": "object"
       },
+      "StudentRegistrationOut": {
+        "description": "`טופס הרשמה` blocks 3 and 4, for staff.\n\n**Two access levels in one response, deliberately.** `pickup_contacts` is safety\ninformation a coach needs at the door. `aliyah_years` is national-origin data collected\nfor the עמותה's funding return, which a coach has no reason to see -- it is `None` for\nanyone below manager rather than a second endpoint, so the door surface stays one call.",
+        "properties": {
+          "aliyah_years": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Aliyah Years"
+          },
+          "pickup_contacts": {
+            "items": {
+              "$ref": "#/components/schemas/PickupContactOut"
+            },
+            "title": "Pickup Contacts",
+            "type": "array"
+          }
+        },
+        "title": "StudentRegistrationOut",
+        "type": "object"
+      },
       "StudentStatusHistoryListResponse": {
         "properties": {
           "items": {
@@ -12433,6 +12491,17 @@
       "StudentSummaryOut": {
         "description": "The row dashboard `3b` and staff `9h` render, and the only student shape a coach\nreceives from a list.\n\n`group_names` and not `group_ids`: C11 makes several live enrollments normal, and\n`3b`'s column shows what a manager reads rather than what a client would have to join.",
         "properties": {
+          "agreement_complete": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agreement Complete"
+          },
           "attendance_percent": {
             "anyOf": [
               {
@@ -26364,6 +26433,50 @@
         "summary": "Student Price Plan",
         "tags": [
           "people"
+        ]
+      }
+    },
+    "/api/v1/students/{student_id}/registration": {
+      "get": {
+        "description": "Who may collect this child, and (for a manager) the עמותה's aliyah figures.\n\n**`AnyStaff`, which includes coaches, and that is the whole point of the field.** A\npickup contact only does its job if the person at the door can read it; storing it\nbehind a manager-only rule would have made it write-only data. This is why the contacts\nlive on their own table rather than inside `health_declaration.answers_encrypted` --\n§11.1's boundary is right for medical answers and wrong for \"who is allowed to take this\nchild home\".\n\n`aliyah_years` is the opposite call: national-origin data, for the funding return, and a\ncoach at the door has no use for it. Withheld below manager.",
+        "operationId": "read_student_registration_api_v1_students__student_id__registration_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentRegistrationOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Student Registration",
+        "tags": [
+          "health"
         ]
       }
     },

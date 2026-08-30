@@ -142,6 +142,7 @@ export const health: Bundle = {
   'registration.pickup': 'Кому разрешено забирать',
   'registration.pickupHint':
     'Люди, кроме родителей, которым разрешено забирать ребёнка с занятия',
+  'registration.pickupNone': 'Дополнительные лица не указаны',
   'registration.pickupAdd': 'Добавить человека',
   'registration.pickupRemove': 'Удалить',
   'registration.nationalId': 'Удостоверение личности',
