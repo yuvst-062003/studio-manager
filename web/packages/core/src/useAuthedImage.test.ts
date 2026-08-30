@@ -12,10 +12,23 @@ afterEach(() => {
 
 describe('useAuthedImage', () => {
   it('fetches the path through the API client and yields an object URL', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => new Response(new Blob(['png-bytes']), { status: 200 })),
-    )
+    // **The body is a string, and `new Blob([...])` never worked here at all.**
+    //
+    // Under `environment: 'jsdom'` the two halves of that expression come from different
+    // realms: `Blob` is jsdom's, `Response` is Node's undici — and undici does not accept
+    // a foreign Blob as a BodyInit. Measured, not assumed: on Node 24
+    // `await new Response(new Blob(['png-bytes'])).text()` is the literal string
+    // `"[object Blob]"`. The bytes this test believed it was serving were never in the
+    // response, and it passed anyway because the hook only needs SOME blob back.
+    //
+    // Node 22's converter is stricter and throws instead of stringifying, so there the
+    // constructor rejected, `apiFetch` rejected, the hook's own `.catch` swallowed it and
+    // `result.current` stayed null. That is the CI failure — a vacuous pass on one Node
+    // and a hard failure on the other, from the same wrong line.
+    //
+    // Nothing here needs a Blob going IN. What is under test is that bytes coming BACK
+    // become an object URL, and `response.blob()` produces one from a string body.
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('png-bytes', { status: 200 })))
     const createObjectURL = vi.fn(() => 'blob:local-1')
     vi.stubGlobal('URL', Object.assign(URL, { createObjectURL, revokeObjectURL: vi.fn() }))
 
