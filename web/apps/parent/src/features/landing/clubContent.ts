@@ -71,6 +71,12 @@ export type ClubContent = {
    *  `landing.logo_url` always wins. Staging carries no uploaded logo, and a landing page
    *  with no mark on it is not something to hand a manager. */
   logoUrl?: string
+  /** The club's name as this locale writes it. `studio.name` is one `String(200)` column
+   *  with no locale, so an English reader saw "מועדון גלדיאטור" in the header, the footer
+   *  and every photo's alt text. The ADDRESS is deliberately NOT translated the same way
+   *  (decision 2026-08-31): it is one line of Hebrew that Israeli map providers resolve,
+   *  and the navigate button builds its query from it. */
+  displayName: string
   seasonBadge: string
   hero: { prefix: string; middle: string; accent: string; lead: string }
   coach: {
@@ -174,6 +180,7 @@ type Pair<T> = readonly [T, T]
 // ---------------------------------------------------------------------------
 
 type ClubCopy = {
+  displayName: string
   seasonBadge: string
   hero: { prefix: string; middle: string; accent: string; lead: string }
   coach: {
@@ -201,6 +208,8 @@ type ClubCopy = {
 
 /** The approved Stitch copy, verbatim. The other two locales are translations OF THIS. */
 const HE: ClubCopy = {
+  // Matches `studio.name`, so the Hebrew page is unchanged by this override.
+  displayName: 'מועדון גלדיאטור',
   // The Stitch screen said 2024-2025; the season is data that ages, which is exactly why
   // this belongs in settings. Updated to the season starting now.
   seasonBadge: 'עונת 2026-2027 החלה',
@@ -318,6 +327,9 @@ const HE: ClubCopy = {
 }
 
 const EN: ClubCopy = {
+  // The crest already reads "GLADIATOR TEAM" in Latin, so this is the club's own mark
+  // rather than an invention.
+  displayName: 'Gladiator Judo Club',
   seasonBadge: 'The 2026–2027 season has begun',
   hero: {
     prefix: 'Judo:',
@@ -434,6 +446,7 @@ const EN: ClubCopy = {
 }
 
 const RU: ClubCopy = {
+  displayName: 'Клуб дзюдо «Гладиатор»',
   seasonBadge: 'Сезон 2026–2027 начался',
   hero: {
     prefix: 'Дзюдо:',
@@ -563,6 +576,7 @@ function resolve(copy: ClubCopy): ClubContent {
     // `public/clubs/` — served from the app's own origin, so it needs no object store and
     // no upload. Replaced the moment the club uploads a logo through the הגדרות panel.
     logoUrl: LOGO_URL,
+    displayName: copy.displayName,
     seasonBadge: copy.seasonBadge,
     hero: copy.hero,
     coach: {

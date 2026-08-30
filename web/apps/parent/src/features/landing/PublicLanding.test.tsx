@@ -409,14 +409,24 @@ describe('booking — every call to action reaches the flow', () => {
 describe('the designed page speaks the chosen language', () => {
   const GLADIATOR: Landing = { ...LANDING, slug: 'gladiator', studio_name: 'מועדון גלדיאטור' }
 
-  // A Hebrew letter anywhere in the club's own sections means untranslated content. The
-  // club's NAME is excluded on purpose: "מועדון גלדיאטור" is data in the club's own
-  // language, and translating a proper name is not what this asserts.
+  // A Hebrew letter anywhere in the club's own sections means untranslated content.
   const HEBREW = /[֐-׿]/
 
   it.each([
-    { locale: 'en' as const, coach: 'Leadership', plans: 'Training plans', slot: 'Judo — group 1' },
-    { locale: 'ru' as const, coach: 'Лидерство', plans: 'Тарифы тренировок', slot: 'Дзюдо — группа 1' },
+    {
+      locale: 'en' as const,
+      coach: 'Leadership',
+      plans: 'Training plans',
+      slot: 'Judo — group 1',
+      name: 'Gladiator Judo Club',
+    },
+    {
+      locale: 'ru' as const,
+      coach: 'Лидерство',
+      plans: 'Тарифы тренировок',
+      slot: 'Дзюдо — группа 1',
+      name: 'Клуб дзюдо «Гладиатор»',
+    },
   ])('renders the club content in $locale, with no Hebrew left behind', async (row) => {
     render(<PublicLanding slug="gladiator" locale={row.locale} client={clientReturning(GLADIATOR)} />)
     const coach = await screen.findByTestId('landing-coach')
@@ -425,9 +435,26 @@ describe('the designed page speaks the chosen language', () => {
     // The timetable is the easiest place for an untranslated string to hide: the same
     // lesson repeats across days, so one missed key shows up on half the grid.
     expect(screen.getByTestId('landing-schedule')).toHaveTextContent(row.slot)
-    for (const section of ['landing-coach', 'landing-schedule', 'landing-plans', 'landing-voices']) {
+    // `studio.name` has no locale, so the club names itself per language instead. The
+    // FOOTER is the check: it is the one place the name sits with no Hebrew around it —
+    // the header also holds the language pills, and "עברית" is Hebrew there on purpose.
+    expect(screen.getByTestId('landing-footer')).toHaveTextContent(row.name)
+    for (const section of [
+      'landing-coach',
+      'landing-schedule',
+      'landing-plans',
+      'landing-voices',
+      'landing-footer',
+    ]) {
       expect(screen.getByTestId(section).textContent ?? '').not.toMatch(HEBREW)
     }
+  })
+
+  it('leaves the club’s stored name alone for a club with no designed content', async () => {
+    // The override is content, not a rule about names: every other club has exactly one
+    // name in the database and must keep rendering it.
+    render(<PublicLanding slug="judo-tel-aviv" locale="en" client={clientReturning(LANDING)} />)
+    expect(await screen.findByTestId('landing-footer')).toHaveTextContent(LANDING.studio_name)
   })
 
   it('keeps the prices and the hours identical in every language', async () => {

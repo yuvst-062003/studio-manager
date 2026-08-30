@@ -337,6 +337,9 @@ export function PublicLanding({
   // `apiUrl` (2026-08-30). The bundled fallback is served by this app and must not be
   // rewritten — hence the rewrite is keyed on `logoIsRemote`, not applied to both.
   const logoSrc = logoUrl !== null && logoIsRemote ? apiUrl(logoUrl) : logoUrl
+  // `studio.name` is one column with no locale. A club with designed content names itself
+  // per language; every other club keeps its single stored name.
+  const clubName = content?.displayName ?? landing.studio_name
   const hasSchedule = groups.some((group) => (group.training_weekdays ?? []).length > 0)
 
   // Derived, not synced: an explicit pick wins, then the round trip's `?book=`, then the
@@ -377,7 +380,7 @@ export function PublicLanding({
             // tenant-scoped one needs a token a stranger does not have.
             <img
               src={logoSrc ?? undefined}
-              alt={landing.studio_name}
+              alt={clubName}
               className="gl-logo"
               data-testid="landing-logo"
               onError={logoIsRemote ? () => setLogoFailed(true) : undefined}
@@ -386,7 +389,7 @@ export function PublicLanding({
           {/* The club's name is DATA, not a translated string: it is what the club
               calls itself, in whatever language they chose. */}
           <h1 className="gl-brand">
-            <bdi>{landing.studio_name}</bdi>
+            <bdi>{clubName}</bdi>
           </h1>
           <div className="gl-header-end">
             {anchors.length > 0 ? (
@@ -510,7 +513,7 @@ export function PublicLanding({
                   {photos.map((url) => (
                     // Alt text: the club's name — the photos are the club, and the API
                     // carries no per-photo caption to say more.
-                    <img key={url} src={url} alt={landing.studio_name} className="gl-photo" />
+                    <img key={url} src={url} alt={clubName} className="gl-photo" />
                   ))}
                 </div>
               ) : null}
@@ -653,7 +656,7 @@ export function PublicLanding({
         <footer className="gl-footer" data-testid="landing-footer">
           {logoSrc ? <img src={logoSrc} alt="" className="gl-footer-logo" /> : null}
           <p className="gl-footer-brand">
-            <bdi>{landing.studio_name}</bdi>
+            <bdi>{clubName}</bdi>
           </p>
           <p className="gl-footer-offer">{t(locale, 'people.landing.footerOffer')}</p>
           {anchors.length > 0 ? (
