@@ -10187,6 +10187,11 @@ export interface components {
             amount_agorot: number;
             /** Plan Name */
             plan_name: string;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
             /** Student Name */
             student_name: string;
             /** Url */

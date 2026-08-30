@@ -66,8 +66,8 @@ import { TrainingPlanSection } from './features/billing/TrainingPlanSection'
 // §6.1's plan step — 300 / 400 / 550 and how the money moves, asked once, right after the
 // health declaration. Every piece of it existed behind `#/plan/<studentId>` and nothing in
 // the first-run sequence reached it, so a family finished signup with no plan at all.
-import { PlanGate } from './features/billing/PlanGate'
-import { makeTrainingPlanClient } from './features/billing/trainingPlanClient'
+import { PaymentSetupGate } from './features/billing/PaymentSetup'
+import type { SetupChild, StandingOrderLink } from './features/billing/PaymentSetup'
 import { makeParentBillingClient, submitUpayForm } from './features/billing/PaymentsSection'
 import { ShopSection } from './features/billing'
 // §6.1 step 6 — the BLOCKING declaration. Mounted here because nothing imported it
@@ -237,23 +237,7 @@ function AuthedApp() {
   // keyed on the client, so a fresh object every render would re-fetch forever — the
   // month for 12b, the club for 13a.
   const scheduleClient = useMemo(() => makeParentScheduleClient(apiFetch), [])
-  const trainingPlanClient = useMemo(() => makeTrainingPlanClient(apiFetch), [])
   const billingClient = useMemo(() => makeParentBillingClient(apiFetch), [])
-  // This payer's own monthly total, so the plan step can quote what the card will really
-  // charge. A family with two children is quoted for both, because that is what the order
-  // is priced at and what credit is measured in. Zero until it loads, and the step falls
-  // back to the chosen plan's own price — right for the one-child family, which is most.
-  const [prepayMonthlyTotalAgorot, setPrepayMonthlyTotal] = useState(0)
-  useEffect(() => {
-    let live = true
-    void apiFetch('/api/v1/me/prepay-terms')
-      .then(async (r) => (r.ok ? ((await r.json()) as { monthly_total_agorot: number }) : null))
-      .then((row) => live && row && setPrepayMonthlyTotal(row.monthly_total_agorot))
-      .catch(() => undefined)
-    return () => {
-      live = false
-    }
-  }, [])
   const peopleClient = useMemo(() => makePeopleClient(apiFetch), [])
   const eventsClient = useMemo(() => makeParentEventsClient(apiFetch), [])
   const beltsClient = useMemo(() => makeParentBeltsClient(apiFetch), [])
@@ -274,6 +258,35 @@ function AuthedApp() {
   // a network blip locking a family out of the cached PWA would punish exactly the
   // parent §6.5 worked hardest to keep.
   const [gatedChildren, setGatedChildren] = useState<readonly GatedStudent[] | null>(null)
+  const [setupChildren, setSetupChildren] = useState<readonly SetupChild[]>([])
+  /** §5.10's mandate links, one per child. Read live and never cached: a stale link signs
+   *  a family up at the wrong amount and nobody finds out for months. */
+  const [mandateLinks, setMandateLinks] = useState<readonly StandingOrderLink[]>([])
+  useEffect(() => {
+    let live = true
+    void apiFetch('/api/v1/me/standing-order-links')
+      .then(async (r) =>
+        r.ok
+          ? ((await r.json()) as {
+              items: { student_id: string; amount_agorot: number; url: string }[]
+            })
+          : { items: [] },
+      )
+      .then((body) => {
+        if (!live) return
+        setMandateLinks(
+          body.items.map((row) => ({
+            studentId: row.student_id,
+            amountAgorot: row.amount_agorot,
+            url: row.url,
+          })),
+        )
+      })
+      .catch(() => undefined)
+    return () => {
+      live = false
+    }
+  }, [])
   const [declarationsSigned, setDeclarationsSigned] = useState(0)
   // `2a` §7's unread badge. Fetched by the SHELL and not by `InboxScreen`, because a badge
   // that appeared only after the inbox had been opened would announce news the parent had
@@ -317,6 +330,11 @@ function AuthedApp() {
       )
       .then((data) => {
         if (!alive) return
+        // The payment step needs the parts, not the joined label: it renders a child's
+        // own name beside their price and matches their mandate link by id.
+        setSetupChildren(
+          data.items.map(({ id, first_name, last_name }) => ({ id, first_name, last_name })),
+        )
         setGatedChildren(
           data.items.map((student) => ({
             id: student.id,
@@ -559,23 +577,16 @@ function AuthedApp() {
               picks what they are paying for after the club is allowed to hold the child's
               record, never before. Unlike the two gates above it this one renders the app
               behind it — see `PlanGate`'s header on why nagging beats blocking. */}
-          <PlanGate
-            client={trainingPlanClient}
+          {/* The join already created the children, their groups, their price and their
+              first charge, so this step asks the one thing left: how the money moves, per
+              child. Then one summary — card in a single checkout, a mandate link each,
+              cash and cheques told to the manager. */}
+          <PaymentSetupGate
+            client={billingClient}
             locale={locale}
-            monthlyTotalAgorot={prepayMonthlyTotalAgorot}
-            // The card route, end to end. At signup there is no charge to settle — the
-            // billing run has not reached this family — so the order names no charge and
-            // buys N months FORWARD, which the server prices from this payer's own monthly
-            // total and which lands as credit against their first bill.
-            onPayByCard={async (monthsForward) => {
-              const order = await billingClient.createOrder([], 1, monthsForward)
-              submitUpayForm(await billingClient.orderForm(order.public_ref))
-            }}
-            students={(gatedChildren ?? []).map(({ id, display_name, status }) => ({
-              id,
-              display_name,
-              status,
-            }))}
+            onOrderOpened={submitUpayForm}
+            standingOrderLinks={mandateLinks}
+            students={setupChildren}
           >
           {session.access.parent && isCalendarRoute(hash) ? (
             <>
@@ -697,7 +708,7 @@ function AuthedApp() {
               <Resolve session={session} locale={locale} />
             </>
           )}
-          </PlanGate>
+          </PaymentSetupGate>
           </HealthGate>
           </ConsentGate>
           )}

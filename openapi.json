@@ -11226,6 +11226,11 @@
             "title": "Plan Name",
             "type": "string"
           },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          },
           "student_name": {
             "title": "Student Name",
             "type": "string"
@@ -11236,6 +11241,7 @@
           }
         },
         "required": [
+          "student_id",
           "student_name",
           "plan_name",
           "amount_agorot",

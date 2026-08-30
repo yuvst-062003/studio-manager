@@ -702,6 +702,11 @@ class StandingOrderLinkOut(BaseModel):
     are about to sign -- a uPay shared link charges a fixed amount and does not say so.
     """
 
+    #: **The id, not only the name.** The onboarding payment summary shows one link per
+    #: child beside that child's row, so it has to MATCH a link to a student rather than
+    #: merely print a label — and two children can share a first name. The router already
+    #: holds the id as its map key; leaving it out only forced the client to guess.
+    student_id: uuid.UUID
     student_name: str
     plan_name: str
     amount_agorot: int
@@ -737,6 +742,7 @@ def my_standing_order_links(
     return StandingOrderLinkListOut(
         items=[
             StandingOrderLinkOut(
+                student_id=student_id,
                 student_name=f"{by_id[student_id].first_name} {by_id[student_id].last_name}",
                 plan_name=plan.name,
                 amount_agorot=plan.monthly_amount_agorot,
