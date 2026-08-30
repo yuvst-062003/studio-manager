@@ -151,6 +151,11 @@ class Student(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
         PGUUID(as_uuid=True), ForeignKey("belt_rank.id", ondelete="SET NULL")
     )
     health_status: Mapped[str] = mapped_column(String(15), nullable=False, default="missing")
+    #: The club's `טופס הרשמה` block 1 -- `כיתה/גן`.
+    #:
+    #: **Free text, not an integer.** `ג'` and `גן חובה` are both answers the paper form
+    #: accepts, and a smallint would refuse half the intake every September.
+    grade: Mapped[str | None] = mapped_column(String(20))
     #: §5.10, C11 — the tuition price, **per student**. W4's `price_plan`, constrained
     #: since that wave's contract commit. Nullable: a `lead` or `trial` has no price yet,
     #: and §5.4 makes setting one part of the manager's conversion decision.
@@ -161,6 +166,34 @@ class Student(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
     #: never raised.
     price_plan_id: Mapped[uuid.UUID | None] = mapped_column(
         PGUUID(as_uuid=True), ForeignKey("price_plan.id", ondelete="RESTRICT")
+    )
+
+
+class StudentPickupContact(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
+    """The club's `טופס הרשמה`: 'אנשים אחרים (חוץ מההורים) שרשאים לאסוף את הילדים מהחוג'.
+
+    **Not a `Guardian`.** A guardian row needs a `Person`, and minting person rows for
+    people who will never log in pollutes §5.2's identity resolution -- every one of them
+    becomes a candidate the resolver has to walk past. The paper form asks for a name and
+    a phone; this table holds a name and a phone.
+
+    **Encrypted, and readable by a coach.** The two are not in tension. Encryption is at
+    rest: this is contact data for a third party who never agreed to anything, so it does
+    not sit in plaintext next to the roster. But the entire purpose of the field is that
+    whoever is at the door knows who may collect the child, so the read is authorised at
+    coach level rather than the manager-only rule `health_declaration` carries. A pickup
+    contact nobody at the door can read is write-only data.
+    """
+
+    __tablename__ = "student_pickup_contact"
+    __tenant_table_args__ = (Index("ix_student_pickup_contact_student", "studio_id", "student_id"),)
+
+    student_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("student.id", ondelete="CASCADE"), nullable=False
+    )
+    #: `{"name": str, "phone": str, "relation": str | None}`.
+    contact_encrypted: Mapped[Any] = mapped_column(
+        EncryptedJSON("student_pickup_contact.contact_encrypted"), nullable=False
     )
 
 

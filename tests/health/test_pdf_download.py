@@ -8,7 +8,7 @@ names, "downloadable by the guardian and by managers", and a coach is refused.
 from __future__ import annotations
 
 from app.models.health import HealthDeclaration
-from app.services.health.declarations import _DISCLAIMER, build_pdf_sections
+from app.services.health.declarations import build_pdf_sections, build_terms_sections
 from sqlalchemy import select
 from tests.health.test_declarations import ANSWERS, SIGNATURE_B64
 
@@ -138,7 +138,17 @@ def test_a_re_submission_re_renders_rather_than_serving_the_old_document(
     `pdf_object_key`; this proves the new bytes actually differ."""
     _sign(client, as_manager, a_student, a_full_template)
     first = client.get(_url(a_student), headers=as_manager.headers).content
-    _sign(client, as_manager, a_student, a_full_template, answers=dict(ANSWERS, asthma=False))
+    # `clause_confirmed` moves with `asthma`: with every answer now negative the family is
+    # entitled to the "no limitations" sentence and `verify_clause` refuses the other one. The
+    # second submission is a 422 without this, and the test would pass for the wrong reason --
+    # identical bytes because nothing was re-signed at all.
+    _sign(
+        client,
+        as_manager,
+        a_student,
+        a_full_template,
+        answers=dict(ANSWERS, asthma=False, clause_confirmed="none"),
+    )
     second = client.get(_url(a_student), headers=as_manager.headers).content
     assert first != second
 
@@ -181,8 +191,53 @@ def test_booleans_are_rendered_in_the_studios_locale(a_full_template, app_sessio
     assert dict(english[0].rows)["האם יש אסתמה?"] == "Yes"
 
 
-def test_the_disclaimer_exists_in_all_three_locales():
-    """D11's caveat, on the artefact a club is most likely to hand to an insurer. A locale that
-    fell back to Hebrew would put the caveat in a language the reader may not have."""
-    assert set(_DISCLAIMER) == {"he", "en", "ru"}
-    assert all(text.strip() for text in _DISCLAIMER.values())
+def test_the_club_terms_exist_in_all_three_locales():
+    """What replaced D11's caveat. Same reasoning as the caveat had: a locale that fell back to
+    Hebrew would put the terms a family is agreeing to in a language they may not read."""
+    from app.services.health.club_terms import (
+        CLAUSE_LIMITED_TEXT,
+        CLAUSE_NONE_TEXT,
+        PAYMENT_TERMS,
+        SIGNATURE_LINE,
+        TERMS_TITLE,
+    )
+
+    tables = (PAYMENT_TERMS, CLAUSE_NONE_TEXT, CLAUSE_LIMITED_TEXT, SIGNATURE_LINE, TERMS_TITLE)
+    for table in tables:
+        assert set(table) == {"he", "en", "ru"}
+    assert all(all(clause.strip() for clause in clauses) for clauses in PAYMENT_TERMS.values())
+    assert all(len(clauses) == 3 for clauses in PAYMENT_TERMS.values())
+
+
+def test_the_payment_terms_reach_the_rendered_sections():
+    """The three clauses the club supplied are on the document a family signs, not only on the
+    screen where they ticked a box. Terms that exist in the app and not in the signed record
+    are terms the club cannot show anyone afterwards."""
+    sections = build_terms_sections({"clause_confirmed": "none"}, "he")
+    prose = " ".join(p for section in sections for p in section.paragraphs)
+    assert "עמותת מכבי נתניה סיף ואגרוף" in prose
+    assert "27" in prose and "10" in prose
+
+
+def test_the_confirmed_clause_is_the_one_rendered():
+    """Not the one today's answers would imply. The document is re-rendered later, and a manager
+    editing a question must not silently change which sentence an old signature sits above."""
+    none_text = " ".join(
+        p for s in build_terms_sections({"clause_confirmed": "none"}, "he") for p in s.paragraphs
+    )
+    limited_text = " ".join(
+        p for s in build_terms_sections({"clause_confirmed": "limited"}, "he") for p in s.paragraphs
+    )
+    assert "אין מגבלות רפואיות" in none_text
+    assert "למרות המגבלות הרפואיות" in limited_text
+    assert none_text != limited_text
+
+
+def test_no_disclaimer_string_survives_anywhere_in_the_pipeline():
+    """The removal, asserted rather than assumed. D11's caveat was stamped onto every PDF; a
+    stray copy left in a fallback would put "this is not a compliance document" back onto the
+    club's own legal instrument."""
+    sections = build_terms_sections({"clause_confirmed": "none"}, "he")
+    prose = " ".join(p for section in sections for p in section.paragraphs)
+    assert "נקודת פתיחה" not in prose
+    assert "אינו מסמך עמידה ברגולציה" not in prose

@@ -139,23 +139,29 @@ def ensure_trial_template(
 # `source_pdf_object_key` for reference if they upload one.
 # ---------------------------------------------------------------------------------------
 
-#: **`is_bundled_default` carries D11's caveat in machine-readable form.** A health
-#: declaration for minors in an Israeli sports club touches insurance and regulatory
-#: ground. This set is a STARTING POINT and the app must say so where the manager edits it
-#: -- the visible half is `template.disclaimer` in web/packages/i18n/{he,en,ru}/health.ts.
-#: It is not a compliance artefact and must not be presented as one. Without a marker on
-#: the row, the editor cannot tell whose questions it is showing: a studio that has
-#: reworded every one of them is no longer editing ours, and telling them otherwise is the
-#: opposite of the caveat.
+#: **v2 carries the club's own wording, and that is why D11's caveat is gone.**
+#:
+#: v1 shipped `is_bundled_default: True` and a matching disclaimer -- "a starting point
+#: only, not a compliance artefact" -- because the question set was one WE wrote and handed
+#: to a club that had not reviewed it. That sentence was honest about our questionnaire.
+#:
+#: v2's declaration section is the club's own `טופס הרשמה`, verbatim, signed under the
+#: club's own name alongside its `תקנון`. Printing "this is not a compliance document" on a
+#: club's own legal instrument would be false, so the marker and the disclaimer both go --
+#: see docs/superpowers/specs/2026-08-30-registration-agreement-design.md §11.
+#:
+#: **The medical questions did NOT shrink to match the paper form.** The paper page asks
+#: nothing structured; §5.5's coach badge is derived from structured answers and nothing
+#: else, so adopting the paper form's health section literally would blank every ⚠ on every
+#: roster. The club's clauses are the legal wrapper; these questions remain the substance.
 #:
 #: Longer than the trial form on purpose. 5.4a's trial declaration is step 3 of a five-step
 #: funnel walked on a phone, so it trades completeness for brevity and a long form is
 #: exactly where that funnel leaks. This one is signed once, at leisure, and makes the
 #: opposite trade.
 FULL_TEMPLATE_SCHEMA: dict[str, Any] = {
-    "version": 1,
+    "version": 2,
     "kind": "full",
-    "is_bundled_default": True,
     "title": "הצהרת בריאות",
     "sections": [
         {
@@ -281,20 +287,26 @@ FULL_TEMPLATE_SCHEMA: dict[str, Any] = {
                 },
             ],
         },
+        # The club's `טופס הרשמה` block 5, replacing v1's `fit_to_train` /
+        # `notify_changes` -- which were a weaker paraphrase of these same two sentences.
         {
             "id": "declaration",
             "title": "הצהרה",
             "questions": [
                 {
-                    "id": "fit_to_train",
-                    "type": "boolean",
-                    "label": "אני מצהיר/ה שהתלמיד/ה כשיר/ה לפעילות גופנית ולאימוני ג'ודו",
-                    "required": True,
+                    "id": "special_notes",
+                    "type": "text",
+                    "label": "הערות בריאות מיוחדות",
+                    "required": False,
                 },
+                # Not a boolean: the two clauses are ALTERNATIVES and which one applies is
+                # derived from the answers above (app/services/health/clauses.py). The
+                # client renders the applicable sentence and the parent confirms THAT one;
+                # the stored value is its id, and the server re-derives it on submit.
                 {
-                    "id": "notify_changes",
-                    "type": "boolean",
-                    "label": "אני מתחייב/ת לעדכן את המועדון בכל שינוי במצב הבריאותי",
+                    "id": "clause_confirmed",
+                    "type": "clause",
+                    "label": "אני מאשר/ת את ההצהרה שלמעלה",
                     "required": True,
                 },
             ],

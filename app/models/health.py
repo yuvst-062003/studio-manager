@@ -47,8 +47,21 @@ HEALTH_TEMPLATE_KINDS = ("full", "trial")
 #: because the revocation and versioning rules are identical for both.
 CONSENT_SUBJECT_TYPES = ("person", "student")
 
-#: §4.3 -- `consent_record  consent_type(terms|privacy|photo_video|medical_share|event)`.
-CONSENT_TYPES = ("terms", "privacy", "photo_video", "medical_share", "event")
+#: §4.3 -- `consent_record  consent_type(terms|privacy|photo_video|medical_share|event)`,
+#: plus `club_terms`.
+#:
+#: **`club_terms` is the club's own regulations and payment terms, and `terms` is not.**
+#: `terms` is the PLATFORM's terms of use, versioned by `POLICY_VERSION` and gating §6.1
+#: step 5. The club's `תקנון` and `תנאי תשלום` are a different document, written by a
+#: different party, versioned by `CLUB_TERMS_VERSION`, and gating the registration
+#: agreement instead. Folding them into `terms` would make one version number answer for
+#: two documents, so a reviewed privacy policy would silently re-open a club agreement
+#: nobody had changed.
+#:
+#: **One value, not two.** The paper form's single signature covers the regulations and
+#: (now) the payment terms together, and splitting them would let a club change a payment
+#: date without re-confirming the regulations that date sits inside.
+CONSENT_TYPES = ("terms", "privacy", "photo_video", "medical_share", "event", "club_terms")
 
 
 class HealthFormTemplate(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
@@ -170,7 +183,8 @@ class ConsentRecord(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
             "subject_type IN ('person', 'student')", name="consent_record_subject_type"
         ),
         CheckConstraint(
-            "consent_type IN ('terms', 'privacy', 'photo_video', 'medical_share', 'event')",
+            "consent_type IN ('terms', 'privacy', 'photo_video', 'medical_share', 'event', "
+            "'club_terms')",
             name="consent_record_consent_type",
         ),
         Index(

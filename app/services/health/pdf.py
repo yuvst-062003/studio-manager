@@ -415,6 +415,11 @@ class RenderedSection:
 
     title: str
     rows: list[tuple[str, str]] = field(default_factory=list)
+    #: Prose, for sections that are not question-and-answer: the club's `תקנון ותנאי תשלום`
+    #: and the health clause the family confirmed. A row puts its answer at the reading end
+    #: of the line, which is right for `האם יש אסתמה?  כן` and wrong for a paragraph of
+    #: terms -- it would set the whole clause as a label with nothing opposite it.
+    paragraphs: list[str] = field(default_factory=list)
 
 
 class _Writer:
@@ -557,7 +562,7 @@ def render_declaration_pdf(
     signed_by: str,
     template_version: int,
     sections: list[RenderedSection],
-    disclaimer: str = "",
+    signature_line: str = "",
     signature_png: bytes | None = None,
 ) -> bytes:
     """§5.5's *"renders a filled, signed PDF"*. Deterministic for identical inputs.
@@ -607,6 +612,12 @@ def render_declaration_pdf(
                     # The answer sits at the reading END of the row, which in RTL is the left.
                     page.text_ltr_at(answer, SIZE_BODY, LEFT_EDGE, grey=0.25)
             page.gap(2)
+        for paragraph in section.paragraphs:
+            wrapped = _wrap(paragraph, SIZE_BODY, LINE_WIDTH)
+            ensure(SIZE_BODY * LEADING * len(wrapped) + 4)
+            for line in wrapped:
+                page.text_rtl(line, SIZE_BODY)
+            page.gap(4)
 
     ensure(SIGNATURE_BOX[1] + SIZE_BODY * LEADING * 4 + 24)
     page.gap(14)
@@ -628,10 +639,18 @@ def render_declaration_pdf(
 
     page.text_rtl(f"{signed_by} · {local:%d.%m.%Y}", SIZE_SMALL, grey=0.35)
     page.text_rtl(f"גרסת שאלון {template_version}", SIZE_SMALL, grey=0.5)
-    if disclaimer:
+    # The club's own sentence from `טופס הרשמה` block 6 -- "אני, ..., מאשר בזאת שקראתי את
+    # הצהרת הבריאות ותקנון של מועדון ... ומתחייב לפעול עפ"י הנהלים הרשומים בו".
+    #
+    # **This replaces D11's disclaimer, it does not sit beside it.** That caveat said the
+    # questionnaire was "a starting point only and not a compliance document", which was
+    # true of a question set we wrote and handed to a club that had not reviewed it. This
+    # document is the club's own form and the club's own תקנון, signed under the club's own
+    # name, so printing that sentence on it would be false. See the design doc §11.
+    if signature_line:
         page.gap(6)
-        for line in _wrap(disclaimer, SIZE_SMALL, LINE_WIDTH):
-            page.text_rtl(line, SIZE_SMALL, grey=0.5)
+        for line in _wrap(signature_line, SIZE_SMALL, LINE_WIDTH):
+            page.text_rtl(line, SIZE_SMALL, grey=0.35)
 
     # -- objects ---------------------------------------------------------------
     writer = _Writer()
@@ -647,13 +666,17 @@ def render_declaration_pdf(
     # /W: every glyph the document actually uses. The default /DW covers the rest, and listing all
     # ~1,300 glyphs would put a kilobyte of widths in a file for the sake of glyphs nobody drew.
     used: set[int] = set()
-    for content in (title, studio_name, student_name, signed_by, disclaimer):
+    for content in (title, studio_name, student_name, signed_by, signature_line):
         used.update(font.glyph(c) for c in content)
     for section in sections:
         used.update(font.glyph(c) for c in section.title)
         for question, answer in section.rows:
             used.update(font.glyph(c) for c in question)
             used.update(font.glyph(c) for c in answer)
+        # A paragraph glyph missing from /W renders at the default width, so the club's
+        # terms would set with visibly wrong spacing -- on the page a family signs.
+        for paragraph in section.paragraphs:
+            used.update(font.glyph(c) for c in paragraph)
     used.update(font.glyph(c) for c in "0123456789.:·עבורגרסתשאלוןחתימה ")
     widths = " ".join(
         f"{glyph} [{int(font.advance(glyph) * 1000 / font.units_per_em)}]"

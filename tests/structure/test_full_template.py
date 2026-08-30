@@ -114,20 +114,45 @@ def test_seeding_the_full_one_does_not_disturb_the_trial_one(app_session, studio
 
 
 # -- D11's caveat -----------------------------------------------------------------------
-def test_the_bundled_set_says_it_is_bundled():
-    """D11 -- "the bundled template is a starting point and the app must say so where the
-    manager edits it. It is not a compliance artefact." The editor cannot show that notice
-    on the right template unless the row says which one it is: a studio that has reworded
-    every question is no longer editing ours."""
-    assert FULL_TEMPLATE_SCHEMA["is_bundled_default"] is True
+def test_the_bundled_marker_is_gone():
+    """The inverse of the test that used to stand here, and the reason is the whole change.
+
+    D11 shipped `is_bundled_default: True` so the editor could tell a manager whose questions
+    it was showing -- ours, until they reworded them. Template v2's declaration section is the
+    CLUB's own `טופס הרשמה`, so there is no bundled set left to mark, and a marker still riding
+    along would have the editor claim the club is editing ours."""
+    assert "is_bundled_default" not in FULL_TEMPLATE_SCHEMA
 
 
-def test_the_disclaimer_string_exists_in_every_locale():
-    """The visible half of the same caveat. A marker with no string to render is a caveat
-    nobody reads."""
+def test_the_disclaimer_string_is_gone_from_every_locale():
+    """D11's caveat -- "a starting point only, not a compliance artefact" -- was true of a
+    question set we wrote and handed to a club that had not reviewed it. It is false about the
+    club's own form and its own תקנון, signed under the club's own name, so it is removed from
+    the screen, the editor and the PDF alike.
+
+    Asserted rather than assumed: one locale left behind is one language in which the app still
+    disclaims a document it is no longer entitled to disclaim."""
     for locale in ("he", "en", "ru"):
         text = (ROOT / f"web/packages/i18n/{locale}/health.ts").read_text(encoding="utf-8")
-        assert "'template.disclaimer'" in text, locale
+        assert "'template.disclaimer'" not in text, locale
+        assert "'template.editingBundled'" not in text, locale
+
+
+def test_the_club_terms_strings_exist_in_every_locale():
+    """What replaced the caveat. A family ticking "I have read the terms" against a missing
+    string has agreed to a blank space."""
+    for locale in ("he", "en", "ru"):
+        text = (ROOT / f"web/packages/i18n/{locale}/health.ts").read_text(encoding="utf-8")
+        for key in (
+            "clubTerms.title",
+            "clubTerms.payment.cheques",
+            "clubTerms.payment.cancellation",
+            "clubTerms.payment.proRata",
+            "clubTerms.accept",
+            "declaration.clause.none",
+            "declaration.clause.limited",
+        ):
+            assert f"'{key}'" in text, f"{locale}: {key}"
 
 
 # -- the shape a coach's badge is derived from ------------------------------------------
@@ -161,7 +186,10 @@ def test_the_set_asks_what_an_israeli_sports_declaration_asks():
     family sudden-death question are what a sports declaration exists for; dropping them
     leaves a form that is merely short rather than standard."""
     ids = {q["id"] for q in _questions()}
-    for expected in ("heart", "family_sudden_death", "chest_pain", "fainting", "fit_to_train"):
+    # `fit_to_train` was v1's paraphrase of the club's own declaration sentence. v2 carries the
+    # sentence itself, confirmed through `clause_confirmed` -- so the attestation is still
+    # required, by a question that quotes the club rather than approximating it.
+    for expected in ("heart", "family_sudden_death", "chest_pain", "fainting", "clause_confirmed"):
         assert expected in ids, expected
 
 
@@ -177,7 +205,9 @@ def test_the_schema_is_versioned_so_a_signature_records_what_was_signed():
     """4.3 stores template_version on the declaration. D11 makes editing the questions a
     manager's right, so without a version a template edit silently rewrites the meaning of
     every signature already collected."""
-    assert FULL_TEMPLATE_SCHEMA["version"] == 1
+    # v2: the club's own `טופס הרשמה` replaced the bundled questionnaire. v1 is still seeded
+    # and still rendered for the signatures made against it -- see revision 0018.
+    assert FULL_TEMPLATE_SCHEMA["version"] == 2
     assert FULL_TEMPLATE_SCHEMA["kind"] == "full"
 
 

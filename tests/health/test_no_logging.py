@@ -102,7 +102,7 @@ def test_a_refused_submission_logs_no_answer(
             f"/api/v1/students/{a_student}/health-declaration",
             json={
                 "template_id": str(a_full_template),
-                "answers": {k: v for k, v in ANSWERS.items() if k != "fit_to_train"},
+                "answers": {k: v for k, v in ANSWERS.items() if k != "clause_confirmed"},
                 "signature_image_base64": SIGNATURE_B64,
             },
             headers=as_manager.headers,

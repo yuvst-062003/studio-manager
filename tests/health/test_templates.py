@@ -71,7 +71,9 @@ def test_the_editor_reads_one_template_with_its_questions(client, as_manager, a_
     """The detail route this lane adds, because an editor cannot edit questions it cannot see."""
     response = client.get(f"/api/v1/health-templates/{a_full_template}", headers=as_manager.headers)
     assert response.status_code == 200
-    assert response.json()["schema"]["is_bundled_default"] is True
+    schema = response.json()["schema"]
+    assert [section["id"] for section in schema["sections"]], "an editor needs the questions"
+    assert schema["version"] == FULL_TEMPLATE_SCHEMA["version"]
 
 
 def test_a_coach_may_not_read_a_templates_questions(client, as_lead_coach, a_full_template):
@@ -99,7 +101,7 @@ def test_a_manager_can_reword_a_question(client, as_manager, a_full_template, ap
     app_session.expire_all()
     row = app_session.get(HealthFormTemplate, draft_id)
     assert row.published_at is None
-    assert row.version == 2
+    assert row.version == FULL_TEMPLATE_SCHEMA["version"] + 1
     labels = {q["id"]: q.get("label") for s in row.schema["sections"] for q in s["questions"]}
     assert labels["asthma"] == "האם אובחנה אסתמה?"
 
@@ -146,7 +148,8 @@ def test_a_second_edit_updates_the_same_draft_rather_than_stacking_versions(
             )
         ).all()
     )
-    assert versions == [1, 2]
+    seeded = FULL_TEMPLATE_SCHEMA["version"]
+    assert versions == [seeded, seeded + 1]
 
 
 def test_publishing_with_no_draft_is_refused(client, as_manager, a_full_template):
@@ -158,10 +161,19 @@ def test_publishing_with_no_draft_is_refused(client, as_manager, a_full_template
     assert response.json()["detail"]["code"] == "nothing_to_publish"
 
 
-def test_editing_drops_the_bundled_marker(client, as_manager, a_full_template, app_session):
-    """D11's caveat, machine-readable. A studio that reworded our questions is no longer editing
-    ours, and an editor that still says `is_bundled_default` is telling them otherwise — which is
-    the opposite of the caveat."""
+def test_the_bundled_marker_is_gone_from_the_shipped_schema(
+    client, as_manager, a_full_template, app_session
+):
+    """The inverse of the test that used to live here.
+
+    `is_bundled_default` was D11's caveat in machine-readable form: it told the editor whose
+    questions it was showing, so a studio that had reworded ours would stop being told it was
+    editing the bundled set. Template v2 is the CLUB's own form, so there is no bundled set left
+    to mark -- and a marker still riding along would make the editor claim the club is editing
+    ours. It must be absent on the seeded row and on anything edited from it."""
+    seeded = app_session.get(HealthFormTemplate, a_full_template)
+    assert "is_bundled_default" not in (seeded.schema or {})
+
     draft_id = uuid.UUID(
         client.put(
             f"/api/v1/health-templates/{a_full_template}",
@@ -170,8 +182,8 @@ def test_editing_drops_the_bundled_marker(client, as_manager, a_full_template, a
         ).json()["id"]
     )
     app_session.expire_all()
-    assert (
-        app_session.get(HealthFormTemplate, draft_id).schema.get("is_bundled_default") is not True
+    assert "is_bundled_default" not in (
+        app_session.get(HealthFormTemplate, draft_id).schema or {}
     )
 
 
@@ -262,7 +274,7 @@ def test_publishing_mints_a_new_version_and_leaves_the_old_one_intact(
     )
     assert response.status_code == 201
     body = response.json()
-    assert body["template"]["version"] == 2
+    assert body["template"]["version"] == FULL_TEMPLATE_SCHEMA["version"] + 1
 
     app_session.expire_all()
     # Scoped by studio_id: `app_session` is an UNSCOPED session (tests/health/conftest.py says
@@ -277,7 +289,12 @@ def test_publishing_mints_a_new_version_and_leaves_the_old_one_intact(
             )
         ).all()
     )
-    assert versions == [1, 2]
+    # Every `full` template this studio has, in order. The seeded one plus the one just
+    # published -- computed rather than [1, 2], because the seed is v2 since the club's own
+    # form replaced the bundled questionnaire and a literal here would need editing again
+    # at v3.
+    seeded = FULL_TEMPLATE_SCHEMA["version"]
+    assert versions == [seeded, seeded + 1]
 
 
 def test_a_declaration_keeps_its_own_version_but_gets_fresh_flags(
@@ -311,6 +328,9 @@ def test_a_declaration_keeps_its_own_version_but_gets_fresh_flags(
 
     app_session.expire_all()
     row = app_session.get(HealthDeclaration, declaration.id)
+    # The literal 1 is deliberate: the row above is CONSTRUCTED with template_version=1, and
+    # what this asserts is that publishing a new version did not rewrite it. Deriving it from
+    # FULL_TEMPLATE_SCHEMA would make the assertion agree with itself no matter what happened.
     assert row.template_version == 1, "the signature records the questions actually asked"
     assert row.derived_flags["vertigo"] is True
 
@@ -332,14 +352,14 @@ def test_publishing_is_audit_logged_without_a_single_question_label(
         select(HealthFormTemplate.id).where(
             HealthFormTemplate.studio_id == as_manager.studio_id,
             HealthFormTemplate.kind == "full",
-            HealthFormTemplate.version == 2,
+            HealthFormTemplate.version == FULL_TEMPLATE_SCHEMA["version"] + 1,
         )
     ).scalar_one()
     entries = audit_entries("health_form_template", new_id)
     assert [e.action for e in entries] == ["health_template.publish"]
     diff = entries[0].diff or {}
-    assert diff["from_version"] == 1
-    assert diff["to_version"] == 2
+    assert diff["from_version"] == FULL_TEMPLATE_SCHEMA["version"]
+    assert diff["to_version"] == FULL_TEMPLATE_SCHEMA["version"] + 1
     assert diff["questions_added"] == ["vertigo"]
     serialised = repr(diff)
     assert "שאלה חדשה" not in serialised, "a diff carries ids, never wording"

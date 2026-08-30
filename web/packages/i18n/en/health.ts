@@ -69,8 +69,6 @@ export const health: Bundle = {
   'template.version': 'Version',
   'template.publish': 'Publish this version',
   'template.uploadPdf': 'Upload the club’s own form',
-  'template.disclaimer':
-    'The bundled questionnaire is a starting point only and is not a regulatory compliance document. It is the club’s responsibility to adapt it to its insurance and legal requirements',
 
   'consent.terms': 'Terms of use',
   'consent.privacy': 'Privacy policy',
@@ -104,8 +102,6 @@ export const health: Bundle = {
   'documents.trialOnly': 'Trial declaration only',
 
   // -- the template editor (D11) -------------------------------------------------
-  'template.editingBundled': 'These are the questions the app ships with',
-  'template.editingYours': "These are your club's questions",
   'template.draft': 'Draft',
   'template.draftHint':
     'Changes are saved as a draft. Parents keep filling in the published version until you publish',
@@ -119,4 +115,53 @@ export const health: Bundle = {
   'template.sectionTitle': 'Section name',
   'template.save': 'Save draft',
   'template.saved': 'Draft saved',
+
+  // -- the club's own agreement -- see the Hebrew file for why the disclaimer went ----
+  'clubTerms.title': 'Club terms and payment terms',
+  'clubTerms.payment.title': 'Payment terms',
+  'clubTerms.payment.cheques':
+    'Cheques are made payable to "עמותת מכבי נתניה סיף ואגרוף". The cheque date must be no later than the 10th of each month.',
+  'clubTerms.payment.cancellation':
+    'Cancellation must be given in writing by the 27th of the month, and takes effect for future months only.',
+  'clubTerms.payment.proRata':
+    'When an annual membership is cancelled, the monthly rate is recalculated against the months actually used (for example: three months used is charged at the three-month rate).',
+  'clubTerms.accept': 'I have read the club terms and payment terms and I accept them',
+  'clubTerms.required': 'The club terms and payment terms must be accepted to continue',
+  'clubTerms.alreadyAccepted': 'You have accepted the club terms and payment terms',
+
+  'declaration.clause.none':
+    'I declare that the person named above has no medical limitations or sensitivities of any kind and is able to withstand the effort required by the class they have joined. Should any medical limitation arise, I undertake to report it promptly to the coach and/or the club manager.',
+  'declaration.clause.limited':
+    'I declare that despite the medical limitations noted above, the person named above is able to withstand the effort required by the class they have joined.',
+  'declaration.clause.confirm': 'I confirm the declaration above',
+  'declaration.clause.required': 'The declaration must be confirmed before sending',
+
+  'registration.title': 'Registration details',
+  'registration.student': 'Student details',
+  'registration.parents': 'Parent details',
+  'registration.pickup': 'Authorised for collection',
+  'registration.pickupHint':
+    'People other than the parents who may collect the child from the class',
+  'registration.pickupAdd': 'Add a person',
+  'registration.pickupRemove': 'Remove',
+  'registration.nationalId': 'ID number',
+  'registration.nationalIdInvalid': 'That ID number is not valid',
+  'registration.grade': 'Class',
+  'registration.address': 'Address',
+  'registration.city': 'City',
+  'registration.phoneHome': 'Home phone',
+  'registration.phoneMobile': 'Mobile',
+  'registration.email': 'Email',
+  'registration.motherName': "Mother's name",
+  'registration.fatherName': "Father's name",
+  'registration.otherParent': 'Other parent',
+  'registration.aliyahYear': 'Year of immigration',
+  'registration.aliyahYearHint': 'If a parent immigrated within the last 10 years',
+  'registration.required': 'Every required field must be filled in',
+  'registration.optional': 'Optional',
+  'agreement.title': 'Registration agreement',
+  'agreement.step': 'Step',
+  'agreement.next': 'Continue',
+  'agreement.back': 'Back',
+  'agreement.submit': 'Sign and send',
 }

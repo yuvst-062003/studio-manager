@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime
+from typing import Any
 
 from sqlalchemy import (
     Boolean,
@@ -35,6 +36,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
+from app.core.encryption import EncryptedBytes, EncryptedJSON
 from app.core.tenancy import TenantMixin
 from app.models.base import Base, TimestampColumns, UUIDPrimaryKey
 
@@ -72,6 +74,31 @@ class Person(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
     email: Mapped[str | None] = mapped_column(String(320))
     photo_object_key: Mapped[str | None] = mapped_column(String(500))
     locale: Mapped[str | None] = mapped_column(String(8))
+    #: The club's `טופס הרשמה` block 1 -- a ת.ז., for the student and for each parent.
+    #:
+    #: **Encrypted, unlike the three columns below it.** A ת.ז. is a national identifier
+    #: and Israel's Privacy Protection Law treats it as sensitive; an address is ordinary
+    #: admin data a coach may legitimately read off a roster. Encrypting the address too
+    #: would put every roster render behind a decrypt for no gain, which is the same
+    #: trade `health_declaration.derived_flags` already makes in the other direction.
+    national_id_encrypted: Mapped[bytes | None] = mapped_column(
+        EncryptedBytes("person.national_id_encrypted")
+    )
+    address: Mapped[str | None] = mapped_column(String(200))
+    city: Mapped[str | None] = mapped_column(String(80))
+    #: `מספר טלפון בבית`. `phone` is the mobile; the paper form asks for both, and a
+    #: family whose landline is the only number that answers is not unusual here.
+    phone_home: Mapped[str | None] = mapped_column(String(32))
+    #: `אם אחד מההורים עשה עליה ב-10 שנים אחרונות נא לכתוב שנת עליה` -- collected for the
+    #: עמותה's funding report.
+    #:
+    #: **On the parent, not the student**, because that is whose fact it is: a two-child
+    #: family would otherwise store it twice with nothing keeping the copies in agreement.
+    #: Encrypted because year-of-immigration is national-origin data, and it must never
+    #: reach a roster.
+    aliyah_year_encrypted: Mapped[Any | None] = mapped_column(
+        EncryptedJSON("person.aliyah_year_encrypted"), nullable=True
+    )
     # §11.4 and §3.3 point 5 -- anonymization wipes the Person and leaves financial rows
     # intact, because financial rows never duplicate a name. M9 writes it; the column
     # exists from the start so no later migration has to rewrite this table.

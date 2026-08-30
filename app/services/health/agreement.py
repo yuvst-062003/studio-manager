@@ -1,0 +1,356 @@
+"""The club's `הסכם הרשמה`: one signature over registration details, health and terms.
+
+**The whole design in one paragraph.** The club's paper `טופס הרשמה` is a single page with a
+single signature covering six blocks. This module reproduces that in a product where those
+six blocks have four different homes and four different access rules: registration details
+on `person` and `student`, pickup contacts on `student_pickup_contact`, medical answers
+behind §11.1's health boundary in `health_declaration`, and the acceptance of the club's
+`תקנון ותנאי תשלום` in §11.6's `consent_record`. The parent signs once. The document is a
+view over all four.
+
+**Why the pieces are not merged into one row.** Putting the registration details into
+`health_declaration.answers_encrypted` would have cost no migration -- and would have made a
+child's address manager-and-owner only with every read audit-logged, so a coach could not
+learn who is allowed to collect a child from the mat. The boundary that protects medical
+answers is the wrong boundary for a home phone number.
+
+**Why the terms are not welded to the declaration.** Health changes more often than terms.
+A parent correcting an asthma answer re-signs the health step; because the acceptance is a
+`consent_record` row rather than a field on the declaration, they are not walked back
+through the `תקנון` they already accepted this version of. And when the club does change a
+payment date, `CLUB_TERMS_VERSION` moves and everybody is asked again -- machinery §11.6
+already had.
+
+**G7.** Nothing here logs an answer, a ת.ז., an address or a pickup contact. What reaches a
+log is counts and ids.
+"""
+
+from __future__ import annotations
+
+import uuid
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Any
+
+from sqlalchemy import select
+
+from app.core.national_id import InvalidNationalIdError, normalize_national_id
+from app.core.tenancy import TenantSession
+from app.models.health import ConsentRecord
+from app.models.people import Student, StudentPickupContact
+from app.models.person import Guardian, Person
+from app.services.audit import AuditService
+from app.services.health.club_terms import CLUB_TERMS_CONSENT_TYPE, CLUB_TERMS_VERSION
+
+#: §11.2's action for the registration half. The health half keeps its own
+#: `health_declaration.create`; two actions because they are two different sensitivities and
+#: a single one would make "who has read my child's medical record" unanswerable by grep.
+ACTION_REGISTRATION = "registration_agreement.update"
+
+
+class AgreementError(Exception):
+    """Base for the refusals below, so a router can map them in one place."""
+
+
+class NationalIdInvalidError(AgreementError):
+    """A ת.ז. failed its check digit. Carries the FIELD, never the value."""
+
+    def __init__(self, field: str) -> None:
+        super().__init__(f"{field} failed its check digit")
+        self.field = field
+
+
+class RegistrationIncompleteError(AgreementError):
+    """A required registration field was left empty. Carries field names, never values."""
+
+    def __init__(self, fields: list[str]) -> None:
+        super().__init__(", ".join(sorted(fields)))
+        self.fields = sorted(fields)
+
+
+@dataclass(frozen=True)
+class AgreementStatus:
+    """What the parent app needs to decide whether to open the gate, computed once.
+
+    Returned on `/me/students` so the client never re-derives it. **A gate whose condition is
+    spelled out at two call sites is a gate that will eventually disagree with itself**, and
+    the failure mode is either a family locked out of an app they have finished with, or one
+    walking past a signature the club needs.
+    """
+
+    health_signed: bool
+    registration_complete: bool
+    terms_accepted: bool
+
+    @property
+    def complete(self) -> bool:
+        return self.health_signed and self.registration_complete and self.terms_accepted
+
+
+#: What step 1 will not submit without. Everything else on the paper form -- the second
+#: parent, the landline, the student's own email, pickup contacts, the aliyah year -- is
+#: optional, because none of it is needed to insure a child or to reach a guardian, and a
+#: required field nobody can answer is where a hard gate turns into a support call.
+REQUIRED_REGISTRATION_FIELDS = ("national_id", "address", "city", "grade")
+
+
+def _has_national_id(person: Person | None) -> bool:
+    return bool(person is not None and person.national_id_encrypted)
+
+
+def agreement_status(
+    session: TenantSession, student: Student, *, signer_person_id: uuid.UUID | None
+) -> AgreementStatus:
+    """The three conditions, evaluated together. See `AgreementStatus`."""
+    child = session.get(Person, student.person_id)
+    registration_complete = (
+        _has_national_id(child)
+        and child is not None
+        and bool(child.address)
+        and bool(child.city)
+        and bool(student.grade)
+    )
+
+    terms_accepted = False
+    if signer_person_id is not None:
+        # Imported here rather than at module scope: app.services.privacy.consent imports
+        # policy, which imports club_terms, which this module also imports.
+        from app.services.privacy.consent import ConsentService
+
+        terms_accepted = ConsentService.holds_current(
+            session, person_id=signer_person_id, consent_type=CLUB_TERMS_CONSENT_TYPE
+        )
+
+    return AgreementStatus(
+        health_signed=student.health_status == "signed",
+        registration_complete=bool(registration_complete),
+        terms_accepted=terms_accepted,
+    )
+
+
+def _set_national_id(person: Person, raw: str | None, *, field: str) -> None:
+    """Normalized before storage, so `18` and `000000018` are the same person to any lookup."""
+    if raw is None or not str(raw).strip():
+        return
+    try:
+        person.national_id_encrypted = normalize_national_id(str(raw)).encode()
+    except InvalidNationalIdError as exc:
+        raise NationalIdInvalidError(field) from exc
+
+
+class AgreementService:
+    """Every write the registration half of the agreement makes."""
+
+    @staticmethod
+    def save_registration(
+        session: TenantSession,
+        student: Student,
+        *,
+        child: dict[str, Any],
+        signer: dict[str, Any],
+        other_parent: dict[str, Any] | None,
+        pickup_contacts: list[dict[str, Any]],
+        signed_by_person_id: uuid.UUID,
+        at: datetime,
+        actor_identity_id: uuid.UUID | None = None,
+        actor_ip: str | None = None,
+    ) -> None:
+        """Blocks 1-4 of the paper form, written to the columns they belong in.
+
+        **Validation before any assignment.** A refusal must leave the row untouched, or a
+        parent who mistyped one ת.ז. gets a half-saved record and a form to fill in again.
+        """
+        child_person = session.get(Person, student.person_id)
+        if child_person is None:
+            raise RegistrationIncompleteError(["student"])
+
+        missing = [
+            field
+            for field in REQUIRED_REGISTRATION_FIELDS
+            if not str(child.get(field) or "").strip()
+        ]
+        if missing:
+            raise RegistrationIncompleteError(missing)
+        if not str(signer.get("national_id") or "").strip():
+            raise RegistrationIncompleteError(["signer_national_id"])
+
+        # -- the child ------------------------------------------------------------------
+        _set_national_id(child_person, child.get("national_id"), field="child_national_id")
+        child_person.address = str(child["address"]).strip()
+        child_person.city = str(child["city"]).strip()
+        for column, key in (("phone_home", "phone_home"), ("phone", "phone"), ("email", "email")):
+            value = child.get(key)
+            if value is not None and str(value).strip():
+                setattr(child_person, column, str(value).strip())
+        student.grade = str(child["grade"]).strip()
+
+        # -- the signing parent ---------------------------------------------------------
+        signer_person = session.get(Person, signed_by_person_id)
+        if signer_person is None:
+            raise RegistrationIncompleteError(["signer"])
+        _set_national_id(signer_person, signer.get("national_id"), field="signer_national_id")
+        if signer.get("aliyah_year"):
+            signer_person.aliyah_year_encrypted = str(signer["aliyah_year"]).strip()
+
+        # -- the other parent -----------------------------------------------------------
+        if other_parent and str(other_parent.get("first_name") or "").strip():
+            AgreementService._upsert_other_parent(session, student, other_parent, at=at)
+
+        # -- who may collect the child ---------------------------------------------------
+        AgreementService._replace_pickup_contacts(session, student, pickup_contacts, at=at)
+
+        session.flush()
+        AuditService.record(
+            session,
+            action=ACTION_REGISTRATION,
+            entity_type="student",
+            entity_id=student.id,
+            studio_id=student.studio_id,
+            actor_person_id=signed_by_person_id,
+            actor_identity_id=actor_identity_id,
+            actor_ip=actor_ip,
+            # G7 applied to identifiers: counts and field NAMES, never a ת.ז., an address or
+            # a pickup contact's phone number. An audit diff is read by more people than the
+            # record it describes.
+            diff={
+                "fields_set": sorted(REQUIRED_REGISTRATION_FIELDS),
+                "pickup_contacts": len(pickup_contacts),
+                "other_parent": bool(other_parent),
+            },
+        )
+
+    @staticmethod
+    def _upsert_other_parent(
+        session: TenantSession, student: Student, blob: dict[str, Any], *, at: datetime
+    ) -> None:
+        """A `Person` with no login and a `Guardian` row -- the shape `registrations.py` uses.
+
+        **Matched on ת.ז. only, never on name.** Two siblings' parents share a surname, and a
+        false match writes one family's identifier onto another family's record. A parent with
+        no ID given is a new row: a duplicate person is a tidiness problem, and a merged one is
+        a data-protection incident.
+
+        This does NOT invite them, create an `auth_identity` or grant a role. §3.1: guardian is
+        not a role, and inviting somebody is a manager's deliberate act, not a side effect of a
+        parent filling in a form.
+        """
+        raw_id = str(blob.get("national_id") or "").strip()
+        existing: Person | None = None
+        if raw_id:
+            try:
+                normalized = normalize_national_id(raw_id).encode()
+            except InvalidNationalIdError as exc:
+                raise NationalIdInvalidError("other_parent_national_id") from exc
+            for candidate in session.execute(select(Person)).scalars():
+                if candidate.national_id_encrypted == normalized:
+                    existing = candidate
+                    break
+
+        person = existing
+        if person is None:
+            person = Person(
+                studio_id=student.studio_id,
+                first_name=str(blob.get("first_name") or "").strip(),
+                last_name=str(blob.get("last_name") or "").strip(),
+                created_at=at,
+            )
+            session.add(person)
+            session.flush()
+        if raw_id:
+            _set_national_id(person, raw_id, field="other_parent_national_id")
+        if str(blob.get("phone") or "").strip():
+            person.phone = str(blob["phone"]).strip()
+        if blob.get("aliyah_year"):
+            person.aliyah_year_encrypted = str(blob["aliyah_year"]).strip()
+
+        already = session.execute(
+            select(Guardian).where(
+                Guardian.student_id == student.id, Guardian.person_id == person.id
+            )
+        ).scalar_one_or_none()
+        if already is None:
+            session.add(
+                Guardian(
+                    studio_id=student.studio_id,
+                    student_id=student.id,
+                    person_id=person.id,
+                    is_primary=False,
+                    relation="parent",
+                    created_at=at,
+                )
+            )
+
+    @staticmethod
+    def _replace_pickup_contacts(
+        session: TenantSession, student: Student, contacts: list[dict[str, Any]], *, at: datetime
+    ) -> None:
+        """Replace, not merge.
+
+        The form shows the full list and submits the full list, so a contact the parent
+        deleted must actually go. Merging would make removal impossible from the only screen
+        that offers it -- and "this person may collect my child" is exactly the permission a
+        family needs to be able to withdraw.
+        """
+        for existing in session.execute(
+            select(StudentPickupContact).where(StudentPickupContact.student_id == student.id)
+        ).scalars():
+            session.delete(existing)
+        session.flush()
+
+        for contact in contacts:
+            name = str(contact.get("name") or "").strip()
+            if not name:
+                continue
+            session.add(
+                StudentPickupContact(
+                    studio_id=student.studio_id,
+                    student_id=student.id,
+                    contact_encrypted={
+                        "name": name,
+                        "phone": str(contact.get("phone") or "").strip(),
+                        "relation": str(contact.get("relation") or "").strip() or None,
+                    },
+                    created_at=at,
+                )
+            )
+
+    @staticmethod
+    def accept_club_terms(
+        session: TenantSession,
+        *,
+        studio_id: uuid.UUID,
+        person_id: uuid.UUID,
+        version: int,
+        at: datetime,
+        ip: str | None = None,
+        actor_identity_id: uuid.UUID | None = None,
+    ) -> ConsentRecord | None:
+        """Append the acceptance, unless this person already holds the current version.
+
+        Returns `None` when it was already held. **Not an error**: the flow deliberately skips
+        the terms step for a family who accepted this version already, so a re-signature that
+        does reach here is a duplicate rather than a mistake, and §11.6 makes consent an
+        append-only ledger rather than a set of rows to pile up.
+        """
+        from app.services.privacy.consent import ConsentService, PolicyVersionMismatchError
+
+        if version != CLUB_TERMS_VERSION:
+            # The client posts back the version it RENDERED. Recording today's version for a
+            # screen that showed last month's is how a ledger comes to hold agreements nobody
+            # made -- the same rule `ConsentService.record` states for the platform's policy.
+            raise PolicyVersionMismatchError(version, CLUB_TERMS_VERSION)
+        if ConsentService.holds_current(
+            session, person_id=person_id, consent_type=CLUB_TERMS_CONSENT_TYPE
+        ):
+            return None
+        rows = ConsentService.record(
+            session,
+            person_id=person_id,
+            grants={CLUB_TERMS_CONSENT_TYPE: True},
+            version=version,
+            at=at,
+            ip=ip,
+            actor_identity_id=actor_identity_id,
+            studio_id=studio_id,
+        )
+        return rows[0] if rows else None

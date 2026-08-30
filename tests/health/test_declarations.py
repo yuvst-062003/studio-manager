@@ -12,6 +12,7 @@ import uuid
 from app.models.health import HealthDeclaration
 from app.models.people import Student
 from app.models.studio import Studio
+from app.services.structure.health_templates import FULL_TEMPLATE_SCHEMA
 from sqlalchemy import select, text
 
 #: The smallest valid PNG: 1×1, transparent. A finger-drawn signature is a PNG data URL from a
@@ -32,8 +33,11 @@ ANSWERS = {
     "injury": False,
     "other": False,
     "emergency_contact": "050-0000000",
-    "fit_to_train": True,
-    "notify_changes": True,
+    # Template v2. `fit_to_train` and `notify_changes` were v1's paraphrase of the club's own
+    # two sentences; the club's `טופס הרשמה` supplies the sentences themselves, and which of
+    # the two applies is derived rather than chosen (app/services/health/clauses.py).
+    # `asthma: True` above is why this is `limited` -- `none` would be refused by the server.
+    "clause_confirmed": "limited",
 }
 
 
@@ -74,7 +78,9 @@ def test_a_guardian_submits_and_the_answers_round_trip(
     ).scalar_one()
     assert row.answers_encrypted["emergency_contact"] == "050-0000000"
     assert row.signed_by_person_id == parent.person_id
-    assert row.template_version == 1
+    assert row.template_version == FULL_TEMPLATE_SCHEMA["version"], (
+        "the signature records which questions were actually asked"
+    )
 
 
 def test_the_answers_are_ciphertext_on_disk(
@@ -267,7 +273,7 @@ def test_a_missing_required_answer_is_refused(
     health record nobody actually answered'. The server enforces it too, because a client is a
     suggestion."""
     parent = as_guardian_of(a_student)
-    incomplete = {k: v for k, v in ANSWERS.items() if k != "fit_to_train"}
+    incomplete = {k: v for k, v in ANSWERS.items() if k != "clause_confirmed"}
     response = _submit(client, parent, a_student, a_full_template, answers=incomplete)
     assert response.status_code == 422
     assert response.json()["detail"]["code"] == "answers_incomplete"

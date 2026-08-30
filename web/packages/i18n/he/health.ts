@@ -13,9 +13,12 @@ import type { Bundle } from '../types'
  *    such rule and no `block_attendance_without_health` setting.
  *  - **Coaches see booleans, never free text.** `flag.*` are fixed labels for derived
  *    flags. No key here interpolates an answer.
- *  - **D11's caveat is a visible string, not a footnote.** `template.disclaimer` is
- *    rendered where a manager edits the questions: the bundled set is a starting point
- *    and is explicitly not a compliance artefact.
+ *  - **The club's own text carries the club's own responsibility.** `template.disclaimer`
+ *    used to live here, saying the bundled question set was a starting point and not a
+ *    compliance artefact. Template v2 is the club's own `טופס הרשמה` and its own תקנון,
+ *    signed under the club's own name, so that sentence became false and was removed.
+ *    What stands in its place is `clubTerms.*` — the club's real terms, which a family
+ *    accepts rather than is warned about.
  */
 export const health: Bundle = {
   // -- the parent declaration flow (parent 12c) ---------------------------------
@@ -96,9 +99,6 @@ export const health: Bundle = {
   'template.version': 'גרסה',
   'template.publish': 'פרסום הגרסה',
   'template.uploadPdf': 'העלאת טופס המועדון',
-  // D11's caveat, verbatim in intent. This string is not optional.
-  'template.disclaimer':
-    'השאלון המצורף הוא נקודת פתיחה בלבד ואינו מסמך עמידה ברגולציה. באחריות המועדון להתאים אותו לדרישות הביטוח והחוק',
 
   // -- consent (§11.6) -----------------------------------------------------------
   'consent.terms': 'תנאי שימוש',
@@ -139,11 +139,9 @@ export const health: Bundle = {
   'documents.trialOnly': 'הצהרת ניסיון בלבד',
 
   // -- the template editor (D11) -------------------------------------------------
-  // `is_bundled_default` on the row is what picks between these two. A studio that has
-  // reworded every question is no longer editing ours, and saying otherwise is the opposite
-  // of D11's caveat.
-  'template.editingBundled': 'זהו השאלון המצורף למערכת',
-  'template.editingYours': 'זהו השאלון של המועדון',
+  // `editingBundled` / `editingYours` used to sit here, picked by `is_bundled_default` on
+  // the row. Both are gone with the marker: the questions are the club's own now, so there
+  // is no "ours vs yours" left for the editor to distinguish.
   'template.draft': 'טיוטה',
   'template.draftHint': 'השינויים נשמרים כטיוטה. ההורים ימשיכו למלא את הגרסה הקיימת עד לפרסום',
   'template.published': 'הגרסה פורסמה',
@@ -156,4 +154,59 @@ export const health: Bundle = {
   'template.sectionTitle': 'שם הפרק',
   'template.save': 'שמירת טיוטה',
   'template.saved': 'הטיוטה נשמרה',
+
+  // -- the club's own agreement (`טופס הרשמה` + `תנאי תשלום`) ------------------
+  // These replace `template.disclaimer`, which said the bundled questionnaire was "a
+  // starting point only and not a compliance document". That was true of a question set
+  // WE wrote. This is the club's own form and its own תקנון, signed under the club's own
+  // name, so the caveat would now be false -- see the design doc §11.
+  'clubTerms.title': 'תקנון ותנאי תשלום',
+  'clubTerms.payment.title': 'תנאי תשלום',
+  'clubTerms.payment.cheques':
+    'תשלום בצ\'קים יתבצע לטובת "עמותת מכבי נתניה סיף ואגרוף". תאריך הצ\'ק לא יאוחר מה-10 לכל חודש.',
+  'clubTerms.payment.cancellation':
+    'ביטול מנוי יבוצע בכתב עד ה-27 לחודש, ויהיה תקף לגבי חודשים עתידיים בלבד.',
+  'clubTerms.payment.proRata':
+    'בעת ביטול מנוי שנתי, התעריף החודשי יחושב בהתאם לניצול החודשים בפועל של המנוי (לדוגמה: אם המנוי ניצל שלושה חודשים, החישוב יבוצע לפי תעריף מנוי לשלושה חודשים).',
+  'clubTerms.accept': 'קראתי את התקנון ותנאי התשלום ואני מאשר/ת אותם',
+  'clubTerms.required': 'יש לאשר את התקנון ותנאי התשלום כדי להמשיך',
+  'clubTerms.alreadyAccepted': 'אישרתם את התקנון ותנאי התשלום',
+
+  // The club's two health clauses. ALTERNATIVES, not options: which one applies follows
+  // from the answers, and the parent confirms the one that follows rather than choosing.
+  'declaration.clause.none':
+    'הנני מצהיר/ה כי לרשום מעלה אין מגבלות רפואיות/רגישויות כלשהן והוא מסוגל לעמוד במאמץ הדרוש לחוג אליו נרשם. יחד עם זאת, במידה ותהיה מגבלה רפואית כלשהי, הנני מתחייב/ת לדווח על כך בהקדם למאמן ו/או מנהל המועדון.',
+  'declaration.clause.limited':
+    'הנני מצהיר/ה כי למרות המגבלות הרפואיות המצוינות לעיל, הרשום מעלה מסוגל לעמוד במאמץ הדרוש לחוג אליו נרשם.',
+  'declaration.clause.confirm': 'אני מאשר/ת את ההצהרה שלמעלה',
+  'declaration.clause.required': 'יש לאשר את ההצהרה כדי לשלוח',
+
+  // -- the registration step (`טופס הרשמה` blocks 1-4) -------------------------
+  'registration.title': 'פרטי הרשמה',
+  'registration.student': 'פרטי התלמיד/ה',
+  'registration.parents': 'פרטי ההורים',
+  'registration.pickup': 'מורשי איסוף',
+  'registration.pickupHint': 'אנשים נוספים (חוץ מההורים) שרשאים לאסוף את הילד/ה מהחוג',
+  'registration.pickupAdd': 'הוספת מורשה איסוף',
+  'registration.pickupRemove': 'הסרה',
+  'registration.nationalId': 'ת.ז.',
+  'registration.nationalIdInvalid': 'מספר ת.ז. אינו תקין',
+  'registration.grade': 'כיתה/גן',
+  'registration.address': 'כתובת',
+  'registration.city': 'יישוב',
+  'registration.phoneHome': 'טלפון בבית',
+  'registration.phoneMobile': 'טלפון נייד',
+  'registration.email': 'דוא"ל',
+  'registration.motherName': 'שם האם',
+  'registration.fatherName': 'שם האב',
+  'registration.otherParent': 'הורה נוסף',
+  'registration.aliyahYear': 'שנת עליה',
+  'registration.aliyahYearHint': 'אם אחד ההורים עלה ב-10 השנים האחרונות',
+  'registration.required': 'יש למלא את כל שדות החובה',
+  'registration.optional': 'לא חובה',
+  'agreement.title': 'הסכם הרשמה',
+  'agreement.step': 'שלב',
+  'agreement.next': 'המשך',
+  'agreement.back': 'חזרה',
+  'agreement.submit': 'חתימה ושליחה',
 }

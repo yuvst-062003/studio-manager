@@ -47,4 +47,33 @@ REQUIRED_CONSENT_TYPES: tuple[str, ...] = ("terms", "privacy")
 #: event consent a consent about a STUDENT, granted through the RSVP flow against a
 #: specific event (`app/services/events/rsvp.py`), and one granted here would carry
 #: `subject_type='person'` and name no event at all.
-GRANTABLE_CONSENT_TYPES: tuple[str, ...] = ("terms", "privacy", "photo_video", "medical_share")
+#:
+#: `club_terms` is present so `ConsentService.record` will write it, but the registration
+#: agreement is what grants it -- not this route. See `expected_version` below.
+GRANTABLE_CONSENT_TYPES: tuple[str, ...] = (
+    "terms",
+    "privacy",
+    "photo_video",
+    "medical_share",
+    "club_terms",
+)
+
+
+def expected_version(consent_type: str) -> int:
+    """The version a grant of `consent_type` must be made against.
+
+    **Per type, because there are now two documents with two publishers.** `terms` and
+    `privacy` are ours and move with `POLICY_VERSION`; `club_terms` is the club's own
+    `תקנון` and `תנאי תשלום` and moves with `CLUB_TERMS_VERSION`.
+
+    Before this existed, `ConsentService.record` compared every submission against
+    `POLICY_VERSION` alone -- so a `club_terms` grant at version 1 was rejected as a
+    version mismatch while our own policy sat at draft 0. The two numbers were never going
+    to agree, and making them agree would have coupled a club's agreement to our lawyer's
+    calendar.
+    """
+    # Imported here, not at module scope: app.services.health imports this module, and a
+    # top-level import would close the cycle.
+    from app.services.health.club_terms import CLUB_TERMS_CONSENT_TYPE, CLUB_TERMS_VERSION
+
+    return CLUB_TERMS_VERSION if consent_type == CLUB_TERMS_CONSENT_TYPE else POLICY_VERSION

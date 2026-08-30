@@ -11,6 +11,7 @@ G7: no assertion here prints an answer, and the audit `diff` is checked for the 
 from __future__ import annotations
 
 from app.models.health import HealthDeclaration
+from app.services.structure.health_templates import FULL_TEMPLATE_SCHEMA
 from sqlalchemy import select
 from tests.health.test_declarations import ANSWERS, SIGNATURE_B64
 
@@ -206,4 +207,7 @@ def test_the_create_is_audit_logged_and_says_nothing_about_the_answers(
     ]
     assert len(creates) == 1
     assert creates[0].is_sensitive is True
-    assert creates[0].diff == {"template_version": 1, "flags_raised": 1}
+    assert creates[0].diff == {
+        "template_version": FULL_TEMPLATE_SCHEMA["version"],
+        "flags_raised": 1,
+    }
