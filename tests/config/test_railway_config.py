@@ -1,8 +1,6 @@
 import json
 from pathlib import Path
 
-import pytest
-
 ROOT = Path(__file__).resolve().parents[2]
 DOMAINS = ROOT / "infra/railway/domains.json"
 
@@ -31,12 +29,12 @@ def test_staging_has_a_public_https_url():
         assert marker not in api, f"staging api is still a placeholder: {api}"
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="production has no service instances yet — see docs/deploy/railway-runbook.md. "
-    "strict=True so this fails the moment production hostnames land, forcing the "
-    "marker off rather than letting it rot.",
-)
+# The `xfail(strict=True)` that stood here is gone, and its removal is the point: it was
+# written to FAIL the moment production hostnames landed, "forcing the marker off rather
+# than letting it rot". They landed on 2026-08-30 -- production was populated, and its four
+# hosts are in domains.json -- so the marker came off. It did exactly the job it was
+# designed for, which is why this comment records that rather than the file simply losing
+# six lines.
 def test_each_app_gets_its_own_origin():
     """Staff and parent must not share origin-scoped IndexedDB: it holds
     pending_ops (§10.6) and health flags (G7)."""

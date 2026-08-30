@@ -1,9 +1,12 @@
 # Railway runbook
 
-**Status 2026-08-24:** project `studio-manager` created
-(`375bada8-df9f-4afe-8f24-aa37bb5da9ed`). `staging` and `development` are fully
-provisioned with all four services; `production` exists but has **no service
-instances** — see *Production is not yet populated* at the bottom.
+**Status 2026-08-30:** project `studio-manager` created
+(`375bada8-df9f-4afe-8f24-aa37bb5da9ed`). All three environments are provisioned:
+`staging` and `development` with the four app services, and **`production` with
+thirteen** — Postgres, api, the three PWAs, and eight cron shells. Production serves on
+Railway's generated hostnames, runs `ENV=production` with `/dev/*` absent, and connects as
+`studio_app` so §11.2's append-only audit grant is in force. What is still manual there is
+the cron schedules; see *Production, populated 2026-08-30*.
 
 Run once, by a human with the Railway account. The CLI is already installed
 (`railway 5.43.1`). Every step below is outward-facing and billable.
@@ -91,36 +94,96 @@ this runbook has been run.
 
 ---
 
-## Production is not yet populated
+## Production, populated 2026-08-30
 
 Railway services are **project-scoped by name**, but service *instances* are
-per-environment. An environment created *before* the services exist comes up
-empty and cannot be filled with `railway add` — the names are already taken, and
-`railway up` fails with `404 Not Found` because there is no instance to upload to.
-
-The supported fix is to recreate the environment as a duplicate of a populated
-one:
-
-```bash
-railway environment delete production --yes
-railway environment create production --duplicate staging
-```
-
-That worked for `development`. It was **not** run for `production`: the delete was
-blocked by a safety guard, correctly — the command is destructive by name even
-though this particular `production` is empty and destroys nothing.
-
-Run those two lines by hand, then:
+per-environment. An environment created *before* the services exist comes up empty and
+cannot be filled with `railway add` — the names are already taken. That was still true on
+CLI 5.45.10: `railway add --service api` answers *"A service named `api` already exists in
+this project"*. The only supported fix is to recreate the environment as a duplicate of a
+populated one, which is what was finally run:
 
 ```bash
-railway environment production
-for s in api staff parent dashboard; do railway domain --service "$s"; done
-railway variables --service api --set "ENV=production"
+railway environment delete production --yes          # 0 service instances — destroyed nothing
+railway environment new production --duplicate staging
 ```
 
-and paste the hostnames into `infra/railway/domains.json`. The remaining
-`xfail(strict=True)` in `tests/config/test_railway_config.py` will turn into a
-failure the moment they land, which is the signal to delete the marker.
+The safety guard that blocked the delete when this section was first written is gone on
+5.45.10. **Verify the environment is empty before running it** — the delete is destructive
+by name and only safe because there was nothing in it.
+
+### What duplication gets right, and the two things it does not
+
+`--duplicate` rewrites the Postgres credentials per environment: production's api came up
+pointing at **production's** Postgres, not staging's. That was the dangerous case and it
+was handled. Two things it copies verbatim and you must fix immediately:
+
+* `ENV=staging` on every service. Left alone, production reports itself as staging and
+  **mounts `/dev/*`**, which §19.2 says must not exist there.
+* `VITE_API_ORIGIN=https://api.staging.gladiatorclub.co.il` on all three frontends —
+  production's apps talking to the staging API.
+
+### Hosts
+
+Production is on Railway's **generated** domains, not custom subdomains of `base_domain`.
+That is a deliberate staging point: a custom host needs a CNAME at LiveDNS, and until DNS
+resolves the environment is unreachable. A working production on an ugly hostname beats a
+pretty one that 404s. The four hosts are in `infra/railway/domains.json`; `app/core/cors.py`
+reads that file **at import**, so changing them means redeploying the api.
+
+To move to custom domains later: add the domain in Railway, change the four hosts in
+`domains.json`, redeploy the api so CORS re-reads it, then set `VITE_API_ORIGIN` on the
+three frontends and rebuild them — the origin is baked in at build time, so a variable
+change alone does nothing.
+
+### The database role — production is enforced, staging is not
+
+Migrations ran automatically: Railway's pre-deploy step executes `alembic upgrade head`, so
+the first api deploy took a fresh database to `00cc140ce237` and created the demo studio by
+migration. Production held 1 studio (the demo one) and zero people, students, identities,
+payments, health declarations or audit rows.
+
+Then `studio_app` was given a login and `DATABASE_URL` re-pointed at it, leaving
+`MIGRATION_DATABASE_URL` on the owner. Production's boot log now reads:
+
+```
+audit_log is append-only by grant   connected_as="studio_app"
+```
+
+so §11.2 is genuinely in force there. **`HB-staging-superuser` stays open for STAGING**,
+which still connects as the superuser and therefore still only warns.
+
+The ordering matters if you ever rebuild production. `enforce_runtime_role` raises in
+production on a role that can mutate `audit_log` — but `has_table_privilege` on a table
+that does not exist raises first, which is caught and stood aside. So an **empty** database
+boots, which is what lets you deploy, migrate, create the role, and only then redeploy.
+Deploy → migrate → `ALTER ROLE studio_app WITH LOGIN PASSWORD` → repoint `DATABASE_URL` →
+redeploy. The password is generated at the terminal and never committed.
+
+### Still to do by hand — the cron schedules
+
+The eight production cron services exist as **empty shells** with every variable already
+set (`ENV`, both DSNs, `APP_DB_ROLE`, the alert and SMTP keys, `RAILWAY_DOCKERFILE_PATH`):
+
+| Service | Start command | Schedule |
+|---|---|---|
+| `cron-plan-changes` | `python -m app.workers.plan_changes` | `30 2 * * *` |
+| `cron-billing-run` | `python -m app.workers.billing` | `30 8 * * *` |
+| `cron-people-followups` | `python -m app.workers.followups` | `0 9 * * *` |
+| `cron-health-reminders` | `python -m app.workers.health_reminders` | `30 9 * * *` |
+| `cron-comms-notify` | `python -m app.workers.notify` | `*/15 * * * *` |
+| `cron-sessions-complete` | `python -m app.workers.schedule` | `0 * * * *` |
+| `cron-privacy-requests` | `python -m app.workers.privacy` | `20 * * * *` |
+| `cron-ops-check` | `python -m app.workers.ops_check` | `*/15 * * * *` |
+
+They have **no source attached, deliberately.** Attaching the repo would make each one boot
+the Dockerfile's uvicorn CMD and bill continuously until its start command was overridden;
+an empty shell costs nothing while it waits. For each, in the Railway dashboard: attach the
+source, set the start command, set the cron schedule. The CLI cannot do any of the three —
+there is no `railway cron`, and no variable equivalent.
+
+`demo-reset` is **not** among them: `jobs.json` scopes it to staging, and the worker refuses
+to run anywhere else. Staging separately needs `cron-demo-reset` and `cron-ops-check`.
 
 ## Cost note
 
