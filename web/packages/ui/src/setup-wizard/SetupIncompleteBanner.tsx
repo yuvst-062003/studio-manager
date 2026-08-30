@@ -60,6 +60,13 @@ export function SetupIncompleteBanner({
   if (!progress || progress.complete || !Array.isArray(progress.steps)) return null
 
   const done = progress.steps.filter((step) => step.status === 'done').length
+  // Named, not only counted (owner report 2026-08-30): "6 of 7" with every rail entry
+  // showing a mark reads as a broken counter. The gap is usually a SKIPPED step, and
+  // the way to finish it is to know which one it is.
+  const missing = progress.steps
+    .filter((step) => step.status !== 'done')
+    .map((step) => t(locale, `common.setup.step.${step.id}`))
+    .join(' · ')
 
   return (
     <div data-testid="setup-incomplete">
@@ -79,6 +86,11 @@ export function SetupIncompleteBanner({
                 .replace('{{done}}', String(done))
                 .replace('{{total}}', String(progress.steps.length))}
             </span>
+            {missing ? (
+              <span data-testid="setup-incomplete-missing">
+                {t(locale, 'common.setup.incomplete.missing').replace('{{steps}}', missing)}
+              </span>
+            ) : null}
           </span>
           <Button data-testid="setup-incomplete-resume" onClick={onOpen} variant="secondary">
             {t(locale, 'common.setup.incomplete.resume')}

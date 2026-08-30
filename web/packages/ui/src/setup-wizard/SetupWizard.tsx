@@ -162,7 +162,9 @@ export function SetupWizard({
         </span>
         {position > 0 ? (
           <span className="setup-header__count" data-testid="setup-position">
-            {t(locale, 'common.setup.stepOfSix').replace('{n}', String(position))}
+            {t(locale, 'common.setup.stepOfSix')
+              .replace('{n}', String(position))
+              .replace('{total}', String(WIZARD_STEP_ORDER.length))}
           </span>
         ) : null}
         {/* `5c`–`5e` draw save-and-exit; `5f` drops it and offers the dashboard instead,
@@ -320,7 +322,11 @@ export function SetupWizard({
                     onClick={() => setActiveId(step.id as WizardStepId)}
                   >
                     <span aria-hidden="true" className="setup-rail__dot">
-                      {state === 'done' ? '✓' : index + 1}
+                      {/* A skip is an ANSWER but not a finish — drawn as its own mark
+                          (owner report 2026-08-30: "finished them all, still says 6/7,
+                          and it doesn't show what's missing"). The ✓ it used to share
+                          with done made the two states indistinguishable by eye. */}
+                      {state === 'done' ? (step.status === 'skipped' ? '—' : '✓') : index + 1}
                     </span>
                     <span>{t(locale, `common.setup.step.${step.id}`)}</span>
                     {/* Never a circle alone (SC 1.4.1) — the state is written out, and

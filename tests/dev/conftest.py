@@ -54,6 +54,12 @@ RELOADABLE = (
     # app_origin("parent", settings.ENV), so orders.py reads .ENV off a module-scope
     # `settings` binding like the entries above it.
     "app.services.billing.orders",
+    # 2026-08-30 -- the invitation LINK resolves the parent app's origin with
+    # app_origin("parent", settings.ENV), same shape as orders.py above it.
+    "app.routers.students",
+    # 2026-08-30 -- the setup payload names the dashboard with
+    # app_origin("dashboard", settings.ENV), for the staff wizard's unbuilt-step links.
+    "app.services.structure.setup",
     # W2's contract session -- the OAuth callback's GET arm resolves the app it must send
     # the browser back to with app_origin(transaction.app, settings.ENV), so identity.py
     # now reads .ENV off a module-scope `settings` binding like the entries above it.

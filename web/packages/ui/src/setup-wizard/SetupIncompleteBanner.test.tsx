@@ -107,3 +107,26 @@ describe('SetupIncompleteBanner', () => {
     expect(screen.getByText(t('he', 'common.setup.incomplete.resume'))).toBeInTheDocument()
   })
 })
+
+describe('naming the gap (2026-08-30)', () => {
+  it('says WHICH steps are left — a skipped step counts as left, not finished', async () => {
+    const progress = {
+      steps: [
+        { id: 'studio', order: 1, status: 'done' as const, at: null },
+        { id: 'items', order: 5, status: 'skipped' as const, at: null },
+      ],
+      complete: false,
+      dismissed_at: null,
+    }
+    render(
+      <SetupIncompleteBanner
+        client={{ read: async () => progress } as never}
+        locale="he"
+        onOpen={() => undefined}
+      />,
+    )
+    expect(await screen.findByTestId('setup-incomplete-missing')).toHaveTextContent(
+      t('he', 'common.setup.step.items'),
+    )
+  })
+})

@@ -180,16 +180,20 @@ def test_the_demo_studio_has_its_trial_template_after_a_reset(app_session, reset
 def test_a_reset_restores_the_personas_without_duplicating_them(app_session, reset_demo):
     """19.7 -- 'POST /dev/demo/reset restores the fixture set from a versioned seed.'
     Seeding twice must converge, not accumulate."""
+    # Persona people only: since 2026-08-30 the students layer adds families beside
+    # them, so the studio-wide person count is bigger by design. What convergence means
+    # is unchanged — the identity-holding nine, exactly once each.
+    persona_people = (
+        select(func.count())
+        .select_from(Person)
+        .where(Person.studio_id == reset_demo, Person.auth_identity_id.is_not(None))
+    )
     with with_all_tenants(reason=_SCOPE):
-        before = app_session.execute(
-            select(func.count()).select_from(Person).where(Person.studio_id == reset_demo)
-        ).scalar_one()
+        before = app_session.execute(persona_people).scalar_one()
     DemoStudioService.reset(app_session)
     app_session.commit()
     with with_all_tenants(reason=_SCOPE):
-        after = app_session.execute(
-            select(func.count()).select_from(Person).where(Person.studio_id == reset_demo)
-        ).scalar_one()
+        after = app_session.execute(persona_people).scalar_one()
     assert before == after == len(PERSONAS)
 
 

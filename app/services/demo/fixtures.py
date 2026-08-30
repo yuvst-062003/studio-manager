@@ -33,6 +33,14 @@ from sqlalchemy.orm import Session
 
 from app.models.studio import Studio
 from app.services.demo import DEMO_STUDIO_NAME, DEMO_STUDIO_SETTINGS, DEMO_STUDIO_SLUG
+from app.services.demo.layers import (
+    seed_attendance,
+    seed_belts,
+    seed_health,
+    seed_money,
+    seed_structure,
+    seed_students,
+)
 from app.services.demo.personas import SEEDED_AT, seed_personas
 from app.services.structure.health_templates import (
     ensure_full_template,
@@ -132,7 +140,7 @@ def _seed_health_templates(session: Session, studio_id: uuid.UUID) -> None:
 
 
 _V1 = FixtureSet(
-    version="2026-08-25.1",
+    version="2026-08-30.1",
     studio=StudioFixture(
         name=DEMO_STUDIO_NAME,
         slug=DEMO_STUDIO_SLUG,
@@ -167,6 +175,59 @@ _V1 = FixtureSet(
             tables=("health_form_template",),
             seed=_seed_health_templates,
         ),
+        # -- §19.3's six data layers, authored 2026-08-30 (app/services/demo/layers.py).
+        # Until then every one of these was a PlannedLayer, and a reset restored a club
+        # with no groups and no students — the empty picker a parent read as broken.
+        FixtureLayer(
+            name="structure",
+            milestone="M2",
+            tables=(
+                "location",
+                "class",
+                "group",
+                "group_schedule_rule",
+                "training_year",
+                "studio_closure",
+            ),
+            seed=seed_structure,
+        ),
+        FixtureLayer(
+            name="students",
+            milestone="M3",
+            tables=("person", "student", "guardian", "enrollment", "trial_booking"),
+            seed=seed_students,
+        ),
+        FixtureLayer(
+            name="health",
+            milestone="M4",
+            tables=("health_declaration",),
+            seed=seed_health,
+        ),
+        FixtureLayer(
+            name="attendance",
+            milestone="M5",
+            tables=("session", "attendance"),
+            seed=seed_attendance,
+        ),
+        FixtureLayer(
+            name="money",
+            milestone="M6",
+            tables=(
+                "price_plan",
+                "product",
+                "charge",
+                "payment",
+                "payment_allocation",
+                "upay_ipn_record",
+            ),
+            seed=seed_money,
+        ),
+        FixtureLayer(
+            name="belts",
+            milestone="M7",
+            tables=("belt_rank", "student_belt", "event", "event_exam_result"),
+            seed=seed_belts,
+        ),
     ),
 )
 
@@ -174,36 +235,7 @@ SEEDS: dict[str, FixtureSet] = {_V1.version: _V1}
 LATEST_VERSION: str = _V1.version
 
 #: §19.3 in full, and the milestone that lands each part. An entry moves into
-#: `_V1.layers` (and out of here) when its milestone's models exist.
-PLANNED_LAYERS: tuple[PlannedLayer, ...] = (
-    PlannedLayer(
-        "structure",
-        "M2",
-        "2 classes, 5 groups, schedule rules, one training year, holiday closures",
-    ),
-    PlannedLayer(
-        "students",
-        "M3",
-        "~40 students with Hebrew names, enrollments, one trial booking, one lead",
-    ),
-    PlannedLayer(
-        "health",
-        "M4",
-        "signed, trial-signed and missing declarations across the roster",
-    ),
-    PlannedLayer(
-        "attendance",
-        "M5",
-        "a full training year of materialized sessions and partial attendance history",
-    ),
-    PlannedLayer(
-        "money",
-        "M6",
-        "price plans, settled and open charges, and two unmatched IPNs",
-    ),
-    PlannedLayer(
-        "belts",
-        "M7",
-        "belt history, one competition and one belt exam",
-    ),
-)
+#: `_V1.layers` (and out of here) when its milestone's models exist — and on 2026-08-30
+#: the last six moved. Empty is this tuple's goal state, kept so the test that guards the
+#: promise-vs-reality distance still has something to hold.
+PLANNED_LAYERS: tuple[PlannedLayer, ...] = ()
