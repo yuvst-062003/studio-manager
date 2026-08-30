@@ -90,3 +90,17 @@ describe('ImportStudentsPanel', () => {
     )
   })
 })
+
+describe('the sample file (2026-08-30)', () => {
+  it('downloads through a blob, never a data: URI the CSP refuses', async () => {
+    const createObjectURL = vi.fn(() => 'blob:csv')
+    const revokeObjectURL = vi.fn()
+    Object.assign(URL, { createObjectURL, revokeObjectURL })
+    render(<ImportStudentsPanel locale="he" client={clientWith(vi.fn())} />)
+    await userEvent.click(screen.getByTestId('import-template'))
+    expect(createObjectURL).toHaveBeenCalled()
+    const blob = createObjectURL.mock.calls[0]![0] as Blob
+    expect(await blob.text()).toContain('parent_first,parent_last')
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:csv')
+  })
+})

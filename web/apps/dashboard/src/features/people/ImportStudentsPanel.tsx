@@ -167,13 +167,27 @@ export function ImportStudentsPanel({
         {t(locale, 'people.import.title')}
       </h3>
       <p style={{ margin: 0 }}>{t(locale, 'people.import.hint')}</p>
-      <a
-        download="students.csv"
-        href={`data:text/csv;charset=utf-8,${encodeURIComponent(TEMPLATE)}`}
+      {/* A blob handed to the browser, not a data: URI in an href — the deployed CSP
+          refuses data: navigations, which read as "the link fails" (owner, 2026-08-30).
+          Same shape as @studio/core's downloadFile, inlined because the bytes are local.
+          The BOM is for Excel: without it a Hebrew CSV opens as mojibake. */}
+      <Button
+        variant="ghost"
         data-testid="import-template"
+        onClick={() => {
+          const blob = new Blob(['\uFEFF' + TEMPLATE], { type: 'text/csv;charset=utf-8' })
+          const url = URL.createObjectURL(blob)
+          const anchor = document.createElement('a')
+          anchor.href = url
+          anchor.download = 'students.csv'
+          document.body.append(anchor)
+          anchor.click()
+          anchor.remove()
+          URL.revokeObjectURL(url)
+        }}
       >
         {t(locale, 'people.import.template')}
-      </a>
+      </Button>
       <label>
         {t(locale, 'people.import.pickFile')}
         <input
