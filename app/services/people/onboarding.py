@@ -6,12 +6,17 @@ already trains at the club, the decision was made in the real world months ago a
 database is catching up. Nothing here may be reused for new families; the trial funnel
 (§5.4a) keeps the invariant.
 
-Pricing follows the spec to the letter: derive each child's weekly volume from the chosen
-groups' schedules, assign the ONE live plan whose sessions_per_week matches, and create
-the first prorated tuition charge immediately through `BillingRunService`'s own
-first-month machinery -- the run's idempotency key makes the next monthly run a no-op for
-this period. No matching plan (or two of them) means no charge and no guess: the student
-stays unpriced and lands on the manager's checklist.
+Pricing derives each child's weekly volume from the chosen groups' schedules and hands it
+to `plan_for_volume` -- the ONE matching rule every self-service door shares -- then creates
+the first prorated tuition charge immediately through `BillingRunService.charge_first_month`.
+The run's idempotency key makes the next monthly run a no-op for this period.
+
+**The rule used to demand an exact `sessions_per_week` match and that cost the club money
+in silence.** Zero matching plans (or two) left the student unpriced, so a club selling
+1× / 2× / open membership priced a child ticking three groups' worth of training at nothing
+-- recorded only in `billing_run.log`, which no router, worker or screen reads. See
+`app/services/billing/catalogue.py`. Unpriced is still reachable, for a club with no live
+plans at all, and `GET /billing/unpriced-students` is where a manager now sees it.
 """
 
 from __future__ import annotations
@@ -25,16 +30,17 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models.billing import PricePlan
 from app.models.onboarding import OnboardingLink
 from app.models.people import Enrollment, Student
 from app.models.person import Guardian, Person
-from app.models.structure import Group
 from app.services.audit import AuditService
-from app.services.billing.run import BillingRunService, _Tally, period_end
+from app.services.billing.catalogue import plan_for_volume
+from app.services.billing.run import BillingRunService, _Tally
 from app.services.people.attendance_pattern import weekly_volume
-from app.services.people.errors import NotFoundError, RefusedError
-from app.services.people.group_days import ScheduleReader, training_weekdays
+from app.services.people.enrollments import EnrollmentService
+from app.services.people.errors import DuplicateStudentError, NotFoundError, RefusedError
+from app.services.people.group_days import ScheduleReader
+from app.services.people.matching import duplicate_student
 
 LINK_TTL_DAYS = 7
 
@@ -174,6 +180,25 @@ class OnboardingService:
         if not group_ids:
             raise RefusedError("every child needs at least one group")
         today = at.date()
+
+        # **Before anything is created**, so a refusal leaves no half-family behind.
+        # §5.4a's duplicate check used to run only on the registration-request detail view,
+        # whose sole producer was removed the day this door started enrolling directly --
+        # since when a parent adding a child the club already had got a SECOND student for
+        # them, one `trial` and one `active`, both on the roster and neither visibly wrong.
+        existing = duplicate_student(
+            session,
+            first_name=child["first_name"] if not child.get("self") else parent.first_name,
+            last_name=child["last_name"] if not child.get("self") else parent.last_name,
+            birthdate=child.get("birthdate") if not child.get("self") else parent.birthdate,
+        )
+        if existing is not None:
+            raise DuplicateStudentError(
+                "this child is already on the roster",
+                student_id=existing.student_id,
+                display_name=existing.display_name,
+            )
+
         if child.get("self"):
             child_person = parent
         else:
@@ -207,12 +232,11 @@ class OnboardingService:
 
         volume_pairs = []
         for group_id in group_ids:
-            group = session.get(Group, group_id)
-            if group is None or not group.is_active or group.is_invite_only:
-                raise NotFoundError(f"no group {group_id}")
-            weekdays = training_weekdays(group_id, since=today, schedule=schedule)
-            if not weekdays:
-                raise NotFoundError(f"no group {group_id}")
+            # One rule on every self-service door, and it lives in `EnrollmentService` so
+            # the trial-to-member join reaches the same check rather than restating it.
+            weekdays = EnrollmentService.self_service_weekdays(
+                session, group_id=group_id, since=today, schedule=schedule
+            )
             session.add(
                 Enrollment(
                     studio_id=studio_id,
@@ -226,34 +250,14 @@ class OnboardingService:
             volume_pairs.append((None, weekdays))
         session.flush()
 
-        # §5.10's suggestion becomes the assignment -- there is no manager in this lane.
-        # Exactly one live plan may match; zero or two mean the student stays unpriced,
-        # visibly, on the manager's checklist.
-        volume = weekly_volume(volume_pairs)
-        plans = (
-            session.execute(
-                select(PricePlan).where(
-                    PricePlan.studio_id == studio_id,
-                    PricePlan.active_to.is_(None),
-                    PricePlan.sessions_per_week == volume,
-                )
-            )
-            .scalars()
-            .all()
-        )
-        if len(plans) == 1:
-            student.price_plan_id = plans[0].id
+        # §5.10's suggestion becomes the assignment -- there is no manager in this lane --
+        # through the one rule every self-service door shares. See `plan_for_volume`.
+        plan = plan_for_volume(session, studio_id=studio_id, volume=weekly_volume(volume_pairs))
+        if plan is not None:
+            student.price_plan_id = plan.id
             session.flush()
             run = billing_run if billing_run is not None else BillingRunService(session)
-            month_start = today.replace(day=1)
-            run._charge_one(  # noqa: SLF001 -- the run's own first-month path
-                studio_id,
-                student.id,
-                plans[0].id,
-                month_start,
-                period_end(today.year, today.month),
-                tally if tally is not None else _Tally(),
-            )
+            run.charge_first_month(studio_id, student.id, plan.id, on=today, tally=tally)
         return student.id
 
     @staticmethod
@@ -318,21 +322,48 @@ class OnboardingService:
         `children` rows: {first_name, last_name, birthdate?, group_ids: [uuid], self: bool}.
         A `self` child is §5.3's adult member -- the parent Person doubles as the student's
         person, one human in both roles.
+
+        The student ids are what THIS submission created. A child already on the account is
+        skipped rather than duplicated, so a resubmission can legitimately return fewer ids
+        than it was given children -- or none at all.
         """
         if not children:
             raise RefusedError("a registration needs at least one child")
         if len(children) > 8:
             raise RefusedError("too many children in one registration")
 
-        parent = Person(
-            studio_id=studio_id,
-            auth_identity_id=identity_id,
-            first_name=first_name,
-            last_name=last_name,
-            phone=phone,
-            email=email,
+        # **Do not duplicate the parent; do add the missing children.**
+        #
+        # `existing_registration` answers "does this identity already have a Person here",
+        # and this used to treat that as "this family is already registered" -- returning
+        # `already_registered: true` and creating nothing. Those are different questions,
+        # and the difference is exactly a trial family: booking a trial creates a Person for
+        # the parent, so the club's most natural funnel (try it, like it, get sent the link)
+        # silently did nothing. An existing Person is adopted; each child still runs through
+        # `add_child`, whose duplicate check is what makes a resubmission a no-op.
+        parent = (
+            OnboardingService.existing_registration(
+                session, studio_id=studio_id, identity_id=identity_id
+            )
+            if identity_id is not None
+            else None
         )
-        session.add(parent)
+        if parent is None:
+            parent = Person(
+                studio_id=studio_id,
+                auth_identity_id=identity_id,
+                first_name=first_name,
+                last_name=last_name,
+                phone=phone,
+                email=email,
+            )
+            session.add(parent)
+        else:
+            # Fill the blanks and overwrite nothing. The club's existing record of this
+            # parent is not a form field, and a trial booking that recorded a phone number
+            # must not lose it to a form somebody left empty.
+            parent.phone = parent.phone or phone
+            parent.email = parent.email or email
         session.flush()
 
         billing_run = BillingRunService(session)
@@ -340,18 +371,27 @@ class OnboardingService:
         student_ids: list[uuid.UUID] = []
 
         for child in children:
-            student_ids.append(
-                OnboardingService.add_child(
-                    session,
-                    studio_id=studio_id,
-                    parent=parent,
-                    child=child,
-                    at=at,
-                    schedule=schedule,
-                    billing_run=billing_run,
-                    tally=tally,
+            try:
+                student_ids.append(
+                    OnboardingService.add_child(
+                        session,
+                        studio_id=studio_id,
+                        parent=parent,
+                        child=child,
+                        at=at,
+                        schedule=schedule,
+                        billing_run=billing_run,
+                        tally=tally,
+                    )
                 )
-            )
+            except DuplicateStudentError:
+                # A no-op, not a refusal, and only on THIS door. A parent resubmitting the
+                # link with three children of whom two are already on the account must still
+                # get the third; refusing the whole submission would make the rest of the
+                # family unreachable through the club's own link. `+ הוסף ילד` submits one
+                # child at a time and there the refusal is the useful answer -- it can offer
+                # them the child they already have.
+                continue
 
         AuditService.record(
             session,

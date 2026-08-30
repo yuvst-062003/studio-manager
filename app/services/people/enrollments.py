@@ -56,6 +56,33 @@ class EnrollmentService:
         return group
 
     @staticmethod
+    def self_service_weekdays(
+        session: Session, *, group_id: uuid.UUID, since: date, schedule: ScheduleReader
+    ) -> frozenset[int]:
+        """The days a group a PARENT may choose trains on -- or `NotFoundError`.
+
+        **One rule on every self-service door.** §5.4b's join link, `+ הוסף ילד` and a trial
+        family joining from their own app all reach a group by an id the client sent, and
+        `LandingService.public_groups` filtering the picker is presentation rather than
+        enforcement -- the Girls Team, the group that exists precisely so the product never
+        has to store gender about a minor, was protected by its id not being published.
+        Obscurity is not enforcement.
+
+        A group with no training days is refused for the same reason and with the same
+        answer: it has no weekly volume, so a child enrolled in it has no price.
+
+        **Not found, never forbidden.** A 403 would confirm the group exists, which is the
+        one fact `is_invite_only` is keeping.
+        """
+        group = session.get(Group, group_id)
+        if group is None or not group.is_active or group.is_invite_only:
+            raise NotFoundError(f"no group {group_id}")
+        weekdays = training_weekdays(group_id, since=since, schedule=schedule)
+        if not weekdays:
+            raise NotFoundError(f"no group {group_id}")
+        return weekdays
+
+    @staticmethod
     def weekday_options(
         session: Session, *, group_id: uuid.UUID, since: date, schedule: ScheduleReader
     ) -> WeekdayOptions:

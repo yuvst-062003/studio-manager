@@ -156,6 +156,54 @@ describe('the club inbox (2b)', () => {
 })
 
 // -- §6.5: two platforms, two paths ------------------------------------------
+describe('a message that can DO something (2026-08-30)', () => {
+  it('pins "איך היה?" with a button that goes where the payload says', async () => {
+    // §5.4a ④ has sent this on days 1, 3 and 7 since M3 carrying a booking id, a day
+    // number and nothing to press. The product asked a family whether they enjoyed
+    // themselves, three times, and offered them no way to answer.
+    const client = makeClient({
+      inbox: vi.fn().mockResolvedValue({
+        items: [
+          note({
+            id: 'n7',
+            kind: 'trial.followup',
+            title: 'איך היה?',
+            payload: { trial_booking_id: 'b1', day: 1, route: '#/join' },
+          }),
+        ],
+        next_cursor: null,
+        has_more: false,
+      }),
+    })
+    render(<InboxScreen client={client} locale="he" userAgent={ANDROID} />)
+    await userEvent.click(await screen.findByTestId('inbox-route-go-n7'))
+    expect(globalThis.location.hash).toBe('#/join')
+  })
+
+  it('pins nothing for a message with no route — a no-show gets no join button', async () => {
+    // `trial.no_show` is untouched, deliberately: the worker sends that family a different
+    // message on the stated ground that "איך היה?" to somebody who did not come is worse
+    // than silence. A join button is the same mistake with money attached.
+    const client = makeClient({
+      inbox: vi.fn().mockResolvedValue({
+        items: [
+          note({
+            id: 'n8',
+            kind: 'trial.no_show',
+            title: 'התגעגענו אליכם',
+            payload: { trial_booking_id: 'b1', day: 1 },
+          }),
+        ],
+        next_cursor: null,
+        has_more: false,
+      }),
+    })
+    render(<InboxScreen client={client} locale="he" userAgent={ANDROID} />)
+    await screen.findByTestId('inbox-row-n8')
+    expect(screen.queryByTestId('inbox-route-n8')).toBeNull()
+  })
+})
+
 describe('asking for push permission', () => {
   it('teaches the install on iOS in a tab instead of offering a button that cannot work', async () => {
     // §12 — in a Safari tab the Push API is ABSENT, not denied. There is nothing to request.

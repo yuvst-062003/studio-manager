@@ -13,6 +13,7 @@ import { registerSlot } from '@studio/ui'
 import type { RosterRow } from '@studio/core'
 import type { Locale } from '@studio/i18n'
 import { RosterHealthBadge } from './HealthBadge'
+import { PickupContacts } from './PickupContacts'
 
 export function registerHealthSections(): void {
   // `RosterHealthBadge`, not `HealthBadge`: the container renders sections with the
@@ -23,5 +24,15 @@ export function registerHealthSections(): void {
     // Early: §5.5's ⚠ is the thing a coach must see before they read anything else on the row.
     order: 10,
     render: RosterHealthBadge,
+  })
+
+  // `טופס הרשמה` block 3, on the card a coach opens at the door. Order 55: after the
+  // attendance strip (40) and before the guardian list (50 is M3's, 55 sits with it) —
+  // "who else may collect this child" belongs beside "who the guardians are", not buried
+  // under the marks.
+  registerSlot<{ student: { id: string }; locale: Locale }>('student-card', {
+    key: 'pickup-contacts',
+    order: 55,
+    render: PickupContacts,
   })
 }

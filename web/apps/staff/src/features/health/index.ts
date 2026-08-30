@@ -1,3 +1,5 @@
 export { HealthBadge, badgeStatusFor, labelledFlags } from './HealthBadge'
 export type { HealthBadgeProps } from './HealthBadge'
+export { PickupContacts } from './PickupContacts'
+export type { PickupContact } from './PickupContacts'
 export { registerHealthSections } from './register'

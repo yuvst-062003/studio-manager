@@ -15,13 +15,18 @@
 // **`3e` finding 2 — `billing.run.idempotentHint` is invariant 5 in words**, written for the
 // single most consequential button on the dashboard, and the artboard shows it with no
 // confirmation, no in-progress state and no result. All three are here.
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { apiFetch, downloadFile } from '@studio/core'
+import { apiFetch, downloadFile, formatDateInStudioZone } from '@studio/core'
 import { Button, Card, Checkbox, EmptyState, MoneyDisplay, StatusChip } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
-import type { BillingRunOut, ChargeOut, DashboardBillingClient } from './billingClient'
+import type {
+  BillingRunOut,
+  ChargeOut,
+  DashboardBillingClient,
+  UnpricedStudentOut,
+} from './billingClient'
 import { ageBucket, escalationRung } from './billingClient'
 import { RecordPaymentDialog } from './RecordPaymentDialog'
 
@@ -98,6 +103,23 @@ export function CollectionsScreen({
   // never look alike. `quiet` renders the 21:00 rule; `recent` the 24h rate limit.
   const [reminded, setReminded] = useState<Record<string, 'sent' | 'recent' | 'quiet' | 'failed'>>({})
   const [exportFailed, setExportFailed] = useState(false)
+  // Read by the SCREEN and not passed in as a prop, unlike `households`: it is one small
+  // list with no cross-filtering, and threading it through every caller of this screen
+  // would make three of them carry a fetch for a panel they do not otherwise touch.
+  const [unpriced, setUnpriced] = useState<readonly UnpricedStudentOut[]>([])
+  useEffect(() => {
+    let live = true
+    // A failed read leaves the panel absent rather than showing an error: this is a
+    // secondary list on a screen whose primary job is the debt table, and a broken box
+    // above it would read as the debt being broken.
+    void client
+      .unpricedStudents()
+      .then((rows) => live && setUnpriced(rows))
+      .catch(() => undefined)
+    return () => {
+      live = false
+    }
+  }, [client])
 
   async function sendReminders(payerIds: string[]) {
     const response = await apiFetch('/api/v1/reminders/debt', {
@@ -233,6 +255,48 @@ export function CollectionsScreen({
           </span>
         </Card>
       </div>
+
+      {/* -- the children nobody can bill ------------------------------------- */}
+      {/* §5.10's run has appended these to `tally.unpriced` since M6, the tally lands in
+          `billing_run.log`, and no router, worker or screen read it. A child whose groups
+          total three sessions a week in a club selling 1 / 2 / open membership was priced
+          at nothing and trained all year for free, visible only in a JSON blob.
+
+          It belongs HERE and not on its own screen: this is where a manager already comes
+          to ask "who owes what", and a child nobody can bill is the same question with the
+          answer missing. Rendered only when the list is non-empty — a permanent empty panel
+          on the club's busiest screen is a panel people learn to skip. */}
+      {unpriced.length > 0 ? (
+        <section aria-labelledby="unpriced-students" data-testid="unpriced-students">
+          <h2 id="unpriced-students">{t(locale, 'billing.unpriced.title')}</h2>
+          <p>{t(locale, 'billing.unpriced.hint')}</p>
+          <Card>
+            {unpriced.map((row) => (
+              <div key={row.student_id} style={rowStyle} data-testid="unpriced-row">
+                <bdi>{row.display_name}</bdi>
+                <span data-testid="unpriced-payer">
+                  {row.payer_display_name
+                    ? `${t(locale, 'billing.unpriced.payer')}: ${row.payer_display_name}`
+                    : t(locale, 'billing.unpriced.noPayer')}
+                </span>
+                {row.joined_on ? (
+                  <span data-testid="unpriced-since">
+                    {t(locale, 'billing.unpriced.since').replace(
+                      '{date}',
+                      formatDateInStudioZone(row.joined_on, locale),
+                    )}
+                  </span>
+                ) : null}
+                {/* The plan is set on the student card, which is where the price already
+                    lives — this names the gap and points at the one screen that closes it. */}
+                <a href={`#/students/${row.student_id}`} data-testid="unpriced-open">
+                  {t(locale, 'billing.unpriced.open')}
+                </a>
+              </div>
+            ))}
+          </Card>
+        </section>
+      ) : null}
 
       {/* -- the debt table --------------------------------------------------- */}
       <section aria-labelledby="open-debts">

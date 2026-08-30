@@ -45,6 +45,7 @@ from app.schemas.health import (
     HealthDeclarationOut,
     HealthStatusSummaryOut,
 )
+from app.services.health.clauses import ClauseMismatchError
 from app.services.health.declarations import (
     ACTION_READ_FULL,
     AnswersIncompleteError,
@@ -52,6 +53,7 @@ from app.services.health.declarations import (
     HealthDeclarationService,
     SignatureNotAPngError,
     SignatureRequiredError,
+    TemplateSupersededError,
     render_and_store_pdf,
 )
 
@@ -215,6 +217,15 @@ def submit_declaration(
         raise _unprocessable("signature_not_a_png", str(exc)) from exc
     except AnswersIncompleteError as exc:
         raise _unprocessable("answers_incomplete", f"unanswered: {exc}") from exc
+    except TemplateSupersededError as exc:
+        # A distinct code: the client's remedy is to re-fetch the current template, not to
+        # change an answer.
+        raise _unprocessable("template_superseded", str(exc)) from exc
+    except ClauseMismatchError as exc:
+        # The confirmed health clause contradicts the answers. A distinct code rather than
+        # `answers_incomplete`, because the client's remedy is different: nothing is missing,
+        # the wrong sentence was confirmed, and the form must re-render the other one.
+        raise _unprocessable("clause_mismatch", str(exc)) from exc
     except ValueError as exc:
         # `derive_flags` refusing a non-boolean answer to a flag question (§4.3). The message
         # names the question id and no answer.

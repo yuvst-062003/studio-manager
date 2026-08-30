@@ -12,6 +12,9 @@ import type { components } from '@studio/api-client'
 export type HealthDeclarationOut = components['schemas']['HealthDeclarationOut']
 export type HealthFormTemplateOut = components['schemas']['HealthFormTemplateOut']
 export type HealthStatus = components['schemas']['StudentSummaryOut']['health_status']
+export type AgreementStatusOut = components['schemas']['AgreementStatusOut']
+export type RegistrationIn = components['schemas']['RegistrationIn']
+export type PickupContactIn = components['schemas']['PickupContactIn']
 
 export type Fetcher = (path: string, init?: RequestInit) => Promise<Response>
 
@@ -33,7 +36,14 @@ async function json<T>(response: Response): Promise<T> {
  */
 export type TemplateQuestion = {
   id: string
-  type: 'boolean' | 'text' | 'phone'
+  /**
+   * `clause` is template v2's addition and is not a fourth input type — it is the club's own
+   * declaration sentence, and WHICH sentence is derived from the answers above it (see
+   * `clauses.ts`). The parent confirms the one that follows rather than choosing between two,
+   * because letting a family pick would let them declare "no medical limitations of any kind"
+   * on the same form where they answered yes to asthma.
+   */
+  type: 'boolean' | 'text' | 'phone' | 'clause'
   label: string
   required?: boolean
   /** §5.5 — this question's answer becomes a `derived_flag`, and a coach sees the boolean. */
@@ -51,8 +61,6 @@ export type TemplateSection = {
 export type TemplateSchema = {
   title?: string
   version?: number
-  /** D11's marker. `true` while the studio is still showing the questions the app ships with. */
-  is_bundled_default?: boolean
   sections: TemplateSection[]
 }
 
@@ -110,11 +118,23 @@ export function makeHealthClient(fetcher: Fetcher) {
      */
     template: (): Promise<HealthFormTemplateOut> =>
       fetcher('/api/v1/health-templates?kind=full')
-        .then(json<{ items: { id: string }[] }>)
+        .then(json<{ items: { id: string; version: number }[] }>)
         .then((list) => {
-          const first = list.items[0]
-          if (!first) throw new Error('no full health template in this studio')
-          return fetcher(`/api/v1/health-templates/${first.id}`).then(json<HealthFormTemplateOut>)
+          // **The highest version, never `items[0]`.** A studio holds every version it has
+          // ever published — v1 from the bundled questionnaire, v2 from the club's own form —
+          // and taking the first row handed a parent a SUPERSEDED template to sign. The gate
+          // counts a declaration only when its version is the current one, so that signature
+          // satisfied nothing and step 2 asked again forever, with no error to explain it.
+          //
+          // The list is ordered server-side now and the server refuses a superseded template
+          // outright. This is the third guard, and it is the cheapest: whichever order the
+          // rows arrive in, the client picks the newest.
+          const current = list.items.reduce<{ id: string; version: number } | null>(
+            (best, item) => (best === null || item.version > best.version ? item : best),
+            null,
+          )
+          if (!current) throw new Error('no full health template in this studio')
+          return fetcher(`/api/v1/health-templates/${current.id}`).then(json<HealthFormTemplateOut>)
         }),
 
     declaration: (studentId: string): Promise<HealthDeclarationOut | null> =>
@@ -145,6 +165,37 @@ export function makeHealthClient(fetcher: Fetcher) {
 
     /** §5.5 — 'downloadable by the guardian'. Served through the API, never a bucket URL. */
     pdfUrl: (studentId: string): string => `/api/v1/students/${studentId}/health-declaration/pdf`,
+
+    /**
+     * The three gate conditions, computed server-side.
+     *
+     * **Never re-derived here.** A gate whose condition is spelled out at two call sites is a
+     * gate that will eventually disagree with itself, and both failure modes are bad: a family
+     * locked out of an app they have finished with, or one walking past a signature the club
+     * needs.
+     */
+    agreementStatus: (studentId: string): Promise<AgreementStatusOut> =>
+      fetcher(`/api/v1/students/${studentId}/agreement`).then(json<AgreementStatusOut>),
+
+    /** `טופס הרשמה` blocks 1-4. Idempotent — the form shows what is stored and replaces it. */
+    saveRegistration: (studentId: string, body: RegistrationIn): Promise<AgreementStatusOut> =>
+      fetcher(`/api/v1/students/${studentId}/agreement/registration`, {
+        method: 'PUT',
+        headers: JSON_HEADERS,
+        body: JSON.stringify(body),
+      }).then(json<AgreementStatusOut>),
+
+    /**
+     * Step 3. `version` is the one this client RENDERED, echoed back — the server refuses a
+     * mismatch, because recording today's wording for a screen that showed last month's is how
+     * a consent ledger comes to hold agreements nobody made.
+     */
+    acceptClubTerms: (studentId: string, version: number): Promise<AgreementStatusOut> =>
+      fetcher(`/api/v1/students/${studentId}/agreement/club-terms`, {
+        method: 'POST',
+        headers: JSON_HEADERS,
+        body: JSON.stringify({ accepted: true, version }),
+      }).then(json<AgreementStatusOut>),
   }
 }
 

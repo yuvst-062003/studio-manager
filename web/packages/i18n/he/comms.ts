@@ -158,4 +158,5 @@ export const comms: Bundle = {
   // §5.12's two feeds carry different things — a parent's children's lessons, a coach's own
   // sessions — so the panel says which one you are looking at.
   'calendar.coachSubtitle': 'השיעורים שאתם מעבירים יופיעו ביומן שלכם',
+  'inbox.joinClub': 'הצטרפות למועדון',
 }

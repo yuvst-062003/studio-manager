@@ -312,6 +312,83 @@ def test_converting_a_trial_creates_the_enrollment_and_sets_the_price_on_the_stu
     assert enrollment.status == "active"
 
 
+def test_converting_raises_the_first_charge_so_the_payment_step_has_something_to_show(
+    tenant_session, a_group, trains_sundays
+):
+    """Entrance B, and the one thing that was missing from it.
+
+    `OnboardingService.register` raises the first month immediately; conversion raised
+    nothing. A child converted on the 12th was active, enrolled and priced with nothing to
+    pay until the 1st -- so §6.1's payment step, which shows a family what they owe, stood
+    itself down and the parent was never asked for money. The manager had 'even sent the
+    plan for him' and the app then asked for nothing.
+    """
+    from app.models.billing import Charge
+
+    student = _student(tenant_session, status="lead")
+    StudentStatusService.transition(tenant_session, student=student, to_status="trial", at=T0)
+    price_plan = PricePlan(
+        studio_id=student.studio_id,
+        name="פעמיים בשבוע",
+        sessions_per_week=2,
+        monthly_amount_agorot=25_000,
+        active_from=date(2026, 9, 1),
+    )
+    tenant_session.add(price_plan)
+    tenant_session.flush()
+
+    StudentService.convert(
+        tenant_session,
+        student_id=student.id,
+        group_id=a_group,
+        started_on=TODAY,
+        price_plan_id=price_plan.id,
+        attends_weekdays=None,
+        reason=None,
+        at=T0,
+        actor_person_id=None,
+        schedule=trains_sundays,
+    )
+    tenant_session.flush()
+
+    charge = tenant_session.execute(
+        select(Charge).where(Charge.student_id == student.id, Charge.kind == "tuition")
+    ).scalar_one()
+    assert charge.status == "open"
+    assert charge.amount_agorot == 25_000
+
+
+def test_converting_an_unpriced_student_raises_no_charge_and_does_not_fail(
+    tenant_session, a_group, trains_sundays
+):
+    """§5.4a's manager may convert without choosing a plan -- `price_plan_id` is nullable on
+    the route. That must stay a conversion with no charge, not a 500."""
+    from app.models.billing import Charge
+
+    student = _student(tenant_session, status="lead")
+    StudentStatusService.transition(tenant_session, student=student, to_status="trial", at=T0)
+    StudentService.convert(
+        tenant_session,
+        student_id=student.id,
+        group_id=a_group,
+        started_on=TODAY,
+        price_plan_id=None,
+        attends_weekdays=None,
+        reason=None,
+        at=T0,
+        actor_person_id=None,
+        schedule=trains_sundays,
+    )
+    tenant_session.flush()
+    assert student.status == "active"
+    assert (
+        tenant_session.execute(
+            select(Charge).where(Charge.student_id == student.id)
+        ).scalars().all()
+        == []
+    )
+
+
 def test_converting_closes_the_trial_booking_as_converted(
     tenant_session, studio, a_group, trains_sundays
 ):

@@ -70,6 +70,11 @@ REMINDER_HOURS_BEFORE = 24
 #: §5.4a ④ -- 'Day 1 "איך היה?" · day 3 · day 7'. Exactly these three.
 FOLLOW_UP_DAYS = (1, 3, 7)
 
+#: Where "איך היה?" leads. The parent app routes on `location.hash`, so the payload carries
+#: the hash and the inbox turns it into a button -- see `InboxScreen`. A path would be wrong:
+#: the parent app is one document and every in-app screen is a hash below it.
+JOIN_ROUTE = "#/join"
+
 #: §5.4a -- 'the 7-14 day conversion window every buyer's guide names as decisive'. The
 #: sweep waits past the far end of it before writing anybody off, because `lost` is a real
 #: outcome and a premature one is a family the club gave up on early.
@@ -164,15 +169,30 @@ def _walk_the_ladder(session: Session, *, at: datetime, tally: Tally) -> None:
             continue
         # §5.4a ③/④ -- a no-show and an attender get different messages. "איך היה?" to
         # somebody who did not come is worse than silence.
-        kind = "trial.followup" if booking.attended else "trial.no_show"
-        title = "איך היה?" if booking.attended else "התגעגענו אליכם"
+        #
+        # **The attender's message now has a destination, and the no-show's still has
+        # none.** This prompt has gone out on days 1, 3 and 7 since M3 with no link and no
+        # action: the product asked a family whether they enjoyed themselves, three times,
+        # and offered them no way to answer -- then wrote them off as `lost` on day 21. The
+        # route is what the inbox turns into a button. `trial.no_show` is untouched for the
+        # reason it exists at all: offering a family who did not come a join button is the
+        # same mistake as asking them how it was, with money attached.
+        attended = bool(booking.attended)
+        kind = "trial.followup" if attended else "trial.no_show"
+        title = "איך היה?" if attended else "התגעגענו אליכם"
+        body = (
+            "נשמח לשמוע מכם — ואם בא לכם להמשיך, אפשר להצטרף מכאן" if attended else "נשמח לשמוע מכם"
+        )
+        payload: dict[str, object] = {"trial_booking_id": str(booking.id), "day": elapsed}
+        if attended:
+            payload["route"] = JOIN_ROUTE
         for person_id in _guardians_of(session, booking.student_id):
             if _notify(
                 person_id,
                 kind,
                 title,
-                "נשמח לשמוע מכם",
-                {"trial_booking_id": str(booking.id), "day": elapsed},
+                body,
+                payload,
             ):
                 tally.follow_ups += 1
             else:

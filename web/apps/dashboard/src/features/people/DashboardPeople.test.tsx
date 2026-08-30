@@ -18,7 +18,6 @@ import { registerPeopleAlerts } from './register'
 import type {
   AttendanceMarkRow,
   DashboardPeopleClient,
-  RegistrationRequestOut,
   StudentSummary,
   TrialBookingRow,
 } from './peopleClient'
@@ -39,17 +38,6 @@ const summary = (over: Partial<StudentSummary> = {}): StudentSummary =>
     frozen_until: null,
     ...over,
   }) as StudentSummary
-
-const REQUEST = {
-  id: 'r1',
-  source: 'parent_app',
-  status: 'pending',
-  submitted_at: '2026-09-01T09:00:00Z',
-  reviewed_at: null,
-  matched_person_id: 'p9',
-  child_display_name: 'נועה כהן',
-  guardian_display_name: 'יעל כהן',
-} as unknown as RegistrationRequestOut
 
 const booking = (over: Partial<TrialBookingRow> = {}): TrialBookingRow =>
   ({
@@ -170,7 +158,6 @@ function makeClient(over: Partial<DashboardPeopleClient> = {}): DashboardPeopleC
     convert: vi.fn(),
     markLost: vi.fn(),
     freeze: vi.fn(),
-    pendingRequests: vi.fn(() => Promise.resolve({ items: [REQUEST] })),
     trialBookings: vi.fn(() => Promise.resolve({ items: [booking()] })),
     approve: vi.fn(),
     reject: vi.fn(),
@@ -607,41 +594,18 @@ describe('AlertCentre — the 6c container', () => {
   it('renders this lane’s own alerts through the registry too', async () => {
     registerPeopleAlerts()
     render(<AlertCentre locale="he" client={makeClient()} />)
-    expect(await screen.findByTestId('alert-pending-requests')).toBeInTheDocument()
-    expect(screen.getByTestId('alert-upcoming-trials')).toBeInTheDocument()
+    expect(await screen.findByTestId('alert-upcoming-trials')).toBeInTheDocument()
     expect(screen.getByTestId('alert-trials-awaiting')).toBeInTheDocument()
+    // The registration approval queue is GONE (2026-08-30) — it is not merely hidden. Its
+    // only producer of pending rows was removed when a parent adding a child started
+    // enrolling them, so it stood as two decision buttons over a list that could never
+    // fill. Asserted rather than dropped, because a deleted panel that quietly comes back
+    // is exactly how dead UI returns.
+    expect(screen.queryByTestId('alert-pending-requests')).toBeNull()
   })
 })
 
 describe('the alerts this lane owns', () => {
-  it('shows two display names and no payload', async () => {
-    // L10 — an unapproved registration is a stranger's personal data about a minor.
-    registerPeopleAlerts()
-    render(<AlertCentre locale="he" client={makeClient()} />)
-    const row = await screen.findByTestId('alert-request-row')
-    expect(row).toHaveTextContent('יעל כהן')
-    expect(row).toHaveTextContent('נועה כהן')
-    expect(row.textContent ?? '').not.toContain('2018')
-  })
-
-  it('never claims certainty about a match', async () => {
-    // §5.4a — matching is on a verified address, so the copy is 'ייתכן שזה אותו הורה'.
-    registerPeopleAlerts()
-    render(<AlertCentre locale="he" client={makeClient()} />)
-    expect(await screen.findByTestId('alert-request-matched')).toHaveTextContent(
-      t('he', 'people.request.matchedPerson'),
-    )
-  })
-
-  it('opens the decision rather than approving in place', async () => {
-    // §5.4 — 'Approving is where the group is chosen.'
-    registerPeopleAlerts()
-    render(<AlertCentre locale="he" client={makeClient()} />)
-    expect(await screen.findByTestId('alert-request-approve-r1')).toHaveTextContent(
-      t('he', 'people.request.approveInGroup'),
-    )
-  })
-
   it('excludes a trial that has not happened from the decision queue', async () => {
     // `attended === null` is 'the lesson has not happened yet'. Listing it as awaiting a
     // decision puts a choice in front of somebody who cannot make it.
@@ -678,7 +642,7 @@ describe('the alerts this lane owns', () => {
   it('shows no money in any alert', async () => {
     registerPeopleAlerts()
     render(<AlertCentre locale="he" client={makeClient()} />)
-    await screen.findByTestId('alert-pending-requests')
+    await screen.findByTestId('alert-trials-awaiting')
     expect(document.body.textContent ?? '').not.toContain('₪')
   })
 })

@@ -100,6 +100,40 @@
         "title": "AcceptInvitationRequest",
         "type": "object"
       },
+      "AgreementStatusOut": {
+        "description": "The three gate conditions, computed server-side and never re-derived by a client.\n\nA gate whose condition is spelled out at two call sites is a gate that will eventually\ndisagree with itself -- and the failure modes are a family locked out of an app they have\nfinished with, or one walking past a signature the club needs.",
+        "properties": {
+          "club_terms_version": {
+            "title": "Club Terms Version",
+            "type": "integer"
+          },
+          "complete": {
+            "title": "Complete",
+            "type": "boolean"
+          },
+          "health_signed": {
+            "title": "Health Signed",
+            "type": "boolean"
+          },
+          "registration_complete": {
+            "title": "Registration Complete",
+            "type": "boolean"
+          },
+          "terms_accepted": {
+            "title": "Terms Accepted",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "health_signed",
+          "registration_complete",
+          "terms_accepted",
+          "complete",
+          "club_terms_version"
+        ],
+        "title": "AgreementStatusOut",
+        "type": "object"
+      },
       "AnnouncementIn": {
         "description": "§5.11's publish form. `scheduled_for` absent means send now.",
         "properties": {
@@ -1812,6 +1846,80 @@
         "title": "ChargeOut",
         "type": "object"
       },
+      "ChildDetailsIn": {
+        "additionalProperties": false,
+        "description": "`טופס הרשמה` block 1. Four required fields; the rest are optional on the paper form too.",
+        "properties": {
+          "address": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Address",
+            "type": "string"
+          },
+          "city": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "City",
+            "type": "string"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "maxLength": 320,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "grade": {
+            "maxLength": 20,
+            "minLength": 1,
+            "title": "Grade",
+            "type": "string"
+          },
+          "national_id": {
+            "maxLength": 20,
+            "minLength": 1,
+            "title": "National Id",
+            "type": "string"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "phone_home": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone Home"
+          }
+        },
+        "required": [
+          "national_id",
+          "address",
+          "city",
+          "grade"
+        ],
+        "title": "ChildDetailsIn",
+        "type": "object"
+      },
       "ChildMatchOut": {
         "description": "§5.4a's duplicate-child warning. A candidate the manager judges, never a merge.",
         "properties": {
@@ -2113,6 +2221,26 @@
           "source"
         ],
         "title": "ClosureOut",
+        "type": "object"
+      },
+      "ClubTermsIn": {
+        "additionalProperties": false,
+        "description": "Step 3's acceptance.\n\n**The version is the one the client RENDERED**, echoed back, exactly as\n`POST /privacy/consents` does. Recording the server's current version for a screen that\nshowed the previous one is how a consent ledger comes to hold agreements nobody made.",
+        "properties": {
+          "accepted": {
+            "title": "Accepted",
+            "type": "boolean"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "accepted",
+          "version"
+        ],
+        "title": "ClubTermsIn",
         "type": "object"
       },
       "ConsentGrantIn": {
@@ -6810,6 +6938,11 @@
             ],
             "title": "Attended"
           },
+          "group_id": {
+            "format": "uuid",
+            "title": "Group Id",
+            "type": "string"
+          },
           "group_name": {
             "title": "Group Name",
             "type": "string"
@@ -6834,6 +6967,7 @@
         },
         "required": [
           "student_id",
+          "group_id",
           "group_name",
           "session_starts_at",
           "attended"
@@ -7264,6 +7398,74 @@
           "email_configured"
         ],
         "title": "OpsHealthResponse",
+        "type": "object"
+      },
+      "ParentDetailsIn": {
+        "additionalProperties": false,
+        "description": "`טופס הרשמה` block 2, for the signing parent and optionally the other one.",
+        "properties": {
+          "aliyah_year": {
+            "anyOf": [
+              {
+                "maxLength": 8,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Aliyah Year"
+          },
+          "first_name": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Name"
+          },
+          "last_name": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Name"
+          },
+          "national_id": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "National Id"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          }
+        },
+        "title": "ParentDetailsIn",
         "type": "object"
       },
       "ParentEventOut": {
@@ -7849,6 +8051,71 @@
           "to_date"
         ],
         "title": "PeriodWindowOut",
+        "type": "object"
+      },
+      "PickupContactIn": {
+        "additionalProperties": false,
+        "description": "One person, other than a parent, who may collect the child (`טופס הרשמה` block 3).",
+        "properties": {
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "phone": {
+            "default": "",
+            "maxLength": 32,
+            "title": "Phone",
+            "type": "string"
+          },
+          "relation": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Relation"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "PickupContactIn",
+        "type": "object"
+      },
+      "PickupContactOut": {
+        "description": "One authorised collector, as a coach at the door reads it.\n\nName and phone, nothing else. The point of the field is that somebody can check who is\nstanding there, and a coach who cannot read it is a coach the field does not help.",
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "phone": {
+            "title": "Phone",
+            "type": "string"
+          },
+          "relation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Relation"
+          }
+        },
+        "required": [
+          "name",
+          "phone"
+        ],
+        "title": "PickupContactOut",
         "type": "object"
       },
       "PlanChangeIn": {
@@ -8962,64 +9229,40 @@
         "title": "RegistrationAnswerOut",
         "type": "object"
       },
-      "RegistrationDecisionIn": {
-        "description": "`POST /registration-requests/{id}/{approve|reject}`.\n\n§5.4: **enrollment is always a manager decision.** Approving is where the group is\nchosen, which is why `group_id` lives on the decision and not on the submission — the\npublic link's only job is a first lesson.",
+      "RegistrationIn": {
+        "additionalProperties": false,
+        "description": "Blocks 1-4. Posted by step 1 of the agreement flow.",
         "properties": {
-          "group_id": {
+          "child": {
+            "$ref": "#/components/schemas/ChildDetailsIn"
+          },
+          "other_parent": {
             "anyOf": [
               {
-                "format": "uuid",
-                "type": "string"
+                "$ref": "#/components/schemas/ParentDetailsIn"
               },
               {
                 "type": "null"
               }
-            ],
-            "title": "Group Id"
+            ]
           },
-          "reason": {
-            "anyOf": [
-              {
-                "maxLength": 200,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Reason"
-          }
-        },
-        "title": "RegistrationDecisionIn",
-        "type": "object"
-      },
-      "RegistrationDecisionOut": {
-        "description": "The result of approving or rejecting one submission.\n\nOne shape for both verbs: a rejection creates no students and returns an empty list,\nwhich is a truer answer than a second shape that cannot express the difference.",
-        "properties": {
-          "request_id": {
-            "format": "uuid",
-            "title": "Request Id",
-            "type": "string"
-          },
-          "status": {
-            "pattern": "^(pending|approved|rejected)$",
-            "title": "Status",
-            "type": "string"
-          },
-          "student_ids": {
+          "pickup_contacts": {
             "items": {
-              "format": "uuid",
-              "type": "string"
+              "$ref": "#/components/schemas/PickupContactIn"
             },
-            "title": "Student Ids",
+            "maxItems": 10,
+            "title": "Pickup Contacts",
             "type": "array"
+          },
+          "signer": {
+            "$ref": "#/components/schemas/ParentDetailsIn"
           }
         },
         "required": [
-          "request_id",
-          "status"
+          "child",
+          "signer"
         ],
-        "title": "RegistrationDecisionOut",
+        "title": "RegistrationIn",
         "type": "object"
       },
       "RegistrationRequestDetailOut": {
@@ -11804,6 +12047,26 @@
         "title": "StudentFreezeIn",
         "type": "object"
       },
+      "StudentJoinIn": {
+        "description": "Entrance A — `POST /me/students/{student_id}/join`.\n\n**`group_ids` and no price.** How much a family pays is derived from the weekly volume\nacross the groups they tick (§5.10); how they PAY is chosen on §6.1's payment step. A\n`price_plan_id` here would be a price a client can post.\n\nPlural for the same reason `SiblingRequestIn.group_ids` is: one group id cannot price a\nchild who trains twice a week.",
+        "properties": {
+          "group_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 8,
+            "minItems": 1,
+            "title": "Group Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "group_ids"
+        ],
+        "title": "StudentJoinIn",
+        "type": "object"
+      },
       "StudentLeaveIn": {
         "description": "§7 — `POST /students/{id}/leave`.\n\nParent artboard `12i` states it plainly: **the monthly charge stays the parent's\nresponsibility**. Leaving is not a refund, so this shape carries no money field and no\n\"cancel outstanding charges\" flag. A manager who wants to write one off does it in the\nbilling screen, deliberately, where it is audit-logged as a write-off.",
         "properties": {
@@ -12092,6 +12355,34 @@
         "title": "StudentPricePlansPage",
         "type": "object"
       },
+      "StudentRegistrationOut": {
+        "description": "`טופס הרשמה` blocks 3 and 4, for staff.\n\n**Two access levels in one response, deliberately.** `pickup_contacts` is safety\ninformation a coach needs at the door. `aliyah_years` is national-origin data collected\nfor the עמותה's funding return, which a coach has no reason to see -- it is `None` for\nanyone below manager rather than a second endpoint, so the door surface stays one call.",
+        "properties": {
+          "aliyah_years": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Aliyah Years"
+          },
+          "pickup_contacts": {
+            "items": {
+              "$ref": "#/components/schemas/PickupContactOut"
+            },
+            "title": "Pickup Contacts",
+            "type": "array"
+          }
+        },
+        "title": "StudentRegistrationOut",
+        "type": "object"
+      },
       "StudentStatusHistoryListResponse": {
         "properties": {
           "items": {
@@ -12166,6 +12457,17 @@
       "StudentSummaryOut": {
         "description": "The row dashboard `3b` and staff `9h` render, and the only student shape a coach\nreceives from a list.\n\n`group_names` and not `group_ids`: C11 makes several live enrollments normal, and\n`3b`'s column shows what a manager reads rather than what a client would have to join.",
         "properties": {
+          "agreement_complete": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agreement Complete"
+          },
           "attendance_percent": {
             "anyOf": [
               {
@@ -13349,6 +13651,78 @@
           "ends_at"
         ],
         "title": "UnmarkedSessionOut",
+        "type": "object"
+      },
+      "UnpricedStudentListOut": {
+        "description": "Not paginated. A club with more unpriced children than one page holds has a problem\na cursor would not help with, and the number itself is the signal.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/UnpricedStudentOut"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "title": "UnpricedStudentListOut",
+        "type": "object"
+      },
+      "UnpricedStudentOut": {
+        "description": "One active student nobody can bill — collections screen, §5.10.\n\n**No money on this shape, deliberately.** There is no amount to report: the whole point\nof the row is that no plan says what this family owes. It carries names and a date, so\nthe manager can find the child and see how long it has been true.",
+        "properties": {
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "joined_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Joined On"
+          },
+          "payer_display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payer Display Name"
+          },
+          "payer_person_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payer Person Id"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "student_id",
+          "display_name",
+          "joined_on",
+          "payer_person_id",
+          "payer_display_name"
+        ],
+        "title": "UnpricedStudentOut",
         "type": "object"
       },
       "UpayFormOut": {
@@ -15587,6 +15961,28 @@
           }
         },
         "summary": "Update Billing Settings",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/v1/billing/unpriced-students": {
+      "get": {
+        "description": "§5.10's silent gap, made visible on the screen a manager already opens to ask\n\"who owes what\".\n\nThe run has appended these to `tally.unpriced` since M6; the tally lands in\n`billing_run.log` and no router, worker or screen reads that column. So a child whose\ngroups total three sessions a week in a club with no plan labelled 3 trained all year\nfor nothing, and the only record of it was a JSON blob nobody opens.\n\nA child nobody can bill belongs in the same view as a child who has not paid.",
+        "operationId": "list_unpriced_students_api_v1_billing_unpriced_students_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnpricedStudentListOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Unpriced Students",
         "tags": [
           "billing"
         ]
@@ -19188,6 +19584,79 @@
         ]
       }
     },
+    "/api/v1/me/students/{student_id}/join": {
+      "post": {
+        "description": "Entrance A — the destination §5.4a ④'s \"איך היה?\" never had.\n\nThe worker has asked a trial family how their lesson went on days 1, 3 and 7 since M3,\nwith no link and no action, and written them off as `lost` after 21 days. The only route\nin was a manager opening the student card. This is the other entrance; both end on the\nsame sequence — health declaration → payment method per child → pay.\n\n**It cannot reuse `POST /students/{id}/convert`.** That route is `ManagerOrOwner`, takes\na single `group_id`, and takes a manager-chosen `price_plan_id`. This one is reached by\na guardian, takes the groups they ticked, and derives the price from them.\n\n**No role dependency**, for the reason `/me/students` gives: §3.1 — \"guardian is not a\nrole\", so `require_roles` here would refuse every guardian in the product. The check\nthat matters is the record one, and it is the same as `/me/students/{id}/status-history`\nmakes: **404, never 403.** Under `/me/` the collection is \"my children\", so an id outside\nit does not exist — and a 403 would confirm the child is in this studio.",
+        "operationId": "join_the_club_api_v1_me_students__student_id__join_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StudentJoinIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentSummaryOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Join The Club",
+        "tags": [
+          "people"
+        ]
+      }
+    },
     "/api/v1/me/students/{student_id}/status-history": {
       "get": {
         "description": "§5.4's funnel, read by the family it happened to.\n\n**The gap this closes is asymmetry, not absence.** The rows have been written since M3\nby the single writer in `app/services/people/status.py`, and dashboard `4a` has rendered\nthem as a timeline since the same wave. \"Joined 2 August, frozen 1 October, returned 1\nNovember\" is the record a parent telephones the club about, and until now the only way\nto answer that call was to read it off the manager's screen and say it out loud.\n\n**A second route rather than a widened one.** `GET /students/{id}/status-history` above\nis `AnyStaff` + `ViewerScope` and tagged `coach`; making it guardian-reachable would put\na §3.2 role check and a §3.3 record check in one dependency chain and would return the\nmanager's `reason` to the family. The shape here is `MyStudentStatusHistoryOut`, which\ncannot carry it.\n\nNo role dependency, for the reason `/me/students` states: §3.1 -- \"guardian is not a\nrole\". A `require_roles` here would refuse every guardian in the product.\n\n**404, never 403.** Under `/me/` the collection is \"my children\", so an id outside it\ndoes not exist rather than being forbidden -- and a 403 would confirm the child exists\nin this studio, which is the leak this check is for. Same reasoning the module docstring\ngives for a cross-studio reference.",
@@ -22250,151 +22719,6 @@
         ]
       }
     },
-    "/api/v1/registration-requests/{request_id}/approve": {
-      "post": {
-        "description": "§5.4a's approval transaction.\n\n**The group comes from the body, not the payload** (§5.4): \"Approving is where the group\nis chosen, which is why group_id lives on the decision and not on the submission.\"",
-        "operationId": "approve_registration_request_api_v1_registration_requests__request_id__approve_post",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "request_id",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "title": "Request Id",
-              "type": "string"
-            }
-          },
-          {
-            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
-            "in": "header",
-            "name": "Idempotency-Key",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "maxLength": 255,
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
-              "title": "Idempotency-Key"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RegistrationDecisionIn"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RegistrationDecisionOut"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Approve Registration Request",
-        "tags": [
-          "people"
-        ]
-      }
-    },
-    "/api/v1/registration-requests/{request_id}/reject": {
-      "post": {
-        "operationId": "reject_registration_request_api_v1_registration_requests__request_id__reject_post",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "request_id",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "title": "Request Id",
-              "type": "string"
-            }
-          },
-          {
-            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
-            "in": "header",
-            "name": "Idempotency-Key",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "maxLength": 255,
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
-              "title": "Idempotency-Key"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RegistrationDecisionIn"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RegistrationDecisionOut"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Reject Registration Request",
-        "tags": [
-          "people"
-        ]
-      }
-    },
     "/api/v1/reminders/debt": {
       "post": {
         "description": "One household or many -- the bulk button is this same route with more ids.",
@@ -24842,6 +25166,158 @@
         ]
       }
     },
+    "/api/v1/students/{student_id}/agreement": {
+      "get": {
+        "description": "What the parent app's gate reads. Computed here so the client never re-derives it.",
+        "operationId": "read_agreement_status_api_v1_students__student_id__agreement_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgreementStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Agreement Status",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/api/v1/students/{student_id}/agreement/club-terms": {
+      "post": {
+        "description": "Step 3. Appends a `club_terms` row for the SIGNING PERSON, not for the student.\n\n§4.3 makes a terms acceptance a consent about the adult who accepted it -- which is also\nwhy a second child in the same family does not ask again: the parent already holds it.",
+        "operationId": "accept_club_terms_api_v1_students__student_id__agreement_club_terms_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClubTermsIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgreementStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Accept Club Terms",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/api/v1/students/{student_id}/agreement/registration": {
+      "put": {
+        "description": "`טופס הרשמה` blocks 1-4. Idempotent: the form shows what is stored and replaces it.",
+        "operationId": "save_registration_api_v1_students__student_id__agreement_registration_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegistrationIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgreementStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Save Registration",
+        "tags": [
+          "health"
+        ]
+      }
+    },
     "/api/v1/students/{student_id}/attendance": {
       "get": {
         "description": "Artboard `2d`'s eight marks and `4a`'s twelve — the two artboards disagree on the\nwindow (`2d` finding 9), so the count is the caller's and neither is baked in here.",
@@ -25945,6 +26421,50 @@
         "summary": "Student Price Plan",
         "tags": [
           "people"
+        ]
+      }
+    },
+    "/api/v1/students/{student_id}/registration": {
+      "get": {
+        "description": "Who may collect this child, and (for a manager) the עמותה's aliyah figures.\n\n**`AnyStaff`, which includes coaches, and that is the whole point of the field.** A\npickup contact only does its job if the person at the door can read it; storing it\nbehind a manager-only rule would have made it write-only data. This is why the contacts\nlive on their own table rather than inside `health_declaration.answers_encrypted` --\n§11.1's boundary is right for medical answers and wrong for \"who is allowed to take this\nchild home\".\n\n`aliyah_years` is the opposite call: national-origin data, for the funding return, and a\ncoach at the door has no use for it. Withheld below manager.",
+        "operationId": "read_student_registration_api_v1_students__student_id__registration_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentRegistrationOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Student Registration",
+        "tags": [
+          "health"
         ]
       }
     },

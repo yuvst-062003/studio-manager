@@ -22,15 +22,18 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import date, timedelta
 from urllib.parse import urlsplit
 
-from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy import or_, select
+from sqlalchemy.orm import Session, aliased
 
 from app.core.config import settings
 from app.integrations.upay.form import UPAY_ENDPOINT
 from app.models.billing import PricePlan, Product
+from app.models.people import Student
+from app.models.person import Guardian, Person
 from app.services.billing.errors import ConflictError, NotFoundError, RefusedError
 
 #: A picker, not a catalogue of a supplier's whole range. A גי runs 100..190 in tens (ten
@@ -77,6 +80,128 @@ def validate_standing_order_link(url: str) -> str:
             "add it to STANDING_ORDER_LINK_HOSTS to allow it"
         )
     return url.strip()
+
+
+def plan_for_volume(session: Session, *, studio_id: uuid.UUID, volume: int) -> PricePlan | None:
+    """The plan a self-service enrolment assigns for a weekly volume, or None.
+
+    **This is the one place the rule lives, and every door with no manager behind it calls
+    it** — §5.4b's join link, `+ הוסף ילד`, and a trial family joining from their own app.
+    `sessions_per_week` stays what the model says it is, a LABEL the manager sets and the
+    billing run does not enforce; what changes is only how a lane with nobody to ask reads
+    that label.
+
+    **It used to demand an exact match, and that cost the club money in silence.** The old
+    rule took the ONE live plan whose `sessions_per_week == volume`; zero or two matches
+    left the student with no plan, no charge, and a line in `billing_run.log` that no
+    router, worker or screen reads. A club selling 1× / 2× / open membership has no plan
+    labelled 3, so a perfectly ordinary child ticking three groups' worth of training was
+    billed nothing for the rest of the year.
+
+    The rule now:
+
+    1. **The cheapest live plan that covers the volume.** `sessions_per_week IS NULL` is
+       open membership — the column's documented third state — so it covers everything.
+    2. **If nothing covers it, the largest plan the club sells.** A club with no open
+       membership and a child training four times a week is charged for the biggest
+       package that exists rather than for nothing.
+    3. **Ties by amount, then by id**, so a re-run picks the same plan and a family's
+       price never depends on row order.
+
+    A child can now be priced ABOVE their exact volume — three sessions on the open plan.
+    That is the club selling the smallest package that covers them, it is on the student
+    card, and the plan-change flow exists. The alternative was free forever, and the
+    asymmetry is the argument: a family billed 550 who expected 400 says so within the
+    month, and a family billed nothing says nothing.
+
+    None is still a real answer — a club with no live plans at all — which is why
+    `GET /billing/unpriced-students` exists. It just stops being the normal outcome of an
+    ordinary timetable.
+    """
+    if volume <= 0:
+        # No training days means no weekly volume, and the cheapest plan in the club would
+        # be a price for lessons nobody attends.
+        return None
+    live = select(PricePlan).where(PricePlan.studio_id == studio_id, PricePlan.active_to.is_(None))
+    covering = session.execute(
+        live.where(
+            or_(PricePlan.sessions_per_week.is_(None), PricePlan.sessions_per_week >= volume)
+        ).order_by(PricePlan.monthly_amount_agorot, PricePlan.id)
+    ).scalars()
+    chosen = next(iter(covering), None)
+    if chosen is not None:
+        return chosen
+    # Nothing covers it. `sessions_per_week` is non-null in every row left -- an open
+    # membership would have covered -- so `desc()` needs no NULLS handling.
+    biggest = session.execute(
+        live.order_by(
+            PricePlan.sessions_per_week.desc(), PricePlan.monthly_amount_agorot, PricePlan.id
+        )
+    ).scalars()
+    return next(iter(biggest), None)
+
+
+@dataclass(frozen=True)
+class UnpricedStudent:
+    """One row of the collections screen's 'nobody can bill this child' list."""
+
+    student_id: uuid.UUID
+    display_name: str
+    joined_on: date | None
+    payer_person_id: uuid.UUID | None
+    payer_display_name: str | None
+
+
+def unpriced_students(session: Session) -> list[UnpricedStudent]:
+    """Active students with no `price_plan_id`, for the collections screen.
+
+    **The billing run has recorded these since M6 and nothing has ever read the record.**
+    `_charge_one` appends to `tally.unpriced` when no plan matches, the tally lands in
+    `billing_run.log`, and no router, worker or screen reads that column. A child whose
+    groups total three sessions a week in a club selling 1 / 2 / open membership trained all
+    year and was never billed -- visible only in a JSON blob nobody opens.
+
+    `plan_for_volume` makes that the exception rather than the ordinary outcome of a normal
+    timetable; this makes the exception visible. Both are needed: a club with no live plans
+    at all still produces unpriced children, and the run keeps writing `tally.unpriced` --
+    this adds a read that a human reaches.
+
+    **Active only.** A student who left owes the club nothing new, and a checklist padded
+    with them is a checklist nobody works through. Ordered by name so the list is stable
+    between reloads.
+
+    The payer is the primary guardian, which is who a charge would name (§4.3). `None` when
+    a student has no guardian attached, which is its own reason the run raises nothing --
+    and a row saying so is more use than the student silently missing from the list.
+    """
+    primary = (
+        select(Guardian.student_id, Guardian.person_id)
+        .where(Guardian.is_primary.is_(True))
+        .subquery()
+    )
+    payer = aliased(Person)
+    rows = session.execute(
+        select(Student, Person, payer)
+        .join(Person, Student.person_id == Person.id)
+        .outerjoin(primary, primary.c.student_id == Student.id)
+        .outerjoin(payer, payer.id == primary.c.person_id)
+        .where(Student.status == "active", Student.price_plan_id.is_(None))
+        .order_by(Person.first_name, Person.last_name, Student.id)
+    ).all()
+    return [
+        UnpricedStudent(
+            student_id=student.id,
+            display_name=f"{person.first_name} {person.last_name}",
+            joined_on=student.joined_on,
+            payer_person_id=payer_person.id if payer_person is not None else None,
+            payer_display_name=(
+                f"{payer_person.first_name} {payer_person.last_name}"
+                if payer_person is not None
+                else None
+            ),
+        )
+        for student, person, payer_person in rows
+    ]
 
 
 class CatalogueService:

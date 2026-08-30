@@ -72,8 +72,14 @@ export function makePeopleClient(fetcher: Fetcher) {
       fetcher(`/api/v1/enrollments?student_id=${studentId}`).then(json<EnrollmentOut[]>),
 
     /**
-     * §5.4(c) — parent `12g`. **A request, not an enrollment** (L6). The group travels as a
-     * preference; the manager chooses on the decision (§5.4).
+     * Parent `12g`, `+ הוסף ילד` — and it ENROLS (owner decision, 2026-08-30), so the
+     * response is a `StudentSummaryOut` and not a receipt for a request.
+     *
+     * **422 `duplicate_student` is a real outcome and the caller must render it.** The
+     * server refuses a child who matches an existing student by name and birthdate rather
+     * than creating a second record; `student_id` and `display_name` come back only when
+     * this caller is already that child's guardian, because naming a child they have no
+     * relationship with would disclose that they train here (§11.1).
      */
     requestSibling: (body: {
       first_name: string
@@ -84,6 +90,23 @@ export function makePeopleClient(fetcher: Fetcher) {
       group_ids: string[]
     }): Promise<Response> =>
       fetcher('/api/v1/me/students', {
+        method: 'POST',
+        headers: JSON_HEADERS,
+        body: JSON.stringify(body),
+      }),
+
+    /**
+     * Entrance A — a trial family joining the club from their own app.
+     *
+     * `POST /me/students/{id}/join` and **not** `POST /me/students`: this converts the child
+     * who already exists. The add-a-child door would create a second record for a child
+     * already on the roster — one `trial`, one `active`, both on the register.
+     *
+     * No price in the body and no field for one. The server derives the plan from the weekly
+     * volume across `group_ids` (§5.10); how to PAY is §6.1's payment step, which follows.
+     */
+    joinTheClub: (studentId: string, body: { group_ids: string[] }): Promise<Response> =>
+      fetcher(`/api/v1/me/students/${studentId}/join`, {
         method: 'POST',
         headers: JSON_HEADERS,
         body: JSON.stringify(body),
@@ -146,6 +169,10 @@ export type TrialLesson = {
   sessionStartsAt: string | null
   /** Three-state, like the column. `null` is "it has not happened yet", not "no show". */
   attended: boolean | null
+  /** Whose lesson it was. Entrance A converts THAT child, so the join needs their id. */
+  studentId: string
+  /** The group they trialled in — entrance A's picker opens with it already ticked. */
+  groupId: string
 }
 
 /**
@@ -181,5 +208,10 @@ export function nextTrialLesson(
   const upcoming = scheduled.find((row) => row.session_starts_at >= nowIso)
   const chosen = upcoming ?? scheduled.at(-1) ?? bookings[0]
   if (!chosen) return null
-  return { sessionStartsAt: chosen.session_starts_at, attended: chosen.attended }
+  return {
+    sessionStartsAt: chosen.session_starts_at,
+    attended: chosen.attended,
+    studentId: chosen.student_id,
+    groupId: chosen.group_id,
+  }
 }

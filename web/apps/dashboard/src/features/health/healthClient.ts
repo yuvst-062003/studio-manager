@@ -39,8 +39,6 @@ export type EditableSection = {
 export type EditableSchema = {
   title?: string
   version?: number
-  /** D11's marker — `true` while the studio is still showing the questions the app ships with. */
-  is_bundled_default?: boolean
   sections: EditableSection[]
 }
 

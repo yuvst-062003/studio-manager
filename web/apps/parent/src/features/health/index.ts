@@ -6,6 +6,11 @@
 export { HealthGate, firstStudentNeedingDeclaration } from './HealthGate'
 export type { GatedStudent, HealthGateProps } from './HealthGate'
 export { DeclarationForm } from './DeclarationForm'
+export { AgreementFlow, nextStep } from './AgreementFlow'
+export { RegistrationStep } from './RegistrationStep'
+export { ClubTermsStep } from './ClubTermsStep'
+export { applicableClause, CLAUSE_LIMITED, CLAUSE_NONE, CLAUSE_QUESTION_ID } from './clauses'
+export { isValidNationalId } from './nationalId'
 export { SignaturePad } from './SignaturePad'
 export { makeHealthClient, isVisible, isAnswered, unansweredRequired } from './healthClient'
 export type {

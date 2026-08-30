@@ -6,19 +6,15 @@
 //
 // The `order` values leave gaps deliberately: M6's debt alert belongs above a trial queue,
 // M4's missing declarations below it, and neither lane should have to renumber what is
-// already here to say so.
+// already here to say so. Order 20 is free again — it held the registration approval
+// queue, deleted 2026-08-30 when its only producer of pending rows went: a parent adding
+// a child enrols them, so there was nothing left for a manager to approve.
 import { registerSlot } from '@studio/ui'
-import { PendingRequestsAlert } from './sections/PendingRequestsAlert'
 import { TrialsAwaitingDecisionAlert } from './sections/TrialsAwaitingDecisionAlert'
 import { UpcomingTrialsAlert } from './sections/UpcomingTrialsAlert'
 import type { AlertSectionProps } from './AlertCentre'
 
 export function registerPeopleAlerts(): void {
-  registerSlot<AlertSectionProps>('alert-centre', {
-    key: 'people-pending-requests',
-    order: 20,
-    render: PendingRequestsAlert,
-  })
   registerSlot<AlertSectionProps>('alert-centre', {
     key: 'people-trials-awaiting',
     order: 40,

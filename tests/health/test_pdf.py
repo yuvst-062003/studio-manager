@@ -59,7 +59,7 @@ GOLDEN_INPUT = {
             rows=[("אני מצהיר/ה שהתלמיד/ה כשיר/ה לפעילות גופנית ולאימוני ג'ודו", "כן")],
         ),
     ],
-    "disclaimer": "השאלון המצורף הוא נקודת פתיחה בלבד ואינו מסמך עמידה ברגולציה",
+    "signature_line": "אני, הורה בדיקה, מאשר/ת בזאת שקראתי את הצהרת הבריאות ותקנון המועדון",
     "signature_png": None,
 }
 
@@ -192,12 +192,35 @@ def test_a_declaration_with_no_signature_still_renders():
     assert render_declaration_pdf(**GOLDEN_INPUT).startswith(b"%PDF")
 
 
-def test_the_disclaimer_is_on_the_page():
-    """D11's caveat: the bundled template is a starting point and is not a compliance artefact.
-    On a document a parent signs and a club may hand to an insurer, saying so is the point."""
+def test_the_clubs_signature_line_is_on_the_page():
+    """What replaced D11's caveat. The club's `טופס הרשמה` block 6 puts a sentence above the
+    signature -- "שקראתי את הצהרת הבריאות ותקנון של מועדון ..." -- and a signature with no
+    statement of what was signed is the one thing this document cannot be missing."""
     produced = render_declaration_pdf(**GOLDEN_INPUT)
-    without = render_declaration_pdf(**{**GOLDEN_INPUT, "disclaimer": ""})
+    without = render_declaration_pdf(**{**GOLDEN_INPUT, "signature_line": ""})
     assert produced != without
+
+
+def test_the_renderer_no_longer_accepts_a_disclaimer():
+    """D11's caveat was TRUE of a questionnaire we wrote and shipped to a club that had not
+    reviewed it. Template v2 is the club's own form and its own תקנון, signed under the club's
+    own name, so the sentence would now be false -- and a keyword the renderer still accepted
+    is a caveat one caller could quietly put back."""
+    with pytest.raises(TypeError):
+        render_declaration_pdf(**{**GOLDEN_INPUT, "disclaimer": "anything at all"})
+
+
+def test_terms_paragraphs_reach_the_page():
+    """The club's `תנאי תשלום` are prose, not question-and-answer. A section carrying only
+    paragraphs must still render -- before this the renderer skipped any section with no rows,
+    which would have silently dropped the payment terms from the signed document."""
+    terms = RenderedSection(
+        title="תקנון ותנאי תשלום",
+        paragraphs=["ביטול מנוי יבוצע בכתב עד ה-27 לחודש, ויהיה תקף לגבי חודשים עתידיים בלבד."],
+    )
+    produced = render_declaration_pdf(**{**GOLDEN_INPUT, "sections": [terms]})
+    assert produced.startswith(b"%PDF")
+    assert produced != render_declaration_pdf(**{**GOLDEN_INPUT, "sections": []})
 
 
 def test_a_very_long_question_wraps_rather_than_running_off_the_page():
@@ -229,3 +252,11 @@ def test_the_rendered_pdf_matches_the_golden_fixture():
         pytest.skip("golden fixture regenerated — review the diff before committing")
     assert GOLDEN.exists(), "run REGENERATE_GOLDEN=1 pytest tests/health/test_pdf.py"
     assert produced == GOLDEN.read_bytes()
+
+
+def test_the_questionnaire_version_is_not_printed_on_the_document():
+    """`גרסת שאלון N` was bookkeeping on a page a family keeps. The version still lives on
+    `health_declaration.template_version`, where the audit trail needs it."""
+    produced = render_declaration_pdf(**GOLDEN_INPUT)
+    other = render_declaration_pdf(**{**GOLDEN_INPUT, "template_version": 99})
+    assert produced == other, "the version cannot be on the page if changing it changes nothing"

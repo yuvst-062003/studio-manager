@@ -16,8 +16,7 @@ import type { HealthClient, TemplateSchema } from './healthClient'
 
 const SCHEMA: TemplateSchema = {
   title: 'הצהרת בריאות',
-  version: 1,
-  is_bundled_default: true,
+  version: 2,
   sections: [
     {
       id: 'medical',
@@ -50,6 +49,30 @@ function makeClient(over: Partial<HealthClient> = {}): HealthClient {
     declaration: vi.fn().mockResolvedValue(null),
     submit: vi.fn().mockResolvedValue({ id: 'd1' }),
     pdfUrl: (id: string) => `/api/v1/students/${id}/health-declaration/pdf`,
+    // `הסכם הרשמה`. The default is a family owing everything, because that is what the gate
+    // tests below are about — a client whose status came back `complete` would render nothing
+    // and every one of them would pass vacuously.
+    agreementStatus: vi.fn().mockResolvedValue({
+      health_signed: false,
+      registration_complete: false,
+      terms_accepted: false,
+      complete: false,
+      club_terms_version: 1,
+    }),
+    saveRegistration: vi.fn().mockResolvedValue({
+      health_signed: false,
+      registration_complete: true,
+      terms_accepted: false,
+      complete: false,
+      club_terms_version: 1,
+    }),
+    acceptClubTerms: vi.fn().mockResolvedValue({
+      health_signed: true,
+      registration_complete: true,
+      terms_accepted: true,
+      complete: true,
+      club_terms_version: 1,
+    }),
     ...over,
   } as unknown as HealthClient
 }
@@ -284,11 +307,17 @@ describe('DeclarationForm', () => {
     expect(screen.queryByLabelText('פירוט האלרגיה')).toBeNull()
   })
 
-  it("D11's caveat is on the screen the parent signs", async () => {
-    // 12c finding 3. A family signing something the app privately describes as a starting point
-    // should be told so on the page they sign.
+  it("D11's caveat is gone from the screen the parent signs", async () => {
+    // The inverse of the assertion that stood here, and the reason is the change itself.
+    // 12c finding 3 was right while the questions were OURS: a family signing something the
+    // app privately called "a starting point" should be told so. Template v2's declaration is
+    // the CLUB's own `טופס הרשמה`, signed alongside the club's own תקנון — so the sentence
+    // became false, and printing it on a club's own legal instrument is worse than silence.
     render(<DeclarationForm client={makeClient()} locale="he" studentId="st1" studentName="נועה לוי" />)
-    expect(await screen.findByText(t('he', 'health.template.disclaimer'))).toBeInTheDocument()
+    await screen.findByText(t('he', 'health.declaration.attestation'))
+    expect(
+      screen.queryByText(/נקודת פתיחה בלבד|אינו מסמך עמידה ברגולציה/),
+    ).not.toBeInTheDocument()
   })
 
   it('says the declaration never expires rather than showing a validity date', async () => {

@@ -30,8 +30,8 @@ from app.models.health import ConsentRecord
 from app.services.audit import AuditService
 from app.services.privacy.policy import (
     GRANTABLE_CONSENT_TYPES,
-    POLICY_VERSION,
     REQUIRED_CONSENT_TYPES,
+    expected_version,
 )
 
 
@@ -104,8 +104,25 @@ class ConsentService:
             for consent_type in REQUIRED_CONSENT_TYPES
             if (row := latest.get(consent_type)) is None
             or not row.granted
-            or row.version != POLICY_VERSION
+            or row.version != expected_version(consent_type)
         ]
+
+    @staticmethod
+    def holds_current(session: Session, *, person_id: uuid.UUID, consent_type: str) -> bool:
+        """Does this person hold a granted, non-revoked `consent_type` at its CURRENT version?
+
+        The registration agreement's terms step asks this to decide whether to render at
+        all. A parent who accepted the club's terms last month and is now correcting an
+        asthma answer should not be walked back through the `תקנון` -- and one who accepted
+        v1 after the club changed a payment date should.
+        """
+        row = ConsentService.latest_by_type(session, person_id=person_id).get(consent_type)
+        return (
+            row is not None
+            and row.granted
+            and row.revoked_at is None
+            and row.version == expected_version(consent_type)
+        )
 
     @staticmethod
     def record(
@@ -125,11 +142,16 @@ class ConsentService:
         longer published, and `UngrantableConsentError` for a type this route may not
         write -- see `GRANTABLE_CONSENT_TYPES` for why `event` is among those.
         """
-        if version != POLICY_VERSION:
-            raise PolicyVersionMismatchError(version, POLICY_VERSION)
         unknown = sorted(set(grants) - set(GRANTABLE_CONSENT_TYPES))
         if unknown:
             raise UngrantableConsentError(", ".join(unknown))
+        # Per type, not once for the call. `terms` and `privacy` move with POLICY_VERSION
+        # and `club_terms` moves with the club's own CLUB_TERMS_VERSION; a single global
+        # comparison rejected every club-terms grant while our policy sat at draft 0.
+        for consent_type in sorted(grants):
+            wanted = expected_version(consent_type)
+            if version != wanted:
+                raise PolicyVersionMismatchError(version, wanted)
 
         written: list[ConsentRecord] = []
         for consent_type, granted in grants.items():

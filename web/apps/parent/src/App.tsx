@@ -48,7 +48,7 @@ import {
 import { BeltProgressScreen, makeParentBeltsClient, registerBeltSections } from './features/belts'
 import { BeltRouteResolver } from './features/belts/BeltRouteResolver'
 import { InboxScreen, makeParentCommsClient } from './features/comms'
-import { AddSibling, ProfileSection, makePeopleClient, registerPeopleSections } from './features/people'
+import { AddSibling, JoinClubSection, ProfileSection, makePeopleClient, registerPeopleSections } from './features/people'
 // `2c` behind `#/student/<id>` — the composite card the slot system was built for (P2).
 import { StudentCardSection } from './features/people/StudentCardSection'
 import { registerBillingSections } from './features/billing/StudentCardBillingSection'
@@ -75,6 +75,9 @@ import { ShopSection } from './features/billing'
 // W3 and a guardian with an unsigned declaration still reached home.
 import { HealthGate, firstStudentNeedingDeclaration, makeHealthClient, registerHealthSections } from './features/health'
 import type { GatedStudent } from './features/health'
+// The same predicate the gate uses. Two spellings of "does this child still owe
+// something" is how a drawer comes to disagree with the screen it links to.
+import { needsFullDeclaration } from './features/health/HealthGate'
 // §6.1 step 5 — the OTHER blocking gate, and the one that had never been built.
 // SPEC:1314 puts `5  אישורים  →  terms of service + privacy policy` in the BLOCKING band
 // and SPEC:1327 says steps 5 and 6 are the only hard gates. M4 shipped step 6 and not
@@ -289,6 +292,10 @@ function AuthedApp() {
     }
   }, [])
   const [declarationsSigned, setDeclarationsSigned] = useState(0)
+  // Bumped when a trial family joins the club. The child goes `trial` -> `active` while
+  // still holding the short health form, so §5.5's gate must fire on the very next
+  // render — and `gatedChildren` is read once per this counter, not per route change.
+  const [familyJoined, setFamilyJoined] = useState(0)
   // `2a` §7's unread badge. Fetched by the SHELL and not by `InboxScreen`, because a badge
   // that appeared only after the inbox had been opened would announce news the parent had
   // just finished reading. `notificationsRead` bumps to re-fetch after the inbox marks
@@ -325,6 +332,7 @@ function AuthedApp() {
                 last_name: string
                 status: string
                 health_status: GatedStudent['health_status']
+                agreement_complete?: boolean | null
               }[]
             }>)
           : { items: [] },
@@ -344,6 +352,12 @@ function AuthedApp() {
             // held for the full declaration (§5.4a / §6.3 — see HealthGate's header).
             status: student.status,
             health_status: student.health_status,
+            // **Carried through, and the gate is useless without it.** `הסכם הרשמה` is
+            // three conditions — registration, health, the club's terms — and only the
+            // server knows all three. Dropping it here made every child whose v1
+            // declaration was already `signed` look finished to the gate, so the families
+            // who most needed re-asking were exactly the ones never asked.
+            agreement_complete: student.agreement_complete,
           })),
         )
       })
@@ -353,7 +367,7 @@ function AuthedApp() {
     return () => {
       alive = false
     }
-  }, [session.status, declarationsSigned])
+  }, [session.status, declarationsSigned, familyJoined])
   const hash = useHash()
   const today = useToday()
   // §5.4(c)'s add-a-sibling is one hash away from home. Hash and not a path: it is an
@@ -364,6 +378,9 @@ function AuthedApp() {
   // screen would change only when something else happened to re-render App. One
   // subscription serves both lanes' routes.
   const addingChild = hash === '#/add-child'
+  // Entrance A — §5.4a ④'s "איך היה?" finally leads somewhere, and `trial.followup`'s
+  // payload names this same hash so the inbox row is pressable too.
+  const joiningClub = hash === '#/join'
   // §5.10's payments tab, and `12f`'s history one hash below it.
   const onPayments = hash === '#/payments'
   const onPaymentsHistory = hash === '#/payments/history'
@@ -499,14 +516,12 @@ function AuthedApp() {
                   <p style={{ margin: 0 }}>
                     {t(locale, 'common.nav.myChildren')} · {gatedChildren.length}
                   </p>
-                  {gatedChildren.some((child) => child.health_status !== 'signed') ? (
+                  {gatedChildren.some(needsFullDeclaration) ? (
                     <p style={{ margin: 0 }}>
                       {t(locale, 'health.declaration.title')} ·{' '}
                       {t(locale, 'people.document.missingCount').replace(
                         '{n}',
-                        String(
-                          gatedChildren.filter((child) => child.health_status !== 'signed').length,
-                        ),
+                        String(gatedChildren.filter(needsFullDeclaration).length),
                       )}
                     </p>
                   ) : null}
@@ -661,6 +676,15 @@ function AuthedApp() {
             />
           ) : onProfile ? (
             <ProfileSection locale={locale} />
+          ) : joiningClub ? (
+            // INSIDE the gates, like every other branch: a trial family passes both today
+            // (§5.5 does not hold `trial_signed` while the child is still on a trial), and
+            // the moment the join lands they stop passing — which is the point.
+            <JoinClubSection
+              client={peopleClient}
+              locale={locale}
+              onJoined={() => setFamilyJoined((n) => n + 1)}
+            />
           ) : addingChild ? (
             <AddSibling locale={locale} client={peopleClient} />
           ) : belts.length === 2 ? (

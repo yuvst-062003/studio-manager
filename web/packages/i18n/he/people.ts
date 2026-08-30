@@ -380,4 +380,31 @@ export const people: Bundle = {
   'tenure.months': '{{count}} חודשים',
   'table.results': '{n} תוצאות',
   'table.loadMore': 'טעינת עוד',
+
+  // -- trial to member: the join a "איך היה?" finally leads to (2026-08-30) -------
+  // §5.4a ④ asked this family how their lesson went on days 1, 3 and 7 and gave them
+  // nothing to press, then wrote them off as `lost` on day 21. `joinClub.*` is that
+  // destination. Separate from `join.*` above, which is §5.4b's whole-family link.
+  'joinClub.cta': 'הצטרפות למועדון',
+  'joinClub.title': 'הצטרפות למועדון',
+  'joinClub.subtitle': 'בוחרים קבוצות, חותמים על הצהרת בריאות ומסדירים תשלום.',
+  'joinClub.chooseGroups': 'באילו קבוצות להתאמן',
+  'joinClub.trialledHere': 'התאמנתם כאן',
+  'joinClub.priceHint': 'המחיר נקבע לפי מספר האימונים בשבוע, ומופיע במסך התשלומים.',
+  'joinClub.steps.title': 'מה קורה עכשיו',
+  'joinClub.steps.groups': 'מצטרפים לקבוצות שבחרתם',
+  'joinClub.steps.declaration': 'חותמים על הצהרת בריאות מלאה',
+  'joinClub.steps.payment': 'בוחרים אמצעי תשלום',
+  'joinClub.submit': 'מצטרפים',
+  'joinClub.back': 'חזרה',
+  'joinClub.noGroups': 'לא הצלחנו לטעון את רשימת הקבוצות. אפשר לנסות שוב.',
+  'joinClub.retryGroups': 'טעינה מחדש',
+  'joinClub.error': 'לא הצלחנו להשלים את ההצטרפות. נסו שוב.',
+  'joinClub.forWhom': 'מצטרפים בשביל',
+  // The refusal a duplicate produces, and the two versions of it. Naming a child this
+  // caller is not a guardian of would disclose that they train here (§11.1), so the
+  // server sends the name only when it may — and the copy has to work without it.
+  'sibling.duplicate': 'נראה שהילד/ה כבר רשומים במועדון. פנו למועדון כדי לוודא.',
+  'sibling.duplicateNamed': '{name} כבר רשומים במועדון — אין צורך להוסיף שוב.',
+  'sibling.duplicateOpen': 'לכרטיס החניך',
 }

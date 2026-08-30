@@ -42,7 +42,6 @@ const ROWS: HealthStatusSummaryOut[] = [
 const SCHEMA: EditableSchema = {
   title: 'הצהרת בריאות',
   version: 1,
-  is_bundled_default: true,
   sections: [
     {
       id: 'medical',
@@ -74,7 +73,7 @@ function makeClient(over: Partial<DashboardHealthClient> = {}): DashboardHealthC
       id: 'tpl-2',
       kind: 'full',
       version: 2,
-      schema: { ...SCHEMA, version: 2, is_bundled_default: undefined },
+      schema: { ...SCHEMA, version: 3 },
       source_pdf_object_key: null,
       published_at: null,
     }),
@@ -182,35 +181,25 @@ describe('DocumentsScreen', () => {
 
 // ---------------------------------------------------------------------------------
 describe('TemplateEditor', () => {
-  it("renders D11's caveat unconditionally, before anything can be changed", async () => {
-    // D11: "the app must say so where the manager edits it". Not behind a disclosure, not after
-    // a first edit. This string is not optional.
+  it("no longer prints D11's caveat over the club's own questions", async () => {
+    // The inverse of the assertion that stood here. D11 was right while the questions were
+    // OURS — "the app must say so where the manager edits it" — but template v2's declaration
+    // is the club's own `טופס הרשמה`, signed alongside the club's own תקנון. Telling a manager
+    // that their own form "is not a compliance artefact" is not a caveat, it is an error.
     render(<TemplateEditor client={makeClient()} locale="he" />)
-    expect(await screen.findByText(t('he', 'health.template.disclaimer'))).toBeInTheDocument()
+    await screen.findByText(t('he', 'health.template.draftHint'))
+    expect(
+      screen.queryByText(/נקודת פתיחה בלבד|אינו מסמך עמידה ברגולציה/),
+    ).not.toBeInTheDocument()
   })
 
-  it('says the questions are the bundled ones while they still are', async () => {
+  it('no longer claims to know whose questions these are', async () => {
+    // `template-provenance` existed to swap between "the questions the app ships with" and
+    // "your club's questions", picked by `is_bundled_default`. There is no bundled set left to
+    // distinguish from the club's, so the marker and the line both went.
     render(<TemplateEditor client={makeClient()} locale="he" />)
-    expect(await screen.findByTestId('template-provenance')).toHaveTextContent(
-      t('he', 'health.template.editingBundled'),
-    )
-  })
-
-  it("says they are the club's own once the marker is gone", async () => {
-    const client = makeClient({
-      template: vi.fn().mockResolvedValue({
-        id: 'tpl-1',
-        kind: 'full',
-        version: 2,
-        schema: { ...SCHEMA, is_bundled_default: undefined },
-        source_pdf_object_key: null,
-        published_at: null,
-      }),
-    })
-    render(<TemplateEditor client={client} locale="he" />)
-    expect(await screen.findByTestId('template-provenance')).toHaveTextContent(
-      t('he', 'health.template.editingYours'),
-    )
+    await screen.findByText(t('he', 'health.template.draftHint'))
+    expect(screen.queryByTestId('template-provenance')).not.toBeInTheDocument()
   })
 
   it('saves a draft rather than editing what parents are signing', async () => {

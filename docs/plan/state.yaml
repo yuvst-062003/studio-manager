@@ -680,6 +680,35 @@ waves:
         title: Landing — the record
         status: shipped
         on: 2026-08-27
+      - id: J1
+        title: >-
+          Trial to member — the journey, and the three holes in it. §5.4a ④ has asked
+          "איך היה?" on days 1, 3 and 7 since M3 with no link and no action, and written the
+          family off as `lost` on day 21; the only route in was a manager opening the
+          student card. Entrance A is now `POST /me/students/{id}/join` behind `#/join`,
+          reached from TrialHome's prompt and from `trial.followup`'s payload, which the
+          worker gives a route for the first time — and not to `trial.no_show`, which stays
+          untouched. It CONVERTS the existing student rather than creating one; groups are
+          the parent's choice and the price is derived, never posted. Entrance B is
+          unchanged in shape and gained the thing that broke it: `StudentService.convert`
+          raised no charge, so a child converted on the 12th owed nothing until the 1st and
+          §6.1's payment step stood itself down. Both doors now call
+          `BillingRunService.charge_first_month`. The self-service plan rule stops demanding
+          an exact `sessions_per_week` match — a club selling 1 / 2 / open membership priced
+          a child training three times a week at nothing, all year, recorded only in
+          `billing_run.log` — and becomes the cheapest live plan that covers the volume,
+          else the largest. `plan_for_volume` is that rule, on every door. Three defects
+          with it: `register` adopts an existing Person instead of answering
+          `already_registered` with nothing (a trial family using the club's own join link
+          got no children at all); the duplicate check moved from the dead
+          registration-request detail view to `add_child`, refusing with a code that names
+          the existing child only for its own guardian; and unpriced active students got
+          `GET /billing/unpriced-students` and a panel on the collections screen. The
+          registration approval queue is deleted — `submit_from_parent`, approve and reject
+          in service and router, and the dashboard panel — with the `registration_request`
+          table kept as the trial funnel's encrypted holding pen.
+        status: shipped
+        on: 2026-08-31
 holdbacks:
   - id: HB-w6-health-gate-unmounted
     kind: carried

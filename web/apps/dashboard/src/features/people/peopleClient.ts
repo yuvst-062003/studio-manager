@@ -138,30 +138,14 @@ export function makeDashboardPeopleClient(fetcher: Fetcher) {
         body: JSON.stringify(body),
       }),
 
-    // -- 6c's queues ---------------------------------------------------------
-    pendingRequests: () =>
-      fetcher('/api/v1/registration-requests?status=pending').then(
-        json<{ items: RegistrationRequestOut[] }>,
-      ),
-
+    // -- 6c's queue -----------------------------------------------------------
+    // The registration approval queue is gone (2026-08-30): nothing produces a pending row
+    // any more, so a list read and two decision posts stood over something that could never
+    // fill. The trial queue below is the funnel's remaining decision.
     trialBookings: (outcome?: string) =>
       fetcher(`/api/v1/trial-bookings${outcome ? `?outcome=${outcome}` : ''}`).then(
         json<{ items: TrialBookingRow[] }>,
       ),
-
-    approve: (requestId: string, groupId: string) =>
-      fetcher(`/api/v1/registration-requests/${requestId}/approve`, {
-        method: 'POST',
-        headers: JSON_HEADERS,
-        body: JSON.stringify({ group_id: groupId }),
-      }),
-
-    reject: (requestId: string, reason: string) =>
-      fetcher(`/api/v1/registration-requests/${requestId}/reject`, {
-        method: 'POST',
-        headers: JSON_HEADERS,
-        body: JSON.stringify({ reason }),
-      }),
   }
 }
 

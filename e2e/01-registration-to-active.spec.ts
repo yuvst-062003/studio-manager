@@ -19,8 +19,12 @@ import { buildScenario, signAllDeclarations } from './fixtures/scenario'
  * exists precisely so the same Google account resolves to the same guardian next term.
  *
  * The assertions are deliberately about **state transitions a manager can see**, not about
- * the API. A registration that produced the right rows and never appeared in the approval
- * queue is the failure this flow exists to catch.
+ * the API. A registration that produced the right rows and appeared on no screen is the
+ * failure this flow exists to catch.
+ *
+ * The manager's approval step survives in the FIRST test only, where §5.4a puts it: a
+ * trial is converted by a human. The second test's approval queue was deleted on
+ * 2026-08-30 along with its only producer — see that test's own header.
  *
  * ── What this file had to change from the M0 draft ────────────────────────────────────
  * The landing page is `/t/<slug>` and not `/register/<slug>` — a real path, deliberately,
@@ -180,19 +184,21 @@ test.describe('E2E-1 · registration to active student', () => {
     }
   })
 
-  test('a parent adds a sibling, and the manager approves it from the queue', async ({
+  test('a parent adds a sibling, and the child is on the roster with nobody to ask', async ({
     browser,
     request,
   }) => {
-    // §5.4(c) — the OTHER way a child arrives, and the one with a real approval queue
-    // behind it. §5.4: 'This creates a registration_request with source = parent_app and
-    // matched_person_id set — a request, not an enrollment. The manager approves it,
-    // consistent with (b): conversion is always a human decision.'
+    // §5.4(c) — the OTHER way a child arrives, and it ENROLS (owner decision, 2026-08-30).
     //
-    // Everything this test walks was broken until this wave. The approval raised a 500 for
-    // any guardian whose Person row carried no address, which in the demo studio is all of
-    // them; and the queue's approve button had no handler at all, so a manager could see
-    // pending requests and act on none of them.
+    // **This test used to walk an approval queue that no longer exists.** `+ הוסף ילד`
+    // filed a `registration_request` a manager approved, on L6's "conversion is always a
+    // human decision" — while §5.4b's onboarding link, one WhatsApp message to the whole
+    // club, already created active priced children with no manager at all. A gate on the
+    // second door while the first stood open protected nothing. The queue was deleted with
+    // its producer; what is asserted now is the outcome the parent is actually promised.
+    //
+    // The manager is TOLD rather than asked: `people.child_added` reaches the office, so
+    // removing them from the path does not remove them from the knowing.
     const scenario = await buildScenario(request, { parent: 'parent1', months: 0 })
 
     const familyContext = await browser.newContext()
@@ -205,39 +211,31 @@ test.describe('E2E-1 · registration to active student', () => {
       await expect(parent.getByTestId('add-sibling')).toBeVisible()
       await parent.getByLabel('שם פרטי').fill('יונתן')
       await parent.getByLabel('שם משפחה').fill('לוי')
+      // A CHOICE now, and required: the price is derived from weekly volume across the
+      // groups ticked, so a child with none has no volume and therefore no price. The
+      // submit button stays disabled until one is picked, which is why this click is not
+      // optional decoration.
+      await parent.getByTestId(`sibling-group-${scenario.groupId}`).check()
       await parent.getByTestId('sibling-submit').click()
 
-      // L6 — the promise is REVIEW, never a place. A parent told "done" would turn up to a
-      // lesson their child is not on a roster for.
+      // A PLACE, not a review. The child is enrolled, priced and charged already; what is
+      // left is the health form and the payment method, which is what the copy names.
       await expect(parent.getByTestId('sibling-submitted')).toBeVisible()
       await expect(parent.getByTestId('sibling-pending-hint')).toBeVisible()
 
-      // -- the queue (6c) --------------------------------------------------------
+      // -- the roster, with nobody having approved anything -----------------------
       await signInAs(managerContext, 'manager', 'dashboard')
       const manager = await managerContext.newPage()
+
+      // The queue is GONE, not merely empty. Asserted, because a deleted panel that
+      // quietly comes back is exactly how dead UI returns.
       await manager.goto(`${ORIGINS.dashboard}/#/alerts`)
+      await expect(manager.getByTestId('alert-pending-requests')).toHaveCount(0)
 
-      const row = manager.getByTestId('alert-request-row').filter({ hasText: 'יונתן לוי' })
-      await expect(row).toHaveCount(1)
-      await expect(row.getByTestId('alert-request-source')).toHaveText('מאפליקציית ההורים')
-      // §5.4a — matching is on a verified address, so the copy never claims certainty. The
-      // parent is signed in, so the request carries `matched_person_id` and the queue says
-      // it may be the same parent rather than announcing a new family.
-      await expect(row.getByTestId('alert-request-matched')).toBeVisible()
-
-      // §5.4 — the group is chosen on the DECISION, not read from the submission.
-      await row.getByTestId(/^alert-request-approve-/).click()
-      await manager.getByTestId('alert-request-group').selectOption({ index: 1 })
-      await manager.getByTestId('alert-request-approve-confirm').click()
-
-      await expect(
-        manager.getByTestId('alert-request-row').filter({ hasText: 'יונתן לוי' }),
-      ).toHaveCount(0)
-
-      // Approved into the club, and attached to the parent who asked rather than to a
-      // duplicate of them — which is what the 500 was hiding.
       await manager.goto(`${ORIGINS.dashboard}/#/students`)
       const student = manager.getByTestId('students-row').filter({ hasText: 'יונתן לוי' })
+      // ONE row. The duplicate check is what keeps it at one — a second submission of the
+      // same child is refused rather than creating a second student.
       await expect(student).toHaveCount(1)
       await expect(student).toContainText('פעיל')
 

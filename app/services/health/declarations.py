@@ -40,11 +40,12 @@ from app.core.storage import ObjectStore, sniff_image_type, validate_key
 from app.core.tenancy import TenantSession
 from app.models.audit import AuditLog
 from app.models.health import HealthDeclaration, HealthFormTemplate
-from app.models.people import Student
+from app.models.people import Student, StudentPickupContact
 from app.models.person import Guardian, Person
 from app.schemas.health import HealthStatusSummaryOut
 from app.services.audit import AuditService
-from app.services.health import HealthService
+from app.services.health import HealthService, club_terms
+from app.services.health.clauses import CLAUSE_QUESTION_ID, verify_clause
 from app.services.health.flags import derive_flags
 from app.services.health.pdf import RenderedSection, render_declaration_pdf
 
@@ -74,6 +75,21 @@ class SignatureRequiredError(Exception):
 class SignatureNotAPngError(Exception):
     """The bytes decide, not the caller's word. No SVG, ever — it can carry script and would be
     served from our own origin (app/core/storage.py §2.4)."""
+
+
+class TemplateSupersededError(Exception):
+    """Signing a version of the questions the studio has stopped asking.
+
+    **This is refused rather than accepted, because accepting it is a dead end.**
+    `agreement_status` counts a declaration as current only when its `template_version`
+    matches the published one -- so a signature against a superseded template satisfies
+    nothing, the gate stays shut, and the family is asked to sign the same form again
+    forever with no error to explain why. That is exactly how it shipped: the parent client
+    took `items[0]` from an unordered list, which in a studio holding both v1 and v2 could be
+    v1.
+
+    Refusing costs the caller a 422 that names the versions. It cannot cost anybody a loop.
+    """
 
 
 class AnswersIncompleteError(Exception):
@@ -242,12 +258,49 @@ class HealthDeclarationService:
         if template is None:
             raise DeclarationNotFoundError(str(template_id))
 
+        # A `full` declaration must be signed against the questions the studio asks TODAY.
+        # `trial` is exempt: conflict C3 gives it its own single-version form, and it is not
+        # what the gate measures.
+        if template.kind == "full":
+            current = (
+                session.execute(
+                    select(HealthFormTemplate)
+                    .where(
+                        HealthFormTemplate.kind == "full",
+                        HealthFormTemplate.published_at.is_not(None),
+                    )
+                    .order_by(HealthFormTemplate.version.desc())
+                )
+                .scalars()
+                .first()
+            )
+            if current is not None and template.version != current.version:
+                raise TemplateSupersededError(
+                    f"template version {template.version} is superseded by {current.version}"
+                )
+
         signature = decode_signature(signature_image_base64)
 
         missing = [q for q in required_question_ids(template.schema) if q not in answers]
         if missing:
             # The ids, never the wording and never what was answered elsewhere in the payload.
             raise AnswersIncompleteError(", ".join(sorted(missing)))
+
+        # The club's two clauses are alternatives, and the answers decide which one this family
+        # is entitled to sign. The client renders the same rule; this is the half that matters,
+        # because a client that let somebody declare "no medical limitations of any kind" over a
+        # `yes` to asthma would put a false statement under a real signature.
+        #
+        # Skipped for a template that has no clause question -- v1 and the trial form -- so an
+        # existing signature being re-rendered is not retro-fitted with a rule it never had.
+        if any(
+            question.get("id") == CLAUSE_QUESTION_ID
+            for section in template.schema.get("sections") or ()
+            if isinstance(section, Mapping)
+            for question in section.get("questions") or ()
+            if isinstance(question, Mapping)
+        ):
+            verify_clause(template.schema, answers, answers.get(CLAUSE_QUESTION_ID))
 
         # `strict=True`: a live parent's answers are being written for the first time, and a
         # non-boolean under a flag question is a client bug worth failing loudly on.
@@ -449,24 +502,17 @@ _ANSWER_WORDS: dict[str, tuple[str, str]] = {
 }
 _UNANSWERED = {"he": "—", "en": "—", "ru": "—"}
 
-#: D11's caveat, on the artefact a club is most likely to hand to an insurer. Mirrors
-#: `template.disclaimer` in web/packages/i18n/{he,en,ru}/health.ts; the two are kept in step by
-#: `tests/health/test_pdf_contents.py`, because a caveat that exists only in the app is a caveat
-#: absent from the document it is about.
-_DISCLAIMER: dict[str, str] = {
-    "he": (
-        "השאלון המצורף הוא נקודת פתיחה בלבד ואינו מסמך עמידה ברגולציה. "
-        "באחריות המועדון להתאים אותו לדרישות הביטוח והחוק"
-    ),
-    "en": (
-        "The bundled questionnaire is a starting point only and is not a compliance document. "
-        "Adapting it to insurance and legal requirements is the club's responsibility"
-    ),
-    "ru": (
-        "Прилагаемая анкета — только отправная точка и не является документом соответствия. "
-        "Приведение её в соответствие с требованиями страхования и закона — обязанность клуба"
-    ),
-}
+# D11's `_DISCLAIMER` used to sit here -- "the bundled questionnaire is a starting point only
+# and is not a compliance document" -- stamped onto every rendered PDF.
+#
+# **It was removed when the club's own form replaced the bundled one** (template v2). That
+# sentence was honest about a question set WE wrote and shipped to a club that had not
+# reviewed it. The document this module now renders is the club's own `טופס הרשמה` and its own
+# `תקנון`, signed under the club's own name, and printing "this is not a compliance document"
+# across a club's own legal instrument would be false. What replaced it is
+# `club_terms.SIGNATURE_LINE` -- the club's own sentence, from block 6 of its paper form.
+#
+# See docs/superpowers/specs/2026-08-30-registration-agreement-design.md §11.
 
 
 def _display_answer(value: Any, locale: str) -> str:
@@ -502,6 +548,13 @@ def build_pdf_sections(
             if not isinstance(question, Mapping) or not question.get("id"):
                 continue
             question_id = str(question["id"])
+            # **The clause is prose, not a row.** Its stored value is an id — `none` /
+            # `limited` — and rendering it as an answer printed the literal word "none" beside
+            # "אני מאשר/ת את ההצהרה שלמעלה" on the signed document. The sentence the family
+            # actually confirmed is rendered in full by `build_terms_sections`; this row was
+            # a duplicate of it, showing the internal id instead of the words.
+            if question_id == CLAUSE_QUESTION_ID:
+                continue
             condition = question.get("visible_if")
             if isinstance(condition, Mapping) and not all(
                 answers.get(key) == value for key, value in condition.items()
@@ -515,6 +568,194 @@ def build_pdf_sections(
                     title=str(section.get("title") or section.get("id") or ""), rows=rows
                 )
             )
+    return sections
+
+
+#: Labels for the registration block. Unlike the health questions -- which are manager-editable
+#: rows in `health_form_template.schema` and so are rendered in whatever language the manager
+#: typed them in -- these name COLUMNS, not questions. Nobody typed them, so they follow the
+#: studio's locale like the answer words above.
+_REG_LABELS: dict[str, dict[str, str]] = {
+    "he": {
+        "section_student": "פרטי התלמיד/ה",
+        "section_parents": "פרטי ההורים",
+        "section_pickup": "מורשי איסוף",
+        "name": "שם",
+        "birthdate": "תאריך לידה",
+        "national_id": "ת.ז.",
+        "grade": "כיתה/גן",
+        "address": "כתובת",
+        "city": "יישוב",
+        "phone_home": "טלפון בבית",
+        "phone": "טלפון נייד",
+        "email": 'דוא"ל',
+        "aliyah_year": "שנת עליה",
+    },
+    "en": {
+        "section_student": "Student details",
+        "section_parents": "Parent details",
+        "section_pickup": "Authorised for collection",
+        "name": "Name",
+        "birthdate": "Date of birth",
+        "national_id": "ID number",
+        "grade": "Class",
+        "address": "Address",
+        "city": "City",
+        "phone_home": "Home phone",
+        "phone": "Mobile",
+        "email": "Email",
+        "aliyah_year": "Year of immigration",
+    },
+    "ru": {
+        "section_student": "Данные учащегося",
+        "section_parents": "Данные родителей",
+        "section_pickup": "Кому разрешено забирать",
+        "name": "Имя",
+        "birthdate": "Дата рождения",
+        "national_id": "Удостоверение личности",
+        "grade": "Класс",
+        "address": "Адрес",
+        "city": "Город",
+        "phone_home": "Домашний телефон",
+        "phone": "Мобильный",
+        "email": "Эл. почта",
+        "aliyah_year": "Год репатриации",
+    },
+}
+
+
+def _label(key: str, locale: str) -> str:
+    return _REG_LABELS.get(locale, _REG_LABELS["he"])[key]
+
+
+def _decode_national_id(raw: bytes | None) -> str:
+    """`EncryptedBytes` gives back what was stored; what was stored is the normalized form."""
+    return raw.decode() if raw else ""
+
+
+def _person_rows(person: Person, locale: str, *, keys: tuple[str, ...]) -> list[tuple[str, str]]:
+    """Only the fields that are filled. **A blank row is worse than no row here.**
+
+    Half this block is optional -- a second parent, a landline, a student email -- and a page
+    of labels with dashes beside them reads as a form somebody abandoned, not as a signed
+    agreement. The paper form has the same property: unfilled lines are simply blank.
+    """
+    available: dict[str, str] = {
+        "name": f"{person.first_name} {person.last_name}".strip(),
+        "national_id": _decode_national_id(person.national_id_encrypted),
+        "birthdate": person.birthdate.strftime("%d.%m.%Y") if person.birthdate else "",
+        "address": person.address or "",
+        "city": person.city or "",
+        "phone_home": person.phone_home or "",
+        "phone": person.phone or "",
+        "email": person.email or "",
+        "aliyah_year": str(person.aliyah_year_encrypted or ""),
+    }
+    return [(_label(key, locale), available[key]) for key in keys if available.get(key)]
+
+
+def build_registration_sections(
+    session: TenantSession, declaration: HealthDeclaration, locale: str
+) -> list[RenderedSection]:
+    """The club's `טופס הרשמה` blocks 1-4, read from the columns they live in.
+
+    **Read from `person` and `student`, never from the answers.** These facts were written to
+    real columns precisely so they would not inherit §11.1's manager-only rule; reading them
+    back out of `answers_encrypted` here would undo that in the one place it is most visible.
+    """
+    student = session.get(Student, declaration.student_id)
+    if student is None:
+        return []
+    child = session.get(Person, student.person_id)
+    if child is None:
+        return []
+
+    sections: list[RenderedSection] = []
+    rows = _person_rows(
+        child,
+        locale,
+        keys=(
+            "name",
+            "birthdate",
+            "national_id",
+            "address",
+            "city",
+            "phone_home",
+            "phone",
+            "email",
+        ),
+    )
+    if student.grade:
+        # After the birthdate, where the paper form puts it.
+        rows.insert(min(2, len(rows)), (_label("grade", locale), student.grade))
+    if rows:
+        sections.append(RenderedSection(title=_label("section_student", locale), rows=rows))
+
+    parent_rows: list[tuple[str, str]] = []
+    guardians = (
+        session.execute(
+            select(Guardian)
+            .where(Guardian.student_id == student.id)
+            .order_by(Guardian.is_primary.desc(), Guardian.created_at)
+        )
+        .scalars()
+        .all()
+    )
+    for guardian in guardians:
+        parent = session.get(Person, guardian.person_id)
+        if parent is None:
+            continue
+        parent_rows.extend(
+            _person_rows(parent, locale, keys=("name", "national_id", "phone", "aliyah_year"))
+        )
+    if parent_rows:
+        sections.append(RenderedSection(title=_label("section_parents", locale), rows=parent_rows))
+
+    pickup_rows: list[tuple[str, str]] = []
+    for contact in (
+        session.execute(
+            select(StudentPickupContact)
+            .where(StudentPickupContact.student_id == student.id)
+            .order_by(StudentPickupContact.created_at)
+        )
+        .scalars()
+        .all()
+    ):
+        blob = contact.contact_encrypted or {}
+        name = str(blob.get("name") or "").strip()
+        if name:
+            pickup_rows.append((name, str(blob.get("phone") or "")))
+    if pickup_rows:
+        # Omitted entirely when there are none -- an empty "who may collect this child"
+        # heading on a signed page invites somebody to write a name on it afterwards.
+        sections.append(RenderedSection(title=_label("section_pickup", locale), rows=pickup_rows))
+
+    return sections
+
+
+def build_terms_sections(answers: Mapping[str, Any], locale: str) -> list[RenderedSection]:
+    """The confirmed health clause and the club's `תנאי תשלום`, as prose.
+
+    **The clause that was CONFIRMED, not the one today's answers would imply.** They are the
+    same at the moment of signing -- `verify_clause` refuses otherwise -- but this document is
+    re-rendered later, and a manager editing a question in the template must not silently
+    change which sentence an old signature appears above.
+    """
+    sections: list[RenderedSection] = []
+    confirmed = answers.get(CLAUSE_QUESTION_ID)
+    if isinstance(confirmed, str) and confirmed:
+        sections.append(
+            RenderedSection(
+                title=club_terms.terms_title(locale),
+                paragraphs=[club_terms.clause_text(confirmed, locale)],
+            )
+        )
+    sections.append(
+        RenderedSection(
+            title=club_terms.terms_title(locale),
+            paragraphs=list(club_terms.payment_terms(locale)),
+        )
+    )
     return sections
 
 
@@ -548,6 +789,7 @@ def render_and_store_pdf(
     signer = session.get(Person, declaration.signed_by_person_id)
     signed_by = f"{signer.first_name} {signer.last_name}".strip() if signer else ""
 
+    answers = declaration.answers_encrypted or {}
     data = render_declaration_pdf(
         title=str(template.schema.get("title") or "הצהרת בריאות"),
         student_name=student_name,
@@ -555,8 +797,14 @@ def render_and_store_pdf(
         signed_at=declaration.signed_at,
         signed_by=signed_by,
         template_version=declaration.template_version,
-        sections=build_pdf_sections(template.schema, declaration.answers_encrypted or {}, locale),
-        disclaimer=_DISCLAIMER.get(locale, _DISCLAIMER["he"]),
+        sections=[
+            # The club's paper page reads: details, health, terms, signature. A manager
+            # holding both should be able to read them side by side.
+            *build_registration_sections(session, declaration, locale),
+            *build_pdf_sections(template.schema, answers, locale),
+            *build_terms_sections(answers, locale),
+        ],
+        signature_line=club_terms.signature_line(locale, signer=signed_by, studio=studio_name),
         signature_png=declaration.signature_image_encrypted,
     )
     key = declaration_pdf_key(declaration.studio_id, declaration.id)
