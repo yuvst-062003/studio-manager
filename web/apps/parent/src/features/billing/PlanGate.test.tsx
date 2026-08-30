@@ -7,6 +7,7 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
+import { t } from '@studio/i18n'
 import { PlanGate, isPromiseRoute } from './PlanGate'
 import type { TrainingPlanClient, TrainingPlanView } from './trainingPlanClient'
 
@@ -149,7 +150,6 @@ describe('the plan step (§6.1)', () => {
     // The plan applies on its own; only the MONEY waits for the manager.
     await waitFor(() => expect(requestPlan).toHaveBeenCalledWith('s1', 'p300'))
     expect(claimPaid).toHaveBeenCalledWith('p300', 'cash', true)
-    expect(screen.getByTestId('plan-gate-claimed')).toBeInTheDocument()
   })
 
   it('tells the manager to expect money that has not moved yet', async () => {
@@ -164,7 +164,6 @@ describe('the plan step (§6.1)', () => {
     await userEvent.click(screen.getByTestId('plan-gate-pay-now'))
 
     await waitFor(() => expect(claimPaid).toHaveBeenCalledWith('p550', 'cheque', false))
-    expect(screen.getByTestId('plan-gate-promised')).toBeInTheDocument()
   })
 
   it('lets the family past, and keeps asking', async () => {
@@ -193,6 +192,76 @@ describe('the plan step (§6.1)', () => {
     expect(isPromiseRoute('cash')).toBe(true)
     expect(isPromiseRoute('cheque')).toBe(true)
     expect(isPromiseRoute('standing_order')).toBe(true)
+  })
+
+
+  it('names the route and says the money moves in person', async () => {
+    // "\u05dc\u05e9\u05dc\u05dd \u05e2\u05db\u05e9\u05d9\u05d5" was a lie on these three: pressing it pays nobody, because the
+    // app takes no money on cash, cheques or a standing order (owner, 2026-08-30).
+    gate()
+    await userEvent.click(await chooseIn('p300'))
+    for (const route of ['cash', 'cheque', 'standing_order'] as const) {
+      await userEvent.click(screen.getByTestId(`plan-gate-method-${route}`))
+      expect(screen.getByTestId('plan-gate-pay-now')).toHaveTextContent(
+        t('he', `schedule.plan.gate.hand.${route}`),
+      )
+      expect(screen.getByTestId('plan-gate-pay-now')).not.toHaveTextContent(
+        t('he', 'schedule.plan.gate.payNow'),
+      )
+      await userEvent.click(screen.getByTestId('plan-gate-back'))
+    }
+  })
+
+  it('keeps "pay now" on the card, which really does pay now', async () => {
+    gate({ onPayByCard: vi.fn(async () => undefined) })
+    await userEvent.click(await chooseIn('p300'))
+    await userEvent.click(screen.getByTestId('plan-gate-method-card'))
+    expect(screen.getByTestId('plan-gate-pay-now')).toHaveTextContent(
+      t('he', 'schedule.plan.gate.payNow'),
+    )
+  })
+
+  it('moves on by itself once the answer is recorded', async () => {
+    // It used to stop on a confirmation with a "\u05d4\u05de\u05e9\u05da" to press. There is nothing left to
+    // ask this family, so the step re-reads: the next child who needs a plan, or the app.
+    const read = vi
+      .fn()
+      .mockResolvedValueOnce(view())
+      .mockResolvedValue(view({ id: 'p300', name: 'פעם בשבוע' } as never))
+    gate({ client: client({ read }) })
+
+    await userEvent.click(await chooseIn('p300'))
+    await userEvent.click(screen.getByTestId('plan-gate-method-cash'))
+    await userEvent.click(screen.getByTestId('plan-gate-paid-already'))
+
+    await waitFor(() => expect(screen.getByTestId('app')).toBeInTheDocument())
+    expect(screen.queryByTestId('plan-gate')).toBeNull()
+  })
+
+  it('records a second payment without refusing it', async () => {
+    // **The reported bug.** `act` re-requested the plan on every press, so once it was set
+    // the server refused with "this student is already on that plan" — and every second
+    // action died as a bare common.error.generic. Setting a plan and paying for it are two
+    // operations; only the first is done.
+    const requestPlan = vi.fn(async () => undefined)
+    const claimPaid = vi.fn(async () => undefined)
+    // The child still has no plan on re-read, so the step stays open for a second answer.
+    gate({ client: client({ requestPlan, claimPaid }) })
+
+    await userEvent.click(await chooseIn('p400'))
+    await userEvent.click(screen.getByTestId('plan-gate-method-cash'))
+    await userEvent.click(screen.getByTestId('plan-gate-paid-already'))
+    await waitFor(() => expect(claimPaid).toHaveBeenCalledTimes(1))
+
+    await userEvent.click(await chooseIn('p400'))
+    await userEvent.click(screen.getByTestId('plan-gate-method-cheque'))
+    await userEvent.click(screen.getByTestId('plan-gate-pay-now'))
+
+    await waitFor(() => expect(claimPaid).toHaveBeenCalledTimes(2))
+    expect(claimPaid).toHaveBeenLastCalledWith('p400', 'cheque', false)
+    // The plan was asked for ONCE. The second round changed nothing about it.
+    expect(requestPlan).toHaveBeenCalledTimes(1)
+    expect(screen.queryByTestId('plan-gate-error')).toBeNull()
   })
 
   it('gives every control an accessible name, on both steps', async () => {

@@ -122,9 +122,13 @@ export function PlanGate({
 }: PlanGateProps) {
   // `null` while the reads are in flight — the step must not flash in front of a family
   // whose children all have plans already.
-  const [missing, setMissing] = useState<{ student: PlanGateStudent; plans: PlanOption[] } | null>(
-    null,
-  )
+  const [missing, setMissing] = useState<{
+    student: PlanGateStudent
+    plans: PlanOption[]
+    /** The plan this student is ON. Null until one is set, then the id `act` must not
+     *  re-request — see its body. */
+    currentPlanId: string | null
+  } | null>(null)
   const [skipped, setSkipped] = useState(false)
   const [reopened, setReopened] = useState(0)
   const [chosen, setChosen] = useState<PlanOption | null>(null)
@@ -152,7 +156,17 @@ export function PlanGate({
         if (!live) return
         if (view === null) continue
         if (!needsPlan(student, view.current_plan !== null)) continue
-        setMissing({ student, plans: [...view.plans] })
+        // **Carried across the re-read, for the same child.** Resetting it here undid the
+        // whole point: the step re-reads itself after every answer, so a family recording
+        // a second payment arrived back with no memory of the plan just set and asked the
+        // server to set it again — the refusal this fix exists to stop. A DIFFERENT child
+        // starts empty, which is what the id comparison is for.
+        setMissing((previous) => ({
+          student,
+          plans: [...view.plans],
+          currentPlanId:
+            previous && previous.student.id === student.id ? previous.currentPlanId : null,
+        }))
         return
       }
       if (live) setMissing(null)
@@ -200,13 +214,36 @@ export function PlanGate({
     setBusy(true)
     setError(null)
     try {
-      await client.requestPlan(missing!.student.id, plan.id)
+      // **Only when it would actually change something.**
+      //
+      // This used to fire on every press, so a family who set a plan and then came back to
+      // record a second payment hit `POST /plan-changes` with the plan they were already
+      // on — which the server rightly refuses ("this student is already on that plan"),
+      // and which arrived here as a bare `common.error.generic`. The plan step was
+      // one-shot: any second action failed, and said nothing useful about why.
+      //
+      // Setting a plan and paying for it are two operations, and welding them into one
+      // was the mistake. The server's refusal is correct and stays; this simply stops
+      // asking for a change that is not one.
+      if (missing!.currentPlanId !== plan.id) {
+        await client.requestPlan(missing!.student.id, plan.id)
+        setMissing((current) => (current ? { ...current, currentPlanId: plan.id } : current))
+      }
       const outcome = await run()
-      setDone(outcome)
       onChosen?.()
-      // The card leaves the page for uPay, so its step stays as it is; the two promise
-      // outcomes come back here, and the family reads the confirmation.
-      if (outcome !== 'card') setChosen(null)
+      if (outcome === 'card') {
+        // uPay is a full-page navigation; leave the step exactly as it is behind it.
+        setDone('card')
+        return
+      }
+      // **Straight on, no "continue" to press** (owner, 2026-08-30). The answer is
+      // recorded, so the step has nothing left to ask this family: the re-read either
+      // finds the next child who needs a plan, or finds nobody and renders the app.
+      setDone(null)
+      setChosen(null)
+      setMethod(null)
+      setMonths(1)
+      setReopened((n) => n + 1)
     } catch {
       setError(t(locale, 'common.error.generic'))
     } finally {
@@ -381,6 +418,11 @@ export function PlanGate({
               <>
                 <MoneyDisplay agorot={chosen.monthly_amount_agorot} label={chosen.name} />
                 <div style={rowStyle}>
+                  {/* **Never "לשלם עכשיו" on these three.** Nothing is paid by pressing
+                      it — the app takes no money on cash, cheques or a standing order, and
+                      a button that says otherwise is the screen lying about what it does.
+                      The label names the route and says the money moves in person, which
+                      is what actually happens next (owner, 2026-08-30). */}
                   <Button
                     data-testid="plan-gate-pay-now"
                     disabled={busy}
@@ -392,7 +434,7 @@ export function PlanGate({
                     }
                     variant="primary"
                   >
-                    {t(locale, 'schedule.plan.gate.payNow')}
+                    {t(locale, `schedule.plan.gate.hand.${method}`)}
                   </Button>
                   <Button
                     data-testid="plan-gate-paid-already"
@@ -423,23 +465,6 @@ export function PlanGate({
           </div>
         </Card>
       )}
-
-      {done === 'claimed' ? (
-        // Re-reads rather than closing: a family with two children answers for the second
-        // here, and the same press lands them on home when there is no second.
-        <Button
-          data-testid="plan-gate-continue"
-          onClick={() => {
-            setDone(null)
-            setMethod(null)
-            setMonths(1)
-            setReopened((n) => n + 1)
-          }}
-          variant="primary"
-        >
-          {t(locale, 'common.setup.continue')}
-        </Button>
-      ) : null}
 
       {/* Never a dead end. A club with no plans, a family who wants to ask first, a parent
           who opened the app to check tonight's lesson — all of them get past this. */}

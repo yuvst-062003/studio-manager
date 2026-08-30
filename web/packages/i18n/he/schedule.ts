@@ -555,6 +555,11 @@ export const schedule: Bundle = {
   'plan.gate.method.cheque': 'צ׳קים',
   'plan.gate.method.standing_order': 'הוראת קבע',
   'plan.gate.payNow': 'לשלם עכשיו',
+  // The three hand-carried routes: the button names the route AND says the money moves
+  // in person, because on these routes the app takes nothing (owner, 2026-08-30).
+  'plan.gate.hand.cash': 'אמסור מזומן במועדון',
+  'plan.gate.hand.cheque': 'אמסור צ׳קים במועדון',
+  'plan.gate.hand.standing_order': 'אקים הוראת קבע',
   'plan.gate.paidAlready': 'כבר שילמתי',
   'plan.gate.months': 'כמה חודשים לשלם מראש?',
   'plan.gate.cardTotal': 'סה״כ לתשלום עכשיו',
