@@ -81,19 +81,26 @@ test.describe('E2E-1 · registration to active student', () => {
       // The club's own name, not `landing-headline` — that one renders only when a studio
       // has set a headline, and it is the club the stranger came to see either way.
       await expect(stranger.getByRole('heading', { name: 'מועדון הדגמה' })).toBeVisible()
-      // §5.4a ① — 'groups with schedules'. Asserted on the PICKER row, which is where the
-      // phone publishes them.
+      // §5.4a ① — 'groups with schedules'. Asserted on the TIMETABLE, which is where the
+      // 2026-08-30 Stitch redesign publishes them.
       //
-      // This used to assert `landing-group-name` and `landing-group-days`, and those live
-      // in `.landing-groups-detail` — the desktop column's furniture, which `landing.css`
-      // sets to `display: none` under 64rem. This project runs on a Pixel 7, so both
-      // elements resolved and both were correctly hidden, and the test had been red since
-      // the 2026-08-29 landing redesign split one group list into two renderings. The
-      // product was right; the assertion was written against the markup that redesign
-      // replaced.
-      const pick = stranger.getByTestId(`landing-pick-${scenario.groupId}`)
-      await expect(pick).toBeVisible()
-      await expect(pick.getByTestId('landing-pick-meta')).toBeVisible()
+      // Two redesigns have moved this assertion. It first read `landing-group-name` and
+      // `landing-group-days` inside `.landing-groups-detail`, desktop furniture that
+      // `landing.css` hid under 64rem — resolved but invisible on this project's Pixel 7.
+      // It then moved to the `landing-pick-*` row. The Stitch page has neither: the group
+      // list and the picker became ONE week grid, and the name and ages now sit INSIDE the
+      // slot button, which is rendered at every width. So the desktop-only problem the
+      // previous fix worked around no longer exists.
+      //
+      // Matched by suffix rather than `landing-slot-<day>-<id>`: the group trains on
+      // Sunday and Tuesday (scenario.ts pins [0, 2]), and which day it is asserted on is
+      // not the point — that it appears on the timetable at all is.
+      const slot = stranger
+        .locator(`[data-testid^="landing-slot-"][data-testid$="-${scenario.groupId}"]`)
+        .first()
+      await expect(slot).toBeVisible()
+      await expect(slot.getByTestId('landing-group-name')).toBeVisible()
+      await expect(slot.getByTestId('landing-group-ages')).toBeVisible()
 
       // §5.3 — sign-in first. The form does not exist for an anonymous visitor, because a
       // registration nobody can be matched to is a row the manager cannot action.
@@ -108,7 +115,10 @@ test.describe('E2E-1 · registration to active student', () => {
       // hides the in-column `landing-cta` behind a scroll), and this project runs on a
       // Pixel 7. Pressing the control the reader would actually press is also what keeps
       // the sticky bar from silently ceasing to work.
-      await pick.click()
+      //
+      // No pre-selection step any more: the Stitch page's group choice lives INSIDE the
+      // dialog (`booking-group-<n>`, chosen per child, which this test already does
+      // below), so the entry is just the one call to action.
       await stranger.getByTestId('landing-sticky-cta').click()
       await expect(stranger.getByTestId('booking-sign-in')).toBeVisible()
       await expect(stranger.getByTestId('booking-children')).toBeHidden()
@@ -130,7 +140,6 @@ test.describe('E2E-1 · registration to active student', () => {
       // signed-in parent was shown the sign-in step again — forever, which is the loop the
       // marker was invented to break.
       await parent.goto(`${ORIGINS.parent}/t/demo?signed_in=1`)
-      await parent.getByTestId(`landing-pick-${scenario.groupId}`).click()
       await parent.getByTestId('landing-sticky-cta').click()
       await expect(parent.getByTestId('booking-children')).toBeVisible()
 
