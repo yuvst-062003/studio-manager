@@ -184,6 +184,7 @@ export function SettingsScreen({ locale }: { locale: Locale }) {
   const [details, setDetails] = useState<StudioDetails | null>(null)
   const [saveState, setSaveState] = useState<'idle' | 'saved' | 'failed'>('idle')
   const [photoError, setPhotoError] = useState<string | null>(null)
+  const [logoError, setLogoError] = useState<string | null>(null)
   const logoUrl = useAuthedImage(details?.logo_url ?? null)
 
   useEffect(() => {
@@ -218,6 +219,41 @@ export function SettingsScreen({ locale }: { locale: Locale }) {
   // The strip's writers — multipart POST and a keyed DELETE, both repainting from the
   // response rather than guessing. Errors land in their own line, mapped by the server's
   // code: 'failed' alone sends an owner back to the same six-photo strip or the same SVG.
+  /**
+   * `POST /studio/logo`, which nothing in this app called.
+   *
+   * The endpoint has existed since the studio settings shipped, and so have the strings —
+   * `logoChoose`, `logoRejected`, and `logoDrop`, which was rendered as a bare paragraph
+   * that reads like a drop zone and accepted nothing. So a club could not set a logo at
+   * all, and the reason they could not SEE one was that there had never been a way to
+   * upload it: one missing control, both symptoms (owner report, 2026-08-30).
+   *
+   * `logo_url` is re-read from the response rather than guessed, because the URL carries a
+   * cache-busting version — reusing the old one would show the previous logo until a hard
+   * reload.
+   */
+  const uploadLogo = (file: File) => {
+    setLogoError(null)
+    const body = new FormData()
+    body.append('file', file)
+    void apiFetch('/api/v1/studio/logo', { method: 'POST', body })
+      .then(async (response) => {
+        if (!response.ok) {
+          // 415 names the formats and 413 names the size; both are the owner's to fix, so
+          // neither may arrive as a generic failure.
+          setLogoError(
+            response.status === 415 || response.status === 413
+              ? 'common.setup.studio.logoRejected'
+              : 'common.settings.saveFailed',
+          )
+          return
+        }
+        const next = (await response.json()) as { logo_url: string }
+        setDetails((current) => (current ? { ...current, logo_url: next.logo_url } : current))
+      })
+      .catch(() => setLogoError('common.settings.saveFailed'))
+  }
+
   const uploadPhoto = (file: File) => {
     setPhotoError(null)
     const body = new FormData()
@@ -339,8 +375,33 @@ export function SettingsScreen({ locale }: { locale: Locale }) {
                   style={{ maxInlineSize: '100%', height: 'auto' }}
                 />
               ) : (
-                <p>{t(locale, 'common.setup.studio.logoDrop')}</p>
+                <p data-testid="settings-logo-empty">
+                  {t(locale, 'common.setup.studio.logoDrop')}
+                </p>
               )}
+              {/* The control that was missing. A real `<label>` wrapping the input, like
+                  the landing-photo uploader below — a file input with only a placeholder
+                  paragraph beside it is the state this screen was in. */}
+              <label>
+                {t(locale, 'common.setup.studio.logoChoose')}
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  style={{ display: 'block' }}
+                  data-testid="settings-logo-input"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0]
+                    if (file) uploadLogo(file)
+                    // The same file again after a rejection must refire onChange.
+                    event.target.value = ''
+                  }}
+                />
+              </label>
+              {logoError ? (
+                <p role="alert" data-testid="settings-logo-error">
+                  {t(locale, logoError)}
+                </p>
+              ) : null}
 
               <TextField
                 label={t(locale, 'common.setup.studio.name')}

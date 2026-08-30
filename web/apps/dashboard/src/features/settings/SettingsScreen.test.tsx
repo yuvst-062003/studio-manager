@@ -278,3 +278,76 @@ describe('the landing photo strip (2026-08-29)', () => {
     ).toBeInTheDocument()
   })
 })
+
+// -- the club's logo (owner report, 2026-08-30) --------------------------------
+//
+// "in admin settings i still cant see the logo, nor upload new logo in the settings."
+//
+// One cause for both. `POST /studio/logo` had existed since studio settings shipped and
+// NOTHING in this app called it; the panel only rendered a logo, with `logoDrop` beside it
+// as a bare paragraph that reads like a drop zone and accepted nothing. So no club could
+// set a logo, and the reason none was visible is that there had never been a way to put
+// one there.
+describe('the studio logo', () => {
+  function uploadStub(status = 200) {
+    const calls: { url: string; init?: RequestInit }[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input)
+        calls.push({ url, init })
+        if (url.includes('/studio/logo')) {
+          return status === 200
+            ? new Response(JSON.stringify({ logo_url: '/api/v1/studio/logo?v=2' }), { status })
+            : new Response(JSON.stringify({ detail: { code: 'unsupported_image' } }), { status })
+        }
+        return new Response(JSON.stringify(STUDIO), { status: 200 })
+      }),
+    )
+    return calls
+  }
+
+  const png = () => new File(['bytes'], 'logo.png', { type: 'image/png' })
+
+  it('offers a control at all, and posts the file to the endpoint', async () => {
+    const calls = uploadStub()
+    render(<SettingsScreen locale="he" />)
+    const input = await screen.findByTestId('settings-logo-input')
+    await userEvent.upload(input, png())
+
+    await waitFor(() =>
+      expect(calls.some((call) => call.url.includes('/studio/logo'))).toBe(true),
+    )
+    const posted = calls.find((call) => call.url.includes('/studio/logo'))!
+    expect(posted.init?.method).toBe('POST')
+    // Multipart, and the server names the part `file`.
+    expect(posted.init?.body).toBeInstanceOf(FormData)
+    expect((posted.init?.body as FormData).get('file')).toBeInstanceOf(File)
+  })
+
+  it('never sends an SVG, because the server refuses one', async () => {
+    // The endpoint's own message: "a logo must be a PNG, a JPEG or a WebP. SVG is never
+    // accepted." Filtering at the picker saves a round trip to a refusal.
+    uploadStub()
+    render(<SettingsScreen locale="he" />)
+    const input = await screen.findByTestId('settings-logo-input')
+    expect(input).toHaveAttribute('accept', 'image/png,image/jpeg,image/webp')
+  })
+
+  it('says WHICH formats when the server refuses the file', async () => {
+    // 415 and 413 are both the owner's to fix, so neither may arrive as "save failed" —
+    // that sends them back to the same file.
+    uploadStub(415)
+    render(<SettingsScreen locale="he" />)
+    await userEvent.upload(await screen.findByTestId('settings-logo-input'), png())
+    expect(await screen.findByTestId('settings-logo-error')).toHaveTextContent(
+      t('he', 'common.setup.studio.logoRejected'),
+    )
+  })
+
+  it('shows the placeholder while no logo is set', async () => {
+    uploadStub()
+    render(<SettingsScreen locale="he" />)
+    expect(await screen.findByTestId('settings-logo-empty')).toBeInTheDocument()
+  })
+})
