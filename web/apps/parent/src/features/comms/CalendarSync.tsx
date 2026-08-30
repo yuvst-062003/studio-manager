@@ -16,7 +16,7 @@
 // happens.
 import { useCallback, useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { Button, Card } from '@studio/ui'
+import { Button, Card, LoadFailed } from '@studio/ui'
 import { formatDateInStudioZone } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
@@ -76,6 +76,8 @@ export function CalendarSync({
   onCopy?: (text: string) => void
 }) {
   const [feed, setFeed] = useState<CalendarFeedOut | null>(null)
+  const [readFailed, setReadFailed] = useState(false)
+  const [attempt, setAttempt] = useState(0)
   const [copied, setCopied] = useState(false)
   const [confirmingRotate, setConfirmingRotate] = useState(false)
   const [rotated, setRotated] = useState(false)
@@ -86,13 +88,16 @@ export function CalendarSync({
       .calendarFeeds()
       .then((page) => {
         if (!live) return
+        setReadFailed(false)
         setFeed(page.feeds.find((row) => row.subject_type === subjectType) ?? null)
       })
-      .catch(() => undefined)
+      // P8 — a swallowed failure here rendered the CREATE-a-feed state, inviting a parent
+      // to rotate a feed that exists and break their calendar. Failure says so instead.
+      .catch(() => live && setReadFailed(true))
     return () => {
       live = false
     }
-  }, [client, subjectType])
+  }, [client, subjectType, attempt])
 
   const copy = useCallback(() => {
     if (!feed) return
@@ -111,6 +116,22 @@ export function CalendarSync({
     setCopied(false)
   }, [client, feed])
 
+  if (readFailed) {
+    return (
+      <section style={sectionStyle} aria-labelledby="calendar-title" data-testid="calendar-sync">
+        <h2 id="calendar-title" style={titleStyle}>
+          {t(locale, 'comms.calendar.title')}
+        </h2>
+        <LoadFailed
+          locale={locale}
+          onRetry={() => {
+            setReadFailed(false)
+            setAttempt((n) => n + 1)
+          }}
+        />
+      </section>
+    )
+  }
   if (!feed) return null
 
   return (

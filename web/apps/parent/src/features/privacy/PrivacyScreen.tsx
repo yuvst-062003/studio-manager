@@ -18,7 +18,7 @@
 // renders Asia/Jerusalem from a UTC instant.
 import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { Button, Card, EmptyState, PageHeader, SectionHeader, StatusChip } from '@studio/ui'
+import { Button, Card, EmptyState, LoadFailed, PageHeader, SectionHeader, StatusChip } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { DraftNotice, PolicyDocument } from './PolicyDocument'
@@ -134,14 +134,22 @@ export function PrivacyScreen({
   // because it cascades renders.
   const [reloadToken, setReloadToken] = useState(0)
 
+  const [requestsFailed, setRequestsFailed] = useState(false)
+
   useEffect(() => {
     let alive = true
     void Promise.all([
-      client.requests().catch(() => ({ exports: [], deletions: [] })),
+      // P8 — a swallowed failure here rendered "no requests", which for a screen about
+      // deletion rights is a lie with legal weight. Failure is its own state now.
+      client.requests().then(
+        (list) => ({ list, failed: false }),
+        () => ({ list: { exports: [], deletions: [] }, failed: true }),
+      ),
       client.consents().catch(() => null),
-    ]).then(([list, state]) => {
+    ]).then(([outcome, state]) => {
       if (!alive) return
-      setRequests(list)
+      setRequestsFailed(outcome.failed)
+      setRequests(outcome.list)
       setConsents(state)
     })
     return () => {
@@ -301,7 +309,9 @@ export function PrivacyScreen({
 
       {/* The list. This is where a guardian finds out their erasure did not run. */}
       <Card caption={t(locale, 'reports.privacy.requests.title')}>
-        {rows.length === 0 ? (
+        {requestsFailed ? (
+          <LoadFailed locale={locale} onRetry={() => setReloadToken((n) => n + 1)} />
+        ) : rows.length === 0 ? (
           <EmptyState title={t(locale, 'reports.privacy.requests.empty')} />
         ) : (
           <ul style={{ ...columnStyle, listStyle: 'none', margin: 0, padding: 0 }}>

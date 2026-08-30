@@ -186,6 +186,8 @@ export function BookingFlow({
   const [slotsByGroup, setSlotsByGroup] = useState<Record<string, TrialSlot[]>>({})
   const [sessionIds, setSessionIds] = useState<string[]>([''])
   const [error, setError] = useState<BookingError | null>(null)
+  // P8 — the slots read can fail on a phone network; retrying is a real re-fetch.
+  const [slotsAttempt, setSlotsAttempt] = useState(0)
   const [sending, setSending] = useState(false)
   const [result, setResult] = useState<BookingResult | null>(null)
 
@@ -208,7 +210,7 @@ export function BookingFlow({
     return () => {
       live = false
     }
-  }, [client, groupKey, step])
+  }, [client, groupKey, step, slotsAttempt])
 
   if (result) {
     return <BookingConfirmed result={result} locale={locale} address={address} phone={phone} />
@@ -469,6 +471,20 @@ export function BookingFlow({
                   : 'people.landing.error',
           )}
         </Alert>
+        {/* P8 — the slots READ failing is recoverable in place; the submit errors above
+            are answered by pressing submit again. */}
+        {error === 'schedule_unavailable' ? (
+          <Button
+            variant="secondary"
+            data-testid="booking-retry-slots"
+            onClick={() => {
+              setError(null)
+              setSlotsAttempt((n) => n + 1)
+            }}
+          >
+            {t(locale, 'common.loadFailed.retry')}
+          </Button>
+        ) : null}
         </span>
       ) : null}
 

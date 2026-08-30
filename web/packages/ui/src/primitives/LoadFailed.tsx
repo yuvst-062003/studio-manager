@@ -21,17 +21,28 @@ export function LoadFailed({
   locale,
   onRetry,
   detail,
-  offline = false,
+  offline,
 }: {
   locale: Locale
   onRetry: () => void
   detail?: ReactNode
   offline?: boolean
 }) {
+  // P8's second item, answered at the primitive (2026-08-30): "the app never tells a
+  // parent they are offline while reading". A caller that KNOWS its network state (the
+  // staff app's §10.1 machine) still passes it; everyone else gets the browser's own
+  // answer instead of a hardcoded false — so a failed read in a dojo doorway says
+  // "you are offline", not "something went wrong".
+  const actuallyOffline = offline ?? !(globalThis.navigator?.onLine ?? true)
   return (
-    <div className="studio-load-failed" data-offline={offline || undefined} data-testid="load-failed">
+    <div
+      className="studio-load-failed"
+      data-offline={actuallyOffline || undefined}
+      data-testid="load-failed"
+    >
       <Alert iconLabel={t(locale, 'common.loadFailed.icon')} tone="danger">
-        {detail ?? t(locale, offline ? 'common.loadFailed.offline' : 'common.loadFailed.body')}
+        {detail ??
+          t(locale, actuallyOffline ? 'common.loadFailed.offline' : 'common.loadFailed.body')}
       </Alert>
       <Button data-testid="load-failed-retry" onClick={onRetry} variant="secondary">
         {t(locale, 'common.loadFailed.retry')}

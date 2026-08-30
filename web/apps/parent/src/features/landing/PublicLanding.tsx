@@ -23,7 +23,7 @@
 // left-to-right in English, and it is the one screen in the product a stranger sees first.
 import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { Alert, BeltLadder, Button, Card, EmptyState } from '@studio/ui'
+import { BeltLadder, Button, Card, EmptyState, LoadFailed } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import type { LandingClient, PublicGroup, PublicLanding as Landing } from './landingClient'
@@ -358,6 +358,8 @@ export function PublicLanding({
   signedIn?: boolean
 }) {
   const [state, setState] = useState<LoadState>({ kind: 'loading' })
+  // Bumped by LoadFailed's retry — a real re-fetch, never location.reload() (P8).
+  const [attempt, setAttempt] = useState(0)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   // The `?book=` resume: the sign-in round trip's return_path carries the picked group
   // (BookingFlow writes it), so landing back here reopens the flow instead of dropping the
@@ -384,7 +386,7 @@ export function PublicLanding({
     return () => {
       live = false
     }
-  }, [client, slug])
+  }, [client, slug, attempt])
 
   if (state.kind === 'loading') {
     return <p data-testid="landing-loading">{t(locale, 'people.landing.submitting')}</p>
@@ -406,10 +408,16 @@ export function PublicLanding({
     )
   }
   if (state.kind === 'error') {
+    // P8 — a dead-end Alert on the ONE screen a stranger reaches from a flyer was the
+    // worst place in the product to have no way forward.
     return (
-      <Alert tone="danger" iconLabel={t(locale, 'people.error.generic')}>
-        {t(locale, 'people.error.generic')}
-      </Alert>
+      <LoadFailed
+        locale={locale}
+        onRetry={() => {
+          setState({ kind: 'loading' })
+          setAttempt((n) => n + 1)
+        }}
+      />
     )
   }
 

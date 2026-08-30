@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { DIRECTIONS, THEMES, renderIn } from '../testing'
 import { LoadFailed } from './LoadFailed'
+import { t } from '@studio/i18n'
 
 describe.each(DIRECTIONS)('LoadFailed in $locale ($dir)', ({ locale, dir }) => {
   describe.each(THEMES)('under the %s theme', (theme) => {
@@ -35,5 +36,22 @@ describe('LoadFailed', () => {
     renderIn(<LoadFailed locale="he" offline onRetry={() => {}} />)
     expect(screen.getByTestId('load-failed')).toHaveAttribute('data-offline', 'true')
     expect(screen.getByText(/אין חיבור לרשת/)).toBeVisible()
+  })
+})
+
+describe('offline by detection (2026-08-30)', () => {
+  it('says "offline" from the browser state when no caller answer is given', () => {
+    const spy = vi.spyOn(window.navigator, 'onLine', 'get').mockReturnValue(false)
+    renderIn(<LoadFailed locale="he" onRetry={() => undefined} />)
+    expect(screen.getByTestId('load-failed')).toHaveAttribute('data-offline', 'true')
+    expect(screen.getByText(t('he', 'common.loadFailed.offline'))).toBeInTheDocument()
+    spy.mockRestore()
+  })
+
+  it('lets a caller that KNOWS its network state override the browser', () => {
+    const spy = vi.spyOn(window.navigator, 'onLine', 'get').mockReturnValue(false)
+    renderIn(<LoadFailed locale="he" onRetry={() => undefined} offline={false} />)
+    expect(screen.getByText(t('he', 'common.loadFailed.body'))).toBeInTheDocument()
+    spy.mockRestore()
   })
 })
