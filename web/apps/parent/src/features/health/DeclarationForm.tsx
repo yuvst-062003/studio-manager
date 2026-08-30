@@ -15,17 +15,20 @@
 // value and different meanings, and D12 moved `--paid` in dark mode deliberately. A health answer
 // is not a payment.
 //
-// **D11's caveat is on this screen too.** 12c finding 3 asks whether a parent signing a medical
-// attestation should see it; they should. It costs one line and the alternative is a family
-// signing something the app privately describes as a starting point.
+// **D11's caveat used to be on this screen.** 12c finding 3 asked whether a parent signing a
+// medical attestation should see the app's own disclaimer; they should have, while the questions
+// were ours. Template v2's declaration section is the CLUB's own `טופס הרשמה`, signed alongside
+// the club's own תקנון, so the sentence became false and was removed. What a parent reads before
+// signing now is the club's own clause — rendered below, and derived rather than chosen.
 //
 // **G7.** No answer is logged, and nothing here is put anywhere but the request body.
 import { useEffect, useMemo, useState } from 'react'
 import type { CSSProperties, FormEvent } from 'react'
-import { Alert, Button, Card, LoadFailed, SegmentedControl } from '@studio/ui'
+import { Alert, Button, Card, Checkbox, LoadFailed, SegmentedControl } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { SignaturePad } from './SignaturePad'
+import { applicableClause, clauseTextKey, CLAUSE_QUESTION_ID } from './clauses'
 import { isVisible, unansweredRequired } from './healthClient'
 import type { AnswerValue, HealthClient, TemplateQuestion, TemplateSchema } from './healthClient'
 
@@ -120,6 +123,17 @@ export function DeclarationForm({
   const answer = (question: TemplateQuestion, value: AnswerValue) => {
     setAnswers((previous) => {
       const next = { ...previous, [question.id]: value }
+      // **A confirmed clause does not survive a change to what it was confirmed against.**
+      // A parent can tick "no medical limitations", then go back and answer yes to asthma. The
+      // confirmation would still be sitting there, and they would sign a sentence that had
+      // become false without ever seeing it change. The server refuses that submission — but a
+      // 422 at the end of a long form is a worse way to learn it than the checkbox clearing.
+      if (question.id !== CLAUSE_QUESTION_ID && schema) {
+        const confirmed = next[CLAUSE_QUESTION_ID]
+        if (typeof confirmed === 'string' && confirmed !== applicableClause(schema, next)) {
+          delete next[CLAUSE_QUESTION_ID]
+        }
+      }
       // A `no` hides the detail field AND clears it. Leaving the text behind would submit an
       // answer to a question that is no longer on screen — and for a health record, a stale
       // free-text note about a child is worse than none.
@@ -203,10 +217,6 @@ export function DeclarationForm({
 
       <Card>
         <p style={{ color: 'var(--text-secondary)' }}>{t(locale, 'health.declaration.attestation')}</p>
-        {/* D11's caveat, on the screen the parent signs. 12c finding 3. */}
-        <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-caption)' }}>
-          {t(locale, 'health.template.disclaimer')}
-        </p>
       </Card>
 
       <Card>
@@ -219,6 +229,39 @@ export function DeclarationForm({
               .map((question) => {
                 const value = answers[question.id]
                 const unanswered = value === undefined || value === null || value === ''
+                if (question.type === 'clause') {
+                  // Not a free choice between two sentences: the answers above already decide
+                  // which one this family may sign, and the parent confirms THAT one. Rendering
+                  // both as options would be offering a family a false statement to pick.
+                  const clause = applicableClause(schema, answers)
+                  const confirmed = value === clause
+                  return (
+                    <div key={question.id} style={{ ...rowStyle, flexDirection: 'column', alignItems: 'stretch' }}>
+                      <p
+                        data-testid="declaration-clause"
+                        style={{ color: 'var(--text-secondary)', marginBlockEnd: 'var(--space-2)' }}
+                      >
+                        {t(locale, clauseTextKey(clause))}
+                      </p>
+                      {/* The `Checkbox` primitive, not a bare input: it owns the label
+                          association and the focus ring, and .claude/rules/ui-rtl-a11y.md
+                          requires both on every interactive element. */}
+                      <Checkbox
+                        checked={confirmed}
+                        label={t(locale, 'health.declaration.clause.confirm')}
+                        onChange={(event) => answer(question, event.target.checked ? clause : '')}
+                      />
+                      {showErrors && !confirmed ? (
+                        <span
+                          data-testid={`unanswered-${question.id}`}
+                          style={{ color: 'var(--text-muted)', fontSize: 'var(--text-caption)' }}
+                        >
+                          {t(locale, 'health.declaration.clause.required')}
+                        </span>
+                      ) : null}
+                    </div>
+                  )
+                }
                 if (question.type === 'boolean') {
                   return (
                     <div key={question.id} style={rowStyle}>

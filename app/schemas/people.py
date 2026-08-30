@@ -376,6 +376,13 @@ class StudentSummaryOut(BaseModel):
     #: Where the student came from — 'onboarding_link' rows get 3b's chip so a manager
     #: can spot self-registered families that still need a look (feature pass 2026-08-27).
     source: str | None = None
+    #: `הסכם הרשמה` — whether registration, health and the club's terms have ALL landed.
+    #:
+    #: **`None` everywhere except `/me/students`**, and deliberately. This is what the parent
+    #: app's gate reads, and it costs a consent lookup per row to compute. A staff roster of
+    #: 200 students has no use for it and should not pay for 200 lookups to render, so the
+    #: field is populated on the one route whose caller is the family it describes.
+    agreement_complete: bool | None = None
     #: 9h's `92%` — present / (present + absent) over MARKED sessions only, like the
     #: student-card strip: an unmarked register says nothing about the child. `None`
     #: until anything was marked, so a new student shows nothing rather than 0%.

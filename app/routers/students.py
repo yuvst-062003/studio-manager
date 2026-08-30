@@ -63,6 +63,7 @@ from app.schemas.people import (
     StudentSummaryPage,
     StudentUpdate,
 )
+from app.services.health.agreement import agreement_status
 from app.services.people.errors import ConflictError, NotFoundError, RefusedError
 from app.services.people.errors import NotFoundError as OnboardingNotFound
 from app.services.people.errors import RefusedError as OnboardingRefused
@@ -757,8 +758,24 @@ def my_students(request: Request, session: TenantSessionDep) -> StudentSummaryPa
     Not paginated: this is one person's children. G16 is about lists that grow, and a
     family that outgrows one page is not a case the product has.
     """
-    rows = StudentService.for_guardian(session, person_id=_person_id(request))
-    return StudentSummaryPage(items=[_summary(row) for row in rows], has_more=False)
+    person_id = _person_id(request)
+    rows = StudentService.for_guardian(session, person_id=person_id)
+
+    # §5.5's gate reads `agreement_complete`, and it is computed HERE rather than in the
+    # client for the reason the agreement service states: a gate whose condition is spelled
+    # out at two call sites is a gate that will eventually disagree with itself, and the
+    # failure modes are a family locked out of an app they have finished with, or one walking
+    # past a signature the club needs.
+    items = []
+    for row in rows:
+        summary = _summary(row)
+        student = session.get(Student, row.id)
+        if student is not None:
+            summary.agreement_complete = agreement_status(
+                session, student, signer_person_id=person_id
+            ).complete
+        items.append(summary)
+    return StudentSummaryPage(items=items, has_more=False)
 
 
 @router.get(

@@ -100,6 +100,40 @@
         "title": "AcceptInvitationRequest",
         "type": "object"
       },
+      "AgreementStatusOut": {
+        "description": "The three gate conditions, computed server-side and never re-derived by a client.\n\nA gate whose condition is spelled out at two call sites is a gate that will eventually\ndisagree with itself -- and the failure modes are a family locked out of an app they have\nfinished with, or one walking past a signature the club needs.",
+        "properties": {
+          "club_terms_version": {
+            "title": "Club Terms Version",
+            "type": "integer"
+          },
+          "complete": {
+            "title": "Complete",
+            "type": "boolean"
+          },
+          "health_signed": {
+            "title": "Health Signed",
+            "type": "boolean"
+          },
+          "registration_complete": {
+            "title": "Registration Complete",
+            "type": "boolean"
+          },
+          "terms_accepted": {
+            "title": "Terms Accepted",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "health_signed",
+          "registration_complete",
+          "terms_accepted",
+          "complete",
+          "club_terms_version"
+        ],
+        "title": "AgreementStatusOut",
+        "type": "object"
+      },
       "AnnouncementIn": {
         "description": "§5.11's publish form. `scheduled_for` absent means send now.",
         "properties": {
@@ -1812,6 +1846,80 @@
         "title": "ChargeOut",
         "type": "object"
       },
+      "ChildDetailsIn": {
+        "additionalProperties": false,
+        "description": "`טופס הרשמה` block 1. Four required fields; the rest are optional on the paper form too.",
+        "properties": {
+          "address": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Address",
+            "type": "string"
+          },
+          "city": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "City",
+            "type": "string"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "maxLength": 320,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "grade": {
+            "maxLength": 20,
+            "minLength": 1,
+            "title": "Grade",
+            "type": "string"
+          },
+          "national_id": {
+            "maxLength": 20,
+            "minLength": 1,
+            "title": "National Id",
+            "type": "string"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "phone_home": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone Home"
+          }
+        },
+        "required": [
+          "national_id",
+          "address",
+          "city",
+          "grade"
+        ],
+        "title": "ChildDetailsIn",
+        "type": "object"
+      },
       "ChildMatchOut": {
         "description": "§5.4a's duplicate-child warning. A candidate the manager judges, never a merge.",
         "properties": {
@@ -2113,6 +2221,26 @@
           "source"
         ],
         "title": "ClosureOut",
+        "type": "object"
+      },
+      "ClubTermsIn": {
+        "additionalProperties": false,
+        "description": "Step 3's acceptance.\n\n**The version is the one the client RENDERED**, echoed back, exactly as\n`POST /privacy/consents` does. Recording the server's current version for a screen that\nshowed the previous one is how a consent ledger comes to hold agreements nobody made.",
+        "properties": {
+          "accepted": {
+            "title": "Accepted",
+            "type": "boolean"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "accepted",
+          "version"
+        ],
+        "title": "ClubTermsIn",
         "type": "object"
       },
       "ConsentGrantIn": {
@@ -7266,6 +7394,74 @@
         "title": "OpsHealthResponse",
         "type": "object"
       },
+      "ParentDetailsIn": {
+        "additionalProperties": false,
+        "description": "`טופס הרשמה` block 2, for the signing parent and optionally the other one.",
+        "properties": {
+          "aliyah_year": {
+            "anyOf": [
+              {
+                "maxLength": 8,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Aliyah Year"
+          },
+          "first_name": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Name"
+          },
+          "last_name": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Name"
+          },
+          "national_id": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "National Id"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          }
+        },
+        "title": "ParentDetailsIn",
+        "type": "object"
+      },
       "ParentEventOut": {
         "description": "`12h`'s row: the event, plus this family's own answer for one child.\n\nTwo objects rather than one flattened shape, because the answer is per-child and the\nevent is not -- a family with two children on one competition sees one event and two\nanswers, and flattening would duplicate the event on the screen.",
         "properties": {
@@ -7849,6 +8045,41 @@
           "to_date"
         ],
         "title": "PeriodWindowOut",
+        "type": "object"
+      },
+      "PickupContactIn": {
+        "additionalProperties": false,
+        "description": "One person, other than a parent, who may collect the child (`טופס הרשמה` block 3).",
+        "properties": {
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "phone": {
+            "default": "",
+            "maxLength": 32,
+            "title": "Phone",
+            "type": "string"
+          },
+          "relation": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Relation"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "PickupContactIn",
         "type": "object"
       },
       "PlanChangeIn": {
@@ -9020,6 +9251,42 @@
           "status"
         ],
         "title": "RegistrationDecisionOut",
+        "type": "object"
+      },
+      "RegistrationIn": {
+        "additionalProperties": false,
+        "description": "Blocks 1-4. Posted by step 1 of the agreement flow.",
+        "properties": {
+          "child": {
+            "$ref": "#/components/schemas/ChildDetailsIn"
+          },
+          "other_parent": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ParentDetailsIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "pickup_contacts": {
+            "items": {
+              "$ref": "#/components/schemas/PickupContactIn"
+            },
+            "maxItems": 10,
+            "title": "Pickup Contacts",
+            "type": "array"
+          },
+          "signer": {
+            "$ref": "#/components/schemas/ParentDetailsIn"
+          }
+        },
+        "required": [
+          "child",
+          "signer"
+        ],
+        "title": "RegistrationIn",
         "type": "object"
       },
       "RegistrationRequestDetailOut": {
@@ -24839,6 +25106,158 @@
         "summary": "Update Student",
         "tags": [
           "people"
+        ]
+      }
+    },
+    "/api/v1/students/{student_id}/agreement": {
+      "get": {
+        "description": "What the parent app's gate reads. Computed here so the client never re-derives it.",
+        "operationId": "read_agreement_status_api_v1_students__student_id__agreement_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgreementStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Agreement Status",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/api/v1/students/{student_id}/agreement/club-terms": {
+      "post": {
+        "description": "Step 3. Appends a `club_terms` row for the SIGNING PERSON, not for the student.\n\n§4.3 makes a terms acceptance a consent about the adult who accepted it -- which is also\nwhy a second child in the same family does not ask again: the parent already holds it.",
+        "operationId": "accept_club_terms_api_v1_students__student_id__agreement_club_terms_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClubTermsIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgreementStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Accept Club Terms",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/api/v1/students/{student_id}/agreement/registration": {
+      "put": {
+        "description": "`טופס הרשמה` blocks 1-4. Idempotent: the form shows what is stored and replaces it.",
+        "operationId": "save_registration_api_v1_students__student_id__agreement_registration_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegistrationIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgreementStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Save Registration",
+        "tags": [
+          "health"
         ]
       }
     },

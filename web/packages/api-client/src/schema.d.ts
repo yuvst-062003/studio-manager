@@ -4162,6 +4162,69 @@ export interface paths {
         patch: operations["update_student_api_v1_students__student_id__patch"];
         trace?: never;
     };
+    "/api/v1/students/{student_id}/agreement": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Agreement Status
+         * @description What the parent app's gate reads. Computed here so the client never re-derives it.
+         */
+        get: operations["read_agreement_status_api_v1_students__student_id__agreement_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/students/{student_id}/agreement/club-terms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Accept Club Terms
+         * @description Step 3. Appends a `club_terms` row for the SIGNING PERSON, not for the student.
+         *
+         *     §4.3 makes a terms acceptance a consent about the adult who accepted it -- which is also
+         *     why a second child in the same family does not ask again: the parent already holds it.
+         */
+        post: operations["accept_club_terms_api_v1_students__student_id__agreement_club_terms_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/students/{student_id}/agreement/registration": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Save Registration
+         * @description `טופס הרשמה` blocks 1-4. Idempotent: the form shows what is stored and replaces it.
+         */
+        put: operations["save_registration_api_v1_students__student_id__agreement_registration_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/students/{student_id}/attendance": {
         parameters: {
             query?: never;
@@ -4971,6 +5034,26 @@ export interface components {
         AcceptInvitationRequest: {
             /** Token */
             token: string;
+        };
+        /**
+         * AgreementStatusOut
+         * @description The three gate conditions, computed server-side and never re-derived by a client.
+         *
+         *     A gate whose condition is spelled out at two call sites is a gate that will eventually
+         *     disagree with itself -- and the failure modes are a family locked out of an app they have
+         *     finished with, or one walking past a signature the club needs.
+         */
+        AgreementStatusOut: {
+            /** Club Terms Version */
+            club_terms_version: number;
+            /** Complete */
+            complete: boolean;
+            /** Health Signed */
+            health_signed: boolean;
+            /** Registration Complete */
+            registration_complete: boolean;
+            /** Terms Accepted */
+            terms_accepted: boolean;
         };
         /**
          * AnnouncementIn
@@ -5864,6 +5947,26 @@ export interface components {
             student_id: string | null;
         };
         /**
+         * ChildDetailsIn
+         * @description `טופס הרשמה` block 1. Four required fields; the rest are optional on the paper form too.
+         */
+        ChildDetailsIn: {
+            /** Address */
+            address: string;
+            /** City */
+            city: string;
+            /** Email */
+            email?: string | null;
+            /** Grade */
+            grade: string;
+            /** National Id */
+            national_id: string;
+            /** Phone */
+            phone?: string | null;
+            /** Phone Home */
+            phone_home?: string | null;
+        };
+        /**
          * ChildMatchOut
          * @description §5.4a's duplicate-child warning. A candidate the manager judges, never a merge.
          */
@@ -6004,6 +6107,20 @@ export interface components {
              * Format: uuid
              */
             training_year_id: string;
+        };
+        /**
+         * ClubTermsIn
+         * @description Step 3's acceptance.
+         *
+         *     **The version is the one the client RENDERED**, echoed back, exactly as
+         *     `POST /privacy/consents` does. Recording the server's current version for a screen that
+         *     showed the previous one is how a consent ledger comes to hold agreements nobody made.
+         */
+        ClubTermsIn: {
+            /** Accepted */
+            accepted: boolean;
+            /** Version */
+            version: number;
         };
         /**
          * ConsentGrantIn
@@ -8279,6 +8396,22 @@ export interface components {
             status: string;
         };
         /**
+         * ParentDetailsIn
+         * @description `טופס הרשמה` block 2, for the signing parent and optionally the other one.
+         */
+        ParentDetailsIn: {
+            /** Aliyah Year */
+            aliyah_year?: string | null;
+            /** First Name */
+            first_name?: string | null;
+            /** Last Name */
+            last_name?: string | null;
+            /** National Id */
+            national_id?: string | null;
+            /** Phone */
+            phone?: string | null;
+        };
+        /**
          * ParentEventOut
          * @description `12h`'s row: the event, plus this family's own answer for one child.
          *
@@ -8566,6 +8699,21 @@ export interface components {
              * Format: date
              */
             to_date: string;
+        };
+        /**
+         * PickupContactIn
+         * @description One person, other than a parent, who may collect the child (`טופס הרשמה` block 3).
+         */
+        PickupContactIn: {
+            /** Name */
+            name: string;
+            /**
+             * Phone
+             * @default
+             */
+            phone: string;
+            /** Relation */
+            relation?: string | null;
         };
         /** PlanChangeIn */
         PlanChangeIn: {
@@ -9123,6 +9271,17 @@ export interface components {
             status: string;
             /** Student Ids */
             student_ids?: string[];
+        };
+        /**
+         * RegistrationIn
+         * @description Blocks 1-4. Posted by step 1 of the agreement flow.
+         */
+        RegistrationIn: {
+            child: components["schemas"]["ChildDetailsIn"];
+            other_parent?: components["schemas"]["ParentDetailsIn"] | null;
+            /** Pickup Contacts */
+            pickup_contacts?: components["schemas"]["PickupContactIn"][];
+            signer: components["schemas"]["ParentDetailsIn"];
         };
         /**
          * RegistrationRequestDetailOut
@@ -17902,6 +18061,107 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StudentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_agreement_status_api_v1_students__student_id__agreement_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgreementStatusOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    accept_club_terms_api_v1_students__student_id__agreement_club_terms_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClubTermsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgreementStatusOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_registration_api_v1_students__student_id__agreement_registration_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegistrationIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgreementStatusOut"];
                 };
             };
             /** @description Validation Error */

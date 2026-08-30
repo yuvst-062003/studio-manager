@@ -34,7 +34,7 @@ import type { CSSProperties } from 'react'
 import { Card } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
-import { DeclarationForm } from './DeclarationForm'
+import { AgreementFlow } from './AgreementFlow'
 import type { HealthClient, HealthStatus } from './healthClient'
 
 const gateStyle: CSSProperties = {
@@ -53,6 +53,16 @@ export type GatedStudent = {
    *  is the safe direction: it gates. */
   status?: string
   health_status: HealthStatus
+  /**
+   * `הסכם הרשמה` — registration, health and the club's terms, all three, computed by the
+   * server on `/me/students`.
+   *
+   * **Optional, and `undefined` falls back to the health-only rule.** A caller that predates
+   * this field (a test fixture, a cached response) still gates correctly on the declaration
+   * rather than sailing past on a value it never sent. Defaulting the other way would open
+   * the gate for exactly the callers that know least.
+   */
+  agreement_complete?: boolean | null
 }
 
 /**
@@ -63,10 +73,19 @@ export type GatedStudent = {
  * the next child on submit, which is the same routing decision made again.
  */
 export function needsFullDeclaration(student: GatedStudent): boolean {
-  if (student.health_status === 'signed') return false
-  // The short form covers a child for as long as they are still trying the club out.
+  // The short form covers a child for as long as they are still trying the club out. Checked
+  // FIRST, and before the agreement: §5.4a's trial funnel asked three questions on a phone an
+  // hour ago, and sending that family into a three-step registration agreement is exactly the
+  // over-strictness this function was fixed for once already.
   if (student.health_status === 'trial_signed' && student.status === 'trial') return false
-  return true
+
+  // `הסכם הרשמה`: the club's own form asks for registration details and its `תקנון` as well
+  // as the health declaration, and its single signature covers all three. A family that signed
+  // the declaration but never gave a ת.ז. has not signed the club's agreement.
+  if (typeof student.agreement_complete === 'boolean') return !student.agreement_complete
+
+  // No agreement status in this shape — fall back to the health-only rule, which gates.
+  return student.health_status !== 'signed'
 }
 
 export function firstStudentNeedingDeclaration(students: readonly GatedStudent[]): GatedStudent | null {
@@ -113,10 +132,13 @@ export function HealthGate({
           </p>
         ) : null}
       </Card>
-      <DeclarationForm
+      {/* The whole agreement, not just the declaration. `AgreementFlow` reads the status and
+          renders only the steps this family still owes — so a parent correcting one asthma
+          answer is not made to re-type an address or re-read the `תקנון`. */}
+      <AgreementFlow
         client={client}
         locale={locale}
-        onSubmitted={onSigned}
+        onCompleted={onSigned}
         signerName={signerName}
         studentId={blocked.id}
         studentName={blocked.display_name}

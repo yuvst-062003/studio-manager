@@ -1,22 +1,22 @@
 // D11's editor — the screen behind 4e's `עריכת תבנית הצהרה` button.
 //
-// **This is where D11's caveat lives, and it is not optional.** D11: "A health declaration for
-// minors in an Israeli sports club touches insurance and regulatory ground. The bundled template
-// is a starting point, and the app must say so **where the manager edits it**. It is not a
-// compliance artefact and must not be presented as one." So `template.disclaimer` renders
-// unconditionally, above the questions, before any of them can be changed.
+// **D11's caveat used to live here, and it has been removed.** D11 said: "the bundled template
+// is a starting point, and the app must say so where the manager edits it. It is not a compliance
+// artefact." That was true while the questions were OURS — a set we wrote and shipped to a club
+// that had not reviewed it. Template v2's declaration section is the club's own `טופס הרשמה`,
+// signed alongside the club's own `תקנון`, so the sentence is now false about the document it
+// would be printed on.
 //
-// **`is_bundled_default` decides whose questions this is showing.** A studio that has reworded
-// every one of them is no longer editing ours, and an editor that still called them "the questions
-// the app ships with" would be the opposite of the caveat. The marker is dropped by the server on
-// first edit, so the two labels swap on their own.
+// `is_bundled_default` went with it. It existed to tell a manager whose questions the editor was
+// showing — ours until they reworded them — and there is no bundled set left to distinguish from
+// theirs. See docs/superpowers/specs/2026-08-30-registration-agreement-design.md §11.
 //
 // **Edits are a draft.** Nothing a parent signs and nothing a coach sees moves until publish: a
 // published version is immutable, because §4.3 puts `template_version` on the declaration so a
 // signature records which questions were actually asked.
 import { useCallback, useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { Alert, Button, Card, LoadFailed, TextField } from '@studio/ui'
+import { Button, Card, LoadFailed, TextField } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import type { DashboardHealthClient, EditableQuestion, EditableSchema } from './healthClient'
@@ -164,20 +164,10 @@ export function TemplateEditor({ locale, client }: TemplateEditorProps) {
   }
   if (!schema) return <p>{t(locale, 'health.documents.loading')}</p>
 
-  const bundled = schema.is_bundled_default === true
-
   return (
     <section aria-labelledby="template-title">
       <h1 id="template-title">{t(locale, 'health.template.title')}</h1>
 
-      {/* D11's caveat. Unconditional, above the questions, before anything can be changed. */}
-      <Alert iconLabel={t(locale, 'health.template.title')} tone="pending">
-        {t(locale, 'health.template.disclaimer')}
-      </Alert>
-
-      <p data-testid="template-provenance" style={{ color: 'var(--text-muted)' }}>
-        {bundled ? t(locale, 'health.template.editingBundled') : t(locale, 'health.template.editingYours')}
-      </p>
       <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-caption)' }}>
         {t(locale, 'health.template.draftHint')}
       </p>
