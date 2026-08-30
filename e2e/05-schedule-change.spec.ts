@@ -1,8 +1,8 @@
 import { expect, test } from '@playwright/test'
 
 import { ORIGINS } from './origins'
-import { signInAs } from './fixtures/auth'
-import { buildScenario, readRoster, readSession } from './fixtures/scenario'
+import { dismissPaymentSetup, signInAs } from './fixtures/auth'
+import { buildScenario, passFirstRunGates, readRoster, readSession } from './fixtures/scenario'
 
 /**
  * SPEC §13, flow 5 — "Manager changes a group's schedule → future sessions update, past and
@@ -160,6 +160,9 @@ test.describe('E2E-5 · a schedule change rewrites only the future', () => {
     try {
       await signInAs(managerContext, 'manager', 'dashboard')
       await signInAs(parentContext, scenario.parentPersona, 'parent')
+      // §6.1 steps 5 and 6 wrap every routed branch of the parent app, and both
+      // landed after this spec was written — without this it opens on `אישורים`.
+      await passFirstRunGates(request, scenario.parentPersona)
 
       const manager = await managerContext.newPage()
       await manager.goto(`${ORIGINS.dashboard}/#/groups/${scenario.groupId}`)
@@ -172,6 +175,7 @@ test.describe('E2E-5 · a schedule change rewrites only the future', () => {
 
       const parent = await parentContext.newPage()
       await parent.goto(`${ORIGINS.parent}/#/calendar`)
+    await dismissPaymentSetup(parent)
       await expect(parent.getByTestId('child-calendar')).toBeVisible()
 
       // `upcoming-session` and `past-session` are real; the M0 draft's nested `time` testid
@@ -193,7 +197,10 @@ test.describe('E2E-5 · a schedule change rewrites only the future', () => {
       // today, and the only session left in this month is the protected one above. The
       // parent turns the page, which is what a parent checking next term actually does.
       await parent.getByTestId('calendar-next').click()
-      await expect(parent.getByTestId('calendar-month')).toHaveText('2026-09')
+      // The month reads as a MONTH, not as an ISO key. `ChildCalendar.test.tsx` asserts
+      // `נובמבר` and explicitly `not` `2026-11`; this spec kept the machine form the
+      // redesign replaced.
+      await expect(parent.getByTestId('calendar-month')).toHaveText('ספטמבר 2026')
       await expect(
         parent.getByTestId('upcoming-session').filter({ hasText: '18:00–19:00' }).first(),
       ).toBeVisible()

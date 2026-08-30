@@ -660,6 +660,96 @@ async function completeAgreement(manager: Api, studentId: string): Promise<void>
  * conversion puts a `trial_signed` student behind §6.1's gate — the spec asserts the gate
  * fired, then calls this and asserts the app opened.
  */
+/**
+ * `הסכם הרשמה`'s two non-health parts, for students this scenario created itself.
+ *
+ * `signOutstandingDeclarations` sweeps by HEALTH STATUS — `missing` and `trial_signed` — and
+ * completes the agreement as it goes. A student whose declaration is already `signed` is
+ * therefore skipped, agreement and all, which is exactly the scenario's own child: §6.1's
+ * gate then holds the family on `פרטי הרשמה` for a registration block nobody filled in, and
+ * every screen behind the gate is unreachable. Named so a spec whose subject is BEHIND the
+ * gate can get there without re-walking a first run the first test already covers.
+
+ */
+export async function completeAgreementsForGuardian(
+  request: APIRequestContext,
+  persona: PersonaKey,
+): Promise<void> {
+  // **This persona's own children, asked of the app the gate belongs to.** A list of ids
+  // the scenario created is not enough: §6.1's gate holds a guardian for the FIRST of THEIR
+  // children still owing an agreement, and a persona's family outlives any one scenario —
+  // `parent1` already has a child from the demo fixture layer, and it was that child, not
+  // the scenario's, standing in front of `#/add-child`. Sweeping the whole roster is the
+  // other wrong answer: it writes a registration block onto every family in the studio to
+  // get one screen open.
+  const family = await asPersona(request, persona)
+  const mine = await family.send<{ items: { id: string; agreement_complete: boolean | null }[] }>(
+    'get',
+    '/me/students',
+  )
+  const manager = await asPersona(request, 'manager')
+  for (const student of mine.items) {
+    if (student.agreement_complete === true) continue
+    await completeAgreement(manager, student.id)
+  }
+}
+
+/**
+ * §6.1's first run, satisfied for one family so a spec can reach the screen it is about.
+ *
+ * Steps 5 and 6 wrap EVERY routed branch of the parent app — "no other screen is
+ * reachable" is the routing expression, not one screen — so every spec that opens a parent
+ * hash route walks into them. They landed after these specs were written, which is why five
+ * of them had been asserting their own subject against `אישורים`.
+ *
+ * The gates themselves are asserted in `01-registration-to-active`, once, where the first
+ * run IS the subject. Everywhere else this is preamble.
+ */
+export async function passFirstRunGates(
+  request: APIRequestContext,
+  persona: PersonaKey,
+): Promise<void> {
+  await acceptPlatformConsents(request, persona)
+  await completeAgreementsForGuardian(request, persona)
+}
+
+/**
+ * §6.1 step 5 — accept the club's terms and its privacy policy, as one persona.
+ *
+ * **The gate that shipped after these specs were written.** `ConsentGate` wraps every routed
+ * branch of the parent app and stands in FRONT of the health gate, because step 5 precedes
+ * step 6 and the ordering carries an argument: the privacy policy is what permits the club to
+ * hold a medical record about a child at all, so asking for the record first has the consent
+ * doing no work. Until this existed, `#/calendar` and `#/add-child` went where they said they
+ * did; since it landed, both land on `אישורים` and every spec that assumed otherwise has been
+ * red.
+ *
+ * Accepted over the API rather than by walking the screen, and for the same reason
+ * `signAllDeclarations` files declarations over the API: what a flow spec owns is the ROUTING
+ * on both sides of the gate — the screen's own three states are `ParentPrivacy.test.tsx`'s
+ * job. The callers below assert the gate blocks first, so the gate is still under test here;
+ * this only satisfies it.
+ *
+ * The version comes from the server rather than a constant: `POST /privacy/consents` answers
+ * 409 when the client's version is not the published one, which is the check that stops a
+ * ledger holding agreements nobody made. Reading it first is what a screen does too.
+ */
+export async function acceptPlatformConsents(
+  request: APIRequestContext,
+  persona: PersonaKey,
+): Promise<void> {
+  const api = await asPersona(request, persona)
+  const state = await api.send<{ policy_version: number; outstanding: string[] }>(
+    'get',
+    '/privacy/consents',
+  )
+  if (state.outstanding.length === 0) return
+  await api.send('post', '/privacy/consents', {
+    version: state.policy_version,
+    grants: Object.fromEntries(state.outstanding.map((consent) => [consent, true])),
+  })
+}
+
 export async function signAllDeclarations(request: APIRequestContext): Promise<void> {
   await signOutstandingDeclarations(await asPersona(request, 'manager'))
 }
