@@ -1,19 +1,24 @@
 // Parent artboard 12g — הוספת ילד נוסף.
 //
-// §5.4(c): "An existing guardian taps `+ הוסף ילד`, fills the child form and picks a group.
-// This creates a `registration_request` with `source = 'parent_app'` and
-// `matched_person_id` set — **a request, not an enrollment.** The manager approves it,
-// consistent with (b): conversion is always a human decision."
+// **This door enrols now** (owner decision, 2026-08-30). It used to file a
+// `registration_request` a manager approved, on L6's "conversion is always a human
+// decision" — while §5.4b's onboarding link, sent to the whole club in one WhatsApp
+// message, already created active priced children with no manager at all. A gate on the
+// second door while the first stood open protected nothing; it only meant a parent who
+// forgot a child at signup waited on the office for something they could have done
+// themselves an hour earlier.
 //
-// So the copy promises **review**, never a place. L6 is the rule; `sibling.pendingHint` is
-// how the screen keeps it. The group field is labelled a preference, because §5.4 puts the
-// real choice on the manager's decision.
+// So the copy promises a PLACE, not a review, and the groups are a choice rather than a
+// preference — the price follows weekly volume across them, which is why the picker is
+// multi-select and why at least one is required. `is_invite_only` is enforced server-side
+// in `OnboardingService.add_child`; the Girls Team is not in this list and cannot be
+// reached by posting its id either.
 //
 // L9 — "the child is added to this same account". No household is created, and the subtitle
 // says exactly that: one account, more children.
 import { useEffect, useState } from 'react'
 import type { CSSProperties, FormEvent } from 'react'
-import { Alert, Button, Card, Radio, TextField } from '@studio/ui'
+import { Alert, Button, Card, Checkbox, TextField } from '@studio/ui'
 import { apiFetch } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
@@ -42,7 +47,7 @@ export function AddSibling({
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [birthdate, setBirthdate] = useState('')
-  const [groupId, setGroupId] = useState('')
+  const [groupIds, setGroupIds] = useState<string[]>([])
   // 12g wants group CARDS with schedule and age band, not a bare dropdown (P6). The
   // list is the same public projection §5.4a's landing shows — the parent's own
   // studio, resolved through /me/studio's slug. No capacity anywhere: the 2026-08-27
@@ -92,7 +97,7 @@ export function AddSibling({
         first_name: firstName,
         last_name: lastName,
         birthdate: birthdate || null,
-        preferred_group_id: groupId || null,
+        group_ids: groupIds,
       })
       .then((response) => {
         if (response.ok) setSubmitted(true)
@@ -138,7 +143,8 @@ export function AddSibling({
         value={birthdate}
         onChange={(event) => setBirthdate(event.target.value)}
       />
-      {/* A PREFERENCE, not a decision — §5.4 puts the group on the manager's approval. */}
+      {/* A CHOICE now, and more than one: the price is derived from how many times a week
+          the child trains across every group they join. */}
       <fieldset data-testid="sibling-group">
         <legend>{t(locale, 'people.landing.chooseGroup')}</legend>
         {/* Said, never blank (2026-08-30): an empty list under a "choose a group" legend
@@ -164,12 +170,17 @@ export function AddSibling({
           : publicGroups
         ).map((group) => (
           <Card key={group.id}>
-            <Radio
-              checked={groupId === group.id}
+            <Checkbox
+              checked={groupIds.includes(group.id)}
               data-testid={`sibling-group-${group.id}`}
               label={group.name}
-              name="sibling-group"
-              onChange={() => setGroupId(group.id)}
+              onChange={(event) =>
+                setGroupIds((current) =>
+                  event.target.checked
+                    ? [...current, group.id]
+                    : current.filter((id) => id !== group.id),
+                )
+              }
               value={group.id}
             />
             {group.training_weekdays.length > 0 ? (
@@ -210,7 +221,14 @@ export function AddSibling({
         </span>
       ) : null}
 
-      <Button type="submit" disabled={!firstName || !lastName || sending} data-testid="sibling-submit">
+      {/* At least one group, because a child with none has no weekly volume and therefore
+          no price — the server refuses it, and a button that offers the refusal is worse
+          than one that waits. */}
+      <Button
+        type="submit"
+        disabled={!firstName || !lastName || groupIds.length === 0 || sending}
+        data-testid="sibling-submit"
+      >
         {t(locale, 'people.sibling.submit')}
       </Button>
     </form>

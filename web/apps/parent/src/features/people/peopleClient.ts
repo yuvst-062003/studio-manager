@@ -79,7 +79,9 @@ export function makePeopleClient(fetcher: Fetcher) {
       first_name: string
       last_name: string
       birthdate?: string | null
-      preferred_group_id?: string | null
+      /** Plural and required: the price is derived from weekly volume across every group
+       *  the child trains in, so one id could not price a child who trains twice a week. */
+      group_ids: string[]
     }): Promise<Response> =>
       fetcher('/api/v1/me/students', {
         method: 'POST',

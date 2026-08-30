@@ -37,7 +37,7 @@ from app.core.auth_context import AnyStaff, ManagerOrOwner
 from app.core.clock import now
 from app.core.config import settings
 from app.core.cors import app_origin
-from app.core.tenancy import TenantSession, TenantSessionDep
+from app.core.tenancy import TenantSession, TenantSessionDep, require_current_studio_id
 from app.models.people import Student
 from app.models.person import Person
 from app.schemas._pagination import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, IdempotencyKey
@@ -46,7 +46,6 @@ from app.schemas.people import (
     GuardianListResponse,
     GuardianOut,
     MyStudentStatusHistoryListResponse,
-    RegistrationRequestOut,
     SiblingRequestIn,
     StudentConvertIn,
     StudentCreate,
@@ -65,8 +64,10 @@ from app.schemas.people import (
     StudentUpdate,
 )
 from app.services.people.errors import ConflictError, NotFoundError, RefusedError
+from app.services.people.errors import NotFoundError as OnboardingNotFound
+from app.services.people.errors import RefusedError as OnboardingRefused
 from app.services.people.group_days import ScheduleReader
-from app.services.people.registrations import RegistrationService
+from app.services.people.onboarding import OnboardingService
 from app.services.people.students import StudentRow, StudentService
 from app.services.schedule import ScheduleService
 
@@ -835,43 +836,66 @@ def my_guardians(request: Request, session: TenantSessionDep) -> GuardianListRes
 
 @router.post(
     "/me/students",
-    response_model=RegistrationRequestOut,
+    response_model=StudentSummaryOut,
     status_code=status.HTTP_201_CREATED,
 )
-def request_a_sibling(
+def add_a_child(
     body: SiblingRequestIn,
     request: Request,
     session: TenantSessionDep,
     idempotency_key: IdempotencyKey = None,
-) -> RegistrationRequestOut:
-    """§5.4(c) -- parent `12g`, `+ הוסף ילד`.
+) -> StudentSummaryOut:
+    """Parent `12g`, `+ הוסף ילד` -- and it now ENROLS, like the club's join link.
 
-    **A request, not an enrollment** (L6). §5.4: "This creates a registration_request with
-    source = 'parent_app' and matched_person_id set -- a request, not an enrollment. The
-    manager approves it, consistent with (b): conversion is always a human decision."
+    **The two doors were one policy apart, and the split protected nothing** (owner
+    decision, 2026-08-30). This route used to file a `registration_request` for a manager to
+    approve, on L6's rule that "conversion is always a human decision". Meanwhile §5.4b's
+    onboarding link -- sent to the whole club in one WhatsApp message -- let any parent
+    create up to eight active, enrolled, priced children with no manager at all. A gate on
+    the second door while the first stands open is not a policy; it only meant a parent who
+    forgot a child at signup waited on the office for something they could have done
+    themselves an hour earlier.
+
+    So both doors run `OnboardingService.add_child`, which is also where `is_invite_only`
+    and `is_active` are now enforced -- the check neither door had, and the reason the
+    Girls Team was relying on an unpublished id rather than on a rule.
+
+    The manager is told rather than asked: a notification, so nobody has to approve a child
+    to find out one arrived.
 
     No role dependency, for the same reason `/me/students` has none: §3.1 -- 'guardian is
-    not a role'. Being a guardian is what `person_id` on a `guardian` row means, and this
-    route needs nothing more than an identity with a Person in this studio.
+    not a role'.
     """
-    row = RegistrationService.submit_from_parent(
-        session,
-        submitter_person_id=_person_id(request),
-        first_name=body.first_name,
-        last_name=body.last_name,
-        birthdate=body.birthdate,
-        preferred_group_id=body.preferred_group_id,
-        at=now(),
-    )
-    summary = RegistrationService.summarize(session, row)
+    parent = session.get(Person, _person_id(request))
+    if parent is None:
+        raise _not_found()
+    try:
+        student_id = OnboardingService.add_child(
+            session,
+            studio_id=require_current_studio_id(),
+            parent=parent,
+            child={
+                "first_name": body.first_name,
+                "last_name": body.last_name,
+                "birthdate": body.birthdate,
+                "group_ids": list(body.group_ids),
+            },
+            at=now(),
+            # The module's own seam, not a fresh `ScheduleService`: its docstring exists
+            # because a route that constructs one cannot be substituted by a test, and the
+            # enrollment this creates validates against the schedule.
+            schedule=schedule_reader(session),
+        )
+    except OnboardingNotFound as exc:
+        raise _not_found() from exc
+    except OnboardingRefused as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={"code": "refused", "message": str(exc)},
+        ) from exc
+    OnboardingService.notify_managers_of_new_child(session, parent=parent, student_id=student_id)
     session.commit()
-    return RegistrationRequestOut(
-        id=summary.id,
-        source=summary.source,
-        status=summary.status,
-        submitted_at=summary.submitted_at,
-        reviewed_at=summary.reviewed_at,
-        matched_person_id=summary.matched_person_id,
-        child_display_name=summary.child_display_name,
-        guardian_display_name=summary.guardian_display_name,
-    )
+    student, person = StudentService.get(session, student_id=student_id)
+    # `_project` is what `for_guardian` rows are built from, so the shape the parent app
+    # receives here is the same one `GET /me/students` will hand back a moment later.
+    return _summary(StudentService._project(session, student, person))  # noqa: SLF001

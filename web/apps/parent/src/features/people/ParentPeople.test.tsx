@@ -181,6 +181,11 @@ describe('daysUntil', () => {
 
 // -- 12g: add a sibling ---------------------------------------------------------
 
+const GROUPS = [
+  { id: 'g1', name: 'מתחילים' },
+  { id: 'g2', name: 'מתקדמים' },
+]
+
 describe('AddSibling — 12g', () => {
   it('says the child joins the SAME account', () => {
     // L9 — there is no household entity, and the subtitle is how the screen says so.
@@ -190,39 +195,70 @@ describe('AddSibling — 12g', () => {
     )
   })
 
-  it('submits a REQUEST and promises review, never a place', async () => {
-    // L6 — 'a request, not an enrollment'. The manager decides (§5.4).
+  it('adds the child, and says a place rather than a review', async () => {
+    // Owner decision, 2026-08-30: this door enrols now. It used to file a request a
+    // manager approved, while the club's join link — one WhatsApp message — already
+    // created active priced children with no manager at all.
     const user = userEvent.setup()
     const client = makeClient()
-    render(<AddSibling locale="he" client={client} />)
+    render(<AddSibling locale="he" client={client} groups={GROUPS} />)
     await user.type(screen.getByLabelText(t('he', 'people.student.firstName')), 'נועה')
     await user.type(screen.getByLabelText(t('he', 'people.student.lastName')), 'כהן')
+    await user.click(screen.getByTestId('sibling-group-g1'))
     await user.click(screen.getByTestId('sibling-submit'))
 
     await waitFor(() => expect(client.requestSibling).toHaveBeenCalled())
+    expect(client.requestSibling).toHaveBeenCalledWith(
+      expect.objectContaining({ group_ids: ['g1'] }),
+    )
     expect(await screen.findByTestId('sibling-pending-hint')).toHaveTextContent(
       t('he', 'people.sibling.pendingHint'),
     )
   })
 
-  it('never claims the child is enrolled', async () => {
+  it('takes more than one group, because the price follows weekly volume', async () => {
+    // A child training twice a week is priced at the two-a-week plan. One group id could
+    // not express that, which is why the picker is checkboxes and the field is plural.
     const user = userEvent.setup()
-    render(<AddSibling locale="he" client={makeClient()} />)
+    const client = makeClient()
+    render(<AddSibling locale="he" client={client} groups={GROUPS} />)
     await user.type(screen.getByLabelText(t('he', 'people.student.firstName')), 'נועה')
     await user.type(screen.getByLabelText(t('he', 'people.student.lastName')), 'כהן')
+    await user.click(screen.getByTestId('sibling-group-g1'))
+    await user.click(screen.getByTestId('sibling-group-g2'))
     await user.click(screen.getByTestId('sibling-submit'))
-    await screen.findByTestId('sibling-submitted')
 
-    const text = document.body.textContent ?? ''
-    expect(text).not.toContain(t('he', 'people.enrollment.add'))
-    expect(text).not.toContain(t('he', 'people.status.active'))
+    await waitFor(() =>
+      expect(client.requestSibling).toHaveBeenCalledWith(
+        expect.objectContaining({ group_ids: ['g1', 'g2'] }),
+      ),
+    )
+  })
+
+  it('will not submit a child with no group', async () => {
+    // No group means no weekly volume, so no price and no charge — the server refuses it,
+    // and offering a button that returns a refusal is worse than one that waits.
+    const user = userEvent.setup()
+    const client = makeClient()
+    render(<AddSibling locale="he" client={client} groups={GROUPS} />)
+    await user.type(screen.getByLabelText(t('he', 'people.student.firstName')), 'נועה')
+    await user.type(screen.getByLabelText(t('he', 'people.student.lastName')), 'כהן')
+    expect(screen.getByTestId('sibling-submit')).toBeDisabled()
+    expect(client.requestSibling).not.toHaveBeenCalled()
   })
 
   it('keeps what was typed when the request fails', async () => {
     const user = userEvent.setup()
-    render(<AddSibling locale="he" client={makeClient(new Response(null, { status: 500 }))} />)
+    render(
+      <AddSibling
+        locale="he"
+        client={makeClient(new Response(null, { status: 500 }))}
+        groups={GROUPS}
+      />,
+    )
     await user.type(screen.getByLabelText(t('he', 'people.student.firstName')), 'נועה')
     await user.type(screen.getByLabelText(t('he', 'people.student.lastName')), 'כהן')
+    await user.click(screen.getByTestId('sibling-group-g1'))
     await user.click(screen.getByTestId('sibling-submit'))
 
     expect(await screen.findByTestId('sibling-error')).toBeInTheDocument()

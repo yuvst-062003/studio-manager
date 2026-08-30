@@ -10835,7 +10835,7 @@
         "type": "object"
       },
       "SiblingRequestIn": {
-        "description": "§5.4(c) — parent `12g`. `POST /me/students`.\n\nThe group is a **preference**, not a choice: L6 makes enrolment a manager decision, and\nthe copy on `12g` promises review rather than a place.",
+        "description": "Parent `12g`, `+ הוסף ילד`. `POST /me/students`.\n\n**`group_ids`, plural and required** (owner decision, 2026-08-30). The group used to be\na `preferred_group_id` — a preference on a request a manager approved — and this door\nnow behaves like the club's join link, which enrols directly. Plural because the price\nis derived from WEEKLY VOLUME across every group a child trains in, so one group id\ncould not price a child who trains twice a week.",
         "properties": {
           "birthdate": {
             "anyOf": [
@@ -10855,28 +10855,27 @@
             "title": "First Name",
             "type": "string"
           },
+          "group_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 8,
+            "minItems": 1,
+            "title": "Group Ids",
+            "type": "array"
+          },
           "last_name": {
             "maxLength": 100,
             "minLength": 1,
             "title": "Last Name",
             "type": "string"
-          },
-          "preferred_group_id": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Preferred Group Id"
           }
         },
         "required": [
           "first_name",
-          "last_name"
+          "last_name",
+          "group_ids"
         ],
         "title": "SiblingRequestIn",
         "type": "object"
@@ -19128,8 +19127,8 @@
         ]
       },
       "post": {
-        "description": "§5.4(c) -- parent `12g`, `+ הוסף ילד`.\n\n**A request, not an enrollment** (L6). §5.4: \"This creates a registration_request with\nsource = 'parent_app' and matched_person_id set -- a request, not an enrollment. The\nmanager approves it, consistent with (b): conversion is always a human decision.\"\n\nNo role dependency, for the same reason `/me/students` has none: §3.1 -- 'guardian is\nnot a role'. Being a guardian is what `person_id` on a `guardian` row means, and this\nroute needs nothing more than an identity with a Person in this studio.",
-        "operationId": "request_a_sibling_api_v1_me_students_post",
+        "description": "Parent `12g`, `+ הוסף ילד` -- and it now ENROLS, like the club's join link.\n\n**The two doors were one policy apart, and the split protected nothing** (owner\ndecision, 2026-08-30). This route used to file a `registration_request` for a manager to\napprove, on L6's rule that \"conversion is always a human decision\". Meanwhile §5.4b's\nonboarding link -- sent to the whole club in one WhatsApp message -- let any parent\ncreate up to eight active, enrolled, priced children with no manager at all. A gate on\nthe second door while the first stands open is not a policy; it only meant a parent who\nforgot a child at signup waited on the office for something they could have done\nthemselves an hour earlier.\n\nSo both doors run `OnboardingService.add_child`, which is also where `is_invite_only`\nand `is_active` are now enforced -- the check neither door had, and the reason the\nGirls Team was relying on an unpublished id rather than on a rule.\n\nThe manager is told rather than asked: a notification, so nobody has to approve a child\nto find out one arrived.\n\nNo role dependency, for the same reason `/me/students` has none: §3.1 -- 'guardian is\nnot a role'.",
+        "operationId": "add_a_child_api_v1_me_students_post",
         "parameters": [
           {
             "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
@@ -19166,7 +19165,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/RegistrationRequestOut"
+                  "$ref": "#/components/schemas/StudentSummaryOut"
                 }
               }
             },
@@ -19183,7 +19182,7 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Request A Sibling",
+        "summary": "Add A Child",
         "tags": [
           "people"
         ]

@@ -190,12 +190,12 @@ export const people: Bundle = {
   'request.newFamily': 'משפחה חדשה',
 
   // -- add a sibling (parent 12g) ------------------------------------------------
-  'sibling.steps.title': 'מה קורה אחרי השליחה',
-  'sibling.steps.approve': 'המועדון מאשר את הבקשה',
+  'sibling.steps.title': 'מה קורה עכשיו',
+  'sibling.steps.approve': 'הילד מצטרף לקבוצות שבחרתם',
   'sibling.steps.declaration': 'חותמים על הצהרת בריאות',
-  'sibling.steps.billing': 'החיוב מתחיל רק אחרי האישור — שום דבר לא חויב עדיין',
+  'sibling.steps.billing': 'החיוב נקבע לפי מספר האימונים בשבוע, ומופיע במסך התשלומים',
   'sibling.ages': 'גילאי {min}–{max}',
-  'sibling.noGroups': 'לא הצלחנו לטעון את רשימת הקבוצות. אפשר לשלוח בלי לבחור קבוצה — המנהל ישבץ, או לנסות שוב.',
+  'sibling.noGroups': 'לא הצלחנו לטעון את רשימת הקבוצות. צריך לבחור לפחות קבוצה אחת — אפשר לנסות שוב.',
   'sibling.retryGroups': 'טעינה מחדש',
   'sibling.title': 'הוספת ילד נוסף',
   'join.title': 'הצטרפות למועדון — הרשמת משפחה',
@@ -232,9 +232,9 @@ export const people: Bundle = {
   'landing.card.title': 'דף הנחיתה של המועדון',
   'landing.card.hint': 'לשיתוף עם משפחות חדשות — הרשמה לשיעור ניסיון.',
   'sibling.subtitle': 'הילד יתווסף לאותו חשבון',
-  'sibling.submit': 'שליחת בקשה',
+  'sibling.submit': 'הוספת הילד',
   // §5.4 — enrollment is always a manager decision, so this promises review, not a place.
-  'sibling.pendingHint': 'הבקשה תיבדק במשרד המועדון',
+  'sibling.pendingHint': 'הילד נוסף. נותר לחתום על הצהרת בריאות ולבחור אמצעי תשלום.',
 
   // -- freeze and leave (parent 12i) --------------------------------------------
   'freeze.title': 'הקפאת חברות',

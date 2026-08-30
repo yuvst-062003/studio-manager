@@ -755,16 +755,19 @@ class RegistrationRequestDetailOut(BaseModel):
 
 
 class SiblingRequestIn(BaseModel):
-    """§5.4(c) — parent `12g`. `POST /me/students`.
+    """Parent `12g`, `+ הוסף ילד`. `POST /me/students`.
 
-    The group is a **preference**, not a choice: L6 makes enrolment a manager decision, and
-    the copy on `12g` promises review rather than a place.
+    **`group_ids`, plural and required** (owner decision, 2026-08-30). The group used to be
+    a `preferred_group_id` — a preference on a request a manager approved — and this door
+    now behaves like the club's join link, which enrols directly. Plural because the price
+    is derived from WEEKLY VOLUME across every group a child trains in, so one group id
+    could not price a child who trains twice a week.
     """
 
     first_name: str = Field(min_length=1, max_length=100)
     last_name: str = Field(min_length=1, max_length=100)
     birthdate: date | None = None
-    preferred_group_id: uuid.UUID | None = None
+    group_ids: list[uuid.UUID] = Field(min_length=1, max_length=8)
 
 
 RegistrationRequestPageOut = CursorPage[RegistrationRequestOut]

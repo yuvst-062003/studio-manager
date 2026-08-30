@@ -1984,18 +1984,29 @@ export interface paths {
         get: operations["my_students_api_v1_me_students_get"];
         put?: never;
         /**
-         * Request A Sibling
-         * @description §5.4(c) -- parent `12g`, `+ הוסף ילד`.
+         * Add A Child
+         * @description Parent `12g`, `+ הוסף ילד` -- and it now ENROLS, like the club's join link.
          *
-         *     **A request, not an enrollment** (L6). §5.4: "This creates a registration_request with
-         *     source = 'parent_app' and matched_person_id set -- a request, not an enrollment. The
-         *     manager approves it, consistent with (b): conversion is always a human decision."
+         *     **The two doors were one policy apart, and the split protected nothing** (owner
+         *     decision, 2026-08-30). This route used to file a `registration_request` for a manager to
+         *     approve, on L6's rule that "conversion is always a human decision". Meanwhile §5.4b's
+         *     onboarding link -- sent to the whole club in one WhatsApp message -- let any parent
+         *     create up to eight active, enrolled, priced children with no manager at all. A gate on
+         *     the second door while the first stands open is not a policy; it only meant a parent who
+         *     forgot a child at signup waited on the office for something they could have done
+         *     themselves an hour earlier.
+         *
+         *     So both doors run `OnboardingService.add_child`, which is also where `is_invite_only`
+         *     and `is_active` are now enforced -- the check neither door had, and the reason the
+         *     Girls Team was relying on an unpublished id rather than on a rule.
+         *
+         *     The manager is told rather than asked: a notification, so nobody has to approve a child
+         *     to find out one arrived.
          *
          *     No role dependency, for the same reason `/me/students` has none: §3.1 -- 'guardian is
-         *     not a role'. Being a guardian is what `person_id` on a `guardian` row means, and this
-         *     route needs nothing more than an identity with a Person in this studio.
+         *     not a role'.
          */
-        post: operations["request_a_sibling_api_v1_me_students_post"];
+        post: operations["add_a_child_api_v1_me_students_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -10041,20 +10052,23 @@ export interface components {
         };
         /**
          * SiblingRequestIn
-         * @description §5.4(c) — parent `12g`. `POST /me/students`.
+         * @description Parent `12g`, `+ הוסף ילד`. `POST /me/students`.
          *
-         *     The group is a **preference**, not a choice: L6 makes enrolment a manager decision, and
-         *     the copy on `12g` promises review rather than a place.
+         *     **`group_ids`, plural and required** (owner decision, 2026-08-30). The group used to be
+         *     a `preferred_group_id` — a preference on a request a manager approved — and this door
+         *     now behaves like the club's join link, which enrols directly. Plural because the price
+         *     is derived from WEEKLY VOLUME across every group a child trains in, so one group id
+         *     could not price a child who trains twice a week.
          */
         SiblingRequestIn: {
             /** Birthdate */
             birthdate?: string | null;
             /** First Name */
             first_name: string;
+            /** Group Ids */
+            group_ids: string[];
             /** Last Name */
             last_name: string;
-            /** Preferred Group Id */
-            preferred_group_id?: string | null;
         };
         /**
          * SignalOut
@@ -14456,7 +14470,7 @@ export interface operations {
             };
         };
     };
-    request_a_sibling_api_v1_me_students_post: {
+    add_a_child_api_v1_me_students_post: {
         parameters: {
             query?: never;
             header?: {
@@ -14478,7 +14492,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["RegistrationRequestOut"];
+                    "application/json": components["schemas"]["StudentSummaryOut"];
                 };
             };
             /** @description Validation Error */

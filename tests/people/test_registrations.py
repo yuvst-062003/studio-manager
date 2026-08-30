@@ -40,38 +40,125 @@ def trains_sundays(monkeypatch, studio, a_group, a_second_group, a_training_year
         ]
 
     monkeypatch.setattr(trial_router, "schedule_reader", lambda _session: fake)
+    # The parent's own door enrols now, and it validates against the same seam.
+    import app.routers.students as students_router
+
+    monkeypatch.setattr(students_router, "schedule_reader", lambda _session: fake)
     return fake
 
 
-def _submit(client, guardian_caller, group_id=None) -> dict:
+def _submit(client, guardian_caller, group_id=None, *, first_name=None, last_name=None) -> dict:
+    """Seed one pending request, through the SERVICE rather than a route.
+
+    `POST /me/students` used to be this door and now enrols directly (owner decision,
+    2026-08-30), so the queue tests below seed the way the remaining producer does. What
+    they cover — the payload never leaving, the duplicate warning, approve and reject — is
+    the MANAGER's half, and it is still reached by §5.4a's trial funnel.
+    """
+    from app.core.db import get_engine
+    from app.core.tenancy import TenantSession, use_studio
+    from app.services.people.registrations import RegistrationService
+
     tag = uuid.uuid4().hex[:6]
-    payload = {"first_name": f"נועה{tag}", "last_name": f"כהן{tag}", "birthdate": "2020-03-04"}
-    if group_id is not None:
-        payload["preferred_group_id"] = str(group_id)
-    response = client.post("/api/v1/me/students", json=payload, headers=guardian_caller.headers)
-    assert response.status_code == 201, response.text
-    return response.json()
+    with (
+        use_studio(guardian_caller.studio_id),
+        TenantSession(bind=get_engine(), expire_on_commit=False) as scoped,
+    ):
+        row = RegistrationService.submit_from_parent(
+            scoped,
+            submitter_person_id=guardian_caller.person_id,
+            first_name=first_name or f"נועה{tag}",
+            last_name=last_name or f"כהן{tag}",
+            birthdate=None,
+            preferred_group_id=group_id,
+            at=datetime(2026, 9, 1, 9, 0, tzinfo=UTC),
+        )
+        summary = RegistrationService.summarize(scoped, row)
+        scoped.commit()
+        return {
+            "id": str(summary.id),
+            "child_display_name": summary.child_display_name,
+            "guardian_display_name": summary.guardian_display_name,
+        }
 
 
-# -- §5.4(c): the parent's request ---------------------------------------------
+# -- the parent's own door: it ENROLS now --------------------------------------
+#
+# Owner decision, 2026-08-30. `+ הוסף ילד` used to file a request a manager approved, on
+# L6's "conversion is always a human decision". But §5.4b's onboarding link — one link sent
+# to the whole club by WhatsApp — already let any parent create up to eight active, priced
+# children with no manager at all. A gate on the second door while the first stood open
+# protected nothing; it only made a parent who forgot a child at signup wait on the office.
 
 
-def test_a_parent_adding_a_sibling_creates_a_request_and_not_an_enrollment(
-    client, app_session, as_guardian, a_group
+def _add(client, guardian_caller, group_ids, **over) -> dict:
+    tag = uuid.uuid4().hex[:6]
+    payload = {
+        "first_name": f"נועה{tag}",
+        "last_name": f"כהן{tag}",
+        "birthdate": "2020-03-04",
+        "group_ids": [str(g) for g in group_ids],
+        **over,
+    }
+    return client.post("/api/v1/me/students", json=payload, headers=guardian_caller.headers)
+
+
+def test_a_parent_adding_a_child_enrols_them(
+    client, app_session, as_guardian, a_group, trains_sundays
 ):
-    """L6. If this created an enrollment, a parent would have enrolled themselves."""
-    body = _submit(client, as_guardian, a_group)
+    """The same outcome the join link produces: an active student, enrolled, on this
+    parent's account — no request, and nobody to wait for."""
+    response = _add(client, as_guardian, [a_group])
+    assert response.status_code == 201, response.text
+    student_id = uuid.UUID(response.json()["id"])
 
-    row = app_session.get(RegistrationRequest, uuid.UUID(body["id"]))
-    assert row.source == "parent_app"
-    assert row.status == "pending"
-    # §5.4a -- 'matched_person_id set'. The submitter IS the match; nothing is guessed.
-    assert row.matched_person_id == as_guardian.person_id
-    # No student, and therefore no enrollment.
+    student = app_session.get(Student, student_id)
+    assert student.status == "active"
+    assert app_session.execute(
+        select(Enrollment).where(
+            Enrollment.student_id == student_id, Enrollment.group_id == a_group
+        )
+    ).scalar_one_or_none()
+    # On THIS parent's account — L9, one account, more children.
+    assert app_session.execute(
+        select(Guardian).where(
+            Guardian.student_id == student_id, Guardian.person_id == as_guardian.person_id
+        )
+    ).scalar_one_or_none()
+    # And no request was filed for anyone to approve.
     assert (
         app_session.execute(
-            select(Enrollment).where(
-                Enrollment.student_id.in_(
+            select(RegistrationRequest).where(
+                RegistrationRequest.matched_person_id == as_guardian.person_id
+            )
+        ).first()
+        is None
+    )
+
+
+def test_an_invite_only_group_is_not_joinable_and_does_not_admit_it(
+    client, app_session, as_guardian, a_group, trains_sundays
+):
+    """**The check neither door had.**
+
+    `is_invite_only` is the Girls Team's mechanism, and it exists so the product never has
+    to store gender about a minor. The join FORM hides such groups, but the write validated
+    only that a group had training days — so the rule was an unpublished id rather than a
+    check. Not-found and never forbidden: a 403 would confirm the group exists, which is
+    the one fact the flag is keeping.
+    """
+    from app.models.structure import Group
+
+    app_session.get(Group, a_group).is_invite_only = True
+    app_session.commit()
+
+    response = _add(client, as_guardian, [a_group])
+    assert response.status_code == 404, response.text
+    assert response.json()["detail"]["code"] == "not_found"
+    assert (
+        app_session.execute(
+            select(Student).where(
+                Student.id.in_(
                     select(Guardian.student_id).where(Guardian.person_id == as_guardian.person_id)
                 )
             )
@@ -80,48 +167,48 @@ def test_a_parent_adding_a_sibling_creates_a_request_and_not_an_enrollment(
     )
 
 
-def test_the_group_a_parent_picks_is_a_preference_not_a_decision(
-    client, app_session, as_guardian, a_group
-):
-    """§5.4 -- 'the public link's only job is a first lesson'. The form's group is rendered
-    in the queue and the manager may override it."""
-    body = _submit(client, as_guardian, a_group)
-    row = app_session.get(RegistrationRequest, uuid.UUID(body["id"]))
-    assert row.payload_encrypted["preferred_group_id"] == str(a_group)
+def test_a_child_needs_a_group_to_be_priced_by(client, as_guardian):
+    """The price comes from weekly volume, so a child with no group has no price and no
+    charge. Refused at the schema rather than created unpriced."""
+    response = client.post(
+        "/api/v1/me/students",
+        json={"first_name": "נועה", "last_name": "כהן", "group_ids": []},
+        headers=as_guardian.headers,
+    )
+    assert response.status_code == 422, response.text
 
 
-def test_the_request_response_carries_two_names_and_no_payload(client, as_guardian, a_group):
-    """L10 at the wire, on the parent's own submission too."""
-    body = _submit(client, as_guardian, a_group)
-    assert body["child_display_name"]
-    assert body["guardian_display_name"]
-    assert "payload" not in body
-    assert "birthdate" not in body
-
-
-def test_the_payload_never_reaches_the_logs(client, as_guardian, a_group, caplog):
-    """G7, L10 and §11.1, checked against the bytes that actually come out."""
+def test_the_child_never_reaches_the_logs(client, as_guardian, a_group, caplog, trains_sundays):
+    """G7, L10 and §11.1 — unchanged by the policy, and checked against the bytes that
+    actually come out."""
     tag = uuid.uuid4().hex[:6]
     with caplog.at_level("DEBUG"):
-        client.post(
-            "/api/v1/me/students",
-            json={"first_name": f"סודי{tag}", "last_name": "כהן", "birthdate": "2020-03-04"},
-            headers=as_guardian.headers,
-        )
+        _add(client, as_guardian, [a_group], first_name=f"סודי{tag}")
     assert f"סודי{tag}" not in caplog.text
 
 
-def test_the_submission_audit_diff_names_no_child(client, app_session, as_guardian, a_group):
-    """§11.2 and §11.4 -- `audit_log` is append-only, so a child's name written into a diff
-    is a name anonymization can never reach."""
-    body = _submit(client, as_guardian, a_group)
-    entry = app_session.execute(
-        select(AuditLog).where(
-            AuditLog.entity_id == uuid.UUID(body["id"]),
-            AuditLog.action == "registration_request.submitted",
+def test_the_managers_are_told_a_child_arrived(
+    client, app_session, as_guardian, as_manager, a_group, trains_sundays
+):
+    """The signal the approval queue used to carry. Removing the manager from the PATH must
+    not remove them from the KNOWING — otherwise a club learns about new children by
+    noticing them on the mat."""
+    from app.models.comms import Notification
+
+    _add(client, as_guardian, [a_group])
+    note = (
+        app_session.execute(
+            select(Notification).where(
+                Notification.person_id == as_manager.person_id,
+                Notification.kind == "people.child_added",
+            )
         )
-    ).scalar_one()
-    assert body["child_display_name"].split(" ")[0] not in str(entry.diff)
+        .scalars()
+        .first()
+    )
+    assert note is not None
+    # Names only: §11 keeps health and money out of a notification body.
+    assert "₪" not in note.body
 
 
 # -- the queue -----------------------------------------------------------------
@@ -184,11 +271,9 @@ def test_the_queue_shows_a_duplicate_child_warning(
     app_session.add(Student(studio_id=studio.id, person_id=person.id, status="active"))
     app_session.commit()
 
-    submitted = client.post(
-        "/api/v1/me/students",
-        json={"first_name": f"נועה{tag}", "last_name": f"כהן{tag}", "birthdate": "2020-03-04"},
-        headers=as_guardian.headers,
-    ).json()
+    submitted = _submit(
+        client, as_guardian, a_group, first_name=f"נועה{tag}", last_name=f"כהן{tag}"
+    )
     detail = client.get(
         f"/api/v1/registration-requests/{submitted['id']}", headers=as_manager.headers
     ).json()
