@@ -50,9 +50,25 @@ def test_a_guardian_saves_their_own_childs_registration(client, as_guardian_of, 
     assert response.json()["registration_complete"] is True
 
 
-def test_a_manager_may_file_it_on_their_behalf(client, as_manager, a_student):
-    """§5.1's paper club -- a manager entering what arrived on a form."""
+def test_a_manager_may_file_it_on_their_behalf(client, as_manager, as_guardian_of, a_student):
+    """§5.1's paper club -- a manager entering what arrived on a form.
+
+    The guardian fixture is not decoration: the agreement records a PARENT's ת.ז. and a
+    PARENT's acceptance, so a student with nobody on record has no signature for a manager to
+    transcribe. See the refusal asserted below."""
+    as_guardian_of(a_student)
     assert _put(client, as_manager, a_student).status_code == 200
+
+
+def test_filing_for_a_student_with_no_guardian_is_refused(client, as_manager, a_student):
+    """Refused rather than filed against the member of staff.
+
+    The alternative -- falling back to the caller -- is precisely the bug the subject/actor
+    split exists to prevent, and it would be silent: a manager's own `person` row quietly
+    collecting one family's national identifier after another."""
+    response = _put(client, as_manager, a_student)
+    assert response.status_code == 422
+    assert response.json()["detail"]["code"] == "no_guardian"
 
 
 def test_a_coach_may_not(client, as_lead_coach, a_student):
@@ -131,6 +147,55 @@ def test_declining_is_refused_rather_than_recorded_as_a_withdrawal(
     )
     assert response.status_code == 422
     assert response.json()["detail"]["code"] == "club_terms_required"
+
+
+# -- §5.1's paper club: a manager filing on the family's behalf --------------------------
+def test_a_manager_filing_writes_the_parents_id_not_their_own(
+    client, as_manager, as_guardian_of, a_student, app_session
+):
+    """**The bug this exists to prevent.** `signer.national_id` is the PARENT's. Attributing it
+    to whoever posted would write a different family's national identifier onto the manager's
+    own `person` row every time the office typed a form in."""
+    from app.models.person import Person
+
+    parent = as_guardian_of(a_student)
+    assert _put(client, as_manager, a_student).status_code == 200
+
+    app_session.expire_all()
+    manager_row = app_session.get(Person, as_manager.person_id)
+    parent_row = app_session.get(Person, parent.person_id)
+    assert manager_row.national_id_encrypted is None, "the office is not the signatory"
+    assert parent_row.national_id_encrypted is not None
+
+
+def test_a_manager_accepting_the_terms_unblocks_the_FAMILY(
+    client, as_manager, as_guardian_of, a_student
+):
+    """**The other half of the same bug.** The gate checks whether the PARENT holds the club's
+    terms. A consent recorded against the manager would leave the family blocked for ever,
+    however many forms the office typed in -- the exact outcome §5.1's path exists to avoid."""
+    parent = as_guardian_of(a_student)
+    response = client.post(
+        f"/api/v1/students/{a_student}/agreement/club-terms",
+        json={"accepted": True, "version": CLUB_TERMS_VERSION},
+        headers=as_manager.headers,
+    )
+    assert response.status_code == 201
+    # Asked as the PARENT, which is the reading that matters.
+    assert _status(client, parent, a_student).json()["terms_accepted"] is True
+
+
+def test_a_guardian_filing_is_still_their_own_signature(
+    client, as_guardian_of, a_student, app_session
+):
+    """The ordinary path is unchanged: when the person typing IS the guardian, they are the
+    subject, and no lookup happens."""
+    from app.models.person import Person
+
+    parent = as_guardian_of(a_student)
+    assert _put(client, parent, a_student).status_code == 200
+    app_session.expire_all()
+    assert app_session.get(Person, parent.person_id).national_id_encrypted is not None
 
 
 # -- the gate ---------------------------------------------------------------------------

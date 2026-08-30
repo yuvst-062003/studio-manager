@@ -26,8 +26,10 @@ from app.schemas.agreement import AgreementStatusOut, ClubTermsIn, RegistrationI
 from app.services.health.agreement import (
     AgreementService,
     NationalIdInvalidError,
+    NoGuardianError,
     RegistrationIncompleteError,
     agreement_status,
+    signing_person_id,
 )
 from app.services.health.club_terms import CLUB_TERMS_VERSION
 from app.services.health.declarations import HealthDeclarationService
@@ -98,7 +100,15 @@ def read_agreement_status(
     """What the parent app's gate reads. Computed here so the client never re-derives it."""
     person_id, _, _ = _guardian_or_manager(request, session, student_id)
     student = _student(session, student_id)
-    result = agreement_status(session, student, signer_person_id=person_id)
+    # The same subject a write would use, so a manager checking the status sees what the
+    # FAMILY's gate sees rather than the state of their own consent record.
+    try:
+        subject_id: uuid.UUID | None = signing_person_id(
+            session, student, caller_person_id=person_id
+        )
+    except NoGuardianError:
+        subject_id = None
+    result = agreement_status(session, student, signer_person_id=subject_id)
     return AgreementStatusOut(
         health_signed=result.health_signed,
         registration_complete=result.registration_complete,
@@ -123,6 +133,7 @@ def save_registration(
     person_id, identity_id, ip = _guardian_or_manager(request, session, student_id)
     student = _student(session, student_id)
     try:
+        subject_id = signing_person_id(session, student, caller_person_id=person_id)
         AgreementService.save_registration(
             session,
             student,
@@ -130,11 +141,14 @@ def save_registration(
             signer=body.signer.model_dump(),
             other_parent=body.other_parent.model_dump() if body.other_parent else None,
             pickup_contacts=[c.model_dump() for c in body.pickup_contacts],
-            signed_by_person_id=person_id,
+            subject_person_id=subject_id,
+            actor_person_id=person_id,
             at=now(),
             actor_identity_id=identity_id,
             actor_ip=ip,
         )
+    except NoGuardianError as exc:
+        raise _unprocessable("no_guardian", "this student has no guardian to sign for") from exc
     except NationalIdInvalidError as exc:
         # The FIELD, never the value -- a 422 body is as loggable as anything else.
         raise _unprocessable("national_id_invalid", exc.field) from exc
@@ -143,7 +157,7 @@ def save_registration(
 
     session.commit()
     session.refresh(student)
-    result = agreement_status(session, student, signer_person_id=person_id)
+    result = agreement_status(session, student, signer_person_id=subject_id)
     return AgreementStatusOut(
         health_signed=result.health_signed,
         registration_complete=result.registration_complete,
@@ -173,6 +187,10 @@ def accept_club_terms(
 
     person_id, identity_id, ip = _guardian_or_manager(request, session, student_id)
     student = _student(session, student_id)
+    try:
+        subject_id = signing_person_id(session, student, caller_person_id=person_id)
+    except NoGuardianError as exc:
+        raise _unprocessable("no_guardian", "this student has no guardian to sign for") from exc
     if not body.accepted:
         # Declining is not a withdrawal to record -- it is simply not proceeding. §11.6's
         # revocation path is `POST /privacy/consents`, which is where a considered withdrawal
@@ -182,7 +200,9 @@ def accept_club_terms(
         AgreementService.accept_club_terms(
             session,
             studio_id=student.studio_id,
-            person_id=person_id,
+            # The GUARDIAN's acceptance, even when a manager typed it in: the gate checks the
+            # family, so a consent recorded against the office leaves them blocked for ever.
+            person_id=subject_id,
             version=body.version,
             at=now(),
             ip=ip,
@@ -193,7 +213,7 @@ def accept_club_terms(
 
     session.commit()
     session.refresh(student)
-    result = agreement_status(session, student, signer_person_id=person_id)
+    result = agreement_status(session, student, signer_person_id=subject_id)
     return AgreementStatusOut(
         health_signed=result.health_signed,
         registration_complete=result.registration_complete,

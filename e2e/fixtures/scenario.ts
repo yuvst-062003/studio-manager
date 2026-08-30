@@ -564,10 +564,21 @@ export async function openOrderFor(
 }
 
 /**
- * §5.5's paperwork, done: a full declaration filed for every student in the studio that
- * still owes one, by the manager, on the guardians' behalf (§5.1 sanctions exactly this).
- * All-clear answers, so no derived flag lands on rosters other tests assert against; the
- * two consent booleans are the template's required yeses.
+ * The club's `הסכם הרשמה`, done: filed for every student in the studio that still owes one,
+ * by the manager, on the guardians' behalf (§5.1 sanctions exactly this).
+ *
+ * **Three parts, not one, since the club's own form replaced the bundled questionnaire.**
+ * §6.1's gate checks registration details, the health declaration AND the club's
+ * `תקנון ותנאי תשלום` — so a fixture that files only the declaration leaves every family
+ * behind the gate, and E2E-1's "the app opens" assertion fails for a reason that has nothing
+ * to do with what it is testing.
+ *
+ * All-clear answers, so no derived flag lands on rosters other tests assert against — which
+ * is also why `clause_confirmed` is the `none` clause: with every answer negative that is the
+ * sentence the family is entitled to sign, and the server refuses the other one.
+ *
+ * The manager posts all three, and each lands on the GUARDIAN rather than on the office —
+ * see `signing_person_id` in app/services/health/agreement.py.
  */
 async function signOutstandingDeclarations(manager: Api): Promise<void> {
   const templates = await manager.send<{ items: { id: string }[] }>(
@@ -585,8 +596,11 @@ async function signOutstandingDeclarations(manager: Api): Promise<void> {
         question.type === 'boolean' ? false : question.type === 'phone' ? '050-0000000' : ''
     }
   }
-  answers['fit_to_train'] = true
-  answers['notify_changes'] = true
+  // Template v2's declaration question. Every answer above is negative, so `none` is the
+  // clause that follows — `verify_clause` refuses `limited` with nothing declared, and
+  // refuses an unconfirmed clause outright.
+  answers['clause_confirmed'] = 'none'
+
   for (const status of ['missing', 'trial_signed']) {
     const unsigned = await manager.send<{ items: { id: string }[] }>(
       'get',
@@ -598,8 +612,43 @@ async function signOutstandingDeclarations(manager: Api): Promise<void> {
         answers,
         signature_image_base64: SIGNATURE_PNG,
       })
+      await completeAgreement(manager, student.id)
     }
   }
+}
+
+/**
+ * The registration block and the club's terms — the two parts of `הסכם הרשמה` that are not
+ * the health declaration.
+ *
+ * The ת.ז. values are computed to satisfy the check digit and belong to nobody: `app/core/
+ * national_id.py` refuses a transposed pair, so a fixture cannot use a round number here.
+ */
+async function completeAgreement(manager: Api, studentId: string): Promise<void> {
+  // The version is READ rather than duplicated as a constant here. The server refuses a
+  // mismatch on purpose — accepting wording that is no longer published is how a consent
+  // ledger comes to hold agreements nobody made — and a hard-coded 1 in this fixture would
+  // turn the next legitimate bump of the club's terms into a fleet of red E2E runs whose
+  // cause is a test file rather than the product.
+  const status = await manager.send<{ club_terms_version: number }>(
+    'get',
+    `/students/${studentId}/agreement`,
+  )
+  await manager.send('put', `/students/${studentId}/agreement/registration`, {
+    child: {
+      national_id: '100000009',
+      address: 'הרצל 12',
+      city: 'נתניה',
+      grade: 'ג',
+    },
+    signer: { national_id: '100000017' },
+    other_parent: null,
+    pickup_contacts: [],
+  })
+  await manager.send('post', `/students/${studentId}/agreement/club-terms`, {
+    accepted: true,
+    version: status.club_terms_version,
+  })
 }
 
 /**

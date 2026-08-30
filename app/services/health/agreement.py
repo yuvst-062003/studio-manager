@@ -41,6 +41,7 @@ from app.models.people import Student, StudentPickupContact
 from app.models.person import Guardian, Person
 from app.services.audit import AuditService
 from app.services.health.club_terms import CLUB_TERMS_CONSENT_TYPE, CLUB_TERMS_VERSION
+from app.services.health.declarations import HealthDeclarationService
 
 #: §11.2's action for the registration half. The health half keeps its own
 #: `health_declaration.create`; two actions because they are two different sensitivities and
@@ -85,6 +86,54 @@ class AgreementStatus:
     @property
     def complete(self) -> bool:
         return self.health_signed and self.registration_complete and self.terms_accepted
+
+
+class NoGuardianError(AgreementError):
+    """Staff tried to file an agreement for a student with no guardian on record.
+
+    Refused rather than filed against the member of staff. See `signing_person_id`.
+    """
+
+
+def signing_person_id(
+    session: TenantSession, student: Student, *, caller_person_id: uuid.UUID
+) -> uuid.UUID:
+    """**Whose agreement this is, which is not always who is typing it.**
+
+    §5.1 sanctions a manager filing on a family's behalf -- the paper club, where the parent
+    signed a page and somebody enters it. Two things follow, and both were bugs before this
+    function existed:
+
+    * The `signer` block carries the PARENT's ת.ז. Attributing it to the caller writes a
+      different family's national identifier onto the manager's own `person` row every time
+      they file one.
+    * The gate checks whether the PARENT holds the club's terms. A consent recorded against
+      the manager leaves the family blocked for ever, however many forms the office types in
+      -- the exact failure §5.1's path exists to avoid.
+
+    So the subject is the caller when the caller is a guardian, and the student's guardian
+    otherwise. `actor_person_id` on the audit row stays the caller, which is the honest record
+    of who sat at the keyboard.
+
+    Primary first only as a tie-break for WHICH guardian, never as a privilege: §4.3 gives
+    every guardian the same rights, and this is picking a subject, not a rank.
+    """
+    if HealthDeclarationService.is_guardian_of(
+        session, person_id=caller_person_id, student_id=student.id
+    ):
+        return caller_person_id
+    guardian = (
+        session.execute(
+            select(Guardian)
+            .where(Guardian.student_id == student.id)
+            .order_by(Guardian.is_primary.desc(), Guardian.created_at)
+        )
+        .scalars()
+        .first()
+    )
+    if guardian is None:
+        raise NoGuardianError(str(student.id))
+    return guardian.person_id
 
 
 #: What step 1 will not submit without. Everything else on the paper form -- the second
@@ -150,7 +199,10 @@ class AgreementService:
         signer: dict[str, Any],
         other_parent: dict[str, Any] | None,
         pickup_contacts: list[dict[str, Any]],
-        signed_by_person_id: uuid.UUID,
+        #: Whose details these are -- the guardian. See `signing_person_id`.
+        subject_person_id: uuid.UUID,
+        #: Who is typing. The audit actor, and nothing else.
+        actor_person_id: uuid.UUID,
         at: datetime,
         actor_identity_id: uuid.UUID | None = None,
         actor_ip: str | None = None,
@@ -185,7 +237,9 @@ class AgreementService:
         student.grade = str(child["grade"]).strip()
 
         # -- the signing parent ---------------------------------------------------------
-        signer_person = session.get(Person, signed_by_person_id)
+        # `subject_person_id`, NOT the caller: a manager filing on a family's behalf would
+        # otherwise write that family's ת.ז. onto their own row.
+        signer_person = session.get(Person, subject_person_id)
         if signer_person is None:
             raise RegistrationIncompleteError(["signer"])
         _set_national_id(signer_person, signer.get("national_id"), field="signer_national_id")
@@ -206,7 +260,7 @@ class AgreementService:
             entity_type="student",
             entity_id=student.id,
             studio_id=student.studio_id,
-            actor_person_id=signed_by_person_id,
+            actor_person_id=actor_person_id,
             actor_identity_id=actor_identity_id,
             actor_ip=actor_ip,
             # G7 applied to identifiers: counts and field NAMES, never a ת.ז., an address or
