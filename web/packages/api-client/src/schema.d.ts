@@ -7741,6 +7741,8 @@ export interface components {
         ManagerPaymentPromiseOut: {
             /** Charge Count */
             charge_count: number;
+            /** Claimed Plan Name */
+            claimed_plan_name: string | null;
             /**
              * Created At
              * Format: date-time
@@ -8449,12 +8451,14 @@ export interface components {
         PaymentPromiseCreateIn: {
             /** Charge Ids */
             charge_ids?: string[];
+            /** Claimed Plan Id */
+            claimed_plan_id?: string | null;
             /**
              * Method
              * @default cash
              * @enum {string}
              */
-            method: "cash" | "cheque";
+            method: "cash" | "cheque" | "standing_order";
             /**
              * Prepay Months
              * @default 0
@@ -8470,6 +8474,8 @@ export interface components {
         PaymentPromiseOut: {
             /** Charge Ids */
             charge_ids: string[];
+            /** Claimed Plan Id */
+            claimed_plan_id: string | null;
             /**
              * Created At
              * Format: date-time

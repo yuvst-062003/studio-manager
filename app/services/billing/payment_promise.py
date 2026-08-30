@@ -11,14 +11,16 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import cast
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.tenancy import TenantSession
 from app.models.billing import Charge, PaymentAllocation, PricePlan
 from app.models.payment_promise import PROMISE_METHODS, PaymentPromise, PaymentPromiseCharge
 from app.models.people import Student
-from app.models.person import Guardian, Person
+from app.models.person import Guardian, Person, RoleAssignment
 from app.services.audit import AuditService
 from app.services.billing.errors import ConflictError, NotFoundError, RefusedError
 from app.services.billing.payments import PaymentService
@@ -70,6 +72,7 @@ class PaymentPromiseService:
         at: datetime,
         method: str = "cash",
         prepay_months: int = 0,
+        claimed_plan_id: uuid.UUID | None = None,
     ) -> PaymentPromise:
         """§5.10's human-recorded routes, said out loud. Every refusal is reachable from
         a client.
@@ -78,20 +81,29 @@ class PaymentPromiseService:
         over one month would show the manager the same money twice. Promises already
         decided do not block: a declined promise's charges are free to try again.
 
-        **The two halves never double-count.** `charge_ids` settles charges that exist;
-        `prepay_months` buys whole months that do not, priced at the payer's monthly total.
-        Either may be empty -- a family with nothing owed may still pay three months
-        forward, and a family with no plan may still settle a shop item -- but a promise
-        that is neither is a promise about nothing.
+        **The halves never double-count.** `charge_ids` settles charges that exist;
+        `prepay_months` buys whole months that do not, priced at the payer's monthly total;
+        `claimed_plan_id` is the plan-claim flow -- "I already paid for this program" from
+        the plan picker, priced HERE from the plan row so a client can never name its own
+        amount. Any may be empty, but a promise that is none of them is a promise about
+        nothing.
         """
         if method not in PROMISE_METHODS:
             raise RefusedError(f"method must be one of {', '.join(PROMISE_METHODS)}")
         if prepay_months < 0:
             raise RefusedError("prepay_months cannot be negative")
+        claimed = 0
+        if claimed_plan_id is not None:
+            plan = self._session.get(PricePlan, claimed_plan_id)
+            if plan is None or plan.studio_id != studio_id:
+                raise NotFoundError(f"no price plan {claimed_plan_id}")
+            if plan.active_to is not None:
+                raise RefusedError("that plan is closed and prices nobody")
+            claimed = plan.monthly_amount_agorot
         forward = prepay_months * self.monthly_total_agorot(payer_person_id)
-        if not charge_ids and forward <= 0:
+        if not charge_ids and forward <= 0 and claimed <= 0:
             raise RefusedError(
-                "a payment promise needs at least one charge or a month bought forward"
+                "a payment promise needs a charge, a month bought forward, or a plan claim"
             )
         already_pending = set(
             self._session.execute(
@@ -132,9 +144,11 @@ class PaymentPromiseService:
             status="pending",
             method=method,
             # Display, never settlement -- what the parent saw when they raised it.
-            # Confirmation recomputes both halves.
-            total_agorot=total + forward,
+            # Confirmation recomputes the charge and forward halves; the claim is frozen.
+            total_agorot=total + forward + claimed,
             prepay_months=prepay_months,
+            claimed_plan_id=claimed_plan_id,
+            claimed_agorot=claimed,
         )
         self._session.add(row)
         self._session.flush()
@@ -152,14 +166,52 @@ class PaymentPromiseService:
             studio_id=studio_id,
             actor_person_id=payer_person_id,
             diff={
-                "total_agorot": total + forward,
+                "total_agorot": total + forward + claimed,
                 "charges": len(charges),
                 "method": method,
                 "prepay_months": prepay_months,
+                "claimed_agorot": claimed,
             },
         )
+        self._notify_managers(row)
         self._session.flush()
         return row
+
+    def _notify_managers(self, row: PaymentPromise) -> None:
+        """'A notification will be sent to the manager' -- the owner's words (2026-08-30).
+
+        The promise queue is where the decision happens; this is how a manager learns one
+        is waiting without opening it. Kind prefix `billing` puts it under the mutable
+        payment switch (app/services/comms/kinds.py). The body carries the payer's name,
+        the method, and the amount -- money facts a manager may see, never health ones.
+        """
+        from app.services.comms import NotificationService
+
+        payer = self._session.get(Person, row.payer_person_id)
+        payer_name = f"{payer.first_name} {payer.last_name}" if payer else ""
+        method_he = {"cash": "מזומן", "cheque": "צ'קים", "standing_order": "הוראת קבע"}[row.method]
+        manager_ids = set(
+            self._session.execute(
+                select(RoleAssignment.person_id).where(
+                    RoleAssignment.role.in_(("owner", "manager")),
+                    RoleAssignment.scope_type == "studio",
+                    RoleAssignment.revoked_at.is_(None),
+                )
+            ).scalars()
+        ) - {row.payer_person_id}
+        notifier = NotificationService(cast(TenantSession, self._session))
+        for person_id in sorted(manager_ids, key=str):
+            notifier.enqueue(
+                person_id=person_id,
+                kind="billing.promise_raised",
+                title="הורה מדווח על תשלום",
+                body=f"{payer_name} — {method_he}, {row.total_agorot // 100} ₪",
+                payload={
+                    "promise_id": str(row.id),
+                    "method": row.method,
+                    "total_agorot": row.total_agorot,
+                },
+            )
 
     def charge_ids_of(self, promise_id: uuid.UUID) -> list[uuid.UUID]:
         return list(
@@ -182,22 +234,29 @@ class PaymentPromiseService:
 
     def list_promises(
         self, status: str | None = None, method: str | None = None
-    ) -> list[tuple[PaymentPromise, str, int]]:
-        """(promise, payer display name, charge count) -- the manager's list, newest
-        first."""
+    ) -> list[tuple[PaymentPromise, str, int, str | None]]:
+        """(promise, payer display name, charge count, claimed plan name) -- the manager's
+        list, newest first.
+
+        Both joins are OUTER: a plan-claim promise names no charges at all, and an inner
+        join on the charge table silently dropped exactly the rows the claim flow creates.
+        The plan name rides along so the card can say WHICH program the money is about.
+        """
         stmt = (
             select(
                 PaymentPromise,
                 Person.first_name,
                 Person.last_name,
                 func.count(PaymentPromiseCharge.id),
+                PricePlan.name,
             )
             .join(Person, Person.id == PaymentPromise.payer_person_id)
-            .join(
+            .outerjoin(
                 PaymentPromiseCharge,
                 PaymentPromiseCharge.payment_promise_id == PaymentPromise.id,
             )
-            .group_by(PaymentPromise.id, Person.first_name, Person.last_name)
+            .outerjoin(PricePlan, PricePlan.id == PaymentPromise.claimed_plan_id)
+            .group_by(PaymentPromise.id, Person.first_name, Person.last_name, PricePlan.name)
             .order_by(PaymentPromise.created_at.desc())
             .limit(100)
         )
@@ -206,8 +265,8 @@ class PaymentPromiseService:
         if method is not None:
             stmt = stmt.where(PaymentPromise.method == method)
         return [
-            (row, f"{first} {last}", int(count))
-            for row, first, last, count in self._session.execute(stmt).all()
+            (row, f"{first} {last}", int(count), plan_name)
+            for row, first, last, count, plan_name in self._session.execute(stmt).all()
         ]
 
     def _decidable(self, promise_id: uuid.UUID) -> PaymentPromise:
@@ -255,7 +314,10 @@ class PaymentPromiseService:
                 outstanding_total += outstanding
                 payable.append(charge_id)
         forward = row.prepay_months * self.monthly_total_agorot(row.payer_person_id)
-        amount = outstanding_total + forward
+        # The claim half is frozen, never recomputed: it is money the parent says already
+        # changed hands, and confirming asserts the manager received exactly that. It stays
+        # unallocated -- the plan's first charge lands on the 1st and step 7 spends it.
+        amount = outstanding_total + forward + row.claimed_agorot
         if amount > 0:
             payment = PaymentService(self._session).record(
                 row.studio_id,

@@ -9,6 +9,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { apiFetch } from '@studio/core'
 import { LoadFailed } from '@studio/ui'
 import type { Locale } from '@studio/i18n'
+import type { PaymentPromiseOut } from './billingClient'
+import { makeParentBillingClient } from './PaymentsSection'
 import { TrainingPlanScreen } from './TrainingPlanScreen'
 import { makeTrainingPlanClient } from './trainingPlanClient'
 import type { TrainingPlanView } from './trainingPlanClient'
@@ -21,7 +23,11 @@ export function TrainingPlanSection({
   studentId: string
 }) {
   const client = useMemo(() => makeTrainingPlanClient(apiFetch), [])
+  const billing = useMemo(() => makeParentBillingClient(apiFetch), [])
   const [view, setView] = useState<TrainingPlanView | null>(null)
+  // The payer's plan-claim promises. A separate, best-effort read: a family who cannot
+  // load their claims can still mark tonight's session.
+  const [claims, setClaims] = useState<readonly PaymentPromiseOut[]>([])
   // Bumped after every write. A counter rather than calling the loader directly, so there
   // is exactly one place that writes `view` — the same reason `PaymentsSection` does it.
   const [reloads, setReloads] = useState(0)
@@ -34,10 +40,14 @@ export function TrainingPlanSection({
       .then((next) => alive && setView(next))
       // A blank screen forever was the old failure mode — a dead end with no words.
       .catch(() => alive && setFailed(true))
+    billing
+      .promises()
+      .then((rows) => alive && setClaims(rows.filter((row) => row.claimed_plan_id !== null)))
+      .catch(() => undefined)
     return () => {
       alive = false
     }
-  }, [client, studentId, reloads])
+  }, [client, billing, studentId, reloads])
 
   const refresh = useCallback(() => setReloads((n) => n + 1), [])
 
@@ -77,6 +87,13 @@ export function TrainingPlanSection({
         await client.cancelChange(studentId, changeId)
         refresh()
       }}
+      // "כבר שילמתי" — the claim rides the same promise queue the payments screen uses,
+      // so the manager's confirm/decline needs no new machinery.
+      onClaimPaid={async (planId, method) => {
+        await client.claimPaid(planId, method)
+        refresh()
+      }}
+      planClaims={claims}
     />
   )
 }

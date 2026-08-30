@@ -13,7 +13,9 @@ import uuid
 from datetime import UTC, datetime
 
 import pytest
-from app.models.billing import Charge, Payment
+from app.models.billing import Charge, Payment, PaymentAllocation, PricePlan
+from app.models.comms import Notification
+from app.models.person import Person, RoleAssignment
 from app.schemas.billing import ManualPaymentIn, PaymentOut
 from app.services.billing import BillingService
 from app.services.billing.errors import ConflictError, NotFoundError, RefusedError
@@ -200,6 +202,119 @@ def test_a_decided_promise_cannot_be_decided_again(
         service.confirm(row.id, actor_person_id=None, at=T0)
 
 
+# -- the plan claim (owner request, 2026-08-30) ---------------------------------
+# A parent picking a payment program in the plan screen may declare "already paid" --
+# cash, cheques, or a standing order -- instead of paying through the app. The claim is
+# priced by the SERVER from the plan row, lands in the manager's promise queue, and the
+# manager's confirm/decline is the mark-paid-or-not the owner asked for.
+
+
+def test_a_plan_claim_promise_prices_the_plan_and_needs_no_charges(
+    tenant_session, app_session, studio, a_priced_student, a_price_plan
+):
+    row = PaymentPromiseService(tenant_session).create(
+        studio.id,
+        payer_person_id=a_priced_student.payer_person_id,
+        charge_ids=[],
+        at=T0,
+        method="standing_order",
+        claimed_plan_id=a_price_plan,
+    )
+    assert row.status == "pending"
+    assert row.method == "standing_order"
+    assert row.claimed_plan_id == a_price_plan
+    assert row.claimed_agorot == MONTHLY_AGOROT
+    assert row.total_agorot == MONTHLY_AGOROT
+
+
+def test_a_claim_of_a_closed_plan_is_refused(
+    tenant_session, app_session, studio, a_priced_student, a_price_plan
+):
+    plan = app_session.get(PricePlan, a_price_plan)
+    plan.active_to = plan.active_from
+    app_session.commit()
+    with pytest.raises(RefusedError):
+        PaymentPromiseService(tenant_session).create(
+            studio.id,
+            payer_person_id=a_priced_student.payer_person_id,
+            charge_ids=[],
+            at=T0,
+            claimed_plan_id=a_price_plan,
+        )
+
+
+def test_confirming_a_plan_claim_records_it_as_unallocated_credit(
+    tenant_session, app_session, studio, a_priced_student, a_price_plan
+):
+    """No charge exists yet -- the plan's first charge lands on the 1st -- so the confirmed
+    money is deliberately unallocated. That surplus IS the credit, and the billing run's
+    step 7 spends it, the same road every prepayment already travels."""
+    service = PaymentPromiseService(tenant_session)
+    row = service.create(
+        studio.id,
+        payer_person_id=a_priced_student.payer_person_id,
+        charge_ids=[],
+        at=T0,
+        method="standing_order",
+        claimed_plan_id=a_price_plan,
+    )
+    service.confirm(row.id, actor_person_id=None, at=T0)
+    tenant_session.commit()
+
+    assert row.status == "received"
+    payment = tenant_session.execute(
+        select(Payment).where(Payment.payer_person_id == a_priced_student.payer_person_id)
+    ).scalar_one()
+    assert payment.method == "standing_order"
+    assert payment.amount_agorot == MONTHLY_AGOROT
+    allocations = (
+        tenant_session.execute(
+            select(PaymentAllocation).where(PaymentAllocation.payment_id == payment.id)
+        )
+        .scalars()
+        .all()
+    )
+    assert allocations == []
+
+
+def test_raising_a_promise_notifies_every_manager(
+    tenant_session, app_session, studio, a_priced_student, a_price_plan
+):
+    """'A notification will be sent to the manager' -- the owner's words. The queue is
+    where the decision happens; the notification is how the manager learns it is waiting."""
+    manager = Person(studio_id=studio.id, first_name="מנהל", last_name="בודק")
+    app_session.add(manager)
+    app_session.flush()
+    app_session.add(
+        RoleAssignment(
+            studio_id=studio.id,
+            person_id=manager.id,
+            role="manager",
+            scope_type="studio",
+            granted_at=T0,
+        )
+    )
+    app_session.commit()
+
+    PaymentPromiseService(tenant_session).create(
+        studio.id,
+        payer_person_id=a_priced_student.payer_person_id,
+        charge_ids=[],
+        at=T0,
+        method="cash",
+        claimed_plan_id=a_price_plan,
+    )
+    tenant_session.commit()
+
+    note = tenant_session.execute(
+        select(Notification).where(
+            Notification.person_id == manager.id, Notification.kind == "billing.promise_raised"
+        )
+    ).scalar_one()
+    assert note.payload["method"] == "cash"
+    assert note.payload["total_agorot"] == MONTHLY_AGOROT
+
+
 def test_an_empty_selection_is_refused(tenant_session, studio, a_priced_student):
     with pytest.raises(RefusedError):
         PaymentPromiseService(tenant_session).create(
@@ -313,7 +428,7 @@ def test_the_method_filter_returns_only_what_it_says(
         method="cheque",
     )
     filtered = service.list_promises(method="cheque")
-    assert [row.id for row, _, _ in filtered] == [cheque_row.id]
+    assert [row.id for row, _, _, _ in filtered] == [cheque_row.id]
 
 
 def test_an_unknown_method_is_refused(tenant_session, app_session, studio, a_priced_student):

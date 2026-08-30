@@ -33,7 +33,7 @@ export type UpayForm = { action: string; fields: Record<string, string> }
  * structurally identical to it — `web/scripts/…` regenerates that one, and a drift shows
  * up as a type error at `makeParentBillingClient`, which is where it should.
  */
-export type PromiseMethod = 'cash' | 'cheque'
+export type PromiseMethod = 'cash' | 'cheque' | 'standing_order'
 
 export type PaymentPromiseOut = {
   id: string
@@ -43,6 +43,10 @@ export type PaymentPromiseOut = {
   /** Whole months bought forward beyond the charges named below. 0 is the ordinary
    *  settle-what-is-owed promise. */
   prepay_months: number
+  /** The payment program a plan claim is about, or null for an ordinary promise. What
+   *  lets the payments screen leave its cash/cheque cards usable while a plan claim from
+   *  the plan picker is still with the manager. */
+  claimed_plan_id: string | null
   charge_ids: string[]
   created_at: string
   decided_at: string | null

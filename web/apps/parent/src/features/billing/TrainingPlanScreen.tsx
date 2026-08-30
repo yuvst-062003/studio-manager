@@ -15,11 +15,24 @@
 // transform would flip `300₪` to `₪300`.
 import { useState } from 'react'
 import type { CSSProperties } from 'react'
-import { Alert, Button, Card, EmptyState, MoneyDisplay, StatusChip } from '@studio/ui'
+import {
+  Alert,
+  Button,
+  Card,
+  EmptyState,
+  MoneyDisplay,
+  SegmentedControl,
+  StatusChip,
+} from '@studio/ui'
 import { formatDateInStudioZone, formatTimeInStudioZone } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
+import type { PaymentPromiseOut, PromiseMethod } from './billingClient'
 import type { BookableSession, PlanOption, TrainingPlanView } from './trainingPlanClient'
+
+//: The three ways money changes hands outside the app (owner request, 2026-08-30). The
+//: order mirrors the payments screen's cards; the strings come from the same namespace.
+const CLAIM_METHODS: readonly PromiseMethod[] = ['cash', 'cheque', 'standing_order']
 
 const columnStyle: CSSProperties = {
   display: 'flex',
@@ -45,6 +58,14 @@ export type TrainingPlanScreenProps = {
   onRelease: (bookingId: string) => Promise<void>
   onRequestPlan: (planId: string) => Promise<void>
   onCancelChange: (changeId: string) => Promise<void>
+  /** "כבר שילמתי" — raises a payment promise claiming this program, for the manager to
+   *  confirm or decline. Optional so older mounts still render; without it the confirm
+   *  step offers only the ordinary request. */
+  onClaimPaid?: (planId: string, method: PromiseMethod) => Promise<void>
+  /** This payer's plan-claim promises, newest first. What lets the screen say "waiting
+   *  for the manager" — and, when the manager pressed ✗, say THAT rather than leaving
+   *  the family to infer a decline from silence. */
+  planClaims?: readonly PaymentPromiseOut[]
 }
 
 export function TrainingPlanScreen({
@@ -54,9 +75,23 @@ export function TrainingPlanScreen({
   onRelease,
   onRequestPlan,
   onCancelChange,
+  onClaimPaid,
+  planClaims = [],
 }: TrainingPlanScreenProps) {
+  const pendingClaim = planClaims.find((row) => row.status === 'pending') ?? null
+  // Say a decline out loud exactly until the family acts again — same rule as the
+  // payments screen's cards: the NEWEST decided claim being a decline, with nothing
+  // pending, is the state that needs the sentence.
+  const declinedClaim =
+    !pendingClaim && planClaims[0]?.status === 'declined' ? planClaims[0] : null
   const [inFlight, setInFlight] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // The confirm step (owner request, 2026-08-30): picking a plan opens it rather than
+  // firing the request, so "how will you pay?" is asked BEFORE anything is recorded.
+  const [choosing, setChoosing] = useState<PlanOption | null>(null)
+  const [alreadyPaid, setAlreadyPaid] = useState(false)
+  const [claimMethod, setClaimMethod] = useState<PromiseMethod>('cash')
+  const [requestDone, setRequestDone] = useState<'requested' | 'claimed' | null>(null)
 
   function run(action: () => Promise<void>) {
     if (inFlight) return
@@ -65,6 +100,19 @@ export function TrainingPlanScreen({
     action()
       .catch(() => setError(t(locale, 'common.error.generic')))
       .finally(() => setInFlight(false))
+  }
+
+  function confirmChoice(plan: PlanOption) {
+    run(async () => {
+      await onRequestPlan(plan.id)
+      // Order matters: a refused change (409 — one waiting already) must not leave a
+      // claim the manager would confirm against nothing.
+      if (alreadyPaid && onClaimPaid) await onClaimPaid(plan.id, claimMethod)
+      setRequestDone(alreadyPaid && onClaimPaid ? 'claimed' : 'requested')
+      setChoosing(null)
+      setAlreadyPaid(false)
+      setClaimMethod('cash')
+    })
   }
 
   return (
@@ -164,15 +212,101 @@ export function TrainingPlanScreen({
       {/* -- what a different plan would change ------------------------------- */}
       <section aria-labelledby="plan-options">
         <h2 id="plan-options">{t(locale, 'schedule.plan.switch')}</h2>
+        {pendingClaim ? (
+          <p data-testid="plan-claim-pending">
+            <StatusChip status="pending" label={t(locale, 'schedule.plan.claimPending')} />
+          </p>
+        ) : null}
+        {declinedClaim ? (
+          <Alert tone="danger" live iconLabel={t(locale, 'schedule.plan.switch')}>
+            <span data-testid="plan-claim-declined">
+              {t(locale, 'schedule.plan.claimDeclined')}
+            </span>
+          </Alert>
+        ) : null}
+        {requestDone ? (
+          <Alert tone="paid" live iconLabel={t(locale, 'schedule.plan.switch')}>
+            <span data-testid={`plan-request-${requestDone}`}>
+              {t(
+                locale,
+                requestDone === 'claimed'
+                  ? 'schedule.plan.claimSent'
+                  : 'schedule.plan.changeRequested',
+              )}
+            </span>
+          </Alert>
+        ) : null}
         {view.plans.map((plan) => (
           <PlanRow
             key={plan.id}
             locale={locale}
             plan={plan}
             inFlight={inFlight}
-            onChoose={() => run(() => onRequestPlan(plan.id))}
+            onChoose={() => {
+              setRequestDone(null)
+              setChoosing(plan)
+            }}
           />
         ))}
+        {choosing ? (
+          // The confirm step. One card, two questions: which plan (restated, with its
+          // price), and how the money moves — through the app later, or already handed
+          // over by one of the three human routes, which the manager then confirms.
+          <Card>
+            <div data-testid="plan-confirm">
+              <h3>
+                {t(locale, 'schedule.plan.confirmTitle')} — <bdi>{choosing.name}</bdi>
+              </h3>
+              <MoneyDisplay agorot={choosing.monthly_amount_agorot} label={choosing.name} />
+              <SegmentedControl
+                legend={t(locale, 'schedule.plan.howWillYouPay')}
+                legendVisible
+                value={alreadyPaid ? 'paid' : 'later'}
+                options={[
+                  { value: 'later', label: t(locale, 'schedule.plan.payLater') },
+                  { value: 'paid', label: t(locale, 'schedule.plan.alreadyPaid') },
+                ]}
+                onValueChange={(next) => setAlreadyPaid(next === 'paid')}
+              />
+              {alreadyPaid ? (
+                <div data-testid="plan-claim-method">
+                  <SegmentedControl
+                    legend={t(locale, 'schedule.plan.claimMethod')}
+                    legendVisible
+                    value={claimMethod}
+                    options={CLAIM_METHODS.map((method) => ({
+                      value: method,
+                      label: t(locale, `billing.method.${method}`),
+                    }))}
+                    onValueChange={(next) => setClaimMethod(next as PromiseMethod)}
+                  />
+                  {/* What pressing send actually does — the manager still has to mark the
+                      money received, and saying so here is what makes a decline later a
+                      followed rule rather than a surprise. */}
+                  <p style={mutedStyle}>{t(locale, 'schedule.plan.claimHint')}</p>
+                </div>
+              ) : null}
+              <div style={rowStyle}>
+                <Button
+                  variant="primary"
+                  data-testid="plan-confirm-send"
+                  disabled={inFlight}
+                  onClick={() => confirmChoice(choosing)}
+                >
+                  {t(locale, 'schedule.plan.confirmSend')}
+                </Button>
+                <Button
+                  variant="ghost"
+                  data-testid="plan-confirm-cancel"
+                  disabled={inFlight}
+                  onClick={() => setChoosing(null)}
+                >
+                  {t(locale, 'schedule.plan.confirmCancel')}
+                </Button>
+              </div>
+            </div>
+          </Card>
+        ) : null}
       </section>
     </div>
   )
@@ -258,19 +392,24 @@ function PlanRow({
         </span>
         {plan.is_current ? (
           <StatusChip status="planned" label={t(locale, 'schedule.plan.current')} />
-        ) : plan.is_offered ? (
-          <Button
-            variant="secondary"
-            data-testid="plan-choose"
-            disabled={inFlight}
-            onClick={onChoose}
-          >
-            {t(locale, 'schedule.plan.upgrade')}
-          </Button>
         ) : (
-          // §5.1 — shown with its reason, never hidden. It turns itself on when the child
-          // moves up a group.
-          <span style={mutedStyle}>{t(locale, 'schedule.plan.notOffered')}</span>
+          // Any non-current plan is pickable (owner decision, 2026-08-30: "he can pick
+          // any program") — the server accepts both directions, and the manager settles
+          // every change either way. A plan that would not raise this child's week keeps
+          // its §5.1 reason line beside the button rather than losing the button.
+          <>
+            {plan.is_offered ? null : (
+              <span style={mutedStyle}>{t(locale, 'schedule.plan.notOffered')}</span>
+            )}
+            <Button
+              variant="secondary"
+              data-testid="plan-choose"
+              disabled={inFlight}
+              onClick={onChoose}
+            >
+              {t(locale, plan.is_offered ? 'schedule.plan.upgrade' : 'schedule.plan.choose')}
+            </Button>
+          </>
         )}
       </div>
     </Card>

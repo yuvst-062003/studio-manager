@@ -13,6 +13,7 @@ marked tonight's session — lives on its own tagged router and returns names an
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, datetime
 
 from app.models.training_plan import SessionBooking
 from tests.schedule.conftest import NOW, SUNDAY, make_session, make_student
@@ -267,3 +268,54 @@ def test_marking_writes_a_row_the_service_can_see(
     row = tenant_session.get(SessionBooking, uuid.UUID(created["id"]))
     assert row is not None and row.cancelled_at is None
     assert NOW  # the module's shared clock constant, kept in scope for the imports above
+
+
+def test_each_sibling_reads_their_own_plan_and_spends_their_own_credit(
+    client, app_session, studio, plans, timetable, an_active_year, as_guardian_of
+):
+    """One parent, two children, two plans — each child's screen is priced and gated by
+    THEIR plan (owner verification, 2026-08-30). Marking a session for the 400-plan child
+    spends that child's credit and leaves the sibling's untouched."""
+    from app.models.person import Guardian
+
+    older = make_student(
+        app_session, studio, plan_id=plans["400"], base_group_id=timetable["קבוצה 3"]
+    )
+    younger = make_student(
+        app_session, studio, plan_id=plans["300"], base_group_id=timetable["קבוצה 2"]
+    )
+    parent = as_guardian_of(older, is_primary=True)
+    app_session.add(Guardian(studio_id=studio.id, person_id=parent.person_id, student_id=younger))
+    app_session.commit()
+    # Inside the caller's club week: `Caller.headers` pins X-Dev-Now to T0 (Tue 2026-11-03),
+    # and credits_remaining counts THAT week's spend — so the booking must land in
+    # Nov 1–7, after T0 itself. SUNDAY (the 15th) is two weeks out and would not count.
+    this_thursday = datetime(2026, 11, 5, 14, 0, tzinfo=UTC)
+    session_id = make_session(
+        app_session, studio, an_active_year, timetable["ג'ודו ראשון"], this_thursday
+    )
+
+    older_view = client.get(
+        f"/api/v1/students/{older}/training-plan", headers=parent.headers
+    ).json()
+    younger_view = client.get(
+        f"/api/v1/students/{younger}/training-plan", headers=parent.headers
+    ).json()
+    assert older_view["current_plan"]["name"] == "400"
+    assert younger_view["current_plan"]["name"] == "300"
+    # 400 buys one weekly extra; 300 buys none — and the refusal names the plan, per child.
+    assert older_view["credits_remaining"] == 1
+    assert younger_view["credits_remaining"] == 0
+
+    marked = client.post(
+        "/api/v1/session-bookings",
+        json={"student_id": str(older), "session_id": str(session_id)},
+        headers=parent.headers,
+    )
+    assert marked.status_code == 201, marked.text
+    after = client.get(f"/api/v1/students/{older}/training-plan", headers=parent.headers).json()
+    sibling_after = client.get(
+        f"/api/v1/students/{younger}/training-plan", headers=parent.headers
+    ).json()
+    assert after["credits_remaining"] == 0
+    assert sibling_after["credits_remaining"] == 0  # still their own zero, not a shared pool

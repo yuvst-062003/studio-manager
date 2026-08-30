@@ -144,6 +144,7 @@ describe('the payment-promise queue on the phone', () => {
       status: 'pending',
       method,
       total_agorot: 90_000,
+      claimed_plan_name: null,
       payer_name: 'משפחת כהן',
       charge_count: 3,
       created_at: '2026-09-01T09:00:00Z',

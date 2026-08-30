@@ -139,16 +139,17 @@ describe('the parent’s training plan', () => {
     )
   })
 
-  it('shows a plan that buys this student nothing, with its reason', () => {
-    // §5.1 — a greyed PLAN is shown, never hidden. It turns itself on when the child moves
-    // up a group, which is exactly why hiding it would be wrong rather than merely unkind.
+  it('shows a plan that buys this student nothing with its reason, and still lets it be picked', () => {
+    // §5.1 — a greyed PLAN is shown, never hidden. Since 2026-08-30 it is also PICKABLE
+    // (owner: "he can pick any program"): the reason stays beside the button, and the
+    // manager settles every change either way.
     renderScreen()
     const row = screen.getByTestId('plan-option-p550')
     expect(row).toHaveTextContent(t(LOCALE, 'schedule.plan.notOffered'))
-    expect(within(row).queryByTestId('plan-choose')).not.toBeInTheDocument()
+    expect(within(row).getByTestId('plan-choose')).toBeInTheDocument()
   })
 
-  it('offers the plans that do raise the week, and never the current one', () => {
+  it('offers every plan except the current one', () => {
     renderScreen()
     expect(
       within(screen.getByTestId('plan-option-p300')).getByTestId('plan-choose'),
@@ -158,13 +159,98 @@ describe('the parent’s training plan', () => {
     ).not.toBeInTheDocument()
   })
 
-  it('requests a plan change and says when it takes effect', async () => {
+  it('requests a plan change through the confirm step', async () => {
     const onRequestPlan = vi.fn().mockResolvedValue(undefined)
     renderScreen({ onRequestPlan })
     await userEvent.click(
       within(screen.getByTestId('plan-option-p300')).getByTestId('plan-choose'),
     )
+    // Picking opens the confirm step — nothing is recorded yet.
+    expect(onRequestPlan).not.toHaveBeenCalled()
+    await userEvent.click(within(screen.getByTestId('plan-confirm')).getByTestId('plan-confirm-send'))
     expect(onRequestPlan).toHaveBeenCalledWith('p300')
+    expect(screen.getByTestId('plan-request-requested')).toBeInTheDocument()
+  })
+
+  it('sends an already-paid claim with its method, after the change request', async () => {
+    // Owner request (2026-08-30): instead of paying, the parent says the money already
+    // changed hands — cash, cheques, or a standing order — and the manager confirms.
+    const calls: string[] = []
+    const onRequestPlan = vi.fn(async () => {
+      calls.push('request')
+    })
+    const onClaimPaid = vi.fn(async () => {
+      calls.push('claim')
+    })
+    renderScreen({ onRequestPlan, onClaimPaid })
+    await userEvent.click(
+      within(screen.getByTestId('plan-option-p550')).getByTestId('plan-choose'),
+    )
+    const confirm = screen.getByTestId('plan-confirm')
+    await userEvent.click(
+      within(confirm).getByRole('radio', { name: t(LOCALE, 'schedule.plan.alreadyPaid') }),
+    )
+    await userEvent.click(
+      within(screen.getByTestId('plan-claim-method')).getByRole('radio', {
+        name: t(LOCALE, 'billing.method.standing_order'),
+      }),
+    )
+    await userEvent.click(within(confirm).getByTestId('plan-confirm-send'))
+    expect(onRequestPlan).toHaveBeenCalledWith('p550')
+    expect(onClaimPaid).toHaveBeenCalledWith('p550', 'standing_order')
+    // A refused change must never leave an orphan claim, so the request goes first.
+    expect(calls).toEqual(['request', 'claim'])
+    expect(screen.getByTestId('plan-request-claimed')).toBeInTheDocument()
+  })
+
+  it('says a claim is waiting for the manager', () => {
+    renderScreen({
+      planClaims: [
+        {
+          id: 'pr1',
+          status: 'pending',
+          method: 'cash',
+          total_agorot: 55_000,
+          prepay_months: 0,
+          claimed_plan_id: 'p550',
+          charge_ids: [],
+          created_at: '2026-09-01T09:00:00Z',
+          decided_at: null,
+        },
+      ],
+    })
+    expect(screen.getByTestId('plan-claim-pending')).toBeInTheDocument()
+  })
+
+  it('says a declined claim out loud rather than leaving silence', () => {
+    renderScreen({
+      planClaims: [
+        {
+          id: 'pr1',
+          status: 'declined',
+          method: 'standing_order',
+          total_agorot: 55_000,
+          prepay_months: 0,
+          claimed_plan_id: 'p550',
+          charge_ids: [],
+          created_at: '2026-09-01T09:00:00Z',
+          decided_at: '2026-09-02T09:00:00Z',
+        },
+      ],
+    })
+    expect(screen.getByTestId('plan-claim-declined')).toBeInTheDocument()
+    expect(screen.queryByTestId('plan-claim-pending')).not.toBeInTheDocument()
+  })
+
+  it('a cancelled confirm step records nothing', async () => {
+    const onRequestPlan = vi.fn().mockResolvedValue(undefined)
+    renderScreen({ onRequestPlan })
+    await userEvent.click(
+      within(screen.getByTestId('plan-option-p300')).getByTestId('plan-choose'),
+    )
+    await userEvent.click(screen.getByTestId('plan-confirm-cancel'))
+    expect(onRequestPlan).not.toHaveBeenCalled()
+    expect(screen.queryByTestId('plan-confirm')).not.toBeInTheDocument()
   })
 
   it('shows a scheduled change with the date and a way out of it', async () => {

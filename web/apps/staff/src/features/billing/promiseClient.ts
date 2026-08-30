@@ -12,8 +12,10 @@ export type Fetcher = (path: string, init?: RequestInit) => Promise<Response>
 export type StaffPromiseRow = {
   id: string
   status: string
-  method: 'cash' | 'cheque'
+  method: 'cash' | 'cheque' | 'standing_order'
   total_agorot: number
+  /** The program a plan claim is about, or null for an ordinary promise. */
+  claimed_plan_name: string | null
   payer_name: string
   charge_count: number
   created_at: string

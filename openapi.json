@@ -6157,6 +6157,17 @@
             "title": "Charge Count",
             "type": "integer"
           },
+          "claimed_plan_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Claimed Plan Name"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -6199,6 +6210,7 @@
           "method",
           "total_agorot",
           "prepay_months",
+          "claimed_plan_name",
           "payer_person_id",
           "payer_name",
           "charge_count",
@@ -7642,11 +7654,24 @@
             "title": "Charge Ids",
             "type": "array"
           },
+          "claimed_plan_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Claimed Plan Id"
+          },
           "method": {
             "default": "cash",
             "enum": [
               "cash",
-              "cheque"
+              "cheque",
+              "standing_order"
             ],
             "title": "Method",
             "type": "string"
@@ -7687,6 +7712,18 @@
             },
             "title": "Charge Ids",
             "type": "array"
+          },
+          "claimed_plan_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Claimed Plan Id"
           },
           "created_at": {
             "format": "date-time",
@@ -7733,6 +7770,7 @@
           "method",
           "total_agorot",
           "prepay_months",
+          "claimed_plan_id",
           "charge_ids",
           "created_at",
           "decided_at"

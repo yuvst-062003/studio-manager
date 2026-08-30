@@ -16,14 +16,19 @@ from pydantic import BaseModel, Field
 
 
 class PaymentPromiseCreateIn(BaseModel):
-    #: May be empty when `prepay_months` is not: a family with nothing owed may still buy
-    #: three months forward. The service refuses a promise that is neither.
+    #: May be empty when `prepay_months` or `claimed_plan_id` is not: a family with
+    #: nothing owed may still buy three months forward, or claim a program already paid
+    #: for. The service refuses a promise that is none of the three.
     charge_ids: list[uuid.UUID] = Field(default_factory=list, max_length=50)
-    method: Literal["cash", "cheque"] = "cash"
+    method: Literal["cash", "cheque", "standing_order"] = "cash"
     #: Whole months bought forward beyond the charges above, priced at the payer's monthly
     #: total. Capped at the same two years the studio setting is: a longer term is a
     #: deposit, not a prepayment.
     prepay_months: int = Field(default=0, ge=0, le=24)
+    #: The plan-claim flow (owner request, 2026-08-30): the payment program the parent
+    #: says they already paid for, from the plan picker. Priced by the SERVER from the
+    #: plan row -- the body names a plan, never an amount.
+    claimed_plan_id: uuid.UUID | None = None
 
 
 class PaymentPromiseOut(BaseModel):
@@ -32,6 +37,9 @@ class PaymentPromiseOut(BaseModel):
     method: str
     total_agorot: int
     prepay_months: int
+    #: Which program the claim half is about, or null. The payments screen uses it to
+    #: tell a plan claim from a settle-my-charges promise without inferring from emptiness.
+    claimed_plan_id: uuid.UUID | None
     charge_ids: list[uuid.UUID]
     created_at: datetime.datetime
     decided_at: datetime.datetime | None
@@ -49,6 +57,9 @@ class ManagerPaymentPromiseOut(BaseModel):
     #: Beside the amount in the manager's queue, because "3,600 ₪" with no explanation is
     #: the number they phone the office about. Twelve months forward is why it is large.
     prepay_months: int
+    #: The program a plan claim is about, by name -- "which plan is this money for" is the
+    #: first thing the manager asks before marking it received. Null for ordinary promises.
+    claimed_plan_name: str | None
     payer_person_id: uuid.UUID
     payer_name: str
     charge_count: int

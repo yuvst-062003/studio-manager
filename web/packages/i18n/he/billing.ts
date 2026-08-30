@@ -32,6 +32,7 @@ export const billing: Bundle = {
   // §5.10 — the three routes, always all three, never one hidden.
   'method.card': 'כרטיס אשראי',
   'method.standingOrder': 'הוראת קבע',
+  'method.standing_order': 'הוראת קבע',
   'method.cash': 'מזומן',
   'method.cheque': 'צ׳קים',
   'method.bankTransfer': 'העברה בנקאית',
@@ -104,6 +105,7 @@ export const billing: Bundle = {
   'promise.manager.charges': 'חיובים',
   'promise.manager.method': 'אמצעי תשלום',
   'promise.manager.filterAll': 'הכול',
+  'promise.manager.forPlan': 'עבור מסלול',
   'shop.title': 'חנות המועדון',
   'shop.empty': 'אין פריטים למכירה כרגע.',
   'shop.order': 'הזמנה',

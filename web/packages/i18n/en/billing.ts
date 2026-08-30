@@ -12,6 +12,7 @@ export const billing: Bundle = {
 
   'method.card': 'Credit card',
   'method.standingOrder': 'Standing order',
+  'method.standing_order': 'Standing order',
   'method.cash': 'Cash',
   'method.cheque': 'Cheques',
   'method.bankTransfer': 'Bank transfer',
@@ -70,6 +71,7 @@ export const billing: Bundle = {
   'promise.manager.charges': 'charges',
   'promise.manager.method': 'Method',
   'promise.manager.filterAll': 'All',
+  'promise.manager.forPlan': 'For plan',
   'shop.title': 'Club shop',
   'shop.empty': 'Nothing is on sale right now.',
   'shop.order': 'Order',

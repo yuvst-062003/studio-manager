@@ -16,6 +16,7 @@ export const billing: Bundle = {
 
   'method.card': 'Кредитная карта',
   'method.standingOrder': 'Постоянное поручение',
+  'method.standing_order': 'Постоянное поручение',
   'method.cash': 'Наличные',
   'method.cheque': 'Чеки',
   'method.bankTransfer': 'Банковский перевод',
@@ -74,6 +75,7 @@ export const billing: Bundle = {
   'promise.manager.charges': 'счетов',
   'promise.manager.method': 'Способ оплаты',
   'promise.manager.filterAll': 'Все',
+  'promise.manager.forPlan': 'За тариф',
   'shop.title': 'Магазин клуба',
   'shop.empty': 'Сейчас ничего не продаётся.',
   'shop.order': 'Заказать',

@@ -29,6 +29,9 @@ export type TrainingPlanClient = {
   release(bookingId: string): Promise<void>
   requestPlan(studentId: string, planId: string): Promise<void>
   cancelChange(studentId: string, changeId: string): Promise<void>
+  /** The plan picker's "already paid" — a payment promise claiming this program, priced
+   *  by the server from the plan row. The manager confirms or declines it. */
+  claimPaid(planId: string, method: 'cash' | 'cheque' | 'standing_order'): Promise<void>
 }
 
 export function makeTrainingPlanClient(fetcher: Fetcher): TrainingPlanClient {
@@ -67,6 +70,15 @@ export function makeTrainingPlanClient(fetcher: Fetcher): TrainingPlanClient {
       await json(
         await fetcher(`/api/v1/students/${studentId}/plan-changes/${changeId}`, {
           method: 'DELETE',
+        }),
+      )
+    },
+    async claimPaid(planId, method) {
+      await json(
+        await fetcher('/api/v1/me/payment-promises', {
+          method: 'POST',
+          headers: JSON_HEADERS,
+          body: JSON.stringify({ claimed_plan_id: planId, method }),
         }),
       )
     },

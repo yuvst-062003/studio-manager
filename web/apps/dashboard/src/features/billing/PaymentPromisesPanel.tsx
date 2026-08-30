@@ -28,7 +28,7 @@ const rowStyle: CSSProperties = {
   paddingBlock: 'var(--space-2)',
 }
 
-const METHODS: readonly PromiseMethod[] = ['cash', 'cheque']
+const METHODS: readonly PromiseMethod[] = ['cash', 'cheque', 'standing_order']
 
 export function PaymentPromisesPanel({
   locale,
@@ -116,6 +116,14 @@ export function PaymentPromisesPanel({
               {' · '}
               {formatDateInStudioZone(promise.created_at, locale)}
             </span>
+            {/* Which program the money is about — the first question a manager asks
+                before pressing ✓ on a claim raised from the plan picker. */}
+            {promise.claimed_plan_name ? (
+              <span data-testid="promise-plan">
+                {t(locale, 'billing.promise.manager.forPlan')}{' '}
+                <bdi>{promise.claimed_plan_name}</bdi>
+              </span>
+            ) : null}
             <MoneyDisplay agorot={promise.total_agorot} tone="pending" />
             {/* Why the number is large. 3,600 ₪ with no explanation is what a manager
                 phones the office about; "12 months forward" is the answer, and it is what

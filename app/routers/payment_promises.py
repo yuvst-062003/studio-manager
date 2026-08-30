@@ -63,6 +63,7 @@ def _out(service: PaymentPromiseService, row: PaymentPromise) -> PaymentPromiseO
         method=row.method,
         total_agorot=row.total_agorot,
         prepay_months=row.prepay_months,
+        claimed_plan_id=row.claimed_plan_id,
         charge_ids=service.charge_ids_of(row.id),
         created_at=row.created_at,
         decided_at=row.decided_at,
@@ -90,6 +91,7 @@ def raise_payment_promise(
             at=now(),
             method=body.method,
             prepay_months=body.prepay_months,
+            claimed_plan_id=body.claimed_plan_id,
         )
     except (NotFoundError, ConflictError, RefusedError) as exc:
         raise _refusal(exc) from exc
@@ -106,7 +108,7 @@ def my_payment_promises(request: Request, session: TenantSessionDep) -> PaymentP
 
 
 def _manager_out(
-    row: PaymentPromise, payer_name: str, charge_count: int
+    row: PaymentPromise, payer_name: str, charge_count: int, claimed_plan_name: str | None
 ) -> ManagerPaymentPromiseOut:
     return ManagerPaymentPromiseOut(
         id=row.id,
@@ -114,6 +116,7 @@ def _manager_out(
         method=row.method,
         total_agorot=row.total_agorot,
         prepay_months=row.prepay_months,
+        claimed_plan_name=claimed_plan_name,
         payer_person_id=row.payer_person_id,
         payer_name=payer_name,
         charge_count=charge_count,
@@ -131,8 +134,10 @@ def list_payment_promises(
     service = PaymentPromiseService(session)
     return ManagerPaymentPromiseListOut(
         items=[
-            _manager_out(row, name, count)
-            for row, name, count in service.list_promises(status=promise_status, method=method)
+            _manager_out(row, name, count, plan_name)
+            for row, name, count, plan_name in service.list_promises(
+                status=promise_status, method=method
+            )
         ]
     )
 

@@ -29,8 +29,9 @@ import { distinctMonths, instalmentSplit, oldestMonths, selectionTotal } from '.
 const MONTH_OPTIONS = [1, 2, 3, 6]
 const INSTALMENT_OPTIONS = [1, 2, 3]
 
-//: The two routes a parent hands money over by. Mirrors `PROMISE_METHODS` in
-//: `app/models/payment_promise.py`, which is the constraint that actually refuses a third.
+//: The two routes a parent hands money over by HERE. The model's `PROMISE_METHODS` also
+//: allows `standing_order` for the plan-claim flow (the plan picker's "already paid");
+//: this screen keeps its own standing-order card as links, so the cards stay two.
 const PROMISE_METHODS: readonly PromiseMethod[] = ['cash', 'cheque']
 
 const columnStyle: CSSProperties = {
@@ -140,8 +141,11 @@ export function PaymentsScreen({
   const [error, setError] = useState<string | null>(null)
 
   // One live promise at a time across BOTH routes: the service refuses a second over the
-  // same charges, so a card that still offered its button would be offering a 409.
-  const pending = promises.find((row) => row.status === 'pending') ?? null
+  // same charges, so a card that still offered its button would be offering a 409. A plan
+  // CLAIM (raised from the plan picker) names no charges and must not lock these cards —
+  // a family whose claim waits with the manager can still settle open months in cash.
+  const pending =
+    promises.find((row) => row.status === 'pending' && row.claimed_plan_id === null) ?? null
   const pendingChargeIds = new Set(pending?.charge_ids ?? [])
 
   // Only charges nothing else already covers are selectable. §5.10's guard 1, and the

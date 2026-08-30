@@ -77,6 +77,7 @@ function managerPromise(
     status: 'pending',
     method,
     total_agorot: 90_000,
+    claimed_plan_name: null,
     payer_person_id: 'payer-1',
     payer_name: 'משפחת כהן',
     charge_count: 3,

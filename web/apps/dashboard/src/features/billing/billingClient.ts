@@ -126,7 +126,7 @@ export type DashboardBillingClient = {
 }
 
 /** The two routes a family hands money over by. Mirrors `PROMISE_METHODS` on the server. */
-export type PromiseMethod = 'cash' | 'cheque'
+export type PromiseMethod = 'cash' | 'cheque' | 'standing_order'
 
 /**
  * The manager's view of 'אני אשלם במזומן' / 'אביא צ׳קים' — who, how much, by which route,
@@ -140,6 +140,9 @@ export type ManagerPaymentPromiseOut = {
   total_agorot: number
   /** Whole months bought forward. Why a 3,600 ₪ promise is 3,600 ₪. */
   prepay_months: number
+  /** The program a plan claim ("כבר שילמתי" from the plan picker) is about, by name.
+   *  Null for ordinary settle-my-charges promises. */
+  claimed_plan_name: string | null
   payer_person_id: string
   payer_name: string
   charge_count: number

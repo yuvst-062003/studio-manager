@@ -187,7 +187,7 @@ describe('1b — the pay screen', () => {
 
 function promise(
   id: string,
-  method: 'cash' | 'cheque',
+  method: PaymentPromiseOut['method'],
   overrides: Partial<PaymentPromiseOut> = {},
 ): PaymentPromiseOut {
   return {
@@ -196,6 +196,7 @@ function promise(
     method,
     total_agorot: 50_000,
     prepay_months: 0,
+    claimed_plan_id: null,
     charge_ids: ['c1'],
     created_at: '2026-09-01T09:00:00Z',
     decided_at: null,
@@ -326,6 +327,20 @@ describe('1b — the two hand-carried routes', () => {
     expect(screen.queryByTestId('promise-button-cheque')).not.toBeInTheDocument()
     // And it says why, rather than rendering a card with nothing in it.
     expect(screen.getByTestId('promise-blocked-cheque')).toBeInTheDocument()
+  })
+
+  it('a pending PLAN CLAIM from the plan picker locks neither card', () => {
+    // The claim names no charges — a family whose "כבר שילמתי" waits with the manager can
+    // still settle open months in cash. Only charge-carrying promises hold the lock.
+    renderPay({
+      promises: [
+        promise('r1', 'standing_order', { claimed_plan_id: 'p550', charge_ids: [] }),
+      ],
+      onPaymentPromise: vi.fn(),
+    })
+    expect(screen.getByTestId('promise-button-cash')).toBeInTheDocument()
+    expect(screen.getByTestId('promise-button-cheque')).toBeInTheDocument()
+    expect(screen.queryByTestId('promise-blocked-cheque')).not.toBeInTheDocument()
   })
 
   it('badges the charge rows a pending cheque promise covers, in its own words', () => {

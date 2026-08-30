@@ -107,6 +107,14 @@ export function PaymentPromisesSection({
                 {' · '}
                 {formatDateInStudioZone(promise.created_at, locale)}
               </span>
+              {/* A claim from the plan picker names its program; the door needs to know
+                  which plan the notes in hand are for. */}
+              {promise.claimed_plan_name ? (
+                <span data-testid="promise-plan">
+                  {t(locale, 'billing.promise.manager.forPlan')}{' '}
+                  <bdi>{promise.claimed_plan_name}</bdi>
+                </span>
+              ) : null}
               <MoneyDisplay agorot={promise.total_agorot} tone="pending" />
               <Button
                 variant="primary"
