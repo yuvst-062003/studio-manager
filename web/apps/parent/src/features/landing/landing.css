@@ -356,19 +356,33 @@
 .gl-cred-row {
   display: grid;
   gap: var(--space-4);
-  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+
+  /* 12rem, not 14rem: three cards, and the phone still gets one per row. */
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
 }
 
 .gl-cred {
   background: var(--gl-card);
   border: 1px solid var(--gl-outline);
+  display: flex;
+  flex-direction: column;
   padding: var(--space-4);
 }
 
-.gl-cred-icon {
-  block-size: 2rem;
-  color: var(--gl-red);
-  inline-size: 2rem;
+/* The card that leads with a number wears the navy, so a row of three reads as two
+ * statements and one figure rather than three identical rectangles. */
+.gl-cred--figure {
+  background: var(--gl-primary);
+  border-color: var(--gl-primary);
+}
+
+.gl-cred-figure {
+  color: var(--gl-on-primary);
+  font-size: 2.5rem;
+  font-weight: var(--weight-bold);
+  letter-spacing: -0.02em;
+  line-height: 1;
+  margin: 0 0 var(--space-2);
 }
 
 .gl-cred-title {
@@ -377,10 +391,19 @@
   margin: var(--space-2) 0 var(--space-1);
 }
 
+.gl-cred--figure .gl-cred-title {
+  color: var(--gl-on-primary);
+  margin-block-start: 0;
+}
+
 .gl-cred-text {
   color: var(--gl-ink-2);
   line-height: 1.55;
   margin: 0;
+}
+
+.gl-cred--figure .gl-cred-text {
+  color: color-mix(in srgb, var(--gl-on-primary) 82%, transparent);
 }
 
 .gl-coach-visual {
@@ -442,6 +465,32 @@
   block-size: 11rem;
   border-radius: 4px;
   object-fit: cover;
+}
+
+/* -- the club in photographs ---------------------------------------------------------- */
+.gl-gallery {
+  display: grid;
+  gap: var(--space-2);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-block-start: var(--space-5);
+}
+
+.gl-shot {
+  /* Squared, like the buttons: the page's one radius is 2px and photos do not get their
+   * own. `cover` on a fixed ratio is what lets portrait and landscape tile together. */
+  aspect-ratio: 1 / 1;
+  background: var(--gl-surface-low);
+  border-radius: 2px;
+  display: block;
+  inline-size: 100%;
+  object-fit: cover;
+}
+
+/* The lead spans the row at both widths: 1 + 4 fills a 2-column grid and a 4-column one
+ * exactly, so the gallery never ends on an orphan tile. */
+.gl-shot--lead {
+  aspect-ratio: 16 / 9;
+  grid-column: 1 / -1;
 }
 
 /* -- the week: a snap pager in the hand, the full table at a desk --------------------- */
@@ -885,7 +934,7 @@
   z-index: 41;
 }
 
-/* -- the mobile sticky CTA bar -------------------------------------------------------- */
+/* -- the sticky CTA: the way in, at every scroll position and every width ------------- */
 .landing-sticky-bar {
   background: var(--gl-card);
   border-block-start: 1px solid var(--gl-outline);
@@ -942,6 +991,17 @@
     overflow-x: visible;
   }
 
+  /* Four across: the lead still spans the row, and the other four sit under it in one. */
+  .gl-gallery {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  /* A banner, not a screenful: at this width the lead is the whole container, and 16/9
+   * of 1200px is taller than most of the viewport it appears in. */
+  .gl-shot--lead {
+    aspect-ratio: 5 / 2;
+  }
+
   .gl-plans {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
@@ -950,8 +1010,22 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  /* At a desk it stops being a bar and becomes one floating button in the inline-end
+   * corner — the same crimson call to action, still one tap away at any scroll position,
+   * without a full-width band eating the bottom of the page. */
   .landing-sticky-bar {
-    display: none;
+    background: none;
+    border-block-start: 0;
+    box-shadow: none;
+    inset-block-end: var(--space-6);
+    inset-inline: auto var(--space-6);
+    padding: 0;
+  }
+
+  .landing-sticky-bar .gl-btn {
+    box-shadow: 0 10px 28px rgb(0 0 0 / 28%);
+    inline-size: auto;
+    padding-inline: var(--space-6);
   }
 
   .landing-booking-dialog {

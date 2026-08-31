@@ -22,7 +22,7 @@
 import { useEffect, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import { apiUrl } from '@studio/core'
-import { Button, EmptyState, LoadFailed, MoneyDisplay, RangeText } from '@studio/ui'
+import { EmptyState, LoadFailed, MoneyDisplay, RangeText } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import type { LandingClient, PublicGroup, PublicLanding as Landing } from './landingClient'
@@ -83,29 +83,6 @@ function AgeRange({ locale, group }: { locale: Locale; group: PublicGroup }) {
       {t(locale, 'people.landing.ageRange')}:{' '}
       <RangeText from={String(group.age_min ?? '')} to={String(group.age_max ?? '')} />
     </>
-  )
-}
-
-// Two inline icons for the coach credentials — drawn here because the app loads no icon
-// font, and the offline PWA must not fetch Material Symbols at runtime.
-function CredentialIcon({ kind }: { kind: 'experience' | 'education' }) {
-  return (
-    <svg viewBox="0 0 24 24" className="gl-cred-icon" aria-hidden="true">
-      {kind === 'experience' ? (
-        // A medal: ribbon over a disc.
-        <>
-          <path d="M8 2h8l-3 7h-2L8 2z" fill="currentColor" />
-          <circle cx="12" cy="15" r="5.5" fill="none" stroke="currentColor" strokeWidth="2" />
-          <circle cx="12" cy="15" r="2" fill="currentColor" />
-        </>
-      ) : (
-        // A mortarboard.
-        <>
-          <path d="M12 4 2 9l10 5 10-5-10-5z" fill="currentColor" />
-          <path d="M6 12.5V16c0 1.7 2.7 3 6 3s6-1.3 6-3v-3.5l-6 3-6-3z" fill="currentColor" />
-        </>
-      )}
-    </svg>
   )
 }
 
@@ -473,8 +450,20 @@ export function PublicLanding({
                 <p className="gl-coach-bio">{content.coach.bio}</p>
                 <div className="gl-cred-row">
                   {content.coach.credentials.map((credential) => (
-                    <div className="gl-cred" key={credential.title}>
-                      <CredentialIcon kind={credential.icon} />
+                    <div
+                      className={credential.figure ? 'gl-cred gl-cred--figure' : 'gl-cred'}
+                      key={credential.title}
+                    >
+                      {/* The number is the headline of its card, and it is already read
+                          aloud as part of the heading below — so it is not a second
+                          announcement, just a larger one. */}
+                      {credential.figure ? (
+                        <p className="gl-cred-figure" aria-hidden="true">
+                          {/* An LTR island: bidi renders a bare "300+" as "+300" beside
+                              Hebrew, the same defect RangeText exists to prevent. */}
+                          <bdi dir="ltr">{credential.figure}</bdi>
+                        </p>
+                      ) : null}
                       <h3 className="gl-cred-title">{credential.title}</h3>
                       <p className="gl-cred-text">{credential.text}</p>
                     </div>
@@ -517,6 +506,35 @@ export function PublicLanding({
                   ))}
                 </div>
               ) : null}
+            </div>
+          </section>
+        ) : null}
+
+        {/* The club in photographs — content only, and bundled with the app rather than
+            uploaded (clubContent.ts). Every tile is lazy: the section sits below the fold
+            and a parent on a phone should not pay for it before scrolling to it. */}
+        {content ? (
+          <section className="gl-section" aria-labelledby="landing-gallery" data-testid="landing-gallery">
+            <div className="gl-section-inner">
+              <h2 id="landing-gallery" className="gl-title">
+                {content.galleryTitle}
+              </h2>
+              <p className="gl-lead">{content.galleryLead}</p>
+              <div className="gl-gallery">
+                {content.gallery.map((photo, index) => (
+                  <img
+                    key={photo.src}
+                    src={photo.src}
+                    alt={photo.alt}
+                    // The first is the wide lead tile; the rest are squares. Index, not a
+                    // flag in the data: "the first one leads" is a layout fact.
+                    className={index === 0 ? 'gl-shot gl-shot--lead' : 'gl-shot'}
+                    style={photo.focus ? { objectPosition: photo.focus } : undefined}
+                    loading="lazy"
+                    decoding="async"
+                  />
+                ))}
+              </div>
             </div>
           </section>
         ) : null}
@@ -681,14 +699,19 @@ export function PublicLanding({
           {content ? <p className="gl-footer-line">{content.copyright}</p> : null}
         </footer>
 
-        {/* The mobile sticky CTA — landing.css pins it to the screen's bottom edge and
-            hides it at desk widths, where the header's way in is always on screen. Gone
+        {/* The sticky CTA — pinned to the screen's bottom edge at every width: a full
+            bar on the phone, a floating button in the inline-end corner at a desk. Gone
             while the flow is open: the dialog owns the screen then. */}
         {!flowOpen && selectedGroup ? (
           <div className="landing-sticky-bar">
-            <Button onClick={openFlow} data-testid="landing-sticky-cta" style={{ inlineSize: '100%' }}>
+            <button
+              type="button"
+              className="gl-btn gl-btn--red gl-btn--full"
+              onClick={openFlow}
+              data-testid="landing-sticky-cta"
+            >
               {t(locale, 'people.landing.freeTrial')}
-            </Button>
+            </button>
           </div>
         ) : null}
 

@@ -430,6 +430,11 @@ describe('booking — every call to action reaches the flow', () => {
     render(<PublicLanding slug="judo-tel-aviv" locale="he" client={clientReturning(TWO_GROUPS)} />)
     const bar = await screen.findByTestId('landing-sticky-cta')
     expect(bar).toHaveTextContent(t('he', 'people.landing.freeTrial'))
+    // It is the page's own crimson button, not the app's. The desk-width float is styled
+    // through `.landing-sticky-bar .gl-btn` — drop the class and the button keeps its
+    // full-bar width in a corner with no background behind it, which looks like a bug and
+    // fails no test that only checks the text.
+    expect(bar).toHaveClass('gl-btn', 'gl-btn--red')
     await user.click(bar)
     expect(screen.getByTestId('booking-dialog')).toBeInTheDocument()
     expect(screen.queryByTestId('landing-sticky-cta')).toBeNull()
@@ -549,6 +554,61 @@ describe('the designed Gladiator page (Stitch, hardcoded content)', () => {
     expect(coach).toHaveTextContent('סנסאי לביא תמיר')
     expect(coach).toHaveTextContent('20 שנות ניסיון')
     expect(coach).toHaveTextContent('בוגר וינגייט')
+  })
+
+  it('states the club\u2019s size on a third credential card, and draws no icons', async () => {
+    render(<PublicLanding slug="gladiator" locale="he" client={clientReturning(GLADIATOR)} />)
+    const coach = await screen.findByTestId('landing-coach')
+    const cards = coach.querySelectorAll('.gl-cred')
+    expect(cards).toHaveLength(3)
+    // The figure card: the number is the headline, the heading says what it counts.
+    const figure = coach.querySelector('.gl-cred--figure')
+    expect(figure).toHaveTextContent('300+')
+    // Inside an LTR island, so Hebrew's bidi cannot reorder it into "+300".
+    expect(figure?.querySelector('bdi')).toHaveAttribute('dir', 'ltr')
+    expect(figure).toHaveTextContent('חניכים עברו במועדון')
+    // The icons are gone — the whole point of the change. An <svg> back in this row means
+    // a drawing has crept back in beside cards that already say the thing in words.
+    expect(coach.querySelectorAll('.gl-cred svg')).toHaveLength(0)
+  })
+
+  it('shows the club\u2019s own photographs, each with alt text a screen reader can use', async () => {
+    render(<PublicLanding slug="gladiator" locale="he" client={clientReturning(GLADIATOR)} />)
+    const gallery = await screen.findByTestId('landing-gallery')
+    const shots = [...gallery.querySelectorAll('img')]
+    expect(shots).toHaveLength(5)
+    // The seam: every tile carries a real src, a translated alt, and defers its bytes.
+    // Alt text falling back to a filename, or an eager below-the-fold photo, both pass a
+    // test that only counts the images.
+    for (const shot of shots) {
+      expect(shot.getAttribute('src')).toMatch(/^\/clubs\/gladiator-.+\.jpg$/)
+      expect(shot.getAttribute('alt')).toBeTruthy()
+      expect(shot).toHaveAttribute('loading', 'lazy')
+    }
+    expect(shots[0]).toHaveAttribute('alt', "נבחרת הבוגרים של המועדון עם המדליות מפסטיבל הג'ודו באילת")
+    // The first tile leads the grid; the rest are squares under it.
+    expect(shots[0]).toHaveClass('gl-shot--lead')
+    expect(shots.slice(1).some((shot) => shot.classList.contains('gl-shot--lead'))).toBe(false)
+    // The one photograph whose square crop would take a head off carries its focus.
+    const certificates = shots.find((shot) => shot.getAttribute('src')?.includes('certificates'))
+    expect(certificates).toHaveStyle({ objectPosition: 'center 20%' })
+  })
+
+  it('translates the gallery with the page, photographs and all', async () => {
+    render(<PublicLanding slug="gladiator" locale="en" client={clientReturning(GLADIATOR)} />)
+    const gallery = await screen.findByTestId('landing-gallery')
+    expect(gallery).toHaveTextContent('Moments from the club')
+    expect(gallery.querySelectorAll('img')).toHaveLength(5)
+    expect(gallery.querySelector('img')).toHaveAttribute(
+      'alt',
+      "The club's senior squad with their medals from the Eilat judo festival",
+    )
+  })
+
+  it('keeps no gallery for a club without designed content', async () => {
+    render(<PublicLanding slug="judo-tel-aviv" locale="he" client={clientReturning(LANDING)} />)
+    await screen.findByTestId('landing-hero')
+    expect(screen.queryByTestId('landing-gallery')).toBeNull()
   })
 
   it('renders the designed timetable cell-for-cell, times low-first, with the legend', async () => {

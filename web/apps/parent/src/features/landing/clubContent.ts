@@ -85,7 +85,10 @@ export type ClubContent = {
     name: string
     title: string
     bio: string
-    credentials: { icon: 'experience' | 'education'; title: string; text: string }[]
+    /** A card each. `figure` marks the one that leads with a number — it renders as the
+     *  accent card, which is what keeps a row of three from reading as three identical
+     *  rectangles now that the icons are gone. */
+    credentials: readonly { title: string; text: string; figure?: string }[]
   }
   scheduleLead: string
   /** Sunday-first weekday → its slots, matching `people.weekdays.*`. */
@@ -95,6 +98,11 @@ export type ClubContent = {
   plansLead: string
   perMonth: string
   plans: ClubPlan[]
+  galleryTitle: string
+  galleryLead: string
+  /** The club's own photographs. `focus` is an `object-position` for the tiles whose
+   *  square crop would otherwise cut a face off. */
+  gallery: { src: string; alt: string; focus?: string }[]
   voicesTitle: string
   voices: { quote: string; name: string; role?: string }[]
   navItems: { href: string; label: string }[]
@@ -169,11 +177,25 @@ const PRICES_AGOROT = [30000, 40000, 55000] as const
 
 const LOGO_URL = '/clubs/gladiator-logo.png'
 
+/** The club's photographs, in render order — the first is the wide lead tile. Same
+ *  reasoning as LOGO_URL: served by this app, so no object store and no upload. A club
+ *  that uploads its own strip through the הגדרות panel still gets that one; this is the
+ *  designed page's own set. `focus` only appears where a centred square crop would take
+ *  a head off. */
+const GALLERY: Quintet<{ src: string; focus?: string }> = [
+  { src: '/clubs/gladiator-team.jpg' },
+  { src: '/clubs/gladiator-medals.jpg' },
+  // Portrait: centred, the square would cut the coach's head and the children's faces.
+  { src: '/clubs/gladiator-certificates.jpg', focus: 'center 20%' },
+  { src: '/clubs/gladiator-celebration.jpg' },
+  { src: '/clubs/gladiator-podium.jpg' },
+]
+
 /** Fixed arities, so a translation that drops a plan or a nav entry fails to COMPILE
  *  rather than rendering a short page in one language only. */
 type Trio<T> = readonly [T, T, T]
 type Quartet<T> = readonly [T, T, T, T]
-type Pair<T> = readonly [T, T]
+type Quintet<T> = readonly [T, T, T, T, T]
 
 // ---------------------------------------------------------------------------
 // Per-locale words.
@@ -189,7 +211,7 @@ type ClubCopy = {
     name: string
     title: string
     bio: string
-    credentials: Pair<{ title: string; text: string }>
+    credentials: Trio<{ title: string; text: string; figure?: string }>
   }
   scheduleLead: string
   slotTitles: Record<SlotTitleKey, string>
@@ -199,6 +221,11 @@ type ClubCopy = {
   plansLead: string
   perMonth: string
   plans: Trio<{ name: string; cadence: string; features: string[]; cta: string; badge?: string }>
+  galleryTitle: string
+  galleryLead: string
+  /** One per `GALLERY` entry, in the same order — the alt text IS the caption here, so a
+   *  screen reader and a broken connection both get the club, not a filename. */
+  galleryAlts: Quintet<string>
   voicesTitle: string
   voices: { quote: string; name: string; role?: string }[]
   navLabels: Quartet<string>
@@ -235,6 +262,11 @@ const HE: ClubCopy = {
       {
         title: 'גישה חינוכית',
         text: 'בוגר וינגייט המשלב פסיכולוגיית ספורט בכל אימון.',
+      },
+      {
+        figure: '300+',
+        title: 'חניכים עברו במועדון',
+        text: 'דורות של ילדים ובני נוער יצאו מהמזרן הזה לתחרויות, לנבחרות ולחיים.',
       },
     ],
   },
@@ -316,6 +348,15 @@ const HE: ClubCopy = {
       role: 'נבחרת גלדיאטור',
     },
   ],
+  galleryTitle: 'רגעים מהמועדון',
+  galleryLead: 'תחרויות, טקסים וחגיגות סוף עונה — המועדון כפי שהוא נראה מבפנים.',
+  galleryAlts: [
+    "נבחרת הבוגרים של המועדון עם המדליות מפסטיבל הג'ודו באילת",
+    "קבוצת הצעירים בדוג'ו עם המדליות והגביעים של סוף העונה",
+    'שני חניכים עם המאמן ותעודות ההשתתפות בטורניר',
+    'חגיגת סוף שנה במועדון, חניכים והורים מרימים כוסית',
+    'קבוצת חניכים עם המאמנים והמדליות בתחרות',
+  ],
   navLabels: ['אודות', 'מערכת שעות', 'מסלולים', 'המלצות'],
   steps: [
     'נרשמים לשיעור ניסיון דרך הטופס',
@@ -353,6 +394,11 @@ const EN: ClubCopy = {
       {
         title: 'An educational approach',
         text: 'A Wingate graduate who brings sport psychology into every session.',
+      },
+      {
+        figure: '300+',
+        title: 'Students have trained here',
+        text: 'Generations of children and teenagers left this mat for competitions, for squads and for life.',
       },
     ],
   },
@@ -435,6 +481,15 @@ const EN: ClubCopy = {
       role: 'Gladiator squad',
     },
   ],
+  galleryTitle: 'Moments from the club',
+  galleryLead: 'Competitions, ceremonies and end-of-season celebrations — the club as it looks from the inside.',
+  galleryAlts: [
+    "The club's senior squad with their medals from the Eilat judo festival",
+    "The youngest group in the dojo with the season's medals and cups",
+    'Two students with their coach and their tournament participation certificates',
+    'The club’s end-of-year celebration, students and parents raising a glass',
+    'A group of students with their coaches and their medals at a competition',
+  ],
   navLabels: ['About', 'Timetable', 'Plans', 'Testimonials'],
   steps: [
     'Book a trial session through the form',
@@ -470,6 +525,11 @@ const RU: ClubCopy = {
       {
         title: 'Педагогический подход',
         text: 'Выпускник института Вингейт, применяющий спортивную психологию на каждой тренировке.',
+      },
+      {
+        figure: '300+',
+        title: 'Учеников прошли через клуб',
+        text: 'Поколения детей и подростков ушли с этого татами на соревнования, в сборные и в жизнь.',
       },
     ],
   },
@@ -552,6 +612,15 @@ const RU: ClubCopy = {
       role: 'Сборная «Гладиатор»',
     },
   ],
+  galleryTitle: 'Моменты из клуба',
+  galleryLead: 'Соревнования, церемонии и праздники конца сезона — клуб таким, какой он изнутри.',
+  galleryAlts: [
+    'Взрослая команда клуба с медалями фестиваля дзюдо в Эйлате',
+    'Младшая группа в додзё с медалями и кубками конца сезона',
+    'Двое учеников с тренером и грамотами участника турнира',
+    'Праздник конца года в клубе: ученики и родители поднимают бокалы',
+    'Группа учеников с тренерами и медалями на соревновании',
+  ],
   navLabels: ['О клубе', 'Расписание', 'Тарифы', 'Отзывы'],
   steps: [
     'Записываетесь на пробную тренировку через форму',
@@ -570,8 +639,9 @@ const COPY: Record<Locale, ClubCopy> = { he: HE, en: EN, ru: RU }
 function resolve(copy: ClubCopy): ClubContent {
   const [foundation, fighter, gladiator] = copy.plans
   const [priceFoundation, priceFighter, priceGladiator] = PRICES_AGOROT
-  const [experience, education] = copy.coach.credentials
   const [navAbout, navSchedule, navPlans, navVoices] = copy.navLabels
+  const [team, medals, certificates, celebration, podium] = GALLERY
+  const [altTeam, altMedals, altCertificates, altCelebration, altPodium] = copy.galleryAlts
   return {
     // `public/clubs/` — served from the app's own origin, so it needs no object store and
     // no upload. Replaced the moment the club uploads a logo through the הגדרות panel.
@@ -579,13 +649,7 @@ function resolve(copy: ClubCopy): ClubContent {
     displayName: copy.displayName,
     seasonBadge: copy.seasonBadge,
     hero: copy.hero,
-    coach: {
-      ...copy.coach,
-      credentials: [
-        { icon: 'experience', ...experience },
-        { icon: 'education', ...education },
-      ],
-    },
+    coach: copy.coach,
     scheduleLead: copy.scheduleLead,
     schedule: SCHEDULE.map(({ day, slots }) => ({
       day,
@@ -604,6 +668,15 @@ function resolve(copy: ClubCopy): ClubContent {
       { ...foundation, priceAgorot: priceFoundation, highlighted: false },
       { ...fighter, priceAgorot: priceFighter, highlighted: true },
       { ...gladiator, priceAgorot: priceGladiator, highlighted: false },
+    ],
+    galleryTitle: copy.galleryTitle,
+    galleryLead: copy.galleryLead,
+    gallery: [
+      { ...team, alt: altTeam },
+      { ...medals, alt: altMedals },
+      { ...certificates, alt: altCertificates },
+      { ...celebration, alt: altCelebration },
+      { ...podium, alt: altPodium },
     ],
     voicesTitle: copy.voicesTitle,
     voices: copy.voices,
