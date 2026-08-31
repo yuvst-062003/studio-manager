@@ -1,17 +1,27 @@
 // Parent artboard 13a, steps 1-5 — §5.4a's booking flow, in its stated order:
 //
-//   1 התחברות     sign-in FIRST, before any child detail is typed
+//   1 הפרטים שלכם  who is booking — name and a way to reach them
 //   2 פרטי הילדים  name · birthdate · group, [ + הוסף ילד נוסף ]
 //   3 הצהרת בריאות the SHORT trial form, per child
 //   4 בחירת שיעור  the next N sessions of the chosen group
 //   5 אישור        handled by BookingConfirmed
 //
-// **Step 1 is not negotiable.** §5.4a: "The parent authenticates **before** entering child
-// details." Three consequences the spec spells out — no invitation email and no waiting, so
-// the funnel has one less place to leak; the profile exists the moment they finish; and
-// somebody who abandons after step 1 leaves a Person with no students, which the app renders
-// as a resume prompt. Rendering the child form first and asking for sign-in at submit would
-// throw away everything they typed.
+// **Step 1 was a sign-in wall until 2026-08-31** (owner's decision). §5.4a's "the parent
+// authenticates BEFORE entering child details" was written to stop somebody typing a whole
+// form and losing it at a login prompt — a real problem — but it paid for that by charging
+// a Google account at the only self-service door in the product, and a parent who did not
+// want one could not book a first lesson at all. Every other club takes a name, an email
+// and a phone number.
+//
+// What the ordering protected is kept: who-you-are is still asked first, so nothing typed
+// is ever thrown away. What changed is that answering it is a form rather than an account.
+// Sign-in survives on this step as an OFFER — a family that already has an account should
+// reach their own record instead of creating a second lead.
+//
+// The address is the load-bearing field. It is how the club replies, and §6.1 step 3
+// attaches this booking to whoever later signs in with it verified — so the children are
+// already there when the family opens the app. The server treats a typed address as
+// unverified and makes a lead, never an account (see `_resolve_parent`).
 //
 // L6 — nothing in this flow enrols anybody. The group choice picks which trial lesson to
 // attend; the manager decides membership later (§5.4).
@@ -32,7 +42,7 @@ import type {
 } from './landingClient'
 
 type Child = { first_name: string; last_name: string; birthdate: string; group_id: string }
-type Step = 'sign-in' | 'children' | 'health' | 'slot'
+type Step = 'you' | 'children' | 'health' | 'slot'
 
 const listStyle: CSSProperties = {
   listStyle: 'none',
@@ -57,14 +67,18 @@ const blankChild = (groupId = ''): Child => ({
   group_id: groupId,
 })
 
-const STEPS = ['sign-in', 'children', 'health', 'slot'] as const
+const STEPS = ['you', 'children', 'health', 'slot'] as const
 
 const STEP_KEY: Record<Step, string> = {
-  'sign-in': 'signIn',
+  you: 'you',
   children: 'children',
   health: 'health',
   slot: 'slot',
 }
+
+/** Enough of an address to be worth sending to. The server holds the real rule
+ *  (`EMAIL_PATTERN`); this only exists so the reader is told before they press. */
+const LOOKS_LIKE_EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
 
 const progressStyle: CSSProperties = {
   listStyle: 'none',
@@ -177,7 +191,15 @@ export function BookingFlow({
   /** Redesign 2026-08-29 — the group the landing picker chose; pre-fills the first child. */
   initialGroupId?: string | null
 }) {
-  const [step, setStep] = useState<Step>(signedIn ? 'children' : 'sign-in')
+  const [step, setStep] = useState<Step>(signedIn ? 'children' : 'you')
+  // Who is booking, when nobody signed in. A signed-in parent never sees this step and
+  // never sends it: the server ignores a typed address in favour of the verified one.
+  const [guardian, setGuardian] = useState({
+    first_name: '',
+    last_name: '',
+    email: '',
+    phone: '',
+  })
   const [children, setChildren] = useState<Child[]>([blankChild(initialGroupId ?? '')])
   const [confirmed, setConfirmed] = useState<boolean[]>([false])
   // Keyed by group, because §5.4a step 4 offers 'the next N upcoming sessions of EACH
@@ -216,30 +238,76 @@ export function BookingFlow({
     return <BookingConfirmed result={result} locale={locale} address={address} phone={phone} />
   }
 
-  // -- step 1: sign in, before anything is typed ------------------------------
-  if (step === 'sign-in') {
-    // `return_path` brings them back to this exact club after the provider round trip, so
-    // the flow resumes instead of dropping them on a generic home screen — and it carries
-    // the picked group, so the choice survives the trip (PublicLanding reads `?book=`).
+  // -- step 1: who is booking -------------------------------------------------
+  // This step used to be a sign-in wall (owner's decision 2026-08-31 removed it): a Google
+  // account stood in front of the only self-service door in the product, and a parent who
+  // did not want one could not book a first lesson at all. Every other club takes a name
+  // and a way to reach you, so this one does too.
+  //
+  // The address is not decoration. It is how the club replies, and it is how §6.1 step 3
+  // finds this booking if the family signs in later — "verified email hit → attach to the
+  // matched Person" — so the children are already there when they open the app.
+  if (step === 'you') {
+    const complete =
+      guardian.first_name.trim().length > 0 && LOOKS_LIKE_EMAIL.test(guardian.email.trim())
+    // The provider round trip returns to this exact club, carrying the picked group so the
+    // choice survives it (PublicLanding reads `?book=`).
     const returnPath = encodeURIComponent(
       `/t/${slug}${initialGroupId ? `?book=${initialGroupId}` : ''}`,
     )
     return (
-      <section aria-labelledby="booking-signin" data-testid="booking-sign-in">
+      <section aria-labelledby="booking-you" data-testid="booking-you">
         <StepProgress locale={locale} current={step} />
-        <h3 id="booking-signin">{t(locale, 'people.landing.step.signIn')}</h3>
-        <p>{t(locale, 'people.landing.signInHint')}</p>
-        {/* Through `apiUrl`, like SignIn.tsx's provider buttons. This is a TOP-LEVEL
-            NAVIGATION, not a fetch, so a relative path is resolved against the APP's host
-            — and on split origins that host answers `200 text/html` with the SPA shell.
-            The page reloaded, the reader stayed on this step, and every step behind it was
-            unreachable (2026-08-31). */}
-        <a
-          href={apiUrl(`/api/v1/auth/google/start?app=parent&return_path=${returnPath}`)}
-          data-testid="booking-sign-in-link"
+        <h3 id="booking-you">{t(locale, 'people.landing.step.you')}</h3>
+        <p>{t(locale, 'people.landing.youHint')}</p>
+        <div style={rowStyle}>
+          <TextField
+            label={t(locale, 'people.student.firstName')}
+            value={guardian.first_name}
+            onChange={(event) => setGuardian({ ...guardian, first_name: event.target.value })}
+            data-testid="booking-you-first-name"
+          />
+          <TextField
+            label={t(locale, 'people.student.lastName')}
+            value={guardian.last_name}
+            onChange={(event) => setGuardian({ ...guardian, last_name: event.target.value })}
+            data-testid="booking-you-last-name"
+          />
+          <TextField
+            label={t(locale, 'people.student.email')}
+            type="email"
+            value={guardian.email}
+            onChange={(event) => setGuardian({ ...guardian, email: event.target.value })}
+            data-testid="booking-you-email"
+          />
+          <TextField
+            label={t(locale, 'people.student.phone')}
+            type="tel"
+            value={guardian.phone}
+            onChange={(event) => setGuardian({ ...guardian, phone: event.target.value })}
+            data-testid="booking-you-phone"
+          />
+        </div>
+        <Button
+          disabled={!complete}
+          onClick={() => setStep('children')}
+          data-testid="booking-to-children"
         >
-          {t(locale, 'people.landing.signInFirst')}
-        </a>
+          {t(locale, 'people.landing.next')}
+        </Button>
+        {/* Kept, as an offer rather than a gate. A family that already has an account
+            should reach their own record instead of creating a second lead — and this is
+            the fast path for them. Through `apiUrl` because it is a TOP-LEVEL NAVIGATION:
+            a relative path resolves against the APP's host, which answers with the SPA
+            shell and silently reloads the page (2026-08-31). */}
+        <p>
+          <a
+            href={apiUrl(`/api/v1/auth/google/start?app=parent&return_path=${returnPath}`)}
+            data-testid="booking-sign-in-link"
+          >
+            {t(locale, 'people.landing.signInInstead')}
+          </a>
+        </p>
       </section>
     )
   }
@@ -392,6 +460,18 @@ export function BookingFlow({
     setError(null)
     client
       .book({
+        // Only when nobody signed in. A session's verified address wins on the server
+        // regardless, so sending this alongside one would be noise at best.
+        ...(signedIn
+          ? {}
+          : {
+              guardian: {
+                first_name: guardian.first_name.trim(),
+                last_name: guardian.last_name.trim(),
+                email: guardian.email.trim(),
+                phone: guardian.phone.trim() || null,
+              },
+            }),
         children: children.map((child, index) => ({
           first_name: child.first_name,
           last_name: child.last_name,

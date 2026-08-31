@@ -347,13 +347,16 @@ describe('booking — every call to action reaches the flow', () => {
     window.history.replaceState(null, '', '/')
   })
 
-  it('the hero CTA opens the flow as a dialog, sign-in first, with the first group carried in', async () => {
+  it('the hero CTA opens the flow as a dialog, asking who is booking, with the first group carried in', async () => {
     const user = userEvent.setup()
     render(<PublicLanding slug="judo-tel-aviv" locale="he" client={clientReturning(TWO_GROUPS)} />)
     await user.click(await screen.findByTestId('landing-hero-cta'))
     const dialog = screen.getByTestId('booking-dialog')
     expect(dialog).toHaveAttribute('role', 'dialog')
-    expect(screen.getByTestId('booking-sign-in')).toBeInTheDocument()
+    // Step 1 is a form, not a sign-in wall (2026-08-31). The sign-in link is still there
+    // as a shortcut for a family that already has an account, which is what the href
+    // assertion below is about.
+    expect(screen.getByTestId('booking-you')).toBeInTheDocument()
     expect(screen.getByTestId('booking-sign-in-link')).toHaveAttribute(
       'href',
       expect.stringContaining(encodeURIComponent('book=g1')),
