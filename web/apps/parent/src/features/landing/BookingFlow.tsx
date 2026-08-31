@@ -162,12 +162,60 @@ const progressDotStyle: CSSProperties = {
   color: 'var(--text-muted)',
 }
 
+/** A passed step, as the control it now is. Inherits the rail's own type and colour so it
+ *  reads as the same thing it was a moment ago — a real button, not a link pretending. */
+const stepBackButtonStyle: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  gap: 'var(--space-1)',
+  background: 'none',
+  border: 'none',
+  padding: 0,
+  font: 'inherit',
+  color: 'inherit',
+  cursor: 'pointer',
+}
+
 /** The four §5.4a steps as a progress rail, the current one marked for AT and eye alike. */
-function StepProgress({ locale, current }: { locale: Locale; current: Step }) {
+function StepProgress({
+  locale,
+  current,
+  onGo,
+  firstStep,
+}: {
+  locale: Locale
+  current: Step
+  /** Jump back to a step already passed. */
+  onGo: (step: Step) => void
+  /** Where this booking begins — `children` for a parent who signed in, so their rail
+   *  never offers a details step they were right to skip. */
+  firstStep: Step
+}) {
+  const currentIndex = STEPS.indexOf(current)
+  const firstIndex = STEPS.indexOf(firstStep)
   return (
     <ol style={progressStyle} data-testid="booking-progress">
       {STEPS.map((step, index) => {
         const active = step === current
+        // Backwards only. A step already answered can be reopened; one still ahead cannot,
+        // because reaching it means passing the checks in between — the group a child
+        // belongs to, a declaration per child — and a rail that skipped them would be a
+        // way around them rather than a way through.
+        const canGoBack = index < currentIndex && index >= firstIndex
+        const label = t(locale, `people.landing.step.${STEP_KEY[step]}`)
+        const dot = (
+          <span
+            style={
+              active
+                ? { ...progressDotStyle, background: 'var(--fg)', color: 'var(--on-fg)', border: 'none' }
+                : progressDotStyle
+            }
+            aria-hidden="true"
+          >
+            {index + 1}
+          </span>
+        )
         return (
           <li
             key={step}
@@ -178,17 +226,22 @@ function StepProgress({ locale, current }: { locale: Locale; current: Step }) {
                 : progressItemStyle
             }
           >
-            <span
-              style={
-                active
-                  ? { ...progressDotStyle, background: 'var(--fg)', color: 'var(--on-fg)', border: 'none' }
-                  : progressDotStyle
-              }
-              aria-hidden="true"
-            >
-              {index + 1}
-            </span>
-            {t(locale, `people.landing.step.${STEP_KEY[step]}`)}
+            {canGoBack ? (
+              <button
+                type="button"
+                onClick={() => onGo(step)}
+                style={stepBackButtonStyle}
+                data-testid={`booking-step-${STEP_KEY[step]}`}
+              >
+                {dot}
+                {label}
+              </button>
+            ) : (
+              <>
+                {dot}
+                {label}
+              </>
+            )}
           </li>
         )
       })}
@@ -240,7 +293,10 @@ export function BookingFlow({
   /** Redesign 2026-08-29 — the group the landing picker chose; pre-fills the first child. */
   initialGroupId?: string | null
 }) {
-  const [step, setStep] = useState<Step>(signedIn ? 'children' : 'you')
+  // A signed-in parent has no details to give — theirs came from the provider — so their
+  // booking starts at the children and `you` is not a step they can go back to.
+  const firstStep: Step = signedIn ? 'children' : 'you'
+  const [step, setStep] = useState<Step>(firstStep)
   // Who is booking, when nobody signed in. A signed-in parent never sees this step and
   // never sends it: the server ignores a typed address in favour of the verified one.
   const [guardian, setGuardian] = useState({
@@ -306,7 +362,7 @@ export function BookingFlow({
     )
     return (
       <section aria-labelledby="booking-you" data-testid="booking-you">
-        <StepProgress locale={locale} current={step} />
+        <StepProgress locale={locale} current={step} onGo={setStep} firstStep={firstStep} />
         <h3 id="booking-you">{t(locale, 'people.landing.step.you')}</h3>
         <p>{t(locale, 'people.landing.youHint')}</p>
         <div style={fieldGridStyle}>
@@ -377,7 +433,7 @@ export function BookingFlow({
     )
     return (
       <section aria-labelledby="booking-children" data-testid="booking-children">
-        <StepProgress locale={locale} current={step} />
+        <StepProgress locale={locale} current={step} onGo={setStep} firstStep={firstStep} />
         <h3 id="booking-children">{t(locale, 'people.landing.step.children')}</h3>
         <ul style={listStyle}>
           {children.map((child, index) => (
@@ -448,6 +504,14 @@ export function BookingFlow({
           ))}
         </ul>
         <div style={actionsStyle}>
+          {/* Step 2 had no way back at all — the only step that did not (2026-08-31).
+              Hidden for a signed-in parent, whose booking starts here: a "back" to a
+              details step they never saw would be a dead end. */}
+          {firstStep !== 'children' ? (
+            <Button variant="ghost" onClick={() => setStep('you')} data-testid="booking-to-you">
+              {t(locale, 'people.landing.back')}
+            </Button>
+          ) : null}
           <Button
             variant="secondary"
             onClick={() => {
@@ -478,7 +542,7 @@ export function BookingFlow({
     const allConfirmed = confirmed.every(Boolean)
     return (
       <section aria-labelledby="booking-health" data-testid="booking-health">
-        <StepProgress locale={locale} current={step} />
+        <StepProgress locale={locale} current={step} onGo={setStep} firstStep={firstStep} />
         <h3 id="booking-health">{t(locale, 'people.trialHealth.title')}</h3>
         <p>{t(locale, 'people.trialHealth.subtitle')}</p>
         <ul style={listStyle}>
@@ -577,7 +641,7 @@ export function BookingFlow({
 
   return (
     <form onSubmit={submit} aria-labelledby="booking-slot" data-testid="booking-slot">
-      <StepProgress locale={locale} current="slot" />
+      <StepProgress locale={locale} current="slot" onGo={setStep} firstStep={firstStep} />
       <h3 id="booking-slot">{t(locale, 'people.landing.chooseSlot')}</h3>
       {children.map((child, index) => {
         const forChild = slotsByGroup[child.group_id] ?? []

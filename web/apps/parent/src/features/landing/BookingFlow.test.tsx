@@ -557,3 +557,59 @@ describe('landing redesign (2026-08-29) — pre-selected group and step progress
     ).toHaveTextContent(t('he', 'people.landing.step.you'))
   })
 })
+
+// "A person can't go back on the stages — he needs to be able to go back and forth"
+// (2026-08-31). Step 2 was the only step with no way back at all, so a parent who mistyped
+// their own email had to abandon the booking and start it again.
+describe('moving back through the steps', () => {
+  const fillYou = async (user: ReturnType<typeof userEvent.setup>) => {
+    await user.type(screen.getByTestId('booking-you-first-name'), 'רונית')
+    await user.type(screen.getByTestId('booking-you-email'), 'ronit@example.test')
+    await user.click(screen.getByTestId('booking-to-children'))
+  }
+
+  it('goes back from the children to the details, with what was typed still there', async () => {
+    const user = userEvent.setup()
+    render(<BookingFlow slug="judo" locale="he" client={makeClient()} groups={GROUPS} />)
+    await fillYou(user)
+
+    await user.click(screen.getByTestId('booking-to-you'))
+    expect(screen.getByTestId('booking-you')).toBeInTheDocument()
+    // Going back to correct something must not cost you the rest. The state lives in the
+    // flow, not in the step, so every answer survives the trip.
+    expect(screen.getByTestId('booking-you-email')).toHaveValue('ronit@example.test')
+  })
+
+  it('offers no way back to a details step the signed-in parent never saw', async () => {
+    // Their booking starts at the children, so "back" would be a dead end.
+    render(<BookingFlow slug="judo" locale="he" client={makeClient()} groups={GROUPS} signedIn />)
+    expect(screen.queryByTestId('booking-to-you')).toBeNull()
+  })
+
+  it('reopens an earlier step from the progress rail, and keeps the children', async () => {
+    const user = userEvent.setup()
+    render(<BookingFlow slug="judo" locale="he" client={makeClient()} groups={GROUPS} />)
+    await fillYou(user)
+    await user.type(screen.getByLabelText(t('he', 'people.student.firstName')), 'נועה')
+    await user.type(screen.getByLabelText(t('he', 'people.student.lastName')), 'לוי')
+    await user.selectOptions(screen.getByTestId('booking-group-0'), 'g1')
+    await user.click(screen.getByTestId('booking-to-health'))
+
+    await user.click(screen.getByTestId('booking-step-children'))
+    expect(screen.getByTestId('booking-children')).toBeInTheDocument()
+    expect(screen.getByLabelText(t('he', 'people.student.firstName'))).toHaveValue('נועה')
+  })
+
+  it('will not let the rail skip a step that has not been answered', async () => {
+    // Forward through the rail would walk past the checks between here and there — the
+    // group each child belongs to, a declaration per child. Backwards only.
+    const user = userEvent.setup()
+    render(<BookingFlow slug="judo" locale="he" client={makeClient()} groups={GROUPS} />)
+    await fillYou(user)
+    expect(screen.queryByTestId('booking-step-health')).toBeNull()
+    expect(screen.queryByTestId('booking-step-slot')).toBeNull()
+    // The one behind is reachable; the current one is not a button at all.
+    expect(screen.getByTestId('booking-step-you')).toBeInTheDocument()
+    expect(screen.queryByTestId('booking-step-children')).toBeNull()
+  })
+})
