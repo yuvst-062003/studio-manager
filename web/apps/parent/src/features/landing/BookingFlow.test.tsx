@@ -114,6 +114,29 @@ describe('BookingFlow — §5.4a steps 1-4', () => {
     expect(link).toHaveAccessibleName(t('he', 'people.landing.signInFirst'))
   })
 
+  // The whole flow sat behind this one link, and on a deployed build it pointed at the
+  // wrong origin (2026-08-31). `/api/v1/auth/google/start` is a TOP-LEVEL NAVIGATION, so
+  // the browser resolved the relative path against the APP's host: staging answered
+  // `200 text/html` with the SPA shell, the page simply reloaded, and the reader stayed on
+  // the sign-in step forever — reported as "can't write the kids, can't fill the health,
+  // can't sign in", which is all one bug. The API host answers 307 to Google.
+  //
+  // Asserted with an origin STUBBED IN, because the test build bakes none: with an empty
+  // `VITE_API_ORIGIN` the broken and the fixed link are byte-identical, and a test that
+  // cannot tell them apart is the reason this shipped. `SignIn.tsx` solved it the same way
+  // for the dashboard and this link never got it.
+  it('sends the reader to the API’s own origin, not the app’s', async () => {
+    vi.stubEnv('VITE_API_ORIGIN', 'https://api.example.test')
+    vi.resetModules()
+    const { BookingFlow: Fresh } = await import('./BookingFlow')
+    render(<Fresh slug="judo-tel-aviv" locale="he" client={makeClient()} groups={GROUPS} />)
+    expect(screen.getByTestId('booking-sign-in-link').getAttribute('href')).toMatch(
+      /^https:\/\/api\.example\.test\/api\/v1\/auth\/google\/start\?/,
+    )
+    vi.unstubAllEnvs()
+    vi.resetModules()
+  })
+
   it('a signed-in parent starts at the child form', async () => {
     render(<BookingFlow slug="judo" locale="he" client={makeClient()} groups={GROUPS} signedIn />)
     expect(screen.getByTestId('booking-children')).toBeInTheDocument()

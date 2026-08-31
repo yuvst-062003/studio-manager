@@ -18,7 +18,7 @@
 import { useEffect, useState } from 'react'
 import type { CSSProperties, FormEvent } from 'react'
 import { Alert, Button, Checkbox, SelectField, SlotChips, TextField } from '@studio/ui'
-import { formatDateInStudioZone, formatTimeInStudioZone } from '@studio/core'
+import { apiUrl, formatDateInStudioZone, formatTimeInStudioZone } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { BookingConfirmed } from './BookingConfirmed'
@@ -229,8 +229,13 @@ export function BookingFlow({
         <StepProgress locale={locale} current={step} />
         <h3 id="booking-signin">{t(locale, 'people.landing.step.signIn')}</h3>
         <p>{t(locale, 'people.landing.signInHint')}</p>
+        {/* Through `apiUrl`, like SignIn.tsx's provider buttons. This is a TOP-LEVEL
+            NAVIGATION, not a fetch, so a relative path is resolved against the APP's host
+            — and on split origins that host answers `200 text/html` with the SPA shell.
+            The page reloaded, the reader stayed on this step, and every step behind it was
+            unreachable (2026-08-31). */}
         <a
-          href={`/api/v1/auth/google/start?app=parent&return_path=${returnPath}`}
+          href={apiUrl(`/api/v1/auth/google/start?app=parent&return_path=${returnPath}`)}
           data-testid="booking-sign-in-link"
         >
           {t(locale, 'people.landing.signInFirst')}
