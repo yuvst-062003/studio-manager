@@ -195,7 +195,12 @@ export const people: Bundle = {
   'join.card.revoke': 'Revoke',
   'join.card.copy': 'Copy',
   'join.card.copied': 'Copied',
+  // Kept: the staff app still shows it on the moment-of-creation card.
   'join.card.onceNote': 'The link is shown once — copy and share it now.',
+  // The permanent link (2026-08-31). No countdown, because there is nothing to count.
+  'join.card.permanent': 'Active · permanent link',
+  'join.card.legacyNote':
+    'This link is active but was created before the update, so it cannot be shown. Create a new one to get a permanent link you can copy any time.',
   'landing.card.title': "The club's landing page",
   'landing.card.hint': 'Share with new families — trial-lesson signup.',
   'sibling.subtitle': 'The child is added to this same account',

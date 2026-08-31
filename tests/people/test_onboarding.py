@@ -71,13 +71,45 @@ def test_regenerating_revokes_the_previous_link(tenant_session, studio):
         OnboardingService.resolve(tenant_session, token=old_token, at=T0)
 
 
-def test_expired_revoked_and_unknown_tokens_are_indistinguishable(tenant_session, studio):
-    """No oracle: 'never existed', 'expired' and 'revoked' all answer identically."""
+def test_revoked_and_unknown_tokens_are_indistinguishable(tenant_session, studio):
+    """No oracle: 'never existed' and 'revoked' answer identically.
+
+    Expiry left this list on 2026-08-31 — a link that no longer expires cannot be the
+    third case. Revocation is the whole answer to a leaked link now, which is what the
+    spec always said it was ("the answer to a leaked link is a button").
+    """
     _, token = OnboardingService.regenerate(tenant_session, studio.id, actor_person_id=None, at=T0)
+    OnboardingService.revoke(tenant_session, actor_person_id=None, at=T0)
     with pytest.raises(NotFoundError):
-        OnboardingService.resolve(tenant_session, token=token, at=T0 + timedelta(days=8))
+        OnboardingService.resolve(tenant_session, token=token, at=T0)
     with pytest.raises(NotFoundError):
         OnboardingService.resolve(tenant_session, token="never-existed", at=T0)
+
+
+def test_a_link_does_not_expire(tenant_session, studio):
+    """Owner decision 2026-08-31: one permanent link the club posts once.
+
+    The 7-day TTL cost a repost for every family joining mid-season, and each
+    regeneration silently killed the link already sitting in the club's WhatsApp groups.
+    Revocation — instant, and unchanged — is what answers a leak.
+    """
+    row, token = OnboardingService.regenerate(
+        tenant_session, studio.id, actor_person_id=None, at=T0
+    )
+    assert row.expires_at is None
+    assert OnboardingService.resolve(tenant_session, token=token, at=T0 + timedelta(days=400))
+
+
+def test_the_live_token_is_readable_so_the_card_can_always_offer_copy(tenant_session, studio):
+    """The card draws a permanent העתקה button (onboarding-link-spec, "Where the button
+    lives"), which a hash-only row could never serve — the manager who reloaded the page
+    lost the link for good (owner report, 2026-08-31). The token is stored encrypted, so
+    a database read still yields nothing: the key lives in Railway secrets, not here.
+    """
+    _, token = OnboardingService.regenerate(tenant_session, studio.id, actor_person_id=None, at=T0)
+    current = OnboardingService.current(tenant_session, at=T0)
+    assert current is not None
+    assert OnboardingService.token_of(current) == token
 
 
 # -- the registration ----------------------------------------------------------
@@ -247,6 +279,25 @@ def test_the_manager_card_regenerates_and_the_public_read_validates(client, as_m
     assert client.get(f"/api/v1/public/onboarding/{token}").status_code == 404
 
 
+def test_the_card_reads_the_live_url_back_on_every_load(client, as_manager):
+    """The manager who reloads the page must still be able to copy the link (owner
+    report, 2026-08-31). Before this, GET returned status only, so the card rendered a
+    live link with no way to copy it and no way to recover it."""
+    created = client.post("/api/v1/onboarding-link", headers=as_manager.headers)
+    assert created.status_code == 201, created.text
+
+    status = client.get("/api/v1/onboarding-link", headers=as_manager.headers).json()
+    assert status["active"] is True
+    assert status["url"] == created.json()["url"]
+    assert status["expires_at"] is None
+
+    # Revoked, and the card has nothing left to offer.
+    client.delete("/api/v1/onboarding-link", headers=as_manager.headers)
+    after = client.get("/api/v1/onboarding-link", headers=as_manager.headers).json()
+    assert after["active"] is False
+    assert after["url"] is None
+
+
 def test_a_coach_sees_no_card_and_a_stranger_no_oracle(client, as_lead_coach):
     assert client.get("/api/v1/onboarding-link", headers=as_lead_coach.headers).status_code == 403
     assert client.get(f"/api/v1/public/onboarding/{uuid.uuid4().hex}").status_code == 404
@@ -344,7 +395,11 @@ def test_a_child_who_matches_an_existing_student_is_refused_and_creates_nothing(
         "self": False,
     }
     first = OnboardingService.add_child(
-        tenant_session, studio_id=studio.id, parent=parent, child=child, at=T0,
+        tenant_session,
+        studio_id=studio.id,
+        parent=parent,
+        child=child,
+        at=T0,
         schedule=twice_weekly,
     )
     tenant_session.flush()
@@ -352,7 +407,11 @@ def test_a_child_who_matches_an_existing_student_is_refused_and_creates_nothing(
 
     with pytest.raises(DuplicateStudentError) as raised:
         OnboardingService.add_child(
-            tenant_session, studio_id=studio.id, parent=parent, child=child, at=T0,
+            tenant_session,
+            studio_id=studio.id,
+            parent=parent,
+            child=child,
+            at=T0,
             schedule=twice_weekly,
         )
     assert raised.value.student_id == first
@@ -369,13 +428,21 @@ def test_a_different_birthdate_is_a_different_child(
     tenant_session.flush()
     base = {"first_name": "נועה", "last_name": "לוי", "group_ids": [a_group], "self": False}
     OnboardingService.add_child(
-        tenant_session, studio_id=studio.id, parent=parent,
-        child={**base, "birthdate": date(2016, 4, 1)}, at=T0, schedule=twice_weekly,
+        tenant_session,
+        studio_id=studio.id,
+        parent=parent,
+        child={**base, "birthdate": date(2016, 4, 1)},
+        at=T0,
+        schedule=twice_weekly,
     )
     tenant_session.flush()
     second = OnboardingService.add_child(
-        tenant_session, studio_id=studio.id, parent=parent,
-        child={**base, "birthdate": date(2018, 9, 9)}, at=T0, schedule=twice_weekly,
+        tenant_session,
+        studio_id=studio.id,
+        parent=parent,
+        child={**base, "birthdate": date(2018, 9, 9)},
+        at=T0,
+        schedule=twice_weekly,
     )
     assert tenant_session.get(Student, second).status == "active"
 

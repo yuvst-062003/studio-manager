@@ -44,16 +44,26 @@ class OnboardingLinkStatusOut(BaseModel):
     active: bool
     expires_at: datetime.datetime | None
     registered_count: int
+    #: The live link itself, so the card's העתקה button works on every load and not only
+    #: in the seconds after creation (2026-08-31). Null when there is no live link — and
+    #: also for a pre-2026-08-31 row, whose token was only ever hashed and cannot be
+    #: recovered; the card offers those a regenerate instead.
+    #:
+    #: Manager-or-owner only, like every field beside it: §3.2 gives coaches no card at
+    #: all, and this route is already behind that dependency.
+    url: str | None = None
     #: §5.4a's shop window, on the same sharing card family: the client cannot know the
     #: parent app's origin (it differs per environment), so the server says it.
     landing_url: str | None = None
 
 
 class OnboardingLinkCreatedOut(BaseModel):
-    """The URL appears here and nowhere else, once."""
+    """The freshly created link. Since 2026-08-31 the URL also comes back from `GET`,
+    so this is the creation receipt rather than the one chance to read it."""
 
     url: str
-    expires_at: datetime.datetime
+    #: NULL — the link is permanent. Kept in the shape for a time-boxed link later.
+    expires_at: datetime.datetime | None
     registered_count: int
 
 
@@ -127,11 +137,13 @@ def _landing_url(session: TenantSession) -> str | None:
 @router.get("/onboarding-link", response_model=OnboardingLinkStatusOut)
 def link_status(_: ManagerOrOwner, session: TenantSessionDep) -> OnboardingLinkStatusOut:
     live = OnboardingService.current(session, at=now())
+    token = OnboardingService.token_of(live) if live else None
     return OnboardingLinkStatusOut(
         active=live is not None,
         expires_at=live.expires_at if live else None,
         registered_count=OnboardingService.registered_count(session),
         landing_url=_landing_url(session),
+        url=_share_url(token) if token else None,
     )
 
 

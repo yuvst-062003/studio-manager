@@ -24,10 +24,10 @@ from __future__ import annotations
 import hashlib
 import secrets
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.models.onboarding import OnboardingLink
@@ -42,8 +42,6 @@ from app.services.people.errors import DuplicateStudentError, NotFoundError, Ref
 from app.services.people.group_days import ScheduleReader
 from app.services.people.matching import duplicate_student
 
-LINK_TTL_DAYS = 7
-
 
 def _hash(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
@@ -53,13 +51,29 @@ class OnboardingService:
     # -- the link ---------------------------------------------------------------
     @staticmethod
     def current(session: Session, *, at: datetime) -> OnboardingLink | None:
-        """The live link, or None. Expired and revoked rows are history, not state."""
+        """The live link, or None. Expired and revoked rows are history, not state.
+
+        A NULL `expires_at` is the permanent link (2026-08-31) and is live by definition;
+        the dated rows written before that decision still age out on their own date.
+        """
         return session.execute(
             select(OnboardingLink)
-            .where(OnboardingLink.revoked_at.is_(None), OnboardingLink.expires_at > at)
+            .where(
+                OnboardingLink.revoked_at.is_(None),
+                or_(OnboardingLink.expires_at.is_(None), OnboardingLink.expires_at > at),
+            )
             .order_by(OnboardingLink.created_at.desc())
             .limit(1)
         ).scalar_one_or_none()
+
+    @staticmethod
+    def token_of(row: OnboardingLink) -> str | None:
+        """The link's own token, for the card's העתקה button.
+
+        None for a row written before `token_encrypted` existed: that token was only ever
+        hashed and is genuinely unrecoverable, so the card offers a regenerate instead.
+        """
+        return row.token_encrypted.decode() if row.token_encrypted else None
 
     @staticmethod
     def registered_count(session: Session) -> int:
@@ -74,8 +88,16 @@ class OnboardingService:
     def regenerate(
         session: Session, studio_id: uuid.UUID, *, actor_person_id: uuid.UUID | None, at: datetime
     ) -> tuple[OnboardingLink, str]:
-        """A new link, revoking the previous one. The token is returned ONCE and never
-        stored -- only its SHA-256 lands in the row."""
+        """A new link, revoking the previous one.
+
+        The token is stored twice over: its SHA-256 is the lookup key an arriving token is
+        matched against, and the token itself is stored encrypted so the card can offer
+        העתקה on every load rather than only in the seconds after creation. The keyring
+        lives in Railway secrets, so a database read still yields no usable link.
+
+        `expires_at` is NULL — one permanent link (2026-08-31). Revocation is what
+        answers a leak, and it is one tap away.
+        """
         live = OnboardingService.current(session, at=at)
         if live is not None:
             live.revoked_at = at
@@ -83,7 +105,8 @@ class OnboardingService:
         row = OnboardingLink(
             studio_id=studio_id,
             token_hash=_hash(token),
-            expires_at=at + timedelta(days=LINK_TTL_DAYS),
+            token_encrypted=token.encode(),
+            expires_at=None,
             created_by_person_id=actor_person_id,
         )
         session.add(row)
@@ -125,7 +148,13 @@ class OnboardingService:
         row = session.execute(
             select(OnboardingLink).where(OnboardingLink.token_hash == _hash(token))
         ).scalar_one_or_none()
-        if row is None or row.revoked_at is not None or row.expires_at <= at:
+        if (
+            row is None
+            or row.revoked_at is not None
+            # NULL is the permanent link and never expires; a dated row from before that
+            # decision still ages out on its own date.
+            or (row.expires_at is not None and row.expires_at <= at)
+        ):
             raise NotFoundError("the link is not valid")
         return row
 

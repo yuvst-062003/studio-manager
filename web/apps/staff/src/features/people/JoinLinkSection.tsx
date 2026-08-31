@@ -14,6 +14,8 @@ type LinkStatus = {
   expires_at: string | null
   registered_count: number
   landing_url: string | null
+  /** The live link, readable on every load since 2026-08-31 — see SharingCards' header. */
+  url: string | null
 }
 
 const rowStyle: CSSProperties = {
@@ -80,30 +82,36 @@ export function JoinLinkSection({ locale }: { locale: Locale }) {
       <Card>
         <h3 style={{ marginBlockStart: 0 }}>{t(locale, 'people.join.card.title')}</h3>
         <p style={{ color: 'var(--text-muted)' }} data-testid="join-link-status">
-          {status.active && status.expires_at
-            ? t(locale, 'people.join.card.active').replace(
-                '{{date}}',
-                formatDateInStudioZone(status.expires_at, locale),
-              )
-            : t(locale, 'people.join.card.inactive')}
+          {!status.active
+            ? t(locale, 'people.join.card.inactive')
+            : status.expires_at
+              ? // A dated link from before the permanent decision — it still ages out.
+                t(locale, 'people.join.card.active').replace(
+                  '{{date}}',
+                  formatDateInStudioZone(status.expires_at, locale),
+                )
+              : t(locale, 'people.join.card.permanent')}
           {' · '}
           {status.registered_count} {t(locale, 'people.join.card.registered')}
         </p>
-        {freshUrl ? (
+        {/* The link itself, on every load. `freshUrl` still wins for the moment after a
+            regenerate, when the status reload has not landed yet. */}
+        {freshUrl ?? status.url ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
             <code
               style={{ overflowWrap: 'anywhere', fontSize: 'var(--text-caption)' }}
               data-testid="join-link-url"
             >
-              {freshUrl}
+              {freshUrl ?? status.url}
             </code>
             <div style={rowStyle}>
-              <CopyButton locale={locale} value={freshUrl} />
+              <CopyButton locale={locale} value={(freshUrl ?? status.url) as string} />
             </div>
-            <p style={{ color: 'var(--text-muted)', margin: 0, fontSize: 'var(--text-caption)' }}>
-              {t(locale, 'people.join.card.onceNote')}
-            </p>
           </div>
+        ) : status.active ? (
+          <p style={{ color: 'var(--text-muted)', margin: 0, fontSize: 'var(--text-caption)' }}>
+            {t(locale, 'people.join.card.legacyNote')}
+          </p>
         ) : null}
         <div style={rowStyle}>
           <Button

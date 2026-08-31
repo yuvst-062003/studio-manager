@@ -199,7 +199,12 @@ export const people: Bundle = {
   'join.card.revoke': 'Отозвать',
   'join.card.copy': 'Копировать',
   'join.card.copied': 'Скопировано',
+  // Kept: the staff app still shows it on the moment-of-creation card.
   'join.card.onceNote': 'Ссылка показывается один раз — скопируйте и поделитесь сейчас.',
+  // The permanent link (2026-08-31). No countdown, because there is nothing to count.
+  'join.card.permanent': 'Активна · постоянная ссылка',
+  'join.card.legacyNote':
+    'Ссылка активна, но создана до обновления, поэтому показать её нельзя. Создайте новую — её можно будет копировать в любое время.',
   'landing.card.title': 'Лендинг клуба',
   'landing.card.hint': 'Для новых семей — запись на пробное занятие.',
   'sibling.subtitle': 'Ребёнок будет добавлен в этот же аккаунт',

@@ -228,7 +228,11 @@ export const people: Bundle = {
   'join.card.revoke': 'ביטול',
   'join.card.copy': 'העתקה',
   'join.card.copied': 'הועתק',
+  // Kept: the staff app still shows it on the moment-of-creation card.
   'join.card.onceNote': 'הקישור מוצג פעם אחת — העתיקו ושתפו עכשיו.',
+  // The permanent link (2026-08-31). No countdown, because there is nothing to count.
+  'join.card.permanent': 'פעיל · קישור קבוע',
+  'join.card.legacyNote': 'הקישור פעיל אך נוצר לפני העדכון ולכן אינו ניתן להצגה. צרו קישור חדש כדי לקבל קישור קבוע שאפשר להעתיק בכל עת.',
   'landing.card.title': 'דף הנחיתה של המועדון',
   'landing.card.hint': 'לשיתוף עם משפחות חדשות — הרשמה לשיעור ניסיון.',
   'sibling.subtitle': 'הילד יתווסף לאותו חשבון',
