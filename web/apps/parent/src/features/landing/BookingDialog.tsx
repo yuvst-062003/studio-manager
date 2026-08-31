@@ -5,7 +5,7 @@
 // The pattern is ConfirmDialog's (dashboard, rollover): `role="dialog" aria-modal="true"`
 // plus `useModalDialog` for the trap — deliberately NOT a Dialog primitive; a primitive is
 // a shared contract that wants its own artboard.
-import { Button, useModalDialog } from '@studio/ui'
+import { Button, SelectField, useModalDialog } from '@studio/ui'
 import type { CSSProperties } from 'react'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
@@ -50,19 +50,22 @@ export function BookingDialog({
   address,
   phone,
   onClose,
+  onGroupChange,
 }: {
   slug: string
   locale: Locale
   client: LandingClient
   groups: PublicGroup[]
-  /** The group the landing picker chose. */
+  /** The group the page opened with — a default, not a decision. */
   group: PublicGroup
-  /** The picker's own ages-and-schedule line, repeated here so the choice stays visible. */
+  /** Its ages-and-schedule line, so the choice stays legible after it changes. */
   groupMeta: string
   signedIn: boolean
   address: string | null
   phone: string | null
   onClose: () => void
+  /** Re-points the flow at another group without closing it. */
+  onGroupChange: (groupId: string) => void
 }) {
   // Always open: the caller's conditional IS the open state (ConfirmDialog's convention).
   const dialogRef = useModalDialog(true, onClose)
@@ -92,17 +95,42 @@ export function BookingDialog({
           </span>
         </div>
 
+        {/* The group, as a CHOICE rather than a statement. It used to be the name plus a
+            "change" button that only closed the dialog — which worked while the page
+            underneath carried an inline picker to re-choose from. The Stitch redesign
+            removed that picker (the designed timetable is decorative), so closing left the
+            reader on a page with nothing to pick and `groups[0]` still selected: pressing
+            the one call to action and being unable to choose your team (2026-08-31).
+
+            A single group is not a choice, so it stays a plain line — a select with one
+            option is furniture that asks a question with one answer. */}
         <div style={contextStyle}>
-          <span style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
-            <p style={contextNameStyle}>
-              <bdi>{group.name}</bdi>
-            </p>
+          <span style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)', flex: 1 }}>
+            {groups.length > 1 ? (
+              <SelectField
+                // `chooseGroup` ("בחירת קבוצה"), not `changeGroup` ("שינוי"): the latter
+                // was a BUTTON's word, and reads as an instruction rather than a name
+                // when a field label borrows it. Same label as the per-child select in
+                // BookingFlow, because it is the same question.
+                label={t(locale, 'people.landing.chooseGroup')}
+                value={group.id}
+                onChange={(event) => onGroupChange(event.target.value)}
+                data-testid="booking-dialog-group"
+              >
+                {groups.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.name}
+                  </option>
+                ))}
+              </SelectField>
+            ) : (
+              <p style={contextNameStyle}>
+                <bdi>{group.name}</bdi>
+              </p>
+            )}
+            {/* Kept under both shapes: the ages and the days are what tell a parent
+                whether the group they just chose actually suits their child. */}
             {groupMeta ? <p style={contextMetaStyle}>{groupMeta}</p> : null}
-          </span>
-          <span style={{ marginInlineStart: 'auto' }}>
-            <Button variant="ghost" onClick={onClose} data-testid="booking-dialog-change">
-              {t(locale, 'people.landing.changeGroup')}
-            </Button>
           </span>
         </div>
 

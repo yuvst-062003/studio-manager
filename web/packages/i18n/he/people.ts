@@ -295,7 +295,6 @@ export const people: Bundle = {
   'landing.next': 'המשך',
   'landing.noCommitment': 'ללא התחייבות · ההרשמה אורכת דקה',
   'landing.bookTrial': 'קביעת שיעור ניסיון',
-  'landing.changeGroup': 'שינוי',
   'landing.closeBooking': 'סגירה',
   'landing.mapTitle': 'מפת הגעה למועדון',
 

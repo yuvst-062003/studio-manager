@@ -261,7 +261,6 @@ export const people: Bundle = {
   'landing.next': 'Продолжить',
   'landing.noCommitment': 'Без обязательств · регистрация занимает минуту',
   'landing.bookTrial': 'Записаться на пробное занятие',
-  'landing.changeGroup': 'Изменить',
   'landing.closeBooking': 'Закрыть',
   'landing.mapTitle': 'Карта проезда к клубу',
 

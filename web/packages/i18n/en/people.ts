@@ -258,7 +258,6 @@ export const people: Bundle = {
   'landing.next': 'Continue',
   'landing.noCommitment': 'No commitment · signing up takes a minute',
   'landing.bookTrial': 'Book a trial lesson',
-  'landing.changeGroup': 'Change',
   'landing.closeBooking': 'Close',
   'landing.mapTitle': 'Map of the club location',
 

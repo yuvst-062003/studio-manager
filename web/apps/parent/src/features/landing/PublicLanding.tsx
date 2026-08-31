@@ -704,6 +704,7 @@ export function PublicLanding({
             address={landing.address ?? null}
             phone={landing.phone ?? null}
             onClose={() => setFlowOpen(false)}
+            onGroupChange={setSelectedId}
           />
         ) : null}
       </main>

@@ -371,13 +371,58 @@ describe('booking — every call to action reaches the flow', () => {
     )
   })
 
-  it('the change button closes the flow back to the page', async () => {
+  // Reported from production 2026-08-31: "user presses the free trial and can't pick the
+  // team he wants out of the teams." The dialog opens on `groups[0]` — a decision made FOR
+  // the reader — and "שינוי" used to mean "close, and choose again on the page". That was
+  // true while the page carried an inline picker; the Stitch redesign replaced it with a
+  // timetable that is decorative on the designed page (`ContentSchedule` renders <li>, not
+  // buttons), so closing returned the reader to a page with nothing to pick from and the
+  // first group still chosen. The choice has to be reachable from INSIDE the dialog.
+  it('lets the reader change the group from inside the dialog', async () => {
     const user = userEvent.setup()
     render(<PublicLanding slug="judo-tel-aviv" locale="he" client={clientReturning(TWO_GROUPS)} />)
     await user.click(await screen.findByTestId('landing-hero-cta'))
-    await user.click(screen.getByTestId('booking-dialog-change'))
+    const dialog = screen.getByTestId('booking-dialog')
+    const picker = within(dialog).getByTestId('booking-dialog-group')
+
+    // Every group the club offers, not just the one the page guessed.
+    expect(within(picker).getAllByRole('option').map((o) => o.textContent)).toEqual([
+      'מתחילים',
+      'נוער',
+    ])
+
+    await user.selectOptions(picker, 'g2')
+    // The dialog now describes the group actually chosen — name AND its schedule line,
+    // because the meta is what tells a parent whether the time suits them.
+    expect(dialog).toHaveTextContent('נוער')
+    expect(dialog).toHaveTextContent('17:30')
+    // And it stays open: changing your mind is not a reason to lose the flow.
+    expect(screen.getByTestId('booking-dialog')).toBeInTheDocument()
+  })
+
+  it('the close button still closes the flow back to the page', async () => {
+    const user = userEvent.setup()
+    render(<PublicLanding slug="judo-tel-aviv" locale="he" client={clientReturning(TWO_GROUPS)} />)
+    await user.click(await screen.findByTestId('landing-hero-cta'))
+    await user.click(screen.getByTestId('booking-dialog-close'))
     expect(screen.queryByTestId('booking-dialog')).toBeNull()
     expect(screen.getByTestId('landing-hero')).toBeInTheDocument()
+  })
+
+  // The designed page is where the dead end actually bit: it has no picker to fall back
+  // to, so a dialog that could only close was the end of the road.
+  it('offers the same in-dialog choice on the designed page', async () => {
+    const user = userEvent.setup()
+    render(
+      <PublicLanding
+        slug="gladiator"
+        locale="he"
+        client={clientReturning({ ...TWO_GROUPS, slug: 'gladiator' })}
+      />,
+    )
+    await user.click(await screen.findByTestId('landing-hero-cta'))
+    const picker = within(screen.getByTestId('booking-dialog')).getByTestId('booking-dialog-group')
+    expect(within(picker).getAllByRole('option')).toHaveLength(2)
   })
 
   it('the sticky bar opens the flow and disappears while it is open', async () => {
