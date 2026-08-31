@@ -125,22 +125,39 @@ def book_trial_for_self(
     writes below all happen inside a `TenantSession` scoped to the studio the group belongs
     to, so nothing here escapes the tenant guard; it simply arrives by a different route.
 
-    §11.7's two controls: rate-limited per IP and per identity (see
-    `app/services/people/rate_limit.py` for what that limiter is and is not), and
-    sign-in-first standing in for the captcha that has no provider configured.
+    §11.7's two controls: rate-limited per IP and per caller (see
+    `app/services/people/rate_limit.py` for what that limiter is and is not).
+
+    **Signing in is no longer required** (owner's decision, 2026-08-31): a first lesson is
+    booked the way every other club books one, with a form. Sign-in-first stood in front of
+    the only self-service entry in the product, so a parent who did not want a Google
+    account could not book at all — and it was standing in for a captcha that has no
+    provider configured, which is a job it was never doing well.
+
+    A signed-in caller still wins on identity: their provider-verified address is used and
+    a typed `guardian` is ignored, because a client-supplied string must never override one
+    a provider vouched for.
     """
-    identity_id = getattr(request.state, "identity_id", None)
-    if not isinstance(identity_id, uuid.UUID):
+    raw_identity = getattr(request.state, "identity_id", None)
+    identity_id = raw_identity if isinstance(raw_identity, uuid.UUID) else None
+    guardian = body.guardian if identity_id is None else None
+    if identity_id is None and guardian is None:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail={"code": "unauthenticated", "message": "sign in first"},
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "code": "guardian_required",
+                "message": "tell us who is booking, or sign in",
+            },
         )
 
     at = now()
     client_ip = request.client.host if request.client else "unknown"
-    if not ip_limiter.allow(client_ip, at=at) or not identity_limiter.allow(
-        str(identity_id), at=at
-    ):
+    # Without an identity the second limiter keys on the address typed in. It is weaker —
+    # a new address is free — but it stops the ordinary double-submit, and the IP limiter
+    # is the one doing the real work. Named rather than silently dropped: this is the
+    # protection sign-in used to provide.
+    caller_key = str(identity_id) if guardian is None else f"email:{guardian.email}"
+    if not ip_limiter.allow(client_ip, at=at) or not identity_limiter.allow(caller_key, at=at):
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail={"code": "too_many_bookings", "message": "try again in a few minutes"},
@@ -159,7 +176,24 @@ def book_trial_for_self(
     except NotFoundError as exc:
         raise _not_found("class") from exc
 
-    identity = session.get(AuthIdentity, identity_id)
+    identity = session.get(AuthIdentity, identity_id) if identity_id is not None else None
+    # Signed in: the provider's address, which `_resolve_parent` may match on. Anonymous:
+    # the typed one, carried but never treated as verified — it makes a lead the family
+    # claims later by signing in, per §6.1 step 3. The defaults below are the service's own
+    # ("הורה", ""), kept for the signed-in path where the name comes off the identity.
+    if guardian is None:
+        contact_email = identity.email if identity else None
+        contact_verified = bool(identity and identity.email_verified)
+        parent_first, parent_last, parent_phone = "הורה", "", None
+    else:
+        contact_email = guardian.email
+        contact_verified = False
+        parent_first, parent_last, parent_phone = (
+            guardian.first_name,
+            guardian.last_name,
+            guardian.phone,
+        )
+
     with use_studio(studio_id), TenantSession(bind=get_engine(), expire_on_commit=False) as scoped:
         try:
             booked = TrialService.book_for_self(
@@ -168,8 +202,11 @@ def book_trial_for_self(
                 studio_id=studio_id,
                 children=[child.model_dump() for child in body.children],
                 declarations=body.trial_health_declarations,
-                provider_email=identity.email if identity else None,
-                provider_email_verified=bool(identity and identity.email_verified),
+                provider_email=contact_email,
+                provider_email_verified=contact_verified,
+                parent_first_name=parent_first,
+                parent_last_name=parent_last,
+                parent_phone=parent_phone,
                 at=at,
             )
         except ConflictError as exc:

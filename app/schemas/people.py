@@ -20,6 +20,7 @@ from typing import Annotated, Any
 from pydantic import BaseModel, Field, model_validator
 
 from app.schemas._pagination import CursorPage
+from app.schemas.platform import EMAIL_PATTERN
 from app.schemas.schedule import TrialSlotOut
 
 #: §4.3, mirrored as patterns so the generated client gets unions rather than `string`.
@@ -243,15 +244,45 @@ class TrialChildIn(StudentCreate):
     session_id: uuid.UUID | None = None
 
 
-class TrialBookingSelfIn(BaseModel):
-    """§7 — `POST /trial-bookings/self`, **authenticated**: the parent has just signed in.
+class TrialGuardianIn(BaseModel):
+    """Who is booking, when nobody signed in.
 
-    §5.4's sign-in-first booking. The children are described here rather than matched by
-    the client, because §5.4 matches people on **verified email or phone** and a client
-    cannot verify anything. `trial_health_declarations` carries §5.4a's trial answers,
-    which is why the request lands in `registration_request.payload_encrypted` rather than
-    being written straight to a table (§11.1).
+    Owner's decision 2026-08-31: a first lesson is booked the way every other club books
+    one — a form. Sign-in-first was standing in front of the ONLY self-service entry in the
+    product, and a parent who does not want a Google account could not book at all.
+
+    The address is unverified by definition, and the system treats it that way: it makes a
+    lead, never an account. §6.1 step 3 does the linking later, on the address Google
+    verifies at sign-in.
     """
+
+    first_name: str = Field(min_length=1, max_length=80)
+    last_name: str = Field(default="", max_length=80)
+    #: The one field that matters after the lesson: it is how signing in later finds this
+    #: booking, and how the club replies in the meantime.
+    #:
+    #: `EMAIL_PATTERN`, not `EmailStr`, for the reason `app/schemas/platform.py` records
+    #: where it defines it: the only real test of an address is whether delivery succeeds,
+    #: and a stricter type would reject legal-but-unusual addresses at the one screen a
+    #: stranger meets first. A refused booking teaches the parent nothing.
+    email: str = Field(pattern=EMAIL_PATTERN, max_length=254)
+    phone: str | None = Field(default=None, max_length=40)
+
+
+class TrialBookingSelfIn(BaseModel):
+    """§7 — `POST /trial-bookings/self`. Signed in, or not.
+
+    The children are described here rather than matched by the client, because §5.4 matches
+    people on **verified email or phone** and a client cannot verify anything.
+    `trial_health_declarations` carries §5.4a's trial answers, which is why the request
+    lands in `registration_request.payload_encrypted` rather than being written straight to
+    a table (§11.1).
+    """
+
+    #: Required when the caller has no session; ignored when they have one, because a
+    #: signed-in parent's identity carries an address a provider actually verified and a
+    #: typed one must never be allowed to override it.
+    guardian: TrialGuardianIn | None = None
 
     #: §5.4a ① — 'A per-group QR pre-selects that group.' A default for children who name
     #: no group of their own; a child's own `group_id` always wins. Optional because a
@@ -788,5 +819,3 @@ class StudentJoinIn(BaseModel):
 
 
 RegistrationRequestPageOut = CursorPage[RegistrationRequestOut]
-
-

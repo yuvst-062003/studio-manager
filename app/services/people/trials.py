@@ -111,7 +111,7 @@ class TrialService:
     def _resolve_parent(
         session: Session,
         *,
-        identity_id: uuid.UUID,
+        identity_id: uuid.UUID | None,
         provider_email: str | None,
         provider_email_verified: bool,
         first_name: str,
@@ -125,18 +125,42 @@ class TrialService:
         supplied. A brand-new family is the common case and gets a fresh Person attached to
         the identity that just signed in, which is what makes their children appear in the
         parent app the moment this returns (§5.4a).
+
+        **`identity_id` is None for a booking made without an account** (2026-08-31, owner's
+        decision: a first lesson is booked the way every other club books one -- a form).
+        The Person is then created with no identity, holding the address the parent TYPED.
+        It is a lead and nothing more: an identity-less Person grants no app access, because
+        access is `EXISTS(guardian WHERE person_id = :me)` resolved from the signed-in
+        identity. §6.1 step 3 attaches them later -- 'verified email hit -> attach to the
+        matched Person' -- so signing in afterwards with that same address finds the
+        children already there, which is the whole point of collecting it.
         """
-        existing = (
-            session.execute(
-                select(Person).where(
-                    Person.auth_identity_id == identity_id, Person.anonymized_at.is_(None)
+        if identity_id is not None:
+            existing = (
+                session.execute(
+                    select(Person).where(
+                        Person.auth_identity_id == identity_id, Person.anonymized_at.is_(None)
+                    )
                 )
+                .scalars()
+                .first()
             )
-            .scalars()
-            .first()
-        )
-        if existing is not None:
-            return existing
+            if existing is not None:
+                return existing
+
+        # An anonymous booking matches NOTHING and always creates a fresh lead. Two reasons,
+        # and the second is why there is no clever version of this:
+        #
+        # * A typed address is unverified. Matching it onto an existing Person would let
+        #   anyone reach a stranger's family by typing their email, which is exactly the
+        #   join below refusing to happen -- `match_person` keys on `AuthIdentity.email`,
+        #   an address a provider vouched for, never on a string a client sent.
+        # * `Person.email` is encrypted at rest (§11.1), so there is no `WHERE email = ?`
+        #   to look one up by anyway. Deduplicating typed addresses would need a
+        #   deterministic hash column and a migration to carry it.
+        #
+        # So the same parent booking twice makes two leads. That is the manager's queue
+        # doing its job, and the price of not asking a stranger to open a Google account.
 
         if provider_email and provider_email_verified:
             matched = match_person(session, email=provider_email)
@@ -161,7 +185,7 @@ class TrialService:
     def book_for_self(
         session: Session,
         *,
-        identity_id: uuid.UUID,
+        identity_id: uuid.UUID | None,
         studio_id: uuid.UUID,
         children: list[dict[str, Any]],
         declarations: list[dict[str, Any]],
