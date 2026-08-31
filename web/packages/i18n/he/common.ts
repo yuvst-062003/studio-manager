@@ -99,6 +99,23 @@ export const common: Bundle = {
   'auth.eyebrow.staff': 'כניסת מאמנים',
   'auth.eyebrow.dashboard': 'כניסת מנהלים',
   'auth.noPasswords': 'בלי סיסמאות. הגישה נקבעת לפי החשבון שאיתו הוזמנתם.',
+  // -- the manager sign-in (docs/design "Gladiator Manager Sign In", 2026-09-01) ------
+  // The staff app's own face. `SignIn`'s split screen still serves parent and dashboard,
+  // so these keys live beside those rather than replacing them.
+  //
+  // `manager.badge` carries BOTH scripts on purpose -- the mock's eyebrow reads
+  // "ממשק ניהול · MANAGER", the Hebrew naming the surface and the Latin naming the
+  // product tier. Same argument as `brand.wordmark` above: the Latin half is the brand,
+  // not a translation, so it stays put in every locale.
+  'auth.manager.badge': 'ממשק ניהול · MANAGER',
+  'auth.manager.signInWithGoogle': 'התחברות עם Google',
+  'auth.manager.blurb': 'הזדהו עם חשבון Google כדי לנהל אימונים, חגורות ורישום לתחרויות.',
+  // The footer's legal pair. Both open INSIDE this app -- see the staff app's `#/terms`
+  // and `#/privacy-policy` -- and render the same document the parent app renders.
+  'auth.manager.terms': 'Terms of Service',
+  'auth.manager.privacy': 'Privacy Policy',
+  'auth.manager.copyright': '© 2026 Gladiator. All rights reserved.',
+  'auth.manager.backToSignIn': 'חזרה להתחברות',
   'dash.hint.home': 'תמונת מצב יומית — נוכחות, כסף פתוח ומה שדורש טיפול',
   'dash.hint.schedule': 'הלוח השבועי — שיעורים, אולמות ושיוך מאמנים',
   'dash.hint.attendance': 'דוח נוכחות — אחוזים לכל קבוצה ושיעורים שלא סומנו',

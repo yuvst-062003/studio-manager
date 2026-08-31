@@ -13,7 +13,12 @@
 // RTL: no physical properties anywhere in this file, and the one place a bare number could
 // appear — the version label — is a `dir="ltr"` island (`0.1-draft` in the middle of a
 // Hebrew sentence otherwise renders with the `0` and the `1` on the wrong sides).
-import { Alert, Card } from '@studio/ui'
+//
+// It lives in @studio/ui rather than in the parent app (where it was written) because the
+// staff app's sign-in footer now links to the SAME two documents. Legal copy that two apps
+// render is legal copy that must not be able to drift between them.
+import { Alert } from '../primitives/Alert'
+import { Card } from '../primitives/Card'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 
@@ -77,26 +82,41 @@ export function DraftNotice({ label, locale }: { label: string; locale: Locale }
   )
 }
 
+/** Which of the two documents to render. Omitted means both, in the consent gate's order. */
+export type PolicyDoc = 'terms' | 'policy'
+
 export function PolicyDocument({
   locale,
   isDraft,
   versionLabel,
+  only,
 }: {
   locale: Locale
   isDraft: boolean
   versionLabel: string
+  /**
+   * The staff app's sign-in footer links to the two documents SEPARATELY, because the
+   * mock's footer names them separately. The consent gate and the parent's privacy screen
+   * pass nothing and keep rendering both — a default rather than a flag every existing
+   * caller had to learn.
+   */
+  only?: PolicyDoc
 }) {
   return (
     <div data-testid="policy-document" style={documentStyle}>
       {isDraft ? <DraftNotice label={versionLabel} locale={locale} /> : null}
-      <Card>
-        <h2 style={{ marginBlock: 0 }}>{t(locale, 'reports.privacy.terms.title')}</h2>
-        <Sections locale={locale} prefix="terms" sections={TERMS_SECTIONS} />
-      </Card>
-      <Card>
-        <h2 style={{ marginBlock: 0 }}>{t(locale, 'reports.privacy.policy.title')}</h2>
-        <Sections locale={locale} prefix="policy" sections={POLICY_SECTIONS} />
-      </Card>
+      {only !== 'policy' ? (
+        <Card>
+          <h2 style={{ marginBlock: 0 }}>{t(locale, 'reports.privacy.terms.title')}</h2>
+          <Sections locale={locale} prefix="terms" sections={TERMS_SECTIONS} />
+        </Card>
+      ) : null}
+      {only !== 'terms' ? (
+        <Card>
+          <h2 style={{ marginBlock: 0 }}>{t(locale, 'reports.privacy.policy.title')}</h2>
+          <Sections locale={locale} prefix="policy" sections={POLICY_SECTIONS} />
+        </Card>
+      ) : null}
     </div>
   )
 }

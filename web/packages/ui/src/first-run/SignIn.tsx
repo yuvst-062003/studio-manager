@@ -15,23 +15,14 @@
 // wordmark, red rule, role eyebrow, provider buttons over the sun-and-throw artwork.
 // Layout and copy follow the document direction; the artwork keeps its physical
 // composition — see gladiator-signin.css.
-import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
+import { startUrl, useAuthProviders } from './useAuthProviders'
 import './gladiator-signin.css'
 import logoUrl from './assets/gladiator-logo.png'
 
-export type SignInProvider = { name: string; start_url: string }
-
-/**
- * Where the API lives. The same variable `@studio/core` bakes into `apiUrl` — declared
- * again here because ui must not import core (the dependency runs the other way). Empty
- * in development, where the Vite proxy makes relative paths reach the API; absolute in a
- * deployed build, where the start links below must navigate to the API's own origin for
- * the callback to set its cookie there.
- */
-const API_ORIGIN: string = import.meta.env.VITE_API_ORIGIN ?? ''
+export type { SignInProvider } from './useAuthProviders'
 
 const LABEL: Record<string, string> = {
   google: 'common.auth.continueWithGoogle',
@@ -55,27 +46,7 @@ export function SignIn({
   /** §6.1 puts language before login; the screen floats it over the artwork. */
   languagePicker?: ReactNode
 }) {
-  const [providers, setProviders] = useState<SignInProvider[] | null>(null)
-
-  useEffect(() => {
-    let alive = true
-    void (async () => {
-      try {
-        const response = await fetch(`${API_ORIGIN}/api/v1/auth/providers`, {
-          credentials: 'include',
-        })
-        if (!response.ok) return
-        const body = await response.json()
-        if (alive) setProviders(body.items ?? [])
-      } catch {
-        // Offline on the sign-in screen means no buttons, which is the truth. An error
-        // banner here would ask someone to act on something they cannot fix.
-      }
-    })()
-    return () => {
-      alive = false
-    }
-  }, [])
+  const providers = useAuthProviders()
 
   const providerLinks = (providers ?? []).map((provider) => ({
     key: provider.name,
@@ -188,7 +159,7 @@ export function SignIn({
             <a
               key={provider.name}
               className={BUTTON_CLASS[provider.name] ?? 'gsignin__btn gsignin__btn--google'}
-              href={`${API_ORIGIN}${provider.start_url}?app=${app}&return_path=${encodeURIComponent(returnPath)}`}
+              href={startUrl(provider, app, returnPath)}
             >
               {t(locale, LABEL[provider.name] ?? 'common.auth.continueWithGoogle')}
             </a>

@@ -8367,6 +8367,30 @@
         "title": "PlanRepricing",
         "type": "object"
       },
+      "PolicyOut": {
+        "description": "The published policy's identity, and nothing about any person.\n\nThe three fields `ConsentStateOut` already carries, split out so a reader who is not\nsigned in can have them: the staff sign-in footer's legal screens render before there\nis an identity or a studio to scope to.",
+        "properties": {
+          "policy_is_draft": {
+            "title": "Policy Is Draft",
+            "type": "boolean"
+          },
+          "policy_version": {
+            "title": "Policy Version",
+            "type": "integer"
+          },
+          "policy_version_label": {
+            "title": "Policy Version Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "policy_version",
+          "policy_version_label",
+          "policy_is_draft"
+        ],
+        "title": "PolicyOut",
+        "type": "object"
+      },
       "PrepayTermsOut": {
         "description": "What the parent's cash and cheque cards need to draw their breakdown.\n\nThe payer's monthly total travels with the terms so the screen renders from server\nnumbers rather than computing the same product twice -- G2 is an integer rule, and two\nplaces that multiply months by a price are two places that can round differently.\n\n`0` on a route means the club does not offer months forward that way; the card falls\nback to settling open charges, which is how cash behaved before this existed.",
         "properties": {
@@ -21879,6 +21903,28 @@
           }
         },
         "summary": "Get Export Status",
+        "tags": [
+          "privacy"
+        ]
+      }
+    },
+    "/api/v1/privacy/policy": {
+      "get": {
+        "description": "Which policy text is published, for a reader who is not signed in.\n\nThe staff sign-in's footer links to the terms and the privacy policy, and the person\nreading them there is anonymous by definition -- so `GET /consents` cannot serve that\nscreen: it needs an identity and a studio, and it would 401.\n\nDeliberately NOT `TenantSessionDep`, and deliberately touches no table. The three\nvalues are module constants describing the text every studio is shown; scoping them to\na tenant would be scoping a global to something that does not vary by it, and would\nmake a public route fail closed on a studio it never needed.\n\nThe draft flag is on the wire for the reason `ConsentStateOut` states: the banner is\ndata, so it cannot be left behind on a screen after the reviewed text lands.",
+        "operationId": "read_policy_api_v1_privacy_policy_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Read Policy",
         "tags": [
           "privacy"
         ]

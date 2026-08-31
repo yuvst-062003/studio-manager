@@ -97,6 +97,14 @@ export type { SwitchableStudio } from './shell/StudioSwitcher'
 export { LanguagePicker } from './first-run/LanguagePicker'
 export { SignIn } from './first-run/SignIn'
 export type { SignInProvider } from './first-run/SignIn'
+// The staff app's own face on the same flow — docs/design "Gladiator Manager Sign In".
+// `SignIn` above still dresses parent and dashboard; both read the provider list through
+// the one hook, so a provider cannot be added to one screen and forgotten on the other.
+export { ManagerSignIn, PRIVACY_HASH, TERMS_HASH } from './first-run/ManagerSignIn'
+// The legal copy the staff sign-in's footer links to, and the parent's consent gate has
+// always rendered. One copy, because two would be able to drift apart.
+export { DraftNotice, PolicyDocument } from './legal/PolicyDocument'
+export type { PolicyDoc } from './legal/PolicyDocument'
 export { RefusalScreen } from './first-run/RefusalScreen'
 export { InstallWalkthrough, isIosSafari } from './first-run/InstallWalkthrough'
 export type { InstallPromptEvent } from './first-run/InstallWalkthrough'

@@ -2985,6 +2985,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/privacy/policy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Policy
+         * @description Which policy text is published, for a reader who is not signed in.
+         *
+         *     The staff sign-in's footer links to the terms and the privacy policy, and the person
+         *     reading them there is anonymous by definition -- so `GET /consents` cannot serve that
+         *     screen: it needs an identity and a studio, and it would 401.
+         *
+         *     Deliberately NOT `TenantSessionDep`, and deliberately touches no table. The three
+         *     values are module constants describing the text every studio is shown; scoping them to
+         *     a tenant would be scoping a global to something that does not vary by it, and would
+         *     make a public route fail closed on a studio it never needed.
+         *
+         *     The draft flag is on the wire for the reason `ConsentStateOut` states: the banner is
+         *     data, so it cannot be left behind on a screen after the reviewed text lands.
+         */
+        get: operations["read_policy_api_v1_privacy_policy_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/privacy/requests": {
         parameters: {
             query?: never;
@@ -8981,6 +9013,22 @@ export interface components {
             plan_id: string;
             /** Registration Fee Agorot */
             registration_fee_agorot?: number | null;
+        };
+        /**
+         * PolicyOut
+         * @description The published policy's identity, and nothing about any person.
+         *
+         *     The three fields `ConsentStateOut` already carries, split out so a reader who is not
+         *     signed in can have them: the staff sign-in footer's legal screens render before there
+         *     is an identity or a studio to scope to.
+         */
+        PolicyOut: {
+            /** Policy Is Draft */
+            policy_is_draft: boolean;
+            /** Policy Version */
+            policy_version: number;
+            /** Policy Version Label */
+            policy_version_label: string;
         };
         /**
          * PrepayTermsOut
@@ -16280,6 +16328,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_policy_api_v1_privacy_policy_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PolicyOut"];
                 };
             };
         };

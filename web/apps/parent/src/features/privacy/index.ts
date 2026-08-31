@@ -5,7 +5,9 @@
 // mount, and a feature the shell does not mount does not ship.
 export { ConsentGate } from './ConsentGate'
 export type { ConsentGateStatus } from './ConsentGate'
-export { PolicyDocument, DraftNotice } from './PolicyDocument'
+// The legal copy moved to @studio/ui when the staff sign-in began linking to the same
+// two documents. Re-exported here so this feature's public surface is unchanged.
+export { PolicyDocument, DraftNotice } from '@studio/ui'
 export { PrivacyScreen } from './PrivacyScreen'
 export { makePrivacyClient, readConsentState, REQUIRED_CONSENTS } from './privacyClient'
 export type {

@@ -96,6 +96,16 @@ export const common: Bundle = {
   'auth.eyebrow.staff': 'Coach sign-in',
   'auth.eyebrow.dashboard': 'Manager sign-in',
   'auth.noPasswords': 'No passwords. Access follows the account you were invited with.',
+  // -- the manager sign-in (docs/design "Gladiator Manager Sign In", 2026-09-01) ------
+  // See he/common.ts for why the badge carries both scripts.
+  'auth.manager.badge': 'ממשק ניהול · MANAGER',
+  'auth.manager.signInWithGoogle': 'Sign in with Google',
+  'auth.manager.blurb':
+    'Identify yourself with a Google account to manage training, belts and competition entries.',
+  'auth.manager.terms': 'Terms of Service',
+  'auth.manager.privacy': 'Privacy Policy',
+  'auth.manager.copyright': '© 2026 Gladiator. All rights reserved.',
+  'auth.manager.backToSignIn': 'Back to sign-in',
   'dash.hint.home': 'Daily snapshot — attendance, open money and what needs care',
   'dash.hint.schedule': 'The weekly board — sessions, halls and coach assignment',
   'dash.hint.attendance': 'Attendance report — a rate per group and unmarked sessions',

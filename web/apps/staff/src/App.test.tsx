@@ -74,3 +74,84 @@ describe('staff app', () => {
     expect(screen.queryByTestId('studio-dev-bar')).toBeNull()
   })
 })
+
+// -- docs/design "Gladiator Manager Sign In" (2026-09-01) -----------------------------
+//
+// The seam, not the component. `ManagerSignIn.test.tsx` proves the screen; these prove the
+// SHELL reaches for it and routes the two hashes its footer links to. A field asserted only
+// on the component is a field that can be dropped in between and still pass every test.
+describe('the manager sign-in, as the staff shell mounts it', () => {
+  const anonymous = () =>
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input)
+        if (url.includes('/auth/refresh')) return new Response('', { status: 401 })
+        if (url.includes('/auth/providers')) {
+          return new Response(
+            JSON.stringify({ items: [{ name: 'google', start_url: '/api/v1/auth/google/start' }] }),
+            { status: 200 },
+          )
+        }
+        if (url.includes('/privacy/policy')) {
+          return new Response(
+            JSON.stringify({
+              policy_version: 0,
+              policy_version_label: '0.1-draft',
+              policy_is_draft: true,
+            }),
+            { status: 200 },
+          )
+        }
+        return new Response(JSON.stringify({ items: [] }), { status: 200 })
+      }),
+    )
+
+  it('shows an anonymous visitor the manager screen, not the split screen', async () => {
+    anonymous()
+    render(<App />)
+    // The club badge is the element only this screen has; `sign-in` is on both.
+    await waitFor(() =>
+      expect(screen.getByText(t('he', 'common.auth.manager.badge'))).toBeInTheDocument(),
+    )
+    expect(
+      screen.getByRole('link', { name: t('he', 'common.auth.manager.signInWithGoogle') }),
+    ).toHaveAttribute('href', expect.stringContaining('app=staff'))
+  })
+
+  it('opens the terms IN THIS APP, without a session', async () => {
+    // The whole point of the route: the reader deciding whether to sign in is anonymous,
+    // so a legal screen behind the shell would be a link that bounces back to sign-in.
+    anonymous()
+    globalThis.location.hash = '#/terms'
+    render(<App />)
+    await waitFor(() => expect(screen.getByTestId('legal-screen')).toBeInTheDocument())
+    expect(screen.getByTestId('policy-document')).toBeInTheDocument()
+    expect(screen.getByText(t('he', 'reports.privacy.terms.title'))).toBeInTheDocument()
+    expect(screen.queryByText(t('he', 'reports.privacy.policy.title'))).toBeNull()
+  })
+
+  it('opens the privacy policy on its own hash, and tells the reader it is a draft', async () => {
+    anonymous()
+    globalThis.location.hash = '#/privacy-policy'
+    render(<App />)
+    await waitFor(() => expect(screen.getByTestId('legal-screen')).toBeInTheDocument())
+    expect(screen.getByText(t('he', 'reports.privacy.policy.title'))).toBeInTheDocument()
+    expect(screen.queryByText(t('he', 'reports.privacy.terms.title'))).toBeNull()
+    // The banner is data — `GET /privacy/policy` is public so this screen can render it
+    // rather than quietly implying the text is final.
+    await waitFor(() =>
+      expect(screen.getByTestId('policy-draft-notice')).toBeInTheDocument(),
+    )
+  })
+
+  it('does not let the legal hashes reach §16’s operator queue', async () => {
+    // `#/privacy` is the manager-gated operator screen and `#/privacy-policy` is a public
+    // document. A prefix match between them would put a privacy QUEUE behind a footer link.
+    anonymous()
+    globalThis.location.hash = '#/privacy-policy'
+    render(<App />)
+    await waitFor(() => expect(screen.getByTestId('legal-screen')).toBeInTheDocument())
+    expect(screen.queryByTestId('privacy-operator')).toBeNull()
+  })
+})
