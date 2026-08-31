@@ -71,6 +71,18 @@ export const attendance: Bundle = {
   'absence.requiresConnection': 'דיווח היעדרות דורש חיבור לאינטרנט',
   'absence.requiresConnectionHint': 'הדיווח לא יישמר במצב לא מקוון. נסו שוב כשיש חיבור',
 
+  // -- the two-way answer on the home screen (owner decision, 2026-09-01) ---------
+  // "מגיע/ה" is a REAL answer now, not the absence of one: the club stores it, so a
+  // coach's roster tells "said yes" from "has not answered". Gendered per child, which
+  // is why these carry a {name} rather than a fixed noun.
+  'intent.prompt': 'מה לעדכן למאמן?',
+  'intent.coming': 'מגיע/ה',
+  'intent.notComing': 'לא מגיע/ה',
+  'intent.confirmed': 'עדכנתם שמגיע/ה',
+  'intent.reported': 'עדכנתם שלא מגיע/ה',
+  'intent.unanswered': 'לא עדכנתם',
+  'intent.changeable': 'אפשר לשנות עד תחילת השיעור',
+
   // -- §10.1's four network states, not two --------------------------------------
   'network.online': 'מחובר',
   'network.offline': 'לא מקוון',

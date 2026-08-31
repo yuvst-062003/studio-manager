@@ -417,6 +417,7 @@ export const common: Bundle = {
   // Parent artboard 1a — базовый экран. 2a — расширенная версия, относится к M5.
   'home.title': 'Мои дети',
   'home.settings': 'Настройки',
+  'home.nextLesson': 'Следующее занятие',
   'home.upcoming': 'Ближайшие занятия',
   'home.alerts': 'Уведомления',
   'home.noChildren': 'К этому аккаунту пока не привязан ни один ребёнок.',

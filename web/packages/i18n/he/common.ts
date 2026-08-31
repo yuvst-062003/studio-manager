@@ -439,6 +439,7 @@ export const common: Bundle = {
   // and past attendance, and belongs to M5.
   'home.title': 'הילדים שלי',
   'home.settings': 'הגדרות',
+  'home.nextLesson': 'השיעור הבא',
   'home.upcoming': 'השיעורים הקרובים',
   'home.alerts': 'התראות',
   'home.noChildren': 'עדיין אין ילדים משויכים לחשבון הזה.',

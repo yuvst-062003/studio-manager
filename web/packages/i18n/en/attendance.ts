@@ -46,6 +46,15 @@ export const attendance: Bundle = {
   'absence.requiresConnectionHint':
     'The report will not be saved offline. Try again when you have a connection',
 
+  // -- the two-way answer on the home screen (owner decision, 2026-09-01) ---------
+  'intent.prompt': 'Tell the coach',
+  'intent.coming': 'Coming',
+  'intent.notComing': 'Not coming',
+  'intent.confirmed': 'You said they are coming',
+  'intent.reported': 'You said they are not coming',
+  'intent.unanswered': 'You have not answered',
+  'intent.changeable': 'You can change this until the lesson starts',
+
   'network.online': 'Online',
   'network.offline': 'Offline',
   'network.intermittent': 'Unstable connection',

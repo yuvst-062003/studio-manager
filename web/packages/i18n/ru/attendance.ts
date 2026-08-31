@@ -46,6 +46,15 @@ export const attendance: Bundle = {
   'absence.requiresConnectionHint':
     'Без сети сообщение не сохранится. Попробуйте снова при подключении',
 
+  // -- the two-way answer on the home screen (owner decision, 2026-09-01) ---------
+  'intent.prompt': 'Сообщить тренеру',
+  'intent.coming': 'Придёт',
+  'intent.notComing': 'Не придёт',
+  'intent.confirmed': 'Вы сообщили, что придёт',
+  'intent.reported': 'Вы сообщили, что не придёт',
+  'intent.unanswered': 'Вы не ответили',
+  'intent.changeable': 'Можно изменить до начала занятия',
+
   'network.online': 'В сети',
   'network.offline': 'Нет сети',
   'network.intermittent': 'Нестабильное соединение',

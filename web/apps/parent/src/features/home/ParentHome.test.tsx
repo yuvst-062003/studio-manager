@@ -53,11 +53,16 @@ describe('ParentHome', () => {
   })
 
   it('raises the debt alert with its CTA when the family owes money', async () => {
-    // 1a's debt card — the one alert the mounted §6.1 gate does not already own.
+    // The owner's Option B (2026-09-01) turned this from a card into a STRIP: three
+    // surfaces already show this number, and on home its job is to be noticed rather
+    // than to be the largest thing on the screen. Still a real 44px control, and now a
+    // link — it navigates to the payments tab rather than acting in place.
     render(<ParentHome locale="he" students={CHILDREN} upcoming={LESSONS} debtAgorot={32000} />)
-    const card = screen.getByTestId('parent-home-debt')
-    expect(card).toHaveTextContent(t('he', 'common.home.debt.title'))
-    expect(screen.getByRole('button', { name: t('he', 'common.home.debt.cta') })).toBeInTheDocument()
+    const strip = screen.getByTestId('parent-home-debt')
+    expect(strip).toHaveTextContent(t('he', 'common.home.debt.title'))
+    const cta = screen.getByTestId('parent-home-debt-cta')
+    expect(cta).toHaveTextContent(t('he', 'common.home.debt.cta'))
+    expect(cta).toHaveAttribute('href', '#/payments')
     expect(screen.queryByTestId('parent-home-no-alerts')).toBeNull()
   })
 

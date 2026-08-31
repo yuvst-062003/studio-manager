@@ -28,7 +28,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import date
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import select
@@ -296,6 +296,72 @@ def cancel_absence_report(
     session.commit()
 
 
+@router.put(
+    "/attendance-confirmations/{session_id}/{student_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def confirm_attendance(
+    _: SignedIn,
+    session_id: uuid.UUID,
+    student_id: uuid.UUID,
+    request: Request,
+    session: TenantSessionDep,
+) -> None:
+    """A parent saying the child WILL be there.
+
+    PUT, not POST: the answer is one row per (session, student) and a parent double-tapping
+    a button on a phone must not be a 409. Keyed on the same pair as its absence
+    counterpart, and for the same reason -- the parent app renders from the roster, which
+    carries flags and not row ids.
+    """
+    person_id = _require_person(request)
+    try:
+        AttendanceService(session).confirm_attendance(
+            session_id,
+            student_id,
+            reporter_person_id=person_id,
+            guardian_student_ids=_guardian_student_ids(request, session),
+            at=now(),
+        )
+    except NotFoundError as exc:
+        raise _not_found() from exc
+    except PreconditionError as exc:
+        # The same 409-with-a-code the absence path uses, so `attendance.absence.tooLate`
+        # renders here too rather than the app needing a second refusal vocabulary.
+        raise _precondition(exc) from exc
+    except ForbiddenError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"code": "already_marked", "message": str(exc)},
+        ) from exc
+    session.commit()
+
+
+@router.delete(
+    "/attendance-confirmations/{session_id}/{student_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def withdraw_confirmation(
+    _: SignedIn,
+    session_id: uuid.UUID,
+    student_id: uuid.UUID,
+    request: Request,
+    session: TenantSessionDep,
+) -> None:
+    """Back to having said nothing -- which is NOT the same as reporting an absence."""
+    _require_person(request)
+    try:
+        AttendanceService(session).withdraw_confirmation(
+            session_id,
+            student_id,
+            guardian_student_ids=_guardian_student_ids(request, session),
+            at=now(),
+        )
+    except NotFoundError as exc:
+        raise _not_found() from exc
+    session.commit()
+
+
 @router.get("/attendance/report", response_model=AttendanceReportOut)
 def attendance_report(
     _: ManagerOrOwner,
@@ -362,7 +428,11 @@ from datetime import timedelta as _timedelta  # noqa: E402
 
 from pydantic import BaseModel as _BaseModel  # noqa: E402
 
-from app.models.attendance import Attendance  # noqa: E402
+from app.models.attendance import (  # noqa: E402
+    AbsenceReport,
+    Attendance,
+    AttendanceConfirmation,
+)
 from app.models.schedule import Session as SessionRow  # noqa: E402
 from app.models.structure import Group  # noqa: E402
 
@@ -377,6 +447,91 @@ class FamilyAttendanceRow(_BaseModel):
 
 class FamilyAttendanceOut(_BaseModel):
     items: list[FamilyAttendanceRow]
+
+
+class FamilyIntentRow(_BaseModel):
+    """What this family has told the club about one child at one coming session."""
+
+    student_id: uuid.UUID
+    session_id: uuid.UUID
+    #: Three states, because the absence of an answer is its own answer -- which is the
+    #: whole reason `attendance_confirmation` exists alongside `absence_report`.
+    intent: Literal["coming", "not_coming"]
+
+
+class FamilyIntentsOut(_BaseModel):
+    """Only the sessions this family has ANSWERED.
+
+    Unanswered sessions are absent rather than listed with a third value: the parent app
+    keys these by `<session>:<student>` and defaults a miss to "unanswered", so a row per
+    unanswered lesson would grow with the timetable and say nothing.
+    """
+
+    items: list[FamilyIntentRow]
+
+
+@router.get("/me/attendance-intents", response_model=FamilyIntentsOut)
+def my_family_intents(
+    request: Request,
+    session: TenantSessionDep,
+    date_from: Annotated[_date, Query(alias="from")],
+    date_to: Annotated[_date, Query(alias="to")],
+) -> FamilyIntentsOut:
+    """What this family has already told the club about their COMING lessons.
+
+    The read half of the home screen's two-way control: without it the buttons would
+    render from local state, and a parent reopening the app would see "unanswered" for a
+    lesson they had already answered. The same §3.3 guardian filter and the same 62-day
+    cap as `/me/attendance`.
+
+    Only answered sessions come back. A miss is "unanswered" on the client, which keeps
+    this payload proportional to what the family has done rather than to the timetable.
+    """
+    person_id = getattr(request.state, "person_id", None)
+    if not isinstance(person_id, uuid.UUID):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={"code": "unauthenticated", "message": "sign in first"},
+        )
+    if date_to < date_from or (date_to - date_from).days > 62:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={"code": "refused", "message": "the range must be 0-62 days"},
+        )
+    my_students = select(Guardian.student_id).where(Guardian.person_id == person_id)
+    # Padded a day each side for the same reason /me/attendance pads: the client groups by
+    # the STUDIO day, and a session near midnight must not fall off the edge.
+    lower = _datetime.combine(date_from - _timedelta(days=1), _time.min, tzinfo=_UTC)
+    upper = _datetime.combine(date_to + _timedelta(days=2), _time.min, tzinfo=_UTC)
+
+    confirmations = session.execute(
+        select(AttendanceConfirmation.student_id, AttendanceConfirmation.session_id)
+        .join(SessionRow, SessionRow.id == AttendanceConfirmation.session_id)
+        .where(
+            AttendanceConfirmation.student_id.in_(my_students),
+            SessionRow.starts_at >= lower,
+            SessionRow.starts_at < upper,
+        )
+    ).all()
+    absences = session.execute(
+        select(AbsenceReport.student_id, AbsenceReport.session_id)
+        .join(SessionRow, SessionRow.id == AbsenceReport.session_id)
+        .where(
+            AbsenceReport.student_id.in_(my_students),
+            SessionRow.starts_at >= lower,
+            SessionRow.starts_at < upper,
+        )
+    ).all()
+    return FamilyIntentsOut(
+        items=[
+            FamilyIntentRow(student_id=student_id, session_id=session_id, intent="coming")
+            for student_id, session_id in confirmations
+        ]
+        + [
+            FamilyIntentRow(student_id=student_id, session_id=session_id, intent="not_coming")
+            for student_id, session_id in absences
+        ]
+    )
 
 
 @router.get("/me/attendance", response_model=FamilyAttendanceOut)

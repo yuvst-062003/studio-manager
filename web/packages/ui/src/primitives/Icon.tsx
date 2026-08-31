@@ -138,6 +138,10 @@ const PATHS = {
     </>
   ),
   chevronDown: <path d="m6 9 6 6 6-6" />,
+  // A selected state needs a mark that is not a colour (D — never colour alone), and the
+  // set had no tick: every selected control in the product was carrying its state in the
+  // fill alone. Same 24x24 stroke grid as the rest.
+  check: <path d="M20 6 9 17l-5-5" />,
   close: (
     <>
       <path d="M18 6 6 18" />

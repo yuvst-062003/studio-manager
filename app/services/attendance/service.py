@@ -28,7 +28,7 @@ from sqlalchemy import Select, select
 from sqlalchemy.orm import Session as OrmSession
 
 from app.core.tenancy import TenantSession
-from app.models.attendance import AbsenceReport, Attendance
+from app.models.attendance import AbsenceReport, Attendance, AttendanceConfirmation
 from app.models.people import Student
 from app.models.person import Guardian, Person, RoleAssignment
 from app.models.schedule import Session as SessionRow
@@ -296,6 +296,19 @@ class AttendanceService:
         if existing is not None:
             raise PreconditionError("already_reported", "this absence was already reported")
 
+        # Mutual exclusion, and it runs in BOTH directions -- `confirm_attendance` does
+        # the same unwind the other way. A one-sided version left a child recorded as
+        # coming AND not coming at once, which the roster then reported as both.
+        confirmation = self.session.execute(
+            select(AttendanceConfirmation).where(
+                AttendanceConfirmation.session_id == body.session_id,
+                AttendanceConfirmation.student_id == body.student_id,
+            )
+        ).scalar_one_or_none()
+        if confirmation is not None:
+            self.session.delete(confirmation)
+            self.session.flush()
+
         report = AbsenceReport(
             student_id=body.student_id,
             session_id=body.session_id,
@@ -324,6 +337,47 @@ class AttendanceService:
             source="parent",
             session_status_seen=session_row.status,
         )
+
+        # §5.7 — the club has to learn this BEFORE the lesson, and a row on a roster
+        # nobody has opened yet is not the club learning it. The register mark above is
+        # what a coach sees when they open the session; this is what reaches a manager
+        # who has not.
+        #
+        # Group `attendance`, so §5.11's switch governs it: a manager who muted attendance
+        # notices chose that. Not `health.`, which is always-on and reserved for a child
+        # stepping onto a mat uncovered.
+        student = self.session.get(Student, body.student_id)
+        person = self.session.get(Person, student.person_id) if student is not None else None
+        display_name = f"{person.first_name} {person.last_name}" if person else ""
+        manager_ids = set(
+            self.session.execute(
+                select(RoleAssignment.person_id).where(
+                    RoleAssignment.role.in_(("owner", "manager")),
+                    RoleAssignment.scope_type == "studio",
+                    RoleAssignment.revoked_at.is_(None),
+                )
+            ).scalars()
+        )
+        # Minus the reporter: a manager phoning in an absence on a family's behalf does
+        # not need to be told about their own action.
+        recipients = manager_ids - {reporter_person_id}
+        notifier = NotificationService(cast(TenantSession, self.session))
+        for person_id in sorted(recipients, key=str):
+            notifier.enqueue(
+                person_id=person_id,
+                kind="attendance.absence_reported",
+                title="דיווח היעדרות",
+                # The reason travels here and ONLY here. It is free text a parent typed
+                # and may name an illness, so it stays out of the audit diff and out of
+                # every log line — the same boundary `report_injury` draws around its
+                # description.
+                body=f"{display_name} — {body.reason}" if body.reason else display_name,
+                payload={
+                    "student_id": str(body.student_id),
+                    "session_id": str(body.session_id),
+                    "starts_at": session_row.starts_at.isoformat(),
+                },
+            )
         return report
 
     def cancel_absence_report(
@@ -363,6 +417,111 @@ class AttendanceService:
             # register — the coach was on the mat and the parent was not.
             raise ForbiddenError("a coach has already marked this session")
         self.session.delete(report)
+
+    def confirm_attendance(
+        self,
+        session_id: uuid.UUID,
+        student_id: uuid.UUID,
+        *,
+        reporter_person_id: uuid.UUID,
+        guardian_student_ids: set[uuid.UUID] | None,
+        at: datetime,
+    ) -> AttendanceConfirmation:
+        """A parent saying their child WILL be there.
+
+        **The opposite of `report_absence`, and not its mirror image.** That one writes an
+        `attendance` row as well, because "cancelled" settles the outcome. This one writes
+        no register mark at all: an intention is not an attendance, and SPEC 5.14 needs
+        `unmarked` to keep meaning "nobody has opened the register". A confirmation that
+        pre-filled `present` would report a child as having trained when they never
+        arrived, which is the one error a register must never make.
+
+        **Confirming withdraws an absence notice**, because a child cannot be both. That
+        is the same unwind `cancel_absence_report` performs, including its refusal when a
+        coach has already marked the session -- the coach was on the mat and the parent
+        was not.
+
+        **Idempotent.** Tapping twice is one answer: the existing row's timestamp moves
+        rather than a second row being written or a 409 being raised at someone who
+        double-tapped a button on a phone.
+        """
+        session_row = require_session(self.session, session_id)
+        if guardian_student_ids is not None and student_id not in guardian_student_ids:
+            # Not-found rather than forbidden, for the same reason as report_absence: a
+            # 403 would confirm another family's child exists in this studio.
+            raise NotFoundError(str(student_id))
+        if at >= session_row.starts_at:
+            raise PreconditionError("too_late", "the lesson has already started")
+
+        report = self.session.execute(
+            select(AbsenceReport).where(
+                AbsenceReport.session_id == session_id,
+                AbsenceReport.student_id == student_id,
+            )
+        ).scalar_one_or_none()
+        if report is not None:
+            mark = self.session.execute(
+                select(Attendance).where(
+                    Attendance.session_id == session_id,
+                    Attendance.student_id == student_id,
+                )
+            ).scalar_one_or_none()
+            if mark is not None and mark.source == "parent":
+                mark.status = "unmarked"
+                mark.marked_at = at
+                mark.device_marked_at = at
+            elif mark is not None:
+                raise ForbiddenError("a coach has already marked this session")
+            self.session.delete(report)
+            self.session.flush()
+
+        existing = self.session.execute(
+            select(AttendanceConfirmation).where(
+                AttendanceConfirmation.session_id == session_id,
+                AttendanceConfirmation.student_id == student_id,
+            )
+        ).scalar_one_or_none()
+        if existing is not None:
+            existing.confirmed_by_person_id = reporter_person_id
+            existing.confirmed_at = at
+            return existing
+
+        confirmation = AttendanceConfirmation(
+            student_id=student_id,
+            session_id=session_id,
+            confirmed_by_person_id=reporter_person_id,
+            confirmed_at=at,
+        )
+        self.session.add(confirmation)
+        self.session.flush()
+        return confirmation
+
+    def withdraw_confirmation(
+        self,
+        session_id: uuid.UUID,
+        student_id: uuid.UUID,
+        *,
+        guardian_student_ids: set[uuid.UUID] | None,
+        at: datetime,
+    ) -> None:
+        """Back to having said nothing.
+
+        Deliberately NOT the same as reporting an absence: a family that answered by
+        mistake returns to "has not answered", which is a third state the roster can now
+        show. Touches no `attendance` row, because confirming never wrote one.
+        """
+        require_session(self.session, session_id)
+        if guardian_student_ids is not None and student_id not in guardian_student_ids:
+            raise NotFoundError(str(student_id))
+        confirmation = self.session.execute(
+            select(AttendanceConfirmation).where(
+                AttendanceConfirmation.session_id == session_id,
+                AttendanceConfirmation.student_id == student_id,
+            )
+        ).scalar_one_or_none()
+        if confirmation is None:
+            raise NotFoundError(str(student_id))
+        self.session.delete(confirmation)
 
     # -- internals ------------------------------------------------------------
     def _bulk_touches(self, row: RosterRowRaw) -> bool:
@@ -567,6 +726,7 @@ class AttendanceService:
             source=row.source,
             has_absence_report=row.has_absence_report,
             absence_reason=row.absence_reason,
+            has_confirmation=row.has_confirmation,
         )
 
     def _project_session(self, session_row: SessionRow, rows: list[RosterRowRaw]) -> SessionOut:

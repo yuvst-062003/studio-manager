@@ -198,6 +198,35 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/attendance-confirmations/{session_id}/{student_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Confirm Attendance
+         * @description A parent saying the child WILL be there.
+         *
+         *     PUT, not POST: the answer is one row per (session, student) and a parent double-tapping
+         *     a button on a phone must not be a 409. Keyed on the same pair as its absence
+         *     counterpart, and for the same reason -- the parent app renders from the roster, which
+         *     carries flags and not row ids.
+         */
+        put: operations["confirm_attendance_api_v1_attendance_confirmations__session_id___student_id__put"];
+        post?: never;
+        /**
+         * Withdraw Confirmation
+         * @description Back to having said nothing -- which is NOT the same as reporting an absence.
+         */
+        delete: operations["withdraw_confirmation_api_v1_attendance_confirmations__session_id___student_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/attendance/batch": {
         parameters: {
             query?: never;
@@ -1712,6 +1741,34 @@ export interface paths {
          *     eventually aim at January-to-December.
          */
         get: operations["my_family_attendance_api_v1_me_attendance_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/attendance-intents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Family Intents
+         * @description What this family has already told the club about their COMING lessons.
+         *
+         *     The read half of the home screen's two-way control: without it the buttons would
+         *     render from local state, and a parent reopening the app would see "unanswered" for a
+         *     lesson they had already answered. The same §3.3 guardian filter and the same 62-day
+         *     cap as `/me/attendance`.
+         *
+         *     Only answered sessions come back. A miss is "unanswered" on the client, which keeps
+         *     this payload proportional to what the family has done rather than to the timetable.
+         */
+        get: operations["my_family_intents_api_v1_me_attendance_intents_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -7062,6 +7119,39 @@ export interface components {
             student_id: string;
         };
         /**
+         * FamilyIntentRow
+         * @description What this family has told the club about one child at one coming session.
+         */
+        FamilyIntentRow: {
+            /**
+             * Intent
+             * @enum {string}
+             */
+            intent: "coming" | "not_coming";
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+        };
+        /**
+         * FamilyIntentsOut
+         * @description Only the sessions this family has ANSWERED.
+         *
+         *     Unanswered sessions are absent rather than listed with a third value: the parent app
+         *     keys these by `<session>:<student>` and defaults a miss to "unanswered", so a row per
+         *     unanswered lesson would grow with the timetable and say nothing.
+         */
+        FamilyIntentsOut: {
+            /** Items */
+            items: components["schemas"]["FamilyIntentRow"][];
+        };
+        /**
          * GenerateSessionsOut
          * @description §5.15 step 6 — 'materialize every session for the year … and show a summary of what
          *     was created'.
@@ -8395,14 +8485,12 @@ export interface components {
         };
         /**
          * OnboardingLinkCreatedOut
-         * @description The URL appears here and nowhere else, once.
+         * @description The freshly created link. Since 2026-08-31 the URL also comes back from `GET`,
+         *     so this is the creation receipt rather than the one chance to read it.
          */
         OnboardingLinkCreatedOut: {
-            /**
-             * Expires At
-             * Format: date-time
-             */
-            expires_at: string;
+            /** Expires At */
+            expires_at: string | null;
             /** Registered Count */
             registered_count: number;
             /** Url */
@@ -8418,6 +8506,8 @@ export interface components {
             landing_url?: string | null;
             /** Registered Count */
             registered_count: number;
+            /** Url */
+            url?: string | null;
         };
         /** OnboardingRegisterIn */
         OnboardingRegisterIn: {
@@ -9698,6 +9788,11 @@ export interface components {
              * @default false
              */
             has_absence_report: boolean;
+            /**
+             * Has Confirmation
+             * @default false
+             */
+            has_confirmation: boolean;
             /**
              * Health Status
              * @default missing
@@ -11965,6 +12060,66 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ResendOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_attendance_api_v1_attendance_confirmations__session_id___student_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    withdraw_confirmation_api_v1_attendance_confirmations__session_id___student_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -14453,6 +14608,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FamilyAttendanceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_family_intents_api_v1_me_attendance_intents_get: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FamilyIntentsOut"];
                 };
             };
             /** @description Validation Error */

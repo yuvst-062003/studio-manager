@@ -9,7 +9,10 @@
 import { useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { formatDateInStudioZone, formatTimeInStudioZone, studioDayKey } from '@studio/core'
-import { Button, Card, EmptyState, Icon, MoneyDisplay, StatusChip } from '@studio/ui'
+import { Card, EmptyState, Icon, MoneyDisplay, StatusChip } from '@studio/ui'
+import { NextLessonCard } from './NextLessonCard'
+import type { NextLesson } from './NextLessonCard'
+import type { Intent, IntentClient } from './intentClient'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 
@@ -17,7 +20,12 @@ export type HomeStudent = {
   id: string
   displayName: string
   groupNames: readonly string[]
+  /** D7's bar colour. `null` until a belt is awarded, which renders as the ring alone. */
+  beltColorHex?: string | null
 }
+
+/** What the family has already told the club, keyed `<sessionId>:<studentId>`. */
+export type HomeIntents = Readonly<Record<string, Intent>>
 
 export type HomeLesson = {
   id: string
@@ -55,12 +63,6 @@ const pageStyle: CSSProperties = {
   maxInlineSize: '30rem',
   marginInline: 'auto',
   inlineSize: '100%',
-}
-
-const alertRowStyle: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 'var(--space-3)',
 }
 
 const dayHeaderStyle: CSSProperties = {
@@ -105,6 +107,32 @@ const chipStyle: CSSProperties = {
   color: 'var(--fg)',
   font: 'inherit',
   cursor: 'pointer',
+}
+
+//: Option B's debt strip — one 44px row, the amount first because that is the fact a
+//: parent scans for. `--debt` on `--debt-tint` is the audited pair.
+const debtStripStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 'var(--space-2)',
+  minBlockSize: '44px',
+  paddingInline: 'var(--space-3)',
+  background: 'var(--debt-tint)',
+  border: 'var(--border-width-hairline) solid var(--debt)',
+  borderRadius: 'var(--radius-lg)',
+}
+
+//: A control sized like one, not a caption-sized link — the rule PA adopted after four
+//: header actions shipped 19px tall.
+const debtCtaStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  marginInlineStart: 'auto',
+  minBlockSize: '44px',
+  paddingInline: 'var(--space-2)',
+  color: 'var(--emphasis)',
+  fontWeight: 'var(--weight-semibold)',
+  fontSize: 'var(--text-label)',
 }
 
 const chipActiveStyle: CSSProperties = {
@@ -164,6 +192,9 @@ export function ParentHome({
   upcoming = null,
   attendance = [],
   debtAgorot = 0,
+  intents = {},
+  intentClient,
+  onIntentChanged,
 }: {
   locale: Locale
   /** `null` while loading — the section stays quiet rather than flashing an empty state. */
@@ -174,6 +205,12 @@ export function ParentHome({
   attendance?: readonly HomeAttendanceRow[]
   /** The family's open balance — 1a's debt alert, fed from `/me/balance`. */
   debtAgorot?: number
+  /** What the family has answered per (session, child). Absent keys are "unanswered". */
+  intents?: HomeIntents
+  /** Writes the answer. Absent in tests that only render the list. */
+  intentClient?: IntentClient
+  /** Re-read after an answer lands, so the card shows what the SERVER accepted. */
+  onIntentChanged?: () => void
 }) {
   const [childFilter, setChildFilter] = useState<string | null>(null)
   const todayKey = studioDayKey(new Date().toISOString())
@@ -232,6 +269,34 @@ export function ParentHome({
       .map((s) => s.displayName)
       .join(' · ')
 
+  /**
+   * The soonest lesson that has not started, resolved to ONE child.
+   *
+   * A lesson belongs to a group, and a group can hold two of a family's children — so
+   * the card names the first child in that group rather than pretending a session is
+   * per-child. The answer it writes is keyed on (session, student), which is the pair
+   * the server stores, so a second child in the same group keeps their own answer and is
+   * asked separately further down the list.
+   */
+  const nextLesson = ((): NextLesson | null => {
+    if (upcoming === null || students === null) return null
+    const now = new Date().toISOString()
+    for (const lesson of upcoming) {
+      if (lesson.startsAt <= now) continue
+      const child = students.find((s) => s.groupNames.includes(lesson.groupName))
+      if (!child) continue
+      return {
+        sessionId: lesson.id,
+        studentId: child.id,
+        studentName: child.displayName,
+        groupName: lesson.groupName,
+        startsAt: lesson.startsAt,
+        beltColorHex: child.beltColorHex ?? null,
+      }
+    }
+    return null
+  })()
+
   return (
     <section aria-labelledby="parent-home-title" data-testid="parent-home" style={pageStyle}>
       <header style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--space-3)' }}>
@@ -265,24 +330,38 @@ export function ParentHome({
       {/* `2a` §5 — the debt + health banner is conditional on the selected day being
           TODAY. It rendered on every day of the strip, so stepping back to last Tuesday
           asked the parent to pay for it. */}
+      {/* Option B — the debt is a STRIP, not a card competing with the lesson. Three
+          surfaces already show this number (here, the payments tab, every student card),
+          and on home its job is to be noticed, not to be the largest thing on screen.
+          Still a real 44px control, and still conditional on the selected day being
+          today: stepping back to last Tuesday must not ask a parent to pay for it. */}
       {debtAgorot > 0 && selectedDay === todayKey ? (
-        <Card>
-          <div style={alertRowStyle} data-testid="parent-home-debt">
-            <Icon name="warning" size={20} style={{ color: 'var(--debt)' }} />
-            <div style={{ flex: 1 }}>
-              <strong style={{ color: 'var(--debt)' }}>
-                {t(locale, 'common.home.debt.title')}
-              </strong>
-              <div style={{ fontSize: 'var(--text-title)', fontWeight: 600 }}>
-                <MoneyDisplay agorot={debtAgorot} tone="debt" />
-              </div>
-            </div>
-            <Button onClick={() => (globalThis.location.hash = '#/payments')}>
-              {t(locale, 'common.home.debt.cta')}
-            </Button>
-          </div>
-        </Card>
-      ) : (
+        <div style={debtStripStyle} data-testid="parent-home-debt">
+          <Icon name="warning" size={16} style={{ color: 'var(--debt)', flex: 'none' }} />
+          <strong style={{ color: 'var(--debt)', fontSize: 'var(--text-label)' }}>
+            <MoneyDisplay agorot={debtAgorot} tone="debt" />
+          </strong>
+          <span style={{ fontSize: 'var(--text-label)', color: 'var(--text-secondary)' }}>
+            {t(locale, 'common.home.debt.title')}
+          </span>
+          <a href="#/payments" data-testid="parent-home-debt-cta" style={debtCtaStyle}>
+            {t(locale, 'common.home.debt.cta')}
+          </a>
+        </div>
+      ) : null}
+
+      {/* The one question this screen exists to answer, at the top and at full size. */}
+      {nextLesson !== null && intentClient !== undefined ? (
+        <NextLessonCard
+          locale={locale}
+          lesson={nextLesson}
+          intent={intents[`${nextLesson.sessionId}:${nextLesson.studentId}`] ?? 'unanswered'}
+          client={intentClient}
+          onChanged={onIntentChanged ?? (() => {})}
+        />
+      ) : null}
+
+      {debtAgorot > 0 && selectedDay === todayKey ? null : (
         <p data-testid="parent-home-no-alerts" style={{ margin: 0, color: 'var(--text-muted)' }}>
           {t(locale, 'common.home.noAlerts')}
         </p>

@@ -153,6 +153,10 @@ class RosterEntry(BaseModel):
     #: §10.5 — a bulk action must not overwrite this, regardless of timestamps.
     has_absence_report: bool = False
     absence_reason: str | None = None
+    #: The parent said the child WILL be there. Separate from `has_absence_report`
+    #: because "said yes", "said no" and "has not answered" are three states — a coach
+    #: reading one boolean cannot tell the last two apart, which is the gap this closes.
+    has_confirmation: bool = False
 
     _validate_flags = field_validator("derived_flags", mode="before")(_flags_are_booleans)
 

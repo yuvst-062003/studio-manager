@@ -137,3 +137,52 @@ class AbsenceReport(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
     #: §5.7 — "סיבה לא חובה" on parent artboard `12a`. Optional on purpose: requiring a
     #: reason to report a sick child is friction at the worst moment.
     reason: Mapped[str | None] = mapped_column(String(200))
+
+
+class AttendanceConfirmation(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
+    """A parent saying their child WILL be at a session.
+
+    **Its own table, and deliberately not a column on `absence_report`.** That table's
+    whole meaning is "a row here is a notice of absence" -- §10.5's resolver, the roster's
+    `has_absence_report`, and `bulk-present`'s `respect_absence_reports` all read it that
+    way, and widening a row to also mean the opposite would silently invert every one of
+    them. Two facts, two tables; the service keeps them mutually exclusive.
+
+    **It writes no `attendance` row, and that is the point.** §5.7's absence path sets the
+    register to `absent_excused` because the answer is already known -- nobody attends a
+    lesson they have cancelled. A confirmation says the opposite is *intended*, which is
+    not the same as having happened: §5.14 depends on `unmarked` meaning "nobody has
+    opened the register", and a confirmation that pre-filled `present` would report
+    attendance for a child who never arrived.
+
+    So a coach's roster can now distinguish three states that used to be two: said yes,
+    said no, and has not answered.
+    """
+
+    __tablename__ = "attendance_confirmation"
+    __tenant_table_args__ = (
+        # One answer per (student, session), the same shape as `absence_report` -- a
+        # parent tapping twice is one answer, and an upsert needs somewhere to conflict.
+        Index(
+            "uq_attendance_confirmation_student_id_session_id",
+            "student_id",
+            "session_id",
+            unique=True,
+        ),
+        Index("ix_attendance_confirmation_session_id", "session_id"),
+    )
+
+    student_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("student.id", ondelete="CASCADE"), nullable=False
+    )
+    session_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("session.id", ondelete="CASCADE"), nullable=False
+    )
+    #: RESTRICT, matching `absence_report`: who answered is evidence, so a person row that
+    #: something still points at cannot be deleted out from under it.
+    confirmed_by_person_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("person.id", ondelete="RESTRICT"), nullable=False
+    )
+    #: The server's clock, like `attendance.marked_at`. A confirmation is not queued
+    #: offline (§10.2 -- same reasoning as a pre-report), so there is one clock to record.
+    confirmed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

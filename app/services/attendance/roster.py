@@ -33,7 +33,7 @@ from dataclasses import dataclass
 from sqlalchemy import select
 from sqlalchemy.orm import Session as OrmSession
 
-from app.models.attendance import AbsenceReport, Attendance
+from app.models.attendance import AbsenceReport, Attendance, AttendanceConfirmation
 from app.models.health import HealthDeclaration
 from app.models.people import Enrollment, Student
 from app.models.person import Person
@@ -73,6 +73,11 @@ class RosterRowRaw:
     #: §10.5 -- a bulk action must not overwrite this, regardless of timestamps.
     has_absence_report: bool
     absence_reason: str | None
+    #: The parent said the child WILL be there. Its own flag rather than a third value of
+    #: `has_absence_report`, because "said yes", "said no" and "has not answered" are
+    #: three states and a boolean can only carry two. Never both true: the service
+    #: withdraws one when the other is written.
+    has_confirmation: bool
     #: §5.7 / C12 -- on the roster proper, or beneath it in `לא אמורים להגיע היום`.
     expected: bool
     #: W7's `belt_rank` fills these. `None` until then, which `BeltBar` renders as its
@@ -152,6 +157,17 @@ def build_roster(
         .scalars()
         .all()
     }
+    confirmations = {
+        row.student_id
+        for row in session.execute(
+            select(AttendanceConfirmation).where(
+                AttendanceConfirmation.session_id == session_id,
+                AttendanceConfirmation.student_id.in_(student_ids),
+            )
+        )
+        .scalars()
+        .all()
+    }
     # The seam's second half. One query for the whole roster rather than one per student:
     # a coach's roster is thirty children and a per-student call is thirty round trips
     # inside a payload §6.1 makes the app block on.
@@ -172,6 +188,7 @@ def build_roster(
             weekday=weekday,
             mark=marks.get(student.id),
             report=reports.get(student.id),
+            confirmed=student.id in confirmations,
             derived_flags=flags.get(student.id) or {},
         )
         for enrollment, student, person in enrollments
@@ -190,6 +207,7 @@ def _row(
     weekday: int,
     mark: Attendance | None,
     report: AbsenceReport | None,
+    confirmed: bool,
     derived_flags: dict[str, bool],
 ) -> RosterRowRaw:
     return RosterRowRaw(
@@ -203,6 +221,7 @@ def _row(
         source=mark.source if mark is not None else None,
         has_absence_report=report is not None,
         absence_reason=report.reason if report is not None else None,
+        has_confirmation=confirmed,
         # This session exists, so its weekday is a day the group trains. Passing that one
         # day as the group's scheduled set is C12's intersection applied to one session --
         # see the module docstring for why the general helper is the wrong tool here.

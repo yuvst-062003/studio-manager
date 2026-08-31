@@ -4430,6 +4430,53 @@
         "title": "FamilyAttendanceRow",
         "type": "object"
       },
+      "FamilyIntentRow": {
+        "description": "What this family has told the club about one child at one coming session.",
+        "properties": {
+          "intent": {
+            "enum": [
+              "coming",
+              "not_coming"
+            ],
+            "title": "Intent",
+            "type": "string"
+          },
+          "session_id": {
+            "format": "uuid",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "student_id",
+          "session_id",
+          "intent"
+        ],
+        "title": "FamilyIntentRow",
+        "type": "object"
+      },
+      "FamilyIntentsOut": {
+        "description": "Only the sessions this family has ANSWERED.\n\nUnanswered sessions are absent rather than listed with a third value: the parent app\nkeys these by `<session>:<student>` and defaults a miss to \"unanswered\", so a row per\nunanswered lesson would grow with the timetable and say nothing.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/FamilyIntentRow"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "FamilyIntentsOut",
+        "type": "object"
+      },
       "GenerateSessionsOut": {
         "description": "§5.15 step 6 — 'materialize every session for the year … and show a summary of what\nwas created'.",
         "properties": {
@@ -7212,12 +7259,19 @@
         "type": "object"
       },
       "OnboardingLinkCreatedOut": {
-        "description": "The URL appears here and nowhere else, once.",
+        "description": "The freshly created link. Since 2026-08-31 the URL also comes back from `GET`,\nso this is the creation receipt rather than the one chance to read it.",
         "properties": {
           "expires_at": {
-            "format": "date-time",
-            "title": "Expires At",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
           },
           "registered_count": {
             "title": "Registered Count",
@@ -7268,6 +7322,17 @@
           "registered_count": {
             "title": "Registered Count",
             "type": "integer"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
           }
         },
         "required": [
@@ -9990,6 +10055,11 @@
           "has_absence_report": {
             "default": false,
             "title": "Has Absence Report",
+            "type": "boolean"
+          },
+          "has_confirmation": {
+            "default": false,
+            "title": "Has Confirmation",
             "type": "boolean"
           },
           "health_status": {
@@ -14971,6 +15041,100 @@
         ]
       }
     },
+    "/api/v1/attendance-confirmations/{session_id}/{student_id}": {
+      "delete": {
+        "description": "Back to having said nothing -- which is NOT the same as reporting an absence.",
+        "operationId": "withdraw_confirmation_api_v1_attendance_confirmations__session_id___student_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Withdraw Confirmation",
+        "tags": [
+          "coach",
+          "attendance"
+        ]
+      },
+      "put": {
+        "description": "A parent saying the child WILL be there.\n\nPUT, not POST: the answer is one row per (session, student) and a parent double-tapping\na button on a phone must not be a 409. Keyed on the same pair as its absence\ncounterpart, and for the same reason -- the parent app renders from the roster, which\ncarries flags and not row ids.",
+        "operationId": "confirm_attendance_api_v1_attendance_confirmations__session_id___student_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Confirm Attendance",
+        "tags": [
+          "coach",
+          "attendance"
+        ]
+      }
+    },
     "/api/v1/attendance/batch": {
       "post": {
         "description": "§7's `POST /attendance/batch  (idempotent)` — the offline queue drains here.\n\n**200 and not 201**, even when rows are created: the queue replays this request, and a\nclient that treated 201 as \"new work happened\" would raise a fresh toast on every\nreconnect for marks it made three hours ago.\n\nIdempotency is per *mark* on `client_mark_id`, not per request. `Idempotency-Key` is\naccepted for consistency with the rest of the API and is not what makes this safe — a\nrequest-level key would make the second attempt a no-op that silently dropped the marks\nthe first attempt never delivered.",
@@ -19107,6 +19271,61 @@
           }
         },
         "summary": "My Family Attendance",
+        "tags": [
+          "coach",
+          "attendance"
+        ]
+      }
+    },
+    "/api/v1/me/attendance-intents": {
+      "get": {
+        "description": "What this family has already told the club about their COMING lessons.\n\nThe read half of the home screen's two-way control: without it the buttons would\nrender from local state, and a parent reopening the app would see \"unanswered\" for a\nlesson they had already answered. The same §3.3 guardian filter and the same 62-day\ncap as `/me/attendance`.\n\nOnly answered sessions come back. A miss is \"unanswered\" on the client, which keeps\nthis payload proportional to what the family has done rather than to the timetable.",
+        "operationId": "my_family_intents_api_v1_me_attendance_intents_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "from",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "title": "From",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "title": "To",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FamilyIntentsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "My Family Intents",
         "tags": [
           "coach",
           "attendance"

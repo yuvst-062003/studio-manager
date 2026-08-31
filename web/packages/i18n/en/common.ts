@@ -408,6 +408,7 @@ export const common: Bundle = {
   // Parent artboard 1a — the BASE home. 2a is the enriched version and belongs to M5.
   'home.title': 'My children',
   'home.settings': 'Settings',
+  'home.nextLesson': 'Next lesson',
   'home.upcoming': 'Upcoming lessons',
   'home.alerts': 'Alerts',
   'home.noChildren': 'No children are linked to this account yet.',

@@ -18,7 +18,8 @@ import { apiFetch } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { ParentHome } from '../home/ParentHome'
-import type { HomeLesson } from '../home/ParentHome'
+import type { HomeIntents, HomeLesson } from '../home/ParentHome'
+import { makeIntentClient } from '../home/intentClient'
 import { everyChildIsOnATrial, makePeopleClient, nextTrialLesson, useMyStudents } from '../people'
 import type { TrialLesson } from '../people'
 import { TrialHome } from '../people'
@@ -122,6 +123,12 @@ export function Resolve({ session, locale }: { session: Session; locale: Locale 
   const [attendance, setAttendance] = useState<
     readonly { session_id: string; student_id: string; status: string }[]
   >([])
+  // What the family has already told the club about their COMING lessons. Read from the
+  // server rather than held locally, so reopening the app shows what the club knows and
+  // not what this device last hoped — the whole point of the answer being real.
+  const [intents, setIntents] = useState<HomeIntents>({})
+  // Bumped after an answer lands, which re-runs the read below. One source of truth.
+  const [intentEpoch, setIntentEpoch] = useState(0)
   // §6.3's reduced home is drawn around a lesson, and `TrialHome` was mounted below with
   // no `sessionStartsAt` at all — so every trial family fell through to the fallback copy.
   // `null` means "not asked yet or nothing booked", which is the same thing to the screen.
@@ -168,6 +175,22 @@ export function Resolve({ session, locale }: { session: Session; locale: Locale 
         )
       })
       .catch(() => live && setUpcoming([]))
+    // The two-way control's read half — the coming week, not the past one.
+    void apiFetch(`/api/v1/me/attendance-intents?from=${day(now)}&to=${day(weekOut)}`)
+      .then((response) =>
+        response.ok
+          ? (response.json() as Promise<{
+              items: { session_id: string; student_id: string; intent: 'coming' | 'not_coming' }[]
+            }>)
+          : { items: [] },
+      )
+      .then((body) => {
+        if (!live) return
+        const next: Record<string, 'coming' | 'not_coming'> = {}
+        for (const row of body.items) next[`${row.session_id}:${row.student_id}`] = row.intent
+        setIntents(next)
+      })
+      .catch(() => {})
     // 2a's other half — what actually happened, for the strip's past days.
     void apiFetch(`/api/v1/me/attendance?from=${day(weekBack)}&to=${day(now)}`)
       .then((response) =>
@@ -182,7 +205,7 @@ export function Resolve({ session, locale }: { session: Session; locale: Locale 
     return () => {
       live = false
     }
-  }, [scheduleClient, session.access.parent])
+  }, [scheduleClient, session.access.parent, intentEpoch])
 
   // §3.1 — the parent app asks 'do you have any guardian rows?', which is what
   // `access.parent` reports. A role check here would let a manager with no children in.
@@ -306,6 +329,9 @@ export function Resolve({ session, locale }: { session: Session; locale: Locale 
       upcoming={upcoming}
       attendance={attendance}
       debtAgorot={debtAgorot}
+      intents={intents}
+      intentClient={makeIntentClient(apiFetch)}
+      onIntentChanged={() => setIntentEpoch((n) => n + 1)}
     />
   )
 }
