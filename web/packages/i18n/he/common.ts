@@ -444,6 +444,7 @@ export const common: Bundle = {
   'home.title': 'הילדים שלי',
   'home.settings': 'הגדרות',
   'home.nextLesson': 'השיעור הבא',
+  'home.restOfWeek': 'בהמשך השבוע',
   'home.upcoming': 'השיעורים הקרובים',
   'home.alerts': 'התראות',
   'home.noChildren': 'עדיין אין ילדים משויכים לחשבון הזה.',

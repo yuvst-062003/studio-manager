@@ -1,15 +1,18 @@
-// Parent artboard 1a — the BASE home, 390×844, light and dark.
+// Parent artboard 1a — the parent's home, 390×844, light and dark.
 //
-// The design pass (2026-08-27) reshaped this screen to the artboard's own order: the
-// title row, the alert cards (a debt with its לתשלום CTA — the one alert 1a draws that
-// the mounted §6.1 gate doesn't already own), the family's lessons grouped by day, and
-// the child filter chips. The tab bar left this file for the App shell, where 1a always
-// drew it — on every screen, not only home. 2a's day strip (read back/forward with past
-// attendance) remains unbuilt and recorded.
+// Rearranged to Option B (owner's pick, 2026-09-01): the next lesson answers the screen's
+// one question at full size and carries the two-way attendance control; the debt is a
+// strip rather than a card competing with it; the family filter sits directly under the
+// thing it filters; and the rest of the week is a compact list of rows.
+//
+// What that REPLACED, so the removal is not mistaken for a regression: 2a's seven-day
+// strip and the day-grouped lesson cards. The strip let a parent read backwards into past
+// attendance — Option B looks forward only, and the day now sits on each row's leading
+// edge instead. The screen fits 844px again; the previous arrangement scrolled to 2,700.
 import { useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { formatDateInStudioZone, formatTimeInStudioZone, studioDayKey } from '@studio/core'
-import { Card, EmptyState, Icon, MoneyDisplay, StatusChip } from '@studio/ui'
+import { formatTimeInStudioZone, studioDayKey } from '@studio/core'
+import { EmptyState, Icon, MoneyDisplay } from '@studio/ui'
 import { NextLessonCard } from './NextLessonCard'
 import type { NextLesson } from './NextLessonCard'
 import type { Intent, IntentClient } from './intentClient'
@@ -19,8 +22,10 @@ import type { Locale } from '@studio/i18n'
 export type HomeStudent = {
   id: string
   displayName: string
+  /** What the card and the week rows use — three surnames in a column identify nobody. */
+  firstName?: string
   groupNames: readonly string[]
-  /** D7's bar colour. `null` until a belt is awarded, which renders as the ring alone. */
+  /** D7's bar colour, from `current_belt_color_hex`. `null` before a first belt. */
   beltColorHex?: string | null
 }
 
@@ -31,7 +36,10 @@ export type HomeLesson = {
   id: string
   /** UTC ISO — rendered in the studio zone here, per G3. */
   startsAt: string
+  /** The other end of the range the card prints, low value first. */
+  endsAt?: string
   groupName: string
+  locationName?: string | null
 }
 
 /** One child's answer for one session — 2a's "כולל נוכחות שהייתה". */
@@ -41,18 +49,6 @@ export type HomeAttendanceRow = {
   status: string
 }
 
-const ATTENDANCE_LABEL: Record<string, string> = {
-  present: 'attendance.roster.present',
-  absent_excused: 'attendance.roster.absentExcused',
-  absent_unexcused: 'attendance.roster.absentUnexcused',
-  unmarked: 'attendance.roster.unmarked',
-}
-
-/** YYYY-MM-DD ± days, in the studio zone's own keys. */
-function shiftDayKey(key: string, by: number): string {
-  const base = new Date(`${key}T12:00:00Z`)
-  return studioDayKey(new Date(base.getTime() + by * 24 * 60 * 60 * 1000).toISOString())
-}
 
 const pageStyle: CSSProperties = {
   display: 'flex',
@@ -65,29 +61,56 @@ const pageStyle: CSSProperties = {
   inlineSize: '100%',
 }
 
-const dayHeaderStyle: CSSProperties = {
-  margin: 0,
-  paddingBlockStart: 'var(--space-2)',
-  borderBlockStart: 'var(--border-width-hairline) solid var(--border)',
-  color: 'var(--text-muted)',
-  fontSize: 'var(--text-caption)',
-  fontWeight: 500,
-}
 
-const lessonRowStyle: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 'var(--space-3)',
-}
 
-const lessonListStyle: CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 'var(--space-2)',
+
+//: Option B's week — hairline-separated rows, not a stack of cards. Cards at this
+//: density read as boxes-in-boxes; the design's own rule is rows separated by a rule.
+const weekListStyle: CSSProperties = {
   listStyle: 'none',
   margin: 0,
   padding: 0,
+  display: 'flex',
+  flexDirection: 'column',
 }
+
+const weekRowStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 'var(--space-3)',
+  minBlockSize: '52px',
+  paddingBlock: 'var(--space-3)',
+  borderBlockEnd: 'var(--border-width-hairline) solid var(--border)',
+}
+
+const weekDayStyle: CSSProperties = {
+  inlineSize: '42px',
+  flex: 'none',
+  textAlign: 'center',
+  lineHeight: 'var(--leading-snug)',
+}
+
+//: D7 — never fill-only. The ring is the current foreground, which is what rescues a
+//: white belt on a light ground and a black one on a dark ground.
+const beltBarStyle = (hex: string): CSSProperties => ({
+  inlineSize: '4px',
+  blockSize: '30px',
+  flex: 'none',
+  borderRadius: 'var(--radius-xs)',
+  background: hex,
+  border: 'var(--belt-ring-width) solid currentcolor',
+})
+
+//: The belt dot inside a filter chip. Same D7 rule as the bar: fill plus a ring, or a
+//: white belt is an invisible chip.
+const chipBeltStyle = (hex: string): CSSProperties => ({
+  inlineSize: '9px',
+  blockSize: '9px',
+  flex: 'none',
+  borderRadius: 'var(--radius-xs)',
+  background: hex,
+  border: 'var(--belt-ring-width) solid currentcolor',
+})
 
 const chipRowStyle: CSSProperties = {
   display: 'flex',
@@ -99,8 +122,12 @@ const chipRowStyle: CSSProperties = {
 }
 
 const chipStyle: CSSProperties = {
+  // Flex so the belt dot sits beside the name rather than on its own line.
+  display: 'flex',
+  alignItems: 'center',
+  gap: 'var(--space-2)',
   minBlockSize: '44px',
-  paddingInline: 'var(--space-4)',
+  paddingInline: 'var(--space-3)',
   borderRadius: 'var(--radius-xl)',
   border: 'var(--border-width-hairline) solid var(--border-strong)',
   background: 'var(--surface)',
@@ -153,13 +180,6 @@ const headerLinkStyle: CSSProperties = {
   minBlockSize: '44px',
 }
 
-//: A chip and its card link travel together, so the link is visibly THIS child's.
-const childRowStyle: CSSProperties = {
-  alignItems: 'center',
-  display: 'flex',
-  gap: 'var(--space-1)',
-}
-
 //: The route to `2c`, sized like a control rather than like a footnote. It was 56×14.
 const cardLinkStyle: CSSProperties = {
   alignItems: 'center',
@@ -177,20 +197,11 @@ const cardLinkStyle: CSSProperties = {
  * the same slot, and the whole point is that the reader may treat a hidden label as "same
  * as above".
  */
-function sharesTimeWithPrevious(lessons: readonly HomeLesson[], index: number): boolean {
-  return index > 0 && lessons[index - 1]!.startsAt === lessons[index]!.startsAt
-}
-
 /** Today / tomorrow get their names; further out, the studio-zone date carries the row. */
-function dayLabel(iso: string, locale: Locale): string {
-  return formatDateInStudioZone(iso, locale)
-}
-
 export function ParentHome({
   locale,
   students = null,
   upcoming = null,
-  attendance = [],
   debtAgorot = 0,
   intents = {},
   intentClient,
@@ -201,7 +212,12 @@ export function ParentHome({
   students?: readonly HomeStudent[] | null
   /** The family's lessons across 2a's strip window (past AND coming week). `null` = loading. */
   upcoming?: readonly HomeLesson[] | null
-  /** 2a — what actually happened, per child per session, for the strip's past days. */
+  /**
+   * 2a's past-attendance rows. Option B's week looks FORWARD only, so nothing on this
+   * screen reads them any more — kept on the prop so `Resolve` keeps fetching them for
+   * the day a past view returns, and so removing the fetch is a deliberate second
+   * decision rather than a side effect of this redesign.
+   */
   attendance?: readonly HomeAttendanceRow[]
   /** The family's open balance — 1a's debt alert, fed from `/me/balance`. */
   debtAgorot?: number
@@ -213,61 +229,24 @@ export function ParentHome({
   onIntentChanged?: () => void
 }) {
   const [childFilter, setChildFilter] = useState<string | null>(null)
-  const todayKey = studioDayKey(new Date().toISOString())
-  const [selectedDay, setSelectedDay] = useState(todayKey)
-  // 2a's strip: three days back, today, three forward — read either way with one thumb.
-  const strip = [-3, -2, -1, 0, 1, 2, 3].map((by) => shiftDayKey(todayKey, by))
 
-  const filtered = useMemo(() => {
-    if (upcoming === null) return null
-    let rows = upcoming
-    // 2a: a selected day shows exactly that day; today keeps 1a's forward list.
-    rows =
-      selectedDay === todayKey
-        ? rows.filter((lesson) => studioDayKey(lesson.startsAt) >= todayKey)
-        : rows.filter((lesson) => studioDayKey(lesson.startsAt) === selectedDay)
-    // `null` and not `rows`: the children decide which lessons belong on this screen, so
-    // rendering the list before they arrive shows rows this family may not own. `byDay`
-    // already renders nothing for `null`, which is the correct loading state anyway.
-    if (students === null) return null
-    // "הכל" means every one of MY children, never every group in the club. `GET /sessions`
-    // hands the whole studio to anyone holding a staff role — `_visible_groups` in
-    // app/routers/sessions.py returns None for staff whichever app asked — so a parent who
-    // also coaches received the club's whole timetable here. Without this filter those rows
-    // survived, and `childrenOf` had no child to name them with, so they rendered with the
-    // GROUP name sitting in the slot every other row uses for a child.
-    const mine = new Set(students.flatMap((s) => s.groupNames))
-    if (childFilter === null) return rows.filter((lesson) => mine.has(lesson.groupName))
+  /**
+   * Option B's list: what is still to come, in time order, already filtered by the
+   * chips above it. Deliberately NOT grouped by day — the day sits on each row's
+   * leading edge instead, which is what lets seven lessons fit where four cards did.
+   */
+  const week = useMemo(() => {
+    if (upcoming === null || students === null) return null
+    const now = new Date().toISOString()
+    const mine = new Set((students ?? []).flatMap((s) => s.groupNames))
     const child = students.find((s) => s.id === childFilter)
-    if (!child) return rows.filter((lesson) => mine.has(lesson.groupName))
-    return rows.filter((lesson) => child.groupNames.includes(lesson.groupName))
-  }, [upcoming, childFilter, students, selectedDay, todayKey])
-
-  const marksOf = (lesson: HomeLesson) =>
-    attendance
-      .filter((row) => row.session_id === lesson.id)
-      .map((row) => ({
-        row,
-        name: (students ?? []).find((s) => s.id === row.student_id)?.displayName ?? '',
-      }))
-
-  const byDay = useMemo(() => {
-    if (filtered === null) return null
-    const groups = new Map<string, HomeLesson[]>()
-    for (const lesson of filtered) {
-      const key = dayLabel(lesson.startsAt, locale)
-      const rows = groups.get(key) ?? []
-      rows.push(lesson)
-      groups.set(key, rows)
-    }
-    return [...groups.entries()]
-  }, [filtered, locale])
-
-  const childrenOf = (lesson: HomeLesson): string =>
-    (students ?? [])
-      .filter((s) => s.groupNames.includes(lesson.groupName))
-      .map((s) => s.displayName)
-      .join(' · ')
+    return upcoming
+      .filter((lesson) => lesson.startsAt > now)
+      .filter((lesson) =>
+        child ? child.groupNames.includes(lesson.groupName) : mine.has(lesson.groupName),
+      )
+      .slice(0, 6)
+  }, [upcoming, students, childFilter])
 
   /**
    * The soonest lesson that has not started, resolved to ONE child.
@@ -288,9 +267,11 @@ export function ParentHome({
       return {
         sessionId: lesson.id,
         studentId: child.id,
-        studentName: child.displayName,
+        studentName: child.firstName ?? child.displayName,
         groupName: lesson.groupName,
+        locationName: lesson.locationName ?? null,
         startsAt: lesson.startsAt,
+        endsAt: lesson.endsAt ?? null,
         beltColorHex: child.beltColorHex ?? null,
       }
     }
@@ -335,7 +316,7 @@ export function ParentHome({
           and on home its job is to be noticed, not to be the largest thing on screen.
           Still a real 44px control, and still conditional on the selected day being
           today: stepping back to last Tuesday must not ask a parent to pay for it. */}
-      {debtAgorot > 0 && selectedDay === todayKey ? (
+      {debtAgorot > 0 ? (
         <div style={debtStripStyle} data-testid="parent-home-debt">
           <Icon name="warning" size={16} style={{ color: 'var(--debt)', flex: 'none' }} />
           <strong style={{ color: 'var(--debt)', fontSize: 'var(--text-label)' }}>
@@ -361,137 +342,15 @@ export function ParentHome({
         />
       ) : null}
 
-      {debtAgorot > 0 && selectedDay === todayKey ? null : (
+      {debtAgorot > 0 ? null : (
         <p data-testid="parent-home-no-alerts" style={{ margin: 0, color: 'var(--text-muted)' }}>
           {t(locale, 'common.home.noAlerts')}
         </p>
       )}
 
-      <section aria-labelledby="parent-home-upcoming-title">
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--space-3)' }}>
-          <h2
-            id="parent-home-upcoming-title"
-            style={{ fontSize: 'var(--text-title)', marginInlineEnd: 'auto' }}
-          >
-            {selectedDay === todayKey
-              ? t(locale, 'common.home.upcoming')
-              : formatDateInStudioZone(`${selectedDay}T12:00:00Z`, locale)}
-          </h2>
-          {/* `12a`'s entry from home (P1): the pre-report belongs beside the lessons it
-              is about. A link, not a button — it navigates. */}
-          <a data-testid="parent-home-absence" href="#/absence" style={headerLinkStyle}>
-            {t(locale, 'attendance.absence.title')}
-          </a>
-        </div>
-        {/* 2a — the day strip: read back and forward, tap a day. Past days carry what
-            actually happened; the strip is the affordance that makes attendance a thing
-            a parent can SEE rather than ask about. */}
-        <div
-          role="group"
-          aria-label={t(locale, 'common.home.dayStrip')}
-          data-testid="parent-day-strip"
-          style={{ display: 'flex', gap: 'var(--space-2)', overflowX: 'auto', paddingBlockEnd: 'var(--space-2)' }}
-        >
-          {strip.map((day) => {
-            const selected = day === selectedDay
-            return (
-              <button
-                key={day}
-                type="button"
-                data-testid={`home-day-${day}`}
-                aria-current={selected ? 'date' : undefined}
-                style={selected ? { ...chipActiveStyle, minInlineSize: '44px' } : { ...chipStyle, minInlineSize: '44px' }}
-                onClick={() => setSelectedDay(day)}
-              >
-                <span style={{ display: 'block', fontSize: 'var(--text-caption)' }}>
-                  {t(locale, `schedule.weekday.${new Date(`${day}T12:00:00Z`).getUTCDay()}`)}
-                </span>
-                <span>{day.slice(8)}</span>
-              </button>
-            )
-          })}
-        </div>
-        {byDay === null ? null : byDay.length === 0 ? (
-          <EmptyState
-            title={t(locale, 'common.home.noUpcoming')}
-            description={t(locale, 'common.home.noUpcomingWeek')}
-          />
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-            {byDay.map(([day, lessons]) => (
-              <div key={day} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-                <h3 style={dayHeaderStyle}>{day}</h3>
-                <ul style={lessonListStyle}>
-                  {lessons.map((lesson, index) => (
-                    <li key={lesson.id} data-testid="parent-home-lesson">
-                      <Card>
-                        <div style={lessonRowStyle}>
-                          <div style={{ flex: 1, minInlineSize: 0 }}>
-                            {/* No `|| lesson.groupName` fallback. Every row reaching here
-                                belongs to a child of this family — `filtered` guarantees
-                                it — and the fallback is what made the leak above look like
-                                an ordinary lesson instead of a bug. */}
-                            <strong>
-                              <bdi>{childrenOf(lesson)}</bdi>
-                            </strong>
-                            <div
-                              style={{ color: 'var(--text-muted)', fontSize: 'var(--text-caption)' }}
-                            >
-                              <bdi>{lesson.groupName}</bdi>
-                            </div>
-                          </div>
-                          {/* `2a` §6 — "rows sharing a time hide the repeated time label,
-                              so concurrent lessons read as one merged block". A family with
-                              two children at 16:30 was reading 16:30 twice, which looks
-                              like two separate things rather than one hour with two
-                              children in it.
-                              
-                              HIDDEN, not dropped. The second lesson really is at that
-                              hour, and a row that removed the fact outright would be
-                              lying to anyone who cannot see the alignment that replaces
-                              it — so the time stays in the tree and only its ink goes. */}
-                          <span
-                            data-testid="lesson-time"
-                            data-repeated={String(sharesTimeWithPrevious(lessons, index))}
-                            style={{
-                              fontVariantNumeric: 'tabular-nums',
-                              fontWeight: 600,
-                              fontSize: 'var(--text-title)',
-                              visibility: sharesTimeWithPrevious(lessons, index)
-                                ? 'hidden'
-                                : undefined,
-                            }}
-                          >
-                            {formatTimeInStudioZone(lesson.startsAt, locale)}
-                          </span>
-                        </div>
-                        <div
-                          style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}
-                        >
-                          {marksOf(lesson).map(({ row, name }) => (
-                            <span key={row.student_id} data-testid="home-attendance-mark">
-                              <StatusChip
-                                status={
-                                  row.status === 'present'
-                                    ? 'paid'
-                                    : row.status === 'unmarked'
-                                      ? 'unmarked'
-                                      : 'cancelled'
-                                }
-                                label={`${name} · ${t(locale, ATTENDANCE_LABEL[row.status] ?? 'attendance.roster.unmarked')}`}
-                              />
-                            </span>
-                          ))}
-                        </div>
-                      </Card>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
+      {/* Option B — the family filter sits directly under the thing it filters, which is
+          the point of the arrangement: the screen used to end with a control that
+          partitioned everything above it. */}
 
       {/* 1a's child list.
 
@@ -522,7 +381,7 @@ export function ParentHome({
             </li>
           ) : null}
           {students.map((student) => (
-            <li key={student.id} data-testid="parent-home-child" style={childRowStyle}>
+            <li key={student.id} data-testid="parent-home-child">
               {students.length > 1 ? (
                 <button
                   type="button"
@@ -530,24 +389,33 @@ export function ParentHome({
                   aria-pressed={childFilter === student.id}
                   onClick={() => setChildFilter(childFilter === student.id ? null : student.id)}
                 >
-                  <bdi>{student.displayName}</bdi>
+                  {/* The belt as the identifier, which is what the chip row is FOR: three
+                      similar Hebrew first names in one row tell a parent nothing apart. */}
+                  {student.beltColorHex ? (
+                    <span aria-hidden="true" style={chipBeltStyle(student.beltColorHex)} />
+                  ) : null}
+                  <bdi>{student.firstName ?? student.displayName}</bdi>
                 </button>
               ) : null}
-              {/* 2c's entry (P1/P2). Named per child, or a screen reader hears three
-                  identical links; and it carries the child's name when there is no chip
-                  beside it to supply one. */}
-              <a
-                aria-label={`${t(locale, 'people.card.open')} · ${student.displayName}`}
-                data-testid={`parent-home-card-${student.id}`}
-                href={`#/student/${student.id}`}
-                style={cardLinkStyle}
-              >
-                {students.length > 1 ? (
-                  t(locale, 'people.card.open')
-                ) : (
-                  <bdi>{student.displayName}</bdi>
-                )}
-              </a>
+              {/* 2c's entry (P1/P2). One link for the SELECTED child rather than one per
+                  child stacked down the screen: three "כרטיס חניך" links each on their own
+                  row is what made this block three rows tall and pushed the week below the
+                  fold. A parent of one child still gets theirs, because there is no chip
+                  beside it to select. */}
+              {students.length === 1 || childFilter === student.id ? (
+                <a
+                  aria-label={`${t(locale, 'people.card.open')} · ${student.displayName}`}
+                  data-testid={`parent-home-card-${student.id}`}
+                  href={`#/student/${student.id}`}
+                  style={cardLinkStyle}
+                >
+                  {students.length > 1 ? (
+                    t(locale, 'people.card.open')
+                  ) : (
+                    <bdi>{student.displayName}</bdi>
+                  )}
+                </a>
+              ) : null}
             </li>
           ))}
         </ul>
@@ -557,6 +425,63 @@ export function ParentHome({
           description={t(locale, 'common.home.childrenComeLater')}
         />
       ) : null}
+      {/* Option B's week: one compact row per lesson, ordered by time, with the day on
+          the leading edge and the belt bar naming whose it is. It replaces the seven-day
+          strip and the day-grouped cards — a scan, not a stack of boxes, and the whole
+          screen now fits 844px instead of scrolling to 2,700. */}
+      <section aria-labelledby="parent-home-upcoming-title">
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--space-3)' }}>
+          <h2
+            id="parent-home-upcoming-title"
+            style={{ fontSize: 'var(--text-title)', marginInlineEnd: 'auto' }}
+          >
+            {t(locale, 'common.home.restOfWeek')}
+          </h2>
+          <a data-testid="parent-home-absence" href="#/absence" style={headerLinkStyle}>
+            {t(locale, 'attendance.absence.title')}
+          </a>
+        </div>
+        {week === null ? null : week.length === 0 ? (
+          <EmptyState
+            title={t(locale, 'common.home.noUpcoming')}
+            description={t(locale, 'common.home.noUpcomingWeek')}
+          />
+        ) : (
+          <ul style={weekListStyle}>
+            {week.map((lesson) => {
+              const child = (students ?? []).find((s) =>
+                s.groupNames.includes(lesson.groupName),
+              )
+              const day = new Date(lesson.startsAt)
+              return (
+                <li key={lesson.id} style={weekRowStyle} data-testid="parent-home-lesson">
+                  <div style={weekDayStyle}>
+                    <span style={{ display: 'block', fontSize: 'var(--text-caption)', color: 'var(--text-muted)' }}>
+                      {t(locale, `schedule.weekday.${day.getUTCDay()}`)}
+                    </span>
+                    <span style={{ fontWeight: 'var(--weight-semibold)' }}>
+                      {studioDayKey(lesson.startsAt).slice(8)}
+                    </span>
+                  </div>
+                  {/* D7 — fill plus a ring, so a white belt is still a bar. Absent when
+                      the child has no belt rather than drawn as an empty outline. */}
+                  {child?.beltColorHex ? (
+                    <span aria-hidden="true" style={beltBarStyle(child.beltColorHex)} />
+                  ) : null}
+                  <span style={{ flex: 1, minInlineSize: 0, fontSize: 'var(--text-body)' }}>
+                    <bdi>
+                      {child ? `${child.firstName ?? child.displayName} · ${lesson.groupName}` : lesson.groupName}
+                    </bdi>
+                  </span>
+                  <span style={{ fontWeight: 'var(--weight-semibold)' }}>
+                    {formatTimeInStudioZone(lesson.startsAt, locale)}
+                  </span>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </section>
     </section>
   )
 }

@@ -32,12 +32,14 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field
+from sqlalchemy import select
 
 from app.core.auth_context import AnyStaff, ManagerOrOwner
 from app.core.clock import now
 from app.core.config import settings
 from app.core.cors import app_origin
 from app.core.tenancy import TenantSession, TenantSessionDep, require_current_studio_id
+from app.models.belts import BeltRank
 from app.models.people import Student
 from app.models.person import Person
 from app.schemas._pagination import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, IdempotencyKey
@@ -772,9 +774,28 @@ def my_students(request: Request, session: TenantSessionDep) -> StudentSummaryPa
     # out at two call sites is a gate that will eventually disagree with itself, and the
     # failure modes are a family locked out of an app they have finished with, or one walking
     # past a signature the club needs.
+    # `current_belt_name` and `current_belt_color_hex` are on `StudentSummaryOut` and were
+    # populated by NOTHING, anywhere -- the schema promised a belt and every caller got
+    # `null`. D7's bar and the parent home's per-child identity both read them, so a family
+    # with three children had no way to tell whose lesson was whose. One query for the whole
+    # family rather than one per child: G16's rule applies to a list of any size.
+    belt_ids = {row.current_belt_id for row in rows if row.current_belt_id is not None}
+    belts = (
+        {
+            belt.id: belt
+            for belt in session.execute(select(BeltRank).where(BeltRank.id.in_(belt_ids))).scalars()
+        }
+        if belt_ids
+        else {}
+    )
+
     items = []
     for row in rows:
         summary = _summary(row)
+        belt = belts.get(row.current_belt_id) if row.current_belt_id is not None else None
+        if belt is not None:
+            summary.current_belt_name = belt.name
+            summary.current_belt_color_hex = belt.color_hex
         student = session.get(Student, row.id)
         if student is not None:
             summary.agreement_complete = agreement_status(

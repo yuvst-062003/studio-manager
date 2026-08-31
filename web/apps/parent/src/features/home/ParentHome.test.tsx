@@ -13,6 +13,10 @@ import type { Locale } from '@studio/i18n'
 import { THEME_STORAGE_KEY, ThemeProvider } from '@studio/ui'
 import type { ResolvedTheme } from '@studio/ui'
 import { ParentHome } from './ParentHome'
+import { makeIntentClient } from './intentClient'
+
+/** The card only renders when it can write; these tests are about the arrangement. */
+const STUB_CLIENT = makeIntentClient(async () => new Response(null, { status: 204 }))
 
 const DIRECTIONS = [
   { locale: 'he', dir: 'rtl' },
@@ -22,13 +26,21 @@ const DIRECTIONS = [
 const THEMES = ['light', 'dark'] as const
 
 const CHILDREN = [
-  { id: 'st1', displayName: 'נועה לוי', groupNames: ['מתחילים'] },
-  { id: 'st2', displayName: 'איתי לוי', groupNames: ['מתקדמים', 'נבחרת'] },
+  { id: 'st1', displayName: 'נועה לוי', firstName: 'נועה', groupNames: ['מתחילים'], beltColorHex: '#d9a800' },
+  { id: 'st2', displayName: 'איתי לוי', firstName: 'איתי', groupNames: ['מתקדמים', 'נבחרת'], beltColorHex: null },
 ]
 
+/**
+ * RELATIVE to now, and that is a bug fix rather than a style choice. These were two
+ * hardcoded 2026 dates, and the screen only ever lists lessons still to come — so the
+ * day the calendar passed them, five tests here began failing and stayed failing. A
+ * fixture pinned to a wall clock is a test with an expiry date on it.
+ */
+const inHours = (h: number) => new Date(Date.now() + h * 3600_000).toISOString()
+
 const LESSONS = [
-  { id: 'se1', startsAt: '2026-08-30T14:00:00Z', groupName: 'מתחילים' },
-  { id: 'se2', startsAt: '2026-09-01T14:00:00Z', groupName: 'מתקדמים' },
+  { id: 'se1', startsAt: inHours(2), endsAt: inHours(3), groupName: 'מתחילים', locationName: 'אולם א׳' },
+  { id: 'se2', startsAt: inHours(26), endsAt: inHours(27), groupName: 'מתקדמים', locationName: null },
 ]
 
 function renderIn(
@@ -73,90 +85,75 @@ describe('ParentHome', () => {
     )
   })
 
-  it('groups the lessons by day with the studio-zone time on each card', () => {
+  it('leads with the next lesson and its two-way answer', () => {
+    // Option B's whole point: the soonest lesson answers the screen's question at full
+    // size, and the answer to "does anything need me" is ON it rather than three taps
+    // away behind #/absence.
+    render(
+      <ParentHome
+        locale="he"
+        students={CHILDREN}
+        upcoming={LESSONS}
+        intentClient={STUB_CLIENT}
+      />,
+    )
+    const card = screen.getByTestId('parent-home-next-lesson')
+    expect(card).toHaveTextContent('נועה')
+    expect(within(card).getByTestId('intent-coming')).toBeInTheDocument()
+    expect(within(card).getByTestId('intent-not-coming')).toBeInTheDocument()
+  })
+
+  it('names the child by their first name, not their full one', () => {
+    // Three "… לוי" surnames in one column identify nobody, which is the defect the
+    // belt bar and the first name together are for.
+    render(
+      <ParentHome locale="he" students={CHILDREN} upcoming={LESSONS} intentClient={STUB_CLIENT} />,
+    )
+    expect(screen.getByTestId('parent-home-next-lesson')).not.toHaveTextContent('נועה לוי')
+  })
+
+  it('lists the rest of the week as rows, each carrying its own day', () => {
+    // The day-grouped cards and the seven-day strip are gone: the day sits on each
+    // row's leading edge, which is what lets the screen fit 844px again.
     render(<ParentHome locale="he" students={CHILDREN} upcoming={LESSONS} />)
     const rows = screen.getAllByTestId('parent-home-lesson')
-    expect(rows).toHaveLength(2)
-    // 14:00Z on 2026-08-30 is 17:00 in Asia/Jerusalem (IDT) — G3's rendering rule.
-    expect(rows[0]).toHaveTextContent('17:00')
-    expect(rows[0]).toHaveTextContent('נועה לוי')
-    // Two different days → two day headers.
-    expect(screen.getAllByRole('heading', { level: 3 })).toHaveLength(2)
+    expect(rows.length).toBeGreaterThan(0)
+    expect(rows[0]).toHaveTextContent('מתחילים')
   })
 
-  it('shows only lessons a child of this family actually attends', async () => {
-    // The `dev+both` case — a parent who also coaches. `GET /sessions` returns the whole
-    // studio to anyone holding a staff role (app/routers/sessions.py `_visible_groups`
-    // returns None for staff, whichever app asked), so this list arrived carrying groups
-    // no child of theirs is in. With no child chip selected nothing filtered them out, and
-    // the row then had no child to name: `childrenOf(lesson) || lesson.groupName` printed
-    // the GROUP where every other row shows a child, so "השיעורים הקרובים" listed the
-    // club's timetable as if it were this family's.
+  it('shows only lessons a child of this family actually attends', () => {
+    // `GET /sessions` hands a parent who ALSO coaches the whole studio, so the screen
+    // filters to the family's own groups. Without it a coaching parent saw the club's
+    // entire timetable on their family's home screen.
     render(
       <ParentHome
         locale="he"
         students={CHILDREN}
-        upcoming={[...LESSONS, { id: 'se9', startsAt: '2026-08-30T16:00:00Z', groupName: 'קבוצה אחרת' }]}
-      />,
-    )
-    expect(screen.getAllByTestId('parent-home-lesson')).toHaveLength(2)
-    expect(screen.queryByText('קבוצה אחרת')).toBeNull()
-  })
-
-  it('hides a repeated time so concurrent lessons read as one block', () => {
-    // `2a` §6 — "Rows sharing a time hide the repeated time label, so concurrent lessons
-    // read as one merged block." A family with two children at 16:30 was reading 16:30
-    // twice, which looks like two different things happening.
-    render(
-      <ParentHome
-        locale="he"
-        students={CHILDREN}
-        upcoming={[
-          { id: 'a', startsAt: '2026-08-30T14:00:00Z', groupName: 'מתחילים' },
-          { id: 'b', startsAt: '2026-08-30T14:00:00Z', groupName: 'מתקדמים' },
-        ]}
+        upcoming={[...LESSONS, { id: 'se9', startsAt: inHours(4), groupName: 'קבוצה זרה' }]}
       />,
     )
     const rows = screen.getAllByTestId('parent-home-lesson')
-    expect(rows).toHaveLength(2)
-    expect(rows[0]).toHaveTextContent('17:00')
-    // Still announced to a screen reader — the second lesson genuinely is at 17:00, and a
-    // row that simply dropped the fact would be lying to anyone not seeing the alignment.
-    expect(within(rows[0]!).getByTestId('lesson-time')).toHaveAttribute('data-repeated', 'false')
-    const second = within(rows[1]!).getByTestId('lesson-time')
-    expect(second).toHaveAttribute('data-repeated', 'true')
-    // Hidden, not removed: the second lesson really is at 17:00, and a row that dropped
-    // the fact would be lying to anyone who cannot see the alignment that replaces it.
-    expect(second).toHaveTextContent('17:00')
+    expect(rows.some((row) => row.textContent?.includes('קבוצה זרה'))).toBe(false)
   })
 
-  it('keeps the time on a row that starts at a different hour', () => {
-    render(
-      <ParentHome
-        locale="he"
-        students={CHILDREN}
-        upcoming={[
-          { id: 'a', startsAt: '2026-08-30T14:00:00Z', groupName: 'מתחילים' },
-          { id: 'b', startsAt: '2026-08-30T15:00:00Z', groupName: 'מתקדמים' },
-        ]}
-      />,
-    )
-    const rows = screen.getAllByTestId('parent-home-lesson')
-    const second = within(rows[1]!).getByTestId('lesson-time')
-    expect(second).toHaveAttribute('data-repeated', 'false')
-    expect(second).toHaveTextContent('18:00')
+  it('filters the week through the child chips, and releases on a second tap', async () => {
+    render(<ParentHome locale="he" students={CHILDREN} upcoming={LESSONS} />)
+    const before = screen.getAllByTestId('parent-home-lesson').length
+    await userEvent.click(screen.getByRole('button', { name: 'נועה' }))
+    const filtered = screen.getAllByTestId('parent-home-lesson')
+    expect(filtered.length).toBeLessThan(before)
+    expect(filtered.every((row) => row.textContent?.includes('מתחילים'))).toBe(true)
+    await userEvent.click(screen.getByRole('button', { name: 'נועה' }))
+    expect(screen.getAllByTestId('parent-home-lesson')).toHaveLength(before)
   })
 
-  it('raises the debt alert only on today', async () => {
-    // `2a` §5 — the debt + health banner is "conditional: rendered only when the selected
-    // day is today". It was rendering on every day of the strip, so stepping back to last
-    // Tuesday asked a parent to pay for it.
-    render(<ParentHome locale="he" students={CHILDREN} upcoming={LESSONS} debtAgorot={32000} />)
-    expect(screen.getByTestId('parent-home-debt')).toBeInTheDocument()
-    const strip = screen.getByTestId('parent-day-strip')
-    const days = within(strip).getAllByRole('button')
-    await userEvent.click(days[0]!)
-    expect(screen.queryByTestId('parent-home-debt')).toBeNull()
+  it('puts the family filter ABOVE the week it filters', () => {
+    // It used to be the last thing on a screen titled "my children" — a control that
+    // partitioned everything above it, placed below all of it.
+    render(<ParentHome locale="he" students={CHILDREN} upcoming={LESSONS} />)
+    const chips = screen.getByTestId('parent-home-chip-all')
+    const week = screen.getAllByTestId('parent-home-lesson')[0]!
+    expect(chips.compareDocumentPosition(week) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
   it('skips the family layer for a family with one child', () => {
@@ -173,16 +170,6 @@ describe('ParentHome', () => {
   it('keeps the family layer for a family with more than one child', () => {
     render(<ParentHome locale="he" students={CHILDREN} upcoming={LESSONS} />)
     expect(screen.getByTestId('parent-home-chip-all')).toBeInTheDocument()
-  })
-
-  it('filters the lessons through the child chips, and releases on a second tap', async () => {
-    render(<ParentHome locale="he" students={CHILDREN} upcoming={LESSONS} />)
-    const chips = screen.getAllByTestId('parent-home-child')
-    expect(chips).toHaveLength(2)
-    await userEvent.click(screen.getByRole('button', { name: 'נועה לוי' }))
-    expect(screen.getAllByTestId('parent-home-lesson')).toHaveLength(1)
-    await userEvent.click(screen.getByRole('button', { name: 'נועה לוי' }))
-    expect(screen.getAllByTestId('parent-home-lesson')).toHaveLength(2)
   })
 
   it('tells a parent with no children why the screen is empty', () => {
@@ -210,36 +197,5 @@ describe('ParentHome', () => {
     const { container } = renderIn(<ParentHome locale="he" />, { theme })
     expect(container.querySelector('[data-testid="parent-home"]')).toBeInTheDocument()
     expect(document.documentElement).toHaveAttribute('data-theme', theme)
-  })
-
-  it('builds 2a: a seven-day strip with today marked for a screen reader', () => {
-    // The guard that used to sit here kept 2a OUT; the feature pass built it
-    // deliberately, so the guard flips into a spec.
-    render(<ParentHome locale="he" students={CHILDREN} upcoming={[]} />)
-    const strip = screen.getByTestId('parent-day-strip')
-    const days = within(strip).getAllByRole('button')
-    expect(days).toHaveLength(7)
-    expect(days.filter((day) => day.getAttribute('aria-current') === 'date')).toHaveLength(1)
-  })
-
-  it("shows a past day's lessons with what actually happened, per child", async () => {
-    // 2a — "כולל נוכחות שהייתה". A lesson yesterday, one child present.
-    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000)
-    const lesson = { id: 'past1', startsAt: yesterday.toISOString(), groupName: 'מתחילים' }
-    render(
-      <ParentHome
-        locale="he"
-        students={CHILDREN}
-        upcoming={[lesson]}
-        attendance={[{ session_id: 'past1', student_id: 'st1', status: 'present' }]}
-      />,
-    )
-    const strip = screen.getByTestId('parent-day-strip')
-    const days = within(strip).getAllByRole('button')
-    const todayIndex = days.findIndex((day) => day.getAttribute('aria-current') === 'date')
-    await userEvent.click(days[todayIndex - 1]!)
-    const mark = screen.getByTestId('home-attendance-mark')
-    expect(mark).toHaveTextContent('נועה לוי')
-    expect(mark).toHaveTextContent(t('he', 'attendance.roster.present'))
   })
 })

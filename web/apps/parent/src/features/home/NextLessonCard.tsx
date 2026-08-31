@@ -13,7 +13,7 @@
 import { useState } from 'react'
 import type { CSSProperties } from 'react'
 import { formatTimeInStudioZone } from '@studio/core'
-import { Icon } from '@studio/ui'
+import { Icon, RangeText } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { IntentError } from './intentClient'
@@ -77,7 +77,9 @@ export type NextLesson = {
   studentId: string
   studentName: string
   groupName: string
+  locationName: string | null
   startsAt: string
+  endsAt: string | null
   beltColorHex: string | null
 }
 
@@ -168,11 +170,27 @@ export function NextLessonCard({
             <bdi>{lesson.studentName}</bdi>
           </div>
           <div style={{ fontSize: 'var(--text-label)' }}>
-            <bdi>{lesson.groupName}</bdi>
+            {/* The room, when the club records one. Absent rather than a dangling
+                separator when it does not — `location_name` is nullable. */}
+            <bdi>
+              {lesson.locationName ? `${lesson.groupName} · ${lesson.locationName}` : lesson.groupName}
+            </bdi>
           </div>
         </div>
-        <div style={{ fontSize: 'var(--text-display)', fontWeight: 'var(--weight-bold)' }}>
-          {formatTimeInStudioZone(lesson.startsAt, locale)}
+        <div style={{ textAlign: 'end' }}>
+          <div style={{ fontSize: 'var(--text-display)', fontWeight: 'var(--weight-bold)' }}>
+            {formatTimeInStudioZone(lesson.startsAt, locale)}
+          </div>
+          {/* Through RangeText, which is what keeps a range low-value-first and stops
+              the two ends being concatenated into one string. */}
+          {lesson.endsAt === null ? null : (
+            <div style={{ fontSize: 'var(--text-caption)' }}>
+              <RangeText
+                from={formatTimeInStudioZone(lesson.startsAt, locale)}
+                to={formatTimeInStudioZone(lesson.endsAt, locale)}
+              />
+            </div>
+          )}
         </div>
       </div>
 

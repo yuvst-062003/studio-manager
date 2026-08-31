@@ -171,7 +171,13 @@ export function Resolve({ session, locale }: { session: Session; locale: Locale 
           rows
             .filter((row) => row.status === 'scheduled')
             .sort((a, b) => a.starts_at.localeCompare(b.starts_at))
-            .map((row) => ({ id: row.id, startsAt: row.starts_at, groupName: row.group_name })),
+            .map((row) => ({
+              id: row.id,
+              startsAt: row.starts_at,
+              endsAt: row.ends_at,
+              groupName: row.group_name,
+              locationName: row.location_name,
+            })),
         )
       })
       .catch(() => live && setUpcoming([]))
@@ -320,7 +326,14 @@ export function Resolve({ session, locale }: { session: Session; locale: Locale 
           ? mine.students.map((student) => ({
               id: student.id,
               displayName: `${student.first_name} ${student.last_name}`,
+              // The card and the week rows name a child by their FIRST name — three
+              // "… הורה" surnames in one column identify nobody.
+              firstName: student.first_name,
               groupNames: student.group_names ?? [],
+              // D7's bar colour. It was on `/me/students` all along as
+              // `current_belt_color_hex`; the first pass simply never mapped it, so
+              // every child rendered without the one mark that tells them apart.
+              beltColorHex: student.current_belt_color_hex ?? null,
             }))
           : mine.status === 'error'
             ? []

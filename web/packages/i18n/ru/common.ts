@@ -422,6 +422,7 @@ export const common: Bundle = {
   'home.title': 'Мои дети',
   'home.settings': 'Настройки',
   'home.nextLesson': 'Следующее занятие',
+  'home.restOfWeek': 'Далее на неделе',
   'home.upcoming': 'Ближайшие занятия',
   'home.alerts': 'Уведомления',
   'home.noChildren': 'К этому аккаунту пока не привязан ни один ребёнок.',

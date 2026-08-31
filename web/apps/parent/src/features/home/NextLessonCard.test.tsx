@@ -17,8 +17,10 @@ const LESSON = {
   studentId: 'kid-1',
   studentName: 'נעמי',
   groupName: 'גוזלים',
+  locationName: 'אולם ב׳',
   // Well into the future, so nothing here depends on when the suite runs.
   startsAt: '2099-01-01T14:00:00Z',
+  endsAt: '2099-01-01T14:45:00Z',
   beltColorHex: '#c76a1e',
 }
 
