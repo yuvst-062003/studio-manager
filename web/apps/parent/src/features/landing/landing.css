@@ -349,7 +349,7 @@
   color: var(--gl-ink-2);
   font-size: 1.05rem;
   line-height: 1.7;
-  margin: 0 0 var(--space-5);
+  margin: 0 0 var(--space-3);
   padding-inline-start: var(--space-4);
 }
 
@@ -406,53 +406,24 @@
   color: color-mix(in srgb, var(--gl-on-primary) 82%, transparent);
 }
 
-.gl-coach-visual {
-  position: relative;
-}
-
-.gl-coach-photo {
-  aspect-ratio: 4 / 3;
-  border-radius: 50% 50% 4px 4px / 40% 40% 4px 4px;
-  inline-size: 100%;
-  object-fit: cover;
-}
-
-.gl-coach-photo--empty {
-  align-items: center;
-  background: color-mix(in srgb, var(--gl-primary) 7%, var(--gl-card));
-  border: 1px solid var(--gl-outline);
+/* Who the section is about, under the words rather than pinned to a panel. */
+.gl-coach-byline {
   display: flex;
-  justify-content: center;
-  padding: var(--space-6);
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  margin: 0 0 var(--space-5);
+  padding-inline-start: var(--space-4);
 }
 
-.gl-coach-photo--empty img {
-  max-block-size: 70%;
-  max-inline-size: 70%;
-  opacity: 0.9;
-}
-
-.gl-coach-card {
-  background: var(--gl-card);
-  border-inline-start: 4px solid var(--gl-red);
-  box-shadow: 0 8px 24px rgb(0 0 0 / 10%);
-  inset-block-end: var(--space-4);
-  inset-inline-end: var(--space-4);
-  padding: var(--space-3) var(--space-4);
-  position: absolute;
-}
-
-.gl-coach-card h3 {
+.gl-coach-byline strong {
   color: var(--gl-heading);
   font-size: 1.05rem;
-  margin: 0;
 }
 
-.gl-coach-card p {
+.gl-coach-byline span {
   color: var(--gl-red);
   font-size: 0.85rem;
   font-weight: var(--weight-semibold);
-  margin: var(--space-1) 0 0;
 }
 
 .gl-photos {
@@ -983,6 +954,21 @@
   .gl-coach {
     align-items: center;
     grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  }
+
+  /* One column, so the credential row spreads across the section instead of sharing it
+   * with a panel. Only the designed page: the data-driven one still pairs its about text
+   * with the club's uploaded photo strip. */
+  .gl-coach--solo {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* The cards want the whole width; the prose does not. Losing the panel took the bio
+   * from a readable column to a 150-character line, which is a paragraph nobody's eye
+   * can track back from. The cards below are unconstrained. */
+  .gl-coach--solo .gl-coach-bio,
+  .gl-coach--solo .gl-coach-byline {
+    max-inline-size: 48rem;
   }
 
   /* The full week at a glance — the pager unrolls into equal columns. */

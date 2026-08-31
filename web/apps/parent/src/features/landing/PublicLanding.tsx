@@ -441,13 +441,20 @@ export function PublicLanding({
             `about` text and photos in the same slot. */}
         {content ? (
           <section className="gl-section gl-section--zen" aria-labelledby="landing-about" data-testid="landing-coach">
-            <div className="gl-section-inner gl-coach">
+            <div className="gl-section-inner gl-coach gl-coach--solo">
               <div className="gl-coach-copy">
                 <h2 id="landing-about" className="gl-title gl-title--stacked">
                   {content.coach.headingTop}
                   <span>{content.coach.headingBottom}</span>
                 </h2>
                 <p className="gl-coach-bio">{content.coach.bio}</p>
+                {/* Whose leadership the section is about. It used to be a card pinned to
+                    the crest panel; with the panel gone it reads as what it always was —
+                    the byline under the words. */}
+                <p className="gl-coach-byline">
+                  <strong>{content.coach.name}</strong>
+                  <span>{content.coach.title}</span>
+                </p>
                 <div className="gl-cred-row">
                   {content.coach.credentials.map((credential) => (
                     <div
@@ -459,7 +466,7 @@ export function PublicLanding({
                           announcement, just a larger one. */}
                       {credential.figure ? (
                         <p className="gl-cred-figure" aria-hidden="true">
-                          {/* An LTR island: bidi renders a bare "300+" as "+300" beside
+                          {/* An LTR island: bidi renders a bare "1000+" as "+1000" beside
                               Hebrew, the same defect RangeText exists to prevent. */}
                           <bdi dir="ltr">{credential.figure}</bdi>
                         </p>
@@ -468,22 +475,6 @@ export function PublicLanding({
                       <p className="gl-cred-text">{credential.text}</p>
                     </div>
                   ))}
-                </div>
-              </div>
-              <div className="gl-coach-visual">
-                {photos[0] ? (
-                  <img src={photos[0]} alt={content.coach.name} className="gl-coach-photo" />
-                ) : (
-                  // No photo uploaded: the club's own mark on a tinted panel. Stitch drew
-                  // a dashed "add" placeholder here, which is right in a design tool and
-                  // reads as broken on a page a parent actually opens.
-                  <div className="gl-coach-photo gl-coach-photo--empty">
-                    {logoSrc ? <img src={logoSrc} alt="" /> : null}
-                  </div>
-                )}
-                <div className="gl-coach-card">
-                  <h3>{content.coach.name}</h3>
-                  <p>{content.coach.title}</p>
                 </div>
               </div>
             </div>
@@ -509,6 +500,14 @@ export function PublicLanding({
             </div>
           </section>
         ) : null}
+
+        {/* The week — designed cell-for-cell when the club has content, derived from the
+            API's groups when it does not. */}
+        {content ? (
+          <ContentSchedule content={content} locale={locale} />
+        ) : (
+          <DerivedSchedule groups={groups} locale={locale} onBook={bookGroup} />
+        )}
 
         {/* The club in photographs — content only, and bundled with the app rather than
             uploaded (clubContent.ts). Every tile is lazy: the section sits below the fold
@@ -538,14 +537,6 @@ export function PublicLanding({
             </div>
           </section>
         ) : null}
-
-        {/* The week — designed cell-for-cell when the club has content, derived from the
-            API's groups when it does not. */}
-        {content ? (
-          <ContentSchedule content={content} locale={locale} />
-        ) : (
-          <DerivedSchedule groups={groups} locale={locale} onBook={bookGroup} />
-        )}
 
         {/* The pricing tiers — content only: the public contract serves no prices. */}
         {content ? (

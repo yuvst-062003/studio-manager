@@ -563,13 +563,36 @@ describe('the designed Gladiator page (Stitch, hardcoded content)', () => {
     expect(cards).toHaveLength(3)
     // The figure card: the number is the headline, the heading says what it counts.
     const figure = coach.querySelector('.gl-cred--figure')
-    expect(figure).toHaveTextContent('300+')
+    expect(figure).toHaveTextContent('1000+')
     // Inside an LTR island, so Hebrew's bidi cannot reorder it into "+300".
     expect(figure?.querySelector('bdi')).toHaveAttribute('dir', 'ltr')
     expect(figure).toHaveTextContent('חניכים עברו במועדון')
     // The icons are gone — the whole point of the change. An <svg> back in this row means
     // a drawing has crept back in beside cards that already say the thing in words.
     expect(coach.querySelectorAll('.gl-cred svg')).toHaveLength(0)
+  })
+
+  it('names the coach in the copy, with no second copy of the crest beside it', async () => {
+    render(<PublicLanding slug="gladiator" locale="he" client={clientReturning(GLADIATOR)} />)
+    const coach = await screen.findByTestId('landing-coach')
+    // The name and rank survived the panel they used to be pinned to.
+    expect(coach).toHaveTextContent('סנסאי לביא תמיר')
+    expect(coach).toHaveTextContent('מאמן ראשי')
+    // The header already carries the club's mark; the section must not carry it again,
+    // which is what cost the credential row half the width it now spreads across.
+    expect(coach.querySelectorAll('img')).toHaveLength(0)
+  })
+
+  it('puts the timetable straight after the credentials, and the photographs under it', async () => {
+    render(<PublicLanding slug="gladiator" locale="he" client={clientReturning(GLADIATOR)} />)
+    await screen.findByTestId('landing-coach')
+    // Document order, not CSS: "when do we train" is the question the coach's section
+    // raises, so it must be answered before the page shows anything else.
+    const order = ['landing-coach', 'landing-schedule', 'landing-gallery', 'landing-plans'].map(
+      (id) => [...document.querySelectorAll('[data-testid]')].indexOf(screen.getByTestId(id)),
+    )
+    expect(order).toEqual([...order].sort((a, b) => a - b))
+    expect(order.every((position) => position >= 0)).toBe(true)
   })
 
   it('shows the club\u2019s own photographs, each with alt text a screen reader can use', async () => {

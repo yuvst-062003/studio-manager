@@ -264,7 +264,7 @@ const HE: ClubCopy = {
         text: 'בוגר וינגייט המשלב פסיכולוגיית ספורט בכל אימון.',
       },
       {
-        figure: '300+',
+        figure: '1000+',
         title: 'חניכים עברו במועדון',
         text: 'דורות של ילדים ובני נוער יצאו מהמזרן הזה לתחרויות, לנבחרות ולחיים.',
       },
@@ -396,7 +396,7 @@ const EN: ClubCopy = {
         text: 'A Wingate graduate who brings sport psychology into every session.',
       },
       {
-        figure: '300+',
+        figure: '1000+',
         title: 'Students have trained here',
         text: 'Generations of children and teenagers left this mat for competitions, for squads and for life.',
       },
@@ -527,7 +527,7 @@ const RU: ClubCopy = {
         text: 'Выпускник института Вингейт, применяющий спортивную психологию на каждой тренировке.',
       },
       {
-        figure: '300+',
+        figure: '1000+',
         title: 'Учеников прошли через клуб',
         text: 'Поколения детей и подростков ушли с этого татами на соревнования, в сборные и в жизнь.',
       },
