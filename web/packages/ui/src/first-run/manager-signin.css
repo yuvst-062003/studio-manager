@@ -1,0 +1,395 @@
+/* The staff app's sign-in — docs/design "Gladiator Manager Sign In", implemented
+ * 2026-09-01. `gladiator-signin.css` still dresses `SignIn` for parent and dashboard.
+ *
+ * Like that screen, this one deliberately commits to ONE look in both themes: the navy
+ * ground, the gold rule and the club badge are the brand moment, not a data surface, so
+ * every colour here is a literal from the mock rather than a theme token. The explicit
+ * background on the root is what keeps a light host theme from bleeding through.
+ *
+ * Two families live HERE and not in fonts.css, for the reason Archivo already does:
+ * fonts.css is gated by fonts.test.ts to exactly one family (D6/G14, "one family, one
+ * loading strategy", because every extra family is an asset to cache before a coach walks
+ * into a basement). That argument is about screens that must work offline — and this one
+ * cannot: OAuth needs the network before anything else happens.
+ *
+ * NEITHER family carries Hebrew, in the mock or here. Plex and Jakarta dress the Latin
+ * (the MANAGER eyebrow, "Google", the footer), and every Hebrew and Cyrillic string falls
+ * through to Rubik, which the app already ships. That is why each face below declares a
+ * unicode-range: without one the browser would download a Latin file to fail at a Hebrew
+ * string. Subsets follow fonts.css's rule — latin, latin-ext and base cyrillic, the range
+ * Russian actually lives in; greek and vietnamese are omitted, as arabic is there.
+ */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 700;
+  font-stretch: 100%;
+  src: url('./assets/ibm-plex-sans-latin-wght.woff2') format('woff2-variations');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215,
+    U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 700;
+  font-stretch: 100%;
+  src: url('./assets/ibm-plex-sans-latin-ext-wght.woff2') format('woff2-variations');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304,
+    U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB,
+    U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 700;
+  font-stretch: 100%;
+  src: url('./assets/ibm-plex-sans-cyrillic-wght.woff2') format('woff2-variations');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+
+@font-face {
+  font-family: 'Plus Jakarta Sans';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 200 800;
+  src: url('./assets/plus-jakarta-sans-latin-wght.woff2') format('woff2-variations');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215,
+    U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Plus Jakarta Sans';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 200 800;
+  src: url('./assets/plus-jakarta-sans-latin-ext-wght.woff2') format('woff2-variations');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304,
+    U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB,
+    U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+/* ── the ground ──────────────────────────────────────────────────────────────
+ * Four stacked layers, exactly as the mock stacks them: a radial lift from the top
+ * edge, a 60px blueprint grid at half opacity, a 45° hatch, and a vignette that
+ * darkens the bottom so the footer has something to sit on. All decorative, all
+ * behind `z-index: 0`, none of them reachable by a pointer. */
+.msignin {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-block-size: 100vh;
+  min-block-size: 100svh;
+  overflow: hidden;
+  background: #001129;
+  color: #eff1f3;
+  font-family: 'Plus Jakarta Sans', 'Rubik Variable', sans-serif;
+}
+
+.msignin__ground,
+.msignin__grid,
+.msignin__hatch,
+.msignin__vignette {
+  position: absolute;
+  inset-block: 0;
+  inset-inline: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.msignin__ground {
+  background: radial-gradient(120% 80% at 50% 0%, #0f2644 0%, #001129 55%, #00091a 100%);
+}
+
+.msignin__grid {
+  opacity: 0.5;
+  background-image:
+    linear-gradient(to right, rgb(178 199 237 / 14%) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(178 199 237 / 14%) 1px, transparent 1px);
+  background-size: 60px 60px;
+}
+
+.msignin__hatch {
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgb(255 255 255 / 2.5%) 0,
+    rgb(255 255 255 / 2.5%) 2px,
+    transparent 2px,
+    transparent 4px
+  );
+}
+
+.msignin__vignette {
+  background: linear-gradient(
+    to bottom,
+    rgb(0 17 41 / 50%) 0%,
+    transparent 35%,
+    rgb(0 9 26 / 85%) 100%
+  );
+}
+
+/* 柔道 — "judo", set vertically the way a dojo banner is. Decorative and `aria-hidden`:
+ * it is a texture, not a heading, and a screen reader announcing "jūdō" between the
+ * badge and the logo would be noise. Overflow on the root clips it, which is what the
+ * mock does at every viewport it was drawn for. */
+.msignin__kanji {
+  position: absolute;
+  inset-block: 0;
+  inset-inline: 0;
+  z-index: 0;
+  pointer-events: none;
+
+  /* Centred by grid, NOT by `inset: 50%` + a translate. The logical inset properties map
+   * to physical edges through the ELEMENT'S OWN writing mode, and this element's is
+   * `vertical-rl` — so `inset-block-start` here means the RIGHT edge and
+   * `inset-inline-start` means the TOP. Written the obvious way it centred the kanji one
+   * full height off, in a layer faint enough that the mistake was easy to miss. Grid
+   * centring has no axes to swap and needs no RTL counterpart. */
+  display: grid;
+  place-content: center;
+  font-family: 'Yu Mincho', 'MS Mincho', serif;
+  font-size: 350px;
+  font-weight: 700;
+  color: rgb(178 199 237 / 9%);
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+  white-space: nowrap;
+}
+
+/* ── the column ──────────────────────────────────────────────────────────── */
+.msignin__inner {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  min-block-size: 100vh;
+  min-block-size: 100svh;
+}
+
+/* The mock opened with a 12px gold rule across the top. Dropped at the owner's request
+ * (2026-09-01): the navy ground now runs clean to the top edge, and the gold survives
+ * where it carries meaning — the eyebrow badge, the active language, focus rings. */
+.msignin__main {
+  position: relative;
+  z-index: 10;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 40px;
+  inline-size: 100%;
+  max-inline-size: 500px;
+  margin-inline: auto;
+  padding: 16px 16px 48px;
+}
+
+/* ── the eyebrow badge ───────────────────────────────────────────────────── */
+.msignin__badge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  /* The mock's `7px 16px 7px 12px` in an RTL document: the tighter side is the one the
+   * icon sits on, which is the inline END. */
+  padding-block: 7px;
+  padding-inline: 16px 12px;
+  border: 1px solid rgb(241 190 120 / 45%);
+  border-radius: 9999px;
+  background: rgb(241 190 120 / 8%);
+  font-family: 'IBM Plex Sans', 'Rubik Variable', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: #f1be78;
+}
+
+.msignin__badge svg {
+  flex: none;
+  inline-size: 18px;
+  block-size: 18px;
+}
+
+/* ── the club mark ───────────────────────────────────────────────────────── */
+.msignin__logo {
+  inline-size: 100%;
+  max-inline-size: 300px;
+  block-size: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 8px 30px rgb(0 0 0 / 50%));
+}
+
+/* ── the call to action ──────────────────────────────────────────────────── */
+.msignin__cta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  inline-size: 100%;
+}
+
+.msignin__btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  box-sizing: border-box;
+  inline-size: 100%;
+  max-inline-size: 320px;
+  padding: 16px 24px;
+  border: 1px solid rgb(255 255 255 / 60%);
+  border-radius: 8px;
+  background: #f7f9fb;
+  color: #001129;
+  font-family: 'IBM Plex Sans', 'Rubik Variable', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 10px 30px rgb(0 0 0 / 45%);
+}
+
+.msignin__btn:hover {
+  background: #fff;
+  text-decoration: none;
+  transform: translateY(-2px);
+  box-shadow: 0 16px 38px rgb(0 0 0 / 55%);
+}
+
+.msignin__btn:focus-visible {
+  outline: 3px solid #f1be78;
+  outline-offset: 3px;
+}
+
+.msignin__btn svg {
+  flex: none;
+  inline-size: 22px;
+  block-size: 22px;
+}
+
+.msignin__blurb {
+  margin: 0;
+  max-inline-size: 290px;
+  text-align: center;
+  font-size: 16px;
+  line-height: 24px;
+  color: #bec8d0;
+  text-wrap: pretty;
+}
+
+/* ── the footer ──────────────────────────────────────────────────────────── */
+.msignin__footer {
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  inline-size: 100%;
+  padding: 32px 16px;
+  background: rgb(0 9 26 / 45%);
+  backdrop-filter: blur(8px);
+  border-block-start: 1px solid rgb(178 199 237 / 12%);
+  font-family: 'IBM Plex Sans', 'Rubik Variable', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+}
+
+.msignin__langs {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+/* A real <button>, dressed as the mock's link: choosing a language changes this page,
+ * it does not navigate to one, and `aria-pressed` is what tells a screen reader which
+ * of the three is currently on. */
+.msignin__lang {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  letter-spacing: inherit;
+  color: #bec8d0;
+  cursor: pointer;
+}
+
+.msignin__lang:hover {
+  color: #f1be78;
+}
+
+.msignin__lang[aria-pressed='true'] {
+  color: #f1be78;
+  font-weight: 700;
+  cursor: default;
+}
+
+.msignin__legal {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  color: #bec8d0;
+}
+
+/* The app underlines links and paints them with the accent token. Neither belongs on a
+ * navy footer: the accent is a green that fails contrast here, and the mock's footer is
+ * one tone of grey with the gold reserved for hover. */
+.msignin__legal a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.msignin__legal a:hover {
+  color: #f1be78;
+  text-decoration: underline;
+}
+
+.msignin__dot {
+  color: rgb(178 199 237 / 35%);
+}
+
+.msignin__copy {
+  margin-block-start: 8px;
+  color: #74777e;
+}
+
+.msignin__lang:focus-visible,
+.msignin__legal a:focus-visible {
+  outline: 2px solid #f1be78;
+  outline-offset: 3px;
+}
+
+/* A narrow phone is the viewport this was drawn for (430×932), but the kanji is sized
+ * in absolute px and the logo has a floor — below ~360px the column needs the air back. */
+@media (width <= 380px) {
+  .msignin__main {
+    gap: 28px;
+  }
+
+  .msignin__kanji {
+    font-size: 280px;
+  }
+
+  .msignin__legal {
+    gap: 10px;
+  }
+}
+
+/* The two transforms above are decoration. Someone who asked the system to stop moving
+ * things gets the same screen without the lift. */
+@media (prefers-reduced-motion: reduce) {
+  .msignin__btn {
+    transition: none;
+  }
+
+  .msignin__btn:hover {
+    transform: none;
+  }
+}

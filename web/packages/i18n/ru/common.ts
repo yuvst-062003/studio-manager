@@ -100,6 +100,16 @@ export const common: Bundle = {
   'auth.eyebrow.staff': 'Вход для тренеров',
   'auth.eyebrow.dashboard': 'Вход для менеджеров',
   'auth.noPasswords': 'Без паролей. Доступ определяется аккаунтом, на который вас пригласили.',
+  // -- the manager sign-in (docs/design "Gladiator Manager Sign In", 2026-09-01) ------
+  // See he/common.ts for why the badge carries both scripts.
+  'auth.manager.badge': 'ממשק ניהול · MANAGER',
+  'auth.manager.signInWithGoogle': 'Войти через Google',
+  'auth.manager.blurb':
+    'Войдите через аккаунт Google, чтобы вести тренировки, пояса и заявки на соревнования.',
+  'auth.manager.terms': 'Terms of Service',
+  'auth.manager.privacy': 'Privacy Policy',
+  'auth.manager.copyright': '© 2026 Gladiator. All rights reserved.',
+  'auth.manager.backToSignIn': 'Назад ко входу',
   'dash.hint.home': 'Дневная сводка — посещаемость, открытые платежи и что требует внимания',
   'dash.hint.schedule': 'Недельная доска — занятия, залы и назначение тренеров',
   'dash.hint.attendance': 'Отчёт посещаемости — процент по группам и неотмеченные занятия',

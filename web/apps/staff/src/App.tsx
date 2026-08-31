@@ -18,11 +18,12 @@ import {
   Icon,
   InstallBanner,
   InstallWalkthrough,
-  LanguagePicker,
+  ManagerSignIn,
+  PRIVACY_HASH,
   SetupIncompleteBanner,
   SetupWizard,
-  SignIn,
   TabBar,
+  TERMS_HASH,
   ThemeProvider,
   UpdateToast,
   makeSetupClient,
@@ -39,6 +40,7 @@ import { DevBar } from '@studio/ui/dev-bar'
 import type { InstallPromptEvent } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
+import { LegalScreen } from './features/legal/LegalScreen'
 import { Resolve } from './features/identity/Resolve'
 import { PaymentPromisesSection } from './features/billing/PaymentPromisesSection'
 import { JoinLinkSection } from './features/people/JoinLinkSection'
@@ -227,6 +229,12 @@ export default function App() {
   // subjects — and an empty list on a screen titled "requests in this club" reads as
   // "there are none", which is a different and worse claim than "not yours".
   const onPrivacy = hash === '#/privacy'
+  // The sign-in footer's two documents (§6.1 step 5's text, read before there is an
+  // account). Routed with the ANONYMOUS branch below rather than here in the shell: a
+  // legal link that needs a session is a legal link nobody at the sign-in can follow.
+  // Distinct from `#/privacy` above, which is §16's operator queue and is manager-gated.
+  const onTerms = hash === TERMS_HASH
+  const onPrivacyPolicy = hash === PRIVACY_HASH
   // 2026-08-28 — the way BACK into the wizard after a dismissal. Resolve routes an owner
   // in only on first run; the incomplete-setup banner needs a door that exists after it.
   const onSetup = hash === '#/setup'
@@ -268,13 +276,24 @@ export default function App() {
       {/* New-build toast — floats over whatever is open, in every session state. */}
       <UpdateToast locale={locale} />
       {session.status === 'anonymous' ? (
-        // §6.1's ordering rationale: 'language before login, because a Russian-speaking
-        // parent cannot read a Hebrew consent screen.' The picker floats over the screen.
-        <SignIn
-          locale={locale}
-          app="staff"
-          languagePicker={<LanguagePicker locale={locale} onChoose={setLocale} />}
-        />
+        // docs/design "Gladiator Manager Sign In" (2026-09-01) — this app's own face on the
+        // flow. The other two apps keep `SignIn`'s split screen.
+        //
+        // §6.1's ordering rationale still holds — 'language before login, because a
+        // Russian-speaking parent cannot read a Hebrew consent screen' — and the screen
+        // carries the picker itself, in the footer the mock draws it in, rather than
+        // floating a separate one over the artwork.
+        //
+        // The footer's two legal links are the reason this is a small router and not one
+        // component: they must be readable BEFORE signing in, so they are routed here,
+        // beside the sign-in, and not behind the shell below.
+        onTerms ? (
+          <LegalScreen locale={locale} doc="terms" />
+        ) : onPrivacyPolicy ? (
+          <LegalScreen locale={locale} doc="policy" />
+        ) : (
+          <ManagerSignIn locale={locale} onChooseLocale={setLocale} />
+        )
       ) : null}
 
       {session.status === 'signed-in' ? (

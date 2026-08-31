@@ -72,6 +72,19 @@ class ConsentRecordOut(BaseModel):
     revoked_at: str | None
 
 
+class PolicyOut(BaseModel):
+    """The published policy's identity, and nothing about any person.
+
+    The three fields `ConsentStateOut` already carries, split out so a reader who is not
+    signed in can have them: the staff sign-in footer's legal screens render before there
+    is an identity or a studio to scope to.
+    """
+
+    policy_version: int
+    policy_version_label: str
+    policy_is_draft: bool
+
+
 class ConsentStateOut(BaseModel):
     """What §6.1 step 5's gate reads, and what the privacy screen renders.
 
@@ -242,6 +255,29 @@ def _consent_state(session: TenantSessionDep, person_id: uuid.UUID) -> ConsentSt
 
 
 # -- §6.1 step 5 / §11.6 -----------------------------------------------------------
+
+
+@router.get("/policy", response_model=PolicyOut)
+def read_policy() -> PolicyOut:
+    """Which policy text is published, for a reader who is not signed in.
+
+    The staff sign-in's footer links to the terms and the privacy policy, and the person
+    reading them there is anonymous by definition -- so `GET /consents` cannot serve that
+    screen: it needs an identity and a studio, and it would 401.
+
+    Deliberately NOT `TenantSessionDep`, and deliberately touches no table. The three
+    values are module constants describing the text every studio is shown; scoping them to
+    a tenant would be scoping a global to something that does not vary by it, and would
+    make a public route fail closed on a studio it never needed.
+
+    The draft flag is on the wire for the reason `ConsentStateOut` states: the banner is
+    data, so it cannot be left behind on a screen after the reviewed text lands.
+    """
+    return PolicyOut(
+        policy_version=POLICY_VERSION,
+        policy_version_label=POLICY_VERSION_LABEL,
+        policy_is_draft=POLICY_IS_DRAFT,
+    )
 
 
 @router.get("/consents", response_model=ConsentStateOut)

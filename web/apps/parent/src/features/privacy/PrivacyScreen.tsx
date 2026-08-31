@@ -18,10 +18,20 @@
 // renders Asia/Jerusalem from a UTC instant.
 import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { Button, Card, EmptyState, LoadFailed, PageHeader, SectionHeader, StatusChip } from '@studio/ui'
+import {
+  Button,
+  Card,
+  DraftNotice,
+  EmptyState,
+  LoadFailed,
+  PageHeader,
+  PolicyDocument,
+  SectionHeader,
+  StatusChip,
+} from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
-import { DraftNotice, PolicyDocument } from './PolicyDocument'
+
 import type { ConsentState, PrivacyClient, PrivacyRequest, PrivacyRequests } from './privacyClient'
 
 const columnStyle: CSSProperties = {

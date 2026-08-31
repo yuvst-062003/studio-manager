@@ -23,10 +23,10 @@
 // screen who can try again.
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
-import { Alert, Button, Card, Checkbox } from '@studio/ui'
+import { Alert, Button, Card, Checkbox, PolicyDocument } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
-import { PolicyDocument } from './PolicyDocument'
+
 import type { ConsentState, PrivacyClient } from './privacyClient'
 
 const gateStyle: CSSProperties = {
