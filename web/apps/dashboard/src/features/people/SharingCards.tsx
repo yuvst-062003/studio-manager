@@ -85,6 +85,10 @@ export function SharingCards({ locale }: { locale: Locale }) {
 
   if (status === null) return null
 
+  // The link the card can actually put on the clipboard: the one just created, or the
+  // live one read back. Null for a pre-2026-08-31 row, whose token was only hashed.
+  const canCopy = freshUrl ?? status.url
+
   return (
     <div style={cardsStyle} data-testid="sharing-cards">
       <Card>
@@ -104,16 +108,16 @@ export function SharingCards({ locale }: { locale: Locale }) {
         </p>
         {/* The link itself, on every load. `freshUrl` still wins for the moment after a
             regenerate, when the status reload has not landed yet. */}
-        {freshUrl ?? status.url ? (
+        {canCopy ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
             <code
               style={{ overflowWrap: 'anywhere', fontSize: 'var(--text-caption)' }}
               data-testid="join-link-url"
             >
-              {freshUrl ?? status.url}
+              {canCopy}
             </code>
             <div style={rowStyle}>
-              <CopyButton locale={locale} value={(freshUrl ?? status.url) as string} />
+              <CopyButton locale={locale} value={canCopy} />
             </div>
           </div>
         ) : status.active ? (
@@ -123,19 +127,27 @@ export function SharingCards({ locale }: { locale: Locale }) {
             {t(locale, 'people.join.card.legacyNote')}
           </p>
         ) : null}
+        {/* A live, copyable link offers no "new one" (2026-08-31). Regenerating revokes
+            the link already sitting in the club's WhatsApp groups, and once the link is
+            permanent there is no reason to reach for that — so replacing one is a
+            deliberate two steps: ביטול, then create. The button stays for the two states
+            that genuinely need it: no link at all, and a pre-2026-08-31 link whose token
+            cannot be shown and which a new one is the only way to replace. */}
         <div style={rowStyle}>
-          <Button
-            variant="primary"
-            data-testid="join-link-new"
-            onClick={() => {
-              void client.regenerate().then((created) => {
-                setFreshUrl(created?.url ?? null)
-                setReloads((n) => n + 1)
-              })
-            }}
-          >
-            {t(locale, 'people.join.card.new')}
-          </Button>
+          {canCopy ? null : (
+            <Button
+              variant="primary"
+              data-testid="join-link-new"
+              onClick={() => {
+                void client.regenerate().then((created) => {
+                  setFreshUrl(created?.url ?? null)
+                  setReloads((n) => n + 1)
+                })
+              }}
+            >
+              {t(locale, 'people.join.card.new')}
+            </Button>
+          )}
           {status.active ? (
             <Button
               variant="secondary"
