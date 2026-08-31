@@ -1,6 +1,6 @@
 # uPay Integration — Studio Manager
 
-> **Read [Round two](#round-two--live-account-testing-2026-08-25) first.** Everything
+> **Read [Round three](#round-three--refername-is-an-allowlist-2026-08-31) and then [Round two](#round-two--live-account-testing-2026-08-25) first.** Everything
 > before it is round one, written from earlier testing. Round two was done against the
 > live account with real charges and **corrects two things that would have reached
 > production**: the inbound `amount` format is not the outbound one, and `livesystem=0`
@@ -49,7 +49,7 @@ The backend renders the raw HTML POST form dynamically per order — this is the
   <input type='hidden' name='maxpayments' value='1'>
   <input type='hidden' name='livesystem' value='1'>
   <input type='hidden' name='createinvoiceandreceipt' value='1'>
-  <input type='hidden' name='refername' value='STUDIOMANAGER'>
+  <input type='hidden' name='refername' value='UPAY'>            <!-- allowlisted; see Round three -->
   <input type='hidden' name='lang' value='HE'>
   <input type='hidden' name='currency' value='NIS'>
   <input type='image' src='...payment-button.png'>
@@ -155,7 +155,7 @@ Each item is labelled as it was reported: **[VERIFIED]** observed directly ·
 | Installment cap | **[VERIFIED]** the dashboard dropdown stops at **12**. `MAX_INSTALLMENTS` in `form.py` clamps to it; behaviour above 12 was never tested and now never needs to be. |
 | Fee | **[VERIFIED]** ~1%, taken at settlement (₪1.00 gross → ₪0.99 transferred). It is **not** in the IPN — `depositnetamount` came back equal to `depositamount`. |
 | Domain registration | **[VERIFIED]** no domain/website field exists on the account. Changing our domain needs nothing on uPay's side. |
-| `refername` | **[VERIFIED]** free text — `UPAY` was accepted. `STUDIOMANAGER` has never actually been submitted; it was only ever an example in this document. |
+| `refername` | **[VERIFIED]** a case-sensitive **allowlist**, not free text — see [Round three](#round-three--refername-is-an-allowlist-2026-08-31). Only `UPAY` (or omitting the field) is accepted on this account. Round two's "free text" reading was wrong and reached production. |
 | API key | An API key exists in account settings. Unused — the form path works and needs no API. Noted only so nobody rediscovers it as a surprise. |
 
 ## There is no sandbox — and §19.6 was redesigned because of it
@@ -270,3 +270,67 @@ transfers.
 One new observation: the recurring payment page shows the customer **no
 monthly-commitment disclosure** anywhere. If that flow is ever used for real, the
 disclosure has to come from our side.
+
+
+---
+
+# Round three — `refername` is an allowlist, 2026-08-31
+
+One field, one correction, and it is the field round two labelled **[VERIFIED] free text**
+while noting in the same sentence that the value we actually ship "has never actually been
+submitted". Those two halves should not have been allowed to coexist: the label was applied
+to a value nobody had tried.
+
+## What happened
+
+A parent opened the card route on production and paid ₪600. The API did everything right —
+`POST /payment-orders` returned 201, `GET /payment-orders/{ref}/form` returned 200, the
+browser POSTed to uPay. uPay replied:
+
+```
+HTTP/2 200
+content-type: text/html; charset=UTF-8
+content-length: 33
+
+wronginputrefername STUDIOMANAGER
+```
+
+**A rejection delivered as an HTTP 200 with a text/html content type**, so the browser
+rendered it: one line of English on a white screen, where the card form should have been.
+Nothing in our logs recorded a failure, because on our side nothing failed. The order sat
+`pending`, no IPN ever arrived, and `upay_ipn_record` stayed empty.
+
+## The probe
+
+Against the live account the same evening, one field varied at a time, everything else held
+at the exact values `form_fields` produced for that parent's order:
+
+| `refername` | Response |
+|---|---|
+| `UPAY` | **38681 bytes** — the real card page, `סכום לתשלום 600.00 ₪` |
+| *(field omitted entirely)* | **38681 bytes** — the same real card page |
+| `STUDIOMANAGER` | 33 bytes — `wronginputrefername STUDIOMANAGER` |
+| `Gladiator` | 29 bytes — `wronginputrefername Gladiator` |
+| `upay` | 24 bytes — `wronginputrefername upay` |
+
+So: an allowlist, **case-sensitive**, with `UPAY` as this merchant account's entry. Whether
+the entry is per-account or global is **[NOT COVERED]** — there is one account to ask.
+
+`refername` is the only field this round re-tested. Every other row in round two stands.
+
+## What this changes beyond the literal
+
+`form.py` now sends `REFERNAME = "UPAY"` and `tests/upay/test_form.py` pins it with this
+evidence attached, because **no test CI can run reaches uPay**. That is the uncomfortable
+part and it is worth stating plainly: the pin is a tripwire on the literal, not a check that
+the literal is right. Only a probe against the live account can tell you that. If you change
+the value, re-run the probe first.
+
+Two general lessons, both cheap next time:
+
+1. **[VERIFIED] means the exact bytes were sent and the response was read.** Round two
+   verified that *`UPAY`* was accepted and then documented the field as free text — a
+   generalisation from one sample, recorded at the same confidence as the observation.
+   A value that has never been submitted is [NOT COVERED], however plausible it looks.
+2. **uPay signals rejection with 200.** There is no status code to key on, inbound or
+   outbound. Any future check of an outbound form has to read the body.

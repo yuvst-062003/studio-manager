@@ -118,6 +118,35 @@ describe('the P1 routes — screens that were built and rendered by nothing', ()
     await waitFor(() => expect(screen.getByTestId('payment-complete')).toBeInTheDocument())
   })
 
+  it('strips uPay\'s appended payload off the ref on the return leg', async () => {
+    // upay-integration.md round one: 'The customer's browser is ALSO redirected to
+    // returnurl with the same payload.' Our returnurl is a hash route
+    // (`.../#/payment-complete/<ref>`), so anything uPay appends lands INSIDE the
+    // fragment and becomes part of the ref unless it is stripped here.
+    //
+    // The seam, not the component: what is asserted is the `ref=` the API is actually
+    // called with. `ref` is typed `uuid.UUID` on the server, so a ref carrying
+    // `?providererrorcode=0&...` is a 422 — and the screen turns a 422 into LoadFailed.
+    // That is a generic error screen shown to a parent who has just been charged.
+    globalThis.location.hash =
+      '#/payment-complete/26d61842-c618-4000-9c71-58f816d02323?providererrorcode=0&errordescription=SUCCESS&amount=600'
+    const calls: string[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        calls.push(String(input))
+        return String(input).includes('/payment-complete')
+          ? new Response(JSON.stringify({ status: 'pending', public_ref: null }), { status: 200 })
+          : new Response(JSON.stringify({ items: [] }), { status: 200 })
+      }),
+    )
+    render(<App />)
+    await waitFor(() => expect(screen.getByTestId('payment-complete')).toBeInTheDocument())
+    const asked = calls.find((url) => url.includes('/api/v1/payment-complete'))
+    expect(asked).toContain('ref=26d61842-c618-4000-9c71-58f816d02323')
+    expect(asked).not.toContain('providererrorcode')
+  })
+
   it('routes #/student/<id> to the 2c card', async () => {
     globalThis.location.hash = '#/student/s1'
     render(<App />)

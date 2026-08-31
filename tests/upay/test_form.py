@@ -90,3 +90,46 @@ def test_a_missing_or_blank_merchant_email_refuses_to_build_a_form(
     )
     with pytest.raises(MerchantEmailMissingError):
         service.form_fields(order.public_ref, base_url="https://studio.example")
+
+
+def test_refername_is_the_value_upay_s_allowlist_actually_accepts(
+    tenant_session, studio, a_priced_student, three_open_months, a_merchant_email
+):
+    """`refername` is a case-sensitive allowlist, not free text -- and the wrong value
+    fails SILENTLY, with an HTTP 200.
+
+    upay-integration.md round two A4 recorded `refername` as "free text", and noted in the
+    same breath that the literal this module shipped had "never actually been submitted; it
+    was only ever an example in this document". It was submitted for the first time by a
+    real parent paying real tuition on 2026-08-31, and uPay answered:
+
+        HTTP 200, content-type text/html, 33 bytes
+        wronginputrefername STUDIOMANAGER
+
+    A 200 with a plain-text body, so the browser rendered it as a page. The parent left our
+    origin, landed on one line of English on a white screen, and no payment page ever
+    existed. Probed against the live account the same evening, one field varied at a time:
+
+        refername=UPAY           -> 38681 bytes, the real card form, 600.00 ₪
+        refername omitted        -> 38681 bytes, the real card form
+        refername=STUDIOMANAGER  -> 33 bytes,  wronginputrefername STUDIOMANAGER
+        refername=Gladiator      -> 29 bytes,  wronginputrefername Gladiator
+        refername=upay           -> 24 bytes,  wronginputrefername upay
+
+    So it is an allowlist, it is case-sensitive, and `UPAY` is the entry this merchant
+    account has. The literal is pinned here rather than only in `form.py` because no test
+    CI can run reaches uPay: the only proof this string is right is the probe above, and
+    this test is where that evidence is written down. **If you change the value in
+    `form.py`, this test fails -- go and re-run the probe against the live account before
+    you change it here too.**
+    """
+    service = OrderService(tenant_session)
+    order = service.create(
+        studio.id,
+        payer_person_id=a_priced_student.payer_person_id,
+        charge_ids=[three_open_months[0]],
+        max_payments=1,
+        at=T0,
+    )
+    fields = service.form_fields(order.public_ref, base_url="https://studio.example")
+    assert fields["refername"] == "UPAY"

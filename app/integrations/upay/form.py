@@ -52,6 +52,13 @@ LIVE = "1"
 #: here means it never has to be -- an untested branch is one nobody has to guess about.
 MAX_INSTALLMENTS = 12
 
+#: uPay's `refername`, which is an allowlisted value and NOT the free text round two
+#: recorded. Only this exact string (and omitting the field) returns a card page on this
+#: merchant account; every other value tried, lowercase `upay` included, comes back as
+#: `wronginputrefername <value>` in a 33-byte HTTP 200. See the `refername` field below
+#: and `tests/upay/test_form.py` for the probe that established it.
+REFERNAME = "UPAY"
+
 
 class TooManyInstallmentsError(ValueError):
     """`max_payments` above what the merchant account offers (`MAX_INSTALLMENTS`)."""
@@ -117,10 +124,18 @@ def upay_form_fields(
         # חשבונית מס (tax invoice), whatever the account config says. M6 stores
         # transactionid and links to uPay's own receipt view rather than inferring one.
         "createinvoiceandreceipt": "1",
-        # Round two A4: free text, no pre-registration. Note the value actually submitted
-        # in live testing was "UPAY" -- this literal has never been sent to uPay, and is
-        # untested rather than verified.
-        "refername": "STUDIOMANAGER",
+        # NOT free text. Round two A4 recorded it as such and flagged in the same breath
+        # that "STUDIOMANAGER" had never actually been submitted -- it was an example in
+        # the document, nothing more. A real parent submitted it on 2026-08-31 and uPay
+        # answered HTTP 200 with a 33-byte body reading `wronginputrefername
+        # STUDIOMANAGER`: a rejection dressed as a success, rendered as one line of
+        # English on a white screen where the card form should have been. Probing the live
+        # account one field at a time, `UPAY` and omitting the field both return the real
+        # 38kB card page; `STUDIOMANAGER`, `Gladiator` and lowercase `upay` are all
+        # refused. It is a case-sensitive allowlist and `UPAY` is this account's entry.
+        # `tests/upay/test_form.py` pins the literal and carries the full probe, because
+        # nothing CI can run reaches uPay to check it.
+        "refername": REFERNAME,
         "lang": "HE",
         "currency": "NIS",
     }
