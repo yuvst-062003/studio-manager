@@ -1,7 +1,7 @@
 // §5.4a's booking flow, in its stated order. The first test is the one that matters:
 // sign-in comes BEFORE any child detail is typed, and getting that backwards throws away
 // everything a parent entered.
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { t } from '@studio/i18n'
@@ -555,6 +555,63 @@ describe('landing redesign (2026-08-29) — pre-selected group and step progress
     expect(
       screen.getByTestId('booking-progress').querySelector('[aria-current="step"]'),
     ).toHaveTextContent(t('he', 'people.landing.step.you'))
+  })
+})
+
+// "There is nothing to approve — it shows only the name" (2026-08-31). The step asked the
+// reader to tick "I confirm the details are correct" over a name and nothing else, which is
+// a formality rather than a confirmation. It has to show what it is asking about.
+describe('the confirmation shows what it is asking to confirm', () => {
+  const reachHealth = async (user: ReturnType<typeof userEvent.setup>) => {
+    await user.type(screen.getByTestId('booking-you-first-name'), 'רונית')
+    await user.type(screen.getByTestId('booking-you-last-name'), 'כהן')
+    await user.type(screen.getByTestId('booking-you-email'), 'ronit@example.test')
+    await user.type(screen.getByTestId('booking-you-phone'), '050-1112222')
+    await user.click(screen.getByTestId('booking-to-children'))
+    await user.type(screen.getByLabelText(t('he', 'people.student.firstName')), 'נועה')
+    await user.type(screen.getByLabelText(t('he', 'people.student.lastName')), 'לוי')
+    // `fireEvent.change`, not `user.type`: typing into `<input type="date">` goes through
+    // the browser's own segmented editor, which jsdom does not model.
+    fireEvent.change(screen.getByLabelText(t('he', 'people.student.birthdate')), {
+      target: { value: '2019-03-15' },
+    })
+    await user.selectOptions(screen.getByTestId('booking-group-0'), 'g1')
+    await user.click(screen.getByTestId('booking-to-health'))
+  }
+
+  it('writes out the child’s birthdate and group beside the tick', async () => {
+    const user = userEvent.setup()
+    render(<BookingFlow slug="judo" locale="he" client={makeClient()} groups={GROUPS} />)
+    await reachHealth(user)
+
+    const details = screen.getByTestId('booking-health-details-0')
+    // Day first. A birthdate is a calendar date, so it is reordered rather than run
+    // through the studio-zone formatter, which would read it as UTC midnight.
+    expect(details).toHaveTextContent('15/03/2019')
+    expect(details).toHaveTextContent(GROUPS[0]!.name)
+  })
+
+  it('shows who is booking, so the address can be checked before it is the only way back', async () => {
+    // The typed address is how the club replies and how signing in later finds this
+    // booking. This is the last screen where a typo in it is cheap to fix.
+    const user = userEvent.setup()
+    render(<BookingFlow slug="judo" locale="he" client={makeClient()} groups={GROUPS} />)
+    await reachHealth(user)
+
+    const guardian = screen.getByTestId('booking-health-guardian')
+    expect(guardian).toHaveTextContent('רונית כהן')
+    expect(guardian).toHaveTextContent('ronit@example.test')
+    expect(guardian).toHaveTextContent('050-1112222')
+  })
+
+  it('shows no booker card for a signed-in parent, whose details are not theirs to correct here', async () => {
+    const user = userEvent.setup()
+    render(<BookingFlow slug="judo" locale="he" client={makeClient()} groups={GROUPS} signedIn />)
+    await user.type(screen.getByLabelText(t('he', 'people.student.firstName')), 'נועה')
+    await user.type(screen.getByLabelText(t('he', 'people.student.lastName')), 'לוי')
+    await user.selectOptions(screen.getByTestId('booking-group-0'), 'g1')
+    await user.click(screen.getByTestId('booking-to-health'))
+    expect(screen.queryByTestId('booking-health-guardian')).toBeNull()
   })
 })
 

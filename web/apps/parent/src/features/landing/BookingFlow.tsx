@@ -109,6 +109,34 @@ const childNameStyle: CSSProperties = {
   fontWeight: 'var(--weight-semibold)',
 }
 
+/** The line under a name on the confirmation step: what is actually being confirmed. */
+const summaryLineStyle: CSSProperties = {
+  margin: 0,
+  color: 'var(--text-secondary)',
+  fontSize: 'var(--text-caption)',
+}
+
+/** Tells the parent's card apart from a child's, which otherwise look identical. */
+const summaryCaptionStyle: CSSProperties = {
+  margin: 0,
+  color: 'var(--text-muted)',
+  fontSize: 'var(--text-micro)',
+}
+
+/**
+ * `2017-03-15` → `15/03/2017`.
+ *
+ * Deliberately NOT `formatDateInStudioZone`: a birthdate is a calendar date, not an
+ * instant. Passing it through a zone conversion parses it as UTC midnight, which in a
+ * negative-offset zone is still the previous day — the one-day-off bug `formatMonthLabel`
+ * documents in datetime.ts. There is no instant here to convert, so nothing is converted;
+ * the parts are simply reordered.
+ */
+function asDayMonthYear(isoDate: string): string {
+  const [year, month, day] = isoDate.split('-')
+  return year && month && day ? `${day}/${month}/${year}` : isoDate
+}
+
 const blankChild = (groupId = ''): Child => ({
   first_name: '',
   last_name: '',
@@ -545,27 +573,57 @@ export function BookingFlow({
         <StepProgress locale={locale} current={step} onGo={setStep} firstStep={firstStep} />
         <h3 id="booking-health">{t(locale, 'people.trialHealth.title')}</h3>
         <p>{t(locale, 'people.trialHealth.subtitle')}</p>
+        {/* "אני מאשר/ת שהפרטים נכונים" over a name and nothing else asks the reader to
+            confirm details the screen never showed them (2026-08-31). Everything the
+            booking is about to send is written out here — who is booking, and for each
+            child their birthdate and the group they are going into — so the tick is a
+            statement about something rather than a formality. */}
         <ul style={listStyle}>
-          {children.map((child, index) => (
-            // The child's name was a bare `<bdi>` immediately before the checkbox, so the
-            // two ran together on one line and the name read as part of the label rather
-            // than as the thing being declared about — "no details present" (2026-08-31).
-            // It is a heading in a frame of its own now, above what it heads.
-            <li key={index} style={childCardStyle} data-testid={`booking-health-${index}`}>
+          {/* Only when they typed it. A signed-in parent's name and address came from the
+              provider, are not editable in this flow, and are not theirs to correct here. */}
+          {!signedIn && guardian.first_name.trim() ? (
+            <li style={childCardStyle} data-testid="booking-health-guardian">
+              <p style={summaryCaptionStyle}>{t(locale, 'people.guardian.one')}</p>
               <p style={childNameStyle}>
-                <bdi>{`${child.first_name} ${child.last_name}`.trim()}</bdi>
+                <bdi>{`${guardian.first_name} ${guardian.last_name}`.trim()}</bdi>
               </p>
-              <Checkbox
-                label={t(locale, 'people.trialHealth.confirm')}
-                checked={confirmed[index] ?? false}
-                onChange={(event) =>
-                  setConfirmed((current) =>
-                    current.map((flag, i) => (i === index ? event.target.checked : flag)),
-                  )
-                }
-              />
+              <p style={summaryLineStyle}>
+                <bdi>
+                  {[guardian.email.trim(), guardian.phone.trim()].filter(Boolean).join(' · ')}
+                </bdi>
+              </p>
             </li>
-          ))}
+          ) : null}
+          {children.map((child, index) => {
+            const group = groups.find((row) => row.id === child.group_id)
+            const details = [
+              child.birthdate
+                ? `${t(locale, 'people.student.birthdate')}: ${asDayMonthYear(child.birthdate)}`
+                : null,
+              group ? `${t(locale, 'people.student.group')}: ${group.name}` : null,
+            ].filter(Boolean)
+            return (
+              <li key={index} style={childCardStyle} data-testid={`booking-health-${index}`}>
+                <p style={childNameStyle}>
+                  <bdi>{`${child.first_name} ${child.last_name}`.trim()}</bdi>
+                </p>
+                {details.length > 0 ? (
+                  <p style={summaryLineStyle} data-testid={`booking-health-details-${index}`}>
+                    <bdi>{details.join(' · ')}</bdi>
+                  </p>
+                ) : null}
+                <Checkbox
+                  label={t(locale, 'people.trialHealth.confirm')}
+                  checked={confirmed[index] ?? false}
+                  onChange={(event) =>
+                    setConfirmed((current) =>
+                      current.map((flag, i) => (i === index ? event.target.checked : flag)),
+                    )
+                  }
+                />
+              </li>
+            )
+          })}
         </ul>
         {!allConfirmed ? <p>{t(locale, 'people.trialHealth.required')}</p> : null}
         <div style={actionsStyle}>
