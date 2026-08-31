@@ -15,6 +15,15 @@ export type BookingResult = components['schemas']['TrialBookingSelfResult']
 export type Fetcher = (path: string, init?: RequestInit) => Promise<Response>
 
 export type BookingRequest = {
+  /** Who is booking, when nobody signed in (owner's decision 2026-08-31 — a first lesson
+   *  is booked with a form). Omitted for a signed-in parent, whose provider-verified
+   *  address the server uses instead and which a typed one must never override. */
+  guardian?: {
+    first_name: string
+    last_name: string
+    email: string
+    phone: string | null
+  }
   /** §5.4a steps 2 and 4 are asked PER CHILD — the group list is filtered by each child's
    *  age, so siblings of different ages are the case the picker exists for. The request
    *  root still accepts a `group_id`/`session_id` pair as a default for a per-group QR,

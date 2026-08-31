@@ -14,7 +14,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 import sqlalchemy as sa
 from app.models.people import Enrollment, RegistrationRequest, Student, TrialBooking
-from app.models.person import Guardian
+from app.models.person import Guardian, Person
 from sqlalchemy import select
 from tests.conftest import sign_in
 from tests.people.conftest import FakeSchedule, make_session
@@ -338,14 +338,123 @@ def test_the_parent_lands_in_the_app_already_signed_in(client, a_stranger, booka
     assert body["bookings"][0]["student_id"] == body["students"][0]["id"]
 
 
-def test_an_anonymous_caller_cannot_book(client, bookable, a_group):
-    """§5.4a is sign-in-FIRST. Rows created by an unauthenticated caller would be a lead
-    funnel anyone can fill with anything."""
+# -- booking without an account (owner's decision, 2026-08-31) ----------------
+# This route was sign-in-FIRST, and that made Google an entry fee for the one self-service
+# door in the product. A first lesson is booked the way every other club books one: a form.
+# What sign-in bought is not pretended away — see each test below for which half it was.
+GUARDIAN = {
+    "first_name": "רונית",
+    "last_name": "כהן",
+    "email": "ronit@example.test",
+    "phone": "050-1112222",
+}
+
+
+def _book_anon(client, group_id, session_id, guardian=GUARDIAN, **kwargs):
+    body = _body(group_id, session_id, **kwargs)
+    if guardian is not None:
+        body["guardian"] = guardian
+    return client.post("/api/v1/trial-bookings/self", json=body)
+
+
+def test_a_parent_with_no_account_can_book(client, bookable, a_group, app_session):
     session_id = bookable.sessions[a_group][0].id
-    assert (
-        client.post("/api/v1/trial-bookings/self", json=_body(a_group, session_id)).status_code
-        == 401
+    response = _book_anon(client, a_group, session_id)
+    assert response.status_code == 201, response.text
+
+    student = app_session.get(Student, uuid.UUID(response.json()["students"][0]["id"]))
+    assert student.status == "trial"
+    assert student.source == "public_link"
+
+
+def _guardian_person_of(app_session, response):
+    """The booking's parent, reached the way the product reaches it — through the guardian
+    row. `Person.email` is encrypted at rest (§11.1), so no test may look a parent up by
+    address, and the join is what the app itself does anyway."""
+    student_id = uuid.UUID(response.json()["students"][0]["id"])
+    link = (
+        app_session.execute(select(Guardian).where(Guardian.student_id == student_id))
+        .scalars()
+        .one()
     )
+    return app_session.get(Person, link.person_id)
+
+
+def test_an_anonymous_booking_makes_a_lead_and_not_an_account(
+    client, bookable, a_group, app_session
+):
+    """The half of sign-in worth keeping. App access is
+    `EXISTS(guardian WHERE person_id = :me)` resolved from the SIGNED-IN identity, so a
+    parent row with no identity can be a lead and can never be a login. §6.1 step 3
+    attaches them later, on the address Google verifies at sign-in."""
+    session_id = bookable.sessions[a_group][0].id
+    response = _book_anon(client, a_group, session_id)
+    assert response.status_code == 201, response.text
+
+    parent = _guardian_person_of(app_session, response)
+    assert parent.auth_identity_id is None
+    assert parent.first_name == "רונית"
+    assert parent.email == GUARDIAN["email"]
+    assert parent.phone == "050-1112222"
+
+
+def test_a_booking_with_nobody_named_is_refused(client, bookable, a_group):
+    """422 rather than a row nobody can be contacted about. The address is the only thing
+    that makes this booking reachable after the lesson."""
+    session_id = bookable.sessions[a_group][0].id
+    response = _book_anon(client, a_group, session_id, guardian=None)
+    assert response.status_code == 422
+    assert response.json()["detail"]["code"] == "guardian_required"
+
+
+def test_a_typed_address_never_reaches_an_existing_account(
+    client, a_stranger, bookable, a_group, app_session
+):
+    """What makes booking-without-an-account safe: an anonymous booking matches NOTHING.
+    `match_person` keys on `AuthIdentity.email` — an address a provider vouched for — so
+    typing a stranger's address reaches a fresh lead, never their family."""
+    sessions = bookable.sessions[a_group]
+    signed = _book(client, a_stranger, a_group, sessions[0].id)
+    assert signed.status_code == 201
+    account_parent = _guardian_person_of(app_session, signed)
+    assert account_parent.auth_identity_id is not None
+
+    impostor = {**GUARDIAN, "email": account_parent.email}
+    typed = _book_anon(client, a_group, sessions[0].id, guardian=impostor)
+    assert typed.status_code == 201, typed.text
+
+    lead_parent = _guardian_person_of(app_session, typed)
+    assert lead_parent.id != account_parent.id
+    assert lead_parent.auth_identity_id is None
+
+
+def test_the_same_address_twice_makes_two_leads(client, bookable, a_group, app_session):
+    """The cost of the above, stated rather than discovered. `Person.email` is encrypted,
+    so there is no `WHERE email = ?` to deduplicate on without a deterministic hash column
+    and a migration. Two leads is the manager's queue doing its job — and the free-trial
+    check is per parent row, so the second booking is NOT refused."""
+    sessions = bookable.sessions[a_group]
+    first = _book_anon(client, a_group, sessions[0].id)
+    second = _book_anon(client, a_group, sessions[0].id)
+    assert first.status_code == 201
+    assert second.status_code == 201, second.text
+    assert _guardian_person_of(app_session, first).id != _guardian_person_of(app_session, second).id
+
+
+def test_a_signed_in_caller_keeps_the_verified_address(
+    client, a_stranger, bookable, a_group, app_session
+):
+    """A typed `guardian` is ignored when the caller has a session: a client-supplied
+    string must never override one a provider vouched for."""
+    session_id = bookable.sessions[a_group][0].id
+    body = _body(a_group, session_id)
+    body["guardian"] = {**GUARDIAN, "email": "typed@example.test"}
+    response = client.post("/api/v1/trial-bookings/self", json=body, headers=a_stranger)
+    assert response.status_code == 201, response.text
+
+    parent = _guardian_person_of(app_session, response)
+    assert parent.email != "typed@example.test"
+    assert parent.auth_identity_id is not None
 
 
 def test_a_group_in_no_active_studio_is_404(client, a_stranger, bookable):

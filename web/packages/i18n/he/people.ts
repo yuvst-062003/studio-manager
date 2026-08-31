@@ -117,6 +117,9 @@ export const people: Bundle = {
   'landing.noSlots': 'אין מועדים פנויים בקבוצה הזו',
   'landing.noSlotsHint': 'נסו קבוצה אחרת או חזרו בשבוע הבא',
   'landing.signInFirst': 'התחברות והמשך',
+  'landing.youHint':
+    'כדי שנוכל לאשר את השיעור ולחזור אליכם. אפשר להירשם לאפליקציה אחר כך, עם אותו אימייל',
+  'landing.signInInstead': 'כבר יש לכם חשבון? התחברות',
   // §5.4 — sign-in-first, so the copy explains why before the sign-in wall.
   'landing.signInHint':
     'ההתחברות שומרת את הפרטים ומאפשרת לעקוב אחרי השיעור באפליקציה',
@@ -283,7 +286,7 @@ export const people: Bundle = {
   'landing.noGroups': 'המועדון עדיין לא פרסם קבוצות',
   'landing.scheduleComeLater': 'לוח השיעורים עדיין נבנה. נסו שוב בקרוב',
   'landing.notFound': 'לא מצאנו את המועדון הזה',
-  'landing.step.signIn': 'התחברות',
+  'landing.step.you': 'הפרטים שלכם',
   'landing.step.children': 'פרטי הילדים',
   'landing.step.health': 'הצהרת בריאות',
   'landing.step.slot': 'בחירת שיעור',

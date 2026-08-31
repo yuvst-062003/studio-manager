@@ -4936,9 +4936,18 @@ export interface paths {
          *     writes below all happen inside a `TenantSession` scoped to the studio the group belongs
          *     to, so nothing here escapes the tenant guard; it simply arrives by a different route.
          *
-         *     §11.7's two controls: rate-limited per IP and per identity (see
-         *     `app/services/people/rate_limit.py` for what that limiter is and is not), and
-         *     sign-in-first standing in for the captcha that has no provider configured.
+         *     §11.7's two controls: rate-limited per IP and per caller (see
+         *     `app/services/people/rate_limit.py` for what that limiter is and is not).
+         *
+         *     **Signing in is no longer required** (owner's decision, 2026-08-31): a first lesson is
+         *     booked the way every other club books one, with a form. Sign-in-first stood in front of
+         *     the only self-service entry in the product, so a parent who did not want a Google
+         *     account could not book at all — and it was standing in for a captcha that has no
+         *     provider configured, which is a job it was never doing well.
+         *
+         *     A signed-in caller still wins on identity: their provider-verified address is used and
+         *     a typed `guardian` is ignored, because a client-supplied string must never override one
+         *     a provider vouched for.
          */
         post: operations["book_trial_for_self_api_v1_trial_bookings_self_post"];
         delete?: never;
@@ -11154,19 +11163,20 @@ export interface components {
         };
         /**
          * TrialBookingSelfIn
-         * @description §7 — `POST /trial-bookings/self`, **authenticated**: the parent has just signed in.
+         * @description §7 — `POST /trial-bookings/self`. Signed in, or not.
          *
-         *     §5.4's sign-in-first booking. The children are described here rather than matched by
-         *     the client, because §5.4 matches people on **verified email or phone** and a client
-         *     cannot verify anything. `trial_health_declarations` carries §5.4a's trial answers,
-         *     which is why the request lands in `registration_request.payload_encrypted` rather than
-         *     being written straight to a table (§11.1).
+         *     The children are described here rather than matched by the client, because §5.4 matches
+         *     people on **verified email or phone** and a client cannot verify anything.
+         *     `trial_health_declarations` carries §5.4a's trial answers, which is why the request
+         *     lands in `registration_request.payload_encrypted` rather than being written straight to
+         *     a table (§11.1).
          */
         TrialBookingSelfIn: {
             /** Children */
             children: components["schemas"]["TrialChildIn"][];
             /** Group Id */
             group_id?: string | null;
+            guardian?: components["schemas"]["TrialGuardianIn"] | null;
             /** Session Id */
             session_id?: string | null;
             /** Trial Health Declarations */
@@ -11234,6 +11244,31 @@ export interface components {
             phone?: string | null;
             /** Session Id */
             session_id?: string | null;
+        };
+        /**
+         * TrialGuardianIn
+         * @description Who is booking, when nobody signed in.
+         *
+         *     Owner's decision 2026-08-31: a first lesson is booked the way every other club books
+         *     one — a form. Sign-in-first was standing in front of the ONLY self-service entry in the
+         *     product, and a parent who does not want a Google account could not book at all.
+         *
+         *     The address is unverified by definition, and the system treats it that way: it makes a
+         *     lead, never an account. §6.1 step 3 does the linking later, on the address Google
+         *     verifies at sign-in.
+         */
+        TrialGuardianIn: {
+            /** Email */
+            email: string;
+            /** First Name */
+            first_name: string;
+            /**
+             * Last Name
+             * @default
+             */
+            last_name: string;
+            /** Phone */
+            phone?: string | null;
         };
         /**
          * TrialSlotListResponse

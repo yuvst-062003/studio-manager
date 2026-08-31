@@ -96,6 +96,9 @@ export const people: Bundle = {
   'landing.noSlotsHint':
     'Попробуйте другую группу или вернитесь на следующей неделе',
   'landing.signInFirst': 'Войти и продолжить',
+  'landing.youHint':
+    'Чтобы мы могли подтвердить занятие и связаться с вами. В приложение можно войти позже, с этой же почтой',
+  'landing.signInInstead': 'Уже есть аккаунт? Войти',
   'landing.signInHint':
     'Вход сохраняет данные и позволяет следить за занятием в приложении',
   'landing.submit': 'Забронировать место',
@@ -248,7 +251,7 @@ export const people: Bundle = {
   'landing.noGroups': 'Клуб ещё не опубликовал группы',
   'landing.scheduleComeLater': 'Расписание ещё составляется. Загляните позже',
   'landing.notFound': 'Мы не нашли этот клуб',
-  'landing.step.signIn': 'Вход',
+  'landing.step.you': 'Ваши данные',
   'landing.step.children': 'Данные детей',
   'landing.step.health': 'Декларация о здоровье',
   'landing.step.slot': 'Выбор занятия',

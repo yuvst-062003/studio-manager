@@ -45,31 +45,15 @@ const pageStyle: CSSProperties = {
   gridTemplateColumns: 'minmax(0, 1fr)',
 }
 
-/** §5.4a — "מתאמנים בימים". 0-6 Sunday-first, matching `group_schedule_rule.weekday`. */
-function trainingDays(locale: Locale, weekdays: number[]): string {
-  return weekdays.map((day) => t(locale, `people.weekdays.${day}`)).join(' · ')
-}
-
-/** `ראשון וחמישי · 16:00` — the résumé line the booking dialog shows for the group. */
-function scheduleLine(locale: Locale, group: PublicGroup): string {
-  const days = trainingDays(locale, group.training_weekdays ?? [])
-  const times = (group.training_times ?? []).join(' · ')
-  return [days, times].filter(Boolean).join(' · ')
-}
-
-function ageLine(locale: Locale, group: PublicGroup): string | null {
-  return group.age_min != null || group.age_max != null
-    ? `${t(locale, 'people.landing.ageRange')}: ${group.age_min ?? ''}–${group.age_max ?? ''}`
-    : null
-}
+// `trainingDays`, `scheduleLine` and `ageLine` lived here to build the booking dialog's
+// group résumé.
+// That line is gone with the dialog's group control (2026-08-31) — the group is chosen per
+// child in step 2, where each option already carries its own age filter. The page's own
+// rendering of ages uses `AgeRange` below, which is a component rather than a string
+// because a range has to survive bidi.
 
 function hasAges(group: PublicGroup): boolean {
   return group.age_min != null || group.age_max != null
-}
-
-/** The one-line résumé of a group: ages, then days-and-times. */
-function groupMeta(locale: Locale, group: PublicGroup): string {
-  return [ageLine(locale, group), scheduleLine(locale, group)].filter(Boolean).join(' · ')
 }
 
 /**
@@ -713,12 +697,10 @@ export function PublicLanding({
             client={client}
             groups={groups}
             group={selectedGroup}
-            groupMeta={groupMeta(locale, selectedGroup)}
             signedIn={signedIn}
             address={landing.address ?? null}
             phone={landing.phone ?? null}
             onClose={() => setFlowOpen(false)}
-            onGroupChange={setSelectedId}
           />
         ) : null}
       </main>

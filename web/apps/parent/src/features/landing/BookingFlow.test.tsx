@@ -1,7 +1,7 @@
 // §5.4a's booking flow, in its stated order. The first test is the one that matters:
 // sign-in comes BEFORE any child detail is typed, and getting that backwards throws away
 // everything a parent entered.
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { t } from '@studio/i18n'
@@ -93,25 +93,45 @@ async function fillOneChild(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe('BookingFlow — §5.4a steps 1-4', () => {
-  it('step 1 is SIGN IN, and no child form exists until it is done', async () => {
-    // §5.4a: "The parent authenticates **before** entering child details." Rendering the
-    // child form first and asking for sign-in at submit would throw away everything typed.
+  // Step 1 was a SIGN-IN WALL until 2026-08-31. §5.4a's "authenticate before entering
+  // child details" was written to stop a parent typing a whole form and losing it at a
+  // login prompt — but it bought that by charging a Google account for the only
+  // self-service door in the product, and a parent who did not want one could not book at
+  // all. The ordering it protects is kept: who-you-are still comes first, it is just a
+  // form now, the way every other club takes a booking.
+  it('step 1 asks who is booking, and no child form exists until it is answered', async () => {
     render(<BookingFlow slug="judo" locale="he" client={makeClient()} groups={GROUPS} />)
-    expect(screen.getByTestId('booking-sign-in')).toBeInTheDocument()
+    expect(screen.getByTestId('booking-you')).toBeInTheDocument()
     expect(screen.queryByTestId('booking-children')).toBeNull()
-    expect(screen.queryByLabelText(t('he', 'people.student.firstName'))).toBeNull()
+    expect(screen.getByTestId('booking-to-children')).toBeDisabled()
   })
 
-  it('the sign-in link returns to this exact club', async () => {
-    // Otherwise the provider round trip drops them on a generic home screen and the funnel
-    // leaks at the one step §5.4a added sign-in-first to protect.
+  it('needs a name and a plausible address before it will go on', async () => {
+    // The address is the whole point of the step: it is how the club replies, and how
+    // §6.1 step 3 attaches this booking if the family signs in later.
+    const user = userEvent.setup()
+    render(<BookingFlow slug="judo" locale="he" client={makeClient()} groups={GROUPS} />)
+    await user.type(screen.getByTestId('booking-you-first-name'), 'רונית')
+    expect(screen.getByTestId('booking-to-children')).toBeDisabled()
+
+    await user.type(screen.getByTestId('booking-you-email'), 'ronit@')
+    expect(screen.getByTestId('booking-to-children')).toBeDisabled()
+
+    await user.type(screen.getByTestId('booking-you-email'), 'example.test')
+    expect(screen.getByTestId('booking-to-children')).toBeEnabled()
+  })
+
+  it('still offers sign-in, as a shortcut rather than a gate', async () => {
+    // A family that already has an account should reach their own record instead of
+    // creating a second lead. `return_path` brings them back to THIS club, carrying the
+    // picked group, so the round trip does not drop them on a generic home screen.
     render(<BookingFlow slug="judo-tel-aviv" locale="he" client={makeClient()} groups={GROUPS} />)
     const link = screen.getByTestId('booking-sign-in-link')
     expect(link).toHaveAttribute(
       'href',
       expect.stringContaining(encodeURIComponent('/t/judo-tel-aviv')),
     )
-    expect(link).toHaveAccessibleName(t('he', 'people.landing.signInFirst'))
+    expect(link).toHaveAccessibleName(t('he', 'people.landing.signInInstead'))
   })
 
   // The whole flow sat behind this one link, and on a deployed build it pointed at the
@@ -274,6 +294,62 @@ describe('BookingFlow — §5.4a steps 1-4', () => {
     expect(body.children[0]!.session_id).toBe('s1')
     expect(body.children[1]!.group_id).toBe('g2')
     expect(body.children[1]!.session_id).toBe('s9')
+  })
+
+  // The seam, not the form. The step above proves the fields render and gate the button;
+  // this proves what was typed reaches the REQUEST. Without it, `guardian` could be
+  // dropped between the form and `client.book` and every other test would still pass —
+  // and the booking would arrive with nobody attached to it.
+  it('carries the typed details into the booking when nobody signed in', async () => {
+    const user = userEvent.setup()
+    const client = makeClient()
+    render(<BookingFlow slug="judo" locale="he" client={client} groups={GROUPS} />)
+
+    await user.type(screen.getByTestId('booking-you-first-name'), 'רונית')
+    await user.type(screen.getByTestId('booking-you-last-name'), 'כהן')
+    await user.type(screen.getByTestId('booking-you-email'), 'ronit@example.test')
+    await user.type(screen.getByTestId('booking-you-phone'), '050-1112222')
+    await user.click(screen.getByTestId('booking-to-children'))
+
+    await user.type(screen.getByLabelText(t('he', 'people.student.firstName')), 'נועה')
+    await user.type(screen.getByLabelText(t('he', 'people.student.lastName')), 'כהן')
+    await user.selectOptions(screen.getByTestId('booking-group-0'), 'g1')
+    await user.click(screen.getByTestId('booking-to-health'))
+    await user.click(screen.getByLabelText(t('he', 'people.trialHealth.confirm')))
+    await user.click(screen.getByTestId('booking-to-slot'))
+    await screen.findByTestId('booking-slot-child-0')
+    await user.click(slotRadio(0, 's1')!)
+    await user.click(screen.getByTestId('booking-submit'))
+
+    await waitFor(() => expect(client.book).toHaveBeenCalled())
+    const body = vi.mocked(client.book).mock.calls[0]![0]
+    expect(body.guardian).toEqual({
+      first_name: 'רונית',
+      last_name: 'כהן',
+      email: 'ronit@example.test',
+      phone: '050-1112222',
+    })
+  })
+
+  it('sends no typed details when the parent has a session', async () => {
+    // The server ignores a typed address in favour of the verified one, so sending it
+    // would be noise at best — and at worst it reads as an attempt to override.
+    const user = userEvent.setup()
+    const client = makeClient()
+    render(<BookingFlow slug="judo" locale="he" client={client} groups={GROUPS} signedIn />)
+
+    await user.type(screen.getByLabelText(t('he', 'people.student.firstName')), 'נועה')
+    await user.type(screen.getByLabelText(t('he', 'people.student.lastName')), 'כהן')
+    await user.selectOptions(screen.getByTestId('booking-group-0'), 'g1')
+    await user.click(screen.getByTestId('booking-to-health'))
+    await user.click(screen.getByLabelText(t('he', 'people.trialHealth.confirm')))
+    await user.click(screen.getByTestId('booking-to-slot'))
+    await screen.findByTestId('booking-slot-child-0')
+    await user.click(slotRadio(0, 's1')!)
+    await user.click(screen.getByTestId('booking-submit'))
+
+    await waitFor(() => expect(client.book).toHaveBeenCalled())
+    expect(vi.mocked(client.book).mock.calls[0]![0].guardian).toBeUndefined()
   })
 
   it('will not submit until every child has picked a slot of their own', async () => {
@@ -467,16 +543,130 @@ describe('landing redesign (2026-08-29) — pre-selected group and step progress
   it('shows the four steps with the current one marked', async () => {
     render(<BookingFlow slug="judo" locale="he" client={makeClient()} groups={GROUPS} signedIn />)
     const progress = screen.getByTestId('booking-progress')
-    for (const key of ['signIn', 'children', 'health', 'slot'] as const) {
+    for (const key of ['you', 'children', 'health', 'slot'] as const) {
       expect(progress).toHaveTextContent(t('he', `people.landing.step.${key}`))
     }
     const current = progress.querySelector('[aria-current="step"]')
     expect(current).toHaveTextContent(t('he', 'people.landing.step.children'))
   })
 
-  it('marks sign-in as the current step for a stranger', async () => {
+  it('marks the details step as current for a stranger, and skips it for a member', async () => {
     render(<BookingFlow slug="judo" locale="he" client={makeClient()} groups={GROUPS} />)
-    const current = screen.getByTestId('booking-progress').querySelector('[aria-current="step"]')
-    expect(current).toHaveTextContent(t('he', 'people.landing.step.signIn'))
+    expect(
+      screen.getByTestId('booking-progress').querySelector('[aria-current="step"]'),
+    ).toHaveTextContent(t('he', 'people.landing.step.you'))
+  })
+})
+
+// "There is nothing to approve — it shows only the name" (2026-08-31). The step asked the
+// reader to tick "I confirm the details are correct" over a name and nothing else, which is
+// a formality rather than a confirmation. It has to show what it is asking about.
+describe('the confirmation shows what it is asking to confirm', () => {
+  const reachHealth = async (user: ReturnType<typeof userEvent.setup>) => {
+    await user.type(screen.getByTestId('booking-you-first-name'), 'רונית')
+    await user.type(screen.getByTestId('booking-you-last-name'), 'כהן')
+    await user.type(screen.getByTestId('booking-you-email'), 'ronit@example.test')
+    await user.type(screen.getByTestId('booking-you-phone'), '050-1112222')
+    await user.click(screen.getByTestId('booking-to-children'))
+    await user.type(screen.getByLabelText(t('he', 'people.student.firstName')), 'נועה')
+    await user.type(screen.getByLabelText(t('he', 'people.student.lastName')), 'לוי')
+    // `fireEvent.change`, not `user.type`: typing into `<input type="date">` goes through
+    // the browser's own segmented editor, which jsdom does not model.
+    fireEvent.change(screen.getByLabelText(t('he', 'people.student.birthdate')), {
+      target: { value: '2019-03-15' },
+    })
+    await user.selectOptions(screen.getByTestId('booking-group-0'), 'g1')
+    await user.click(screen.getByTestId('booking-to-health'))
+  }
+
+  it('writes out the child’s birthdate and group beside the tick', async () => {
+    const user = userEvent.setup()
+    render(<BookingFlow slug="judo" locale="he" client={makeClient()} groups={GROUPS} />)
+    await reachHealth(user)
+
+    const details = screen.getByTestId('booking-health-details-0')
+    // Day first. A birthdate is a calendar date, so it is reordered rather than run
+    // through the studio-zone formatter, which would read it as UTC midnight.
+    expect(details).toHaveTextContent('15/03/2019')
+    expect(details).toHaveTextContent(GROUPS[0]!.name)
+  })
+
+  it('shows who is booking, so the address can be checked before it is the only way back', async () => {
+    // The typed address is how the club replies and how signing in later finds this
+    // booking. This is the last screen where a typo in it is cheap to fix.
+    const user = userEvent.setup()
+    render(<BookingFlow slug="judo" locale="he" client={makeClient()} groups={GROUPS} />)
+    await reachHealth(user)
+
+    const guardian = screen.getByTestId('booking-health-guardian')
+    expect(guardian).toHaveTextContent('רונית כהן')
+    expect(guardian).toHaveTextContent('ronit@example.test')
+    expect(guardian).toHaveTextContent('050-1112222')
+  })
+
+  it('shows no booker card for a signed-in parent, whose details are not theirs to correct here', async () => {
+    const user = userEvent.setup()
+    render(<BookingFlow slug="judo" locale="he" client={makeClient()} groups={GROUPS} signedIn />)
+    await user.type(screen.getByLabelText(t('he', 'people.student.firstName')), 'נועה')
+    await user.type(screen.getByLabelText(t('he', 'people.student.lastName')), 'לוי')
+    await user.selectOptions(screen.getByTestId('booking-group-0'), 'g1')
+    await user.click(screen.getByTestId('booking-to-health'))
+    expect(screen.queryByTestId('booking-health-guardian')).toBeNull()
+  })
+})
+
+// "A person can't go back on the stages — he needs to be able to go back and forth"
+// (2026-08-31). Step 2 was the only step with no way back at all, so a parent who mistyped
+// their own email had to abandon the booking and start it again.
+describe('moving back through the steps', () => {
+  const fillYou = async (user: ReturnType<typeof userEvent.setup>) => {
+    await user.type(screen.getByTestId('booking-you-first-name'), 'רונית')
+    await user.type(screen.getByTestId('booking-you-email'), 'ronit@example.test')
+    await user.click(screen.getByTestId('booking-to-children'))
+  }
+
+  it('goes back from the children to the details, with what was typed still there', async () => {
+    const user = userEvent.setup()
+    render(<BookingFlow slug="judo" locale="he" client={makeClient()} groups={GROUPS} />)
+    await fillYou(user)
+
+    await user.click(screen.getByTestId('booking-to-you'))
+    expect(screen.getByTestId('booking-you')).toBeInTheDocument()
+    // Going back to correct something must not cost you the rest. The state lives in the
+    // flow, not in the step, so every answer survives the trip.
+    expect(screen.getByTestId('booking-you-email')).toHaveValue('ronit@example.test')
+  })
+
+  it('offers no way back to a details step the signed-in parent never saw', async () => {
+    // Their booking starts at the children, so "back" would be a dead end.
+    render(<BookingFlow slug="judo" locale="he" client={makeClient()} groups={GROUPS} signedIn />)
+    expect(screen.queryByTestId('booking-to-you')).toBeNull()
+  })
+
+  it('reopens an earlier step from the progress rail, and keeps the children', async () => {
+    const user = userEvent.setup()
+    render(<BookingFlow slug="judo" locale="he" client={makeClient()} groups={GROUPS} />)
+    await fillYou(user)
+    await user.type(screen.getByLabelText(t('he', 'people.student.firstName')), 'נועה')
+    await user.type(screen.getByLabelText(t('he', 'people.student.lastName')), 'לוי')
+    await user.selectOptions(screen.getByTestId('booking-group-0'), 'g1')
+    await user.click(screen.getByTestId('booking-to-health'))
+
+    await user.click(screen.getByTestId('booking-step-children'))
+    expect(screen.getByTestId('booking-children')).toBeInTheDocument()
+    expect(screen.getByLabelText(t('he', 'people.student.firstName'))).toHaveValue('נועה')
+  })
+
+  it('will not let the rail skip a step that has not been answered', async () => {
+    // Forward through the rail would walk past the checks between here and there — the
+    // group each child belongs to, a declaration per child. Backwards only.
+    const user = userEvent.setup()
+    render(<BookingFlow slug="judo" locale="he" client={makeClient()} groups={GROUPS} />)
+    await fillYou(user)
+    expect(screen.queryByTestId('booking-step-health')).toBeNull()
+    expect(screen.queryByTestId('booking-step-slot')).toBeNull()
+    // The one behind is reachable; the current one is not a button at all.
+    expect(screen.getByTestId('booking-step-you')).toBeInTheDocument()
+    expect(screen.queryByTestId('booking-step-children')).toBeNull()
   })
 })

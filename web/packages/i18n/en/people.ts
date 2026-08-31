@@ -92,6 +92,9 @@ export const people: Bundle = {
   'landing.noSlots': 'No available times in this group',
   'landing.noSlotsHint': 'Try another group or come back next week',
   'landing.signInFirst': 'Sign in and continue',
+  'landing.youHint':
+    'So we can confirm the lesson and get back to you. You can join the app later with the same email',
+  'landing.signInInstead': 'Already have an account? Sign in',
   'landing.signInHint':
     'Signing in saves your details and lets you follow the class in the app',
   'landing.submit': 'Reserve a place',
@@ -246,7 +249,7 @@ export const people: Bundle = {
   'landing.scheduleComeLater':
     'The timetable is still being built. Try again soon',
   'landing.notFound': 'We could not find this club',
-  'landing.step.signIn': 'Sign in',
+  'landing.step.you': 'Your details',
   'landing.step.children': 'Your children',
   'landing.step.health': 'Health declaration',
   'landing.step.slot': 'Pick a class',
