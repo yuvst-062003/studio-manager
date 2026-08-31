@@ -385,8 +385,18 @@ function AuthedApp() {
   const onPayments = hash === '#/payments'
   const onPaymentsHistory = hash === '#/payments/history'
   // §5.10 step 5 — the uPay return leg carries the order's public_ref in the hash.
+  //
+  // **Everything after the ref is dropped, and that is not defensive tidying.**
+  // upay-integration.md round one: 'the customer's browser is ALSO redirected to
+  // returnurl with the same payload'. Our returnurl is a hash route, so whatever uPay
+  // appends lands INSIDE the fragment: `#/payment-complete/<ref>?providererrorcode=0&...`.
+  // Slicing the prefix alone made the query part of the ref, `?ref=` went to a route typed
+  // `uuid.UUID`, the server answered 422, and `PaymentCompleteSection` renders a 422 as
+  // LoadFailed — a generic error screen, shown to a parent who has just been charged.
+  // Nothing uPay puts here is read: the IPN is the only settlement (see that section's
+  // own comment), so the ref is the single thing worth recovering from this hash.
   const paymentCompleteRef = hash.startsWith('#/payment-complete/')
-    ? hash.slice('#/payment-complete/'.length)
+    ? (hash.slice('#/payment-complete/'.length).split(/[?&#/]/)[0] ?? '')
     : ''
   // `12a` — the absence pre-report.
   const onAbsence = hash === '#/absence'
