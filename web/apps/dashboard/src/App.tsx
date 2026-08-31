@@ -10,6 +10,7 @@
 // in a new tab, the lot — without adding a dependency, which
 // .claude/rules/ui-rtl-a11y.md says not to do without asking.
 import { useEffect, useMemo, useState } from 'react'
+import type { CSSProperties } from 'react'
 import { apiFetch, useAuthedImage, useSession, switchStudio } from '@studio/core'
 import {
   AccessibilityMenu,
@@ -173,6 +174,16 @@ const MANAGER_ONLY_ROUTES = new Set([
 /** §6.1 — 'given a direct link, not a dead end.' A person with no dashboard role often
  *  does have a staff one, and the staff app will refuse them in turn if not. */
 const STAFF_APP_URL = '/staff'
+
+/** Logical properties throughout, not `margin-top`/`max-width`: the app is RTL and
+ *  .claude/rules/ui-rtl-a11y.md says so. `maxInlineSize` because §6.4 is desktop-first —
+ *  ungapped, a 43-character token got an input stretched across the whole 1100px. */
+const inviteStyle: CSSProperties = {
+  display: 'grid',
+  gap: 'var(--space-2)',
+  marginBlockStart: 'var(--space-5)',
+  maxInlineSize: '24rem',
+}
 
 const NAV = [
   { key: 'home', labelKey: 'common.dash.home.title', href: '#/home' },
@@ -583,6 +594,21 @@ export default function App() {
    */
   const hasNoRole =
     session.studios.length === 0 || (membership !== undefined && membership.roles.length === 0)
+
+  // The code an invited manager was handed, and the redemption the refusal arm below
+  // offers. §5.3's binding attaches this identity to the Person the invite pre-created,
+  // which is what turns `hasNoRole` false and replaces the refusal with the dashboard.
+  const [inviteCode, setInviteCode] = useState('')
+  const redeemInvite = (token: string) =>
+    apiFetch('/api/v1/auth/accept-invitation', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
+    }).then((response) => {
+      // `reload` and not a local state flip: accepting mints a new session naming the
+      // invited studio, and every branch in this component routes on what it says.
+      if (response.ok) session.reload()
+    })
   // Memoised: SetupWizard reads through this in an effect keyed on the client, so a fresh
   // object every render would re-fetch progress forever.
   const setupClient = useMemo(() => makeSetupClient(apiFetch), [])
@@ -650,12 +676,41 @@ export default function App() {
       {session.status === 'signed-in' && hasNoRole ? (
         // No wrapper: `RefusalScreen` already carries `data-testid="dashboard-refusal"`,
         // and a second one made the query ambiguous.
-        <RefusalScreen
-          locale={locale}
-          onSignOut={() => void session.signOut()}
-          otherAppUrl={STAFF_APP_URL}
-          which="dashboard"
-        />
+        <>
+          <RefusalScreen
+            locale={locale}
+            onSignOut={() => void session.signOut()}
+            otherAppUrl={STAFF_APP_URL}
+            which="dashboard"
+          />
+          {/* F5's other half. An invited MANAGER lands here and nowhere else, so the
+              redemption has to live on this screen or the code this app itself issued
+              cannot be spent in it — the staff screen's own hint reads 'בכניסה
+              לאפליקציה בוחרים "יש לי קוד הזמנה"', and until now that named a control
+              this app did not have (2026-08-31).
+
+              `notFound` leads for the same reason it does in the other two apps: without
+              it the entry butts against the refusal's sign-out row and reads as part of
+              it, and the refusal says only 'ask your manager' — the one thing somebody
+              already holding the manager's code does not need to do. */}
+          <section data-testid="dashboard-no-match" style={inviteStyle}>
+            <p>{t(locale, 'common.auth.notFound')}</p>
+            <label htmlFor="invite-code">{t(locale, 'common.auth.inviteCodeLabel')}</label>
+            <input
+              id="invite-code"
+              value={inviteCode}
+              onChange={(event) => setInviteCode(event.target.value)}
+            />
+            <button
+              type="button"
+              onClick={() => {
+                void redeemInvite(inviteCode)
+              }}
+            >
+              {t(locale, 'common.auth.haveInviteCode')}
+            </button>
+          </section>
+        </>
       ) : null}
 
       {session.status === 'signed-in' && !hasNoRole ? (
