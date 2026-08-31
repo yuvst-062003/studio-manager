@@ -56,6 +56,43 @@ done
 Repeat for `production`. `development` runs locally and needs no deployed
 services, but the environment exists so config parity is explicit.
 
+### The api needs a volume, and this runbook did not say so
+
+**Every environment's `api` MUST have a volume, and `STORAGE_ROOT` must point inside
+it.** Without one, uploads land in the container's own filesystem and are destroyed by
+the next deploy.
+
+```bash
+railway service link api        # per environment
+railway volume add -m /data
+railway variables --set STORAGE_ROOT=/data
+```
+
+`app/core/storage.py`'s `FilesystemObjectStore` was written for this — its docstring
+says "staging/production on a Railway volume" — but nothing here asked for one, so
+neither environment ever got one. `STORAGE_ROOT` defaults to the RELATIVE path
+`var/storage`, which against the Dockerfile's `WORKDIR /srv` resolves to
+`/srv/var/storage`: a directory in the image, wiped on every redeploy.
+
+The failure is quiet and looks like a frontend bug. The upload succeeds, `logo_object_key`
+is written, and the club sees its logo — until the next deploy. After that the column
+still points at a key whose bytes are gone, `read_logo` raises `NoLogoError`, the route
+answers 404, and the dashboard renders no logo at all with nothing on screen to say why.
+Diagnosed 2026-08-31, after the logo "stopped working" for the third time; each earlier
+round fixed a real but different bug (`2b4278c` the origin and the bearer token,
+`8706af8` the upload itself) and left this one standing.
+
+**It is not only the logo.** `settings.landing.photo_object_keys` — the landing photo
+strip — uses the same store and dies the same way.
+
+Bytes already lost are lost: a volume added now protects the NEXT upload, and every
+studio that had a logo has to upload it again.
+
+Two consequences worth stating rather than discovering. The volume mounts to one service
+instance, so it blocks horizontal scaling of the api while the filesystem backend is in
+use (`storage.py` records this as the accepted trade-off). And its backups are ours —
+Railway does not take them for you.
+
 ## 4. Environment variables
 
 Per environment:

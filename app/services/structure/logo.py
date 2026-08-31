@@ -8,6 +8,7 @@ leave a stale PNG on the volume forever.
 
 from __future__ import annotations
 
+import logging
 import uuid
 from typing import Any
 
@@ -25,6 +26,8 @@ from app.models.studio import Studio
 from app.schemas.studio import SUPPORTED_LOCALES
 from app.services.audit import AuditService
 from app.services.structure import landing_photos
+
+logger = logging.getLogger(__name__)
 
 
 class NoLogoError(Exception):
@@ -88,8 +91,19 @@ def read_logo(session: Session, store: ObjectStore, *, studio_id: uuid.UUID) -> 
     try:
         return store.get(studio.logo_object_key)
     except ObjectNotFoundError as exc:
-        # A pointer at nothing. Reported as absent rather than as a server error: the
-        # honest answer to "show me the logo" is that there is not one.
+        # A pointer at nothing. Reported to the CALLER as absent rather than as a server
+        # error: the honest answer to "show me the logo" is that there is not one.
+        #
+        # But it is logged, because the two cases are not the same thing and the screen
+        # cannot tell them apart. "This club never uploaded a logo" is ordinary; "this
+        # club uploaded one and the bytes are gone" is a broken deployment, and it looked
+        # exactly like ordinary for three rounds of bug reports (2026-08-31). The cause
+        # was an `api` service with no volume, so STORAGE_ROOT lived in the container and
+        # every redeploy emptied it — see docs/deploy/railway-runbook.md §3.
+        logger.warning(
+            "logo object missing for a studio that has a logo key",
+            extra={"studio_id": str(studio_id), "logo_object_key": studio.logo_object_key},
+        )
         raise NoLogoError(str(studio_id)) from exc
 
 

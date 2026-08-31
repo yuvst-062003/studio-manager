@@ -8,6 +8,7 @@ another's object even by guessing. The last test in this file is that claim.
 
 from __future__ import annotations
 
+import logging
 import uuid
 
 import pytest
@@ -97,6 +98,40 @@ def test_delete_clears_the_column_and_the_bytes(client, as_manager, app_session)
 
 def test_get_before_any_upload_is_404_not_500(client, as_manager) -> None:
     assert client.get("/api/v1/studio/logo", headers=as_manager.headers).status_code == 404
+
+
+# -- a key that outlived its bytes -------------------------------------------
+# Both cases below answer 404, because 404 is the honest answer to "show me the logo"
+# either way. They are NOT the same event, and the screen cannot tell them apart: the
+# dashboard renders nothing and says nothing, which is how a broken deployment read as a
+# frontend bug for three rounds (2026-08-31 — the `api` service had no volume, so
+# STORAGE_ROOT lived in the container and every redeploy emptied it). The log is the only
+# place the difference survives, so it is asserted.
+def test_a_logo_key_whose_object_is_gone_is_404_and_is_logged(
+    client, as_manager, storage_root, caplog
+) -> None:
+    upload(client, as_manager, PNG)
+    key = f"studios/{as_manager.studio_id}/logo.png"
+    # Exactly what a redeploy does to an unmounted STORAGE_ROOT: the column still points
+    # at the key, the bytes are gone.
+    (storage_root / key).unlink()
+
+    with caplog.at_level(logging.WARNING):
+        assert client.get("/api/v1/studio/logo", headers=as_manager.headers).status_code == 404
+
+    missing = [record for record in caplog.records if "logo object missing" in record.message]
+    assert len(missing) == 1, caplog.text
+    # `extra=`, so the scrubber has keys to match — never interpolated into the message.
+    assert missing[0].logo_object_key == key
+    assert missing[0].studio_id == str(as_manager.studio_id)
+
+
+def test_no_logo_at_all_is_404_and_stays_quiet(client, as_manager, caplog) -> None:
+    """The ordinary case stays quiet. A warning on every club that never uploaded a logo
+    is a warning nobody reads, which would cost the test above its whole value."""
+    with caplog.at_level(logging.WARNING):
+        assert client.get("/api/v1/studio/logo", headers=as_manager.headers).status_code == 404
+    assert [record for record in caplog.records if "logo object missing" in record.message] == []
 
 
 def test_delete_with_no_logo_is_still_204(client, as_manager) -> None:
