@@ -36,6 +36,17 @@
   --surface: #fffefb;
   --fg: #17150f;
   --on-fg: #f7f5f1;
+
+  /* The fill of an emphasis control — the primary button, a selected segment, a toast, a
+   * progress bar, the switch knob. It was `--fg` at eighteen call sites, which made ink
+   * and emphasis the same decision and meant a surface could not change one without the
+   * other: re-colouring the emphasis fill would have re-coloured every word on the page.
+   *
+   * Identical to `--fg` on the inward surface, deliberately — the staff app and the
+   * dashboard do not move a pixel. The split exists so the outward surface can put the
+   * club's navy on its controls while its prose stays ink. */
+  --emphasis: #17150f;
+  --on-emphasis: #f7f5f1;
   --text-secondary: #55524a;
   --text-muted: #6f6b62;
   --border: #e6e1d6;
@@ -130,6 +141,8 @@
   --surface: #1e1d1a;
   --fg: #fffefb;
   --on-fg: #141311;
+  --emphasis: #fffefb;
+  --on-emphasis: #141311;
   --text-secondary: #a8a49a;
   --text-muted: #8f8b82;
   --border: #3a3833;
@@ -145,6 +158,100 @@
 
   /* Lighter than `--surface` (#1e1d1a), not darker. Elevation in dark mode is light. */
   --surface-raised: #272521;
+}
+
+/* ═══ THE OUTWARD SURFACE ═════════════════════════════════════════════════════════
+ * Outward-facing surfaces wear the club's brand; inward-facing tools wear the neutral
+ * working palette. The rule and its reasoning are in docs/design/decisions.md.
+ *
+ * This is a re-VALUING of tokens that already exist above, never a second palette: every
+ * primitive already reads var(--surface), var(--radius-md), var(--text-title), so the
+ * whole parent app and the landing re-skin with no primitive forked and no call site
+ * touched. tokens.audit.test.ts asserts that — the block may re-value a token, never
+ * introduce one, and never a semantic one.
+ *
+ * Named `outward` rather than `parent`: the landing and the app are the same person at
+ * two moments, and the name is what makes their later convergence possible instead of
+ * shipping a second permanent fork.
+ *
+ * Values are the landing's own (`landing.css`, the user's Stitch design of 2026-08-30),
+ * transcribed. The three that are NOT in it are marked below, with what decided them. */
+
+[data-surface="outward"] {
+  /* The brand tier, and the first consumer brand.ts has ever had. v2's colour picker
+   * re-skins the landing and the app through this one guarded path. */
+  --brand-primary: #003874;
+  --brand-on-primary: #fff;
+
+  /* The surface ladder: page → card. `--surface-raised` has nowhere left to go in light
+   * mode, because the landing's ladder tops out at pure white and the card is already
+   * there. A popover is separated by its hairline and the scrim instead; dark mode keeps
+   * a real step, where elevation is light. */
+  --ground: #fcf9f8;
+  --surface: #fff;
+  --surface-raised: #fff;
+  --disabled-surface: #eae7e7;
+  --fg: #1c1b1b;
+  --on-fg: #fcf9f8;
+
+  /* Where the brand actually lands. Ink stays ink — prose is not navy — but every
+   * emphasis control wears the club's colour. */
+  --emphasis: #003874;
+  --on-emphasis: #fff;
+  --text-secondary: #424751;
+
+  /* NOT in landing.css — the marketing page has no third text weight. Derived to sit
+   * between `--text-secondary` and the hairline on the navy-cool axis, and measured: it
+   * clears 4.5:1 on both the page and the card. */
+  --text-muted: #5b6270;
+  --border: #c3c6d2;
+  --border-strong: #737782;
+
+  /* D3's one deep accent becomes the navy. The green survives untouched as `--paid`,
+   * which is the only place it was ever carrying meaning. */
+  --accent: #003874;
+  --on-accent: #fff;
+  --belt-ring: #1c1b1b;
+  --scrim: rgb(0 32 66 / 45%);
+
+  /* The squared button — 2px — is the strongest single piece of the landing's shape
+   * language, and `--radius-md` is what buttons, fields and the segmented track read.
+   * Cards keep their 14px: a squared card at this density reads as a table, not a list. */
+  --radius-md: 2px;
+}
+
+/* Both forms deliberately. `data-theme` is set on documentElement by ThemeProvider, so
+ * when the surface marker is on <html> too the two attributes sit on ONE element and the
+ * descendant form matches nothing — the app would have gone dark keeping every light
+ * navy value. The descendant form stays for a marker nested inside a non-outward app. */
+[data-theme="dark"][data-surface="outward"],
+[data-theme="dark"] [data-surface="outward"] {
+  --brand-primary: #aac7ff;
+  --brand-on-primary: #0e2a52;
+  --ground: #141519;
+  --surface: #202329;
+  --surface-raised: #272b33;
+  --disabled-surface: #2a2d33;
+  --fg: #e8e6e3;
+  --on-fg: #141519;
+
+  /* Same inversion as --accent: in dark the navy is a light foreground blue, so the fill
+   * is that blue and the text on it is the deep navy. */
+  --emphasis: #aac7ff;
+  --on-emphasis: #0e2a52;
+  --text-secondary: #b0b4bd;
+  --text-muted: #8f949e;
+  --border: #3a3f4a;
+  --border-strong: #6a707c;
+
+  /* In dark the navy is a light FOREGROUND blue, so the on-colour is the deep navy —
+   * filling with the light blue and writing white on it is the mistake landing.css
+   * records having made. */
+  --accent: #aac7ff;
+  --on-accent: #0e2a52;
+  --belt-ring: #e8e6e3;
+  --scrim: rgb(0 0 0 / 62%);
+  --radius-md: 2px;
 }
 
 *,

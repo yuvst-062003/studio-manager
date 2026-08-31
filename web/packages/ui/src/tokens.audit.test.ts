@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { AA_TEXT, NON_TEXT, contrastRatio } from './contrast'
+import { GROUND_COLOR } from './theme'
 import { GROUND_TOKENS, TIERS, TOKEN_ROLES } from './tokens.roles'
 
 // Read from cwd rather than import.meta.url: the jsdom environment rewrites
@@ -19,19 +20,32 @@ function readTokenBlock(selector: string): Record<string, string> {
   // one wins" holds. Reading only the first is a real hole: a token added in a second
   // `:root { }` further down the file was invisible to this audit, and the plant that
   // proved the gate fires passed straight through it. Found by planting exactly that.
+  //
+  // The prelude is compared WHOLE, not by substring. `[data-theme="dark"]` is a prefix of
+  // `[data-theme="dark"] [data-surface="outward"]`, so a substring match merged the
+  // outward block's navy into the plain dark palette and audited neither one as itself —
+  // both would have gone green while describing a stylesheet nobody wrote.
   const out: Record<string, string> = {}
-  let cursor = 0
   let blocks = 0
+  let cursor = 0
   for (;;) {
-    const start = css.indexOf(selector, cursor)
-    if (start === -1) break
-    const open = css.indexOf('{', start)
+    const open = css.indexOf('{', cursor)
+    if (open === -1) break
     const close = css.indexOf('}', open)
-    if (open === -1 || close === -1) break
-    blocks += 1
-    for (const match of css.slice(open + 1, close).matchAll(/(--[a-z0-9-]+)\s*:\s*([^;]+);/gi)) {
-      const [, name, value] = match
-      if (name && value) out[name] = value.trim()
+    if (close === -1) break
+    // The prelude runs from the end of the previous rule to this rule's brace. Commas
+    // make one rule serve several selectors, so each is compared on its own.
+    const prelude = css.slice(cursor, open).trim()
+    const selectors = prelude
+      .split(',')
+      .map((s) => s.replaceAll(/\s+/g, ' ').trim())
+      .filter(Boolean)
+    if (selectors.includes(selector)) {
+      blocks += 1
+      for (const match of css.slice(open + 1, close).matchAll(/(--[a-z0-9-]+)\s*:\s*([^;]+);/gi)) {
+        const [, name, value] = match
+        if (name && value) out[name] = value.trim()
+      }
     }
     cursor = close + 1
   }
@@ -42,20 +56,50 @@ function readTokenBlock(selector: string): Record<string, string> {
 const LIGHT = readTokenBlock(':root')
 const DARK = readTokenBlock('[data-theme="dark"]')
 
+/**
+ * The outward-facing surface — the landing page and the parent app, which wear the club's
+ * brand where the staff tools wear the neutral working palette (see
+ * `docs/design/decisions.md`). One token block, so every `@studio/ui` primitive re-skins
+ * without being forked.
+ *
+ * **This gate lands BEFORE the values it audits, and that is the point.** A second token
+ * block the audit does not read is not a theme, it is a fork that rots silently: every
+ * token added to `tokens.css` afterwards inherits a warm value into a navy screen, and
+ * nothing fails.
+ */
+const OUTWARD_SELECTOR = '[data-surface="outward"]'
+const OUTWARD_DARK_SELECTOR = '[data-theme="dark"] [data-surface="outward"]'
+const OUTWARD = readTokenBlock(OUTWARD_SELECTOR)
+const OUTWARD_DARK = readTokenBlock(OUTWARD_DARK_SELECTOR)
+
+/** What a token actually resolves to on each of the four surface-and-theme combinations. */
+const EFFECTIVE = {
+  light: LIGHT,
+  dark: { ...LIGHT, ...DARK },
+  'outward light': { ...LIGHT, ...OUTWARD },
+  // Both layers, in cascade order: the plain dark override first, then the outward one.
+  'outward dark': { ...LIGHT, ...DARK, ...OUTWARD, ...OUTWARD_DARK },
+} as const
+
 describe('the roles table and tokens.css are in exact bijection', () => {
   it('finds a non-trivial number of tokens in each block, so a parse failure cannot pass silently', () => {
     expect(Object.keys(LIGHT).length).toBeGreaterThan(30)
     expect(Object.keys(DARK).length).toBeGreaterThan(10)
   })
 
-  it('declares no custom property outside the two audited blocks', () => {
+  it('declares no custom property outside the four audited blocks', () => {
     // The backstop for the parser itself. A token declared inside `html { }`, inside a
     // media query, or in a second `:root { }` would otherwise never reach TOKEN_ROLES
     // and would be audited by nothing at all.
     const declared = new Set(
       [...css.matchAll(/(--[a-z0-9-]+)\s*:/gi)].map((m) => m[1]).filter((n): n is string => !!n),
     )
-    const audited = new Set([...Object.keys(LIGHT), ...Object.keys(DARK)])
+    const audited = new Set([
+      ...Object.keys(LIGHT),
+      ...Object.keys(DARK),
+      ...Object.keys(OUTWARD),
+      ...Object.keys(OUTWARD_DARK),
+    ])
     expect([...declared].filter((t) => !audited.has(t))).toEqual([])
   })
 
@@ -93,6 +137,71 @@ describe('the roles table and tokens.css are in exact bijection', () => {
       (t) => TOKEN_ROLES[t]?.obligation.kind !== 'none' && !(t in DARK),
     )
     expect(missing, 'these carry colour and must have a dark value').toEqual([])
+  })
+})
+
+describe('the outward surface is a theme, not a fork', () => {
+  it('finds a non-trivial number of tokens in each outward block', () => {
+    expect(Object.keys(OUTWARD).length).toBeGreaterThan(8)
+    expect(Object.keys(OUTWARD_DARK).length).toBeGreaterThan(8)
+  })
+
+  it('overrides only tokens that already exist in :root', () => {
+    // An override layer, not a second palette. A token defined only here would be
+    // undefined on every inward screen and inherit from nowhere.
+    const invented = [...Object.keys(OUTWARD), ...Object.keys(OUTWARD_DARK)].filter(
+      (t) => !(t in LIGHT),
+    )
+    expect(invented, 'the outward block may re-value a token, never introduce one').toEqual([])
+  })
+
+  it('gives every token it overrides a role', () => {
+    const unclassified = [...Object.keys(OUTWARD), ...Object.keys(OUTWARD_DARK)].filter(
+      (t) => !(t in TOKEN_ROLES),
+    )
+    expect(unclassified).toEqual([])
+  })
+
+  it('re-values every colour it takes in light for dark as well', () => {
+    // The failure this catches is precise: a navy screen keeping a warm light value on a
+    // dark ground, because the outward block re-coloured only half the pair.
+    const missing = Object.keys(OUTWARD).filter(
+      (t) => TOKEN_ROLES[t]?.obligation.kind !== 'none' && !(t in OUTWARD_DARK),
+    )
+    expect(missing, 'these carry colour on the outward surface and need a dark value').toEqual([])
+  })
+
+  it('never touches the semantic band — D2, and the reason the debt banner survives a brand', () => {
+    // Decision 2 of the redesign spec: the brand's palette is carried in, the semantic
+    // band stays untouchable. The landing's crimson is a BRAND colour; red in this app
+    // means a family owes money, and a club branding itself red still gets a working
+    // debt banner only because these nine are out of reach.
+    const semantic = [...Object.keys(OUTWARD), ...Object.keys(OUTWARD_DARK)].filter(
+      (t) => TOKEN_ROLES[t]?.tier === 'semantic',
+    )
+    expect(semantic, 'the outward surface may not re-value a semantic token').toEqual([])
+  })
+
+  it('is the source of GROUND_COLOR, so a manifest cannot drift from the stylesheet', () => {
+    // `theme.ts` promises these four ARE `--ground`. Nothing enforced it, and the promise
+    // was already false for the parent app the moment the outward block landed: its
+    // manifest and its status bar named the inward grey while the page painted navy-warm.
+    // Asserted against the parsed CSS rather than restated, so the stylesheet stays the
+    // one place a ground colour is decided.
+    expect(GROUND_COLOR.inward.light).toBe(LIGHT['--ground'])
+    expect(GROUND_COLOR.inward.dark).toBe(DARK['--ground'])
+    expect(GROUND_COLOR.outward.light).toBe(OUTWARD['--ground'])
+    expect(GROUND_COLOR.outward.dark).toBe(OUTWARD_DARK['--ground'])
+  })
+
+  it('derives its ramp from --brand-primary rather than adding brand tokens', () => {
+    // `brandOverridesFor` is the one guarded path a studio colour takes into the token
+    // layer. Six brand tokens would let a studio set six colours badly instead of one.
+    const brand = Object.entries(TOKEN_ROLES)
+      .filter(([, r]) => r.tier === 'brand')
+      .map(([t]) => t)
+    expect(brand.sort()).toEqual(['--brand-on-primary', '--brand-primary'])
+    expect(OUTWARD).toHaveProperty('--brand-primary')
   })
 })
 
@@ -157,12 +266,15 @@ describe('D2 — the three tiers, and nothing else', () => {
   })
 })
 
+// Each block is an override LAYER, so an effective palette is the light block with the
+// later ones laid over it. Auditing DARK alone would silently skip every token dark does
+// not override — and auditing the outward blocks alone would skip far more, since the
+// outward surface re-values a palette and inherits the whole type and spacing scale.
 const MODES = [
-  { name: 'light', tokens: LIGHT },
-  // The dark block is an override layer, so a dark mode's effective palette is the light
-  // block with the dark block laid over it. Auditing DARK alone would silently skip every
-  // token dark does not override.
-  { name: 'dark', tokens: { ...LIGHT, ...DARK } },
+  { name: 'light', tokens: EFFECTIVE.light },
+  { name: 'dark', tokens: EFFECTIVE.dark },
+  { name: 'outward light', tokens: EFFECTIVE['outward light'] },
+  { name: 'outward dark', tokens: EFFECTIVE['outward dark'] },
 ] as const
 
 const valueOf = (tokens: Record<string, string>, token: string): string => {

@@ -6,7 +6,7 @@
 | **Surface** | `web/apps/parent/` · 390×844 · Hebrew RTL · installable PWA (§6.5) |
 | **Supersedes nothing** | It *fills in* [`docs/design/proposals/parent-app-shell.md`](../../design/proposals/parent-app-shell.md), whose Provenance row for Stitch reads `NOT RUN` |
 | **Canvas** | **No artboard is added.** `tests/contracts/test_canvas_matches_spec.py` holds the canvas at exactly 61; a 62nd fails the build |
-| **Status** | Design approved 2026-08-31. Not yet built. |
+| **Status** | Design approved 2026-08-31. **Step 0 shipped 2026-08-31** — all eight screens re-skinned, none rearranged. Screens 1–8 pending, each behind its own checkpoint. |
 
 ## Why this exists
 
@@ -39,7 +39,8 @@ Recorded because each one closes an argument that would otherwise be re-litigate
 
 | Source | What it contributes | What is rejected |
 |---|---|---|
-| **Google Stitch** | **To be filled by each screen's pass.** One row per screen, written at step 5 of the loop. Do not fill from imagination — that is the failure this file inherited. | — |
+| **Google Stitch — Step 0, the design system** | Project [`17786356207688067866`](https://stitch.withgoogle.com/projects/17786356207688067866), design system *Gladiator*, generated from [`docs/design/DESIGN.md`](../../design/DESIGN.md). It contributed the three bands as a machine-readable theme, and independently **confirmed Rubik** — `DESIGN.md` argued the landing's Hanken Grotesk and Work Sans have no Hebrew glyph, which is why the landing already ships in Rubik despite its Stitch design naming them. | Its derived `primary` `#00234d`, a tonal step darker than the landing's `#003874` that decision 2 carries across unchanged. Its `error: #ba1a1a` — the landing's brand crimson, which may not become an app colour (D14); measured at 2.82:1 on the outward dark ground, it could not have served as text there in any case. |
+| **Google Stitch — per screen** | **To be filled by each screen's pass.** One row per screen, written at step 5 of the loop. Do not fill from imagination — that is the failure this file inherited. | — |
 | [`parent-app-shell.md`](../../design/proposals/parent-app-shell.md) | The four open composition questions; the measured deltas 2, 5, 6 and 7; the shell's region map; the rule that a trailing header action is a control sized like one | Its precedence rule, superseded by decision 1 |
 | [`audit/parent.md`](../../design/audit/parent.md) | The accent-count and coloured-bar measurements | Its screen verdicts, overtaken by the P0–P12 log in its own tail |
 | [`landing-page.md`](../../design/proposals/landing-page.md) | The palette, the type scale, the squared button shape, the dark equivalent — and the precedent that the user's chosen look wins over token orthodoxy | `--gl-` as a delivery mechanism (see *Approach*) |
@@ -124,6 +125,32 @@ sections. No testimonial blocks, no pricing cards, no soft neomorphism.
    "three visual registers and the staff app will have to pick a side" into a stated rule.
 
 **Checkpoint — the user sees all eight screens re-skinned before anything is rearranged.**
+
+### What Step 0 actually cost, recorded for the screens that follow
+
+* **The captures are scripts, not screenshots.** `web/scripts/capture-parent.mjs` and
+  `capture-signing.mjs` re-run after every screen's build, which is what makes step 7's
+  "compare against the baseline" a comparison rather than a memory. Baselines are in
+  `docs/design/captures/parent-baseline/`, the re-skin in `parent-outward/`.
+* **The signing flow cannot be walked by clicking.** Fourteen health questions per child,
+  three ת.ז. check-digit fields and a clause the server refuses unless it matches the
+  answers. Each step is reached by satisfying the ones before it through the API
+  (`satisfy-gates.mjs`) and photographed in the browser. Screen 3 should budget for this.
+* **`/dev/sign-in-as` gives a refresh cookie, not a bearer.** Any in-page `fetch` must
+  spend it on `POST /auth/refresh` first, or every studio-scoped route answers
+  `no active studio` and a screen silently falls back to home.
+* **Two defects were fixed rather than stepped around.** `readTokenBlock` matched
+  selectors by substring, so `[data-theme="dark"]` also matched
+  `[data-theme="dark"] [data-surface="outward"]` — the two palettes would have merged and
+  both would have passed. And `THEME_COLOR` claimed to BE `--ground` with nothing
+  enforcing it; the outward block made that false for the parent app's manifest and status
+  bar. `GROUND_COLOR` is now per surface and asserted against the parsed stylesheet.
+* **One structural token pair was added: `--emphasis` / `--on-emphasis`.** `--fg` was ink
+  AND the emphasis fill at eighteen call sites, so re-colouring the controls would have
+  re-coloured every word on the page. Equal to `--fg` on the inward surface, so the staff
+  app and the dashboard do not move a pixel. Without it the re-skin was invisible: the
+  first re-capture came back with a black primary button on a navy-warm ground.
+* **Rubik stays.** `DESIGN.md` band 3 states why, and Stitch agreed.
 
 ---
 

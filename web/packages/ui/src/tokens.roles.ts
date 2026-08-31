@@ -35,6 +35,7 @@ export const GROUND_TOKENS = [
   '--ground',
   '--surface',
   '--fg',
+  '--emphasis',
   '--accent',
   '--brand-primary',
   '--debt-tint',
@@ -163,6 +164,23 @@ export const TOKEN_ROLES: Record<string, TokenRole> = {
     group: 'palette',
     obligation: { kind: 'text', on: ['--fg'] },
     note: 'Text on an ink fill: primary button, toast, active segment.',
+  },
+  '--emphasis': {
+    tier: 'structural',
+    group: 'palette',
+    // Both obligations apply and the stricter one is stated: the fill is a control
+    // boundary (SC 1.4.11, 3:1), but it is also what --on-emphasis is measured against,
+    // which needs it declared as a ground. `ground` is the kind that carries that, and
+    // its 3:1 duty is covered because every value it takes is also --fg or --accent,
+    // both of which are audited as text at 4.5:1 on the same two grounds.
+    obligation: { kind: 'ground' },
+    note: 'The fill of an emphasis control — primary button, selected segment, toast, progress fill, switch knob. Equal to --fg on the inward surface; the club’s brand on the outward one.',
+  },
+  '--on-emphasis': {
+    tier: 'structural',
+    group: 'palette',
+    obligation: { kind: 'text', on: ['--emphasis'] },
+    note: 'Text on an emphasis fill. Split from --on-fg for the same reason --emphasis is split from --fg.',
   },
   '--text-secondary': {
     tier: 'structural',

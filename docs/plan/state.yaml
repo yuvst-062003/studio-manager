@@ -2,7 +2,7 @@
 # comments across a round-trip, so every explanation belongs in a `why:` or
 # `source:` field rather than in a comment that would silently disappear.
 version: 1
-updated: 2026-08-26
+updated: 2026-08-31
 waves:
   - id: W0
     milestone: M0
@@ -709,6 +709,68 @@ waves:
           table kept as the trial funnel's encrypted holding pen.
         status: shipped
         on: 2026-08-31
+  - id: W9D
+    milestone: design
+    title: The parent app's redesign — eight screens through Stitch
+    mode: sequential
+    lanes: []
+    exit_gate: all eight screens re-skinned and rearranged, each adjudicated in writing; lane-check green; a three-child family fills nineteen registration fields instead of forty-five
+    status: active
+    opened: 2026-08-31
+    source: docs/superpowers/specs/2026-08-31-parent-app-stitch-redesign-design.md
+    pieces:
+      - id: S0
+        title: Step 0 — baseline capture, the audit gate, the design system, the outward token block
+        why: >-
+          The eight surfaces are captured as they ship, light and dark, by two scripts kept
+          in web/scripts so every later comparison re-runs rather than being remembered.
+          The signing flow could not be walked by clicking — fourteen health questions per
+          child, three check-digit fields and a derived clause that refuses a mismatch — so
+          each of its five steps is reached by satisfying the ones before it through the
+          API and photographed in the browser.
+
+          The audit gate landed BEFORE the values and was watched failing, then watched
+          firing on a planted semantic override. Two real defects surfaced and were fixed
+          rather than stepped around: readTokenBlock matched selectors by substring, so
+          [data-theme="dark"] also matched the new compound selector and would have merged
+          the two palettes while both passed; and THEME_COLOR promised to BE --ground with
+          nothing enforcing it, which the outward block made false for the parent app's
+          manifest and status bar. GROUND_COLOR is now surface-aware and asserted against
+          the parsed stylesheet.
+
+          --emphasis / --on-emphasis are new, and are the only structural change: --fg was
+          doing double duty as ink and as the emphasis fill at eighteen call sites, so a
+          surface could not re-colour its controls without re-colouring its prose. Equal to
+          --fg inward, so the staff app and the dashboard do not move.
+
+          Nothing is rearranged. Every composition question is still open and belongs to
+          its own screen pass, each of which stops for the owner to pick a variant.
+        status: shipped
+        on: 2026-08-31
+      - id: S1
+        title: Screen 1 — home and the shell
+        status: pending
+      - id: S2
+        title: Screen 2 — sign-in (blocked on the one-face-or-three question)
+        status: pending
+      - id: S3
+        title: Screen 3 — the signing flow, its grouping bug and its validation gap
+        status: pending
+      - id: S4
+        title: Screen 4 — student card
+        status: pending
+      - id: S5
+        title: Screen 5 — payments
+        status: pending
+      - id: S6
+        title: Screen 6 — calendar
+        status: pending
+      - id: S7
+        title: Screen 7 — inbox
+        status: pending
+      - id: S8
+        title: Screen 8 — profile
+        status: pending
 holdbacks:
   - id: HB-w6-health-gate-unmounted
     kind: carried

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { THEME_COLOR } from '@studio/ui/theme'
+import { GROUND_COLOR } from '@studio/ui/theme'
 import { manifest } from '../manifest.config'
 
 describe('parent manifest (§6.5 — the install is the product, not boilerplate)', () => {
@@ -20,8 +20,8 @@ describe('parent manifest (§6.5 — the install is the product, not boilerplate
   })
 
   it('takes theme and background colours from the D2 token layer, not literals', () => {
-    expect(manifest.theme_color).toBe(THEME_COLOR.light)
-    expect(manifest.background_color).toBe(THEME_COLOR.light)
+    expect(manifest.theme_color).toBe(GROUND_COLOR.outward.light)
+    expect(manifest.background_color).toBe(GROUND_COLOR.outward.light)
   })
 
   it('declares RTL and Hebrew, so the install dialog is not mirrored wrong', () => {

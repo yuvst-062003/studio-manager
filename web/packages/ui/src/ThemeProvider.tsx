@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import { THEME_COLOR, THEME_STORAGE_KEY, resolveTheme } from './theme'
+import { GROUND_COLOR, THEME_STORAGE_KEY, resolveTheme, surfaceOf } from './theme'
 import type { ResolvedTheme, ThemePreference } from './theme'
 
 type ThemeContextValue = {
@@ -34,9 +34,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     document.documentElement.dataset.theme = resolved
-    document
-      .querySelector('meta[name="theme-color"]')
-      ?.setAttribute('content', THEME_COLOR[resolved])
+    // The surface is read from the same element the stylesheet matches on, so the status
+    // bar of an installed PWA follows whichever palette the CSS actually applied.
+    const ground = GROUND_COLOR[surfaceOf(document.documentElement)][resolved]
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', ground)
   }, [resolved])
 
   const setPreference = useCallback((next: ThemePreference) => {

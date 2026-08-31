@@ -109,9 +109,11 @@ const chipStyle: CSSProperties = {
 
 const chipActiveStyle: CSSProperties = {
   ...chipStyle,
-  background: 'var(--fg)',
-  color: 'var(--on-fg)',
-  borderColor: 'var(--fg)',
+  //: --emphasis, not --fg: this is a selected-control fill, and on the outward surface it
+  //: wears the club's colour. Identical to ink on the staff surfaces.
+  background: 'var(--emphasis)',
+  color: 'var(--on-emphasis)',
+  borderColor: 'var(--emphasis)',
 }
 
 //: The two links that sit in a header row. Text-sized, but tappable: both rendered 19px

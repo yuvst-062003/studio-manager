@@ -66,8 +66,8 @@
 }
 
 .studio-theme-control__option[data-selected="true"] {
-  background: var(--fg);
-  color: var(--on-fg);
+  background: var(--emphasis);
+  color: var(--on-emphasis);
   font-weight: var(--weight-medium);
 }
 
@@ -109,12 +109,12 @@
 }
 
 .studio-btn[data-variant="primary"] {
-  background: var(--fg);
-  color: var(--on-fg);
+  background: var(--emphasis);
+  color: var(--on-emphasis);
 }
 
 .studio-btn[data-variant="secondary"] {
-  border-color: var(--fg);
+  border-color: var(--emphasis);
   border-width: var(--border-width-strong);
 }
 
@@ -209,7 +209,7 @@
 }
 
 .studio-field__input:focus-visible {
-  border-color: var(--fg);
+  border-color: var(--emphasis);
   border-width: var(--border-width-strong);
   outline: 2px solid var(--focus-ring);
   outline-offset: 1px;
@@ -409,7 +409,7 @@
 }
 
 .studio-switch__knob {
-  background: var(--fg);
+  background: var(--emphasis);
   block-size: 19px;
   border-radius: var(--radius-circle);
   display: block;
@@ -475,8 +475,8 @@
 }
 
 .studio-segmented__option[data-selected="true"] {
-  background: var(--fg);
-  color: var(--on-fg);
+  background: var(--emphasis);
+  color: var(--on-emphasis);
   font-weight: var(--weight-medium);
 }
 
@@ -589,9 +589,9 @@
 }
 
 .studio-slot-chips__chip[data-selected="true"] .studio-slot-chips__label {
-  background: var(--fg);
-  border-color: var(--fg);
-  color: var(--on-fg);
+  background: var(--emphasis);
+  border-color: var(--emphasis);
+  color: var(--on-emphasis);
   font-weight: var(--weight-medium);
 }
 
@@ -693,7 +693,9 @@
 }
 
 .studio-progress__track {
-  background: color-mix(in srgb, var(--fg) 8%, transparent);
+  /* Tinted from --emphasis, not --fg: the track sits directly under the fill, so on the
+     outward surface it has to tint navy or the bar reads as sitting in a grey slot. */
+  background: color-mix(in srgb, var(--emphasis) 8%, transparent);
   block-size: 8px;
   border-radius: 5px;
   flex: 1;
@@ -701,7 +703,7 @@
 }
 
 .studio-progress__fill {
-  background: var(--fg);
+  background: var(--emphasis);
   block-size: 100%;
   display: block;
   transition: inline-size var(--motion-base) var(--ease-standard);
@@ -716,9 +718,9 @@
 
 .studio-toast {
   align-items: center;
-  background: var(--fg);
+  background: var(--emphasis);
   border-radius: var(--radius-lg);
-  color: var(--on-fg);
+  color: var(--on-emphasis);
   display: flex;
   gap: var(--space-2);
   padding-block: var(--space-3);
@@ -1031,7 +1033,7 @@ a {
   inline-size: 34px;
   block-size: 34px;
   border-radius: 9px;
-  background: var(--fg);
+  background: var(--emphasis);
   flex: none;
   display: flex;
   align-items: center;
@@ -1093,8 +1095,8 @@ a {
 
 .studio-sidenav__item--active,
 .studio-sidenav__item--active:hover {
-  background: var(--fg);
-  color: var(--on-fg);
+  background: var(--emphasis);
+  color: var(--on-emphasis);
   font-weight: var(--weight-medium);
 }
 
@@ -1220,7 +1222,7 @@ a {
 }
 
 .studio-update-toast__reload {
-  background: var(--fg);
+  background: var(--emphasis);
   color: var(--ground);
   border: var(--border-width-hairline) solid var(--fg);
 }
@@ -1265,7 +1267,7 @@ a {
 }
 
 .studio-install-banner__cta {
-  background: var(--fg);
+  background: var(--emphasis);
   color: var(--ground);
   border: var(--border-width-hairline) solid var(--fg);
 }
@@ -1572,9 +1574,9 @@ a.studio-stat-tile:focus-visible {
 
 /* An open membership is the club's top plan, so it reads as the filled one. */
 .studio-plan-badge[data-plan='open'] {
-  background: var(--fg);
-  border-color: var(--fg);
-  color: var(--on-fg);
+  background: var(--emphasis);
+  border-color: var(--emphasis);
+  color: var(--on-emphasis);
 }
 
 /* Not a plan the manager chose — a gap. Bordered in the same tone the product uses for
@@ -1649,7 +1651,7 @@ a.studio-stat-tile:focus-visible {
 }
 
 .studio-a11y__scale[data-selected] {
-  border-color: var(--fg);
+  border-color: var(--emphasis);
   border-width: var(--border-width-strong);
   background: var(--cancelled-tint);
 }

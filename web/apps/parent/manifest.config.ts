@@ -1,4 +1,4 @@
-import { THEME_COLOR } from '@studio/ui/theme'
+import { GROUND_COLOR } from '@studio/ui/theme'
 import type { AppManifest, ManifestIcon } from '@studio/ui/manifest'
 
 const icons: ManifestIcon[] = [
@@ -32,8 +32,11 @@ export const manifest: AppManifest = {
   orientation: 'portrait',
   dir: 'rtl',
   lang: 'he',
-  theme_color: THEME_COLOR.light,
-  background_color: THEME_COLOR.light,
+  // The OUTWARD ground: this app wears the club's brand, so its splash screen and its
+  // status bar are #fcf9f8, not the staff apps' warm grey. `THEME_COLOR` is the inward
+  // record and naming it here is what put a mismatched band behind the installed app.
+  theme_color: GROUND_COLOR.outward.light,
+  background_color: GROUND_COLOR.outward.light,
   categories: ['sports', 'education', 'productivity'],
   icons,
 }

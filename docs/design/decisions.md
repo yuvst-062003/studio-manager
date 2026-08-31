@@ -294,6 +294,11 @@ component layer.
   (3.12, 19 uses), `#7a766d` (4.16, 9 uses). `#6f6b62` at 4.88 is the lowest passing grey and
   should be the floor for any text token.
 - **Q4 — Where the studio logo appears** across the three surfaces.
+- **Q6 — `SignIn.tsx`: one face or three?** It lives in `@studio/ui` and takes
+  `app: 'staff' | 'parent' | 'dashboard'`, so it is one screen serving all three — and
+  [D14](#d14--outward-surfaces-wear-the-brand-inward-tools-wear-the-working-palette) is the
+  one surface boundary it cannot be placed on. Restyling it to the brand moves the dashboard
+  sign-in the owner is happy with. To be asked against a screenshot, not in the abstract.
 - ~~**Q5 — Scope resolutions**~~ **SETTLED 2026-08-24 as [D9](#d9--three-scope-cuts-from-the-canvas).**
   The §2.1/§2.2 contradiction is **fixed in SPEC.md** — `trial-lesson booking` removed from
   the deferred list. The three artboard cuts (2b, 7c, 12f) are decided and **applied to the canvas**
@@ -330,6 +335,57 @@ this adds an accelerator rather than a second way to change a session. It is del
 built on HTML5 drag-and-drop, which is unusable with a screen reader and does not fire on
 touch; the popover's date fields remain the keyboard path.
 
+## D14 — outward surfaces wear the brand; inward tools wear the working palette
+
+**Decided:** 2026-08-31 · owner decision, in session
+
+The product had three visual registers and no stated rule about which surface takes which:
+a navy Stitch landing page, a warm neutral parent app, and a warm neutral dashboard. A
+parent's real sequence was navy landing → red split-screen sign-in → warm app, three looks
+in three taps, and nobody could say which was correct.
+
+**The rule.**
+
+| Surface | Palette | Why |
+|---|---|---|
+| Public landing, **parent app** | The club's **brand** | The same person at two moments — before they join, and every week after. A family should not cross a visual border by signing in. |
+| Staff app, manager dashboard | The **neutral working palette** | A tool used for hours a day by someone who works there. Its job is to recede; a saturated brand at that duration is fatigue, not identity. |
+
+**How it is carried.** One CSS block — `[data-surface="outward"]` in
+`packages/ui/src/tokens.css`, plus its dark pair — re-values the structural palette and the
+brand tier. Every `@studio/ui` primitive already reads `var(--surface)`, `var(--radius-md)`,
+`var(--text-title)`, so eighteen screens re-skin with **no primitive forked and no call site
+touched**. The parent app's `index.html` carries the attribute on `<html>`; the staff app and
+the dashboard carry nothing and are unmoved.
+
+The two alternatives were considered and rejected: a `theme` prop on every primitive touches
+every call site across three apps to solve what one block solves, and a hand-written
+`parent.css` puts eighteen screens outside the tested primitives — which is where the RTL,
+contrast and tap-target guarantees live.
+
+**Named `outward`, not `parent`.** The landing and the app are the same person at two
+moments; the name is what makes their later convergence possible instead of shipping a second
+permanent fork. `landing.css` now reads eight of its colours from this block rather than
+repeating them, so "the navy look" has one definition and the audit reads it.
+
+**This does not touch D2.** The semantic band is not brand-tier and the outward block may not
+re-value it — `tokens.audit.test.ts` fails if it tries. A club branding itself red still gets
+a working debt banner, which is the whole reason D2 exists. It is also why the landing's
+crimson `#ba1a1a` does **not** cross into the app: on a marketing page it is brand, and in
+this app red means a family owes money. (Measured, as it happens: `#ba1a1a` reaches only
+2.82:1 on the outward dark ground, so it could not have served as text there either.)
+
+**D1's brand tier gets its first consumer.** `brand.ts` was written in v1 so that v2's colour
+picker would have a guarded path rather than an improvised one, and had never been called.
+The navy enters through it, which means v2's picker re-skins the landing and the app together
+with contrast validated at the moment the colour is set. The ramp is derived from
+`--brand-primary` rather than adding six brand tokens — otherwise a studio could set six
+colours badly instead of one.
+
+**Open, and deliberately not decided here.** `SignIn.tsx` lives in `@studio/ui` and serves all
+three apps, so it is the one screen the boundary cannot classify on its own. Whether it wears
+one face or three is the owner's call — see the open questions below.
+
 ## Applied vs. pending
 
 | Decision | Recorded | Applied |
@@ -343,6 +399,7 @@ touch; the popover's date fields remain the keyboard path.
 | SPEC.md §2.2 contradiction | yes | **yes — SPEC.md edited 2026-08-24** |
 | C10 — `3f` loses the health-block toggle | yes | **yes — canvas edited 2026-08-26 (W6)** |
 | D13 empty cell may start a session | yes | **yes — `WeekBoard.tsx`, 2026-08-29. The canvas is NOT edited: `3a` still draws an inert cell, and the affordance is invisible until hover.** |
+| D14 outward wears the brand | yes | **yes — the `[data-surface="outward"]` block in `tokens.css`, the parent app's `index.html`, and `landing.css` re-pointed at it. Asserted by `tokens.audit.test.ts`, which audits all four surface-and-theme palettes and fails if the block re-values a semantic token.** |
 
 **All three D9 rows were re-verified against the artboard markup on 2026-08-26**, because
 `milestone-plan.md`'s C9 still claimed the opposite and that claim was blocking W6. They were

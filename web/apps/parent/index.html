@@ -1,9 +1,20 @@
 <!doctype html>
-<html lang="he" dir="rtl" data-theme="light">
+<!-- `data-surface="outward"` is what puts this app in the club's brand rather than the
+     neutral working palette the staff app and the dashboard wear. The rule and its
+     reasoning are in docs/design/decisions.md; the values are the [data-surface="outward"]
+     block in packages/ui/src/tokens.css.
+
+     On <html> and not on <body>: tokens.css sets `html { background: var(--ground) }`, so
+     a marker on the body leaves the page behind it painted the inward warm grey — visible
+     as a mismatched band under a short screen and behind the overscroll on iOS. -->
+<html lang="he" dir="rtl" data-theme="light" data-surface="outward">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#f7f5f1" />
+    <!-- The OUTWARD ground. ThemeProvider rewrites this on mount for dark mode; this
+         value is what paints the status bar in the moments before it does, so a stale one
+         is a visible flash of the wrong palette on every cold start. -->
+    <meta name="theme-color" content="#fcf9f8" />
 
     <!-- iOS ignores the manifest for the home-screen icon and reads these
          instead. Without them the icon is a screenshot of the page (§6.5). -->

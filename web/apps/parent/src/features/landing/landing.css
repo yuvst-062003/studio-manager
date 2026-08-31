@@ -10,19 +10,34 @@
  */
 
 .landing-root {
-  --gl-primary: #003874;
+  /* ── Eight of these now READ the token layer rather than repeating it ──────────────
+   * `[data-surface="outward"]` in packages/ui/src/tokens.css carries the same navy, the
+   * same ladder and the same ink that this file transcribed from the Stitch design, and
+   * the parent app's <html> wears that attribute — so the landing and the app resolve
+   * the brand from ONE definition. Two files defining "the navy look" drift the first
+   * time either is edited, and the audit only reads one of them.
+   *
+   * Their dark values are gone from the block below for the same reason: the token
+   * layer's own dark override supplies them. */
+  --gl-primary: var(--brand-primary);
+  --gl-on-primary: var(--brand-on-primary);
+  --gl-surface: var(--ground);
+  --gl-card: var(--surface);
+  --gl-ink: var(--fg);
+  --gl-ink-2: var(--text-secondary);
+  --gl-outline: var(--border);
+  --gl-outline-strong: var(--border-strong);
+
+  /* ── Landing-only, and deliberately still literal ──────────────────────────────────
+   * `--gl-red` is the marketing page's crimson. It does NOT become an app colour and so
+   * has no token: in the app red means a family owes money, and `--danger` is a semantic
+   * token the brand may not reach. The rest are page ornament — the zen-dot ground, the
+   * hero heading tint, the lowered band — with no counterpart in an app of cards. */
   --gl-primary-strong: #1a4f95;
-  --gl-on-primary: #fff;
   --gl-red: #ba1a1a;
   --gl-on-red: #fff;
-  --gl-surface: #fcf9f8;
   --gl-surface-low: #f6f3f2;
-  --gl-card: #fff;
   --gl-zen: #f7f5f0;
-  --gl-ink: #1c1b1b;
-  --gl-ink-2: #424751;
-  --gl-outline: #c3c6d2;
-  --gl-outline-strong: #737782;
   --gl-heading: var(--gl-primary);
   --gl-dot: rgb(0 56 116 / 7%);
 
@@ -44,19 +59,15 @@
 }
 
 [data-theme='dark'] .landing-root {
-  --gl-primary: #aac7ff;
+  /* The eight re-pointed above are ABSENT here on purpose. `--gl-primary` resolves to
+   * `var(--brand-primary)`, which the token layer's dark outward block has already
+   * turned to #aac7ff — re-stating it here would restore the second definition this
+   * change exists to remove, and only one of the two is audited. */
   --gl-primary-strong: #0e2a52;
-  --gl-on-primary: #fff;
   --gl-red: #ff9d93;
   --gl-on-red: #40100c;
-  --gl-surface: #141519;
   --gl-surface-low: #1b1d22;
-  --gl-card: #202329;
   --gl-zen: #17181c;
-  --gl-ink: #e8e6e3;
-  --gl-ink-2: #b0b4bd;
-  --gl-outline: #3a3f4a;
-  --gl-outline-strong: #6a707c;
   --gl-heading: #d6e3ff;
   --gl-dot: rgb(170 199 255 / 8%);
   --gl-cat-judo-bg: #1b2537;

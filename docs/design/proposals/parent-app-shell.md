@@ -10,12 +10,17 @@
 | **i18n namespace** | `common`, plus each feature's own |
 | **Slot** | `student-card` (five sections, one per milestone) |
 
-> **Status: proposal, and one input is missing.** Written 2026-08-29 from three of this
-> pipeline's four inputs — the artboards and their specs, the shipped container, and a
-> measured walk of the running app as all four §19.3 personas. **The Stitch generation has
-> not been run**; its row in *Provenance* is empty on purpose and must not be filled from
-> imagination. The composition questions this file leaves open are precisely the ones the
-> two previous passes used Stitch to settle. Appendix A is the prompt to run.
+> **Status: proposal. Step 0 of the redesign has run; the eight screen passes have not.**
+> Written 2026-08-29 from three of this pipeline's four inputs — the artboards and their
+> specs, the shipped container, and a measured walk of the running app as all four §19.3
+> personas.
+>
+> **The Stitch design system now exists** — project `17786356207688067866`, system
+> *Gladiator*, built from [`../DESIGN.md`](../DESIGN.md) on 2026-08-31 — and the whole app
+> is re-skinned in it. **No screen has been rearranged**, so every composition question
+> below is still open and its Provenance row is still empty on purpose. Each is settled by
+> its own Stitch pass, at a checkpoint where the owner picks a variant before anything is
+> built. Appendix A is the prompt for screen 1.
 
 ## Why the shell and not one screen
 
@@ -34,16 +39,20 @@ times, which is how the app arrived at seventeen answers.
 
 | Source | What it contributed | What was rejected |
 |---|---|---|
-| **Google Stitch** | **NOT RUN.** See Appendix A. | — |
+| **Google Stitch** | **Step 0 only — the design system, not a composition.** Project `17786356207688067866`, system *Gladiator*, generated from `DESIGN.md`. It contributed the three-band structure as a machine-readable theme and **confirmed Rubik over the landing's Hanken Grotesk / Work Sans**. One row per screen is added here at step 5 of each pass; none has run. | Its derived `primary` `#00234d` — a tonal step darker than the landing's own `#003874`, which decision 2 carries across unchanged. Its `error: #ba1a1a`, which is the landing's brand crimson and may not become an app colour (D14). |
 | [`2a`](../specs/2a-parent-home.md) | The day strip's two-state rule. The agenda row's shape: time gutter · belt swatch · child · group · trailing status chip. The tab bar's **unread badge on messages**. The debt banner as a *conditional* on the selected day being today. | — |
 | [`2b`](../specs/2b-parent-inbox.md) | The one-way inbox, and its own finding that read/unread is drawn nowhere while four i18n keys exist for it | Its `ללא הצהרה חתומה לא ניתן להשתתף באימון` line — §5.5 blocks nothing on the mat, and `2b`'s spec already flags this as the third artboard to make the claim |
 | [`2c`](../specs/2c-parent-student-card.md) | The card as a container of milestone-owned sections | — |
 | Measured walk, 2026-08-29 (this session) | Every delta in *What ships today and should not* below — each one read off the DOM at 390×844, not off a screenshot | — |
 | `ff134f8` | The eight functional defects already fixed, so this file does not re-litigate them | — |
 
-**Precedence rule, unchanged from `MH`:** tokens, RTL and accessibility are
-non-negotiable · the existing artboards win on domain correctness · Stitch wins on
-composition and hierarchy only · anything requiring data that does not exist is cut.
+**Precedence rule, and how it changed.** RTL and accessibility are non-negotiable · the
+existing artboards win on domain correctness · anything requiring data that does not exist
+is cut. **"Stitch wins on composition and hierarchy ONLY" is superseded** by the owner's
+decision of 2026-08-31 (full Stitch look, as on the landing), the same way it was
+superseded for the landing on 2026-08-30. This is a restyle *and* a rearrangement. What
+survives unchanged is the token layer as the delivery mechanism: the look arrives as
+values in `[data-surface="outward"]`, never as markup pasted from a Stitch export.
 
 ## What ships today and should not
 
@@ -131,10 +140,17 @@ partitions a set does not render for a set of one.**
 
 ## Tokens by role
 
+**Re-valued by [D14](../decisions.md) since this table was written.** The token NAMES are
+unchanged and no component moved; the parent app now resolves them through
+`[data-surface="outward"]`, so the ground is `#fcf9f8` and the card is `#ffffff`. The
+values below are the inward ones the staff app and the dashboard still wear. The semantic
+rows — debt, paid, pending — are identical on both surfaces, by D2.
+
 | Role | Token |
 |---|---|
-| Page ground | `--ground` (`#f7f5f1`) |
-| Card surface | `--surface` (`#fffefb`) |
+| Page ground | `--ground` (`#f7f5f1` inward · `#fcf9f8` outward) |
+| Card surface | `--surface` (`#fffefb` inward · `#ffffff` outward) |
+| Emphasis control fill | `--emphasis` (ink inward · `#003874` outward) |
 | Debt amount and its icon | `--debt` (`#b3261e`) |
 | Settled / attended | `--paid` (`#1f6b3f`) |
 | Awaiting an answer | `--pending` (`#8a5a00`) |

@@ -236,7 +236,7 @@ function StepProgress({
           <span
             style={
               active
-                ? { ...progressDotStyle, background: 'var(--fg)', color: 'var(--on-fg)', border: 'none' }
+                ? { ...progressDotStyle, background: 'var(--emphasis)', color: 'var(--on-emphasis)', border: 'none' }
                 : progressDotStyle
             }
             aria-hidden="true"
