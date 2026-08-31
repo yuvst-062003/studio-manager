@@ -331,6 +331,11 @@ export const people: Bundle = {
   'card.title': 'כרטיס חניך',
   'card.details': 'פרטים',
   'card.enrollments': 'קבוצות',
+  // 12j's "what happens next" line. Asked for by FirstRegistration since it was
+  // written and translated nowhere, so a parent who had just registered read the key
+  // itself on the screen that told them they were done (2026-08-31).
+  'card.sectionsComeLater':
+    'שאר המסכים — לוח השיעורים, הנוכחות והתשלומים — נפתחים באפליקציה אחרי חתימה על הצהרת הבריאות.',
   'alerts.title': 'מרכז התראות',
   'alerts.empty': 'אין התראות שדורשות טיפול',
   'alerts.pendingRequests': 'בקשות הצטרפות ממתינות',

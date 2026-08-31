@@ -539,6 +539,23 @@ describe('FirstRegistration — 12j', () => {
     )
     noPhysicalCss(container)
   })
+
+  it('says what happens next in words, in every locale', () => {
+    // `t()` falls back to the KEY when nothing translates it, and this one translated
+    // nowhere — so a parent who had just registered read the literal string
+    // `people.card.sectionsComeLater` on the screen that told them they were done
+    // (2026-08-31). A missing key is invisible to i18n parity, which compares the
+    // locales to each other and not to what the code asks for.
+    for (const locale of ['he', 'en', 'ru'] as const) {
+      const { unmount } = render(
+        <FirstRegistration source="invitation" students={onFile} locale={locale} />,
+      )
+      expect(screen.getByTestId('first-reg-next')).not.toHaveTextContent(
+        'people.card.sectionsComeLater',
+      )
+      unmount()
+    }
+  })
 })
 
 describe('the empty group picker says so (2026-08-30)', () => {

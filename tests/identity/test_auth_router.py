@@ -16,6 +16,7 @@ from urllib.parse import parse_qs, urlparse
 
 from app.core.config import settings
 from app.routers.identity import REFRESH_COOKIE_NAME, REFRESH_COOKIE_PATH
+from sqlalchemy import select
 from tests.conftest import sign_in, start_flow
 
 
@@ -342,6 +343,82 @@ def test_an_already_signed_in_person_can_redeem_an_invitation_code(
     assert redeemed.json()["studios"][0]["studio_id"] == str(studio.id)
     # The invitation named the studio, so accepting one is also choosing it.
     assert redeemed.json()["active_studio_id"] == str(studio.id)
+
+
+def test_accepting_an_invitation_survives_the_next_rotation(client, fake_provider, app_session):
+    """The studio an invitation named must still be active after the token rotates.
+
+    `accept-invitation` handed back a session scoped to the invited studio and never wrote
+    it to the refresh row, so the choice lived only in the fifteen minutes that access
+    token was valid. The next rotation re-read the row and silently moved the parent back
+    to whichever studio they had before — the sibling of the join-link defect, and the one
+    case the sole-membership rule in `_build_session` cannot cover, because a parent with
+    two memberships has a real choice to lose.
+    """
+    import hashlib
+    import secrets
+    from datetime import UTC, datetime, timedelta
+
+    from app.models.identity import AuthIdentity
+    from app.models.person import Invitation, Person
+    from app.models.studio import Studio
+
+    at = datetime.now(UTC)
+    subject = f"two-clubs-{uuid.uuid4()}"
+    email = f"{uuid.uuid4().hex[:8]}@example.invalid"
+    fake_provider.register(code="c-two", subject=subject, email=email)
+    sign_in(client, code="c-two")
+    identity_id = app_session.execute(
+        select(AuthIdentity.id).where(AuthIdentity.provider_subject == subject)
+    ).scalar_one()
+
+    # The club they already belong to, and the session that names it.
+    first_club = Studio(name="מועדון א", slug=f"a-{uuid.uuid4().hex[:8]}")
+    app_session.add(first_club)
+    app_session.flush()
+    app_session.add(
+        Person(
+            studio_id=first_club.id,
+            auth_identity_id=identity_id,
+            first_name="שירה",
+            last_name="הורה",
+        )
+    )
+    app_session.commit()
+    assert client.post("/api/v1/auth/refresh").json()["active_studio_id"] == str(first_club.id)
+
+    # A second club invites them by name.
+    token = secrets.token_urlsafe(16)
+    second_club = Studio(name="מועדון ב", slug=f"b-{uuid.uuid4().hex[:8]}")
+    app_session.add(second_club)
+    app_session.flush()
+    app_session.add(
+        Person(studio_id=second_club.id, first_name="שירה", last_name="הורה", email=email)
+    )
+    app_session.add(
+        Invitation(
+            studio_id=second_club.id,
+            email=email,
+            intended_role="guardian",
+            token_hash=hashlib.sha256(token.encode()).hexdigest(),
+            expires_at=at + timedelta(days=7),
+        )
+    )
+    app_session.commit()
+
+    fresh = client.post("/api/v1/auth/refresh").json()["access_token"]
+    redeemed = client.post(
+        "/api/v1/auth/accept-invitation",
+        json={"token": token},
+        headers={"Authorization": f"Bearer {fresh}"},
+    )
+    assert redeemed.status_code == 200, redeemed.text
+    assert redeemed.json()["active_studio_id"] == str(second_club.id)
+
+    rotated = client.post("/api/v1/auth/refresh")
+    assert rotated.json()["active_studio_id"] == str(second_club.id), (
+        "the rotation moved the parent back to the club they did not just choose"
+    )
 
 
 def test_an_unknown_invitation_code_is_refused(client, fake_provider):

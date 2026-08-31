@@ -132,6 +132,24 @@ def _build_session(
     at = now()
     memberships = studios_for_identity(session, identity_id)
     active = next((m for m in memberships if m.studio_id == active_studio_id), None)
+    if active is None and len(memberships) == 1:
+        # §5.2's rule -- 'the switcher exists only when there is a choice' -- applied to
+        # EVERY session and not only to the one `_complete_callback` mints.
+        #
+        # A membership can arrive after the sign-in that minted the session, and §5.4b's
+        # join link is built on exactly that order: the parent signs in from
+        # `/join/<token>` while they belong to no studio at all, and the registration
+        # creates their first Person a moment later. The callback's choice cannot see a
+        # membership that does not exist yet, and `refresh` carries the refresh row's
+        # NULL forward on every rotation -- so the studio never became active, and
+        # `studio_id_from_request` answered 401 'no active studio' on every tenant-scoped
+        # route the parent's app touched. `/me/students` came back empty on the done
+        # screen and the app behind כניסה לאפליקציה was dead (2026-08-31).
+        #
+        # It also covers a studio named on a stale refresh row that this identity no
+        # longer belongs to: falling back to the one membership they DO have beats
+        # handing back a session scoped to nothing.
+        active = memberships[0]
     access = app_access(session, [m.person_id for m in memberships])
 
     if refresh_secret is not None:
@@ -515,6 +533,12 @@ def refresh(request: Request, response: Response, session: SessionDep) -> Sessio
         acting_as_person_id=issued.row.acting_as_person_id,
         refresh_secret=issued.secret,
     )
+    # The studio the session actually resolved, written back to the row -- the same reason
+    # `switch-studio` writes it there: the studio lives on the refresh row, so the choice
+    # survives the next rotation. Without this a family who later joins a SECOND studio
+    # would stop matching the sole-membership rule above and be dropped back to a picker
+    # mid-session, having never been asked.
+    issued.row.active_studio_id = result.active_studio_id
     session.commit()
     return result
 
@@ -566,6 +590,28 @@ def accept_invitation_code(
             detail={"code": "invitation_rejected", "message": "this invitation is not valid"},
         ) from exc
 
+    # The choice goes onto the refresh row, exactly as `switch-studio` puts it there and
+    # for the same stated reason: the studio lives on the row, so it survives a rotation.
+    # Without this the invited studio lived only as long as the access token it was minted
+    # into, and the next `refresh` re-read the row and moved the parent back to whichever
+    # club they belonged to before -- silently, and without ever asking (2026-08-31).
+    #
+    # An accept with no cookie still answers with the right session; there is simply no
+    # row to write to. Same tolerance `switch-studio` shows, for the same reason.
+    presented = request.cookies.get(REFRESH_COOKIE_NAME)
+    refresh_secret = None
+    if presented:
+        try:
+            issued = rotate_refresh_token(session, presented=presented, at=now())
+        except RefreshRejectedError as exc:
+            session.commit()
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail={"code": "no_session", "message": "sign in again"},
+            ) from exc
+        issued.row.active_studio_id = person.studio_id
+        refresh_secret = issued.secret
+
     identity = session.get(AuthIdentity, identity_id)
     result = _build_session(
         session,
@@ -576,6 +622,7 @@ def accept_invitation_code(
         # The invitation named the studio, so accepting one is also choosing it -- a
         # parent who has just proved which club they belong to should not then be asked.
         active_studio_id=person.studio_id,
+        refresh_secret=refresh_secret,
     )
     session.commit()
     return result

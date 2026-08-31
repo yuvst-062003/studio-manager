@@ -18,6 +18,7 @@ from app.models.person import Guardian, Person
 from app.services.people.errors import DuplicateStudentError, NotFoundError, RefusedError
 from app.services.people.onboarding import OnboardingService
 from sqlalchemy import func, select
+from tests.conftest import sign_in
 from tests.people.conftest import T0, make_session
 
 SUNDAY = T0.replace(hour=14)
@@ -588,3 +589,73 @@ def test_the_route_does_not_disclose_another_familys_child(
     detail = response.json()["detail"]
     assert detail["code"] == "duplicate_student"
     assert "student_id" not in detail or detail["student_id"] is None
+
+
+# -- the join link's own session ----------------------------------------------
+def test_the_join_link_leaves_the_new_parent_with_an_active_studio(
+    client, fake_provider, app_session, studio, a_group, a_live_plan, as_manager, monkeypatch
+):
+    """The reported defect (2026-08-31): a parent who followed the club's join link
+    filled the form, saw "נרשמתם!", and then could reach nothing at all.
+
+    The identity signs in from `/join/<token>` BEFORE it belongs to any studio, so
+    `callback`'s "a single membership is activated here" rule activates nothing — null
+    on the access token and null on the refresh row. The registration then creates the
+    family's first membership and nothing re-mints the session: `refresh` carries the
+    row's null forward for ever, so `studio_id_from_request` answers 401 "no active
+    studio" on every tenant-scoped route. That is why the done screen's `/me/students`
+    read came back empty, and why the app behind כניסה לאפליקציה was dead.
+    """
+    from app.routers import onboarding as onboarding_router
+
+    class _TwiceWeekly:
+        def materialize_sessions(self, group_id, from_date, to_date):
+            return [
+                make_session(
+                    studio_id=studio.id,
+                    group_id=group_id,
+                    training_year_id=uuid.uuid4(),
+                    starts_at=moment,
+                )
+                for moment in (SUNDAY, SUNDAY + timedelta(days=3))
+            ]
+
+    monkeypatch.setattr(onboarding_router, "ScheduleService", lambda session: _TwiceWeekly())
+
+    created = client.post("/api/v1/onboarding-link", headers=as_manager.headers)
+    token = created.json()["url"].rsplit("/join/", 1)[1]
+
+    # A stranger, on their own device: the manager's cookie is not theirs.
+    client.cookies.clear()
+    subject = f"joiner-{uuid.uuid4()}"
+    fake_provider.register(code="c-join", subject=subject, email=f"{subject}@example.invalid")
+    signed = sign_in(client, code="c-join").json()
+    assert signed["active_studio_id"] is None, "precondition: no membership yet, so no studio"
+    headers = {"Authorization": f"Bearer {signed['access_token']}"}
+
+    registered = client.post(
+        f"/api/v1/onboarding/{token}/register",
+        headers=headers,
+        json={
+            "first_name": "שירה",
+            "last_name": "לוי",
+            "phone": "050-7654321",
+            "children": [{"first_name": "נועה", "last_name": "לוי", "group_ids": [str(a_group)]}],
+        },
+    )
+    assert registered.status_code == 201, registered.text
+    assert len(registered.json()["student_ids"]) == 1
+
+    # The app's very next act, on `location.assign('/')` and on any 401 replay.
+    rotated = client.post("/api/v1/auth/refresh")
+    assert rotated.status_code == 200, rotated.text
+    assert rotated.json()["active_studio_id"] == str(studio.id), (
+        "the family's only studio must be active, or every screen 401s"
+    )
+
+    mine = client.get(
+        "/api/v1/me/students",
+        headers={"Authorization": f"Bearer {rotated.json()['access_token']}"},
+    )
+    assert mine.status_code == 200, mine.text
+    assert [row["first_name"] for row in mine.json()["items"]] == ["נועה"]

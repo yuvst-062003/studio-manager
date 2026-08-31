@@ -292,6 +292,8 @@ export const people: Bundle = {
   'card.title': 'Карточка ученика',
   'card.details': 'Данные',
   'card.enrollments': 'Группы',
+  'card.sectionsComeLater':
+    'Остальные разделы — расписание, посещаемость и платежи — откроются после подписания декларации о здоровье.',
   'alerts.title': 'Центр уведомлений',
   'alerts.empty': 'Ничего не требует внимания',
   'alerts.pendingRequests': 'Заявки на вступление',

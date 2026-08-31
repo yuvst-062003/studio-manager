@@ -289,6 +289,8 @@ export const people: Bundle = {
   'card.title': 'Student card',
   'card.details': 'Details',
   'card.enrollments': 'Groups',
+  'card.sectionsComeLater':
+    'The rest of the app — schedule, attendance and payments — opens once the health declaration is signed.',
   'alerts.title': 'Alert centre',
   'alerts.empty': 'Nothing needs your attention',
   'alerts.pendingRequests': 'Join requests waiting',

@@ -114,8 +114,16 @@ def _make_caller(
         )
     app_session.commit()
 
-    signed = sign_in(client, code=code, app_name="staff")
-    return Caller(token=signed.json()["access_token"], studio_id=studio.id, person_id=person.id)
+    # ONE sign-in, then the rotation the user's own app makes. This used to sign in a
+    # SECOND time: the first session was minted before the Person existed, so it carried
+    # no active studio and every tenant-scoped route answered 401. That is the very defect
+    # §5.4b's join link hit in production (2026-08-31) -- encoded here as a workaround no
+    # real user can perform, which is why it never reported the bug it was standing on.
+    # `refresh` activates a sole membership now, so the fixture walks the same path a
+    # parent walks.
+    rotated = client.post("/api/v1/auth/refresh")
+    assert rotated.status_code == 200, rotated.text
+    return Caller(token=rotated.json()["access_token"], studio_id=studio.id, person_id=person.id)
 
 
 @pytest.fixture

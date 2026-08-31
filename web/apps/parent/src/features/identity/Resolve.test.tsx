@@ -85,6 +85,36 @@ describe('Resolve', () => {
     expect(screen.getByTestId('parent-home')).toBeInTheDocument()
   })
 
+  it('activates the one studio rather than rendering a home that reads nothing', async () => {
+    // A session with memberships but no active studio has no tenant scope, so EVERY
+    // tenant-scoped route answers 401 -- and the picker below is skipped at one studio,
+    // so this fell straight through to a home whose every read failed, in silence. The
+    // server no longer mints such a session (identity.py's `_build_session` activates a
+    // sole membership), and this is the screen's own answer if one ever reaches it: with
+    // exactly one club there is no choice to offer, so it is chosen.
+    // Shaped bodies: the home's own reads run alongside the switch, and a bare `{}` for
+    // `/me/students` crashes the trial check on an undefined list — a fixture fault, not
+    // a product one.
+    const fetchMock = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>(
+      async () => new Response('{"items":[]}', { status: 200 }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    const s = session({ activeStudioId: null })
+    render(<Resolve session={s} locale="he" />)
+
+    await waitFor(() =>
+      expect(
+        fetchMock.mock.calls.some(([url]) => String(url).includes('/auth/switch-studio')),
+      ).toBe(true),
+    )
+    const call = fetchMock.mock.calls.find(([url]) =>
+      String(url).includes('/auth/switch-studio'),
+    )!
+    expect(String(call[1]?.body)).toContain('"a"')
+    await waitFor(() => expect(s.reload).toHaveBeenCalled())
+    vi.unstubAllGlobals()
+  })
+
   it('leaks nothing about the staff app in the refusal', () => {
     const { container } = render(
       <Resolve

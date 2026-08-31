@@ -64,6 +64,48 @@ export function Resolve({ session, locale }: { session: Session; locale: Locale 
     void redeem(code).finally(() => setJoining(false))
     // eslint-disable-next-line react-hooks/exhaustive-deps -- one shot, on arrival only.
   }, [])
+
+  // A session with memberships but NO active studio has no tenant scope, and every
+  // tenant-scoped route answers 401 without one. The picker below is skipped at a single
+  // studio (§6.1 step 4 shows it "only if she belongs to more than one"), so such a
+  // session fell straight through to a home whose every read failed, in silence — the
+  // state a parent joining through §5.4b's link was left in (2026-08-31).
+  //
+  // The server no longer mints one: `_build_session` activates a sole membership. This is
+  // the screen's own answer if one ever arrives anyway. With exactly one club there is no
+  // choice to offer, so it is taken rather than presented.
+  const soleStudioId =
+    session.activeStudioId === null && session.studios.length === 1
+      ? (session.studios[0]?.studio_id ?? null)
+      : null
+  // Which studio the switch has already been attempted for, rather than a pending flag:
+  // `activating` is then DERIVED, and the effect never sets state synchronously in its
+  // own body (react-hooks/set-state-in-effect).
+  const [attempted, setAttempted] = useState<string | null>(null)
+  const activating = soleStudioId !== null && attempted !== soleStudioId
+  useEffect(() => {
+    if (soleStudioId === null) return
+    let live = true
+    // One shot, keyed on the studio id: a refused switch is recorded as attempted and
+    // falls through, rather than retrying for ever against a server that just said no.
+    void apiFetch('/api/v1/auth/switch-studio', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studio_id: soleStudioId }),
+    })
+      .then((response) => {
+        if (live && response.ok) session.reload()
+      })
+      .catch(() => undefined)
+      .finally(() => live && setAttempted(soleStudioId))
+    return () => {
+      live = false
+    }
+    // `session` is a fresh object every render; the studio id is the only input that
+    // decides whether to act.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [soleStudioId])
+
   // Memoised: `useMyStudents` reads through this in an effect keyed on the client, so a
   // fresh object every render would re-fetch forever.
   const peopleClient = useMemo(() => makePeopleClient(apiFetch), [])
@@ -148,6 +190,17 @@ export function Resolve({ session, locale }: { session: Session; locale: Locale 
   if (joining) {
     return (
       <section aria-busy="true" data-testid="parent-joining">
+        <p>{t(locale, 'common.auth.joining')}</p>
+      </section>
+    )
+  }
+
+  // Held while the sole studio is being activated, for the reason the health gate holds
+  // its own render: a home drawn before the scope exists is a home whose every read 401s,
+  // and the parent reads empty boxes rather than a wait.
+  if (activating) {
+    return (
+      <section aria-busy="true" data-testid="parent-activating-studio">
         <p>{t(locale, 'common.auth.joining')}</p>
       </section>
     )
