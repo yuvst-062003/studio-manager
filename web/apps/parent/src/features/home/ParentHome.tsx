@@ -279,30 +279,16 @@ export function ParentHome({
   })()
 
   return (
-    <section aria-labelledby="parent-home-title" data-testid="parent-home" style={pageStyle}>
-      <header style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--space-3)' }}>
-        <h1
-          id="parent-home-title"
-          style={{
-            margin: 0,
-            fontSize: 'var(--text-display)',
-            fontWeight: 600,
-            marginInlineEnd: 'auto',
-          }}
-        >
-          {t(locale, 'common.home.title')}
-        </h1>
-        {/* 1a's gear. A link and not an icon-only button with no name: an unnamed control
-            is unreachable to a screen reader (ui-rtl-a11y.md). */}
-        <a
-          href="#/profile"
-          data-testid="parent-home-settings"
-          style={headerLinkStyle}
-        >
-          <Icon name="settings" size={16} />
-          {t(locale, 'common.home.settings')}
-        </a>
-      </header>
+    <section aria-label={t(locale, 'common.home.title')} data-testid="parent-home" style={pageStyle}>
+      {/* No visible title row, and no settings gear (owner, 2026-09-01).
+       *
+       * The heading said "הילדים שלי" on a screen whose first two elements are a debt and
+       * a lesson, and the app bar directly above it already names where you are. The gear
+       * was a second route to `#/profile` sitting a thumb's width from the profile TAB
+       * that is on every screen — two doors to one room, one of them decorative.
+       *
+       * The section keeps the name as `aria-label`, so a screen reader still hears which
+       * region this is. Removing a visible heading is not the same as removing a heading. */}
 
       {/* 1a's alert cards. The health card is the §6.1 gate's job now — a family who owes
           a declaration never reaches this screen — so the debt card is the one that can

@@ -52,6 +52,24 @@ const mainStyle: CSSProperties = {
   flex: 1,
 }
 
+/**
+ * The clearance the docstring below has always PROMISED and never had.
+ *
+ * `.studio-tabbar` is `position: fixed` at the block-end edge, so it is out of flow and
+ * the last thing on any screen sat underneath it — on the parent home that was the final
+ * row of the week, permanently half-hidden however far you scrolled. Reported as "there
+ * is a gap between the end and the menu", which is exactly what it looks like.
+ *
+ * 55px is the bar, `env(safe-area-inset-bottom)` is the home indicator on a notched
+ * phone, and `--space-4` keeps the last row off the hairline rather than touching it.
+ * Applied only when a tab bar is actually passed: the dashboard has none and must not
+ * grow a phantom margin.
+ */
+const mainWithTabBarStyle: CSSProperties = {
+  ...mainStyle,
+  paddingBlockEnd: 'calc(55px + env(safe-area-inset-bottom, 0px) + var(--space-4))',
+}
+
 /* Pushed to the inline-end — the far side from the nav, which in an RTL document is the
    left. A flex row so the search and the studio switcher sit on one line. */
 const spacerStyle: CSSProperties = {
@@ -163,7 +181,7 @@ export function AppShell({
               footer={drawerFooter}
             />
           </div>
-          <main style={mainStyle}>{children}</main>
+          <main style={tabBarNode ? mainWithTabBarStyle : mainStyle}>{children}</main>
         </div>
       </div>
       {tabBarNode}

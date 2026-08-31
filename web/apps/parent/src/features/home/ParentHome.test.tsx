@@ -54,14 +54,17 @@ function renderIn(
 }
 
 describe('ParentHome', () => {
-  it('renders 1a title', () => {
+  it('names the region without printing a heading on it', () => {
+    // Owner, 2026-09-01: the visible "הילדים שלי" title went, along with the settings
+    // gear beside it. The app bar above already names where you are, and the gear was a
+    // second door to `#/profile` a thumb's width from the profile TAB.
+    //
+    // The NAME did not go — a region a screen reader cannot identify is a different
+    // defect from a heading nobody needs to read.
     render(<ParentHome locale="he" />)
-    expect(screen.getByRole('heading', { level: 1, name: t('he', 'common.home.title') })).toBeInTheDocument()
-  })
-
-  it('gives the settings affordance an accessible name', () => {
-    render(<ParentHome locale="he" />)
-    expect(screen.getByTestId('parent-home-settings')).toHaveAccessibleName()
+    expect(screen.getByTestId('parent-home')).toHaveAccessibleName(t('he', 'common.home.title'))
+    expect(screen.queryByRole('heading', { level: 1 })).toBeNull()
+    expect(screen.queryByTestId('parent-home-settings')).toBeNull()
   })
 
   it('raises the debt alert with its CTA when the family owes money', async () => {
