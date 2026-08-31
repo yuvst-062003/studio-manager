@@ -1,13 +1,15 @@
 // §6.4's dashboard: the shell, the three screens, and the §5.1 wizard both staff and
 // dashboard mount.
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { t } from '@studio/i18n'
 import App, { routeFromHash } from './App'
 
 const SESSION = {
   access: { staff: true, parent: false },
-  studios: [{ studio_id: 's', studio_name: 'מכבי ג׳ודו רעננה', studio_is_demo: false, roles: ['owner'] }],
+  studios: [
+    { studio_id: 's', studio_name: 'מכבי ג׳ודו רעננה', studio_is_demo: false, roles: ['owner'] },
+  ],
   active_studio_id: 's',
   dev_tools: false,
 }
@@ -101,7 +103,9 @@ describe('dashboard shell', () => {
     stubApi({ ...SIGNED_IN, '/api/v1/staff': { items: [], groups_without_coach: [] } })
     render(<App />)
     await waitFor(() =>
-      expect(screen.getByRole('heading', { name: t('he', 'common.staff.title') })).toBeInTheDocument(),
+      expect(
+        screen.getByRole('heading', { name: t('he', 'common.staff.title') }),
+      ).toBeInTheDocument(),
     )
   })
 
@@ -331,5 +335,59 @@ describe('the global search lives in the shell header (2026-08-29)', () => {
     const box = await screen.findByTestId('global-search')
     expect(box.closest('header')).not.toBeNull()
     expect(box.closest('main')).toBeNull()
+  })
+})
+
+// -- the invited manager who has not redeemed yet -----------------------------
+//
+// F5's invitation is a code the manager copies off THIS app's own staff screen and hands
+// over; there is no mailer anywhere in this product. The invite screen says so in as many
+// words: 'קוד ההזמנה מוצג פעם אחת בלבד — שלחו אותו למוזמן. בכניסה לאפליקציה בוחרים
+// "יש לי קוד הזמנה".'
+//
+// Until it is redeemed the invited person holds no role assignment, so `hasNoRole` is
+// true and they take the refusal arm. That arm offered a link to the staff app and a
+// sign-out button and nothing else — so the dashboard told an invited MANAGER to enter a
+// code, then refused them the field to enter it in (2026-08-31). The staff app carries
+// the same entry beneath its own refusal, for the same reason.
+describe('the invited manager', () => {
+  const NO_STUDIO = { ...SESSION, studios: [], active_studio_id: null }
+  const REFUSED = {
+    '/auth/refresh': { access_token: 'tok', expires_in: 900, ...NO_STUDIO },
+    '/auth/me': NO_STUDIO,
+    '/api/v1/sessions': { items: [] },
+  }
+
+  it('can enter the invitation code the staff screen told them to enter', async () => {
+    stubApi(REFUSED)
+    render(<App />)
+    expect(await screen.findByTestId('dashboard-refusal')).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: t('he', 'common.auth.haveInviteCode') }),
+    ).toBeInTheDocument()
+    // .claude/rules/ui-rtl-a11y.md — every input has an associated <label>.
+    expect(screen.getByLabelText(t('he', 'common.auth.inviteCodeLabel'))).toBeInTheDocument()
+  })
+
+  it('redeems the typed code', async () => {
+    // The seam, not the control: a rendered button and a labelled input prove nothing
+    // about whether the code reaches `accept-invitation`. A button wired to nothing
+    // renders identically and passes the test above.
+    stubApi({ '/auth/accept-invitation': {}, ...REFUSED })
+    render(<App />)
+    expect(await screen.findByTestId('dashboard-refusal')).toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText(t('he', 'common.auth.inviteCodeLabel')), {
+      target: { value: 'tok-manager' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: t('he', 'common.auth.haveInviteCode') }))
+
+    await waitFor(() => {
+      const call = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.find(([url]) =>
+        String(url).includes('/auth/accept-invitation'),
+      )
+      expect(call).toBeDefined()
+      expect(String(call![1]?.body)).toContain('tok-manager')
+    })
   })
 })
