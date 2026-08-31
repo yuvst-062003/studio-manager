@@ -294,11 +294,19 @@ component layer.
   (3.12, 19 uses), `#7a766d` (4.16, 9 uses). `#6f6b62` at 4.88 is the lowest passing grey and
   should be the floor for any text token.
 - **Q4 — Where the studio logo appears** across the three surfaces.
-- **Q6 — `SignIn.tsx`: one face or three?** It lives in `@studio/ui` and takes
-  `app: 'staff' | 'parent' | 'dashboard'`, so it is one screen serving all three — and
-  [D14](#d14--outward-surfaces-wear-the-brand-inward-tools-wear-the-working-palette) is the
-  one surface boundary it cannot be placed on. Restyling it to the brand moves the dashboard
-  sign-in the owner is happy with. To be asked against a screenshot, not in the abstract.
+- ~~**Q6 — `SignIn.tsx`: one face or three?**~~ **ANSWERED 2026-09-01: per app.** The owner
+  supplied a Stitch design ("Dojo Hazon") and scoped it to parents. `SignIn` branches on its
+  existing `app` prop: the parent app gets the new face — club logo, navy call to action, a
+  柔道 watermark, policy links and the language row in the footer — and the staff app and the
+  dashboard keep the Gladiator split screen unchanged. A test asserts both halves, because
+  one component serving three apps is exactly where a restyle leaks.
+
+  Three things the design asked for and did not get, each recorded rather than silently
+  dropped: **IBM Plex Sans / Plus Jakarta Sans** (neither has a Hebrew glyph — D6 stands, and
+  the design's own screenshot rendered its Hebrew in a fallback); **the logo from a Google
+  CDN** (this is an installable PWA and the CSP admits no external image host, so the club's
+  own bundled asset is used); and **`© 2024`** (already two years stale on arrival — the year
+  is read at render).
 - ~~**Q5 — Scope resolutions**~~ **SETTLED 2026-08-24 as [D9](#d9--three-scope-cuts-from-the-canvas).**
   The §2.1/§2.2 contradiction is **fixed in SPEC.md** — `trial-lesson booking` removed from
   the deferred list. The three artboard cuts (2b, 7c, 12f) are decided and **applied to the canvas**

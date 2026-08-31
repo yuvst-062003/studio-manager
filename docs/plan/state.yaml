@@ -751,8 +751,19 @@ waves:
         title: Screen 1 — home and the shell
         status: pending
       - id: S2
-        title: Screen 2 — sign-in (blocked on the one-face-or-three question)
-        status: pending
+        title: Screen 2 — sign-in, the parent app's own face
+        why: >-
+          The owner supplied the design rather than generating it, and scoped it to
+          parents — which also answers the one-face-or-three question this piece was
+          blocked on. SignIn branches on the `app` prop it already took, so the staff app
+          and the dashboard are untouched and a test asserts that.
+
+          Three things the design specified were not copied, each for a reason recorded in
+          decisions.md Q6: its two typefaces carry no Hebrew glyph, its logo came from a
+          CDN the PWA's CSP does not admit, and its copyright year was hardcoded and
+          already stale.
+        status: shipped
+        on: 2026-09-01
       - id: S3
         title: Screen 3 — the signing flow, its grouping bug and its validation gap
         status: pending

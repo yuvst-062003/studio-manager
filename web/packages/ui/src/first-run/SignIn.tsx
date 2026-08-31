@@ -20,6 +20,7 @@ import type { ReactNode } from 'react'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import './gladiator-signin.css'
+import logoUrl from './assets/gladiator-logo.png'
 
 export type SignInProvider = { name: string; start_url: string }
 
@@ -75,6 +76,92 @@ export function SignIn({
       alive = false
     }
   }, [])
+
+  const providerLinks = (providers ?? []).map((provider) => ({
+    key: provider.name,
+    href: `${API_ORIGIN}${provider.start_url}?app=${app}&return_path=${encodeURIComponent(returnPath)}`,
+    label: t(locale, LABEL[provider.name] ?? 'common.auth.continueWithGoogle'),
+  }))
+
+  // The PARENT app's own face — the owner's Stitch design of 2026-09-01. Scoped by
+  // `app` rather than replacing the screen, because this one file also serves the staff
+  // app and the dashboard, and the brief was for parents. The other two are unmoved.
+  if (app === 'parent') {
+    return (
+      <div className="gsignin gsignin--parent" data-testid="sign-in">
+        <div className="gsignin-parent__rule" />
+        <div className="gsignin-parent__ground" aria-hidden="true" />
+        {/* Decorative, and marked so: a screen reader announcing "柔道" on a Hebrew
+            sign-in screen is noise, not atmosphere. */}
+        <div className="gsignin-parent__kanji" aria-hidden="true">
+          柔道
+        </div>
+
+        <div className="gsignin-parent__body">
+          {/* The club's own mark. `alt` carries the app's full name, which is what
+              distinguishes the three apps where the logo alone cannot. */}
+          <img
+            className="gsignin-parent__logo"
+            src={logoUrl}
+            alt={t(locale, `common.appName.${app}`)}
+          />
+
+          <div className="gsignin-parent__stack">
+            {providerLinks.map((provider) => (
+              <a key={provider.key} className="gsignin-parent__cta" href={provider.href}>
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 24 24"
+                  width="22"
+                  height="22"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+                  <path d="M10 17l5-5-5-5" />
+                  <path d="M15 12H3" />
+                </svg>
+                {provider.key === 'google'
+                  ? t(locale, 'common.auth.signInWithGoogle')
+                  : provider.label}
+              </a>
+            ))}
+            {providers !== null && providers.length === 0 ? (
+              <p className="gsignin-parent__fine">{t(locale, 'common.auth.noProviders')}</p>
+            ) : (
+              <p className="gsignin-parent__hint">{t(locale, 'common.auth.parentHint')}</p>
+            )}
+          </div>
+        </div>
+
+        <div className="gsignin-parent__foot">
+          {languagePicker}
+          <div className="gsignin-parent__links">
+            {/* Hebrew, and the app's own screens — the design drew these in English on
+                a Hebrew page, and pointed them nowhere. */}
+            <a className="gsignin-parent__link" href="#/privacy">
+              {t(locale, 'reports.privacy.policy.title')}
+            </a>
+            <span className="gsignin-parent__dot" aria-hidden="true">
+              ·
+            </span>
+            <a className="gsignin-parent__link" href="#/privacy">
+              {t(locale, 'reports.privacy.terms.title')}
+            </a>
+          </div>
+          {/* The year is READ, never written into the bundle. The design hardcoded
+              2024, which was already two years stale when it arrived and would have
+              shipped a wrong date that nobody looks at until a parent does. */}
+          <p className="gsignin-parent__copyright">
+            © {new Date().getFullYear()} Gladiator · {t(locale, 'common.auth.rights')}
+          </p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="gsignin" data-testid="sign-in">

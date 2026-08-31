@@ -265,3 +265,266 @@
     max-inline-size: none;
   }
 }
+
+/* ══ THE PARENT FACE ═════════════════════════════════════════════════════════
+ * Owner's Stitch design, 2026-09-01 ("Dojo Hazon"), and it is the PARENT app's
+ * alone: `SignIn` serves the staff app and the dashboard from the same file, and
+ * the owner's brief scoped this one to parents. The split screen above is
+ * untouched, so neither of the other two apps moves.
+ *
+ * Committed to one look in both themes, for the same reason the split screen is:
+ * this is the club's front door, not a data surface, so the values are literals
+ * from the design rather than theme tokens.
+ *
+ * TWO THINGS THE DESIGN ASKED FOR AND DID NOT GET, each with a reason:
+ *
+ *   1. IBM Plex Sans + Plus Jakarta Sans. Neither has a single Hebrew glyph, so
+ *      the design's own screenshot renders its Hebrew in a fallback. D6 makes
+ *      Rubik the one family covering he+en+ru; a typeface the audience cannot
+ *      read is not a brand decision. Rubik carries the whole screen.
+ *   2. The logo from a Google CDN URL. This is an installable PWA and the CSP
+ *      admits no external image host, so the club's own asset is bundled
+ *      instead — the same file the landing page already ships.
+ */
+.gsignin--parent {
+  display: flex;
+  flex-direction: column;
+  background: #f7f9fb;
+  color: #191c1e;
+  font-family: 'Rubik Variable', Helvetica, sans-serif;
+}
+
+/* The navy hairline the design runs across the top edge. */
+.gsignin--parent .gsignin-parent__rule {
+  block-size: 12px;
+  background: #0f2644;
+  flex: none;
+  position: relative;
+  z-index: 2;
+}
+
+/* Grid + tatami weave + the 柔道 watermark, all drawn in CSS. The design used a
+ * 350px glyph in a Mincho serif; the family is not guaranteed on any device we
+ * ship to, so the watermark falls back through the platform's own CJK serif and
+ * is decorative either way. */
+.gsignin--parent .gsignin-parent__ground {
+  position: absolute;
+  inset-block: 0;
+  inset-inline: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(to right, rgb(15 38 68 / 8%) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(15 38 68 / 8%) 1px, transparent 1px);
+  background-size: 60px 60px;
+}
+
+.gsignin--parent .gsignin-parent__kanji {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: 50%;
+  transform: translate(-50%, -50%);
+  font-family: 'Yu Mincho', 'Hiragino Mincho ProN', 'MS Mincho', serif;
+  font-size: 340px;
+  font-weight: 700;
+  line-height: 1;
+  color: rgb(15 38 68 / 8%);
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+  white-space: nowrap;
+  z-index: 0;
+  pointer-events: none;
+  user-select: none;
+}
+
+.gsignin--parent .gsignin-parent__body {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 40px;
+  padding: 16px;
+  inline-size: 100%;
+  max-inline-size: 500px;
+  margin-inline: auto;
+}
+
+.gsignin--parent .gsignin-parent__logo {
+  inline-size: 100%;
+  max-inline-size: 300px;
+  block-size: auto;
+  filter: drop-shadow(0 4px 20px rgb(0 0 0 / 15%));
+}
+
+.gsignin--parent .gsignin-parent__stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  inline-size: 100%;
+}
+
+/* The design's own button shape: 12px and a lifted shadow. It departs from the
+ * app's squared 2px control on purpose — this screen is the brand moment and
+ * the owner chose this design for it. Every control INSIDE the app keeps the
+ * squared shape. */
+.gsignin--parent .gsignin-parent__cta {
+  inline-size: 100%;
+  max-inline-size: 320px;
+  min-block-size: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding-block: 16px;
+  padding-inline: 24px;
+  border: none;
+  border-radius: 12px;
+  background: #0f2644;
+  color: #fff;
+  font: inherit;
+  font-size: 18px;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgb(15 38 68 / 30%);
+  transition:
+    background 0.15s,
+    box-shadow 0.15s,
+    transform 0.15s;
+}
+
+.gsignin--parent .gsignin-parent__cta:hover {
+  background: #001129;
+  box-shadow: 0 12px 32px rgb(15 38 68 / 40%);
+  transform: translateY(-2px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gsignin--parent .gsignin-parent__cta {
+    transition: none;
+  }
+
+  .gsignin--parent .gsignin-parent__cta:hover {
+    transform: none;
+  }
+}
+
+.gsignin--parent .gsignin-parent__hint {
+  margin: 0;
+  max-inline-size: 280px;
+  text-align: center;
+  color: #44474e;
+  font-size: 16px;
+  line-height: 24px;
+}
+
+.gsignin--parent .gsignin-parent__foot {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding-block: 16px 24px;
+  padding-inline: 16px;
+  background: rgb(247 249 251 / 30%);
+  backdrop-filter: blur(8px);
+}
+
+.gsignin--parent .gsignin-parent__links {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* 44px, because the design drew these at label size and a policy link a thumb
+ * cannot hit is a policy nobody reads. The padding does the work; the text
+ * stays the size the design set. */
+.gsignin--parent .gsignin-parent__link {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: 44px;
+  padding-inline: 8px;
+  color: #44474e;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-decoration: none;
+}
+
+.gsignin--parent .gsignin-parent__link:hover {
+  color: #0f2644;
+  text-decoration: underline;
+}
+
+.gsignin--parent .gsignin-parent__dot {
+  color: #74777e;
+}
+
+.gsignin--parent .gsignin-parent__copyright {
+  margin: 0;
+  color: #74777e;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+}
+
+.gsignin--parent .gsignin-parent__fine {
+  margin: 0;
+  color: #44474e;
+  font-size: 14px;
+  text-align: center;
+}
+
+/* The shared `LanguagePicker` restyled to the design's footer row: plain text, no
+ * boxes. Scoped to this face only — the staff and dashboard sign-ins keep the
+ * control they have.
+ *
+ * The heading is hidden VISUALLY, not removed: the picker's own <section> carries
+ * `aria-label`, so the group keeps its accessible name while the design gets its
+ * label-free row.
+ *
+ * The active language is underlined as well as coloured. Colour alone would not
+ * carry it, and this is the one control on the screen whose state a person has to
+ * be able to read before they can trust the rest of the page. */
+.gsignin--parent .gsignin-parent__foot h2 {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.gsignin--parent .gsignin-parent__foot button {
+  min-block-size: 44px;
+  padding-inline: 10px;
+  border: none;
+  background: none;
+  color: #44474e;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+}
+
+.gsignin--parent .gsignin-parent__foot button[aria-pressed='true'] {
+  color: #0f2644;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.gsignin--parent .gsignin-parent__foot button:hover {
+  color: #0f2644;
+  text-decoration: underline;
+}

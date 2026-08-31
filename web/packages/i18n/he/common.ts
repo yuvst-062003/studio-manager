@@ -86,6 +86,10 @@ export const common: Bundle = {
   'nav.signOut': 'התנתקות',
   // §6.1's first run. The refusal wording is §6.1's own, verbatim.
   'language.title': 'שפה',
+  // -- the parent app's sign-in face (owner's Stitch design, 2026-09-01) ---------
+  'auth.parentHint': 'הזדהו עם חשבון Google כדי להיכנס ליומן האימונים, החגורות והתחרויות.',
+  'auth.signInWithGoogle': 'התחברות עם Google',
+  'auth.rights': 'כל הזכויות שמורות',
   'auth.continueWithGoogle': 'המשך עם Google',
   'auth.tagline.parent': 'המועדון של הילדים שלכם — נוכחות, תשלומים והודעות במקום אחד.',
   'auth.tagline.staff': 'הנוכחות של היום, גם בלי קליטה.',

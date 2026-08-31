@@ -76,11 +76,44 @@ describe('SignIn', () => {
 
   it('tells the server which app began the flow', async () => {
     // The callback returns to that app's own origin; §6.5 gives each PWA one.
+    //
+    // Selected by its href rather than as "the only link on the screen": the parent
+    // face carries policy links in its footer, so `getByRole('link')` stopped being a
+    // way to name the PROVIDER link the moment that design landed.
     render(<SignIn locale="he" app="parent" />)
     await waitFor(() => {
-      const link = screen.getByRole('link')
-      expect(link.getAttribute('href')).toContain('app=parent')
+      const start = screen
+        .getAllByRole('link')
+        .find((link) => link.getAttribute('href')?.includes('/auth/'))
+      expect(start?.getAttribute('href')).toContain('app=parent')
     })
+  })
+
+  it('gives the parent app its own face and leaves the other two alone', async () => {
+    // The owner's Stitch design (2026-09-01) was scoped to PARENTS. This file serves
+    // three apps from one component, so the scoping is the whole risk: restyling it
+    // for everyone would have moved the dashboard sign-in the owner is happy with.
+    const parent = render(<SignIn locale="he" app="parent" />)
+    await waitFor(() =>
+      expect(parent.container.querySelector('.gsignin--parent')).not.toBeNull(),
+    )
+    parent.unmount()
+
+    for (const app of ['staff', 'dashboard'] as const) {
+      const other = render(<SignIn locale="he" app={app} />)
+      await waitFor(() => expect(other.container.querySelector('.gsignin')).not.toBeNull())
+      expect(other.container.querySelector('.gsignin--parent')).toBeNull()
+      other.unmount()
+    }
+  })
+
+  it('reads the year rather than shipping one', async () => {
+    // The design hardcoded "© 2024", already two years stale when it arrived. A wrong
+    // date nobody looks at until a parent does.
+    render(<SignIn locale="he" app="parent" />)
+    await waitFor(() =>
+      expect(screen.getByText(new RegExp(String(new Date().getFullYear())))).toBeInTheDocument(),
+    )
   })
 
   it('offers only the providers the server configured', async () => {

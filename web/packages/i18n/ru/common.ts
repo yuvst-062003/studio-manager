@@ -91,6 +91,10 @@ export const common: Bundle = {
   'nav.signOut': 'выйти',
   // §6.1's first run.
   'language.title': 'язык',
+  // -- the parent app's sign-in face (owner's Stitch design, 2026-09-01) ---------
+  'auth.parentHint': 'Войдите через Google, чтобы открыть расписание тренировок, пояса и соревнования.',
+  'auth.signInWithGoogle': 'Войти через Google',
+  'auth.rights': 'Все права защищены',
   'auth.continueWithGoogle': 'продолжить с Google',
   'auth.tagline.parent': 'Клуб ваших детей — посещаемость, платежи и сообщения в одном месте.',
   'auth.tagline.staff': 'Сегодняшняя перекличка — даже без связи.',
