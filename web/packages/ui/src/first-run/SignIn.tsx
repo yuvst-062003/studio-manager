@@ -90,11 +90,13 @@ export function SignIn({
     return (
       <div className="gsignin gsignin--parent" data-testid="sign-in">
         <div className="gsignin-parent__rule" />
-        <div className="gsignin-parent__ground" aria-hidden="true" />
-        {/* Decorative, and marked so: a screen reader announcing "柔道" on a Hebrew
-            sign-in screen is noise, not atmosphere. */}
-        <div className="gsignin-parent__kanji" aria-hidden="true">
-          柔道
+        {/* The watermark lives INSIDE the ground, which is the absolutely-positioned
+            layer. As a sibling it was a flex item of the column instead — 600px of
+            real layout that pushed the logo, the button and the footer down and grew
+            the page from 844 to 1249. Decorative either way, and marked so: a screen
+            reader announcing "柔道" on a Hebrew sign-in screen is noise. */}
+        <div className="gsignin-parent__ground" aria-hidden="true">
+          <span className="gsignin-parent__kanji">柔道</span>
         </div>
 
         <div className="gsignin-parent__body">

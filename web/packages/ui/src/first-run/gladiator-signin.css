@@ -307,34 +307,62 @@
  * 350px glyph in a Mincho serif; the family is not guaranteed on any device we
  * ship to, so the watermark falls back through the platform's own CJK serif and
  * is decorative either way. */
+
+/* Grid, tatami weave and the watermark in ONE layer, centred by flexbox.
+ *
+ * It used to centre the glyph with `inset-inline-start: 50%` plus a translate, and
+ * that is broken here twice over: `inset-inline-start` is the RIGHT edge in an RTL
+ * document, and the glyph's own `writing-mode: vertical-rl` re-maps what the
+ * transform's percentages resolve against. Measured result: a 340x680 box at
+ * top -598, left -315 — almost entirely off screen, which is why the design's most
+ * recognisable element was missing from the build. Layout centring has no direction
+ * to get wrong. */
 .gsignin--parent .gsignin-parent__ground {
   position: absolute;
   inset-block: 0;
   inset-inline: 0;
   z-index: 0;
   pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
   background-image:
     linear-gradient(to right, rgb(15 38 68 / 8%) 1px, transparent 1px),
-    linear-gradient(to bottom, rgb(15 38 68 / 8%) 1px, transparent 1px);
-  background-size: 60px 60px;
+    linear-gradient(to bottom, rgb(15 38 68 / 8%) 1px, transparent 1px),
+    repeating-linear-gradient(
+      45deg,
+      rgb(0 0 0 / 2%) 0,
+      rgb(0 0 0 / 2%) 2px,
+      transparent 2px,
+      transparent 4px
+    ),
+    linear-gradient(to bottom, rgb(15 38 68 / 4%), transparent 40%, rgb(15 38 68 / 10%));
+  background-size:
+    60px 60px,
+    60px 60px,
+    auto,
+    auto;
 }
 
+/* 柔道 — the design's watermark, in whichever Mincho the device has. The design
+ * named 'Yu Mincho' (Windows only); the stack below reaches macOS and iOS through
+ * Hiragino and Android through Noto, and falls back to the platform serif. No
+ * webfont: this stylesheet loads on all three apps' sign-in screens, and a
+ * render-blocking remote font for one decorative glyph is a poor trade. */
 .gsignin--parent .gsignin-parent__kanji {
-  position: absolute;
-  inset-block-start: 50%;
-  inset-inline-start: 50%;
-  transform: translate(-50%, -50%);
-  font-family: 'Yu Mincho', 'Hiragino Mincho ProN', 'MS Mincho', serif;
-  font-size: 340px;
+  font-family:
+    'Yu Mincho', 'Hiragino Mincho ProN', 'Noto Serif CJK JP', 'Noto Serif JP',
+    'MS Mincho', serif;
+  font-size: 300px;
   font-weight: 700;
   line-height: 1;
-  color: rgb(15 38 68 / 8%);
+  color: rgb(15 38 68 / 13%);
   writing-mode: vertical-rl;
   text-orientation: upright;
   white-space: nowrap;
-  z-index: 0;
-  pointer-events: none;
   user-select: none;
+  flex: none;
 }
 
 .gsignin--parent .gsignin-parent__body {
