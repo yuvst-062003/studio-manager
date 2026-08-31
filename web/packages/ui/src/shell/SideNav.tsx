@@ -50,6 +50,7 @@ export function SideNav({
   studioNote,
   groups,
   settingsItem,
+  appearance,
   footer,
 }: {
   label: string
@@ -58,6 +59,17 @@ export function SideNav({
   studioNote?: string
   groups: SideNavGroup[]
   settingsItem?: SideNavItem
+  /**
+   * A preference control that belongs to the whole app rather than to a screen — today the
+   * light/dark/system switch, which had nowhere else to go on this surface.
+   *
+   * The drawer footer is where the other two apps put it, and the sidebar exists precisely
+   * because the drawer's trigger is hidden at these widths: a control passed only to
+   * `drawerFooter` is a control the dashboard's own users can never open. Not an item and
+   * not a link — it changes nothing about where you are, so it must not sit in a list of
+   * places to go.
+   */
+  appearance?: ReactNode
   /** The signed-in person: name + role line, per the canvas footer. */
   footer?: { name: string; note?: string }
 }) {
@@ -85,6 +97,7 @@ export function SideNav({
           <Item item={settingsItem} />
         </div>
       ) : null}
+      {appearance ? <div className="studio-sidenav__appearance">{appearance}</div> : null}
       {footer ? (
         <div className="studio-sidenav__footer">
           <div className="studio-sidenav__avatar" aria-hidden="true" />

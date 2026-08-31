@@ -44,6 +44,15 @@
   padding: var(--space-2);
   border-radius: var(--radius-sm);
   background: var(--surface);
+
+  /* A `<button>` does not inherit `color` — the UA stylesheet gives it `buttontext`, and
+   * tokens.css resets only `font-family` for form controls. Without this line the block's
+   * text is UA black in both themes: on the light `--surface` that passes for deliberate,
+   * on the dark one (#1e1d1a) the classes vanish off the board entirely, which is how a
+   * manager on a dark OS could not read a single session (2026-09-01). `.month-grid__pill`
+   * below is the same shape and always declared its own colour — the month view reading
+   * while the week and day views did not is what named the cause. */
+  color: var(--fg);
   border: var(--border-width-hairline) solid var(--border);
   font-size: var(--text-caption);
   text-align: start;

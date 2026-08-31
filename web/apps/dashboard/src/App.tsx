@@ -14,6 +14,7 @@ import type { CSSProperties } from 'react'
 import { apiFetch, useAuthedImage, useSession, switchStudio } from '@studio/core'
 import {
   AccessibilityMenu,
+  AccountDrawerFooter,
   AppShell,
   EmptyState,
   Icon,
@@ -23,6 +24,7 @@ import {
   SetupWizard,
   SideNav,
   SignIn,
+  ThemeControl,
   ThemeProvider,
   UpdateToast,
   makeSetupClient,
@@ -747,6 +749,26 @@ export default function App() {
                     }
                   : undefined
               }
+              appearance={
+                // 3f's light/dark/system switch, in the sidebar rather than only in the
+                // drawer. `ThemeProvider` has always wrapped this app, so a preference set
+                // elsewhere applied here — but nothing on the dashboard could CHANGE it,
+                // and the drawer where the other two apps keep the control has its trigger
+                // hidden at exactly the widths this surface is built for. Not gated on
+                // `canSeeMoney`: reading the screen is not a manager's privilege.
+                <ThemeControl
+                  labels={{
+                    light: t(locale, 'common.theme.light'),
+                    dark: t(locale, 'common.theme.dark'),
+                    system: t(locale, 'common.theme.system'),
+                  }}
+                  legend={t(locale, 'common.theme.legend')}
+                  stateLabels={{
+                    light: t(locale, 'common.theme.state.light'),
+                    dark: t(locale, 'common.theme.state.dark'),
+                  }}
+                />
+              }
               footer={
                 // The canvas's user footer, real since /auth/me carries display_name
                 // (feature pass 2026-08-27). No note line: the only candidate is the
@@ -754,6 +776,18 @@ export default function App() {
                 // the persona in words.
                 session.displayName ? { name: session.displayName } : undefined
               }
+            />
+          }
+          drawerFooter={
+            // The narrow-viewport half of the same answer, and the same footer the staff
+            // and parent apps already mount — this app was the only one passing none, so
+            // under 1024px (where the sidebar is hidden) it had no theme control at all.
+            // It brings the language picker with it, which the dashboard also lacked
+            // after first run: `LanguagePicker` is only ever shown on the sign-in screen.
+            <AccountDrawerFooter
+              locale={locale}
+              onChooseLocale={setLocale}
+              accountName={session.displayName}
             />
           }
           studios={session.studios.map((s) => ({

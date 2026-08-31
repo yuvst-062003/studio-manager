@@ -1,6 +1,6 @@
 // §6.4's dashboard: the shell, the three screens, and the §5.1 wizard both staff and
 // dashboard mount.
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { t } from '@studio/i18n'
 import App, { routeFromHash } from './App'
@@ -389,5 +389,70 @@ describe('the invited manager', () => {
       expect(call).toBeDefined()
       expect(String(call![1]?.body)).toContain('tok-manager')
     })
+  })
+})
+
+// The dashboard mounted `ThemeProvider` from the start — so a preference stored by
+// another app applied here — but never rendered a control to CHANGE it. It is the only
+// app that passed no `drawerFooter`, and at sidebar widths the drawer's own trigger is
+// hidden by `.studio-shell--sidenav .studio-shell__drawer-button { display: none }`, so
+// even the footer it did not pass would have been out of reach on the surface this app is
+// built for. The preference therefore sat at its `'system'` default for good, which is
+// how a manager on a dark OS ended up with a dark dashboard and no way out
+// (reported 2026-09-01).
+describe('the dashboard can be switched between light, dark and system', () => {
+  // A coach's session, repeated here rather than reached for across describes: this block
+  // asserts the switch is NOT a permission, so it needs a viewer who holds none.
+  const COACH = {
+    ...SESSION,
+    studios: [
+      { studio_id: 's', studio_name: 'מכבי', studio_is_demo: false, roles: ['lead_coach'] },
+    ],
+  }
+  const COACH_IN = {
+    '/auth/refresh': { access_token: 'tok', expires_in: 900, ...COACH },
+    '/auth/me': COACH,
+    '/api/v1/sessions': { items: [] },
+  }
+
+  it('offers the switch in the sidebar, the desktop door', async () => {
+    stubApi(SIGNED_IN)
+    render(<App />)
+    const nav = within(await screen.findByTestId('side-nav'))
+    for (const key of ['light', 'dark', 'system'] as const) {
+      expect(nav.getByRole('radio', { name: t('he', `common.theme.${key}`) })).toBeInTheDocument()
+    }
+  })
+
+  it('reports the resolved mode in words, never by position alone', async () => {
+    // 3f's rule for this screen and 2e's for the drawer: לכל מתג יש תווית מצב. "System"
+    // selected is exactly the case where the label is load-bearing — the choice does not
+    // tell you which of the two you got.
+    stubApi(SIGNED_IN)
+    render(<App />)
+    const nav = within(await screen.findByTestId('side-nav'))
+    fireEvent.click(nav.getByRole('radio', { name: t('he', 'common.theme.dark') }))
+    expect(nav.getByText(t('he', 'common.theme.state.dark'))).toBeInTheDocument()
+    expect(document.documentElement.dataset.theme).toBe('dark')
+  })
+
+  it('offers it in the drawer too, so it is not reachable at exactly one width', async () => {
+    // The sidebar is hidden under 1024px and the drawer trigger is hidden above it. A
+    // control in only one of them is a control half the viewports cannot reach — which is
+    // the invariant AppShell's own comment states.
+    stubApi(SIGNED_IN)
+    render(<App />)
+    fireEvent.click(await screen.findByRole('button', { name: t('he', 'common.nav.menu') }))
+    const drawer = within(await screen.findByRole('dialog'))
+    expect(
+      drawer.getByRole('radio', { name: t('he', 'common.theme.system') }),
+    ).toBeInTheDocument()
+  })
+
+  it('offers it to a coach as well — it is a preference, not a permission', async () => {
+    stubApi(COACH_IN)
+    render(<App />)
+    const nav = within(await screen.findByTestId('side-nav'))
+    expect(nav.getByRole('radio', { name: t('he', 'common.theme.light') })).toBeInTheDocument()
   })
 })
