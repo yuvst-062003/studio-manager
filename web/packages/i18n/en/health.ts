@@ -82,6 +82,9 @@ export const health: Bundle = {
 
   // -- states 12c does not draw, and one it draws wrongly -----------------------
   'declaration.unanswered': 'Not answered yet',
+  'declaration.markAllHealthy': 'No known health problems',
+  'declaration.markAllHealthyHint':
+    'Every question still blank is answered "no". You can change any of them.',
   'declaration.answerRequired': 'Every question needs an answer',
   'declaration.loading': 'Loading the form…',
   'declaration.error': 'We could not load the form. Try again',

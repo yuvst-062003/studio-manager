@@ -11,6 +11,13 @@
 // question is a `SegmentedControl` with neither option selected until the parent picks — the
 // primitive already exists, and this lane does not write a second one.
 //
+// **The shortcut does not weaken that.** Template v2 asks thirteen booleans, and for most
+// families every answer is `לא` — thirteen taps on a phone to say "nothing is wrong". The
+// `אין בעיות בריאות ידועות` button fills the ones still blank, and that is a different thing
+// from a default: nothing is preselected on load, the parent presses it themselves, and it
+// leaves alone every question they already answered — overwriting a `כן` would silently
+// delete a medical answer a family had given. It does not tick the clause; see below.
+//
 // **`כן` binds to `--accent`, never `--paid`** (12c finding 8). They hold the same light-mode
 // value and different meanings, and D12 moved `--paid` in dark mode deliberately. A health answer
 // is not a payment.
@@ -29,7 +36,7 @@ import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { SignaturePad } from './SignaturePad'
 import { applicableClause, clauseTextKey, CLAUSE_QUESTION_ID } from './clauses'
-import { isVisible, unansweredRequired } from './healthClient'
+import { isAnswered, isVisible, unansweredRequired } from './healthClient'
 import type { AnswerValue, HealthClient, TemplateQuestion, TemplateSchema } from './healthClient'
 
 const formStyle: CSSProperties = {
@@ -49,6 +56,14 @@ const rowStyle: CSSProperties = {
   gap: 'var(--space-2)',
   paddingBlock: 'var(--space-3)',
   borderBlockEnd: '1px solid var(--border)',
+}
+
+const quickFillStyle: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'flex-start',
+  gap: 'var(--space-1)',
+  paddingBlockEnd: 'var(--space-3)',
 }
 
 const detailStyle: CSSProperties = {
@@ -120,6 +135,20 @@ export function DeclarationForm({
   const missing = useMemo(() => (schema ? unansweredRequired(schema, answers) : []), [schema, answers])
   const complete = missing.length === 0 && signature !== null
 
+  /** The yes/no questions on screen with nothing chosen yet — what the shortcut would fill. */
+  const blankBooleans = useMemo(
+    () =>
+      (schema?.sections ?? [])
+        .flatMap((section) => section.questions ?? [])
+        .filter(
+          (question) =>
+            question.type === 'boolean' &&
+            isVisible(question, answers) &&
+            !isAnswered(answers[question.id]),
+        ),
+    [schema, answers],
+  )
+
   const answer = (question: TemplateQuestion, value: AnswerValue) => {
     setAnswers((previous) => {
       const next = { ...previous, [question.id]: value }
@@ -146,6 +175,26 @@ export function DeclarationForm({
           }
         }
       }
+      return next
+    })
+  }
+
+  /**
+   * The one tap. Answers `לא` everywhere nothing was chosen, and nothing else.
+   *
+   * It cannot invalidate a clause already confirmed: `declaresALimitation` reads a `כן` or a
+   * non-empty medical note, and neither is what this writes — so which sentence applies is the
+   * same before and after. The clause question itself is untouched on purpose. It is the
+   * attestation the family signs under, and a button that ticked it would make a legal
+   * statement on their behalf, which is exactly what `clauses.ts` exists to prevent.
+   *
+   * Detail fields stay put too: they are `visible_if: {x: true}`, so a question this fills was
+   * already hidden and has nothing behind it to clear.
+   */
+  const markAllHealthy = () => {
+    setAnswers((previous) => {
+      const next = { ...previous }
+      for (const question of blankBooleans) next[question.id] = false
       return next
     })
   }
@@ -221,6 +270,19 @@ export function DeclarationForm({
 
       <Card>
         <p style={{ color: 'var(--text-secondary)' }}>{t(locale, 'health.declaration.intro')}</p>
+        {/* Hidden once there is nothing left to fill: a shortcut that would change nothing is a
+            button that does nothing when pressed. `type="button"` because a bare <button> inside
+            a <form> submits it, and submitting here is the opposite of the point. */}
+        {blankBooleans.length > 0 ? (
+          <div style={quickFillStyle}>
+            <Button onClick={markAllHealthy} type="button" variant="secondary">
+              {t(locale, 'health.declaration.markAllHealthy')}
+            </Button>
+            <span style={{ color: 'var(--text-muted)', fontSize: 'var(--text-caption)' }}>
+              {t(locale, 'health.declaration.markAllHealthyHint')}
+            </span>
+          </div>
+        ) : null}
         {(schema.sections ?? []).map((section) => (
           <section key={section.id}>
             {section.title ? <h3>{section.title}</h3> : null}

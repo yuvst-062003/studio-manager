@@ -117,6 +117,12 @@ export const health: Bundle = {
   // two-position Switch cannot express a third state, so the form uses SegmentedControl with
   // neither option selected — and these are the strings that state needs.
   'declaration.unanswered': 'טרם נענתה',
+  // -- the one tap that answers the questions a healthy child answers the same way --------
+  // Thirteen booleans on a phone, and for most families every one of them is לא. This does
+  // NOT preselect anything on load — the third state above survives untouched. It is a
+  // button the parent presses, which is why the hint says what it will do before it does it.
+  'declaration.markAllHealthy': 'אין בעיות בריאות ידועות',
+  'declaration.markAllHealthyHint': 'כל שאלה שטרם נענתה תסומן "לא". אפשר לשנות כל אחת בנפרד.',
   'declaration.answerRequired': 'יש לענות על כל השאלות',
   'declaration.loading': 'טוען את הטופס…',
   'declaration.error': 'לא הצלחנו לטעון את הטופס. נסו שוב',

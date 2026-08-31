@@ -36,6 +36,26 @@ const SCHEMA: TemplateSchema = {
   ],
 }
 
+/** Template v2's shape: the same questions plus the club's own declaration clause. */
+const CLAUSE_SCHEMA: TemplateSchema = {
+  ...SCHEMA,
+  sections: [
+    ...SCHEMA.sections,
+    {
+      id: 'declaration',
+      title: 'הצהרה',
+      questions: [
+        {
+          id: 'clause_confirmed',
+          type: 'clause',
+          label: 'אני מאשר/ת את ההצהרה שלמעלה',
+          required: true,
+        },
+      ],
+    },
+  ],
+}
+
 function makeClient(over: Partial<HealthClient> = {}): HealthClient {
   return {
     template: vi.fn().mockResolvedValue({
@@ -324,6 +344,85 @@ describe('DeclarationForm', () => {
     // §5.5, and the seventh artboard to assume otherwise (12c finding 1).
     render(<DeclarationForm client={makeClient()} locale="he" studentId="st1" studentName="נועה לוי" />)
     expect(await screen.findByText(t('he', 'health.declaration.noExpiry'))).toBeInTheDocument()
+  })
+
+  // -- the quick "no known health problems" fill ---------------------------------
+  // Thirteen booleans on a phone, and for most families every answer is לא. The third answer
+  // state above stays exactly as it is — nothing is preselected on load — and this is the
+  // parent's own single tap, not a default. That is the whole distinction: a declaration
+  // nobody answered versus one answered in one gesture.
+  it('one tap answers every unanswered question with לא', async () => {
+    render(<DeclarationForm client={makeClient()} locale="he" studentId="st1" studentName="נועה לוי" />)
+    await screen.findAllByText('האם יש אסתמה?')
+
+    await userEvent.click(
+      screen.getByRole('button', { name: t('he', 'health.declaration.markAllHealthy') }),
+    )
+
+    for (const radio of screen.getAllByRole('radio')) {
+      const answered = (radio as HTMLInputElement).value === 'no'
+      expect(radio).toHaveProperty('checked', answered)
+    }
+  })
+
+  it('does not overwrite a כן already given, or the detail typed under it', async () => {
+    // The shortcut fills what is still blank. Overwriting a yes would delete a medical answer
+    // a parent had already given, on the one form where a silently deleted answer is worst.
+    render(<DeclarationForm client={makeClient()} locale="he" studentId="st1" studentName="נועה לוי" />)
+    await screen.findAllByText('אלרגיה ידועה')
+    await userEvent.click(screen.getAllByRole('radio')[2]!) // allergy · כן
+    await userEvent.type(await screen.findByLabelText('פירוט האלרגיה'), 'בוטנים')
+
+    await userEvent.click(
+      screen.getByRole('button', { name: t('he', 'health.declaration.markAllHealthy') }),
+    )
+
+    const radios = screen.getAllByRole('radio')
+    expect(radios[1]).toBeChecked() // asthma · לא, filled by the shortcut
+    expect(radios[2]).toBeChecked() // allergy · כן, left alone
+    expect(radios[3]).not.toBeChecked()
+    expect(screen.getByLabelText('פירוט האלרגיה')).toHaveValue('בוטנים')
+  })
+
+  it('leaves the declaration clause for the parent to confirm', async () => {
+    // The clause is the legal attestation — the sentence the family is signing under. A
+    // shortcut that ticked it would sign a statement on their behalf.
+    render(
+      <DeclarationForm
+        client={makeClient({
+          template: vi.fn().mockResolvedValue({
+            id: 'tpl-1',
+            kind: 'full',
+            version: 2,
+            schema: CLAUSE_SCHEMA,
+            source_pdf_object_key: null,
+            published_at: null,
+          }),
+        } as Partial<HealthClient>)}
+        locale="he"
+        studentId="st1"
+        studentName="נועה לוי"
+      />,
+    )
+    await screen.findAllByText('האם יש אסתמה?')
+
+    await userEvent.click(
+      screen.getByRole('button', { name: t('he', 'health.declaration.markAllHealthy') }),
+    )
+
+    expect(screen.getByRole('checkbox')).not.toBeChecked()
+  })
+
+  it('disappears once every question has an answer', async () => {
+    // A shortcut that fills nothing is a button that does nothing when pressed.
+    render(<DeclarationForm client={makeClient()} locale="he" studentId="st1" studentName="נועה לוי" />)
+    await screen.findAllByText('האם יש אסתמה?')
+    await userEvent.click(
+      screen.getByRole('button', { name: t('he', 'health.declaration.markAllHealthy') }),
+    )
+    expect(
+      screen.queryByRole('button', { name: t('he', 'health.declaration.markAllHealthy') }),
+    ).toBeNull()
   })
 
   it('renders in English too, with the manager’s own question wording untouched', async () => {
