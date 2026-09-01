@@ -40,6 +40,11 @@ const STRIP_LABEL: Record<AttendanceStripItem['state'], string> = {
   absent: 'attendance.roster.absent',
   notified: 'attendance.source.preReported',
   unmarked: 'attendance.roster.unmarked',
+  // `STRIP_STATE` above maps only the four states a MARK can carry, so nothing on this
+  // card resolves to `planned` today — a mark exists because a session already happened.
+  // The entry is here because the record is exhaustive over the shared state, and the
+  // calendar's own legend is the one label the product has for it.
+  planned: 'schedule.calendar.legend.planned',
 }
 
 /** `4a`'s twelve. `2d` draws eight and the two artboards disagree (2d finding 9), which is
