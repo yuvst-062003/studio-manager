@@ -320,10 +320,35 @@
   color: var(--pending);
 }
 
+/* Grey, not amber. `notified` is amber and solid, `unmarked` was amber and dashed, so the
+ * only thing separating "you told us in advance" from "nobody filled the register in" was
+ * a border-style at 2px. They do not mean anything like the same thing: one is a family
+ * that did the right thing, the other is missing information. --text-muted says the
+ * second out loud, and frees amber to mean only the first. */
 .studio-attendance[data-state="unmarked"] {
-  border-color: var(--pending);
+  border-color: var(--text-muted);
   border-style: dashed;
-  color: var(--pending);
+  color: var(--text-muted);
+}
+
+/* An empty ring: the lesson has not happened, so there is nothing to draw inside it. */
+.studio-attendance[data-state="planned"] {
+  border-color: var(--text-muted);
+  color: var(--text-muted);
+}
+
+/* The calendar-cell size. Seven of these plus their gaps fit a 390px row; seven 42px
+ * marks do not. */
+.studio-attendance[data-size="sm"] {
+  block-size: 18px;
+  border-radius: var(--radius-circle);
+  border-width: var(--border-width-strong);
+  inline-size: 18px;
+}
+
+.studio-attendance[data-size="sm"] svg {
+  block-size: 12px;
+  inline-size: 12px;
 }
 
 .studio-choice {

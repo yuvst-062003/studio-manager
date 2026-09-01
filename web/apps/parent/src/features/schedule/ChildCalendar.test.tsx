@@ -423,4 +423,77 @@ describe('ChildCalendar (12b)', () => {
     expect(screen.getAllByRole('cell')).toHaveLength(7)
     expect(screen.getByTestId('calendar-day-2026-11-10')).toBeInTheDocument()
   })
+
+  // -- screen 6 of the Stitch redesign, direction A (user pick, 2026-09-01) ------
+
+  it('draws one mark per child, rather than the worst of them', async () => {
+    // `DAY_PRIORITY` picked a single status per day, worst first, so an evening where
+    // דנה trained and יוסי did not rendered as one red dot — and the fact that one child
+    // DID turn up was destroyed at render, in the view that is the default.
+    stubFetch([
+      {
+        session_id: 'past',
+        student_id: 'child-1',
+        status: 'present',
+        starts_at: '2026-11-02T14:00:00Z',
+      },
+      {
+        session_id: 'other',
+        student_id: 'child-2',
+        status: 'absent_unexcused',
+        starts_at: '2026-11-02T16:00:00Z',
+      },
+    ])
+    render(calendar())
+    const day = await screen.findByTestId('calendar-day-2026-11-02')
+    // The marks are the only `role="img"` in a cell — the cell is `role="cell"`.
+    await waitFor(() => expect(day.querySelectorAll('[role="img"]')).toHaveLength(2))
+    const states = [...day.querySelectorAll('[role="img"]')].map((mark) =>
+      mark.getAttribute('data-state'),
+    )
+    expect(states).toContain('present')
+    expect(states).toContain('absent')
+  })
+
+  it('names all five states in the legend, the unmarked one included', async () => {
+    // `DayState` is five and `DAY_TONE` colours five, but the legend mapped four — so a
+    // grey dot shipped with nothing naming it while `calendar.legend.unmarked` sat unused
+    // in all three locales. A state the legend does not name is a state told by colour.
+    render(calendar())
+    const legend = await screen.findByTestId('calendar-legend')
+    expect(legend.querySelectorAll('li')).toHaveLength(5)
+    expect(legend).toHaveTextContent(t('he', 'schedule.calendar.legend.unmarked'))
+  })
+
+  it('gives a training day a tap target a thumb can hit', async () => {
+    // §6.2's floor is 44px and the cell was 40. jsdom computes no layout, so the declared
+    // minimum is what there is to assert — which is also the thing that regressed.
+    const { ui } = withAbsence()
+    render(ui)
+    const target = await screen.findByTestId('calendar-open-2026-11-17')
+    const cell = target.closest('[role="cell"]')
+    expect(cell?.getAttribute('style') ?? '').toMatch(/min-block-size:\s*(4[4-9]|[5-9]\d)px/)
+  })
+
+  it('folds the coming lessons away, and says how many there are', async () => {
+    // The upcoming list ran to eighteen rows over a sixty-day horizon and was the longest
+    // thing on the page, under a grid that already carries every one of those days. The
+    // past list was folded in P3; this half never was.
+    render(calendar())
+    await waitFor(() => expect(screen.getByTestId('upcoming-toggle')).toBeInTheDocument())
+    expect(screen.getByTestId('upcoming-session')).not.toBeVisible()
+    expect(screen.getByTestId('upcoming-toggle')).toHaveTextContent('1')
+    await userEvent.click(screen.getByTestId('upcoming-toggle'))
+    expect(screen.getByTestId('upcoming-session')).toBeVisible()
+  })
+
+  it('offers the absence report as a control, not a caption-sized link', async () => {
+    // It shipped as a bare `<a>` with no styling at all, wedged into the end of the band
+    // that also held both month arrows and the day/week/month switch. It is the only
+    // WRITE on the screen and it looked like the least important thing on it.
+    render(calendar())
+    const entry = await screen.findByTestId('calendar-absence')
+    expect(entry.getAttribute('style') ?? '').toMatch(/min-block-size:\s*(4[4-9]|[5-9]\d)px/)
+    expect(entry).toHaveAccessibleName()
+  })
 })
