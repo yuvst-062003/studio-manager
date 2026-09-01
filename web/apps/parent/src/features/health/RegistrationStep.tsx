@@ -53,6 +53,13 @@ export type RegistrationStepProps = {
   sending?: boolean
   /** A failed save. The step stays on screen with what was typed still in it. */
   error?: string
+  /**
+   * Whether this student is asked for `כיתה/גן`. Comes from `agreementStatus`, never
+   * derived here: a school class is a fact about a school-age child, and the only way to
+   * know this student is an adult who is their own guardian is the guardian rows, which
+   * the client cannot see. Defaulting to `true` keeps every existing caller unchanged.
+   */
+  schoolClassRequired?: boolean
 }
 
 const EMPTY_PICKUP: PickupDraft = { name: '', phone: '' }
@@ -64,6 +71,7 @@ export function RegistrationStep({
   onBack,
   sending = false,
   error,
+  schoolClassRequired = true,
 }: RegistrationStepProps) {
   const [childId, setChildId] = useState('')
   const [grade, setGrade] = useState('')
@@ -95,7 +103,7 @@ export function RegistrationStep({
   const valid =
     isValidNationalId(childId) &&
     isValidNationalId(signerId) &&
-    grade.trim() !== '' &&
+    (!schoolClassRequired || grade.trim() !== '') &&
     address.trim() !== '' &&
     city.trim() !== '' &&
     // An optional field that was filled in still has to be right. A second parent's ת.ז. with
@@ -163,12 +171,17 @@ export function RegistrationStep({
             onChange={(event) => setChildId(event.target.value)}
             value={childId}
           />
-          <TextField
-            error={requiredError(grade)}
-            label={t(locale, 'health.registration.grade')}
-            onChange={(event) => setGrade(event.target.value)}
-            value={grade}
-          />
+          {/* Not rendered at all for an adult rather than shown and made optional: a grown
+              student asked which class they are in at school reads as a broken form, and an
+              optional field nobody can answer still invites them to try. */}
+          {schoolClassRequired ? (
+            <TextField
+              error={requiredError(grade)}
+              label={t(locale, 'health.registration.grade')}
+              onChange={(event) => setGrade(event.target.value)}
+              value={grade}
+            />
+          ) : null}
           <TextField
             error={requiredError(address)}
             label={t(locale, 'health.registration.address')}

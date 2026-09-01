@@ -43,6 +43,10 @@ const OWES_EVERYTHING: AgreementStatusOut = {
   terms_accepted: false,
   complete: false,
   club_terms_version: 1,
+  // NOT a "done" flag like the four above — it says the club's registration template asks
+  // for a school grade, and the server defaults it to true. False here would quietly put
+  // every test that uses this baseline on the non-default path.
+  school_class_required: true,
 }
 
 function makeClient(status: Partial<AgreementStatusOut> = {}): HealthClient {
@@ -306,6 +310,51 @@ describe('RegistrationStep', () => {
     expect(body.child.national_id).toBe('100000009')
     expect(body.child.city).toBe('נתניה')
     expect(body.signer.national_id).toBe('100000017')
+  })
+
+  it('lets an adult who is their own guardian through with no school class', async () => {
+    // `selfStudent` in the join form makes a student of the parent themselves, and the
+    // registration gate then demanded a כיתה nobody could answer. The server stopped
+    // requiring it; this is the other half — the submit never fired while the form did.
+    const onSubmit = vi.fn()
+    render(
+      <RegistrationStep
+        locale="he"
+        onSubmit={onSubmit}
+        schoolClassRequired={false}
+        studentName="יובל בוגר"
+      />,
+    )
+
+    expect(
+      screen.queryByLabelText(t('he', 'health.registration.grade')),
+    ).not.toBeInTheDocument()
+
+    const ids = screen.getAllByLabelText(t('he', 'health.registration.nationalId'))
+    await userEvent.type(ids[0]!, '100000009')
+    await userEvent.type(ids[1]!, '100000017')
+    await userEvent.type(screen.getByLabelText(t('he', 'health.registration.address')), 'ביאליק 4')
+    await userEvent.type(screen.getByLabelText(t('he', 'health.registration.city')), 'נתניה')
+    await userEvent.click(screen.getByRole('button', { name: t('he', 'health.agreement.next') }))
+
+    expect(onSubmit).toHaveBeenCalledTimes(1)
+    expect(onSubmit.mock.calls[0]![0].child.grade).toBe('')
+  })
+
+  it('still demands a school class for a child', async () => {
+    // The guard: the flag defaults to true, so nothing about an ordinary registration moves.
+    const onSubmit = vi.fn()
+    render(<RegistrationStep locale="he" onSubmit={onSubmit} studentName="נועה לוי" />)
+
+    const ids = screen.getAllByLabelText(t('he', 'health.registration.nationalId'))
+    await userEvent.type(ids[0]!, '100000009')
+    await userEvent.type(ids[1]!, '100000017')
+    await userEvent.type(screen.getByLabelText(t('he', 'health.registration.address')), 'הרצל 12')
+    await userEvent.type(screen.getByLabelText(t('he', 'health.registration.city')), 'נתניה')
+    await userEvent.click(screen.getByRole('button', { name: t('he', 'health.agreement.next') }))
+
+    expect(onSubmit).not.toHaveBeenCalled()
+    expect(screen.getByLabelText(t('he', 'health.registration.grade'))).toBeInTheDocument()
   })
 
   it('drops a pickup row the parent never filled in', async () => {

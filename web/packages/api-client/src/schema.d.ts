@@ -5249,6 +5249,11 @@ export interface components {
             health_signed: boolean;
             /** Registration Complete */
             registration_complete: boolean;
+            /**
+             * School Class Required
+             * @default true
+             */
+            school_class_required: boolean;
             /** Terms Accepted */
             terms_accepted: boolean;
         };

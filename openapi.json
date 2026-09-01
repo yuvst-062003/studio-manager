@@ -119,6 +119,11 @@
             "title": "Registration Complete",
             "type": "boolean"
           },
+          "school_class_required": {
+            "default": true,
+            "title": "School Class Required",
+            "type": "boolean"
+          },
           "terms_accepted": {
             "title": "Terms Accepted",
             "type": "boolean"

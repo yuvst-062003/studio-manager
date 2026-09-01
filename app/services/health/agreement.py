@@ -82,6 +82,11 @@ class AgreementStatus:
     health_signed: bool
     registration_complete: bool
     terms_accepted: bool
+    #: Whether this student's form must ask for `כיתה/גן`. False for a student who is their
+    #: own guardian -- see `is_self_guarding`. Sent rather than derived for the reason in the
+    #: docstring above: the client would otherwise need the guardian rows to work it out, and
+    #: a form that requires a field the server does not is a submit button that never fires.
+    school_class_required: bool = True
 
     @property
     def complete(self) -> bool:
@@ -142,6 +147,45 @@ def signing_person_id(
 #: required field nobody can answer is where a hard gate turns into a support call.
 REQUIRED_REGISTRATION_FIELDS = ("national_id", "address", "city", "grade")
 
+#: The same list for a student who is their own guardian. `grade` is `כיתה/גן` -- a SCHOOL
+#: class, a fact about a school-age child, and a grown adult has no answer for it. §3.3
+#: allows an adult student who is also their own guardian, and `JoinFlow`'s `selfStudent`
+#: checkbox creates exactly one, so this is not a hypothetical shape: without this list
+#: every parent who ticks that box meets a required field nobody can fill, on a HARD gate.
+REQUIRED_REGISTRATION_FIELDS_SELF = ("national_id", "address", "city")
+
+
+def is_self_guarding(session: TenantSession, student: Student) -> bool:
+    """**The sole guardian IS the student.** Not "nobody else is a guardian".
+
+    A student whose guardian link has not landed yet has no guardian rows either, and
+    reading that absence as self-guarding would quietly drop `כיתה/גן` for every child in
+    that state -- a silent hole in the club's own form.
+
+    Two rows is not self-guarding either, and that is deliberate: a nineteen-year-old whose
+    mother still signs and pays is answered FOR, so the parent form is the right one for
+    them. Age is never consulted; the guardian link already carries the answer.
+    """
+    person_ids = (
+        session.execute(select(Guardian.person_id).where(Guardian.student_id == student.id))
+        .scalars()
+        .all()
+    )
+    return len(person_ids) == 1 and person_ids[0] == student.person_id
+
+
+def required_registration_fields(session: TenantSession, student: Student) -> tuple[str, ...]:
+    """Which list this student is held to.
+
+    One function, because the write path and the gate MUST agree. A save that succeeds
+    against a status that still demands a grade puts the family through the form and leaves
+    them behind the gate with nothing left to fill in -- the dead end §4's refusal rule
+    exists to prevent, arrived at from the other direction.
+    """
+    if is_self_guarding(session, student):
+        return REQUIRED_REGISTRATION_FIELDS_SELF
+    return REQUIRED_REGISTRATION_FIELDS
+
 
 def _has_national_id(person: Person | None) -> bool:
     return bool(person is not None and person.national_id_encrypted)
@@ -152,12 +196,16 @@ def agreement_status(
 ) -> AgreementStatus:
     """The three conditions, evaluated together. See `AgreementStatus`."""
     child = session.get(Person, student.person_id)
+    # Resolved once and reused below, so the gate, the write path and the form the client
+    # renders are all reading the same answer to the same question.
+    required = required_registration_fields(session, student)
+    school_class_required = "grade" in required
     registration_complete = (
         _has_national_id(child)
         and child is not None
         and bool(child.address)
         and bool(child.city)
-        and bool(student.grade)
+        and (bool(student.grade) or not school_class_required)
     )
 
     terms_accepted = False
@@ -174,6 +222,7 @@ def agreement_status(
         health_signed=_signed_against_current_questions(session, student),
         registration_complete=bool(registration_complete),
         terms_accepted=terms_accepted,
+        school_class_required=school_class_required,
     )
 
 
@@ -259,7 +308,7 @@ class AgreementService:
 
         missing = [
             field
-            for field in REQUIRED_REGISTRATION_FIELDS
+            for field in required_registration_fields(session, student)
             if not str(child.get(field) or "").strip()
         ]
         if missing:
@@ -275,7 +324,10 @@ class AgreementService:
             value = child.get(key)
             if value is not None and str(value).strip():
                 setattr(child_person, column, str(value).strip())
-        student.grade = str(child["grade"]).strip()
+        # NULL rather than "" when there is no school class to record: an empty string is a
+        # value, and `bool(student.grade)` above would read it the same either way while a
+        # roster would print it as a blank כיתה rather than omitting the field.
+        student.grade = str(child.get("grade") or "").strip() or None
 
         # -- the signing parent ---------------------------------------------------------
         # `subject_person_id`, NOT the caller: a manager filing on a family's behalf would

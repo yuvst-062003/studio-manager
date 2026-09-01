@@ -92,6 +92,12 @@ class AgreementStatusOut(BaseModel):
     complete: bool
     #: What the terms step must echo back if it renders. Sent so the client never hard-codes it.
     club_terms_version: int
+    #: Whether the registration step must ask this student for `כיתה/גן`. False for a student
+    #: who is their own guardian: a school class is a fact about a school-age child and a
+    #: grown adult has no answer for it. Sent for the same reason as everything else here --
+    #: the client cannot see the guardian rows, and a form requiring a field the server does
+    #: not is a submit button that never fires.
+    school_class_required: bool = True
 
 
 class PickupContactOut(BaseModel):

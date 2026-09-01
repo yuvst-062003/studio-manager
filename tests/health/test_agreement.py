@@ -63,9 +63,7 @@ def student_row(tenant_session, a_student) -> Student:
 
 @pytest.fixture
 def signer(tenant_session, studio) -> Person:
-    person = Person(
-        studio_id=studio.id, first_name="הורה", last_name="חותם", created_at=T0
-    )
+    person = Person(studio_id=studio.id, first_name="הורה", last_name="חותם", created_at=T0)
     tenant_session.add(person)
     tenant_session.flush()
     return person
@@ -120,6 +118,115 @@ def test_a_missing_required_field_is_refused(tenant_session, student_row, signer
     with pytest.raises(RegistrationIncompleteError) as exc:
         _save(tenant_session, student_row, signer.id, child=_child(**{field: ""}))
     assert field in exc.value.fields
+
+
+@pytest.fixture
+def adult_student(tenant_session, studio) -> Student:
+    """§3.3's adult who is their own guardian: `student.person_id` and the sole
+    `guardian.person_id` are the same row.
+
+    `JoinFlow`'s `selfStudent` checkbox creates exactly this, so it is not a hypothetical
+    shape -- it is what a parent gets today by ticking a box that already ships.
+    """
+    person = Person(studio_id=studio.id, first_name="יובל", last_name="בוגר", created_at=T0)
+    tenant_session.add(person)
+    tenant_session.flush()
+    student = Student(studio_id=studio.id, person_id=person.id, status="active")
+    tenant_session.add(student)
+    tenant_session.flush()
+    tenant_session.add(
+        Guardian(
+            studio_id=studio.id,
+            student_id=student.id,
+            person_id=person.id,
+            is_primary=True,
+            created_at=T0,
+        )
+    )
+    tenant_session.flush()
+    return student
+
+
+def _save_adult(tenant_session, student, **overrides):
+    """One ת.ז. for both blocks, because for this student they are one person."""
+    return _save(
+        tenant_session,
+        student,
+        student.person_id,
+        child=_child(national_id=VALID_PARENT_ID, grade=""),
+        signer={"national_id": VALID_PARENT_ID},
+        **overrides,
+    )
+
+
+def test_an_adult_who_is_their_own_guardian_needs_no_school_class(tenant_session, adult_student):
+    """`כיתה/גן` is a school class, and a grown adult has no answer for it.
+
+    Requiring it makes the gate unpassable for everyone who ticks `selfStudent` -- the
+    exact failure this module's own comment warns about: "a required field nobody can
+    answer is where a hard gate turns into a support call."
+    """
+    _save_adult(tenant_session, adult_student)
+    tenant_session.flush()
+    assert not adult_student.grade
+
+
+def test_the_gate_opens_for_an_adult_with_no_school_class(tenant_session, adult_student):
+    """The write half is not the whole bug. `agreement_status` reads `student.grade` too,
+    so accepting the save while the status still demands a grade leaves the family through
+    the form and still behind the gate -- a dead end with nothing left to fill in."""
+    _save_adult(tenant_session, adult_student)
+    tenant_session.flush()
+    status = agreement_status(
+        tenant_session, adult_student, signer_person_id=adult_student.person_id
+    )
+    assert status.registration_complete
+
+
+def test_the_status_tells_the_client_not_to_ask_for_a_school_class(
+    tenant_session, adult_student, student_row
+):
+    """The form has to know, and it cannot work this out for itself: deciding needs the
+    guardian rows, which no client can see. A form that requires a field the server does not
+    is a submit button that never fires, whatever the API accepts."""
+    adult = agreement_status(
+        tenant_session, adult_student, signer_person_id=adult_student.person_id
+    )
+    child = agreement_status(tenant_session, student_row, signer_person_id=None)
+    assert not adult.school_class_required
+    assert child.school_class_required
+
+
+def test_a_student_with_no_guardian_at_all_is_not_treated_as_an_adult(
+    tenant_session, student_row, signer
+):
+    """The rule is "the sole guardian IS the student", not "nobody else is a guardian".
+
+    An unlinked student has no guardians either, and reading that as self-guarding would
+    quietly drop `כיתה/גן` for every child whose guardian link has not landed yet.
+    """
+    with pytest.raises(RegistrationIncompleteError) as exc:
+        _save(tenant_session, student_row, signer.id, child=_child(grade=""))
+    assert "grade" in exc.value.fields
+
+
+def test_an_adult_whose_parent_is_still_the_guardian_keeps_the_child_shape(
+    tenant_session, adult_student, signer
+):
+    """A nineteen-year-old whose mother signs and pays is answered FOR, so the parent form
+    is the right one. Two guardian rows means not self-guarding, whatever the ages."""
+    tenant_session.add(
+        Guardian(
+            studio_id=adult_student.studio_id,
+            student_id=adult_student.id,
+            person_id=signer.id,
+            created_at=T0,
+        )
+    )
+    tenant_session.flush()
+    with pytest.raises(RegistrationIncompleteError) as exc:
+        _save_adult(tenant_session, adult_student)
+    assert "grade" in exc.value.fields
 
 
 def test_an_invalid_national_id_is_refused(tenant_session, student_row, signer):
@@ -219,9 +326,7 @@ def test_the_other_parent_becomes_a_person_and_a_guardian(tenant_session, studen
             select(Guardian).where(Guardian.student_id == student_row.id)
         ).scalars()
     )
-    assert any(
-        tenant_session.get(Person, g.person_id).first_name == "אמא" for g in guardians
-    )
+    assert any(tenant_session.get(Person, g.person_id).first_name == "אמא" for g in guardians)
 
 
 def test_the_other_parent_gets_no_login_and_no_role(tenant_session, student_row, signer):
@@ -234,15 +339,11 @@ def test_the_other_parent_gets_no_login_and_no_role(tenant_session, student_row,
         other_parent={"first_name": "אבא", "last_name": "כהן", "national_id": VALID_OTHER_ID},
     )
     tenant_session.flush()
-    created = tenant_session.execute(
-        select(Person).where(Person.first_name == "אבא")
-    ).scalar_one()
+    created = tenant_session.execute(select(Person).where(Person.first_name == "אבא")).scalar_one()
     assert created.auth_identity_id is None
 
 
-def test_the_same_other_parent_twice_is_matched_not_duplicated(
-    tenant_session, student_row, signer
-):
+def test_the_same_other_parent_twice_is_matched_not_duplicated(tenant_session, student_row, signer):
     """Matched on ת.ז., which is the only reliable key on this form."""
     blob = {"first_name": "אמא", "last_name": "כהן", "national_id": VALID_OTHER_ID}
     _save(tenant_session, student_row, signer.id, other_parent=blob)
@@ -329,9 +430,7 @@ def test_accepting_twice_does_not_stack_rows(tenant_session, studio, signer):
 
 
 # -- the gate ---------------------------------------------------------------------------
-def test_each_clause_of_the_gate_blocks_independently(
-    tenant_session, student_row, signer, studio
-):
+def test_each_clause_of_the_gate_blocks_independently(tenant_session, student_row, signer, studio):
     """A family failing only the terms clause is blocked exactly as hard as one with no
     declaration at all. Computed in one place so the client cannot re-derive it differently."""
     status = agreement_status(tenant_session, student_row, signer_person_id=signer.id)

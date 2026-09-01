@@ -123,6 +123,7 @@ def read_agreement_status(
         terms_accepted=result.terms_accepted,
         complete=result.complete,
         club_terms_version=CLUB_TERMS_VERSION,
+        school_class_required=result.school_class_required,
     )
 
 
@@ -172,6 +173,7 @@ def save_registration(
         terms_accepted=result.terms_accepted,
         complete=result.complete,
         club_terms_version=CLUB_TERMS_VERSION,
+        school_class_required=result.school_class_required,
     )
 
 
@@ -228,6 +230,7 @@ def accept_club_terms(
         terms_accepted=result.terms_accepted,
         complete=result.complete,
         club_terms_version=CLUB_TERMS_VERSION,
+        school_class_required=result.school_class_required,
     )
 
 

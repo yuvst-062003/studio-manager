@@ -180,6 +180,7 @@ export function AgreementFlow({
           error={error}
           locale={locale}
           onSubmit={saveRegistration}
+          schoolClassRequired={status.school_class_required}
           sending={sending}
           studentName={studentName}
         />
