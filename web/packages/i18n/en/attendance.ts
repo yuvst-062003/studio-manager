@@ -3,6 +3,11 @@ import type { Bundle } from '../types'
 /** Mirrors `he/attendance.ts`. `en` is `strict` in the parity check — a missing key fails. */
 export const attendance: Bundle = {
   'roster.title': 'Attendance',
+  // 2c's attendance row qualifier. The 62 is baked into the sentence rather than
+  // composed, because the number leads in Hebrew and sits mid-phrase in English —
+  // there is no one word order that serves all three. WINDOW_DAYS is the source of
+  // truth for the QUERY; this is the sentence that describes it.
+  'card.window': 'Over the last 62 days',
   'roster.dayLabel': '{{weekday}}',
   'roster.empty': 'No students in this group',
   'roster.present': 'Present',

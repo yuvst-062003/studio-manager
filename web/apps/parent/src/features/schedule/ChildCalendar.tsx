@@ -15,7 +15,8 @@
 // strip and this screen as its two consumers. The legend is the screen's purpose.
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { Card, EmptyState, SegmentedControl, StatusChip } from '@studio/ui'
+import { AttendanceMark, Card, EmptyState, SegmentedControl, StatusChip } from '@studio/ui'
+import type { AttendanceState } from '@studio/ui'
 import {
   apiFetch,
   formatDateInStudioZone,
@@ -23,7 +24,7 @@ import {
   formatTimeInStudioZone,
   studioDayKey,
 } from '@studio/core'
-import { t } from '@studio/i18n'
+import { DIRECTION, t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { cancelReasonLabel } from './client'
 import type { ParentScheduleClient, SessionRow } from './client'
@@ -101,22 +102,43 @@ const pastSummaryStyle: CSSProperties = {
   paddingBlock: 'var(--space-3)',
 }
 
-//: The day's single word, worst-first: an absence outranks a presence on the same day
-//: (two children, one missed), a pre-report outranks unmarked.
-const DAY_PRIORITY = ['absent_unexcused', 'absent_excused', 'unmarked', 'present'] as const
+/** The stored status, as the shared mark draws it. */
+const STATUS_MARK: Record<string, AttendanceState> = {
+  present: 'present',
+  absent_unexcused: 'absent',
+  absent_excused: 'notified',
+  unmarked: 'unmarked',
+}
 
-type DayState = 'present' | 'absent' | 'notified' | 'unmarked' | 'planned'
+/** One child's answer for one lesson. A day holds as many of these as it has answers. */
+type DayMark = { key: string; state: AttendanceState; label: string }
 
-function dayState(rows: AttendanceRow[]): DayState {
-  for (const status of DAY_PRIORITY) {
-    if (rows.some((row) => row.status === status)) {
-      if (status === 'present') return 'present'
-      if (status === 'absent_unexcused') return 'absent'
-      if (status === 'absent_excused') return 'notified'
-      return 'unmarked'
-    }
-  }
-  return 'unmarked'
+/** Three 18px marks and their gaps are 62px, which is what a seventh of 390 minus the
+ *  card's padding gives. A fourth would push the row past its column. */
+const MAX_MARKS = 3
+
+/**
+ * **The day's single word, kept only as metadata.**
+ *
+ * This used to decide what the day LOOKED like, worst-first, which meant an evening where
+ * דנה trained and יוסי did not rendered as one red dot — and the fact that one child had
+ * turned up was destroyed at render, in the view that is the default. The cell now draws a
+ * mark per child; this survives as `data-state` because a single dominant word is still
+ * the right thing for a test and for anything scanning the DOM.
+ */
+const MARK_PRIORITY: AttendanceState[] = ['absent', 'notified', 'unmarked', 'present', 'planned']
+
+/** Every state the grid can draw, so the legend and the grid cannot disagree. */
+const LEGEND_STATES: AttendanceState[] = [
+  'present',
+  'absent',
+  'notified',
+  'unmarked',
+  'planned',
+]
+
+function dominantState(marks: DayMark[]): AttendanceState | undefined {
+  return MARK_PRIORITY.find((state) => marks.some((mark) => mark.state === state))
 }
 
 //: Which i18n suffix the arrows take, per view. `schedule.calendar.previousDay` etc.
@@ -126,27 +148,133 @@ const STRIDE: Record<BoardView, 'Day' | 'Week' | 'Month'> = {
   month: 'Month',
 }
 
-const DAY_TONE: Record<DayState, string> = {
-  present: 'var(--paid)',
-  absent: 'var(--debt)',
-  notified: 'var(--pending)',
-  unmarked: 'var(--text-muted)',
-  planned: 'var(--accent)',
-}
-
 const pageStyle: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
-  gap: 'var(--space-4)',
+  gap: 'var(--space-3)',
   maxInlineSize: '30rem',
   marginInline: 'auto',
   inlineSize: '100%',
 }
 
-const toolbarStyle: CSSProperties = {
+/**
+ * **Four jobs, four bands.**
+ *
+ * Prev/next, the day-week-month switch, `היום` and the absence link were one flex row, and
+ * at 390px it wrapped onto two lines with the only WRITE on the screen pushed to the end
+ * of it as a bare caption-sized anchor. Only one of those four is about the month on
+ * screen. They are now: the title row (with `היום`), the child chips, the month band (both
+ * arrows and the switch), and the absence report down with the other destinations.
+ */
+const titleRowStyle: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
+  justifyContent: 'space-between',
   gap: 'var(--space-3)',
+}
+
+const chipRowStyle: CSSProperties = {
+  display: 'flex',
+  gap: 'var(--space-2)',
+  flexWrap: 'wrap',
+}
+
+const chipStyle: CSSProperties = {
+  alignItems: 'center',
+  background: 'var(--surface)',
+  border: 'var(--border-width-hairline) solid var(--border)',
+  borderRadius: 'var(--radius-pill)',
+  color: 'var(--fg)',
+  cursor: 'pointer',
+  display: 'inline-flex',
+  font: 'inherit',
+  fontSize: 'var(--text-label)',
+  fontWeight: 'var(--weight-medium)' as CSSProperties['fontWeight'],
+  gap: 'var(--space-1)',
+  minBlockSize: '44px',
+  paddingInline: 'var(--space-4)',
+}
+
+//: Never colour alone, on a control too: the chosen chip carries a check as well as a fill.
+const chipSelectedStyle: CSSProperties = {
+  ...chipStyle,
+  background: 'var(--emphasis)',
+  borderColor: 'var(--emphasis)',
+  color: 'var(--on-emphasis)',
+  fontWeight: 'var(--weight-semibold)' as CSSProperties['fontWeight'],
+}
+
+const bandStyle: CSSProperties = {
+  background: 'var(--surface)',
+  border: 'var(--border-width-hairline) solid var(--border)',
+  borderRadius: 'var(--radius-xl)',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 'var(--space-2)',
+  padding: 'var(--space-2)',
+}
+
+const monthRowStyle: CSSProperties = {
+  alignItems: 'center',
+  display: 'flex',
+  gap: 'var(--space-2)',
+  justifyContent: 'space-between',
+}
+
+const arrowStyle: CSSProperties = {
+  alignItems: 'center',
+  background: 'none',
+  border: 'none',
+  blockSize: '44px',
+  borderRadius: 'var(--radius-md)',
+  color: 'var(--emphasis)',
+  cursor: 'pointer',
+  display: 'inline-flex',
+  inlineSize: '44px',
+  justifyContent: 'center',
+  padding: 0,
+}
+
+const monthLabelStyle: CSSProperties = {
+  fontSize: 'var(--text-title)',
+  fontWeight: 'var(--weight-semibold)' as CSSProperties['fontWeight'],
+}
+
+/** The month's answer, at reading weight. It was a caption between two crowded bands, and
+ *  the audit calls it the point of the screen. */
+const summaryStyle: CSSProperties = {
+  alignItems: 'baseline',
+  color: 'var(--text-secondary)',
+  display: 'flex',
+  flexWrap: 'wrap',
+  fontSize: 'var(--text-body)',
+  gap: 'var(--space-1)',
+  margin: 0,
+}
+
+const summaryFigureStyle: CSSProperties = {
+  color: 'var(--fg)',
+  fontWeight: 'var(--weight-semibold)' as CSSProperties['fontWeight'],
+}
+
+//: A row that opens something else — the folded lists and the absence report all wear it,
+//: so the one WRITE on the screen is the same size as everything around it.
+const destinationStyle: CSSProperties = {
+  alignItems: 'center',
+  background: 'var(--surface)',
+  border: 'var(--border-width-hairline) solid var(--border)',
+  borderRadius: 'var(--radius-xl)',
+  color: 'var(--fg)',
+  cursor: 'pointer',
+  display: 'flex',
+  font: 'inherit',
+  fontSize: 'var(--text-body)',
+  fontWeight: 'var(--weight-medium)' as CSSProperties['fontWeight'],
+  gap: 'var(--space-2)',
+  justifyContent: 'space-between',
+  minBlockSize: '46px',
+  paddingInline: 'var(--space-4)',
+  textDecoration: 'none',
 }
 
 const gridStyle: CSSProperties = {
@@ -165,13 +293,16 @@ const headerCellStyle: CSSProperties = {
   color: 'var(--text-secondary)',
 }
 
+// 52, not 40. §6.2's floor is 44 and the cell was under it — on a grid where the cell IS
+// the target, which is what "the grid cells are not pressable" meant in practice.
 const dayStyle: CSSProperties = {
-  minBlockSize: '40px',
+  minBlockSize: '52px',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  borderRadius: 'var(--radius-sm)',
-  fontSize: 'var(--text-caption)',
+  borderRadius: 'var(--radius-md)',
+  fontSize: 'var(--text-body)',
+  color: 'var(--text-muted)',
 }
 
 // Longhand for the same reason DatePickerScreen uses it: `dayStyle` carries no border at
@@ -181,9 +312,64 @@ const trainingDayStyle: CSSProperties = {
   ...dayStyle,
   background: 'var(--surface)',
   borderStyle: 'solid',
-  borderWidth: 'var(--border-width-strong)',
-  borderColor: 'var(--accent)',
+  borderWidth: 'var(--border-width-hairline)',
+  borderColor: 'var(--border)',
+  color: 'var(--fg)',
   fontWeight: 'var(--weight-semibold)' as CSSProperties['fontWeight'],
+}
+
+//: Today is the ground showing through, not a third border colour competing with the
+//: training-day hairline and the focus ring.
+const todayStyle: CSSProperties = {
+  ...dayStyle,
+  background: 'var(--disabled-surface)',
+  color: 'var(--fg)',
+  fontWeight: 'var(--weight-bold)' as CSSProperties['fontWeight'],
+}
+
+const todayTrainingStyle: CSSProperties = {
+  ...trainingDayStyle,
+  background: 'var(--disabled-surface)',
+  fontWeight: 'var(--weight-bold)' as CSSProperties['fontWeight'],
+}
+
+//: The number over its marks. Three marks and their gaps are 62px, which is why the cap
+//: below is three — a fourth child's mark would push the row past the column.
+const dayInnerStyle: CSSProperties = {
+  alignItems: 'center',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '3px',
+  justifyContent: 'center',
+}
+
+const markRowStyle: CSSProperties = {
+  display: 'flex',
+  gap: '3px',
+}
+
+const overflowStyle: CSSProperties = {
+  color: 'var(--text-secondary)',
+  fontSize: 'var(--text-micro)',
+  fontWeight: 'var(--weight-semibold)' as CSSProperties['fontWeight'],
+}
+
+const legendStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(9rem, 1fr))',
+  gap: 'var(--space-1) var(--space-3)',
+  fontSize: 'var(--text-caption)',
+  listStyle: 'none',
+  margin: 0,
+  padding: 0,
+}
+
+const legendItemStyle: CSSProperties = {
+  alignItems: 'center',
+  color: 'var(--text-secondary)',
+  display: 'flex',
+  gap: 'var(--space-2)',
+  minBlockSize: '24px',
 }
 
 //: Day view is one column, not seven with six blanks beside it.
@@ -274,6 +460,47 @@ function SessionLine({
   )
 }
 
+/** The chosen chip's second signal. `aria-pressed` carries it to a screen reader and the
+ *  fill carries it to everyone else; this is what carries it to a parent who cannot tell
+ *  the fill from the ground. */
+function Tick() {
+  return (
+    <svg
+      aria-hidden="true"
+      fill="none"
+      height="13"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="2.4"
+      viewBox="0 0 16 16"
+      width="13"
+    >
+      <path d="M3 8.5 6.5 12 13 4.5" />
+    </svg>
+  )
+}
+
+/** `start` and `end` are the READER's, not the screen's: the caller picks by locale, so
+ *  the same component points backwards in Hebrew and in English. */
+function Chevron({ towards }: { towards: 'start' | 'end' }) {
+  return (
+    <svg
+      aria-hidden="true"
+      fill="none"
+      height="22"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="2.2"
+      viewBox="0 0 24 24"
+      width="22"
+    >
+      <path d={towards === 'end' ? 'M9 5l7 7-7 7' : 'M15 5l-7 7 7 7'} />
+    </svg>
+  )
+}
+
 export function ChildCalendar({
   locale,
   client,
@@ -295,6 +522,7 @@ export function ChildCalendar({
   }
 }) {
   const todayKey = useMemo(() => studioDayKey(today), [today])
+  const rtl = DIRECTION[locale] === 'rtl'
   /**
    * **The focused DAY, not a year and a month.**
    *
@@ -427,6 +655,66 @@ export function ChildCalendar({
     return map
   }, [filteredAttendance])
 
+  const childNames = useMemo(
+    () => new Map(children.map((child) => [child.id, child.first_name])),
+    [children],
+  )
+
+  /**
+   * **Every answer the day holds, one mark each, in a stable order.**
+   *
+   * Past days come from the attendance rows, which are per (session, child) — so an
+   * evening with two children in two groups draws two marks and says which is which.
+   *
+   * A FUTURE day cannot: `/me/attendance` only has a row once something has been recorded
+   * or pre-reported, and `GET /sessions` returns the family's lessons without naming
+   * whose they are (deliberately — see the module header). So a lesson nobody has answered
+   * for yet gets ONE `planned` ring per lesson rather than one per child. That is what the
+   * screen can honestly say, and it is also what a parent reads it as: two rings on a
+   * Wednesday means two lessons that Wednesday.
+   */
+  const marksByDay = useMemo(() => {
+    const byDay = new Map<string, DayMark[]>()
+    const stateWord = (state: AttendanceState) =>
+      t(locale, `schedule.calendar.legend.${state}`)
+
+    for (const [day, rows] of attendanceByDay) {
+      byDay.set(
+        day,
+        [...rows]
+          .sort(
+            (left, right) =>
+              left.starts_at.localeCompare(right.starts_at) ||
+              left.student_id.localeCompare(right.student_id),
+          )
+          .map((row) => {
+            const state = STATUS_MARK[row.status] ?? 'unmarked'
+            const name = childNames.get(row.student_id)
+            return {
+              key: `${row.session_id}:${row.student_id}`,
+              state,
+              label: name ? `${name} · ${stateWord(state)}` : stateWord(state),
+            }
+          }),
+      )
+    }
+
+    // The two reads overlap on the open month, so the union is taken by id first — a
+    // lesson counted twice is a day drawn with two rings for one lesson.
+    const answered = new Set(filteredAttendance.map((row) => row.session_id))
+    const byId = new Map<string, SessionRow>()
+    for (const session of [...sessions, ...horizon]) byId.set(session.id, session)
+    for (const session of byId.values()) {
+      const day = studioDayKey(session.starts_at)
+      if (day <= todayKey || answered.has(session.id)) continue
+      byDay.set(day, [
+        ...(byDay.get(day) ?? []),
+        { key: `planned:${session.id}`, state: 'planned', label: stateWord('planned') },
+      ])
+    }
+    return byDay
+  }, [attendanceByDay, childNames, filteredAttendance, horizon, locale, sessions, todayKey])
+
   const summary = useMemo(() => {
     const held = [...attendanceByDay.values()].flat().filter((row) => row.starts_at <= today)
     const present = held.filter((row) => row.status === 'present').length
@@ -523,18 +811,37 @@ export function ChildCalendar({
 
   return (
     <section aria-labelledby="child-calendar-title" data-testid="child-calendar" style={pageStyle}>
-      <h1 id="child-calendar-title">{t(locale, 'schedule.calendar.title')}</h1>
+      <div style={titleRowStyle}>
+        <h1 id="child-calendar-title" style={{ margin: 0 }}>
+          {t(locale, 'schedule.calendar.title')}
+        </h1>
+        {/* Navigating three months out and losing the way back is the complaint every
+            calendar with arrows and no home key eventually gets. Out of the month band:
+            it is about where you are, not about what you are looking at. */}
+        {anchor !== todayKey ? (
+          <button
+            type="button"
+            data-testid="calendar-today"
+            onClick={() => setAnchor(todayKey)}
+            style={chipStyle}
+          >
+            {t(locale, 'schedule.calendar.today')}
+          </button>
+        ) : null}
+      </div>
 
       {/* 12b's per-child header: הלוח של דנה. The chip filters the layer; the grid
           itself is the family's. */}
       {children.length > 1 ? (
-        <div role="group" aria-label={t(locale, 'schedule.calendar.childAll')} style={toolbarStyle}>
+        <div role="group" aria-label={t(locale, 'schedule.calendar.childAll')} style={chipRowStyle}>
           <button
             aria-pressed={childFilter === null}
             data-testid="calendar-child-all"
             onClick={() => setChildFilter(null)}
+            style={childFilter === null ? chipSelectedStyle : chipStyle}
             type="button"
           >
+            {childFilter === null ? <Tick /> : null}
             {t(locale, 'schedule.calendar.childAll')}
           </button>
           {children.map((child) => (
@@ -543,35 +850,48 @@ export function ChildCalendar({
               data-testid={`calendar-child-${child.id}`}
               key={child.id}
               onClick={() => setChildFilter(childFilter === child.id ? null : child.id)}
+              style={childFilter === child.id ? chipSelectedStyle : chipStyle}
               type="button"
             >
-              {t(locale, 'schedule.calendar.childOf').replace('{name}', child.first_name)}
+              {childFilter === child.id ? <Tick /> : null}
+              {child.first_name}
             </button>
           ))}
         </div>
       ) : null}
 
-      <div style={toolbarStyle}>
-        {/* The arrows name their own stride. "חודש קודם" on a control that moves a single
-            day is the label lying about what the button does. */}
-        <button type="button" data-testid="calendar-previous" onClick={() => step(-1)}>
-          {t(locale, `schedule.calendar.previous${STRIDE[view]}`)}
-        </button>
-        <span data-testid="calendar-month">
-          {view === 'month'
-            ? formatMonthLabel(year, month, locale)
-            : formatDateInStudioZone(`${anchor}T12:00:00Z`, locale)}
-        </span>
-        <button type="button" data-testid="calendar-next" onClick={() => step(1)}>
-          {t(locale, `schedule.calendar.next${STRIDE[view]}`)}
-        </button>
-        {/* Navigating three months out and losing the way back is the complaint every
-            calendar with arrows and no home key eventually gets. */}
-        {anchor !== todayKey ? (
-          <button type="button" data-testid="calendar-today" onClick={() => setAnchor(todayKey)}>
-            {t(locale, 'schedule.calendar.today')}
+      {/* What you are looking at: which stretch of time, and how much of it. Nothing else
+          shares the band — that crowding is the defect this screen was opened on. */}
+      <div style={bandStyle}>
+        <div style={monthRowStyle}>
+          {/* The arrows name their own stride. "חודש קודם" on a control that moves a
+              single day is the label lying about what the button does. The chevron is
+              mirrored from the locale rather than from a physical side, so `next` points
+              the way the reader is going in both directions. */}
+          <button
+            aria-label={t(locale, `schedule.calendar.previous${STRIDE[view]}`)}
+            data-testid="calendar-previous"
+            onClick={() => step(-1)}
+            style={arrowStyle}
+            type="button"
+          >
+            <Chevron towards={rtl ? 'end' : 'start'} />
           </button>
-        ) : null}
+          <span data-testid="calendar-month" style={monthLabelStyle}>
+            {view === 'month'
+              ? formatMonthLabel(year, month, locale)
+              : formatDateInStudioZone(`${anchor}T12:00:00Z`, locale)}
+          </span>
+          <button
+            aria-label={t(locale, `schedule.calendar.next${STRIDE[view]}`)}
+            data-testid="calendar-next"
+            onClick={() => step(1)}
+            style={arrowStyle}
+            type="button"
+          >
+            <Chevron towards={rtl ? 'start' : 'end'} />
+          </button>
+        </div>
         <SegmentedControl
           legend={t(locale, 'schedule.week.view.legend')}
           onValueChange={(next) => setView(next as BoardView)}
@@ -582,18 +902,22 @@ export function ChildCalendar({
           ]}
           value={view}
         />
-        {/* `12a`'s second entry (P1): the pre-report lives beside the calendar too. */}
-        <a data-testid="calendar-absence" href="#/absence">
-          {t(locale, 'attendance.absence.title')}
-        </a>
       </div>
 
-      {/* The month summary the audit calls the point of the screen. */}
-      <p data-testid="calendar-summary">
-        {t(locale, 'schedule.calendar.summary')
-          .replace('{had}', String(summary.had))
-          .replace('{planned}', String(summary.planned))
-          .replace('{pct}', summary.pct === null ? '—' : String(summary.pct))}
+      {/* The month summary the audit calls the point of the screen — so it is read at body
+          size with the figures carrying weight, not set as a caption under a control band
+          and skipped. */}
+      <p data-testid="calendar-summary" style={summaryStyle}>
+        <strong style={summaryFigureStyle}>
+          {summary.pct === null ? '—' : `${summary.pct}%`}
+        </strong>
+        <span>{t(locale, 'schedule.calendar.summaryRate')}</span>
+        <span aria-hidden="true">·</span>
+        <strong style={summaryFigureStyle}>{summary.had}</strong>
+        <span>{t(locale, 'schedule.calendar.summaryHeld')}</span>
+        <span aria-hidden="true">·</span>
+        <strong style={summaryFigureStyle}>{summary.planned}</strong>
+        <span>{t(locale, 'schedule.calendar.summaryPlanned')}</span>
       </p>
 
       {/* `role="table"`, not `role="grid"`.
@@ -629,27 +953,32 @@ export function ChildCalendar({
             {week.map((cell, index) => {
               if (cell === '') return <div key={`pad-${index}`} style={dayStyle} aria-hidden="true" />
               const has = trainingDays.has(cell)
-              const state = attendanceByDay.has(cell)
-                ? dayState(attendanceByDay.get(cell)!)
-                : has && cell > todayKey
-                  ? 'planned'
-                  : undefined
-              const dot =
-                attendanceByDay.has(cell) || (has && cell > todayKey) ? (
-                  // Never colour alone (SC 1.4.1): the dot carries the state colour, and
-                  // the legend below names every state in words.
-                  <span
-                    aria-hidden="true"
-                    style={{
-                      display: 'block',
-                      inlineSize: '6px',
-                      blockSize: '6px',
-                      borderRadius: '50%',
-                      marginInline: 'auto',
-                      background: DAY_TONE[state ?? 'planned'],
-                    }}
-                  />
-                ) : null
+              const marks = marksByDay.get(cell) ?? []
+              const state = dominantState(marks)
+              // Three fit the column; a fourth child's mark would push the row past it.
+              // `+N` is not a state, so it is not in the legend and carries no colour.
+              const shown = marks.slice(0, MAX_MARKS)
+              const hidden = marks.length - shown.length
+              // Every answer the day holds, spelled out — this is the string that makes
+              // the cell readable without seeing any of the marks at all.
+              const spoken = marks.map((mark) => mark.label).join(', ')
+              const dayName = formatDateInStudioZone(`${cell}T12:00:00Z`, locale)
+              const body = (
+                <span style={dayInnerStyle}>
+                  <span>{Number(cell.slice(8))}</span>
+                  {shown.length > 0 ? (
+                    <span style={markRowStyle}>
+                      {/* Decorative HERE: the cell or its button already speaks every
+                          state in `spoken`, and labelling each mark again would read the
+                          day out twice. */}
+                      {shown.map((mark) => (
+                        <AttendanceMark key={mark.key} label="" size="sm" state={mark.state} />
+                      ))}
+                      {hidden > 0 ? <span style={overflowStyle}>{`+${hidden}`}</span> : null}
+                    </span>
+                  ) : null}
+                </span>
+              )
               return (
                 <div
                   key={cell}
@@ -660,7 +989,16 @@ export function ChildCalendar({
                   data-has-sessions={has ? 'true' : 'false'}
                   data-state={state}
                   aria-current={cell === todayKey ? 'date' : undefined}
-                  style={has ? trainingDayStyle : dayStyle}
+                  aria-label={has && absence ? undefined : spoken ? `${dayName} — ${spoken}` : undefined}
+                  style={
+                    cell === todayKey
+                      ? has
+                        ? todayTrainingStyle
+                        : todayStyle
+                      : has
+                        ? trainingDayStyle
+                        : dayStyle
+                  }
                 >
                   {/* **A day with a lesson is pressable; a day without one is not.**
                       (Owner request, 2026-08-30: "when a user presses the session on the
@@ -671,25 +1009,25 @@ export function ChildCalendar({
                       focus ring for free. */}
                   {has && absence ? (
                     <button
-                      // The day number alone names nothing out loud. The date and the
-                      // question together are what a screen reader needs to hear.
-                      aria-label={`${formatDateInStudioZone(`${cell}T12:00:00Z`, locale)} — ${t(
-                        locale,
-                        'schedule.calendar.attend.title',
-                      )}`}
+                      // The day number alone names nothing out loud. The date, what the
+                      // day already holds, and the question are what a screen reader needs
+                      // to hear — the marks inside are decoration once this exists.
+                      aria-label={[
+                        dayName,
+                        spoken,
+                        t(locale, 'schedule.calendar.attend.title'),
+                      ]
+                        .filter(Boolean)
+                        .join(' — ')}
                       data-testid={`calendar-open-${cell}`}
                       onClick={() => setOpenDay(cell)}
                       style={dayButtonStyle}
                       type="button"
                     >
-                      {Number(cell.slice(8))}
-                      {dot}
+                      {body}
                     </button>
                   ) : (
-                    <>
-                      {Number(cell.slice(8))}
-                      {dot}
-                    </>
+                    body
                   )}
                 </div>
               )
@@ -698,13 +1036,20 @@ export function ChildCalendar({
         ))}
       </div>
 
-      <ul aria-label={t(locale, 'schedule.calendar.legend')} data-testid="calendar-legend" style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexWrap: 'wrap', gap: 'var(--space-3)', fontSize: 'var(--text-caption)' }}>
-        {(['present', 'absent', 'notified', 'planned'] as const).map((state) => (
-          <li key={state} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>
-            <span
-              aria-hidden="true"
-              style={{ inlineSize: '8px', blockSize: '8px', borderRadius: '50%', background: DAY_TONE[state] }}
-            />
+      {/* **Five, not four.** `DayState` was five and `DAY_TONE` coloured five, but this
+          list held four — so `לא סומן` shipped as a grey dot with nothing naming it, while
+          `schedule.calendar.legend.unmarked` sat unused in all three locales. A state the
+          legend does not name is a state told by colour alone, which is the one thing this
+          screen is not allowed to do. */}
+      <ul
+        aria-label={t(locale, 'schedule.calendar.legend')}
+        data-testid="calendar-legend"
+        style={legendStyle}
+      >
+        {LEGEND_STATES.map((state) => (
+          <li key={state} style={legendItemStyle}>
+            {/* Decorative: the words beside it are the name. */}
+            <AttendanceMark label="" size="sm" state={state} />
             {t(locale, `schedule.calendar.legend.${state}`)}
           </li>
         ))}
@@ -722,23 +1067,36 @@ export function ChildCalendar({
       ) : null}
 
       {upcoming.length > 0 ? (
+        // **Folded, like the past half — and for the same reason, only more so.** The
+        // horizon reaches sixty days, so a club training four times a week put thirty-odd
+        // flat rows under the grid and the list became the page. Every one of those days
+        // is already drawn above as a `מתוכנן` ring on its own square, and pressing the
+        // square is the shorter way to the same lesson. The count on the summary keeps
+        // "when does my child next train" answerable without opening anything.
         <section aria-labelledby="upcoming-title">
-          <h2 id="upcoming-title">{t(locale, 'schedule.calendar.upcoming')}</h2>
-          <Card>
-            <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-              {upcoming.map((session) => (
-                <SessionLine
-                  key={session.id}
-                  locale={locale}
-                  onPress={
-                    absence ? () => setOpenDay(studioDayKey(session.starts_at)) : undefined
-                  }
-                  session={session}
-                  testId="upcoming-session"
-                />
-              ))}
-            </ul>
-          </Card>
+          <h2 id="upcoming-title" style={visuallyHidden}>
+            {t(locale, 'schedule.calendar.upcoming')}
+          </h2>
+          <details>
+            <summary data-testid="upcoming-toggle" style={pastSummaryStyle}>
+              {t(locale, 'schedule.calendar.upcomingCount').replace('{n}', String(upcoming.length))}
+            </summary>
+            <Card>
+              <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+                {upcoming.map((session) => (
+                  <SessionLine
+                    key={session.id}
+                    locale={locale}
+                    onPress={
+                      absence ? () => setOpenDay(studioDayKey(session.starts_at)) : undefined
+                    }
+                    session={session}
+                    testId="upcoming-session"
+                  />
+                ))}
+              </ul>
+            </Card>
+          </details>
         </section>
       ) : null}
 
@@ -774,6 +1132,20 @@ export function ChildCalendar({
           </details>
         </section>
       ) : null}
+
+      {/* `12a`'s second entry (P1): the pre-report lives beside the calendar too.
+
+          It was a bare `<a>` with no styling at all, wedged into the end of the band that
+          also held both month arrows and the day/week/month switch — the only WRITE on the
+          screen, dressed as the least important thing on it and under every tap-target
+          floor we hold ourselves to. Down here it is a destination the size of a
+          destination, next to the two lists. */}
+      <a data-testid="calendar-absence" href="#/absence" style={destinationStyle}>
+        {t(locale, 'attendance.absence.title')}
+        <span aria-hidden="true" style={{ color: 'var(--text-muted)', display: 'inline-flex' }}>
+          <Chevron towards={rtl ? 'start' : 'end'} />
+        </span>
+      </a>
 
       {openDay && absence ? (
         <SessionAttendanceDialog

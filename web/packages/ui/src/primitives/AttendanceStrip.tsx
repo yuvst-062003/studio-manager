@@ -15,8 +15,12 @@ const LEGEND_KEYS: Record<AttendanceState, string> = {
   absent: 'attendance.roster.absent',
   notified: 'attendance.source.preReported',
   unmarked: 'attendance.roster.unmarked',
+  planned: 'schedule.calendar.legend.planned',
 }
 
+/** The strip reads BACKWARDS — the last eight sessions — so `planned` cannot occur in it.
+ *  It is in `LEGEND_KEYS` because the type demands every state have a name, not because
+ *  this component can produce one. */
 const STATES: AttendanceState[] = ['present', 'absent', 'notified', 'unmarked']
 
 /**

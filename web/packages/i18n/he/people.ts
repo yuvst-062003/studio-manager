@@ -334,6 +334,10 @@ export const people: Bundle = {
   'card.title': 'כרטיס חניך',
   'card.details': 'פרטים',
   'card.enrollments': 'קבוצות',
+  // 2c's ledger row labels (2026-09-01). Short, because they are a COLUMN — every value on
+  // the card lines up against them, so a label that wraps moves every row beside it.
+  'card.membership': 'חברות',
+  'card.plan': 'מסלול',
   // 12j's "what happens next" line. Asked for by FirstRegistration since it was
   // written and translated nowhere, so a parent who had just registered read the key
   // itself on the screen that told them they were done (2026-08-31).
@@ -418,4 +422,34 @@ export const people: Bundle = {
   'sibling.duplicate': 'נראה שהילד/ה כבר רשומים במועדון. פנו למועדון כדי לוודא.',
   'sibling.duplicateNamed': '{name} כבר רשומים במועדון — אין צורך להוסיף שוב.',
   'sibling.duplicateOpen': 'לכרטיס החניך',
+
+  // -- screen 8: the guardian's own settings -------------------------------------
+  //
+  // The profile tab shipped titled `student.plural`, listing children, with the only
+  // per-child control being the destructive one. These are the keys that make it a screen
+  // about the PARENT: their own record, the app's settings, and the ways onward.
+  'profile.title': 'פרופיל',
+  'profile.account': 'החשבון שלי',
+  'profile.app': 'האפליקציה',
+  'profile.family': 'המשפחה',
+  'profile.club': 'המועדון',
+  'profile.privacy': 'פרטיות',
+  'profile.name': 'שם',
+  'profile.email': 'אימייל',
+  'profile.phone': 'טלפון',
+  'profile.notSet': 'לא הוגדר',
+  'profile.edit': 'עריכה',
+  'profile.save': 'שמירה',
+  'profile.saveFailed': 'לא הצלחנו לשמור את הפרטים. נסו שוב.',
+  'profile.language': 'שפה',
+  'profile.theme': 'ערכת נושא',
+  'profile.notifications': 'התראות',
+  'profile.notifications.hint': 'עדכונים על ביטולי שיעורים',
+  'profile.notifications.on': 'פעילות',
+  'profile.notifications.off': 'כבויות',
+  'profile.paymentMethod': 'אמצעי התשלום שלי',
+  'profile.children': 'הילדים שלי',
+  'profile.leaveHint': 'עזיבת המועדון נעשית מתוך כרטיס החניך',
+  'profile.address': 'כתובת',
+
 }

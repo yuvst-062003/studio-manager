@@ -18,6 +18,11 @@ import type { Bundle } from '../types'
 export const attendance: Bundle = {
   // -- the roster (staff 1c, 9f) -------------------------------------------------
   'roster.title': 'נוכחות',
+  // 2c's attendance row qualifier. The 62 is baked into the sentence rather than
+  // composed, because the number leads in Hebrew and sits mid-phrase in English —
+  // there is no one word order that serves all three. WINDOW_DAYS is the source of
+  // truth for the QUERY; this is the sentence that describes it.
+  'card.window': 'ב־62 הימים האחרונים',
   'roster.dayLabel': 'יום {{weekday}}',
   'roster.empty': 'אין חניכים בקבוצה הזו',
   'roster.present': 'נוכח',

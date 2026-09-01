@@ -3,6 +3,10 @@ import type { Bundle } from '../types'
 /** Mirrors `he/health.ts`. `ru` is `report` in the parity check until §15 item 9 lands. */
 export const health: Bundle = {
   'declaration.title': 'Медицинская декларация',
+  // 2c's ledger row (2026-09-01). `card.rowLabel` is the short column label; the expiry
+  // is the fact the old chip-only section could not tell a parent at all.
+  'card.rowLabel': 'Здоровье',
+  'declaration.validUntil': 'Действует до',
   'declaration.subtitle': 'Требуется до начала тренировок',
   'declaration.forChild': 'Для',
   'declaration.intro': 'Ответьте на вопросы и подпишите внизу формы',

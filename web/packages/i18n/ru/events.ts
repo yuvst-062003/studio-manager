@@ -120,6 +120,8 @@ export const events: Bundle = {
   'belt.noneYet': 'Истории поясов пока нет',
   'belt.noneYetHint': 'Когда пояс будет присвоен, прогресс появится здесь',
   'belt.title': 'Система поясов',
+  // 2c's ledger row label — the object, not the screen that manages it (2026-09-01).
+  'belt.one': 'Пояс',
   'belt.alreadySeeded': 'У этого класса уже есть лестница поясов ({{count}} ступеней)',
   'belt.alreadySeededHint': 'Полное редактирование на экране поясов. Можно перейти к следующему шагу',
   'belt.continue': 'Перейти к следующему шагу',

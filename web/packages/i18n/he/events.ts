@@ -142,6 +142,8 @@ export const events: Bundle = {
   'belt.noneYet': 'אין עדיין היסטוריית חגורות',
   'belt.noneYetHint': 'כשתוענק חגורה, ההתקדמות תוצג כאן',
   'belt.title': 'מערכת חגורות',
+  // 2c's ledger row label — the object, not the screen that manages it (2026-09-01).
+  'belt.one': 'חגורה',
   'belt.alreadySeeded': 'למחלקה הזו כבר מוגדר סולם חגורות ({{count}} דרגות)',
   'belt.alreadySeededHint': 'עריכה מלאה במסך החגורות. אפשר להמשיך לשלב הבא',
   'belt.continue': 'המשך לשלב הבא',

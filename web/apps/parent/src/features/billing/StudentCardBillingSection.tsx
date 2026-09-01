@@ -1,56 +1,115 @@
-// 2c's `מסמכים וחיובים` money rows — M6's student-card slot entry, the one the audit
-// found "left for someone else" by every wave (P2). The section fetches through its own
-// client, the way every slot section does, and renders `PaymentStrip` — the primitive
-// built for exactly this spot and mounted by nothing until now (P1).
+// 2c's money row — M6's student-card slot entry, the one the audit found "left for someone
+// else" by every wave (P2).
 //
-// The balance is the HOUSEHOLD's (§6.3 — debt is per household, not per child), and the
-// strip says so by rendering the same figure on every child's card rather than inventing
-// a per-child split the ledger does not have.
+// ── What changed on 2026-09-01, and why it is a correction and not a restyle ────────────
+//
+// This section used to render the HOUSEHOLD balance through `PaymentStrip`, with a comment
+// arguing the case: "§6.3 — debt is per household, not per child", so the strip "says so by
+// rendering the same figure on every child's card."
+//
+// It does not say so. A family with three children opens three cards and reads `240₪` on
+// each, and nothing on any of them distinguishes "this is the family's total, shown here"
+// from "this child owes 240₪" — so the honest reading of three cards is 720₪. The card is
+// titled with one child's name; every number on it is read as that child's.
+//
+// `ChargeOut` carries `student_id`, so the per-child figure is not an invention: it is the
+// sum of this child's own open charges. The HOUSEHOLD total keeps its home on `1b`, where
+// the row's chevron goes, and where a total is labelled as one.
+//
+// **A charge covered elsewhere is not owed here.** `is_covered_elsewhere` marks a charge
+// another payer has taken on; counting it would bill a parent twice on screen for money
+// they do not owe.
 import { useEffect, useMemo, useState } from 'react'
-import { apiFetch } from '@studio/core'
-import { registerSlot } from '@studio/ui'
+import { apiFetch, formatDateInStudioZone } from '@studio/core'
+import { DetailRow, MoneyDisplay, registerSlot } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
-import { PaymentStrip } from './PaymentStrip'
 import { makeParentBillingClient } from './PaymentsSection'
+import type { ChargeOut } from './billingClient'
 
-export function StudentCardBillingSection({ locale }: { locale: Locale }) {
+/** What this child still owes, in agorot, and the soonest date it falls due. */
+export function oweFor(
+  charges: readonly ChargeOut[],
+  studentId: string,
+): { agorot: number; dueOn: string | null } {
+  const mine = charges.filter(
+    (charge) => charge.student_id === studentId && !charge.is_covered_elsewhere,
+  )
+  return {
+    // `amount - allocated`, never `amount`: a charge half-covered by a payment is half
+    // owed, and the ledger already knows by how much.
+    agorot: mine.reduce(
+      (sum, charge) => sum + (charge.amount_agorot - (charge.allocated_agorot ?? 0)),
+      0,
+    ),
+    // The soonest due date across what is left — the one a parent needs, not the newest.
+    dueOn: mine
+      .map((charge) => charge.due_date)
+      .filter((due): due is string => Boolean(due))
+      .sort()[0] ?? null,
+  }
+}
+
+export function StudentCardBillingSection({
+  student,
+  locale,
+}: {
+  student: { id: string }
+  locale: Locale
+}) {
   const client = useMemo(() => makeParentBillingClient(apiFetch), [])
-  const [balance, setBalance] = useState<number | null>(null)
+  const [charges, setCharges] = useState<readonly ChargeOut[] | null>(null)
 
   useEffect(() => {
     let live = true
     client
-      .balance('')
-      .then((out) => live && setBalance(out.balance_agorot))
-      // A failed read renders as NOTHING here, never as a reassuring zero — P8's rule:
-      // a wrong number about money is worse than an error, and the strip's own contract
-      // hides itself at zero.
+      .openCharges('')
+      .then((items) => live && setCharges(items))
+      // A failed read renders as NOTHING, never as a reassuring zero — P8's rule: a wrong
+      // number about money is worse than an error.
       .catch(() => undefined)
     return () => {
       live = false
     }
   }, [client])
 
-  if (balance === null) return null
+  if (charges === null) return null
+  const { agorot, dueOn } = oweFor(charges, student.id)
+  // Nothing owed for this child renders no row at all. D2 keeps the debt alert for `1a`,
+  // and a row announcing a zero is noise on a card about a child.
+  if (agorot <= 0) return null
+
   return (
-    <section aria-label={t(locale, 'billing.openDebts.total')} data-testid="student-card-billing">
-      <PaymentStrip
-        balanceAgorot={balance}
-        locale={locale}
-        onOpenPayments={() => {
-          globalThis.location.hash = '#/payments'
-        }}
-      />
-    </section>
+    <DetailRow
+      href="#/payments"
+      label={t(locale, 'billing.card.owedRow')}
+      testId="student-card-billing"
+      tone="debt"
+    >
+      {/* Never concatenated into a sentence — `MoneyDisplay` isolates the run so the
+          shekel sign and the digits cannot be reordered by the bidi algorithm. */}
+      <MoneyDisplay agorot={agorot} tone="debt" label={t(locale, 'billing.card.owedRow')} />
+      {/* The due date on its own line, the way the belt row carries its earlier grades and
+          the health row its expiry. On one line with the amount it wrapped mid-date —
+          "לתשלום עד 10 / בספטמבר 2026" — which is the money row of all rows to keep legible. */}
+      {dueOn ? (
+        <span
+          data-testid="billing-due"
+          style={{ color: 'var(--text-muted)', fontSize: 'var(--text-caption)' }}
+        >
+          {t(locale, 'billing.card.dueBy')}{' '}
+          {formatDateInStudioZone(`${dueOn}T12:00:00Z`, locale)}
+        </span>
+      ) : null}
+    </DetailRow>
   )
 }
 
-/** One file plus one line — the seam-4 shape every other section uses. */
+/** One file plus one line — the seam-4 shape every other section uses. Order 70: after the
+ *  health row (60), directly above the training plan (75) the money buys. */
 export function registerBillingSections(): void {
-  registerSlot<{ locale: Locale }>('student-card', {
+  registerSlot<{ student: { id: string }; locale: Locale }>('student-card', {
     key: 'billing-strip',
-    // After M3's guardians (50): money is the card's last word, per 2c's region order.
     order: 70,
     render: StudentCardBillingSection,
   })

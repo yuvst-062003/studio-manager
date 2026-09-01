@@ -320,10 +320,35 @@
   color: var(--pending);
 }
 
+/* Grey, not amber. `notified` is amber and solid, `unmarked` was amber and dashed, so the
+ * only thing separating "you told us in advance" from "nobody filled the register in" was
+ * a border-style at 2px. They do not mean anything like the same thing: one is a family
+ * that did the right thing, the other is missing information. --text-muted says the
+ * second out loud, and frees amber to mean only the first. */
 .studio-attendance[data-state="unmarked"] {
-  border-color: var(--pending);
+  border-color: var(--text-muted);
   border-style: dashed;
-  color: var(--pending);
+  color: var(--text-muted);
+}
+
+/* An empty ring: the lesson has not happened, so there is nothing to draw inside it. */
+.studio-attendance[data-state="planned"] {
+  border-color: var(--text-muted);
+  color: var(--text-muted);
+}
+
+/* The calendar-cell size. Seven of these plus their gaps fit a 390px row; seven 42px
+ * marks do not. */
+.studio-attendance[data-size="sm"] {
+  block-size: 18px;
+  border-radius: var(--radius-circle);
+  border-width: var(--border-width-strong);
+  inline-size: 18px;
+}
+
+.studio-attendance[data-size="sm"] svg {
+  block-size: 12px;
+  inline-size: 12px;
 }
 
 .studio-choice {
@@ -1708,4 +1733,113 @@ a.studio-stat-tile:focus-visible {
 
 [data-a11y-links='underline'] a {
   text-decoration: underline;
+}
+
+/* ── DetailRow — one labelled fact ────────────────────────────────────────────────────
+ * Parent 2c's ledger. The label column is a fixed inline size so values line up down the
+ * whole card regardless of which lane wrote the row; that alignment is what makes eight
+ * sections read as one record. 48px min block size keeps every row over the 44px floor,
+ * including the ones that are links. */
+.studio-detail-row {
+  align-items: center;
+  color: inherit;
+  display: flex;
+  gap: var(--space-3);
+  min-block-size: 48px;
+  padding-block: var(--space-3);
+  padding-inline: var(--space-5);
+  text-decoration: none;
+}
+
+.studio-detail-row + .studio-detail-row {
+  border-block-start: var(--border-width-hairline) solid var(--border);
+}
+
+.studio-detail-row__label {
+  color: var(--text-secondary);
+  flex: none;
+  font-size: var(--text-label);
+  font-weight: var(--weight-medium);
+  inline-size: 92px;
+}
+
+.studio-detail-row__value {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+  font-size: var(--text-body);
+  gap: var(--space-1);
+  min-inline-size: 0;
+}
+
+/* A chip is sized by its own label, never by the column it sits in. The value is a flex
+ * COLUMN so its children stretch by default, which drew the health chip as a pill running
+ * the full width of the card. Rows that push a trailing value to the far edge still do —
+ * they set their own `margin-inline-start: auto` on a stretched child. */
+.studio-detail-row__value > .studio-chip {
+  align-self: start;
+}
+
+.studio-detail-row__value[data-tone="debt"] { color: var(--debt); }
+.studio-detail-row__value[data-tone="pending"] { color: var(--pending); }
+
+.studio-detail-row__action {
+  flex: none;
+  margin-inline-start: auto;
+}
+
+/* "Onward" is leftward in Hebrew and rightward in English, and CSS has no logical
+ * transform — so the chevron is turned per direction, the way .studio-drawer already is. */
+.studio-detail-row > svg {
+  color: var(--border-strong);
+  flex: none;
+  margin-inline-start: auto;
+  transform: rotate(-90deg);
+}
+
+[dir="rtl"] .studio-detail-row > svg {
+  transform: rotate(90deg);
+}
+
+/* ── Parent 2c — the student card ─────────────────────────────────────────────────────
+ * One surface, one heading, and a ledger of rows. No padding on the card itself: the
+ * header and each row own their inline padding so the hairlines between rows run the full
+ * width, which is what makes eight lanes' sections read as one record. */
+.studio-student-card {
+  background: var(--surface);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-xl);
+  display: block;
+  overflow: hidden;
+}
+
+.studio-student-card__header {
+  align-items: center;
+  display: flex;
+  gap: var(--space-3);
+  min-block-size: 48px;
+  padding-block: var(--space-3);
+  padding-inline: var(--space-5);
+}
+
+/* The name takes the room, so a `status` section sits on the far edge without either
+ * frame having to know the other exists. */
+.studio-student-card__name {
+  flex-grow: 1;
+  font-size: var(--text-title);
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-normal);
+  margin: 0;
+  min-inline-size: 0;
+}
+
+.studio-student-card__rows {
+  display: flex;
+  flex-direction: column;
+}
+
+/* The first row's rule separates it from the header; DetailRow's own adjacent-sibling
+ * rule draws the rest. Stated here because the header is not a DetailRow. */
+.studio-student-card__rows > *:first-child {
+  border-block-start: var(--border-width-hairline) solid var(--border);
 }

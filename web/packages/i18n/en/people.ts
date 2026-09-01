@@ -292,6 +292,10 @@ export const people: Bundle = {
   'card.title': 'Student card',
   'card.details': 'Details',
   'card.enrollments': 'Groups',
+  // 2c's ledger row labels (2026-09-01). Short, because they are a COLUMN — every value on
+  // the card lines up against them, so a label that wraps moves every row beside it.
+  'card.membership': 'Membership',
+  'card.plan': 'Plan',
   'card.sectionsComeLater':
     'The rest of the app — schedule, attendance and payments — opens once the health declaration is signed.',
   'alerts.title': 'Alert centre',
@@ -364,4 +368,34 @@ export const people: Bundle = {
   'sibling.duplicate': 'This child looks like they are already registered. Please contact the club.',
   'sibling.duplicateNamed': '{name} is already registered — no need to add them again.',
   'sibling.duplicateOpen': 'Open their card',
+
+  // -- screen 8: the guardian's own settings -------------------------------------
+  //
+  // The profile tab shipped titled `student.plural`, listing children, with the only
+  // per-child control being the destructive one. These are the keys that make it a screen
+  // about the PARENT: their own record, the app's settings, and the ways onward.
+  'profile.title': 'Profile',
+  'profile.account': 'My account',
+  'profile.app': 'The app',
+  'profile.family': 'Family',
+  'profile.club': 'The club',
+  'profile.privacy': 'Privacy',
+  'profile.name': 'Name',
+  'profile.email': 'Email',
+  'profile.phone': 'Phone',
+  'profile.notSet': 'Not set',
+  'profile.edit': 'Edit',
+  'profile.save': 'Save',
+  'profile.saveFailed': 'We could not save your details. Please try again.',
+  'profile.language': 'Language',
+  'profile.theme': 'Theme',
+  'profile.notifications': 'Notifications',
+  'profile.notifications.hint': 'Updates when a lesson is cancelled',
+  'profile.notifications.on': 'On',
+  'profile.notifications.off': 'Off',
+  'profile.paymentMethod': 'My payment method',
+  'profile.children': 'My children',
+  'profile.leaveHint': 'Leaving the club is done from the child’s card',
+  'profile.address': 'Address',
+
 }

@@ -769,7 +769,29 @@ waves:
         status: pending
       - id: S4
         title: Screen 4 — student card
-        status: pending
+        why: >-
+          Eight sections registered by six milestones, each rendering its own h2 at the
+          same weight, so the card read as eight screens rather than one record about one
+          child. The owner picked the dense-ledger arrangement: one header carrying the
+          child, and one hairline-separated list of labelled rows beneath it.
+
+          The container did not learn any section's name. SlotEntry grew a `region`, so a
+          lane declares which frame of the card it belongs in — mark, status, or body
+          (the default, so no existing lane had to be reopened) — next to the `order` it
+          already chose.
+
+          Three corrections rode along, each a defect rather than a restyle: the money row
+          now sums THIS CHILD's open charges instead of repeating the household balance on
+          every child's card; the health row carries the declaration's expiry, which the
+          old chip could not say at all; and the attendance row counts the whole 62-day
+          window rather than the last eight marks, whose 42px strip wrapped to two rows at
+          390px.
+
+          Stitch was attempted for this screen and produced nothing — the generation timed
+          out and left the project with only its DESIGN.md screen. Recorded in the spec's
+          Provenance table as such rather than filled in from imagination.
+        status: shipped
+        on: 2026-09-01
       - id: S5
         title: Screen 5 — payments
         status: pending
