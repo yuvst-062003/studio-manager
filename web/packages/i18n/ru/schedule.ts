@@ -533,6 +533,8 @@ export const schedule: Bundle = {
   'plan.gate.noPlans': 'Клуб ещё не настроил тарифы.',
   'setup.title': 'Платежи',
   'setup.intro': 'Выберите способ оплаты для каждого ребёнка.',
+  'setup.familyMethodHint': 'Выберите один способ оплаты для семьи. В сводке можно изменить любого ребёнка отдельно.',
+  'setup.familyApplies': 'Выбор применяется ко всем детям с открытым счётом.',
   'setup.forChild': 'Для {name}',
   'setup.unpriced': 'Клуб ещё не назначил цену этому ребёнку.',
   'setup.summaryTitle': 'Сводка платежей',

@@ -581,6 +581,8 @@ export const schedule: Bundle = {
   // -- the onboarding payment setup: per child, then one summary ------------------
   'setup.title': 'תשלומים',
   'setup.intro': 'בחרו איך תשלמו עבור כל ילד.',
+  'setup.familyMethodHint': 'בחרו אמצעי תשלום אחד למשפחה. בסיכום אפשר לשנות לכל ילד בנפרד.',
+  'setup.familyApplies': 'הבחירה תחול על כל הילדים עם חיוב פתוח.',
   'setup.forChild': 'עבור {name}',
   'setup.unpriced': 'המועדון עדיין לא קבע מחיר לילד הזה.',
   'setup.summaryTitle': 'סיכום תשלומים',

@@ -204,12 +204,21 @@ function LandingShell({ slug }: { slug: string }) {
 
 function JoinShell({ token }: { token: string }) {
   const [locale, setLocale] = useState<Locale>('he')
+  const session = useSession()
+  const privacyClient = useMemo(() => makePrivacyClient(apiFetch), [])
   useDocumentLocale(locale)
+  const join = <JoinFlow locale={locale} token={token} />
   return (
     <ThemeProvider>
       <AccessibilityMenu locale={locale} />
       <LanguagePicker locale={locale} onChoose={setLocale} />
-      <JoinFlow locale={locale} token={token} />
+      {session.status === 'signed-in' ? (
+        <ConsentGate client={privacyClient} locale={locale}>
+          {join}
+        </ConsentGate>
+      ) : (
+        join
+      )}
     </ThemeProvider>
   )
 }

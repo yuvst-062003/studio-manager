@@ -23,7 +23,12 @@ class PickupContactIn(BaseModel):
 
 
 class ChildDetailsIn(BaseModel):
-    """`טופס הרשמה` block 1. Four required fields; the rest are optional on the paper form too."""
+    """`טופס הרשמה` block 1, with legacy family fields kept for compatibility.
+
+    `address`, `city`, `phone_home`, `phone` and `email` are accepted here because the
+    already-shipped parent client sends them in the child object. The service writes them
+    to the signing guardian's `person` row; they are not child facts.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
@@ -33,7 +38,7 @@ class ChildDetailsIn(BaseModel):
     address: str = Field(min_length=1, max_length=200)
     city: str = Field(min_length=1, max_length=80)
     #: `כיתה/גן`. Free text: `ג'` and `גן חובה` are both answers the paper form accepts.
-    grade: str = Field(min_length=1, max_length=20)
+    grade: str = Field(default="", max_length=20)
     phone_home: str | None = Field(default=None, max_length=32)
     phone: str | None = Field(default=None, max_length=32)
     email: str | None = Field(default=None, max_length=320)

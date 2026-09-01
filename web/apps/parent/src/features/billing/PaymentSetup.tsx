@@ -119,9 +119,10 @@ export function PaymentSetup({
   onNothingToPay,
 }: PaymentSetupProps) {
   const [rows, setRows] = useState<ChildRow[] | null>(null)
-  // Which child is being answered for. `null` once every child has an answer — that is the
-  // summary, and it is a derived position rather than a second state to keep in step.
-  const [index, setIndex] = useState(0)
+  // Before this is true the screen asks once for the family. Child positions are used only
+  // for overrides opened from the summary.
+  const [familyAnswered, setFamilyAnswered] = useState(false)
+  const [index, setIndex] = useState<number | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [handSent, setHandSent] = useState(false)
@@ -144,13 +145,23 @@ export function PaymentSetup({
   useEffect(() => {
     if (rows !== null && payable.length === 0) onNothingToPay?.()
   }, [rows, payable.length, onNothingToPay])
-  const current = index < payable.length ? payable[index] : null
+  const current = familyAnswered && index !== null ? (payable[index] ?? null) : null
 
   const choose = useCallback((childId: string, method: SetupMethod) => {
     setRows((previous) =>
       (previous ?? []).map((row) => (row.child.id === childId ? { ...row, method } : row)),
     )
-    setIndex((n) => n + 1)
+    setIndex(null)
+  }, [])
+
+  const chooseForFamily = useCallback((method: SetupMethod) => {
+    setRows((previous) =>
+      (previous ?? []).map((row) =>
+        row.amountAgorot > 0 ? { ...row, method } : row,
+      ),
+    )
+    setFamilyAnswered(true)
+    setIndex(null)
   }, [])
 
   function run(action: () => Promise<void>) {
@@ -178,7 +189,39 @@ export function PaymentSetup({
     )
   }
 
-  // -- one child at a time --------------------------------------------------
+  // -- one method for the family -------------------------------------------
+  if (!familyAnswered) {
+    const multiple = payable.length > 1
+    return (
+      <div style={pageStyle} data-testid="payment-setup">
+        <Card>
+          <h1>{t(locale, 'schedule.setup.title')}</h1>
+          <p data-testid="setup-family-method">{t(locale, 'schedule.setup.familyMethodHint')}</p>
+        </Card>
+        <Card>
+          <h2>{t(locale, 'schedule.plan.gate.payHow')}</h2>
+          {multiple ? <p style={mutedStyle}>{t(locale, 'schedule.setup.familyApplies')}</p> : null}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+            {METHODS.map((method) => (
+              <Button
+                data-testid={`setup-method-${method}`}
+                key={method}
+                onClick={() => chooseForFamily(method)}
+                variant="secondary"
+              >
+                {t(locale, `schedule.plan.gate.method.${method}`)}
+              </Button>
+            ))}
+          </div>
+        </Card>
+        <Button data-testid="setup-later" onClick={onFinish} variant="ghost">
+          {t(locale, 'schedule.plan.gate.later')}
+        </Button>
+      </div>
+    )
+  }
+
+  // -- one child override ---------------------------------------------------
   if (current) {
     return (
       <div style={pageStyle} data-testid="payment-setup">

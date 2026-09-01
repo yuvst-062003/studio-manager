@@ -160,6 +160,7 @@ export const health: Bundle = {
   'registration.phoneHome': 'Домашний телефон',
   'registration.phoneMobile': 'Мобильный',
   'registration.email': 'Эл. почта',
+  'registration.fullName': 'Полное имя',
   'registration.motherName': 'Имя матери',
   'registration.fatherName': 'Имя отца',
   'registration.otherParent': 'Второй родитель',

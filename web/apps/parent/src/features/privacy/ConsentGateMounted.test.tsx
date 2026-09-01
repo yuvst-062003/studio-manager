@@ -88,6 +88,16 @@ function stub({
           { status: 200 },
         )
       }
+      if (url.includes('/api/v1/public/onboarding/live-token-123456')) {
+        return new Response(
+          JSON.stringify({
+            studio_name: 'מועדון הדגמה',
+            email: 'parent@example.invalid',
+            groups: [{ id: 'g1', name: 'ילדים א', weekdays: [0, 2] }],
+          }),
+          { status: 200 },
+        )
+      }
       return new Response(JSON.stringify({ items: [] }), { status: 200 })
     }),
   )
@@ -149,5 +159,16 @@ describe('§6.1 step 5, mounted in the shell', () => {
     render(<App />)
     await waitFor(() => expect(screen.getByTestId('consent-gate')).toBeInTheDocument())
     expect(screen.queryByTestId('privacy-screen')).toBeNull()
+  })
+
+  it('puts the shared join link behind consent before the family form can write people', async () => {
+    stub({ outstanding: ['terms', 'privacy'] })
+    globalThis.history.pushState({}, '', '/join/live-token-123456')
+
+    render(<App />)
+
+    await waitFor(() => expect(screen.getByTestId('consent-gate')).toBeInTheDocument())
+    expect(screen.queryByTestId('join-form')).toBeNull()
+    globalThis.history.pushState({}, '', '/')
   })
 })

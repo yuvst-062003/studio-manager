@@ -80,9 +80,71 @@ def test_registration_lands_on_columns_not_in_the_health_record(
     tenant_session.flush()
 
     child = tenant_session.get(Person, student_row.person_id)
-    assert child.address == "הרצל 12"
-    assert child.city == "נתניה"
+    reloaded_signer = tenant_session.get(Person, signer.id)
+    assert child.address is None
+    assert child.city is None
+    assert reloaded_signer.address == "הרצל 12"
+    assert reloaded_signer.city == "נתניה"
     assert student_row.grade == "ג'"
+
+
+def test_family_contact_fields_land_on_the_signing_guardian_not_the_child(
+    tenant_session, student_row, signer
+):
+    """The redesigned family step asks address/contact once, on the signer.
+
+    The old per-child gate stored those five fields on every child's `person` row, creating
+    sibling copies with nothing keeping them together. The request shape is still the old
+    client shape for compatibility, but the service must write the fields to the signer.
+    """
+    _save(
+        tenant_session,
+        student_row,
+        signer.id,
+        child=_child(
+            address="הרצל 12",
+            city="נתניה",
+            phone_home="09-7412233",
+            phone="054-8123456",
+            email="parent@example.invalid",
+        ),
+    )
+    tenant_session.flush()
+
+    child = tenant_session.get(Person, student_row.person_id)
+    assert child.address is None
+    assert child.city is None
+    assert child.phone_home is None
+    assert child.phone is None
+    assert child.email is None
+
+    reloaded_signer = tenant_session.get(Person, signer.id)
+    assert reloaded_signer.address == "הרצל 12"
+    assert reloaded_signer.city == "נתניה"
+    assert reloaded_signer.phone_home == "09-7412233"
+    assert reloaded_signer.phone == "054-8123456"
+    assert reloaded_signer.email == "parent@example.invalid"
+
+
+def test_registration_status_reads_required_family_fields_from_the_signer(
+    tenant_session, student_row, signer
+):
+    child = tenant_session.get(Person, student_row.person_id)
+    child.national_id_encrypted = normalize_national_id(VALID_CHILD_ID).encode()
+    student_row.grade = "ג'"
+    signer.national_id_encrypted = normalize_national_id(VALID_PARENT_ID).encode()
+    signer.address = "הרצל 12"
+    tenant_session.flush()
+
+    assert not agreement_status(
+        tenant_session, student_row, signer_person_id=signer.id
+    ).registration_complete
+
+    signer.city = "נתניה"
+    tenant_session.flush()
+    assert agreement_status(
+        tenant_session, student_row, signer_person_id=signer.id
+    ).registration_complete
 
 
 def test_the_national_id_is_normalized_before_storage(tenant_session, student_row, signer):

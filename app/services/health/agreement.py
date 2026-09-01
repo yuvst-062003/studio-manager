@@ -196,15 +196,17 @@ def agreement_status(
 ) -> AgreementStatus:
     """The three conditions, evaluated together. See `AgreementStatus`."""
     child = session.get(Person, student.person_id)
+    signer = session.get(Person, signer_person_id) if signer_person_id is not None else None
     # Resolved once and reused below, so the gate, the write path and the form the client
     # renders are all reading the same answer to the same question.
     required = required_registration_fields(session, student)
     school_class_required = "grade" in required
     registration_complete = (
         _has_national_id(child)
-        and child is not None
-        and bool(child.address)
-        and bool(child.city)
+        and _has_national_id(signer)
+        and signer is not None
+        and bool(signer.address)
+        and bool(signer.city)
         and (bool(student.grade) or not school_class_required)
     )
 
@@ -306,11 +308,8 @@ class AgreementService:
         if child_person is None:
             raise RegistrationIncompleteError(["student"])
 
-        missing = [
-            field
-            for field in required_registration_fields(session, student)
-            if not str(child.get(field) or "").strip()
-        ]
+        required = required_registration_fields(session, student)
+        missing = [field for field in required if not str(child.get(field) or "").strip()]
         if missing:
             raise RegistrationIncompleteError(missing)
         if not str(signer.get("national_id") or "").strip():
@@ -318,12 +317,6 @@ class AgreementService:
 
         # -- the child ------------------------------------------------------------------
         _set_national_id(child_person, child.get("national_id"), field="child_national_id")
-        child_person.address = str(child["address"]).strip()
-        child_person.city = str(child["city"]).strip()
-        for column, key in (("phone_home", "phone_home"), ("phone", "phone"), ("email", "email")):
-            value = child.get(key)
-            if value is not None and str(value).strip():
-                setattr(child_person, column, str(value).strip())
         # NULL rather than "" when there is no school class to record: an empty string is a
         # value, and `bool(student.grade)` above would read it the same either way while a
         # roster would print it as a blank כיתה rather than omitting the field.
@@ -336,6 +329,12 @@ class AgreementService:
         if signer_person is None:
             raise RegistrationIncompleteError(["signer"])
         _set_national_id(signer_person, signer.get("national_id"), field="signer_national_id")
+        signer_person.address = str(child["address"]).strip()
+        signer_person.city = str(child["city"]).strip()
+        for column, key in (("phone_home", "phone_home"), ("phone", "phone"), ("email", "email")):
+            value = child.get(key)
+            if value is not None and str(value).strip():
+                setattr(signer_person, column, str(value).strip())
         if signer.get("aliyah_year"):
             signer_person.aliyah_year_encrypted = str(signer["aliyah_year"]).strip()
 
@@ -360,7 +359,7 @@ class AgreementService:
             # a pickup contact's phone number. An audit diff is read by more people than the
             # record it describes.
             diff={
-                "fields_set": sorted(REQUIRED_REGISTRATION_FIELDS),
+                "fields_set": sorted(required),
                 "pickup_contacts": len(pickup_contacts),
                 "other_parent": bool(other_parent),
             },

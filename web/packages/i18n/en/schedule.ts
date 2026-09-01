@@ -531,6 +531,8 @@ export const schedule: Bundle = {
   'plan.gate.noPlans': 'The club has not set up any plans yet.',
   'setup.title': 'Payments',
   'setup.intro': 'Choose how you will pay for each child.',
+  'setup.familyMethodHint': 'Choose one payment method for the family. You can change any child in the summary.',
+  'setup.familyApplies': 'This choice applies to every child with an open charge.',
   'setup.forChild': 'For {name}',
   'setup.unpriced': 'The club has not priced this child yet.',
   'setup.summaryTitle': 'Payment summary',

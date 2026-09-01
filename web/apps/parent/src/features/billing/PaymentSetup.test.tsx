@@ -65,21 +65,19 @@ function setup(props: Partial<Parameters<typeof PaymentSetup>[0]> = {}) {
   )
 }
 
-/** Answer for the child currently being asked about. */
+/** Answer for the current setup question. */
 async function answer(method: string) {
   await userEvent.click(await screen.findByTestId(`setup-method-${method}`))
 }
 
 describe('the onboarding payment step', () => {
-  it('asks once per child, and names the price their groups already decided', async () => {
-    // The price is not a question here — `register` derived it from the groups the parent
-    // picked. This screen shows it and asks only how the money moves.
+  it('asks for one family method before the per-child summary', async () => {
     setup()
-    expect(await screen.findByTestId('setup-ask-s1')).toHaveTextContent(
-      t('he', 'schedule.plan.gate.payHow'),
+    expect(await screen.findByTestId('setup-family-method')).toHaveTextContent(
+      t('he', 'schedule.setup.familyMethodHint'),
     )
     await answer('card')
-    expect(await screen.findByTestId('setup-ask-s2')).toBeInTheDocument()
+    expect(await screen.findByTestId('setup-card')).toHaveTextContent('700')
   })
 
   it('settles every card child in ONE checkout', async () => {
@@ -89,7 +87,6 @@ describe('the onboarding payment step', () => {
     const onOrderOpened = vi.fn()
     setup({ client: stub({ createOrder }), onOrderOpened })
 
-    await answer('card')
     await answer('card')
 
     // 300 + 400 quoted before they leave the app.
@@ -103,7 +100,6 @@ describe('the onboarding payment step', () => {
     // A uPay shared link charges a FIXED amount, so two children need two mandates — one
     // link for both would underpay for the second every month (owner, 2026-08-30).
     setup()
-    await answer('standing_order')
     await answer('standing_order')
 
     const first = await screen.findByTestId('setup-standing-link-s1')
@@ -126,12 +122,10 @@ describe('the onboarding payment step', () => {
     setup({ client: stub({ createPromise }) })
 
     await answer('cash')
-    await answer('cheque')
     await userEvent.click(await screen.findByTestId('setup-tell-manager'))
 
-    await waitFor(() => expect(createPromise).toHaveBeenCalledTimes(2))
-    expect(createPromise).toHaveBeenCalledWith(['c1'], 'cash', 0)
-    expect(createPromise).toHaveBeenCalledWith(['c2'], 'cheque', 0)
+    await waitFor(() => expect(createPromise).toHaveBeenCalledTimes(1))
+    expect(createPromise).toHaveBeenCalledWith(['c1', 'c2'], 'cash', 0)
     expect(screen.getByTestId('setup-hand-sent')).toBeInTheDocument()
   })
 
@@ -141,6 +135,7 @@ describe('the onboarding payment step', () => {
     setup({ client: stub({ createOrder }) })
 
     await answer('card')
+    await userEvent.click(await screen.findByTestId('setup-change-s2'))
     await answer('standing_order')
 
     // Only the card child is in the checkout, at their own price.
@@ -154,7 +149,6 @@ describe('the onboarding payment step', () => {
 
   it('lets a family change an answer from the summary', async () => {
     setup()
-    await answer('card')
     await answer('card')
     await userEvent.click(await screen.findByTestId('setup-change-s1'))
     // Back on that child's question, not the other's.
@@ -196,7 +190,7 @@ describe('the onboarding payment step', () => {
 
   it('gives every control an accessible name', async () => {
     setup()
-    await screen.findByTestId('setup-ask-s1')
+    await screen.findByTestId('setup-family-method')
     for (const control of screen.getAllByRole('button')) {
       expect(control).toHaveAccessibleName()
     }

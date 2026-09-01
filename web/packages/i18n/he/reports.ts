@@ -195,6 +195,12 @@ export const reports: Bundle = {
     'לפני הכניסה לאפליקציה יש לאשר את תנאי השימוש ואת מדיניות הפרטיות. שני האישורים נדרשים, והם נשמרים עם התאריך והגרסה שאישרתם.',
   'privacy.gate.acceptTerms': 'קראתי ואני מאשר/ת את תנאי השימוש',
   'privacy.gate.acceptPrivacy': 'קראתי ואני מאשר/ת את מדיניות הפרטיות',
+  'privacy.gate.termsSummary':
+    'מה מותר למועדון לעשות באפליקציה, מה באחריותכם, ומה אפשר לבקש מאיתנו בכל רגע.',
+  'privacy.gate.privacySummary':
+    'איזה מידע נשמר, מי במועדון רואה אותו, כמה זמן הוא נשמר וכיצד מוחקים אותו.',
+  'privacy.gate.readFull': 'קריאת המסמך המלא',
+  'privacy.gate.closeFull': 'חזרה',
   'privacy.gate.submit': 'אישור והמשך',
   'privacy.gate.working': 'שומר…',
   'privacy.gate.mustAccept': 'יש לסמן את שני האישורים כדי להמשיך',

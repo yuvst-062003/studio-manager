@@ -82,8 +82,7 @@ export function RegistrationStep({
   const [email, setEmail] = useState('')
   const [signerId, setSignerId] = useState('')
   const [aliyahYear, setAliyahYear] = useState('')
-  const [otherFirst, setOtherFirst] = useState('')
-  const [otherLast, setOtherLast] = useState('')
+  const [otherFullName, setOtherFullName] = useState('')
   const [otherId, setOtherId] = useState('')
   const [otherPhone, setOtherPhone] = useState('')
   const [pickups, setPickups] = useState<PickupDraft[]>([EMPTY_PICKUP])
@@ -114,6 +113,8 @@ export function RegistrationStep({
     event.preventDefault()
     setShowErrors(true)
     if (!valid || sending) return
+    const [otherFirst = '', ...otherRest] = otherFullName.trim().split(/\s+/)
+    const otherLast = otherRest.join(' ')
     const contacts = pickups
       .map((entry) => ({ name: entry.name.trim(), phone: entry.phone.trim() }))
       // A repeatable row the parent tabbed past is not a person.
@@ -135,10 +136,10 @@ export function RegistrationStep({
         last_name: null,
         phone: null,
       },
-      other_parent: otherFirst.trim()
+      other_parent: otherFullName.trim()
         ? {
-            first_name: otherFirst.trim(),
-            last_name: otherLast.trim() || null,
+            first_name: otherFirst,
+            last_name: otherLast || null,
             national_id: otherId.trim() || null,
             phone: otherPhone.trim() || null,
             aliyah_year: null,
@@ -237,15 +238,9 @@ export function RegistrationStep({
           />
           <TextField
             hint={optional}
-            label={`${t(locale, 'health.registration.otherParent')} · ${t(locale, 'health.registration.motherName')}`}
-            onChange={(event) => setOtherFirst(event.target.value)}
-            value={otherFirst}
-          />
-          <TextField
-            hint={optional}
-            label={t(locale, 'health.registration.fatherName')}
-            onChange={(event) => setOtherLast(event.target.value)}
-            value={otherLast}
+            label={`${t(locale, 'health.registration.otherParent')} · ${t(locale, 'health.registration.fullName')}`}
+            onChange={(event) => setOtherFullName(event.target.value)}
+            value={otherFullName}
           />
           <TextField
             error={idError(otherId, false)}

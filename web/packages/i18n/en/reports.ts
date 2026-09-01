@@ -158,6 +158,12 @@ export const reports: Bundle = {
     'Before you can use the app you must accept the terms of service and the privacy policy. Both are required, and each is stored with the date and the version you accepted.',
   'privacy.gate.acceptTerms': 'I have read and accept the terms of service',
   'privacy.gate.acceptPrivacy': 'I have read and accept the privacy policy',
+  'privacy.gate.termsSummary':
+    'What the club may do in the app, what you are responsible for, and what you can ask us for at any time.',
+  'privacy.gate.privacySummary':
+    'What information is stored, who at the club can see it, how long it is kept, and how it is deleted.',
+  'privacy.gate.readFull': 'Read the full document',
+  'privacy.gate.closeFull': 'Back',
   'privacy.gate.submit': 'Accept and continue',
   'privacy.gate.working': 'Saving…',
   'privacy.gate.mustAccept': 'Tick both boxes to continue',

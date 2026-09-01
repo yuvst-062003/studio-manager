@@ -120,18 +120,18 @@ describe('the national id check digit', () => {
 
 // -- which step is owed ------------------------------------------------------------
 describe('nextStep', () => {
-  it('asks for registration first', () => {
-    expect(nextStep(OWES_EVERYTHING)).toBe('registration')
+  it('asks for the club terms before family details', () => {
+    expect(nextStep(OWES_EVERYTHING)).toBe('terms')
+  })
+
+  it('moves to registration once the terms are in', () => {
+    expect(nextStep({ ...OWES_EVERYTHING, terms_accepted: true })).toBe('registration')
   })
 
   it('moves to health once registration is in', () => {
-    expect(nextStep({ ...OWES_EVERYTHING, registration_complete: true })).toBe('health')
-  })
-
-  it('leaves the terms until last', () => {
     expect(
-      nextStep({ ...OWES_EVERYTHING, registration_complete: true, health_signed: true }),
-    ).toBe('terms')
+      nextStep({ ...OWES_EVERYTHING, registration_complete: true, terms_accepted: true }),
+    ).toBe('health')
   })
 
   it('returns null when the family owes nothing', () => {
@@ -157,7 +157,7 @@ describe('nextStep', () => {
 
 // -- the flow ----------------------------------------------------------------------
 describe('AgreementFlow', () => {
-  it('opens on the registration step and says where the family is', async () => {
+  it('opens on the club-terms step and says where the family is', async () => {
     render(
       <AgreementFlow
         client={makeClient()}
@@ -166,7 +166,7 @@ describe('AgreementFlow', () => {
         studentName="נועה לוי"
       />,
     )
-    expect(await screen.findByTestId('agreement-step-registration')).toBeInTheDocument()
+    expect(await screen.findByTestId('agreement-step-terms')).toBeInTheDocument()
     expect(screen.getByText(/1\/3/)).toBeInTheDocument()
   })
 

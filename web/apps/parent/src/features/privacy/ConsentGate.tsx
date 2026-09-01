@@ -23,9 +23,10 @@
 // screen who can try again.
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
-import { Alert, Button, Card, Checkbox, PolicyDocument } from '@studio/ui'
+import { Alert, Button, Card, Checkbox, DraftNotice, PolicyDocument } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
+import type { PolicyDoc } from '@studio/ui'
 
 import type { ConsentState, PrivacyClient } from './privacyClient'
 
@@ -59,6 +60,7 @@ export function ConsentGate({ locale, client, children, onStatusChange }: Consen
   // pending one and render nothing at all, forever.
   const [state, setState] = useState<ConsentState | null | undefined>(undefined)
   const [accepted, setAccepted] = useState({ terms: false, privacy: false })
+  const [openDoc, setOpenDoc] = useState<PolicyDoc | null>(null)
   const [saving, setSaving] = useState(false)
   const [failed, setFailed] = useState(false)
 
@@ -93,6 +95,7 @@ export function ConsentGate({ locale, client, children, onStatusChange }: Consen
   if (status === 'open' || state == null) return <>{children}</>
 
   const both = accepted.terms && accepted.privacy
+  const version = `${t(locale, 'reports.privacy.doc.version')} ${state.policy_version_label}`
 
   const submit = async (): Promise<void> => {
     setSaving(true)
@@ -118,41 +121,78 @@ export function ConsentGate({ locale, client, children, onStatusChange }: Consen
       <Card>
         <h1>{t(locale, 'reports.privacy.gate.title')}</h1>
         <p style={{ color: 'var(--text-muted)' }}>{t(locale, 'reports.privacy.gate.body')}</p>
+        {state.policy_is_draft ? (
+          <DraftNotice label={state.policy_version_label} locale={locale} />
+        ) : null}
       </Card>
-
-      {/* The full text, always, never behind a disclosure. A checkbox that says "I have
-          read" beside a document the screen declined to show is the thing this gate exists
-          to stop being true. The privacy SCREEN collapses the same document, because
-          there the reader has already accepted it. */}
-      <PolicyDocument
-        isDraft={state.policy_is_draft}
-        locale={locale}
-        versionLabel={state.policy_version_label}
-      />
 
       <Card>
         <Checkbox
           block
           checked={accepted.terms}
           data-testid="consent-check-terms"
-          label={t(locale, 'reports.privacy.gate.acceptTerms')}
+          label={t(locale, 'reports.privacy.terms.title')}
           onChange={(event) => {
-            // Read SYNCHRONOUSLY. `currentTarget` is null by the time a lazy state updater
-            // runs, so the obvious one-liner throws on the first tick of the first tap.
             const { checked } = event.currentTarget
             setAccepted((prev) => ({ ...prev, terms: checked }))
           }}
         />
+        <p style={{ color: 'var(--text-muted)' }}>
+          {t(locale, 'reports.privacy.gate.termsSummary')}
+        </p>
+        <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-caption)' }}>{version}</p>
+        <Button
+          data-testid="consent-read-terms"
+          onClick={() => setOpenDoc('terms')}
+          type="button"
+          variant="ghost"
+        >
+          {t(locale, 'reports.privacy.gate.readFull')}
+        </Button>
+      </Card>
+
+      <Card>
         <Checkbox
           block
           checked={accepted.privacy}
           data-testid="consent-check-privacy"
-          label={t(locale, 'reports.privacy.gate.acceptPrivacy')}
+          label={t(locale, 'reports.privacy.policy.title')}
           onChange={(event) => {
             const { checked } = event.currentTarget
             setAccepted((prev) => ({ ...prev, privacy: checked }))
           }}
         />
+        <p style={{ color: 'var(--text-muted)' }}>
+          {t(locale, 'reports.privacy.gate.privacySummary')}
+        </p>
+        <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-caption)' }}>{version}</p>
+        <Button
+          data-testid="consent-read-privacy"
+          onClick={() => setOpenDoc('policy')}
+          type="button"
+          variant="ghost"
+        >
+          {t(locale, 'reports.privacy.gate.readFull')}
+        </Button>
+      </Card>
+
+      {openDoc ? (
+        <Card>
+          <div data-testid="consent-document-sheet">
+            <Button onClick={() => setOpenDoc(null)} type="button" variant="ghost">
+              {t(locale, 'reports.privacy.gate.closeFull')}
+            </Button>
+            <PolicyDocument
+              isDraft={state.policy_is_draft}
+              locale={locale}
+              only={openDoc}
+              versionLabel={state.policy_version_label}
+            />
+          </div>
+        </Card>
+      ) : null}
+
+      <Card>
         {!both ? (
           <p style={{ color: 'var(--text-muted)' }}>
             {t(locale, 'reports.privacy.gate.mustAccept')}

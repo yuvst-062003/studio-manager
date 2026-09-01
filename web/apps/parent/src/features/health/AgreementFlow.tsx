@@ -62,13 +62,13 @@ type Step = 'registration' | 'health' | 'terms'
  * address only to be told the form was incomplete has done the typing twice.
  */
 export function nextStep(status: AgreementStatusOut): Step | null {
+  if (!status.terms_accepted) return 'terms'
   if (!status.registration_complete) return 'registration'
   if (!status.health_signed) return 'health'
-  if (!status.terms_accepted) return 'terms'
   return null
 }
 
-const STEP_ORDER: Step[] = ['registration', 'health', 'terms']
+const STEP_ORDER: Step[] = ['terms', 'registration', 'health']
 
 export function AgreementFlow({
   locale,
