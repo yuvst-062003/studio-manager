@@ -50,6 +50,22 @@ export function makeParentCommsClient(fetcher: Fetcher) {
         }),
       ),
 
+    /**
+     * Screen 8's notifications switch, turning them off.
+     *
+     * The token rides in the BODY, never the path — it is a credential, and a credential
+     * in a URL ends up in access logs. Resolves on 204 and on an unknown token alike: the
+     * switch reports the state the parent asked for, and a browser that lost its
+     * subscription must land on "off" rather than on an error it cannot act on.
+     */
+    deregisterPush: async (token: string): Promise<void> => {
+      await fetcher('/api/v1/push-tokens', {
+        method: 'DELETE',
+        headers: JSON_HEADERS,
+        body: JSON.stringify({ token }),
+      })
+    },
+
     preferences: async (): Promise<NotificationPreferencesOut> =>
       json(await fetcher('/api/v1/notification-preferences')),
 

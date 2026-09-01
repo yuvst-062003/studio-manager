@@ -152,3 +152,81 @@ def test_last_seen_at_moves_on_every_registration(
     row = app_session.execute(select(PushToken).where(PushToken.token == token)).scalar_one()
     app_session.refresh(row)
     assert row.last_seen_at == later
+
+
+# -- turning them off again ----------------------------------------------------
+#
+# Screen 8 of the parent redesign puts a notifications switch on the profile tab. A switch
+# that only travels one way is not a switch: `POST /push-tokens` could turn push on and
+# nothing could turn it off, so the screen would have shipped a control that lies about
+# its own state the moment a parent flipped it back.
+#
+# The token rides in the BODY, never the path. It is a credential, and a credential in a
+# URL ends up in access logs — the same reason the register route refuses to echo it back.
+
+
+def _deregister(client, caller, *, token: str):
+    return client.request(
+        "DELETE",
+        "/api/v1/push-tokens",
+        json={"token": token},
+        headers=caller.headers,
+    )
+
+
+def test_a_device_deregisters_and_stops_being_pushed_to(
+    client, app_session, as_guardian_of, a_student
+) -> None:
+    parent = as_guardian_of(a_student)
+    token = f"tok-{uuid.uuid4().hex}"
+    assert _register(client, parent, token=token).status_code == 201
+
+    response = _deregister(client, parent, token=token)
+    assert response.status_code == 204, response.text
+
+    app_session.expire_all()
+    rows = app_session.scalars(select(PushToken).where(PushToken.token == token)).all()
+    assert rows == []
+
+
+def test_deregistering_an_unknown_device_is_not_an_error(client, as_guardian_of, a_student) -> None:
+    """The switch reports the state the parent asked for. A browser that lost its
+    subscription, or a second tap, must land on 'notifications are off' rather than on an
+    error a parent can do nothing about."""
+    parent = as_guardian_of(a_student)
+    response = _deregister(client, parent, token=f"tok-{uuid.uuid4().hex}")
+    assert response.status_code == 204, response.text
+
+
+def test_a_parent_cannot_deregister_someone_elses_device(
+    client, app_session, as_guardian_of, a_student, studio
+) -> None:
+    """The token is a bearer-shaped string, so the route must scope the delete to the
+    caller rather than trusting whoever presents one."""
+    from app.models.people import Student
+    from app.models.person import Person
+    from tests.comms.conftest import YEAR_STARTS
+
+    other_person = Person(studio_id=studio.id, first_name="יוסי", last_name="אחר")
+    app_session.add(other_person)
+    app_session.flush()
+    other_student = Student(
+        studio_id=studio.id,
+        person_id=other_person.id,
+        status="active",
+        joined_on=YEAR_STARTS,
+    )
+    app_session.add(other_student)
+    app_session.commit()
+
+    owner = as_guardian_of(a_student)
+    stranger = as_guardian_of(other_student.id)
+    token = f"tok-{uuid.uuid4().hex}"
+    assert _register(client, owner, token=token).status_code == 201
+
+    response = _deregister(client, stranger, token=token)
+    assert response.status_code == 204, response.text
+
+    app_session.expire_all()
+    rows = app_session.scalars(select(PushToken).where(PushToken.token == token)).all()
+    assert len(rows) == 1, "another person's device must survive"

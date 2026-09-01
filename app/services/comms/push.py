@@ -154,6 +154,32 @@ class PushTokenService:
             raise ValueError("no such person in the active studio")
         return person.studio_id
 
+    def deregister(self, person_id: uuid.UUID, *, token: str) -> bool:
+        """Screen 8's notifications switch, travelling the other way.
+
+        Scoped to `person_id` as well as the token, and that is the point rather than
+        belt-and-braces: the token is a bearer-shaped string, so a delete keyed on it alone
+        would let anyone holding one silence somebody else's handset. A caller who does not
+        own the row gets the same answer as one whose device was already gone.
+
+        Returns whether a row went, but the route reports 204 either way. A browser that
+        lost its subscription, or a second tap on the switch, must land on 'notifications
+        are off' -- the state the parent asked for -- rather than on an error they can do
+        nothing about.
+
+        Unlike `register`, this needs no unscoped read: a device belonging to a person in
+        another studio is not this caller's to delete, so the `TenantSession` not seeing it
+        is the correct outcome and not a bug to work around.
+        """
+        row = self._session.execute(
+            select(PushToken).where(PushToken.token == token, PushToken.person_id == person_id)
+        ).scalar_one_or_none()
+        if row is None:
+            return False
+        self._session.delete(row)
+        self._session.commit()
+        return True
+
     def devices_for(self, person_id: uuid.UUID) -> list[PushToken]:
         """Every device this person has registered, across both apps.
 

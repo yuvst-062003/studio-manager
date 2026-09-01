@@ -194,6 +194,19 @@ class PushTokenIn(BaseModel):
     platform: PushPlatform
 
 
+class PushTokenDeleteIn(BaseModel):
+    """Screen 8's notifications switch, turning them off.
+
+    The token travels in the body rather than the path for the same reason
+    `PushTokenOut` refuses to echo it: it is a credential, and a credential in a URL ends
+    up in access logs and browser history. `app` and `platform` are not asked for -- the
+    row is found by token, and a client that had to restate them could get them wrong and
+    silence nothing.
+    """
+
+    token: str = Field(min_length=1, max_length=512)
+
+
 class PushTokenOut(BaseModel):
     id: uuid.UUID
     app: PushApp

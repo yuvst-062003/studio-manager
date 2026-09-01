@@ -9,6 +9,7 @@ export { JoinTheClub } from './JoinTheClub'
 export { JoinClubSection } from './JoinClubSection'
 export type { JoinGroupOption } from './JoinTheClub'
 export { ProfileAndLeave, GuardianRow, chipToneFor } from './ProfileAndLeave'
+export { GuardianSettings } from './GuardianSettings'
 export { ProfileSection } from './ProfileSection'
 export { StatusHistorySection } from './sections/StatusHistorySection'
 export {

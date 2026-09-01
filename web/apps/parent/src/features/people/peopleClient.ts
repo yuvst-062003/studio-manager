@@ -9,6 +9,8 @@ import type { components } from '@studio/api-client'
 
 export type StudentSummary = components['schemas']['StudentSummaryOut']
 export type GuardianOut = components['schemas']['GuardianOut']
+export type MyProfile = components['schemas']['MyProfileOut']
+export type MyProfileUpdate = components['schemas']['MyProfileUpdate']
 export type StudentDetail = components['schemas']['StudentDetailOut']
 export type EnrollmentOut = components['schemas']['EnrollmentOut']
 export type RegistrationRequestOut = components['schemas']['RegistrationRequestOut']
@@ -42,6 +44,26 @@ export function makePeopleClient(fetcher: Fetcher) {
      */
     myGuardians: (): Promise<{ items: GuardianOut[] }> =>
       fetcher('/api/v1/me/guardians').then(json<{ items: GuardianOut[] }>),
+
+    /**
+     * Screen 8's account rows — the CALLER's own record, singular.
+     *
+     * Deliberately not a filter over `myGuardians()`: that read returns the family's
+     * guardians and a screen that guessed which of them is "me" would eventually guess
+     * wrong in a family where both parents share a name.
+     */
+    myProfile: (): Promise<MyProfile> => fetcher('/api/v1/me/profile').then(json<MyProfile>),
+
+    /**
+     * Screen 8's account edit. Only the fields actually passed are sent, so the server can
+     * tell "clear this phone number" from "leave it alone" — see `MyProfileUpdate`.
+     */
+    updateMyProfile: (patch: MyProfileUpdate): Promise<MyProfile> =>
+      fetcher('/api/v1/me/profile', {
+        method: 'PATCH',
+        headers: JSON_HEADERS,
+        body: JSON.stringify(patch),
+      }).then(json<MyProfile>),
 
     student: (id: string): Promise<StudentDetail> =>
       fetcher(`/api/v1/students/${id}`).then(json<StudentDetail>),

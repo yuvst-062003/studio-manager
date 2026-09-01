@@ -66,6 +66,7 @@ from app.schemas.people import (
     StudentSummaryPage,
     StudentUpdate,
 )
+from app.schemas.platform import EMAIL_PATTERN
 from app.services.health.agreement import agreement_status
 from app.services.people.errors import (
     ConflictError,
@@ -77,6 +78,7 @@ from app.services.people.errors import NotFoundError as OnboardingNotFound
 from app.services.people.errors import RefusedError as OnboardingRefused
 from app.services.people.group_days import ScheduleReader
 from app.services.people.onboarding import OnboardingService
+from app.services.people.profile import ProfileService
 from app.services.people.students import StudentRow, StudentService
 from app.services.schedule import ScheduleService
 
@@ -876,6 +878,94 @@ def my_guardians(request: Request, session: TenantSessionDep) -> GuardianListRes
             seen.add(out.person_id)
             items.append(out)
     return GuardianListResponse(items=items)
+
+
+# -- §6.1's profile tab: the guardian's own record ------------------------------
+
+
+class MyProfileUpdate(BaseModel):
+    """The contact fields screen 8 lets a parent correct about themselves.
+
+    Every field is optional, and only the ones actually sent are applied -- so the screen
+    may PATCH one row at a time, and an explicit `null` clears a phone number while an
+    absent key leaves it alone.
+
+    `EMAIL_PATTERN` rather than `EmailStr`, for the reason `app/schemas/platform.py`
+    records where it defines it.
+    """
+
+    first_name: str | None = Field(default=None, min_length=1, max_length=80)
+    last_name: str | None = Field(default=None, min_length=1, max_length=80)
+    phone: str | None = Field(default=None, max_length=32)
+    email: str | None = Field(default=None, pattern=EMAIL_PATTERN, max_length=320)
+
+
+class MyProfileOut(BaseModel):
+    person_id: uuid.UUID
+    first_name: str
+    last_name: str
+    display_name: str
+    email: str | None
+    phone: str | None
+
+
+def _my_profile_out(person: Person) -> MyProfileOut:
+    return MyProfileOut(
+        person_id=person.id,
+        first_name=person.first_name,
+        last_name=person.last_name,
+        display_name=f"{person.first_name} {person.last_name}".strip(),
+        email=person.email,
+        phone=person.phone,
+    )
+
+
+def _no_such_person() -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail={"code": "not_found", "message": "no such person"},
+    )
+
+
+@router.get("/me/profile", response_model=MyProfileOut)
+def my_profile(request: Request, session: TenantSessionDep) -> MyProfileOut:
+    """The caller's own contact details, for the profile tab's account rows.
+
+    Separate from `GET /me/guardians`, which returns the FAMILY's guardians -- both
+    parents. This one is the singular: the person holding the session, and the only person
+    the sibling PATCH can write.
+    """
+    try:
+        person = ProfileService.get(session, person_id=_person_id(request))
+    except NotFoundError as exc:
+        raise _no_such_person() from exc
+    return _my_profile_out(person)
+
+
+@router.patch("/me/profile", response_model=MyProfileOut)
+def update_my_profile(
+    body: MyProfileUpdate,
+    request: Request,
+    session: TenantSessionDep,
+    idempotency_key: IdempotencyKey = None,
+) -> MyProfileOut:
+    """A guardian corrects their own name, email or phone.
+
+    No role dependency, the same reason as `/me/students` and `/me/guardians`: §3.1 --
+    'guardian is not a role'. And no person id in the path or the body, so there is no
+    shape in which this route could address the co-parent.
+    """
+    person_id = _person_id(request)
+    try:
+        person = ProfileService.update_own(
+            session,
+            person_id=person_id,
+            fields={name: getattr(body, name) for name in body.model_fields_set},
+        )
+    except NotFoundError as exc:
+        raise _no_such_person() from exc
+    session.commit()
+    return _my_profile_out(person)
 
 
 @router.post("/me/students/{student_id}/join", response_model=StudentSummaryOut)

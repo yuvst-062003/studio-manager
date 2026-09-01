@@ -1984,6 +1984,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Profile
+         * @description The caller's own contact details, for the profile tab's account rows.
+         *
+         *     Separate from `GET /me/guardians`, which returns the FAMILY's guardians -- both
+         *     parents. This one is the singular: the person holding the session, and the only person
+         *     the sibling PATCH can write.
+         */
+        get: operations["my_profile_api_v1_me_profile_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update My Profile
+         * @description A guardian corrects their own name, email or phone.
+         *
+         *     No role dependency, the same reason as `/me/students` and `/me/guardians`: §3.1 --
+         *     'guardian is not a role'. And no person id in the path or the body, so there is no
+         *     shape in which this route could address the co-parent.
+         */
+        patch: operations["update_my_profile_api_v1_me_profile_patch"];
+        trace?: never;
+    };
     "/api/v1/me/standing-order": {
         parameters: {
             query?: never;
@@ -3271,7 +3303,21 @@ export interface paths {
          *     of a credential is one more place for it to end up in a log.
          */
         post: operations["register_push_token_api_v1_push_tokens_post"];
-        delete?: never;
+        /**
+         * Deregister Push Token
+         * @description Screen 8's notifications switch, travelling the other way.
+         *
+         *     §5.11 permits exactly two levels -- push, and a one-way in-app notice -- and until this
+         *     route existed a parent could reach only the first of them and never leave it. The
+         *     profile tab draws a switch, and a switch that moves one way is a control that lies
+         *     about its own state.
+         *
+         *     204 whether or not a row went. A browser that lost its subscription, or a second tap,
+         *     must land on the state the parent asked for rather than on an error they can do
+         *     nothing about; `PushTokenService.deregister` records why the delete is scoped to the
+         *     caller as well as the token.
+         */
+        delete: operations["deregister_push_token_api_v1_push_tokens_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -8317,6 +8363,45 @@ export interface components {
             /** Total Students */
             total_students: number;
         };
+        /** MyProfileOut */
+        MyProfileOut: {
+            /** Display Name */
+            display_name: string;
+            /** Email */
+            email: string | null;
+            /** First Name */
+            first_name: string;
+            /** Last Name */
+            last_name: string;
+            /**
+             * Person Id
+             * Format: uuid
+             */
+            person_id: string;
+            /** Phone */
+            phone: string | null;
+        };
+        /**
+         * MyProfileUpdate
+         * @description The contact fields screen 8 lets a parent correct about themselves.
+         *
+         *     Every field is optional, and only the ones actually sent are applied -- so the screen
+         *     may PATCH one row at a time, and an explicit `null` clears a phone number while an
+         *     absent key leaves it alone.
+         *
+         *     `EMAIL_PATTERN` rather than `EmailStr`, for the reason `app/schemas/platform.py`
+         *     records where it defines it.
+         */
+        MyProfileUpdate: {
+            /** Email */
+            email?: string | null;
+            /** First Name */
+            first_name?: string | null;
+            /** Last Name */
+            last_name?: string | null;
+            /** Phone */
+            phone?: string | null;
+        };
         /**
          * MyStandingOrderOut
          * @description Whether §5.10's second double-payment guard applies to the person asking.
@@ -9390,6 +9475,20 @@ export interface components {
             studio_name: string;
             /** Trial Steps */
             trial_steps?: string[];
+        };
+        /**
+         * PushTokenDeleteIn
+         * @description Screen 8's notifications switch, turning them off.
+         *
+         *     The token travels in the body rather than the path for the same reason
+         *     `PushTokenOut` refuses to echo it: it is a credential, and a credential in a URL ends
+         *     up in access logs and browser history. `app` and `platform` are not asked for -- the
+         *     row is found by token, and a client that had to restate them could get them wrong and
+         *     silence nothing.
+         */
+        PushTokenDeleteIn: {
+            /** Token */
+            token: string;
         };
         /**
          * PushTokenIn
@@ -14984,6 +15083,62 @@ export interface operations {
             };
         };
     };
+    my_profile_api_v1_me_profile_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyProfileOut"];
+                };
+            };
+        };
+    };
+    update_my_profile_api_v1_me_profile_patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MyProfileUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyProfileOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     my_standing_order_api_v1_me_standing_order_get: {
         parameters: {
             query?: never;
@@ -16761,6 +16916,37 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["PushTokenOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    deregister_push_token_api_v1_push_tokens_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PushTokenDeleteIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

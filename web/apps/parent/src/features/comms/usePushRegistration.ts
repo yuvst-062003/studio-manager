@@ -118,5 +118,30 @@ export function usePushRegistration(
     }
   }, [client, platform])
 
-  return { state: effective, platform, offer, decline, ask }
+  /**
+   * The other direction, for screen 8's notifications switch.
+   *
+   * **`unsubscribe()` is what actually stops the buzzing; the API call is bookkeeping.**
+   * The stored token is `JSON.stringify(subscription)`, so the delete matches only if the
+   * browser serialises it identically — normally it does, and when it does not the device
+   * has still genuinely unsubscribed and the stale row simply stops resolving. Ordering
+   * matters: tell the server first, because after `unsubscribe()` there is no token left
+   * to name the row with.
+   */
+  const turnOff = useCallback(async () => {
+    try {
+      const navigatorWithSW = globalThis.navigator as PushCapableNavigator
+      const registration = await navigatorWithSW.serviceWorker?.ready
+      const subscription = await registration?.pushManager.getSubscription()
+      if (subscription) {
+        await client.deregisterPush(JSON.stringify(subscription))
+        await subscription.unsubscribe()
+      }
+      setState('unasked')
+    } catch {
+      setState('error')
+    }
+  }, [client])
+
+  return { state: effective, platform, offer, decline, ask, turnOff }
 }

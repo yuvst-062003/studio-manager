@@ -803,7 +803,38 @@ waves:
         status: done
       - id: S8
         title: Screen 8 — profile
-        status: pending
+        why: >-
+          The tab was titled חניכים, listed the children, and offered exactly one control
+          on each of them: the destructive one. None of the parent's own material was on
+          the screen the design calls the only one about the parent rather than their
+          children.
+
+          The owner picked the layered settings list, on the single axis the three
+          candidates differed on — where the destructive action lives. Each row states its
+          current value and leads to where it is changed, and עזיבת המועדון is not on this
+          screen at all; it belongs to the child's card, which screen 4 owns.
+
+          Two endpoints had to exist for the screen to be honest. PATCH /me/profile,
+          because the guardian's own name, email and phone were readable and frozen — it
+          is scoped to the caller's own person, and takes no person id in any position, so
+          no shape of it can rewrite the co-parent's record. And DELETE /push-tokens,
+          because POST could only ever turn notifications on: a switch that travels one
+          way is a control that lies about its state the moment it is flipped back.
+
+          Two defects the capture showed and the brief had not named were fixed with it:
+          the page title contradicted the tab that opens it, and the guardian call link
+          rendered underneath the tab bar, unreachable.
+
+          The delete-my-data control was cut by the owner rather than drawn.
+          purge_subject_data raises until it is built, so every request ends failed; a
+          parent asks the manager, which is what earns the club's telephone its row.
+
+          Stitch was attempted and produced nothing — the generation timed out and left
+          the project holding only its DESIGN.md screen, the same failure screen 4 hit.
+          The arrangement came from Claude Design, which the prompts file already names as
+          the alternative. Recorded in the spec's Provenance table as such.
+        status: shipped
+        on: 2026-09-01
 holdbacks:
   - id: HB-w6-health-gate-unmounted
     kind: carried

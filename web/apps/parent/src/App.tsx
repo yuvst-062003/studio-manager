@@ -701,7 +701,7 @@ function AuthedApp() {
               }
             />
           ) : onProfile ? (
-            <ProfileSection locale={locale} />
+            <ProfileSection locale={locale} onLocaleChange={setLocale} />
           ) : joiningClub ? (
             // INSIDE the gates, like every other branch: a trial family passes both today
             // (§5.5 does not hold `trial_signed` while the child is still on a trial), and

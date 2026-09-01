@@ -38,6 +38,7 @@ from app.schemas.comms import (
     NotificationPage,
     PushApp,
     PushPlatform,
+    PushTokenDeleteIn,
     PushTokenIn,
     PushTokenOut,
 )
@@ -132,6 +133,27 @@ def register_push_token(
         platform=body.platform,
         last_seen_at=row.last_seen_at,
     )
+
+
+@router.delete("/push-tokens", status_code=status.HTTP_204_NO_CONTENT)
+def deregister_push_token(
+    request: Request,
+    body: PushTokenDeleteIn,
+    session: TenantSessionDep,
+) -> None:
+    """Screen 8's notifications switch, travelling the other way.
+
+    §5.11 permits exactly two levels -- push, and a one-way in-app notice -- and until this
+    route existed a parent could reach only the first of them and never leave it. The
+    profile tab draws a switch, and a switch that moves one way is a control that lies
+    about its own state.
+
+    204 whether or not a row went. A browser that lost its subscription, or a second tap,
+    must land on the state the parent asked for rather than on an error they can do
+    nothing about; `PushTokenService.deregister` records why the delete is scoped to the
+    caller as well as the token.
+    """
+    PushTokenService(session).deregister(_person_id(request), token=body.token)
 
 
 # -- §5.11's announcements (dashboard 4f) -------------------------------------

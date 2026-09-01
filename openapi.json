@@ -6887,6 +6887,117 @@
         "title": "MonthlyReportSummary",
         "type": "object"
       },
+      "MyProfileOut": {
+        "properties": {
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "first_name": {
+            "title": "First Name",
+            "type": "string"
+          },
+          "last_name": {
+            "title": "Last Name",
+            "type": "string"
+          },
+          "person_id": {
+            "format": "uuid",
+            "title": "Person Id",
+            "type": "string"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          }
+        },
+        "required": [
+          "person_id",
+          "first_name",
+          "last_name",
+          "display_name",
+          "email",
+          "phone"
+        ],
+        "title": "MyProfileOut",
+        "type": "object"
+      },
+      "MyProfileUpdate": {
+        "description": "The contact fields screen 8 lets a parent correct about themselves.\n\nEvery field is optional, and only the ones actually sent are applied -- so the screen\nmay PATCH one row at a time, and an explicit `null` clears a phone number while an\nabsent key leaves it alone.\n\n`EMAIL_PATTERN` rather than `EmailStr`, for the reason `app/schemas/platform.py`\nrecords where it defines it.",
+        "properties": {
+          "email": {
+            "anyOf": [
+              {
+                "maxLength": 320,
+                "pattern": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "first_name": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Name"
+          },
+          "last_name": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Name"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          }
+        },
+        "title": "MyProfileUpdate",
+        "type": "object"
+      },
       "MyStandingOrderOut": {
         "description": "Whether §5.10's second double-payment guard applies to the person asking.",
         "properties": {
@@ -9216,6 +9327,22 @@
           "address"
         ],
         "title": "PublicLandingOut",
+        "type": "object"
+      },
+      "PushTokenDeleteIn": {
+        "description": "Screen 8's notifications switch, turning them off.\n\nThe token travels in the body rather than the path for the same reason\n`PushTokenOut` refuses to echo it: it is a credential, and a credential in a URL ends\nup in access logs and browser history. `app` and `platform` are not asked for -- the\nrow is found by token, and a client that had to restate them could get them wrong and\nsilence nothing.",
+        "properties": {
+          "token": {
+            "maxLength": 512,
+            "minLength": 1,
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token"
+        ],
+        "title": "PushTokenDeleteIn",
         "type": "object"
       },
       "PushTokenIn": {
@@ -19803,6 +19930,89 @@
         ]
       }
     },
+    "/api/v1/me/profile": {
+      "get": {
+        "description": "The caller's own contact details, for the profile tab's account rows.\n\nSeparate from `GET /me/guardians`, which returns the FAMILY's guardians -- both\nparents. This one is the singular: the person holding the session, and the only person\nthe sibling PATCH can write.",
+        "operationId": "my_profile_api_v1_me_profile_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyProfileOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "My Profile",
+        "tags": [
+          "people"
+        ]
+      },
+      "patch": {
+        "description": "A guardian corrects their own name, email or phone.\n\nNo role dependency, the same reason as `/me/students` and `/me/guardians`: §3.1 --\n'guardian is not a role'. And no person id in the path or the body, so there is no\nshape in which this route could address the co-parent.",
+        "operationId": "update_my_profile_api_v1_me_profile_patch",
+        "parameters": [
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MyProfileUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyProfileOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update My Profile",
+        "tags": [
+          "people"
+        ]
+      }
+    },
     "/api/v1/me/standing-order": {
       "get": {
         "description": "§5.10's second guard, from the side of the person it is a guard for.\n\n'If the payer has an active recurring_subscription, the credit-card option shows a\nwarning before opening uPay. **A warning, not a block — the parent decides.**' The\nparent could not be told: `GET /recurring-subscriptions` is manager-only, so\n`PaymentsScreen`'s `hasActiveSubscription` had no payer-facing source and the warning\n§5.10 requires was unreachable by the only person it addresses.\n\nA boolean and not the subscription. The screen asks one question, the answer is not\nmoney, and a family's mandate details are the reconciliation queue's business.",
@@ -22539,6 +22749,40 @@
       }
     },
     "/api/v1/push-tokens": {
+      "delete": {
+        "description": "Screen 8's notifications switch, travelling the other way.\n\n§5.11 permits exactly two levels -- push, and a one-way in-app notice -- and until this\nroute existed a parent could reach only the first of them and never leave it. The\nprofile tab draws a switch, and a switch that moves one way is a control that lies\nabout its own state.\n\n204 whether or not a row went. A browser that lost its subscription, or a second tap,\nmust land on the state the parent asked for rather than on an error they can do\nnothing about; `PushTokenService.deregister` records why the delete is scoped to the\ncaller as well as the token.",
+        "operationId": "deregister_push_token_api_v1_push_tokens_delete",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PushTokenDeleteIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Deregister Push Token",
+        "tags": [
+          "coach",
+          "comms"
+        ]
+      },
       "post": {
         "description": "§7's `POST /push-tokens`. §6.5's install funnel ends here.\n\n201 on a re-registration as well as a first one, deliberately. FCM hands the same token\nback to the same browser on every launch, so \"already registered\" is the ordinary path\nrather than a conflict -- and a 409 would make the client's launch sequence branch on a\nstate it cannot do anything about.\n\nThe token is not echoed back. The client already holds it, and a second representation\nof a credential is one more place for it to end up in a log.",
         "operationId": "register_push_token_api_v1_push_tokens_post",

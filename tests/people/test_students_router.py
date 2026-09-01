@@ -381,3 +381,69 @@ def test_no_coach_scoped_endpoint_returns_a_financial_field():
     from tests.invariants.test_03_coach_endpoints_expose_no_money import leaks
 
     assert leaks(app) == []
+
+
+# -- §6.1's profile tab: a guardian edits their OWN contact details -------------
+#
+# Screen 8 of the parent redesign. `GET /me/guardians` shipped read-only, so the tab the
+# design calls "the only screen about the parent rather than their children" had nothing
+# on it a parent could actually change. The write is deliberately scoped to the CALLER's
+# own person: §5.3 says all guardians are equal, which grants no one the right to rewrite
+# the other parent's phone number.
+
+
+def test_a_guardian_edits_their_own_contact_details(client, as_guardian, app_session):
+    from app.models.person import Person
+
+    response = client.patch(
+        "/api/v1/me/profile",
+        json={"first_name": "שירה", "last_name": "הורה", "phone": "050-1234567"},
+        headers=as_guardian.headers,
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["first_name"] == "שירה"
+    assert body["phone"] == "050-1234567"
+
+    app_session.expire_all()
+    row = app_session.get(Person, as_guardian.person_id)
+    assert row is not None
+    assert (row.first_name, row.last_name, row.phone) == ("שירה", "הורה", "050-1234567")
+
+
+def test_a_guardian_may_not_edit_the_other_parent(client, as_manager, as_guardian, app_session):
+    """L8/§5.3 -- one guardian view, and no permission branching inside it. That equality
+    is about what each parent may do to their OWN record; it is not a licence to rewrite
+    the co-parent's. The route takes no person id at all, which is what makes that true."""
+    from app.models.person import Person
+
+    payload = _payload()
+    created = _create(client, as_manager, payload)
+    other_id = uuid.UUID(created["student"]["id"])
+    assert other_id  # the family exists; its guardian is a different Person
+
+    before = {
+        row.id: (row.first_name, row.phone)
+        for row in app_session.scalars(select(Person)).all()
+        if row.id != as_guardian.person_id
+    }
+
+    response = client.patch(
+        "/api/v1/me/profile",
+        json={"first_name": "מישהו", "phone": "050-0000000"},
+        headers=as_guardian.headers,
+    )
+    assert response.status_code == 200, response.text
+
+    app_session.expire_all()
+    after = {
+        row.id: (row.first_name, row.phone)
+        for row in app_session.scalars(select(Person)).all()
+        if row.id != as_guardian.person_id
+    }
+    assert after == before
+
+
+def test_me_profile_refuses_an_anonymous_caller(client):
+    response = client.patch("/api/v1/me/profile", json={"first_name": "x"})
+    assert response.status_code in (401, 403)
