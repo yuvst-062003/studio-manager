@@ -19,7 +19,7 @@ import { Alert, Button, Card, TextField } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { isValidNationalId } from './nationalId'
-import type { RegistrationIn } from './healthClient'
+import type { RegistrationDefaultsOut, RegistrationIn } from './healthClient'
 
 const formStyle: CSSProperties = {
   display: 'flex',
@@ -60,6 +60,13 @@ export type RegistrationStepProps = {
    * the client cannot see. Defaulting to `true` keeps every existing caller unchanged.
    */
   schoolClassRequired?: boolean
+  /**
+   * What the family already told the club, offered by `agreementStatus` for a SIBLING to
+   * reuse — never for this child's own facts (`childId`, `grade`), which stay blank: each
+   * child is a distinct person with their own id and their own class. `undefined` for a
+   * family's first child, exactly as blank as the form has always opened.
+   */
+  initial?: RegistrationDefaultsOut | null
 }
 
 const EMPTY_PICKUP: PickupDraft = { name: '', phone: '' }
@@ -72,20 +79,29 @@ export function RegistrationStep({
   sending = false,
   error,
   schoolClassRequired = true,
+  initial,
 }: RegistrationStepProps) {
   const [childId, setChildId] = useState('')
   const [grade, setGrade] = useState('')
-  const [address, setAddress] = useState('')
-  const [city, setCity] = useState('')
-  const [phoneHome, setPhoneHome] = useState('')
-  const [phone, setPhone] = useState('')
-  const [email, setEmail] = useState('')
-  const [signerId, setSignerId] = useState('')
-  const [aliyahYear, setAliyahYear] = useState('')
-  const [otherFullName, setOtherFullName] = useState('')
-  const [otherId, setOtherId] = useState('')
-  const [otherPhone, setOtherPhone] = useState('')
-  const [pickups, setPickups] = useState<PickupDraft[]>([EMPTY_PICKUP])
+  const [address, setAddress] = useState(initial?.address ?? '')
+  const [city, setCity] = useState(initial?.city ?? '')
+  const [phoneHome, setPhoneHome] = useState(initial?.phone_home ?? '')
+  const [phone, setPhone] = useState(initial?.phone ?? '')
+  const [email, setEmail] = useState(initial?.email ?? '')
+  const [signerId, setSignerId] = useState(initial?.signer_national_id ?? '')
+  const [aliyahYear, setAliyahYear] = useState(initial?.aliyah_year ?? '')
+  const [otherFullName, setOtherFullName] = useState(
+    initial?.other_parent
+      ? `${initial.other_parent.first_name ?? ''} ${initial.other_parent.last_name ?? ''}`.trim()
+      : '',
+  )
+  const [otherId, setOtherId] = useState(initial?.other_parent?.national_id ?? '')
+  const [otherPhone, setOtherPhone] = useState(initial?.other_parent?.phone ?? '')
+  const [pickups, setPickups] = useState<PickupDraft[]>(
+    initial?.pickup_contacts && initial.pickup_contacts.length > 0
+      ? initial.pickup_contacts.map((contact) => ({ name: contact.name, phone: contact.phone }))
+      : [EMPTY_PICKUP],
+  )
   const [showErrors, setShowErrors] = useState(false)
 
   const idError = (value: string, required: boolean): string | undefined => {

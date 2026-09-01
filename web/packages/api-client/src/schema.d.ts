@@ -5249,6 +5249,7 @@ export interface components {
             health_signed: boolean;
             /** Registration Complete */
             registration_complete: boolean;
+            registration_defaults?: components["schemas"]["RegistrationDefaultsOut"] | null;
             /**
              * School Class Required
              * @default true
@@ -6150,7 +6151,11 @@ export interface components {
         };
         /**
          * ChildDetailsIn
-         * @description `טופס הרשמה` block 1. Four required fields; the rest are optional on the paper form too.
+         * @description `טופס הרשמה` block 1, with legacy family fields kept for compatibility.
+         *
+         *     `address`, `city`, `phone_home`, `phone` and `email` are accepted here because the
+         *     already-shipped parent client sends them in the child object. The service writes them
+         *     to the signing guardian's `person` row; they are not child facts.
          */
         ChildDetailsIn: {
             /** Address */
@@ -6159,7 +6164,10 @@ export interface components {
             city: string;
             /** Email */
             email?: string | null;
-            /** Grade */
+            /**
+             * Grade
+             * @default
+             */
             grade: string;
             /** National Id */
             national_id: string;
@@ -8695,6 +8703,20 @@ export interface components {
             status: string;
         };
         /**
+         * OtherParentDefaultsOut
+         * @description The second parent, as already on file for one of this signer's other children.
+         */
+        OtherParentDefaultsOut: {
+            /** First Name */
+            first_name?: string | null;
+            /** Last Name */
+            last_name?: string | null;
+            /** National Id */
+            national_id?: string | null;
+            /** Phone */
+            phone?: string | null;
+        };
+        /**
          * ParentDetailsIn
          * @description `טופס הרשמה` block 2, for the signing parent and optionally the other one.
          */
@@ -9583,6 +9605,31 @@ export interface components {
             /** Confirmed */
             confirmed: boolean;
             registration: components["schemas"]["EventRegistrationOut"];
+        };
+        /**
+         * RegistrationDefaultsOut
+         * @description What this family already told the club, offered so a sibling's registration does not
+         *     re-ask it. See `registration_defaults` in `app.services.health.agreement` for where each
+         *     field comes from and why.
+         */
+        RegistrationDefaultsOut: {
+            /** Address */
+            address?: string | null;
+            /** Aliyah Year */
+            aliyah_year?: string | null;
+            /** City */
+            city?: string | null;
+            /** Email */
+            email?: string | null;
+            other_parent?: components["schemas"]["OtherParentDefaultsOut"] | null;
+            /** Phone */
+            phone?: string | null;
+            /** Phone Home */
+            phone_home?: string | null;
+            /** Pickup Contacts */
+            pickup_contacts?: components["schemas"]["PickupContactOut"][];
+            /** Signer National Id */
+            signer_national_id?: string | null;
         };
         /**
          * RegistrationIn

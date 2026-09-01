@@ -15,6 +15,7 @@ export type HealthStatus = components['schemas']['StudentSummaryOut']['health_st
 export type AgreementStatusOut = components['schemas']['AgreementStatusOut']
 export type RegistrationIn = components['schemas']['RegistrationIn']
 export type PickupContactIn = components['schemas']['PickupContactIn']
+export type RegistrationDefaultsOut = components['schemas']['RegistrationDefaultsOut']
 
 export type Fetcher = (path: string, init?: RequestInit) => Promise<Response>
 

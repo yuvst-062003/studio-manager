@@ -83,6 +83,44 @@ class ClubTermsIn(BaseModel):
     version: int
 
 
+class PickupContactOut(BaseModel):
+    """One authorised collector, as a coach at the door reads it.
+
+    Name and phone, nothing else. The point of the field is that somebody can check who is
+    standing there, and a coach who cannot read it is a coach the field does not help.
+    """
+
+    name: str
+    phone: str
+    relation: str | None = None
+
+
+class OtherParentDefaultsOut(BaseModel):
+    """The second parent, as already on file for one of this signer's other children."""
+
+    first_name: str | None = None
+    last_name: str | None = None
+    national_id: str | None = None
+    phone: str | None = None
+
+
+class RegistrationDefaultsOut(BaseModel):
+    """What this family already told the club, offered so a sibling's registration does not
+    re-ask it. See `registration_defaults` in `app.services.health.agreement` for where each
+    field comes from and why.
+    """
+
+    address: str | None = None
+    city: str | None = None
+    phone_home: str | None = None
+    phone: str | None = None
+    email: str | None = None
+    signer_national_id: str | None = None
+    aliyah_year: str | None = None
+    other_parent: OtherParentDefaultsOut | None = None
+    pickup_contacts: list[PickupContactOut] = Field(default_factory=list)
+
+
 class AgreementStatusOut(BaseModel):
     """The three gate conditions, computed server-side and never re-derived by a client.
 
@@ -103,18 +141,10 @@ class AgreementStatusOut(BaseModel):
     #: the client cannot see the guardian rows, and a form requiring a field the server does
     #: not is a submit button that never fires.
     school_class_required: bool = True
-
-
-class PickupContactOut(BaseModel):
-    """One authorised collector, as a coach at the door reads it.
-
-    Name and phone, nothing else. The point of the field is that somebody can check who is
-    standing there, and a coach who cannot read it is a coach the field does not help.
-    """
-
-    name: str
-    phone: str
-    relation: str | None = None
+    #: `None` once registration is complete (nothing left to prefill) or for a family's first
+    #: child (nothing on file yet). Computed only while the registration step would actually
+    #: render -- see `read_agreement_status`.
+    registration_defaults: RegistrationDefaultsOut | None = None
 
 
 class StudentRegistrationOut(BaseModel):

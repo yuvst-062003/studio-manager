@@ -11,6 +11,8 @@ child's address manager-only with every read audit-logged.
 
 from __future__ import annotations
 
+from datetime import date
+
 import pytest
 from app.core.national_id import normalize_national_id
 from app.models.health import ConsentRecord
@@ -21,6 +23,7 @@ from app.services.health.agreement import (
     NationalIdInvalidError,
     RegistrationIncompleteError,
     agreement_status,
+    registration_defaults,
 )
 from app.services.health.club_terms import CLUB_TERMS_VERSION
 from app.services.privacy.consent import PolicyVersionMismatchError
@@ -145,6 +148,156 @@ def test_registration_status_reads_required_family_fields_from_the_signer(
     assert agreement_status(
         tenant_session, student_row, signer_person_id=signer.id
     ).registration_complete
+
+
+# -- reused when a sibling registers -----------------------------------------------------
+def _sibling(app_session, studio) -> Student:
+    """A second child of the same family, the way `AddSibling` creates one."""
+    person = Person(studio_id=studio.id, first_name="ילד", last_name="שני")
+    app_session.add(person)
+    app_session.flush()
+    student = Student(
+        studio_id=studio.id, person_id=person.id, status="active", joined_on=date(2026, 9, 1)
+    )
+    app_session.add(student)
+    app_session.commit()
+    return student
+
+
+def test_registration_defaults_is_none_for_a_familys_first_child(
+    tenant_session, student_row, signer
+):
+    """Nothing on file yet -- the form renders exactly as blank as it always has."""
+    assert registration_defaults(tenant_session, student_row, signer_person_id=signer.id) is None
+
+
+def test_registration_defaults_is_none_with_no_signer(tenant_session, student_row):
+    assert registration_defaults(tenant_session, student_row, signer_person_id=None) is None
+
+
+def test_registration_defaults_reuses_the_signers_family_facts(
+    tenant_session, app_session, studio, student_row, signer
+):
+    """A second child's registration should not re-ask what the first one already told the
+    club: address, phones, email and the signer's own ת.ז. all live on the signer's `person`
+    row, shared across every child they guard."""
+    _save(
+        tenant_session,
+        student_row,
+        signer.id,
+        child=_child(
+            address="הרצל 12",
+            city="נתניה",
+            phone_home="09-7412233",
+            phone="054-8123456",
+            email="parent@example.invalid",
+        ),
+        signer={"national_id": VALID_PARENT_ID, "aliyah_year": "2015"},
+    )
+    tenant_session.commit()
+
+    sibling = _sibling(app_session, studio)
+    tenant_session.add(
+        Guardian(
+            studio_id=studio.id,
+            student_id=sibling.id,
+            person_id=signer.id,
+            is_primary=True,
+            relation="parent",
+            created_at=T0,
+        )
+    )
+    tenant_session.commit()
+
+    defaults = registration_defaults(tenant_session, sibling, signer_person_id=signer.id)
+
+    assert defaults is not None
+    assert defaults.address == "הרצל 12"
+    assert defaults.city == "נתניה"
+    assert defaults.phone_home == "09-7412233"
+    assert defaults.phone == "054-8123456"
+    assert defaults.email == "parent@example.invalid"
+    assert defaults.signer_national_id == normalize_national_id(VALID_PARENT_ID)
+    assert defaults.aliyah_year == "2015"
+
+
+def test_registration_defaults_copies_the_other_parent_and_pickup_list_from_a_sibling(
+    tenant_session, app_session, studio, student_row, signer
+):
+    """`other_parent` and `pickup_contacts` are stored per STUDENT even though a family
+    answers them once -- copied forward from whichever sibling of this signer most recently
+    recorded them, which is the family's own most current answer."""
+    _save(
+        tenant_session,
+        student_row,
+        signer.id,
+        other_parent={
+            "first_name": "דני",
+            "last_name": "לוי",
+            "national_id": VALID_OTHER_ID,
+            "phone": "050-1112222",
+        },
+        pickup_contacts=[{"name": "סבתא רותי", "phone": "052-9998888"}],
+    )
+    tenant_session.commit()
+
+    sibling = _sibling(app_session, studio)
+    tenant_session.add_all(
+        [
+            # `signer` guards both children -- without this row on the FIRST child too, the
+            # lookup has no sibling to find and the test would pass on a family shape that
+            # cannot occur (a signer who signed for a child they are not on record as
+            # guarding).
+            Guardian(
+                studio_id=studio.id,
+                student_id=student_row.id,
+                person_id=signer.id,
+                is_primary=True,
+                relation="parent",
+                created_at=T0,
+            ),
+            Guardian(
+                studio_id=studio.id,
+                student_id=sibling.id,
+                person_id=signer.id,
+                is_primary=True,
+                relation="parent",
+                created_at=T0,
+            ),
+        ]
+    )
+    tenant_session.commit()
+
+    defaults = registration_defaults(tenant_session, sibling, signer_person_id=signer.id)
+
+    assert defaults is not None
+    assert defaults.other_parent is not None
+    assert defaults.other_parent.first_name == "דני"
+    assert defaults.other_parent.last_name == "לוי"
+    assert defaults.other_parent.national_id == normalize_national_id(VALID_OTHER_ID)
+    assert defaults.other_parent.phone == "050-1112222"
+    assert [c.name for c in defaults.pickup_contacts] == ["סבתא רותי"]
+    assert [c.phone for c in defaults.pickup_contacts] == ["052-9998888"]
+
+
+def test_registration_defaults_never_copies_a_sibling_into_their_own_form(
+    tenant_session, student_row, signer
+):
+    """A single child with nobody else on the account sees a blank form, same as today --
+    the lookup excludes the student's own rows and finds no sibling to borrow from."""
+    _save(
+        tenant_session,
+        student_row,
+        signer.id,
+        pickup_contacts=[{"name": "דוד", "phone": "050-0000000"}],
+    )
+    tenant_session.commit()
+
+    defaults = registration_defaults(tenant_session, student_row, signer_person_id=signer.id)
+
+    assert defaults is not None
+    assert defaults.pickup_contacts == ()
+    assert defaults.other_parent is None
 
 
 def test_the_national_id_is_normalized_before_storage(tenant_session, student_row, signer):

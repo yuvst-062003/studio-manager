@@ -271,6 +271,7 @@ export function AgreementFlow({
       {step === 'registration' ? (
         <RegistrationStep
           error={error}
+          initial={status.registration_defaults}
           locale={locale}
           onSubmit={saveRegistration}
           schoolClassRequired={status.school_class_required}

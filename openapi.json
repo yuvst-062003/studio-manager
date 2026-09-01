@@ -119,6 +119,16 @@
             "title": "Registration Complete",
             "type": "boolean"
           },
+          "registration_defaults": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RegistrationDefaultsOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "school_class_required": {
             "default": true,
             "title": "School Class Required",
@@ -1853,7 +1863,7 @@
       },
       "ChildDetailsIn": {
         "additionalProperties": false,
-        "description": "`טופס הרשמה` block 1. Four required fields; the rest are optional on the paper form too.",
+        "description": "`טופס הרשמה` block 1, with legacy family fields kept for compatibility.\n\n`address`, `city`, `phone_home`, `phone` and `email` are accepted here because the\nalready-shipped parent client sends them in the child object. The service writes them\nto the signing guardian's `person` row; they are not child facts.",
         "properties": {
           "address": {
             "maxLength": 200,
@@ -1880,8 +1890,8 @@
             "title": "Email"
           },
           "grade": {
+            "default": "",
             "maxLength": 20,
-            "minLength": 1,
             "title": "Grade",
             "type": "string"
           },
@@ -1919,8 +1929,7 @@
         "required": [
           "national_id",
           "address",
-          "city",
-          "grade"
+          "city"
         ],
         "title": "ChildDetailsIn",
         "type": "object"
@@ -7633,6 +7642,57 @@
         "title": "OpsHealthResponse",
         "type": "object"
       },
+      "OtherParentDefaultsOut": {
+        "description": "The second parent, as already on file for one of this signer's other children.",
+        "properties": {
+          "first_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Name"
+          },
+          "last_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Name"
+          },
+          "national_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "National Id"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          }
+        },
+        "title": "OtherParentDefaultsOut",
+        "type": "object"
+      },
       "ParentDetailsIn": {
         "additionalProperties": false,
         "description": "`טופס הרשמה` block 2, for the signing parent and optionally the other one.",
@@ -9500,6 +9560,107 @@
           "confirmed"
         ],
         "title": "RegistrationAnswerOut",
+        "type": "object"
+      },
+      "RegistrationDefaultsOut": {
+        "description": "What this family already told the club, offered so a sibling's registration does not\nre-ask it. See `registration_defaults` in `app.services.health.agreement` for where each\nfield comes from and why.",
+        "properties": {
+          "address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "aliyah_year": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Aliyah Year"
+          },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "other_parent": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OtherParentDefaultsOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "phone_home": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone Home"
+          },
+          "pickup_contacts": {
+            "items": {
+              "$ref": "#/components/schemas/PickupContactOut"
+            },
+            "title": "Pickup Contacts",
+            "type": "array"
+          },
+          "signer_national_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signer National Id"
+          }
+        },
+        "title": "RegistrationDefaultsOut",
         "type": "object"
       },
       "RegistrationIn": {

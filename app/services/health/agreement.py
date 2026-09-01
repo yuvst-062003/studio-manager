@@ -228,6 +228,158 @@ def agreement_status(
     )
 
 
+@dataclass(frozen=True)
+class OtherParentDefaults:
+    """The second parent, read off whichever sibling's `Guardian` row most recently named
+    one -- see `registration_defaults`."""
+
+    first_name: str | None
+    last_name: str | None
+    national_id: str | None
+    phone: str | None
+
+
+@dataclass(frozen=True)
+class PickupContactDefault:
+    name: str
+    phone: str
+    relation: str | None
+
+
+@dataclass(frozen=True)
+class RegistrationDefaults:
+    """What `registration_defaults` found already on file for this family. See there."""
+
+    address: str | None
+    city: str | None
+    phone_home: str | None
+    phone: str | None
+    email: str | None
+    signer_national_id: str | None
+    aliyah_year: str | None
+    other_parent: OtherParentDefaults | None
+    pickup_contacts: tuple[PickupContactDefault, ...]
+
+
+def _decoded(raw: bytes | None) -> str | None:
+    return raw.decode() if raw else None
+
+
+def registration_defaults(
+    session: TenantSession, student: Student, *, signer_person_id: uuid.UUID | None
+) -> RegistrationDefaults | None:
+    """What this family already told the club, for a sibling's registration to reuse.
+
+    **Family facts, not child facts.** `signer`'s address, phones, email, ת.ז. and aliyah
+    year live on the signing guardian's own `person` row (`AgreementService.save_registration`
+    writes them there, never onto the child) -- so a second child's signer already has them
+    the moment the first child's form is saved, and this is simply the read side of that
+    write. No sibling lookup needed for these.
+
+    **`other_parent` and `pickup_contacts` are the opposite shape.** Both are stored per
+    STUDENT (`Guardian`, `StudentPickupContact`) even though a family answers "who else may
+    collect this child" once, not once per child -- the paper form asks it per child. So
+    these two are copied forward from whichever OTHER student this same signer guards that
+    most recently recorded them, rather than read off `student`'s own (still empty) rows.
+
+    `None` when there is no signer, or the signer has never told the club anything at all --
+    the caller renders a blank form, exactly as it always has.
+    """
+    if signer_person_id is None:
+        return None
+    signer = session.get(Person, signer_person_id)
+    if signer is None:
+        return None
+
+    sibling_ids = (
+        session.execute(
+            select(Guardian.student_id).where(
+                Guardian.person_id == signer_person_id, Guardian.student_id != student.id
+            )
+        )
+        .scalars()
+        .all()
+    )
+
+    other_parent: OtherParentDefaults | None = None
+    pickup_contacts: tuple[PickupContactDefault, ...] = ()
+    if sibling_ids:
+        other_guardian = (
+            session.execute(
+                select(Guardian)
+                .where(Guardian.student_id.in_(sibling_ids), Guardian.person_id != signer_person_id)
+                .order_by(Guardian.created_at.desc())
+            )
+            .scalars()
+            .first()
+        )
+        if other_guardian is not None:
+            other_person = session.get(Person, other_guardian.person_id)
+            if other_person is not None:
+                other_parent = OtherParentDefaults(
+                    first_name=other_person.first_name or None,
+                    last_name=other_person.last_name or None,
+                    national_id=_decoded(other_person.national_id_encrypted),
+                    phone=other_person.phone or None,
+                )
+
+        latest = (
+            session.execute(
+                select(StudentPickupContact)
+                .where(StudentPickupContact.student_id.in_(sibling_ids))
+                .order_by(StudentPickupContact.created_at.desc())
+            )
+            .scalars()
+            .first()
+        )
+        if latest is not None:
+            pickup_contacts = tuple(
+                PickupContactDefault(
+                    name=name,
+                    phone=str((row.contact_encrypted or {}).get("phone") or ""),
+                    relation=(row.contact_encrypted or {}).get("relation"),
+                )
+                for row in session.execute(
+                    select(StudentPickupContact)
+                    .where(StudentPickupContact.student_id == latest.student_id)
+                    .order_by(StudentPickupContact.created_at)
+                ).scalars()
+                # Same rule the save path applies: a nameless row is not a person.
+                if (name := str((row.contact_encrypted or {}).get("name") or ""))
+            )
+
+    result = RegistrationDefaults(
+        address=signer.address or None,
+        city=signer.city or None,
+        phone_home=signer.phone_home or None,
+        phone=signer.phone or None,
+        email=signer.email or None,
+        signer_national_id=_decoded(signer.national_id_encrypted),
+        aliyah_year=str(signer.aliyah_year_encrypted) if signer.aliyah_year_encrypted else None,
+        other_parent=other_parent,
+        pickup_contacts=pickup_contacts,
+    )
+    # `email` is deliberately excluded from this check: OAuth sign-in sets it on every
+    # signed-in guardian's `person` row regardless of whether they have ever registered a
+    # child, so its presence alone is not evidence there is anything else here worth
+    # offering back. Everything else on this list is written ONLY by
+    # `AgreementService.save_registration`.
+    if not any(
+        (
+            result.address,
+            result.city,
+            result.phone_home,
+            result.phone,
+            result.signer_national_id,
+            result.aliyah_year,
+            result.other_parent,
+            result.pickup_contacts,
+        )
+    ):
+        return None
+    return result
+
+
 def _signed_against_current_questions(session: TenantSession, student: Student) -> bool:
     """Signed, **and signed against the questions being asked today**.
 

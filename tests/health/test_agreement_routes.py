@@ -209,9 +209,76 @@ def test_the_status_route_reports_all_three_conditions(client, as_guardian_of, a
         "complete",
         "club_terms_version",
         "school_class_required",
+        "registration_defaults",
     }
     assert body["complete"] is False
     assert body["club_terms_version"] == CLUB_TERMS_VERSION
+    assert body["registration_defaults"] is None
+
+
+# -- a sibling's registration reuses the family's own answers ---------------------------
+def test_a_siblings_status_route_offers_the_familys_already_known_details(
+    client, as_guardian_of, a_student, app_session, studio
+):
+    """The fix this covers: a second child's registration step should open with the
+    family's address, phones and pickup list already filled in, not blank."""
+    from datetime import date
+
+    from app.models.people import Student
+    from app.models.person import Guardian, Person
+
+    parent = as_guardian_of(a_student)
+    put = _put(
+        client,
+        parent,
+        a_student,
+        other_parent={
+            "first_name": "דני",
+            "last_name": "לוי",
+            "national_id": "100000025",
+            "phone": "050-1112222",
+        },
+        pickup_contacts=[{"name": "סבתא רותי", "phone": "052-9998888"}],
+    )
+    assert put.status_code == 200
+
+    sibling_person = Person(studio_id=studio.id, first_name="ילד", last_name="שני")
+    app_session.add(sibling_person)
+    app_session.flush()
+    sibling = Student(
+        studio_id=studio.id,
+        person_id=sibling_person.id,
+        status="active",
+        joined_on=date(2026, 9, 1),
+    )
+    app_session.add(sibling)
+    app_session.flush()
+    app_session.add(
+        Guardian(
+            studio_id=studio.id,
+            student_id=sibling.id,
+            person_id=parent.person_id,
+            is_primary=True,
+            relation="parent",
+        )
+    )
+    app_session.commit()
+
+    defaults = _status(client, parent, sibling.id).json()["registration_defaults"]
+    assert defaults["address"] == "הרצל 12"
+    assert defaults["city"] == "נתניה"
+    assert defaults["other_parent"]["first_name"] == "דני"
+    assert [c["name"] for c in defaults["pickup_contacts"]] == ["סבתא רותי"]
+
+
+def test_no_defaults_are_offered_once_registration_is_already_complete(
+    client, as_guardian_of, a_student
+):
+    """Nothing left to prefill for -- the step will not even render, and the field stays
+    empty rather than a blank shell nobody reads."""
+    parent = as_guardian_of(a_student)
+    _put(client, parent, a_student)
+    assert _status(client, parent, a_student).json()["registration_defaults"] is None
 
 
 def test_the_gate_opens_only_when_all_three_have_landed(

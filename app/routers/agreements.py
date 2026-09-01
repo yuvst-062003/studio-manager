@@ -27,16 +27,20 @@ from app.routers.health_templates import client_ip
 from app.schemas.agreement import (
     AgreementStatusOut,
     ClubTermsIn,
+    OtherParentDefaultsOut,
     PickupContactOut,
+    RegistrationDefaultsOut,
     RegistrationIn,
     StudentRegistrationOut,
 )
 from app.services.health.agreement import (
     AgreementService,
+    AgreementStatus,
     NationalIdInvalidError,
     NoGuardianError,
     RegistrationIncompleteError,
     agreement_status,
+    registration_defaults,
     signing_person_id,
 )
 from app.services.health.club_terms import CLUB_TERMS_VERSION
@@ -101,6 +105,57 @@ def _student(session: TenantSessionDep, student_id: uuid.UUID) -> Student:
     return student
 
 
+def _status_out(
+    session: TenantSessionDep,
+    student: Student,
+    *,
+    signer_person_id: uuid.UUID | None,
+    result: AgreementStatus,
+) -> AgreementStatusOut:
+    """One place building `AgreementStatusOut`, because all three endpoints below return one
+    and a field added at one of them and not the others is a client that only sometimes sees
+    it, depending on which step it just posted. Defaults are computed only while the
+    registration step would actually render -- complete, they are dead weight in the
+    response, and the family has nothing left to reuse them for anyway.
+    """
+    defaults: RegistrationDefaultsOut | None = None
+    if not result.registration_complete:
+        found = registration_defaults(session, student, signer_person_id=signer_person_id)
+        if found is not None:
+            defaults = RegistrationDefaultsOut(
+                address=found.address,
+                city=found.city,
+                phone_home=found.phone_home,
+                phone=found.phone,
+                email=found.email,
+                signer_national_id=found.signer_national_id,
+                aliyah_year=found.aliyah_year,
+                other_parent=(
+                    OtherParentDefaultsOut(
+                        first_name=found.other_parent.first_name,
+                        last_name=found.other_parent.last_name,
+                        national_id=found.other_parent.national_id,
+                        phone=found.other_parent.phone,
+                    )
+                    if found.other_parent is not None
+                    else None
+                ),
+                pickup_contacts=[
+                    PickupContactOut(name=c.name, phone=c.phone, relation=c.relation)
+                    for c in found.pickup_contacts
+                ],
+            )
+    return AgreementStatusOut(
+        health_signed=result.health_signed,
+        registration_complete=result.registration_complete,
+        terms_accepted=result.terms_accepted,
+        complete=result.complete,
+        club_terms_version=CLUB_TERMS_VERSION,
+        school_class_required=result.school_class_required,
+        registration_defaults=defaults,
+    )
+
+
 @router.get("/students/{student_id}/agreement", response_model=AgreementStatusOut)
 def read_agreement_status(
     request: Request, student_id: uuid.UUID, session: TenantSessionDep
@@ -117,14 +172,7 @@ def read_agreement_status(
     except NoGuardianError:
         subject_id = None
     result = agreement_status(session, student, signer_person_id=subject_id)
-    return AgreementStatusOut(
-        health_signed=result.health_signed,
-        registration_complete=result.registration_complete,
-        terms_accepted=result.terms_accepted,
-        complete=result.complete,
-        club_terms_version=CLUB_TERMS_VERSION,
-        school_class_required=result.school_class_required,
-    )
+    return _status_out(session, student, signer_person_id=subject_id, result=result)
 
 
 @router.put(
@@ -167,14 +215,7 @@ def save_registration(
     session.commit()
     session.refresh(student)
     result = agreement_status(session, student, signer_person_id=subject_id)
-    return AgreementStatusOut(
-        health_signed=result.health_signed,
-        registration_complete=result.registration_complete,
-        terms_accepted=result.terms_accepted,
-        complete=result.complete,
-        club_terms_version=CLUB_TERMS_VERSION,
-        school_class_required=result.school_class_required,
-    )
+    return _status_out(session, student, signer_person_id=subject_id, result=result)
 
 
 @router.post(
@@ -224,14 +265,7 @@ def accept_club_terms(
     session.commit()
     session.refresh(student)
     result = agreement_status(session, student, signer_person_id=subject_id)
-    return AgreementStatusOut(
-        health_signed=result.health_signed,
-        registration_complete=result.registration_complete,
-        terms_accepted=result.terms_accepted,
-        complete=result.complete,
-        club_terms_version=CLUB_TERMS_VERSION,
-        school_class_required=result.school_class_required,
-    )
+    return _status_out(session, student, signer_person_id=subject_id, result=result)
 
 
 @router.get("/students/{student_id}/registration", response_model=StudentRegistrationOut)

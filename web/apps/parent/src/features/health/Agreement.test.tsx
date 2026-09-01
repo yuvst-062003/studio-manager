@@ -218,6 +218,34 @@ describe('AgreementFlow', () => {
     await waitFor(() => expect(container.querySelector('h1')).toBeNull())
   })
 
+  it('opens the registration step with the family’s already-known details filled in', async () => {
+    render(
+      <AgreementFlow
+        client={makeClient({
+          terms_accepted: true,
+          registration_defaults: {
+            address: 'הרצל 12',
+            city: 'נתניה',
+            phone_home: null,
+            phone: null,
+            email: null,
+            signer_national_id: null,
+            aliyah_year: null,
+            other_parent: null,
+            pickup_contacts: [],
+          },
+        })}
+        locale="he"
+        studentId="st2"
+        studentName="דנה לוי"
+      />,
+    )
+
+    expect(await screen.findByTestId('agreement-step-registration')).toBeInTheDocument()
+    expect(screen.getByLabelText(t('he', 'health.registration.address'))).toHaveValue('הרצל 12')
+    expect(screen.getByLabelText(t('he', 'health.registration.city'))).toHaveValue('נתניה')
+  })
+
   it('tells the caller the moment nothing is outstanding', async () => {
     const onCompleted = vi.fn()
     render(
@@ -424,5 +452,68 @@ describe('RegistrationStep', () => {
     )
     await userEvent.click(screen.getByRole('button', { name: t('he', 'health.agreement.next') }))
     expect(onSubmit).not.toHaveBeenCalled()
+  })
+
+  it("prefills a sibling's registration with the family's already-known details", () => {
+    // The fix this covers: a second child's registration step should not re-ask what the
+    // first one already told the club. The CHILD's own national id is never prefilled --
+    // each child is a distinct person with their own — only family-level facts are.
+    render(
+      <RegistrationStep
+        locale="he"
+        onSubmit={vi.fn()}
+        studentName="דנה לוי"
+        initial={{
+          address: 'הרצל 12',
+          city: 'נתניה',
+          phone_home: '09-7412233',
+          phone: '054-8123456',
+          email: 'parent@example.invalid',
+          signer_national_id: '100000017',
+          aliyah_year: '2015',
+          other_parent: {
+            first_name: 'דני',
+            last_name: 'לוי',
+            national_id: '100000025',
+            phone: '050-1112222',
+          },
+          pickup_contacts: [{ name: 'סבתא רותי', phone: '052-9998888', relation: null }],
+        }}
+      />,
+    )
+
+    const ids = screen.getAllByLabelText(t('he', 'health.registration.nationalId'))
+    expect(ids[0]).toHaveValue('')
+    expect(ids[1]).toHaveValue('100000017')
+    expect(screen.getByLabelText(t('he', 'health.registration.address'))).toHaveValue('הרצל 12')
+    expect(screen.getByLabelText(t('he', 'health.registration.city'))).toHaveValue('נתניה')
+    expect(screen.getByLabelText(t('he', 'health.registration.phoneHome'))).toHaveValue(
+      '09-7412233',
+    )
+    // The label is shared with the pickup row's own phone field, so the first match --
+    // the one that renders before the pickup card -- is the family's own mobile number.
+    expect(
+      screen.getAllByLabelText(t('he', 'health.registration.phoneMobile'))[0],
+    ).toHaveValue('054-8123456')
+    expect(screen.getByLabelText(t('he', 'health.registration.email'))).toHaveValue(
+      'parent@example.invalid',
+    )
+    expect(screen.getByLabelText(t('he', 'health.registration.aliyahYear'))).toHaveValue('2015')
+    expect(
+      screen.getByLabelText(
+        `${t('he', 'health.registration.otherParent')} · ${t('he', 'health.registration.fullName')}`,
+      ),
+    ).toHaveValue('דני לוי')
+    expect(
+      screen.getByLabelText(
+        `${t('he', 'health.registration.otherParent')} · ${t('he', 'health.registration.nationalId')}`,
+      ),
+    ).toHaveValue('100000025')
+    expect(
+      screen.getByLabelText(
+        `${t('he', 'health.registration.otherParent')} · ${t('he', 'health.registration.phoneMobile')}`,
+      ),
+    ).toHaveValue('050-1112222')
+    expect(screen.getByLabelText(t('he', 'health.registration.pickup'))).toHaveValue('סבתא רותי')
   })
 })
