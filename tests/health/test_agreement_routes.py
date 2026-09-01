@@ -208,6 +208,7 @@ def test_the_status_route_reports_all_three_conditions(client, as_guardian_of, a
         "terms_accepted",
         "complete",
         "club_terms_version",
+        "school_class_required",
     }
     assert body["complete"] is False
     assert body["club_terms_version"] == CLUB_TERMS_VERSION
@@ -275,9 +276,7 @@ def test_a_coach_can_read_who_may_collect_the_child(
     assert names == ["סבתא רותי", "דוד יוסי"]
 
 
-def test_a_coach_is_not_shown_the_aliyah_year(
-    client, as_guardian_of, as_lead_coach, a_student
-):
+def test_a_coach_is_not_shown_the_aliyah_year(client, as_guardian_of, as_lead_coach, a_student):
     """National-origin data, collected for the עמותה's funding return. A coach at the door
     has no use for it. `None` rather than `[]`, so "not shown to you" stays distinguishable
     from "this family gave none"."""
@@ -298,9 +297,7 @@ def test_a_manager_sees_the_aliyah_year(client, as_guardian_of, as_manager, a_st
     assert body["aliyah_years"] == ["2019"]
 
 
-def test_a_guardian_may_not_read_it_through_the_staff_route(
-    client, as_guardian_of, a_student
-):
+def test_a_guardian_may_not_read_it_through_the_staff_route(client, as_guardian_of, a_student):
     """`AnyStaff`. A parent reads their own family through the agreement flow, not through
     the door surface -- and a route a guardian could call is a route that would need its own
     'is this your child' check to stop it becoming a directory."""
@@ -391,9 +388,7 @@ def test_the_template_list_puts_the_current_version_first(
     app_session.commit()
 
     parent = as_guardian_of(a_student)
-    items = client.get(
-        "/api/v1/health-templates?kind=full", headers=parent.headers
-    ).json()["items"]
+    items = client.get("/api/v1/health-templates?kind=full", headers=parent.headers).json()["items"]
     assert items[0]["version"] == superseded.version + 1
 
 
