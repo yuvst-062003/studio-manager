@@ -9,6 +9,16 @@
 // warning is a WARNING, never a block: a family who set up a mandate and then wants to clear
 // a one-off must still have a route.
 //
+// **The warning sits above the ledger, not inside the card route.** It used to render only
+// inside `route-card`'s panel — read after a parent had already scrolled past the amount and
+// picked a route. A family paying by cash or cheque never saw it at all, though either route
+// can double the same month. Moved here it is the first thing on the screen, and it carries
+// the per-child amounts `route-standing-order` already renders below, from the same prop.
+//
+// **The total leads the ledger.** It used to sit under the per-charge rows, so the number a
+// parent opened the screen for was the last thing they read rather than the first — the
+// opposite of "the amount owed and the way to clear it are one movement."
+//
 // **Money never mirrors.** Every amount goes through `MoneyDisplay`, which wraps it in
 // `<bdi>`. `1b`'s RTL note is that the danger here is the FIX, not the bug: a `direction: ltr`
 // wrapper or a transform would flip `1,280₪` to `₪1,280`.
@@ -52,6 +62,14 @@ const totalRowStyle: CSSProperties = {
   justifyContent: 'space-between',
   borderBlockStart: '1px solid var(--border)',
   paddingBlockStart: 'var(--space-3)',
+}
+
+/** The ledger's total, leading rather than trailing — see the file header. */
+const heroTotalRowStyle: CSSProperties = {
+  ...rowStyle,
+  justifyContent: 'space-between',
+  fontSize: 'var(--text-display)',
+  fontWeight: 'var(--weight-semibold)',
 }
 
 export type DebtRow = {
@@ -229,9 +247,39 @@ export function PaymentsScreen({
 
   return (
     <div style={columnStyle} data-testid="payments-screen">
+      {hasActiveSubscription ? (
+        // §5.10's second guard, read before any route is chosen or any amount scrolled
+        // past — a WARNING, never a block. Per-child amounts reuse `standingOrderLinks`,
+        // the same prop `route-standing-order` renders below, so nothing is fabricated
+        // here that the mandate route does not already show.
+        <div style={columnStyle} data-testid="standing-order-notice">
+          <Alert tone="danger" iconLabel={t(locale, 'billing.method.standingOrder')}>
+            {t(locale, 'billing.standingOrder.activeWarning')}
+          </Alert>
+          {standingOrderLinks.length > 0 ? (
+            <div style={rowStyle}>
+              {standingOrderLinks.map((link) => (
+                <span key={link.url} style={rowStyle}>
+                  <span>{link.studentName}</span>
+                  <MoneyDisplay agorot={link.amountAgorot} label={link.studentName} />
+                </span>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
       <section aria-labelledby="open-debts">
         <h2 id="open-debts">{t(locale, 'billing.openDebts.title')}</h2>
         <Card>
+          <div style={heroTotalRowStyle}>
+            <span>{t(locale, 'billing.openDebts.total')}</span>
+            <MoneyDisplay
+              agorot={selectionTotal(debts.map((row) => row.charge))}
+              tone="debt"
+              label={t(locale, 'billing.openDebts.total')}
+            />
+          </div>
           {debts.map((row) => (
             <div key={row.charge.id} style={rowStyle} data-testid="debt-row">
               {/* D7 — a belt fill always carries its ring. `BeltBar` has no prop that
@@ -259,14 +307,6 @@ export function PaymentsScreen({
               ) : null}
             </div>
           ))}
-          <div style={totalRowStyle}>
-            <span>{t(locale, 'billing.openDebts.total')}</span>
-            <MoneyDisplay
-              agorot={selectionTotal(debts.map((row) => row.charge))}
-              tone="debt"
-              label={t(locale, 'billing.openDebts.total')}
-            />
-          </div>
         </Card>
       </section>
 
@@ -300,12 +340,6 @@ export function PaymentsScreen({
           {/* `1b` finding 5: the key exists and the artboard never says the rule. The
               selection IS oldest-first across every child, so the screen says so. */}
           <p>{t(locale, 'billing.card.oldestFirst')}</p>
-          {hasActiveSubscription ? (
-            // §5.10's second guard. A WARNING, never a block — the parent decides.
-            <Alert tone="danger" iconLabel={t(locale, 'billing.method.standingOrder')}>
-              {t(locale, 'billing.standingOrder.activeWarning')}
-            </Alert>
-          ) : null}
           {selectable.length === 0 && !canPrepay ? (
             // Nothing owed and no monthly price to buy a month at. The card genuinely has
             // nothing to do — which is NOT the same as "this family owes nothing", the

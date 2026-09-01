@@ -794,7 +794,31 @@ waves:
         on: 2026-09-01
       - id: S5
         title: Screen 5 — payments
-        status: pending
+        why: >-
+          Stitch was not run for this screen — the owner asked for Claude Design instead.
+          Three arrangements went to the owner on one axis, how the amount and the route
+          become one movement: **A** kept every route expanded on one long card (today's
+          shape); **B** led with the total alone and put the four routes behind a picker;
+          **C** made each MONTH a card to tick, route chosen once at the top. The owner
+          picked B.
+
+          B's literal shape — three of the four routes reachable only through a picker —
+          could not ship as drawn. §5.10 and `ParentBilling.test.tsx` both hold that all
+          four routes stay visible together with no persistent payment mode, which a picker
+          that unmounts the other three directly contradicts. What shipped is B's spirit
+          inside that constraint: the total now leads the screen as a headline, ahead of
+          the per-charge list it used to trail, and the הוראת קבע double-charge warning —
+          previously read only inside the card route's own panel, so a family paying cash
+          or cheque never saw it — moved to the top of the screen with the per-child
+          amounts `route-standing-order` already carried, reusing that same prop. All four
+          routes are exactly as expanded as before; nothing about them was rearranged.
+
+          Left open, deliberately: the two stacked segmented pickers (months, instalments)
+          this row also names, and D9.3's receipt affordance — already shipped ahead of
+          this pass in `PaymentHistorySection.tsx` and out of scope for it. Candidates A
+          and C are recorded in the spec's Provenance table rather than discarded.
+        status: shipped
+        on: 2026-09-01
       - id: S6
         title: Screen 6 — calendar
         status: pending
