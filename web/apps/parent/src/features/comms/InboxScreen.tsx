@@ -31,7 +31,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { Button, Card, EmptyState, LoadFailed } from '@studio/ui'
-import { formatDateInStudioZone, formatTimeInStudioZone } from '@studio/core'
+import { formatDateInStudioZone } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { PushDisabledBanner } from './PushDisabledBanner'
@@ -200,6 +200,16 @@ const prePromptStyle: CSSProperties = {
 }
 
 const promptActionsStyle: CSSProperties = { display: 'flex', gap: 'var(--space-2)' }
+
+const feedRowStyle: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  paddingBlock: 'var(--space-3)',
+}
+
+const feedRowDividedStyle: CSSProperties = {
+  borderBlockStart: 'var(--border-width-hairline) solid var(--border)',
+}
 
 const dotsRowStyle: CSSProperties = {
   alignItems: 'center',
@@ -480,43 +490,49 @@ export function InboxScreen({
       {feed.length > 0 ? (
         <section style={sectionStyle}>
           <p style={eyebrowStyle}>{t(locale, 'comms.inbox.updates')}</p>
-          {feed.map((row) => (
-            <Card key={row.id}>
-              {/* A button and not a div: the row is interactive, so it has to be reachable by
-                  keyboard and announced as a control. Its accessible name is the title. */}
-              <button
-                type="button"
-                onClick={() => void open(row)}
-                style={rowStyle}
-                data-testid={`inbox-row-${row.id}`}
+          {/* ONE card, rows divided by hairlines — not a card per row. The feed is an
+              archive, and a stack of separate surfaces gives every announcement the same
+              visual weight as the thing that still needs doing. */}
+          <Card>
+            {feed.map((row, index) => (
+              <div
+                key={row.id}
+                style={index === 0 ? feedRowStyle : { ...feedRowStyle, ...feedRowDividedStyle }}
               >
-                <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                  {row.action?.outstanding === false ? (
-                    <span style={settledMarkStyle} data-testid={`inbox-settled-${row.id}`}>
-                      <SettledIcon />
-                      {t(locale, 'comms.inbox.settled')}
-                    </span>
-                  ) : null}
-                  <span style={{ ...rowTitleStyle, flex: 1 }}>{row.title}</span>
-                  {row.read_at === null ? (
-                    <span style={newMarkStyle}>
-                      <span style={newDotStyle} aria-hidden="true" />
-                      {t(locale, 'comms.inbox.new')}
-                    </span>
-                  ) : null}
-                </span>
-                <p style={bodyStyle}>{row.body}</p>
-                <p style={metaStyle}>
-                  {/* G3 — stored UTC, rendered Asia/Jerusalem REGARDLESS of locale. Both
-                      helpers pin the zone; a bare toLocaleString would follow the phone's
-                      own timezone and put a Sunday cancellation on Saturday for a parent
-                      travelling. */}
-                  {formatDateInStudioZone(row.created_at, locale)}{' '}
-                  {formatTimeInStudioZone(row.created_at, locale)}
-                </p>
-              </button>
-            </Card>
-          ))}
+                {/* A button and not a div: the row is interactive, so it has to be reachable
+                    by keyboard and announced as a control. Its accessible name is the title. */}
+                <button
+                  type="button"
+                  onClick={() => void open(row)}
+                  style={rowStyle}
+                  data-testid={`inbox-row-${row.id}`}
+                >
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                    {row.read_at === null ? (
+                      <span style={newMarkStyle}>
+                        <span style={newDotStyle} aria-hidden="true" />
+                        {t(locale, 'comms.inbox.new')}
+                      </span>
+                    ) : null}
+                    {row.action?.outstanding === false ? (
+                      <span style={settledMarkStyle} data-testid={`inbox-settled-${row.id}`}>
+                        <SettledIcon />
+                        {t(locale, 'comms.inbox.settled')}
+                      </span>
+                    ) : null}
+                    <span style={{ ...rowTitleStyle, flex: 1 }}>{row.title}</span>
+                    {/* G3 — stored UTC, rendered Asia/Jerusalem REGARDLESS of locale. The
+                        helper pins the zone; a bare toLocaleString would follow the phone's
+                        own and put a Sunday cancellation on Saturday for a parent
+                        travelling. The TIME is gone: an announcement is a day, not a minute,
+                        and the clock was competing with the title for the row. */}
+                    <span style={metaStyle}>{formatDateInStudioZone(row.created_at, locale)}</span>
+                  </span>
+                  <p style={bodyStyle}>{row.body}</p>
+                </button>
+              </div>
+            ))}
+          </Card>
         </section>
       ) : null}
     </section>
