@@ -296,11 +296,18 @@ function AuthedApp() {
   // still holding the short health form, so §5.5's gate must fire on the very next
   // render — and `gatedChildren` is read once per this counter, not per route change.
   const [familyJoined, setFamilyJoined] = useState(0)
-  // `2a` §7's unread badge. Fetched by the SHELL and not by `InboxScreen`, because a badge
-  // that appeared only after the inbox had been opened would announce news the parent had
-  // just finished reading. `notificationsRead` bumps to re-fetch after the inbox marks
-  // anything read, so the badge clears without a reload.
-  const [unreadCount, setUnreadCount] = useState(0)
+  // `2a` §7's badge. Fetched by the SHELL and not by `InboxScreen`, because a badge that
+  // appeared only after the inbox had been opened would announce news the parent had just
+  // finished reading. `notificationsRead` bumps to re-fetch after the inbox marks anything
+  // read, so the badge clears without a reload.
+  //
+  // **It counts what has not been DEALT WITH, which is one rule with two readings.** A
+  // notice that asks for something is dealt with when the club's records say it was done
+  // (`action.outstanding`, resolved in `app/services/comms/actions.py`); a notice that asks
+  // for nothing is dealt with when it has been read. Counting `read_at` alone was the
+  // screen-7 defect wearing a different hat: it cleared the moment a parent glanced at a
+  // demand they had not met.
+  const [pendingCount, setPendingCount] = useState(0)
   const [notificationsRead, setNotificationsRead] = useState(0)
   useEffect(() => {
     if (session.status !== 'signed-in') return
@@ -308,13 +315,22 @@ function AuthedApp() {
     void apiFetch('/api/v1/notifications')
       .then((response) =>
         response.ok
-          ? (response.json() as Promise<{ items: { read_at: string | null }[] }>)
+          ? (response.json() as Promise<{
+              items: { read_at: string | null; action: { outstanding: boolean } | null }[]
+            }>)
           : { items: [] },
       )
       // A failed read is NO badge rather than a stale one: the count is a nudge, and a
       // wrong nudge about unread mail is worse than none.
-      .then((data) => alive && setUnreadCount(data.items.filter((row) => row.read_at === null).length))
-      .catch(() => alive && setUnreadCount(0))
+      .then(
+        (data) =>
+          alive &&
+          setPendingCount(
+            data.items.filter((row) => (row.action ? row.action.outstanding : row.read_at === null))
+              .length,
+          ),
+      )
+      .catch(() => alive && setPendingCount(0))
     return () => {
       alive = false
     }
@@ -504,7 +520,7 @@ function AuthedApp() {
                     href: '#/announcements',
                     icon: <Icon name="messages" size={20} />,
                     active: onAnnouncements,
-                    badge: unreadCount,
+                    badge: pendingCount,
                   },
                   {
                     key: 'profile',

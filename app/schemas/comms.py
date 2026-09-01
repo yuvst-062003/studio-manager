@@ -92,6 +92,25 @@ AnnouncementPage = CursorPage[AnnouncementOut]
 
 
 # -- the inbox ----------------------------------------------------------------
+class NotificationActionOut(BaseModel):
+    """What a notice asks for, and whether the club is still waiting for it.
+
+    `null` on every notice that asks for nothing — an announcement, an injury report, the
+    no-show follow-up. See `app/services/comms/actions.py` for why this is resolved on
+    read rather than stored, and why the enum carries no Hebrew: the client owns the
+    label and the route, the server owns the fact.
+    """
+
+    #: `health_declaration | health_renewal | payment | event_rsvp | trial_join`.
+    kind: str
+    #: The axis. Independent of `read_at` in both directions, which is the entire point.
+    outstanding: bool
+    #: Present only where a column says so honestly — never for a payment.
+    settled_at: datetime | None = None
+    #: The child this is about, where it is about one.
+    subject_name: str | None = None
+
+
 class NotificationOut(BaseModel):
     """One inbox row. §5.11: "the inbox is where the message lives" — no permission needed
     and it never expires.
@@ -110,6 +129,8 @@ class NotificationOut(BaseModel):
     payload: dict[str, Any] = Field(default_factory=dict)
     read_at: datetime | None = None
     created_at: datetime
+    #: Resolved per request against the records that settle it. Never a column.
+    action: NotificationActionOut | None = None
 
 
 NotificationPage = CursorPage[NotificationOut]

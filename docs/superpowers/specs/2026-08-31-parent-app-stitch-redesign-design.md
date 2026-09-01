@@ -40,6 +40,7 @@ Recorded because each one closes an argument that would otherwise be re-litigate
 | Source | What it contributes | What is rejected |
 |---|---|---|
 | **Google Stitch — Step 0, the design system** | Project [`17786356207688067866`](https://stitch.withgoogle.com/projects/17786356207688067866), design system *Gladiator*, generated from [`docs/design/DESIGN.md`](../../design/DESIGN.md). It contributed the three bands as a machine-readable theme, and independently **confirmed Rubik** — `DESIGN.md` argued the landing's Hanken Grotesk and Work Sans have no Hebrew glyph, which is why the landing already ships in Rubik despite its Stitch design naming them. | Its derived `primary` `#00234d`, a tonal step darker than the landing's `#003874` that decision 2 carries across unchanged. Its `error: #ba1a1a` — the landing's brand crimson, which may not become an app colour (D14); measured at 2.82:1 on the outward dark ground, it could not have served as text there in any case. |
+| **Google Stitch — screen 7 (inbox)** | **Nothing.** Two prompts were submitted on 2026-09-01 — one stating the outstanding/done axis, one stating a read/unread axis — and both timed out with no screen returned; `list_screens` showed the project still holding only `DESIGN.md`. The pass was run in Claude Design instead, on the owner's instruction, and the four arrangements are recorded in the canvas *Parent Inbox Arrangements*. | — (nothing to reject) |
 | **Google Stitch — per screen** | **To be filled by each screen's pass.** One row per screen, written at step 5 of the loop. Do not fill from imagination — that is the failure this file inherited. | — |
 | [`parent-app-shell.md`](../../design/proposals/parent-app-shell.md) | The four open composition questions; the measured deltas 2, 5, 6 and 7; the shell's region map; the rule that a trailing header action is a control sized like one | Its precedence rule, superseded by decision 1 |
 | [`audit/parent.md`](../../design/audit/parent.md) | The accent-count and coloured-bar measurements | Its screen verdicts, overtaken by the P0–P12 log in its own tail |
@@ -192,7 +193,7 @@ Every prompt carries these, because both previous generations broke the first tw
 | 4 | **Student card** | `features/people/StudentCardSection.tsx` + five slot sections | `2c` is the richest parent artboard (8 accents, 4 bars). How five milestone-owned sections read as one card rather than five stacked boxes. |
 | 5 | **Payments** | `features/billing/PaymentsSection.tsx`, `PaymentHistorySection.tsx` | Two stacked segmented pickers at 390px. The הוראת קבע double-charge warning — the only guard against paying twice, since recurring payments cannot be created programmatically and are marked paid by hand. D9.3: card rows get a receipt affordance; cash and transfer read as recorded **without implying a receipt exists**. |
 | 6 | **Calendar** | `features/schedule/ChildCalendar.tsx` | Prev/next, month/week and the absence link in one band at 390px. The four-state day legend stays readable without colour alone. |
-| 7 | **Inbox** | `features/comms/InboxScreen.tsx` | Read/unread: four i18n keys exist, two ship, the artboard draws none of it. Either the model has a read flag the design does not show, or the design has a resolved/outstanding axis the model does not have. This pass picks one. |
+| 7 | **Inbox** | `features/comms/InboxScreen.tsx` | **Settled 2026-09-01 — see *Screen 7* below.** The axis is outstanding vs done; read/unread survives only as the `חדש` mark. |
 | 8 | **Profile** | `features/people/ProfileSection.tsx`, `ProfileAndLeave.tsx` | Titled **חניכים**, and its only per-child affordance is the destructive **עזיבת המועדון**. Needs the guardian's own identity block, payment method, notification state, theme control. |
 
 ### Screen 2 — sign-in, and the constraint on it
@@ -303,6 +304,65 @@ round trip — and here the round trip happens *after a signature*, which is wor
 
 ---
 
+### Screen 7 — the inbox, and the axis it turned on
+
+**The measured before.** The Step 0 capture caught `parent3`'s inbox EMPTY, so it named no
+defects. Eight notices were seeded and it was re-captured
+(`docs/design/captures/` is unchanged; the working capture is in the session scratchpad).
+With content, the shipped screen showed:
+
+* **Eight notices, ten cards.** Every unread `health.*` row rendered as a pinned card AND
+  again as a plain row in the feed below it.
+* **The two pinned cards were identical twins** — same title, same body, same two buttons,
+  neither naming its child, though `payload.student_id` was right there.
+* **Both were already done.** All three declarations were signed; the screen went on
+  demanding them.
+* **The two a parent could really act on got no button**: the payment reminder and the
+  unanswered belt-exam invitation.
+* `חדש` was a grey caption word at the end of a date line, and the tab badge was the only
+  strong signal on the screen — with `סימון הכל כנקרא`, the control that erases it, as the
+  most prominent thing after the pins.
+
+**The axis, decided.** `read_at` fails in BOTH directions and each direction is now a test:
+sign from §6.1's gate and the notice stays unread while the demand is void
+(`test_an_unread_notice_can_already_be_done`); press `אחר כך` and it is marked read while
+the obligation stands (`test_reading_a_notice_settles_nothing`). Five of the ten kinds a
+parent can receive ask for something, and for every one of them the club's own records
+already settle it — so `app/services/comms/actions.py` resolves the answer **on read, never
+stored**, and `read_at` is demoted to the `חדש` mark on notices that ask for nothing.
+
+**A finding that came out of the audit and is worth keeping.** `HealthGate` makes every
+screen unreachable while an enrolled child's full declaration is missing, so a
+`health.declaration_missing` notice can only ever be SEEN by a family that has already
+satisfied the gate — or by a trial family, whom §5.5 deliberately does not gate. The
+shipped screen's only action card was therefore, for enrolled families, always about
+something already done.
+
+**The arrangement the owner picked (2026-09-01): D, the queue.** Four were drawn — A two
+sections, B one list with a state word per row, C a single card with the rest collapsed to a
+sentence, D which is C with the queue made swipeable. D was chosen with the owner's own
+refinement: one card at a time, a count badge above it, the rest reachable by swipe, the
+next card peeking, **ordered by arrival, oldest first** — which removes C's need for a
+priority rule and puts the longest wait in front. Settling one decrements the badge and the
+next takes its place.
+
+Two consequences decided while building, both flagged to the owner:
+
+* **Where "done" is acknowledged.** The feed is in date order, so a twelve-day-old notice
+  settled this morning would rejoin it twelve days down. The confirmation therefore lives
+  where the action did — a green `טופל` line under the counter, for 24 hours, and only for
+  kinds whose record carries a real timestamp. A payment has none (a balance reaching zero
+  is the sum of allocations across many charges) and none is invented.
+* **The tab badge counts what has not been DEALT WITH** — outstanding for a notice that asks
+  something, unread for one that does not. Counting `read_at` alone was the same defect
+  wearing a different hat; counting only outstanding would have made a new announcement
+  silent for a parent without push.
+
+`סימון הכל כנקרא` is **removed**. It was the most prominent control on a screen whose
+complaint was that its signals were invisible, and its whole effect was to erase them.
+
+---
+
 ## Guardrails — non-negotiable whatever Stitch returns
 
 * RTL, logical properties only (`margin-inline-start`, never `margin-left`)
@@ -331,6 +391,6 @@ round trip — and here the round trip happens *after a signature*, which is wor
 
 1. **Sign-in: one face or three?** Screen 2. Ask against a screenshot.
 2. **Does the debt banner belong on home at all?** Screen 1, for Stitch.
-3. **Read/unread — flag or axis?** Screen 7, for Stitch.
+3. ~~**Read/unread — flag or axis?**~~ **Answered 2026-09-01: outstanding vs done.** See *Screen 7*.
 4. **Pickup contacts: household or per-child?** Screen 3. Default household, editable per
    child, unless the capture shows otherwise.

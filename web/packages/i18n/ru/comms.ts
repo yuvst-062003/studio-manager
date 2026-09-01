@@ -17,6 +17,16 @@ export const comms: Bundle = {
   'inbox.markAllRead': 'Отметить все прочитанными',
   'inbox.new': 'Новое',
   'inbox.older': 'Ранее',
+  // -- screen 7's axis: what the club is still WAITING for, which is not what is unread --
+  'inbox.waiting': 'Ждёт вас',
+  'inbox.settled': 'Готово',
+  'inbox.updates': 'Обновления',
+  'inbox.of': 'из',
+  'inbox.byArrival': 'в порядке поступления',
+  'inbox.queueLabel': 'То, что вас ждёт',
+  'inbox.action.healthRenewal': 'Обновить декларацию',
+  'inbox.action.payment': 'К оплате',
+  'inbox.action.eventRsvp': 'Ответить на приглашение',
 
   // -- publishing (dashboard 4f) --------------------------------------------------
   'announcement.title': 'Сообщения',

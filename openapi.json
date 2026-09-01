@@ -7022,9 +7022,61 @@
         "title": "MyTrialBookingOut",
         "type": "object"
       },
+      "NotificationActionOut": {
+        "description": "What a notice asks for, and whether the club is still waiting for it.\n\n`null` on every notice that asks for nothing — an announcement, an injury report, the\nno-show follow-up. See `app/services/comms/actions.py` for why this is resolved on\nread rather than stored, and why the enum carries no Hebrew: the client owns the\nlabel and the route, the server owns the fact.",
+        "properties": {
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "outstanding": {
+            "title": "Outstanding",
+            "type": "boolean"
+          },
+          "settled_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Settled At"
+          },
+          "subject_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subject Name"
+          }
+        },
+        "required": [
+          "kind",
+          "outstanding"
+        ],
+        "title": "NotificationActionOut",
+        "type": "object"
+      },
       "NotificationOut": {
         "description": "One inbox row. §5.11: \"the inbox is where the message lives\" — no permission needed\nand it never expires.\n\nThere is no sender. Every one of §5.11's fifteen triggers is the system telling a\nperson something, and a `sender_person_id` here is the field a reply box would be\nbuilt on.",
         "properties": {
+          "action": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NotificationActionOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "body": {
             "title": "Body",
             "type": "string"

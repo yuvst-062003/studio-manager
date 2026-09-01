@@ -131,7 +131,10 @@ describe('the club inbox (2b)', () => {
     expect(within(row).getByText(new RegExp(t('he', 'comms.inbox.new')))).toBeInTheDocument()
   })
 
-  it('offers mark-all only while something is unread', async () => {
+  it('offers no bulk control that wipes the only signal on the screen', async () => {
+    // Screen 7 removed `סימון הכל כנקרא`. It was the most prominent control on the page and
+    // its entire effect was to erase the difference between a read row and an unread one —
+    // on a screen whose complaint was that the difference was invisible.
     const client = makeClient({
       inbox: vi.fn().mockResolvedValue({
         items: [note({ read_at: '2026-11-12T16:00:00Z' })],
@@ -169,6 +172,7 @@ describe('a message that can DO something (2026-08-30)', () => {
             kind: 'trial.followup',
             title: 'איך היה?',
             payload: { trial_booking_id: 'b1', day: 1, route: '#/join' },
+            action: { kind: 'trial_join', outstanding: true, settled_at: null, subject_name: null },
           }),
         ],
         next_cursor: null,
@@ -176,7 +180,7 @@ describe('a message that can DO something (2026-08-30)', () => {
       }),
     })
     render(<InboxScreen client={client} locale="he" userAgent={ANDROID} />)
-    await userEvent.click(await screen.findByTestId('inbox-route-go-n7'))
+    await userEvent.click(await screen.findByTestId('inbox-act-n7'))
     expect(globalThis.location.hash).toBe('#/join')
   })
 
@@ -200,7 +204,186 @@ describe('a message that can DO something (2026-08-30)', () => {
     })
     render(<InboxScreen client={client} locale="he" userAgent={ANDROID} />)
     await screen.findByTestId('inbox-row-n8')
-    expect(screen.queryByTestId('inbox-route-n8')).toBeNull()
+    expect(screen.queryByTestId('inbox-act-n8')).toBeNull()
+    expect(screen.queryByTestId('inbox-queue')).toBeNull()
+  })
+})
+
+describe('what is WAITING, which is not what is unread (screen 7)', () => {
+  const declaration = (over = {}) =>
+    note({
+      id: 'w1',
+      kind: 'health.declaration_missing',
+      title: 'נדרשת הצהרת בריאות',
+      body: 'כדי להמשיך, מלאו את הצהרת הבריאות של הילד',
+      payload: { student_id: 's1', day: 3 },
+      action: {
+        kind: 'health_declaration',
+        outstanding: true,
+        settled_at: null,
+        subject_name: 'דנה',
+      },
+      ...over,
+    })
+
+  const inboxOf = (...items: NotificationOut[]) =>
+    makeClient({
+      inbox: vi.fn().mockResolvedValue({ items, next_cursor: null, has_more: false }),
+    })
+
+  it('keeps a READ notice in the queue while the club is still waiting', async () => {
+    // The axis, at the seam. A parent who opened this and pressed `אחר כך` has signed
+    // nothing — the shipped screen cleared the demand anyway, which is the defect screen 7
+    // exists to fix.
+    render(
+      <InboxScreen
+        client={inboxOf(declaration({ read_at: '2026-11-12T16:00:00Z' }))}
+        locale="he"
+        userAgent={ANDROID}
+      />,
+    )
+    expect(await screen.findByTestId('inbox-waiting-w1')).toBeInTheDocument()
+    expect(screen.getByTestId('inbox-waiting-count')).toHaveTextContent('1')
+  })
+
+  it('drops an UNREAD notice out of the queue once the record says it is done', async () => {
+    // The other direction: signed from §6.1's gate, never opened here.
+    render(
+      <InboxScreen
+        client={inboxOf(
+          declaration({
+            action: {
+              kind: 'health_declaration',
+              outstanding: false,
+              settled_at: '2026-11-10T08:00:00Z',
+              subject_name: 'דנה',
+            },
+          }),
+        )}
+        locale="he"
+        userAgent={ANDROID}
+      />,
+    )
+    expect(await screen.findByTestId('inbox-row-w1')).toBeInTheDocument()
+    expect(screen.queryByTestId('inbox-queue')).toBeNull()
+    expect(screen.getByTestId('inbox-settled-w1')).toHaveTextContent(t('he', 'comms.inbox.settled'))
+  })
+
+  it('prints an outstanding notice ONCE — in the queue and not again in the feed', async () => {
+    // Eight notices produced ten cards before: the pinned cards were re-rendered in the
+    // list below them.
+    render(<InboxScreen client={inboxOf(declaration())} locale="he" userAgent={ANDROID} />)
+    expect(await screen.findByTestId('inbox-waiting-w1')).toBeInTheDocument()
+    expect(screen.queryByTestId('inbox-row-w1')).toBeNull()
+  })
+
+  it('names the child, so two identical demands are not identical cards', async () => {
+    render(
+      <InboxScreen
+        client={inboxOf(
+          declaration(),
+          declaration({
+            id: 'w2',
+            payload: { student_id: 's2', day: 3 },
+            action: {
+              kind: 'health_declaration',
+              outstanding: true,
+              settled_at: null,
+              subject_name: 'יוסי',
+            },
+          }),
+        )}
+        locale="he"
+        userAgent={ANDROID}
+      />,
+    )
+    expect(within(await screen.findByTestId('inbox-waiting-w1')).getByText('דנה')).toBeInTheDocument()
+    expect(within(screen.getByTestId('inbox-waiting-w2')).getByText('יוסי')).toBeInTheDocument()
+  })
+
+  it('queues oldest first, so the longest wait is the one you meet', async () => {
+    render(
+      <InboxScreen
+        client={inboxOf(
+          declaration({ id: 'new', created_at: '2026-11-12T09:00:00Z' }),
+          declaration({ id: 'old', created_at: '2026-10-01T09:00:00Z' }),
+        )}
+        locale="he"
+        userAgent={ANDROID}
+      />,
+    )
+    const queue = await screen.findByTestId('inbox-queue')
+    const cards = within(queue).getAllByTestId(/^inbox-waiting-/)
+    expect(cards.map((card) => card.dataset.testid)).toEqual([
+      'inbox-waiting-old',
+      'inbox-waiting-new',
+    ])
+  })
+
+  it('counts what is waiting, not what is unread', async () => {
+    render(
+      <InboxScreen
+        client={inboxOf(
+          declaration(),
+          // Unread, but nothing is waiting on it.
+          note({ id: 'a1', title: 'אין אימונים ביום ראשון' }),
+        )}
+        locale="he"
+        userAgent={ANDROID}
+      />,
+    )
+    expect(await screen.findByTestId('inbox-waiting-count')).toHaveTextContent('1')
+  })
+
+  it('sends the action where the kind says, and marks it read on the way', async () => {
+    const markRead = vi.fn().mockResolvedValue(note())
+    const client = makeClient({
+      inbox: vi.fn().mockResolvedValue({
+        items: [
+          note({
+            id: 'p1',
+            kind: 'billing.reminder',
+            title: 'תזכורת תשלום',
+            action: { kind: 'payment', outstanding: true, settled_at: null, subject_name: null },
+          }),
+        ],
+        next_cursor: null,
+        has_more: false,
+      }),
+      markRead,
+    })
+    render(<InboxScreen client={client} locale="he" userAgent={ANDROID} />)
+    await userEvent.click(await screen.findByTestId('inbox-act-p1'))
+    expect(globalThis.location.hash).toBe('#/payments')
+    expect(markRead).toHaveBeenCalledWith('p1')
+  })
+
+  it('says so above the queue when something was settled today', async () => {
+    // The feed is in date order, so a twelve-day-old notice settled this morning would
+    // rejoin it twelve days down. The confirmation lives where the action did.
+    vi.setSystemTime(new Date('2026-11-12T12:00:00Z'))
+    render(
+      <InboxScreen
+        client={inboxOf(
+          declaration(),
+          declaration({
+            id: 'w9',
+            action: {
+              kind: 'health_declaration',
+              outstanding: false,
+              settled_at: '2026-11-12T09:00:00Z',
+              subject_name: 'יוסי',
+            },
+          }),
+        )}
+        locale="he"
+        userAgent={ANDROID}
+      />,
+    )
+    expect(await screen.findByTestId('inbox-just-settled')).toHaveTextContent(
+      t('he', 'comms.inbox.settled'),
+    )
+    vi.useRealTimers()
   })
 })
 

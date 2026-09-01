@@ -778,7 +778,7 @@ waves:
         status: pending
       - id: S7
         title: Screen 7 — inbox
-        status: pending
+        status: done
       - id: S8
         title: Screen 8 — profile
         status: pending

@@ -25,7 +25,7 @@ from pydantic import BaseModel, Field
 from app.core.auth_context import require_roles
 from app.core.clock import now
 from app.core.tenancy import TenantSessionDep
-from app.models.comms import PREFERENCE_GROUPS
+from app.models.comms import PREFERENCE_GROUPS, Notification
 from app.schemas._pagination import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, IdempotencyKey
 from app.schemas.comms import (
     AnnouncementIn,
@@ -33,6 +33,7 @@ from app.schemas.comms import (
     AnnouncementPage,
     AnnouncementScope,
     DeliveryReportOut,
+    NotificationActionOut,
     NotificationOut,
     NotificationPage,
     PushApp,
@@ -40,6 +41,7 @@ from app.schemas.comms import (
     PushTokenIn,
     PushTokenOut,
 )
+from app.services.comms.actions import InboxAction, InboxActionResolver
 from app.services.comms.announcements import AnnouncementService
 from app.services.comms.errors import (
     AnnouncementAlreadyPublishedError,
@@ -456,6 +458,28 @@ def install_state(session: TenantSessionDep, _: ManagerOnly) -> InstallStateOut:
 
 
 # -- §5.11's inbox ------------------------------------------------------------
+def _with_action(row: Notification, action: InboxAction | None) -> NotificationOut:
+    """One row, plus whether the club is still waiting for what it asked.
+
+    Screen 7's axis. `read_at` still travels — it is what the `חדש` mark reads — but it no
+    longer decides whether a notice needs doing, because it never could: see
+    `app/services/comms/actions.py`.
+    """
+    out = NotificationOut.model_validate(row, from_attributes=True)
+    if action is None:
+        return out
+    return out.model_copy(
+        update={
+            "action": NotificationActionOut(
+                kind=action.kind,
+                outstanding=action.outstanding,
+                settled_at=action.settled_at,
+                subject_name=action.subject_name,
+            )
+        }
+    )
+
+
 class MarkedReadOut(BaseModel):
     """How many rows `read-all` actually changed.
 
@@ -489,8 +513,9 @@ def list_notifications(
     rows, has_more = NotificationReader(session).inbox(
         _person_id(request), after=after, limit=limit, unread_only=unread, kind=kind
     )
+    actions = InboxActionResolver(session).resolve_many(rows)
     return NotificationPage(
-        items=[NotificationOut.model_validate(row, from_attributes=True) for row in rows],
+        items=[_with_action(row, action) for row, action in zip(rows, actions, strict=True)],
         next_cursor=rows[-1].id if has_more and rows else None,
         has_more=has_more,
     )
@@ -515,7 +540,10 @@ def mark_notification_read(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={"code": "not_found", "message": "no such notification"},
         )
-    return NotificationOut.model_validate(row, from_attributes=True)
+    # Resolved on the way back out, so a client that marks read and re-renders one row
+    # sees the SAME outstanding answer the list gave it. Returning a bare row here was
+    # how "tapping it made the demand disappear" would have survived the redesign.
+    return _with_action(row, InboxActionResolver(session).resolve(row))
 
 
 @router.post("/notifications/read-all", response_model=MarkedReadOut)

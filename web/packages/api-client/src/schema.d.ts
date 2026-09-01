@@ -8409,6 +8409,25 @@ export interface components {
             student_id: string;
         };
         /**
+         * NotificationActionOut
+         * @description What a notice asks for, and whether the club is still waiting for it.
+         *
+         *     `null` on every notice that asks for nothing — an announcement, an injury report, the
+         *     no-show follow-up. See `app/services/comms/actions.py` for why this is resolved on
+         *     read rather than stored, and why the enum carries no Hebrew: the client owns the
+         *     label and the route, the server owns the fact.
+         */
+        NotificationActionOut: {
+            /** Kind */
+            kind: string;
+            /** Outstanding */
+            outstanding: boolean;
+            /** Settled At */
+            settled_at?: string | null;
+            /** Subject Name */
+            subject_name?: string | null;
+        };
+        /**
          * NotificationOut
          * @description One inbox row. §5.11: "the inbox is where the message lives" — no permission needed
          *     and it never expires.
@@ -8418,6 +8437,7 @@ export interface components {
          *     built on.
          */
         NotificationOut: {
+            action?: components["schemas"]["NotificationActionOut"] | null;
             /** Body */
             body: string;
             /**
