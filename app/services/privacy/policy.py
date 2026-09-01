@@ -1,42 +1,42 @@
 """The version of the terms and privacy policy a consent row records, and its label.
 
-**The text this ships is an UNREVIEWED DRAFT.** It was written against what the code
-actually does -- tenancy-isolated student and guardian records, `EncryptedJSON` /
-`EncryptedBytes` health declarations with keys in Railway secrets and never in the
-database, attendance, uPay as the payment processor, an append-only audit log -- and
-against the disclosure list Israel's Privacy Protection Law requires since Amendment 13
-came into force on 14 August 2025. Nobody with a practising certificate has read a word of
-it.
+**The text now shipping has been reviewed and approved** (2026-09-01) -- it is no longer
+the unreviewed draft this module was written against. `POLICY_VERSION` moves from 0 to 1
+for exactly the reason `consent_record.version` exists: a family who agreed to the draft
+wording did not agree to the reviewed one, and `ConsentService.outstanding` requires a
+grant AT the current version -- so the version bump itself is what re-gates every family
+and asks them again, honestly, against the text a lawyer has actually read.
 
-**Which is exactly why the version is 0.** `consent_record.version` is an INTEGER column
-(`app/models/health.py`), so a string like `0.1-draft` cannot be stored in it and no lane
-may add a column -- `alembic/versions/**` belongs to `main` and lands one revision per
-wave. Zero is the honest encoding of the same fact: no reviewed policy will ever be
-version 0, the first reviewed one is 1, and
+**Why an integer, and why 0 was the draft.** `consent_record.version` is an INTEGER column
+(`app/models/health.py`), so a label like the old `0.1-draft` could never be stored in it,
+and no lane may add a column -- `alembic/versions/**` belongs to `main` and lands one
+revision per wave. Zero was the honest encoding of "unreviewed": no reviewed policy is ever
+version 0, so it stays reserved, and
 
     SELECT * FROM consent_record
      WHERE consent_type IN ('terms', 'privacy') AND version = 0;
 
-finds every acceptance made against draft wording, forever, with no join and no guessing.
-`POLICY_VERSION_LABEL` carries the human form to the API and onto the screen, where a
-guardian and an operator both need to see the word "draft" rather than a bare 0.
+finds every acceptance made against the draft wording, forever, should it ever need to be
+traced back to what a family actually saw. `POLICY_VERSION_LABEL` carries the human form to
+the API and onto the screen -- rendered only while `POLICY_IS_DRAFT` is true, so it now
+reaches nobody, and is kept accurate rather than deleted for the day this text is revised
+again and a new draft needs the same telling-apart.
 
-When the reviewed text lands: raise `POLICY_VERSION` to 1, clear `POLICY_IS_DRAFT`, and
-every family is asked again -- because `ConsentService.outstanding` requires a grant AT the
-current version, and agreeing to v0 is not agreeing to v1.
+If the text is ever revised again: raise `POLICY_VERSION` further and every family is asked
+again, the same way this version's approval just did.
 """
 
 from __future__ import annotations
 
-#: `consent_record.version` for every acceptance of the draft text. See the module
-#: docstring for why this is an integer 0 rather than the string the wave plan suggested.
-POLICY_VERSION = 0
+#: `consent_record.version` for every acceptance of the current, reviewed text. 0 is
+#: permanently reserved for the pre-review draft -- see the module docstring.
+POLICY_VERSION = 1
 
 #: What the screen and the API say out loud. Never parsed, never stored.
-POLICY_VERSION_LABEL = "0.1-draft"
+POLICY_VERSION_LABEL = "1.0"
 
-#: True while `POLICY_VERSION` is 0. Read by the API so the draft notice cannot be left
-#: behind on a screen after the reviewed text lands -- the banner is data, not markup.
+#: True only while `POLICY_VERSION` is 0. Read by the API so a draft notice can never be
+#: left behind on a screen after the reviewed text lands -- the banner is data, not markup.
 POLICY_IS_DRAFT = POLICY_VERSION == 0
 
 #: §6.1 step 5 -- `5  אישורים  →  terms of service + privacy policy`. SPEC:1327: "Steps 5

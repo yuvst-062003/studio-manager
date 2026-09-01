@@ -586,16 +586,21 @@ def test_accepting_the_club_terms_appends_a_consent_row(tenant_session, studio, 
     assert row.granted is True
 
 
-def test_club_terms_are_accepted_while_the_platform_policy_is_still_draft(
+def test_club_terms_are_accepted_regardless_of_the_platform_policy_version(
     tenant_session, studio, signer
 ):
-    """The integration hazard this design had to solve. `ConsentService.record` compared every
-    submission against `POLICY_VERSION` alone, which is 0 for our unreviewed draft -- so a
-    club-terms grant at version 1 was rejected as a version mismatch. The two numbers were
-    never going to agree: they version documents by different authors."""
-    from app.services.privacy.policy import POLICY_VERSION
+    """The integration hazard this design had to solve. `ConsentService.record` used to
+    compare every submission against `POLICY_VERSION` alone, which was 0 for the unreviewed
+    draft -- so a club-terms grant at version 1 was rejected as a version mismatch. The fix
+    was `expected_version` routing each consent TYPE to its own dedicated number, which
+    holds regardless of whether the two numbers happen to coincide (they do today: the
+    policy's reviewed text also landed at version 1) -- a numeric coincidence is not the
+    same claim as the two being the same counter."""
+    from app.services.health.club_terms import CLUB_TERMS_CONSENT_TYPE
+    from app.services.privacy.policy import POLICY_VERSION, expected_version
 
-    assert CLUB_TERMS_VERSION != POLICY_VERSION, "the whole point of the per-type version"
+    assert expected_version(CLUB_TERMS_CONSENT_TYPE) == CLUB_TERMS_VERSION
+    assert expected_version("terms") == POLICY_VERSION
     assert (
         AgreementService.accept_club_terms(
             tenant_session,

@@ -38,9 +38,10 @@ def test_a_fresh_guardian_owes_both_consents(client, as_guardian: Caller):
     assert body["outstanding"] == ["terms", "privacy"]
     assert body["required"] == ["terms", "privacy"]
     assert body["policy_version"] == POLICY_VERSION
-    # The screen has to say "draft" out loud, and it reads that from here rather than
-    # from a hardcoded client constant that a later reviewed policy would leave lying.
-    assert body["policy_is_draft"] is True
+    # The text is reviewed now (POLICY_VERSION == 1), so the screen must NOT say "draft" --
+    # and it reads that from here rather than from a hardcoded client constant that the
+    # next draft would leave lying.
+    assert body["policy_is_draft"] is False
     assert body["policy_version_label"] == POLICY_VERSION_LABEL
 
 
