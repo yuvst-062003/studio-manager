@@ -23,6 +23,10 @@ import type { Bundle } from '../types'
 export const health: Bundle = {
   // -- the parent declaration flow (parent 12c) ---------------------------------
   'declaration.title': 'הצהרת בריאות',
+  // 2c's ledger row (2026-09-01). `card.rowLabel` is the short column label; the expiry
+  // is the fact the old chip-only section could not tell a parent at all.
+  'card.rowLabel': 'בריאות',
+  'declaration.validUntil': 'תקפה עד',
   'declaration.subtitle': 'נדרשת לפני תחילת האימונים',
   'declaration.forChild': 'עבור',
   'declaration.intro': 'ענו על השאלות וחתמו בתחתית הטופס',

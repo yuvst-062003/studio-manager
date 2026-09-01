@@ -295,6 +295,10 @@ export const people: Bundle = {
   'card.title': 'Карточка ученика',
   'card.details': 'Данные',
   'card.enrollments': 'Группы',
+  // 2c's ledger row labels (2026-09-01). Short, because they are a COLUMN — every value on
+  // the card lines up against them, so a label that wraps moves every row beside it.
+  'card.membership': 'Членство',
+  'card.plan': 'Программа',
   'card.sectionsComeLater':
     'Остальные разделы — расписание, посещаемость и платежи — откроются после подписания декларации о здоровье.',
   'alerts.title': 'Центр уведомлений',
@@ -366,4 +370,34 @@ export const people: Bundle = {
   'sibling.duplicate': 'Похоже, этот ребёнок уже зарегистрирован. Свяжитесь с клубом.',
   'sibling.duplicateNamed': '{name} уже зарегистрирован — добавлять повторно не нужно.',
   'sibling.duplicateOpen': 'Открыть карточку',
+
+  // -- screen 8: the guardian's own settings -------------------------------------
+  //
+  // The profile tab shipped titled `student.plural`, listing children, with the only
+  // per-child control being the destructive one. These are the keys that make it a screen
+  // about the PARENT: their own record, the app's settings, and the ways onward.
+  'profile.title': 'Профиль',
+  'profile.account': 'Моя учётная запись',
+  'profile.app': 'Приложение',
+  'profile.family': 'Семья',
+  'profile.club': 'Клуб',
+  'profile.privacy': 'Конфиденциальность',
+  'profile.name': 'Имя',
+  'profile.email': 'Эл. почта',
+  'profile.phone': 'Телефон',
+  'profile.notSet': 'Не указано',
+  'profile.edit': 'Изменить',
+  'profile.save': 'Сохранить',
+  'profile.saveFailed': 'Не удалось сохранить данные. Попробуйте ещё раз.',
+  'profile.language': 'Язык',
+  'profile.theme': 'Тема',
+  'profile.notifications': 'Уведомления',
+  'profile.notifications.hint': 'Сообщим об отмене занятия',
+  'profile.notifications.on': 'Включены',
+  'profile.notifications.off': 'Выключены',
+  'profile.paymentMethod': 'Мой способ оплаты',
+  'profile.children': 'Мои дети',
+  'profile.leaveHint': 'Уход из клуба оформляется в карточке ребёнка',
+  'profile.address': 'Адрес',
+
 }

@@ -42,6 +42,12 @@ export const billing: Bundle = {
   'card.installments': 'תשלומים בכרטיס',
   'card.total': 'סה״כ',
   'card.pay': 'לתשלום',
+  // 2c's money row (2026-09-01). `owedRow` labels THIS CHILD's open charges — the
+  // household total keeps `openDebts.total` and stays on 1b, where a total is labelled
+  // as one. The card is titled with one child's name, so a figure on it is read as
+  // theirs whatever a comment in the code says.
+  'card.owedRow': 'חוב',
+  'card.dueBy': 'לתשלום עד',
   'card.coveredElsewhere': 'החיוב כלול בתשלום שכבר נפתח',
   'card.nothingSelectable': 'אין חיובים זמינים לתשלום בכרטיס',
   'card.oldestFirst': 'נבחרים החיובים הוותיקים ביותר, לכל הילדים שאתם משלמים עבורם',

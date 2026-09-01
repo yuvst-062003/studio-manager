@@ -3,6 +3,10 @@ import type { Bundle } from '../types'
 /** Mirrors `he/health.ts`. `en` is `strict` in the parity check — a missing key fails. */
 export const health: Bundle = {
   'declaration.title': 'Health declaration',
+  // 2c's ledger row (2026-09-01). `card.rowLabel` is the short column label; the expiry
+  // is the fact the old chip-only section could not tell a parent at all.
+  'card.rowLabel': 'Health',
+  'declaration.validUntil': 'Valid until',
   'declaration.subtitle': 'Required before training begins',
   'declaration.forChild': 'For',
   'declaration.intro': 'Answer the questions and sign at the bottom of the form',

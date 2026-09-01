@@ -45,8 +45,27 @@ export type SlotId =
 export type SlotEntry<P = Record<string, unknown>> = {
   key: string
   order: number
+  /**
+   * Which FRAME of the container this section belongs in. Omitted means `'body'`, so
+   * every lane that registered before regions existed still lands where it did.
+   *
+   * A container is rarely one list. Parent `2c` is a header and a ledger of rows: the
+   * status chip belongs beside the name, the belt belongs in a row, and the two are owned
+   * by different milestones. Without this the container could only place a section by
+   * KNOWING it — `if (key === 'people-details')` — which is the single thing seam 4 exists
+   * to prevent. The region moves that decision into the lane's own file, where the lane
+   * already decides its `order`.
+   *
+   * Deliberately a plain string and not a union: the legal regions are a property of each
+   * CONTAINER, not of the registry, and a union here would mean every container's frames
+   * had to be declared in this file — the same coupling, one level up.
+   */
+  region?: string
   render: ComponentType<P>
 }
+
+/** Where an entry lands when its lane did not name a frame. */
+const DEFAULT_REGION = 'body'
 
 /**
  * The registry is heterogeneous — each slot carries its own props contract — so the
@@ -66,11 +85,18 @@ export function registerSlot<P>(slot: SlotId, entry: SlotEntry<P>): void {
   registry.set(slot, list)
 }
 
-export function useSlot<P = Record<string, unknown>>(slot: SlotId): readonly SlotEntry<P>[] {
+export function useSlot<P = Record<string, unknown>>(
+  slot: SlotId,
+  region?: string,
+): readonly SlotEntry<P>[] {
   // TypeScript has no existential types, so re-widening the erased form needs the
   // double cast. It is sound because `registerSlot` is the only writer and it takes a
   // `SlotEntry<P>`: the props a container asks for are the props a lane registered.
-  return (registry.get(slot) ?? []) as unknown as readonly SlotEntry<P>[]
+  const entries = (registry.get(slot) ?? []) as unknown as readonly SlotEntry<P>[]
+  // No region asked for means "every section", which is what a single-frame container
+  // wants and what every caller written before regions existed already does.
+  if (region === undefined) return entries
+  return entries.filter((entry) => (entry.region ?? DEFAULT_REGION) === region)
 }
 
 /** Tests only. Module-level state outlives a test file without it. */

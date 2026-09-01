@@ -116,6 +116,8 @@ export const events: Bundle = {
   'belt.noneYet': 'No belt history yet',
   'belt.noneYetHint': 'When a belt is awarded, the progression will appear here',
   'belt.title': 'Belt system',
+  // 2c's ledger row label — the object, not the screen that manages it (2026-09-01).
+  'belt.one': 'Belt',
   'belt.alreadySeeded': 'This class already has a belt ladder ({{count}} ranks)',
   'belt.alreadySeededHint': 'Full editing on the belts screen. You can continue to the next step',
   'belt.continue': 'Continue to the next step',

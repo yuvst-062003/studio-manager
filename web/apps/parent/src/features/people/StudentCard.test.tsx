@@ -194,24 +194,50 @@ describe('the sections this lane owns', () => {
     expect(section.textContent ?? '').not.toMatch(/₪|price|מחיר/)
   })
 
-  it('gives every guardian the same affordances', () => {
-    // L8 — §5.3: 'One guardian view, no permission branching.'
+  it('names every guardian and sends the parent to the one guardian view', () => {
+    // L8 — §5.3: 'There is one guardian view in the app and no permission branching inside
+    // it.' That view is 12i behind #/profile, and it is where the phone numbers, the
+    // primary badge and its hint live. The card names who they are and goes there; it does
+    // not build a second guardian view beside the first one. Every guardian is listed, so
+    // the equality rule is visible here too — no row is omitted or marked.
     registerPeopleSections()
     render(<StudentCard student={STUDENT} locale="he" guardians={GUARDIANS} />)
-    expect(screen.getAllByTestId('guardian-row')).toHaveLength(2)
-    expect(screen.getAllByTestId('guardian-call')).toHaveLength(2)
-    expect(screen.getAllByTestId('guardian-primary')).toHaveLength(1)
+    const row = screen.getByTestId('student-card-guardians')
+    expect(screen.getAllByTestId('guardian-name')).toHaveLength(2)
+    expect(row).toHaveTextContent('יעל כהן')
+    expect(row).toHaveTextContent('דוד כהן')
+    expect(row).toHaveAttribute('href', '#/profile')
+    // No badge, no hint, no call link — those belong to 12i, not to a summary row.
+    expect(screen.queryByTestId('guardian-primary')).toBeNull()
+    expect(screen.queryByTestId('guardian-call')).toBeNull()
   })
 
   it('surfaces the student’s status rather than inferring it', () => {
     // §5.4a — 'student.status is surfaced everywhere a student is rendered, never inferred
-    // from the absence of an enrollment.'
+    // from the absence of an enrollment.' It reads in the HEADER now, beside the name,
+    // because it is the child's current standing rather than one fact among the others.
     registerPeopleSections()
     const trial = { ...STUDENT, status: 'trial' } as StudentSummary
     render(<StudentCard student={trial} locale="he" enrollments={[]} />)
-    expect(screen.getByTestId('student-card-details')).toHaveTextContent(
+    expect(screen.getByTestId('student-card-header')).toHaveTextContent(
       t('he', 'people.status.trial'),
     )
+  })
+
+  it('puts the freeze date on the chip, not in a line of its own', () => {
+    // 'מוקפא' without 'until when' is the half of the answer a parent does not need — they
+    // already know the child is not training. The old card said it in a separate paragraph
+    // under a separate heading.
+    registerPeopleSections()
+    const frozen = {
+      ...STUDENT,
+      status: 'frozen',
+      frozen_until: '2026-11-01',
+    } as unknown as StudentSummary
+    render(<StudentCard student={frozen} locale="he" />)
+    const header = screen.getByTestId('student-card-header')
+    expect(header).toHaveTextContent(t('he', 'people.status.frozen'))
+    expect(header).toHaveTextContent(/2026/)
   })
 
   it('renders no physical CSS', () => {
@@ -229,5 +255,80 @@ describe('the sections this lane owns', () => {
         /margin-(left|right)|padding-(left|right)|(^|;)\s*(left|right):/,
       )
     }
+  })
+})
+
+// ── The card is ONE record about one child (Option C, 2026-09-01) ───────────────────────
+//
+// 2c used to be eight sections registered by six milestones, each rendering its own <h2>
+// at the same weight. The redesign spec names the defect for this screen: "how five
+// milestone-owned sections read as one card rather than five stacked boxes."
+//
+// The fix is a REGION on the slot entry, never a container that learns section names — the
+// test above ('hardcodes NO section this lane does not own') is what keeps that honest.
+describe('StudentCard — one card, three frames', () => {
+  afterEach(() => clearSlot('student-card'))
+
+  it('carries exactly one heading, so no section outranks the child', () => {
+    registerPeopleSections()
+    render(
+      <StudentCard
+        student={STUDENT}
+        locale="he"
+        enrollments={ENROLLMENTS}
+        guardians={GUARDIANS}
+      />,
+    )
+    expect(screen.getAllByRole('heading')).toHaveLength(1)
+  })
+
+  it('places a mark section before the name and a status section after it', () => {
+    // The belt swatch is M7's and the status chip is M3's. Both belong in the header, on
+    // opposite sides of a name the container owns — which a single ordered list cannot
+    // express, and which the container must not express by knowing either lane's name.
+    registerSlot<StudentCardSectionProps>('student-card', {
+      key: 'swatch',
+      order: 10,
+      region: 'mark',
+      render: () => <span data-testid="frame-mark" />,
+    })
+    registerSlot<StudentCardSectionProps>('student-card', {
+      key: 'chip',
+      order: 10,
+      region: 'status',
+      render: () => <span data-testid="frame-status" />,
+    })
+    render(<StudentCard student={STUDENT} locale="he" />)
+
+    const header = screen.getByTestId('student-card-header')
+    const order = [...header.querySelectorAll('[data-testid], h1')].map(
+      (node) => node.getAttribute('data-testid') ?? node.tagName,
+    )
+    expect(order).toEqual(['frame-mark', 'H1', 'frame-status'])
+  })
+
+  it('puts a section that names no region into the ledger, so no lane had to be reopened', () => {
+    registerSlot<StudentCardSectionProps>('student-card', {
+      key: 'legacy',
+      order: 10,
+      render: () => <span data-testid="frame-legacy" />,
+    })
+    render(<StudentCard student={STUDENT} locale="he" />)
+    expect(screen.getByTestId('student-card-rows')).toContainElement(
+      screen.getByTestId('frame-legacy'),
+    )
+  })
+
+  it('keeps the header out of the ledger, so a chip is never a row', () => {
+    registerSlot<StudentCardSectionProps>('student-card', {
+      key: 'chip',
+      order: 10,
+      region: 'status',
+      render: () => <span data-testid="frame-status" />,
+    })
+    render(<StudentCard student={STUDENT} locale="he" />)
+    expect(screen.getByTestId('student-card-rows')).not.toContainElement(
+      screen.getByTestId('frame-status'),
+    )
   })
 })
