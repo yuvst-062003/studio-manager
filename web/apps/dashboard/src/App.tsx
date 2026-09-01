@@ -16,14 +16,13 @@ import {
   AccessibilityMenu,
   AccountDrawerFooter,
   AppShell,
+  DashboardSignIn,
   EmptyState,
   Icon,
-  LanguagePicker,
   RefusalScreen,
   SetupIncompleteBanner,
   SetupWizard,
   SideNav,
-  SignIn,
   ThemeControl,
   ThemeProvider,
   UpdateToast,
@@ -663,14 +662,19 @@ export default function App() {
       {/* New-build toast — floats over whatever is open, in every session state. */}
       <UpdateToast locale={locale} />
       {session.status === 'anonymous' ? (
-        // app="dashboard", not "staff": the OAuth callback routes the browser back to
-        // the app named here, and this screen's app is this one (design pass — the
-        // wrong name sent a signed-in manager to the staff origin).
-        <SignIn
-          locale={locale}
-          app="dashboard"
-          languagePicker={<LanguagePicker locale={locale} onChoose={setLocale} />}
-        />
+        // The owner's Stitch export "Dojo Hazon" (2026-09-01) — this app's own face on
+        // §6.1's flow, the light-ground counterpart to the staff app's `ManagerSignIn`.
+        // `SignIn`'s cream split screen still dresses the parent app.
+        //
+        // The screen hard-codes app="dashboard" for the reason the prop used to say so
+        // here: the OAuth callback routes the browser back to the app named in the start
+        // URL, and the wrong name sent a signed-in manager to the staff origin.
+        //
+        // §6.1's ordering still holds — 'language before login, because a Russian-speaking
+        // parent cannot read a Hebrew consent screen' — and the screen carries the picker
+        // itself, in the top bar the export draws it in, rather than floating a separate
+        // `LanguagePicker` over the artwork.
+        <DashboardSignIn locale={locale} onChooseLocale={setLocale} />
       ) : null}
 
       {/* Refused BEFORE the shell, not inside it: the point is that none of the doors are
@@ -783,7 +787,8 @@ export default function App() {
             // and parent apps already mount — this app was the only one passing none, so
             // under 1024px (where the sidebar is hidden) it had no theme control at all.
             // It brings the language picker with it, which the dashboard also lacked
-            // after first run: `LanguagePicker` is only ever shown on the sign-in screen.
+            // after first run: the sign-in screen carries its own, and it is gone the
+            // moment there is a session.
             <AccountDrawerFooter
               locale={locale}
               onChooseLocale={setLocale}

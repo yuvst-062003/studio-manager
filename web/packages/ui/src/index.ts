@@ -98,9 +98,12 @@ export { LanguagePicker } from './first-run/LanguagePicker'
 export { SignIn } from './first-run/SignIn'
 export type { SignInProvider } from './first-run/SignIn'
 // The staff app's own face on the same flow — docs/design "Gladiator Manager Sign In".
-// `SignIn` above still dresses parent and dashboard; both read the provider list through
-// the one hook, so a provider cannot be added to one screen and forgotten on the other.
+// `SignIn` above still dresses the parent app; all three read the provider list through
+// the one hook, so a provider cannot be added to one screen and forgotten on the others.
 export { ManagerSignIn, PRIVACY_HASH, TERMS_HASH } from './first-run/ManagerSignIn'
+// The dashboard's own face — the owner's Stitch export "Dojo Hazon". The light-ground
+// counterpart to `ManagerSignIn`, and the third screen over the same `useAuthProviders`.
+export { DashboardSignIn } from './first-run/DashboardSignIn'
 // The legal copy the staff sign-in's footer links to, and the parent's consent gate has
 // always rendered. One copy, because two would be able to drift apart.
 export { DraftNotice, PolicyDocument } from './legal/PolicyDocument'

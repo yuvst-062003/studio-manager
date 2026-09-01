@@ -116,6 +116,18 @@ export const common: Bundle = {
   'auth.manager.privacy': 'Privacy Policy',
   'auth.manager.copyright': '© 2026 Gladiator. All rights reserved.',
   'auth.manager.backToSignIn': 'חזרה להתחברות',
+  // -- the dashboard sign-in (owner's Stitch export "Dojo Hazon", 2026-09-01) --------
+  // The manager dashboard's own face. The button label and the misconfiguration notice
+  // are the SHARED `auth.signInWithGoogle` / `auth.noProviders` above -- the same words
+  // in the same flow, and a third copy would be a third place to forget.
+  //
+  // `dashboard.wordmark` is the club's name as the export sets it across the top bar.
+  // Latin in every locale, same rule as `brand.wordmark`: it is the brand, not a
+  // translation.
+  'auth.dashboard.wordmark': 'GLADIATOR JUDO',
+  'auth.dashboard.title': 'כניסה לגלדיאטור',
+  'auth.dashboard.blurb': 'פורטל המועדון — לוח האימונים, המערכת והיסטוריית האימונים.',
+  'auth.dashboard.copyright': '© 2026 מועדון הג׳ודו גלדיאטור. כל הזכויות שמורות.',
   'dash.hint.home': 'תמונת מצב יומית — נוכחות, כסף פתוח ומה שדורש טיפול',
   'dash.hint.schedule': 'הלוח השבועי — שיעורים, אולמות ושיוך מאמנים',
   'dash.hint.attendance': 'דוח נוכחות — אחוזים לכל קבוצה ושיעורים שלא סומנו',

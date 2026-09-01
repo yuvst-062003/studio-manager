@@ -1,0 +1,458 @@
+/* The dashboard app's sign-in — the owner's Stitch export "Dojo Hazon", implemented
+ * 2026-09-01. `manager-signin.css` dresses the staff screen; `gladiator-signin.css` still
+ * dresses `SignIn` for the parent app.
+ *
+ * Like both of those, this screen deliberately commits to ONE look in both themes: the
+ * tatami-light ground, the navy card rule and the club crest are the brand moment, not a
+ * data surface, so every colour here is a literal from the export's token block rather
+ * than a theme token. The explicit background on the root is what keeps a dark host theme
+ * from bleeding through — the dashboard gained a theme switch in faa0733, and this screen
+ * is the one surface that must not follow it.
+ *
+ * Contrast, measured rather than assumed (contrast.ts, AA_TEXT = 4.5):
+ *   #191c1e on #f7f9fb ......... 16.23   the ground's body text
+ *   #001129 on #f7f9fb ......... 17.89   the wordmark, the active language, the footer
+ *   #44474e on #ffffff .......... 9.30   the card's blurb
+ *   #ffffff on #001129 ......... 18.88   the button label
+ *   #44474e on #f7f9fb .......... 8.82   the language switcher, unselected
+ *
+ * Two families live HERE and not in fonts.css, for the reason Archivo and the manager
+ * screen's pair already do: fonts.css is gated by fonts.test.ts to exactly one family
+ * (D6/G14, "one family, one loading strategy", because every extra family is an asset to
+ * cache before a coach walks into a basement). That argument is about screens that must
+ * work offline — and this one cannot: OAuth needs the network before anything else.
+ *
+ * The five faces below are the SAME files manager-signin.css declares, restated rather
+ * than shared because a screen-local stylesheet is the established shape here and the
+ * alternative was editing the staff screen's stylesheet, which this change is scoped out
+ * of. Identical `src` URLs, so each woff2 is still fetched exactly once.
+ *
+ * NEITHER family carries Hebrew. Plex and Jakarta dress the Latin (the wordmark, the
+ * language names, "Google"), and every Hebrew string falls through to Rubik, which the
+ * app already ships. That is why each face declares a unicode-range: without one the
+ * browser would download a Latin file to fail at a Hebrew string.
+ */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 700;
+  font-stretch: 100%;
+  src: url('./assets/ibm-plex-sans-latin-wght.woff2') format('woff2-variations');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215,
+    U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 700;
+  font-stretch: 100%;
+  src: url('./assets/ibm-plex-sans-latin-ext-wght.woff2') format('woff2-variations');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304,
+    U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB,
+    U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 700;
+  font-stretch: 100%;
+  src: url('./assets/ibm-plex-sans-cyrillic-wght.woff2') format('woff2-variations');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+
+@font-face {
+  font-family: 'Plus Jakarta Sans';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 200 800;
+  src: url('./assets/plus-jakarta-sans-latin-wght.woff2') format('woff2-variations');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215,
+    U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Plus Jakarta Sans';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 200 800;
+  src: url('./assets/plus-jakarta-sans-latin-ext-wght.woff2') format('woff2-variations');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304,
+    U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB,
+    U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+/* ── the ground ──────────────────────────────────────────────────────────────
+ * "Modern Minimalist with Tonal Layering" is the export's own name for the aesthetic,
+ * and the layers below are what carries it: a tonal lift from the top edge, a 64px
+ * blueprint grid, and the 柔道 watermark. All decorative, all behind `z-index: 0`, none
+ * of them reachable by a pointer.
+ *
+ * The export's fourth layer was a cinematic dojo photograph from a Stitch placeholder
+ * host, which cannot be fetched at runtime. It is dropped rather than substituted: in
+ * the render it survives only as a 40%-opacity multiply under two gradients, and the
+ * tonal field below reproduces that reading without shipping a megabyte of JPEG in front
+ * of a screen a manager cannot get past. */
+.dsignin {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-block-size: 100vh;
+  min-block-size: 100svh;
+  overflow: hidden;
+  background: #f7f9fb;
+  color: #191c1e;
+  font-family: 'Plus Jakarta Sans', 'Rubik Variable', sans-serif;
+}
+
+.dsignin__ground,
+.dsignin__grid,
+.dsignin__kanji {
+  position: absolute;
+  inset-block: 0;
+  inset-inline: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.dsignin__ground {
+  background:
+    radial-gradient(120% 90% at 50% 0%, #fff 0%, #f2f4f6 55%, #e6e8ea 100%),
+    linear-gradient(to bottom, rgb(15 38 68 / 0%) 55%, rgb(15 38 68 / 6%) 100%);
+}
+
+/* The export's grid is `rgba(178, 199, 237, 0.05)` on a dark-mode assumption — an
+ * ice-blue line that on this light ground is simply not there. Same intent, inverted:
+ * a navy-tinted line faint enough to read as paper texture rather than a table. */
+.dsignin__grid {
+  background-image:
+    linear-gradient(to right, rgb(15 38 68 / 6%) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(15 38 68 / 6%) 1px, transparent 1px);
+  background-size: 64px 64px;
+}
+
+/* 柔道 — "judo", the export's own decorative element. Decorative and `aria-hidden`: it is
+ * a texture, not a heading, and a screen reader announcing "jūdō" behind the card would
+ * be noise. Set horizontally, as the export sets it, so it reads out past both inline
+ * edges of the 448px card rather than hiding behind it.
+ *
+ * Centred by grid, NOT by `inset: 50%` + a translate: the logical inset properties map to
+ * physical edges through the ELEMENT'S OWN writing mode, which bit the staff screen when
+ * its watermark was vertical. Grid centring has no axes to swap and needs no RTL
+ * counterpart, so it stays the way this is done even where the text runs horizontally. */
+.dsignin__kanji {
+  display: grid;
+  place-content: center;
+  font-family: 'Yu Mincho', 'MS Mincho', serif;
+  font-size: clamp(220px, 40vw, 480px);
+  font-weight: 700;
+  line-height: 1;
+  color: rgb(0 17 41 / 4.5%);
+  white-space: nowrap;
+}
+
+/* ── the top bar ─────────────────────────────────────────────────────────────
+ * The export's 64px desktop margin and 1200px container, both from its spacing block. */
+.dsignin__bar {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  inline-size: 100%;
+  max-inline-size: 1200px;
+  margin-inline: auto;
+  padding: 24px 16px;
+}
+
+.dsignin__wordmark {
+  font-family: 'IBM Plex Sans', 'Rubik Variable', sans-serif;
+  font-size: clamp(28px, 5.5vw, 48px);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: #001129;
+}
+
+.dsignin__langs {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+/* A real <button>, dressed as the export's link: choosing a language changes this page,
+ * it does not navigate to one, and `aria-pressed` is what tells a screen reader which of
+ * the three is currently on.
+ *
+ * The export names the three in English ("HEBREW ENGLISH RUSSIAN"). They are named in
+ * their OWN language here, which is `LanguagePicker`'s rule and §6.1's reason for putting
+ * the picker before login at all: someone who cannot read the current locale still has to
+ * recognise their own. */
+.dsignin__lang {
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: 'IBM Plex Sans', 'Rubik Variable', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #44474e;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.dsignin__lang:hover {
+  color: #001129;
+}
+
+/* The export marks nav state with a navy underline the width of the text — the same
+ * device, on the one item that has state here. */
+.dsignin__lang[aria-pressed='true'] {
+  color: #001129;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 6px;
+  text-decoration-thickness: 2px;
+  cursor: default;
+}
+
+/* ── the card ────────────────────────────────────────────────────────────────
+ * "Subtle Glassmorphism", the export's words: white at 85% over a 20px backdrop blur,
+ * a 1px outline instead of a drop shadow, and a 4px navy rule across the top edge. */
+.dsignin__main {
+  position: relative;
+  z-index: 10;
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 100%;
+  padding: 24px 16px 48px;
+}
+
+.dsignin__card {
+  position: relative;
+  overflow: hidden;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 32px;
+  inline-size: 100%;
+  max-inline-size: 448px;
+  padding: 48px 40px 40px;
+  border: 1px solid rgb(203 213 225 / 50%);
+  border-radius: 8px;
+  background: rgb(255 255 255 / 85%);
+  backdrop-filter: blur(20px);
+  box-shadow: 0 4px 40px rgb(15 38 68 / 8%);
+}
+
+.dsignin__rule {
+  position: absolute;
+  top: 0;
+  inset-inline: 0;
+  block-size: 4px;
+  background: #001129;
+}
+
+.dsignin__logo {
+  inline-size: 100%;
+  max-inline-size: 236px;
+  block-size: auto;
+  object-fit: contain;
+}
+
+.dsignin__heading {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: center;
+}
+
+.dsignin__title {
+  margin: 0;
+  font-family: 'IBM Plex Sans', 'Rubik Variable', sans-serif;
+  font-size: 32px;
+  font-weight: 600;
+  line-height: 40px;
+  text-transform: uppercase;
+  color: #001129;
+  text-wrap: balance;
+}
+
+/* The export's `secondary` (#566067) measures 6.43:1 on white and would have passed. This
+ * is `on-surface-variant` from the same token block at 9.30:1 — the export's own palette,
+ * one step darker, because a blurred glass panel is not the flat white the ratio assumes. */
+.dsignin__blurb {
+  margin: 0;
+  font-size: 16px;
+  line-height: 24px;
+  color: #44474e;
+  text-wrap: pretty;
+}
+
+/* ── the call to action ──────────────────────────────────────────────────────
+ * The export's primary button: filled navy, white label, and a 1px white tile holding
+ * Google's mark. 4px — the export's "Soft" radius, "to prevent the interface from feeling
+ * clinical, while maintaining the straight lines associated with the edges of a mat". */
+.dsignin__cta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  inline-size: 100%;
+}
+
+.dsignin__btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  box-sizing: border-box;
+  inline-size: 100%;
+  padding: 16px 24px;
+  border: 1px solid #001129;
+  border-radius: 4px;
+  background: #001129;
+  color: #fff;
+  font-family: 'IBM Plex Sans', 'Rubik Variable', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-decoration: none;
+  cursor: pointer;
+
+  /* NOT `transition: all`. Outline colour and offset are animatable, so `all` faded the
+   * focus ring in over 300ms from the button's own `currentColor` — white — which on a
+   * white card is a keyboard user tabbing onto a control with no visible indicator until
+   * the animation lands. Caught by reading the computed style right after Tab: it said
+   * `outline: rgb(255,255,255) solid 3px; outline-offset: 0px`, none of which this
+   * stylesheet asks for. Naming the two properties that actually change is the fix. */
+  transition:
+    background-color 0.3s ease,
+    box-shadow 0.3s ease;
+}
+
+/* "Upon hover, primary elements may exhibit a very soft, diffused Navy-tinted shadow" —
+ * the export's elevation note, verbatim. */
+.dsignin__btn:hover {
+  background: #0f2644;
+  text-decoration: none;
+  box-shadow: 0 4px 20px rgb(15 38 68 / 25%);
+}
+
+.dsignin__btn:focus-visible {
+  outline: 3px solid #0f2644;
+  outline-offset: 3px;
+}
+
+.dsignin__gtile {
+  flex: none;
+  display: grid;
+  place-items: center;
+  inline-size: 24px;
+  block-size: 24px;
+  border-radius: 2px;
+  background: #fff;
+}
+
+.dsignin__gtile svg {
+  inline-size: 16px;
+  block-size: 16px;
+}
+
+.dsignin__fine {
+  margin: 0;
+  text-align: center;
+  font-size: 14px;
+  line-height: 20px;
+  color: #44474e;
+  text-wrap: pretty;
+}
+
+/* ── the footer ──────────────────────────────────────────────────────────────
+ * The export's footer is a white bar carrying the copyright and two legal links. The
+ * links are NOT here: they have to be readable BEFORE there is an account, and the
+ * dashboard routes no document while anonymous — the staff app's `#/terms` and
+ * `#/privacy-policy` are a second screen and a second route, out of this change's scope.
+ * A link to a hash this app does not route would have rendered the board behind the
+ * sign-in, which is worse than the bar the copyright sits on alone. */
+.dsignin__footer {
+  position: relative;
+  z-index: 20;
+  inline-size: 100%;
+
+  /* 64px inline on EVERY viewport, where the top bar keeps the export's 16px mobile
+   * margin. Not the export's doing: `AccessibilityMenu` floats a 44px button 12px off the
+   * inline-start edge at the bottom of every screen in this app, and a centred copyright
+   * ran straight under it at 390px — the © and the year were behind the button. The
+   * reserve is on both sides because the button follows the inline edge, so it is on the
+   * left in English and on the right in Hebrew. */
+  padding: 24px 64px;
+  border-block-start: 1px solid #c4c6ce;
+  background: #fff;
+}
+
+.dsignin__copy {
+  max-inline-size: 1200px;
+  margin-inline: auto;
+  text-align: center;
+  font-family: 'IBM Plex Sans', 'Rubik Variable', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #001129;
+}
+
+/* The export's desktop margin. Applied from the container width up, so the 16px mobile
+ * margin above is what a phone gets. */
+@media (width >= 900px) {
+  .dsignin__bar {
+    padding-inline: 64px;
+  }
+
+  .dsignin__card {
+    padding: 56px 48px 48px;
+  }
+}
+
+/* Below the export's own viewport the wordmark and the switcher stop fitting on one line;
+ * the bar wraps and the two halves centre rather than splitting to opposite edges. */
+@media (width <= 560px) {
+  .dsignin__bar {
+    flex-direction: column;
+    justify-content: center;
+    gap: 12px;
+  }
+
+  .dsignin__card {
+    padding: 40px 24px 32px;
+  }
+
+  .dsignin__title {
+    font-size: 28px;
+    line-height: 36px;
+  }
+}
+
+/* The hover shadow is decoration. Someone who asked the system to stop moving things
+ * gets the same screen without the transition. */
+@media (prefers-reduced-motion: reduce) {
+  .dsignin__btn,
+  .dsignin__lang {
+    transition: none;
+  }
+}

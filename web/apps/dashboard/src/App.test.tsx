@@ -76,8 +76,14 @@ describe('dashboard shell', () => {
       '/auth/providers': { items: [{ name: 'google', start_url: '/api/v1/auth/google/start' }] },
     })
     render(<App />)
+    // `DashboardSignIn` since the "Dojo Hazon" pass, not the shared `SignIn`. Asserted
+    // through the link's href rather than its text, because the thing this shell is
+    // responsible for is mounting the screen that names THIS app in the start URL —
+    // passing "staff" here once sent a signed-in manager to the staff origin.
     await waitFor(() =>
-      expect(screen.getByText(t('he', 'common.auth.continueWithGoogle'))).toBeInTheDocument(),
+      expect(
+        screen.getByRole('link', { name: t('he', 'common.auth.signInWithGoogle') }),
+      ).toHaveAttribute('href', expect.stringContaining('app=dashboard')),
     )
   })
 

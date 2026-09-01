@@ -114,6 +114,12 @@ export const common: Bundle = {
   'auth.manager.privacy': 'Privacy Policy',
   'auth.manager.copyright': '© 2026 Gladiator. All rights reserved.',
   'auth.manager.backToSignIn': 'Назад ко входу',
+  // -- the dashboard sign-in (owner's Stitch export "Dojo Hazon", 2026-09-01) --------
+  // See he/common.ts for why the wordmark stays Latin in all three.
+  'auth.dashboard.wordmark': 'GLADIATOR JUDO',
+  'auth.dashboard.title': 'Вход в Gladiator',
+  'auth.dashboard.blurb': 'Портал клуба — расписание, тренировки и история занятий.',
+  'auth.dashboard.copyright': '© 2026 Клуб дзюдо Gladiator. Все права защищены.',
   'dash.hint.home': 'Дневная сводка — посещаемость, открытые платежи и что требует внимания',
   'dash.hint.schedule': 'Недельная доска — занятия, залы и назначение тренеров',
   'dash.hint.attendance': 'Отчёт посещаемости — процент по группам и неотмеченные занятия',
