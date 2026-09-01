@@ -39,10 +39,12 @@ export function AddSibling({
   locale,
   client,
   groups = [],
+  onAdded,
 }: {
   locale: Locale
   client: PeopleClient
   groups?: SiblingGroupOption[]
+  onAdded?: () => void
 }) {
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
@@ -113,6 +115,7 @@ export function AddSibling({
       .then(async (response) => {
         if (response.ok) {
           setSubmitted(true)
+          onAdded?.()
           return
         }
         if (response.status === 422) {

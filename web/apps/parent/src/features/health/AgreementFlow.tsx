@@ -46,6 +46,7 @@ export type AgreementFlowProps = {
   client: HealthClient
   studentId: string
   studentName: string
+  students?: readonly { id: string; display_name: string; health_status?: string }[]
   signerName?: string
   today?: string
   /** Fired when every part of the agreement has landed — the gate re-reads and opens. */
@@ -68,13 +69,26 @@ export function nextStep(status: AgreementStatusOut): Step | null {
   return null
 }
 
-const STEP_ORDER: Step[] = ['terms', 'registration', 'health']
+const WIZARD_STEPS = [
+  { key: 'consent', label: 'health.onboarding.step.consent' },
+  { key: 'terms', label: 'health.onboarding.step.terms' },
+  { key: 'registration', label: 'health.onboarding.step.family' },
+  { key: 'health', label: 'health.onboarding.step.health' },
+  { key: 'payment', label: 'health.onboarding.step.payment' },
+] as const
+
+const STEP_POSITION: Record<Step, number> = {
+  terms: 2,
+  registration: 3,
+  health: 4,
+}
 
 export function AgreementFlow({
   locale,
   client,
   studentId,
   studentName,
+  students = [],
   signerName,
   today,
   onCompleted,
@@ -164,16 +178,95 @@ export function AgreementFlow({
   const step = nextStep(status)
   if (step === null) return null
 
-  const position = STEP_ORDER.indexOf(step) + 1
+  const position = STEP_POSITION[step]
+  const subjects = students.length > 0 ? students : [{ id: studentId, display_name: studentName }]
 
   return (
-    <div data-testid={`agreement-step-${step}`} style={flowStyle}>
+    <div
+      data-testid={`agreement-step-${step}`}
+      style={flowStyle}
+    >
       <header>
-        <h1>{t(locale, 'health.agreement.title')}</h1>
+        <h1>{t(locale, 'health.onboarding.title')}</h1>
         <p style={stepLabelStyle}>
-          {t(locale, 'health.agreement.step')} {position}/{STEP_ORDER.length}
+          {t(locale, 'health.agreement.step')} {position}/{WIZARD_STEPS.length}
         </p>
+        <div
+          aria-label={t(locale, 'health.onboarding.rail')}
+          data-testid="onboarding-rail"
+          style={{
+            display: 'grid',
+            gap: 'var(--space-2)',
+            gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
+          }}
+        >
+          {WIZARD_STEPS.map((item, index) => {
+            const stepNumber = index + 1
+            const done = stepNumber < position
+            const current = stepNumber === position
+            return (
+              <span
+                aria-current={current ? 'step' : undefined}
+                data-testid={`onboarding-rail-${item.key}`}
+                key={item.key}
+                style={{
+                  background: current
+                    ? 'var(--accent)'
+                    : done
+                      ? 'color-mix(in srgb, var(--paid) 12%, var(--surface))'
+                      : 'color-mix(in srgb, var(--pending) 8%, var(--surface))',
+                  borderRadius: '999px',
+                  color: current ? 'var(--surface)' : 'var(--text-muted)',
+                  fontSize: 'var(--text-caption)',
+                  minBlockSize: '0.25rem',
+                  overflow: 'hidden',
+                  padding: 'var(--space-1)',
+                  textAlign: 'center',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {t(locale, item.label)}
+              </span>
+            )
+          })}
+        </div>
       </header>
+
+      {step === 'health' && subjects.length > 1 ? (
+        <div
+          aria-label={t(locale, 'health.onboarding.healthQueue')}
+          data-testid="onboarding-health-queue"
+          style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)' }}
+        >
+          {subjects.map((subject, index) => {
+            const current = subject.id === studentId
+            const signed = subject.health_status === 'signed'
+            return (
+              <span
+                aria-current={current ? 'step' : undefined}
+                data-testid={`onboarding-health-subject-${subject.id}`}
+                key={subject.id}
+                style={{
+                  background: current
+                    ? 'var(--accent)'
+                    : signed
+                      ? 'color-mix(in srgb, var(--paid) 12%, var(--surface))'
+                      : 'color-mix(in srgb, var(--pending) 8%, var(--surface))',
+                  borderRadius: '999px',
+                  color: current ? 'var(--surface)' : 'var(--text-muted)',
+                  fontSize: 'var(--text-caption)',
+                  padding: 'var(--space-1) var(--space-2)',
+                }}
+              >
+                <bdi>{subject.display_name}</bdi>
+                {' · '}
+                {index + 1}/{subjects.length}
+              </span>
+            )
+          })}
+        </div>
+      ) : null}
 
       {step === 'registration' ? (
         <RegistrationStep

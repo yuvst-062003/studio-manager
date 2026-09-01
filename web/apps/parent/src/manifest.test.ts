@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest'
+import { createHash } from 'node:crypto'
+import { readFileSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { GROUND_COLOR } from '@studio/ui/theme'
 import { manifest } from '../manifest.config'
+
+const testDir = dirname(fileURLToPath(import.meta.url))
+
+const hashFile = (path: string): string =>
+  createHash('sha256').update(readFileSync(path)).digest('hex')
 
 describe('parent manifest (§6.5 — the install is the product, not boilerplate)', () => {
   it('declares standalone display so the app launches without browser chrome', () => {
@@ -41,5 +50,12 @@ describe('parent manifest (§6.5 — the install is the product, not boilerplate
 
   it('declares png mime types', () => {
     expect(manifest.icons.every((i) => i.type === 'image/png')).toBe(true)
+  })
+
+  it('does not reuse the staff install icon, because parents and coaches can install both apps', () => {
+    const parentIcon = resolve(testDir, '../public/icons/icon-192.png')
+    const staffIcon = resolve(testDir, '../../staff/public/icons/icon-192.png')
+
+    expect(hashFile(parentIcon)).not.toBe(hashFile(staffIcon))
   })
 })

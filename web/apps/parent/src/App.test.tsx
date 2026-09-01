@@ -1,4 +1,5 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { t } from '@studio/i18n'
 import App from './App'
@@ -325,5 +326,62 @@ describe('P7 — the belt link resolves or refuses, never silently home', () => 
     globalThis.location.hash = '#/belts/'
     render(<App />)
     expect(await screen.findByText(t('he', 'events.belt.noneYet'))).toBeInTheDocument()
+  })
+})
+
+describe('12g — adding a sibling refreshes the family it just grew', () => {
+  it('refetches /me/students once the child is added, instead of waiting for a reload', async () => {
+    // AddSibling calls `onAdded` on a successful submit, but the shell never passed it
+    // one — the family queue kept showing the roster from before the add until the
+    // parent reloaded the tab by hand. The seam is the wiring, not the component: the
+    // component's own tests already cover that `onAdded` fires.
+    const user = userEvent.setup()
+    globalThis.location.hash = '#/add-child'
+    let studentsGetCalls = 0
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input)
+        if (url.includes('/api/v1/me/students')) {
+          if ((init?.method ?? 'GET') === 'POST') {
+            return new Response(JSON.stringify({ id: 'st-new' }), { status: 201 })
+          }
+          studentsGetCalls += 1
+          return new Response(JSON.stringify({ items: [] }), { status: 200 })
+        }
+        if (url.includes('/api/v1/me/studio')) {
+          return new Response(JSON.stringify({ slug: 'demo' }), { status: 200 })
+        }
+        if (url.includes('/api/v1/public/studios/demo/groups')) {
+          return new Response(
+            JSON.stringify({
+              items: [
+                {
+                  id: 'g1',
+                  name: 'מתחילים',
+                  description: null,
+                  age_min: null,
+                  age_max: null,
+                  training_weekdays: [],
+                },
+              ],
+            }),
+            { status: 200 },
+          )
+        }
+        return new Response(JSON.stringify({ items: [] }), { status: 200 })
+      }),
+    )
+    render(<App />)
+    await screen.findByTestId('sibling-group-g1')
+    const before = studentsGetCalls
+
+    await user.type(screen.getByLabelText(t('he', 'people.student.firstName')), 'דניאל')
+    await user.type(screen.getByLabelText(t('he', 'people.student.lastName')), 'לוי')
+    await user.click(screen.getByTestId('sibling-group-g1'))
+    await user.click(screen.getByTestId('sibling-submit'))
+
+    await screen.findByTestId('sibling-submitted')
+    await waitFor(() => expect(studentsGetCalls).toBeGreaterThan(before))
   })
 })

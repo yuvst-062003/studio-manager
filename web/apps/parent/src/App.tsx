@@ -721,7 +721,11 @@ function AuthedApp() {
               onJoined={() => setFamilyJoined((n) => n + 1)}
             />
           ) : addingChild ? (
-            <AddSibling locale={locale} client={peopleClient} />
+            <AddSibling
+              locale={locale}
+              client={peopleClient}
+              onAdded={() => setFamilyJoined((n) => n + 1)}
+            />
           ) : belts.length === 2 ? (
             <BeltProgressScreen
               classId={belts[1]!}

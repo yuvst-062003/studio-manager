@@ -167,7 +167,40 @@ describe('AgreementFlow', () => {
       />,
     )
     expect(await screen.findByTestId('agreement-step-terms')).toBeInTheDocument()
-    expect(screen.getByText(/1\/3/)).toBeInTheDocument()
+    expect(screen.getByTestId('onboarding-rail')).toBeInTheDocument()
+    expect(screen.getByText(/2\/5/)).toBeInTheDocument()
+    expect(screen.getByTestId('onboarding-rail-consent')).toHaveTextContent(
+      t('he', 'health.onboarding.step.consent'),
+    )
+    expect(screen.getByTestId('onboarding-rail-payment')).toHaveTextContent(
+      t('he', 'health.onboarding.step.payment'),
+    )
+  })
+
+  it('makes the health declarations a visible family queue instead of a hidden per-child loop', async () => {
+    render(
+      <AgreementFlow
+        client={makeClient({ registration_complete: true, terms_accepted: true })}
+        locale="he"
+        studentId="st2"
+        studentName="איתי לוי"
+        students={[
+          { id: 'st1', display_name: 'נועה לוי', health_status: 'signed' },
+          { id: 'st2', display_name: 'איתי לוי', health_status: 'missing' },
+          { id: 'st3', display_name: 'דנה לוי', health_status: 'missing' },
+        ]}
+      />,
+    )
+
+    expect(await screen.findByTestId('agreement-step-health')).toBeInTheDocument()
+    expect(screen.getByText(/4\/5/)).toBeInTheDocument()
+    expect(screen.getByTestId('onboarding-health-queue')).toBeInTheDocument()
+    expect(screen.getByTestId('onboarding-health-subject-st1')).toHaveTextContent('נועה לוי · 1/3')
+    expect(screen.getByTestId('onboarding-health-subject-st2')).toHaveAttribute(
+      'aria-current',
+      'step',
+    )
+    expect(screen.getByTestId('onboarding-health-subject-st3')).toHaveTextContent('דנה לוי · 3/3')
   })
 
   it('renders nothing at all once the agreement is complete', async () => {

@@ -142,6 +142,7 @@ export function HealthGate({
         signerName={signerName}
         studentId={blocked.id}
         studentName={blocked.display_name}
+        students={students}
         today={today}
       />
     </div>
