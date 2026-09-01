@@ -48,9 +48,12 @@ export function SignIn({
 }) {
   const providers = useAuthProviders()
 
+  // `startUrl` and not a second copy of the same template literal. The manager sign-in
+  // landed on main while this branch was open and moved that URL into one helper; two
+  // hand-built copies of an OAuth start link is exactly the drift that helper prevents.
   const providerLinks = (providers ?? []).map((provider) => ({
     key: provider.name,
-    href: `${API_ORIGIN}${provider.start_url}?app=${app}&return_path=${encodeURIComponent(returnPath)}`,
+    href: startUrl(provider, app, returnPath),
     label: t(locale, LABEL[provider.name] ?? 'common.auth.continueWithGoogle'),
   }))
 
