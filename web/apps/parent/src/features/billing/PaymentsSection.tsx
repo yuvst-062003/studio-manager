@@ -12,6 +12,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { apiFetch } from '@studio/core'
 import { LoadFailed } from '@studio/ui'
+import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { PaymentsScreen } from './PaymentsScreen'
 import type { DebtRow, PrepayTerms, StandingOrderLink } from './PaymentsScreen'
@@ -57,11 +58,17 @@ export const DEMO_SIMULATOR: UpayForm = { action: 'demo:ipn-simulator', fields: 
  * Exported because §6.1's plan step now opens uPay too (owner correction, 2026-08-30) and
  * a second hand-rolled copy of this is a second place for the hidden-input handling to
  * drift from the one the payments screen uses.
+ *
+ * `targetName`, added for the in-app payment overlay (2026-09-03 addendum): when given,
+ * the form's `target` is set to that name, so the browser navigates a same-named
+ * `<iframe>` instead of the top window -- the family never leaves the tab. Omitted, this
+ * is the same full-page navigation it has always been.
  */
-export function submitUpayForm(form: UpayForm): void {
+export function submitUpayForm(form: UpayForm, targetName?: string): void {
   const el = document.createElement('form')
   el.method = 'POST'
   el.action = form.action
+  if (targetName) el.target = targetName
   for (const [name, value] of Object.entries(form.fields)) {
     const input = document.createElement('input')
     input.type = 'hidden'
@@ -284,7 +291,11 @@ export function PaymentsSection({ locale }: { locale: Locale }) {
       />
     )
   }
-  if (!loaded) return null
+  if (!loaded) {
+    // §7.9 -- this gate wraps the whole app, so a bare `null` here was not a blank
+    // section, it was a blank screen for as long as the first read took.
+    return <p data-testid="payments-section-loading">{t(locale, 'common.setup.loading')}</p>
+  }
 
   return (
     <PaymentsScreen
