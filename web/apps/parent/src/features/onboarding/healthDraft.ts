@@ -16,6 +16,10 @@ import type { AnswerValue, TemplateSchema } from '../health/healthClient'
 
 export type SubjectHealthDraft = {
   studentId: string
+  /** The template this draft's answers were collected against -- carried through so
+   *  the final flush (`JoinFlow.handleEnterApp`) can call `client.submit()` with the
+   *  `template_id` it requires, without re-fetching the schema a second time. */
+  templateId: string | null
   /** Step 3's inner-step-1 answer, `null` while unanswered. */
   openingAnswer: 'healthy' | 'reporting' | null
   answers: Record<string, AnswerValue>
@@ -25,6 +29,7 @@ export type SubjectHealthDraft = {
 export function emptyHealthDraft(studentId: string): SubjectHealthDraft {
   return {
     studentId,
+    templateId: null,
     openingAnswer: null,
     answers: {},
     signatureBase64: null,

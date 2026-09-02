@@ -81,6 +81,7 @@ function SubjectHealthFlow({
       .then((template) => {
         if (!live) return
         setSchema(template.schema as unknown as TemplateSchema)
+        setDraft((previous) => ({ ...previous, templateId: template.id }))
       })
       .catch(() => live && setLoadFailed(true))
     return () => {

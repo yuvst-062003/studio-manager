@@ -164,6 +164,7 @@ describe('JoinHealthStep (2-inner-step, deferred)', () => {
     await waitFor(() => expect(onSigned).toHaveBeenCalledTimes(1))
     expect(onSigned.mock.calls[0]?.[0]).toMatchObject({
       studentId: 'st1',
+      templateId: 'tmpl1',
       openingAnswer: 'healthy',
       signatureBase64: 'data:image/png;base64,AAAA',
     })

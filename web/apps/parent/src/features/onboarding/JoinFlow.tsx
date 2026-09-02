@@ -8,7 +8,7 @@ import { EmptyState } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { PaymentSetup } from '../billing/PaymentSetup'
-import type { StandingOrderLink } from '../billing/PaymentSetup'
+import type { PaymentSummaryRow, StandingOrderLink } from '../billing/PaymentSetup'
 import type { BillingClient } from '../billing/billingClient'
 import {
   firstStudentNeedingDeclaration,
@@ -18,6 +18,7 @@ import {
 import type { HealthClient } from '../health/healthClient'
 import type { PrivacyClient } from '../privacy/privacyClient'
 import type { SubjectHealthDraft } from './healthDraft'
+import { JoinDoneScreen } from './JoinDoneScreen'
 import { JoinFamilyStep, type JoinFamilyPayload } from './JoinFamilyStep'
 import { JoinHealthStep } from './JoinHealthStep'
 import { JoinWelcomeStep } from './JoinWelcomeStep'
@@ -26,7 +27,7 @@ import { OnboardingWizardChrome, stepPosition } from './OnboardingWizardChrome'
 type JoinGroup = { id: string; name: string; weekdays: number[] }
 type JoinInfo = { studio_name: string; groups: JoinGroup[]; email: string | null }
 
-type JoinStep = 'welcome' | 'family' | 'health' | 'payment'
+type JoinStep = 'welcome' | 'family' | 'health' | 'payment' | 'done'
 
 const pageStyle: CSSProperties = {
   display: 'flex',
@@ -82,6 +83,9 @@ export function JoinFlow({
   const [step, setStep] = useState<JoinStep>('welcome')
   const [students, setStudents] = useState<readonly GatedStudent[]>([])
   const [healthDrafts, setHealthDrafts] = useState<Record<string, SubjectHealthDraft>>({})
+  const [doneRows, setDoneRows] = useState<PaymentSummaryRow[]>([])
+  const [flushing, setFlushing] = useState(false)
+  const [flushError, setFlushError] = useState<string | null>(null)
   const [clubTermsAccepted, setClubTermsAccepted] = useState(false)
   const [inFlight, setInFlight] = useState(false)
   const [failed, setFailed] = useState<string | null>(null)
@@ -231,6 +235,35 @@ export function JoinFlow({
     globalThis.location.assign('/')
   }
 
+  /** Step 4's "enter the app" — the ONE call site for the deferred submission's actual
+   *  `client.submit()` invocations. Every kid's held-in-draft declaration is flushed,
+   *  one call per kid, back to back, before the real navigation. A failure leaves the
+   *  drafts (and the done screen) exactly as they were -- nothing is lost, and the
+   *  family can retry rather than being silently moved on with an unsaved kid. */
+  async function handleEnterApp() {
+    if (flushing) return
+    setFlushing(true)
+    setFlushError(null)
+    try {
+      for (const draft of Object.values(healthDrafts)) {
+        // Set the moment the health step's schema loads (JoinHealthStep.tsx) — by the
+        // time a draft is signable at all its template has loaded, so a missing id
+        // here is a real bug, not a state to paper over silently.
+        if (!draft.templateId) throw new Error(`draft for ${draft.studentId} has no templateId`)
+        await healthClient.submit(draft.studentId, {
+          template_id: draft.templateId,
+          answers: draft.answers,
+          signature_image_base64: draft.signatureBase64 ?? '',
+        })
+      }
+      finishWizard()
+    } catch {
+      setFlushError(t(locale, 'people.join.done.flushFailed'))
+    } finally {
+      setFlushing(false)
+    }
+  }
+
   if (step === 'welcome') {
     return (
       <JoinWelcomeStep
@@ -277,24 +310,45 @@ export function JoinFlow({
     )
   }
 
+  if (step === 'payment') {
+    return (
+      <div style={pageStyle} data-testid="join-payment-step">
+        <OnboardingWizardChrome
+          locale={locale}
+          // No `onBack`: health is complete by construction once this step renders — the
+          // effect above only advances here when no student still needs a declaration — so
+          // "back" would land on the health step's own effect, which immediately bounces
+          // forward again. A button that visibly does nothing is worse than no button.
+          position={stepPosition('payment')}
+          title={t(locale, 'health.onboarding.step.payment')}
+        >
+          <PaymentSetup
+            client={billingClient}
+            locale={locale}
+            onFinish={() => setStep('done')}
+            onNothingToPay={() => setStep('done')}
+            onSummary={setDoneRows}
+            standingOrderLinks={standingOrderLinks}
+            students={setupChildren}
+          />
+        </OnboardingWizardChrome>
+      </div>
+    )
+  }
+
   return (
-    <div style={pageStyle} data-testid="join-payment-step">
+    <div style={pageStyle} data-testid="join-done-step">
       <OnboardingWizardChrome
         locale={locale}
-        // No `onBack`: health is complete by construction once this step renders — the
-        // effect above only advances here when no student still needs a declaration — so
-        // "back" would land on the health step's own effect, which immediately bounces
-        // forward again. A button that visibly does nothing is worse than no button.
         position={stepPosition('payment')}
         title={t(locale, 'health.onboarding.step.payment')}
       >
-        <PaymentSetup
-          client={billingClient}
+        <JoinDoneScreen
+          flushError={flushError}
+          flushing={flushing}
           locale={locale}
-          onFinish={finishWizard}
-          onNothingToPay={finishWizard}
-          standingOrderLinks={standingOrderLinks}
-          students={setupChildren}
+          onEnterApp={() => void handleEnterApp()}
+          rows={doneRows}
         />
       </OnboardingWizardChrome>
     </div>

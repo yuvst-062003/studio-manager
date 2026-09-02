@@ -91,6 +91,17 @@ export function rowsFor(students: readonly SetupChild[], charges: readonly Charg
   })
 }
 
+/** One child's final method/amount decision, reported to the caller once the family
+ *  reaches "סיום" -- the join wizard's done-state (`JoinDoneScreen.tsx`) is built from
+ *  this, structurally compatible with its `JoinDoneChildRow` without either module
+ *  importing the other. */
+export type PaymentSummaryRow = {
+  studentId: string
+  displayName: string
+  method: SetupMethod
+  amountAgorot: number
+}
+
 export type PaymentSetupProps = {
   locale: Locale
   client: BillingClient
@@ -107,6 +118,10 @@ export type PaymentSetupProps = {
    * payment wizard instead of their home screen.
    */
   onNothingToPay?: () => void
+  /** Called once, alongside `onFinish`, with every priced child's final method/amount —
+   *  the join wizard's done-state renders from this. Optional: the app-level nag gate
+   *  (`PaymentSetupGate` in `App.tsx`) has no done-state and does not pass it. */
+  onSummary?: (rows: PaymentSummaryRow[]) => void
 }
 
 export function PaymentSetup({
@@ -116,6 +131,7 @@ export function PaymentSetup({
   standingOrderLinks,
   onFinish,
   onNothingToPay,
+  onSummary,
 }: PaymentSetupProps) {
   const [rows, setRows] = useState<ChildRow[] | null>(null)
   // The in-app payment overlay's current request, or none. Card checkout and every
@@ -348,6 +364,14 @@ export function PaymentSetup({
   }
 
   function finishSetup() {
+    onSummary?.(
+      payable.map((row) => ({
+        studentId: row.child.id,
+        displayName: row.child.first_name,
+        method: row.method ?? 'card',
+        amountAgorot: row.amountAgorot,
+      })),
+    )
     if (standingRows.length === 0 || standingSent) {
       onFinish()
       return

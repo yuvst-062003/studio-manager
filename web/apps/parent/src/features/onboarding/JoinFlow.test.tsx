@@ -243,6 +243,11 @@ describe('JoinFlow', () => {
     await user.click(screen.getByRole('checkbox', { name: 'ילדים א · ראשון·שלישי' }))
     await user.click(screen.getByTestId('join-submit'))
 
+    // Nothing owed (openCharges resolves []) and no health draft to flush (this child
+    // is already `agreement_complete`), so the wizard lands straight on the done
+    // screen -- which still needs its own explicit "enter the app" press.
+    await user.click(await screen.findByTestId('join-done-enter'))
+
     await waitFor(() => expect(onComplete).toHaveBeenCalledTimes(1))
     expect(submittedBody).toMatchObject({
       first_name: 'מיכל',
@@ -364,8 +369,9 @@ describe('JoinFlow', () => {
     expect(screen.queryByTestId('onboarding-wizard-back')).toBeNull()
   })
 
-  it('advances the health queue from local drafts, never from the server, and reaches payment once every kid is signed', async () => {
+  it('advances the health queue from local drafts, never from the server, reaches payment, and flushes both drafts exactly once on "enter the app"', async () => {
     const user = userEvent.setup()
+    const onComplete = vi.fn()
     // The mocked /me/students response NEVER reports either kid as 'signed' -- that is
     // exactly what proves the queue advance is computed locally (from healthDrafts),
     // not re-derived from a server read that the deferred model never triggers.
@@ -424,6 +430,7 @@ describe('JoinFlow', () => {
         billingClient={billingClient}
         healthClient={healthClient}
         locale="he"
+        onComplete={onComplete}
         privacyClient={makePrivacyClient()}
         standingOrderLinks={[]}
         token="live-token-123456"
@@ -475,7 +482,111 @@ describe('JoinFlow', () => {
     await user.click(screen.getByRole('checkbox', { name: /אני מאשר/ }))
     await user.click(screen.getByTestId('health-sign-continue'))
 
-    await screen.findByTestId('join-payment-step')
+    // billingClient.openCharges resolves [] (this file's default mock), so PaymentSetup
+    // reports nothing owed and the wizard advances straight through the payment step to
+    // the done screen -- which must still flush both kids' drafts once "enter the app"
+    // is pressed. (The payment step itself is not asserted here: with charges resolving
+    // near-instantly, it never sits still long enough to reliably observe.)
+    await screen.findByTestId('join-done-step')
     expect(healthClient.submit).not.toHaveBeenCalled()
+    await user.click(screen.getByTestId('join-done-enter'))
+
+    await waitFor(() => expect(onComplete).toHaveBeenCalledTimes(1))
+    expect(healthClient.submit).toHaveBeenCalledTimes(2)
+    expect(healthClient.submit).toHaveBeenCalledWith(
+      'st1',
+      expect.objectContaining({ template_id: 'tmpl1' }),
+    )
+    expect(healthClient.submit).toHaveBeenCalledWith(
+      'st2',
+      expect.objectContaining({ template_id: 'tmpl1' }),
+    )
+  })
+
+  it('a failed flush leaves the done screen up, with an error, and never calls onComplete', async () => {
+    const user = userEvent.setup()
+    const onComplete = vi.fn()
+    const failingHealthClient = {
+      ...healthClient,
+      submit: vi.fn(async () => {
+        throw new Error('boom')
+      }),
+    } as unknown as HealthClient
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input)
+        if (url.includes('/api/v1/public/onboarding/live-token-123456')) {
+          return new Response(
+            JSON.stringify({
+              studio_name: 'מועדון הדגמה',
+              email: null,
+              groups: [{ id: 'g1', name: 'ילדים א', weekdays: [0, 2] }],
+            }),
+            { status: 200 },
+          )
+        }
+        if (
+          url.includes('/api/v1/onboarding/live-token-123456/register') &&
+          init?.method === 'POST'
+        ) {
+          return new Response(JSON.stringify({ student_ids: ['st1'] }), { status: 201 })
+        }
+        if (url.includes('/api/v1/me/students')) {
+          return new Response(
+            JSON.stringify({
+              items: [
+                {
+                  id: 'st1',
+                  first_name: 'מיכל',
+                  last_name: 'כהן',
+                  status: 'active',
+                  health_status: 'missing',
+                },
+              ],
+            }),
+            { status: 200 },
+          )
+        }
+        return new Response(JSON.stringify({ items: [] }), { status: 200 })
+      }),
+    )
+
+    render(
+      <JoinFlow
+        billingClient={billingClient}
+        healthClient={failingHealthClient}
+        locale="he"
+        onComplete={onComplete}
+        privacyClient={makePrivacyClient()}
+        standingOrderLinks={[]}
+        token="live-token-123456"
+      />,
+    )
+
+    await acceptWelcomeStep(user)
+    await screen.findByTestId('join-family-step')
+    await user.type(screen.getByLabelText(t('he', 'people.join.nationalId')), '100000017')
+    await user.type(screen.getByLabelText(t('he', 'people.join.address')), 'הרצל 12')
+    await user.type(screen.getByLabelText(t('he', 'people.join.city')), 'רעננה')
+    await user.type(screen.getByLabelText(t('he', 'people.join.phone')), '0548123456')
+    await user.click(screen.getByTestId('join-add-self'))
+    await user.click(screen.getByRole('checkbox', { name: 'ילדים א · ראשון·שלישי' }))
+    await user.click(screen.getByTestId('join-submit'))
+
+    await user.click(await screen.findByTestId('health-opening-healthy'))
+    await user.type(
+      screen.getByLabelText(t('he', 'health.declaration.signatureTyped')),
+      'מיכל כהן',
+    )
+    await user.type(screen.getByLabelText('טלפון חירום'), '0501111111')
+    await user.click(screen.getByRole('checkbox', { name: /אני מאשר/ }))
+    await user.click(screen.getByTestId('health-sign-continue'))
+
+    await user.click(await screen.findByTestId('join-done-enter'))
+
+    await screen.findByText(t('he', 'people.join.done.flushFailed'))
+    expect(screen.getByTestId('join-done-screen')).toBeInTheDocument()
+    expect(onComplete).not.toHaveBeenCalled()
   })
 })

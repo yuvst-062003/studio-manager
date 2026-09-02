@@ -182,6 +182,21 @@ describe('the onboarding payment step', () => {
     expect(onFinish).toHaveBeenCalled()
   })
 
+  it('reports the final per-child method/amount summary alongside onFinish', async () => {
+    const onSummary = vi.fn()
+    setup({ onSummary })
+    await answer('card')
+    await userEvent.click(await screen.findByTestId('setup-change-s2'))
+    await answer('cash')
+    await userEvent.click(screen.getByTestId('setup-finish'))
+
+    await waitFor(() => expect(onSummary).toHaveBeenCalledTimes(1))
+    expect(onSummary).toHaveBeenCalledWith([
+      { studentId: 's1', displayName: 'דנה', method: 'card', amountAgorot: 30_000 },
+      { studentId: 's2', displayName: 'יואב', method: 'cash', amountAgorot: 40_000 },
+    ])
+  })
+
   it('tells the manager about a standing-order mandate too, on finish', async () => {
     // §7.1 — `tellTheManager()` only loops cash/cheque, so a family who picks standing
     // order for every child pressed סיום and the manager's queue never got a row. The
