@@ -161,6 +161,21 @@ Worse than a false green: it sends him to do pointless work and blame parents.
 once a transport does exist, "sent" will be counted and rendered as
 `'delivery.allReceived'` — "every family received the message".
 
+**RESOLVED 2026-09-02 (fix-notifications, `HB-push-transport` closed).** Web Push with
+VAPID, decided via AskUserQuestion. `app/core/config.py` carries `VAPID_PUBLIC_KEY` /
+`VAPID_PRIVATE_KEY` / `VAPID_SUBJECT`; `app/services/comms/push.py::WebPushSender` signs
+and encrypts for real through `pywebpush`, falling back to `RecordingPushSender` only when
+unconfigured. `GET /push/vapid-public-key` hands the public half to a signed-in browser;
+both registration hooks now pass it as `applicationServerKey`
+(`usePushRegistration.ts`, `useStaffPushRegistration.ts`). No `gcm_sender_id` was needed —
+that requirement is FCM-specific and does not apply to VAPID. `PushDisabledBanner` now
+renders for `'error'` as well as `'denied'`. `DeliveryReporter.RECEIVED` is now
+`("delivered",)` only — `sent` (provider accepted, not confirmed) falls into the same
+derived in-flight bucket as `queued` rather than being counted as received; there is still
+no real delivery-receipt producer (no service worker acks a `push` event back to the
+server), so `received_count` stays 0 until that is built. §2.8's new ops signal is what
+now catches a regression back to the recording fallback in production.
+
 ### 2.2 A cancelled class notifies nobody
 
 The single case the `*/15` cron exists for — `infra/railway/jobs.json` argues for it by
@@ -172,6 +187,18 @@ no one. Belt promotion notifies no one.
 `belt` (`app/models/comms.py:87-96`). A parent can toggle "class cancelled" and it changes
 nothing, because nothing was ever sent.
 
+**PARTIALLY RESOLVED 2026-09-02 (fix-notifications).** `cancel_session` now notifies every
+guardian of every student enrolled in the session's group (`session.cancelled`, dedup'd
+per household) — the one call site named as a crossing into `app/services/schedule/**`,
+kept to that single line plus a private helper. Belt promotion now notifies guardians too
+(`belt.awarded`, `app/services/belts/awards.py::_notify_guardians`), called from both the
+direct-award route and the exam-pass path since both go through `BeltAwardService.award`.
+**Still open:** `coach_substituted` has no producer — no natural single call site was found
+as clean as the other two, and event publish/cancel (`app/services/events/publish.py`)
+still notifies nobody; fixing it means crossing into the `events` vertical, which this
+lane was not cleared for beyond the one schedule-service line. Both are named here rather
+than fixed.
+
 ### 2.3 Two flagship alerts have no producer
 
 - **`attendance.at_risk`** — §5.14's headline manager alert. Fully specified at
@@ -180,6 +207,11 @@ nothing, because nothing was ever sent.
 - **`billing.payment_failed`** — referenced at `kinds.py:46`, `actions.py:57`,
   `models/comms.py:84`. It is the one kind deliberately exempted from the preference
   switch: an exemption for a message nobody sends.
+
+**Not this lane's to close.** `attendance.at_risk` is prompt 2's producer (M9); the seam
+is agreed, not built here. `billing.payment_failed` needs prompt 1 (MONEY) to build the
+`failed` order-outcome state transition first — this lane owns the notification, MONEY
+owns the state, and as of 2026-09-02 nothing exists yet for this lane to attach to.
 
 ### 2.4 The setup wizard discards coach invitation tokens
 
@@ -210,6 +242,19 @@ The job runs at :20 past every hour and turns every request into `failed`. See �
 not yet implemented" — but COMMS shipped in W5. `POST /reports/.../deliver` also hardcodes
 `status="queued"` regardless of outcome (`:156`). Stale code or a live hole; needs walking.
 
+**WALKED AND RESOLVED 2026-09-02 (fix-notifications).** Both, in different halves.
+`NotificationService.enqueue` has never raised `NotImplementedError` (it has no `except`
+path that could produce it), so the branch was dead and `status: "failed"` could never
+actually be returned — that half was stale. The live hole was one nobody had named: the
+endpoint never called `session.commit()`, so `TenantSessionDep` closed the request's
+session and discarded the flushed notification on the way out. The response claimed
+`status: "queued"` for a notification that was rolled back before it reached anyone.
+Fixed: the commit was added, the dead branch removed, and the hardcoded English title/body
+replaced with Hebrew. **Still open, named rather than built:** there is no `report.monthly`
+entry in `app/services/comms/actions.py`, so tapping the notification opens nothing, and
+the payload carries only `year`/`month` — nothing attaches the report itself. That is a new
+capability, not the dead-code question this walk was for.
+
 ### 2.8 The monitor cannot reach anybody
 
 `app/services/ops/checks.py` is genuinely good — it catches jobs that silently stop
@@ -218,6 +263,16 @@ running, zero-charge billing runs, and uPay going quiet. But `ALERT_EMAIL_TO` an
 (`app/workers/ops_check.py:71-79`). It also cannot detect its own silence, by its own
 admission. **There is no comms-specific check at all**: a notify run that "sends" 400
 pushes to nobody is a green heartbeat.
+
+**Partially resolved 2026-09-02 (fix-notifications).** The comms-specific check now
+exists: `app/services/ops/checks.py::_push_transport_unconfigured` reads
+`push_transport` (`webpush` or `recording`) off `comms-notify`'s own `job_run.detail`
+(`app/workers/notify.py::_tally_counts`) and turns red only when a run both attempted a
+push and did so through anything other than the real transport — exactly the "sends 400
+pushes to nobody" case, without firing on a quiet run that queued nothing. **Still open:**
+`ALERT_EMAIL_TO`/`SMTP_HOST` remain unset, so this signal (like the other three) still only
+logs rather than emailing anyone until SMTP is configured — a deployment/secrets step, not
+a code change this lane can make.
 
 ---
 
@@ -385,6 +440,19 @@ Only 8 of the 13 health questions are enforced and the parent cannot tell which 
 optional. `markAllHealthy` (`DeclarationForm.tsx:196-203`) fills every blank with "no" in
 one tap — the single biggest length mitigation in the product, buried mid-form.
 
+**SUPERSEDED 2026-09-03 (the parent onboarding wizard redesign,
+`docs/superpowers/specs/2026-09-02-parent-onboarding-wizard-redesign.md`).** This table's
+own "only 8 of 13 enforced" claim was already corrected in that spec's "Findings
+disproven" section before this pass started — all 13 booleans are required by schema; the
+5 optional fields are free-text elaborations with no positive trigger. The step count
+itself is now 4, not 5 (Welcome+Agreements, Family, Health, Payment) — Step 1 folds
+consent and club terms into one screen, so the 28/49-interaction count above no longer
+applies to either the step total or (since Step 2 is now an empty-by-default flat list,
+not a fixed 18-field form) the per-step field count. Health's per-kid flow is now 2 inner
+screens (opening question, then a collapsed-or-expanded review) rather than one long form,
+and submission is deferred to the wizard's final "enter the app" action — see that spec's
+Step 3 section for the full shape.
+
 ### 6.2 Validation refuses invisibly — the core of "the wizard is not good"
 
 The forward button is disabled while the form is invalid
@@ -399,6 +467,14 @@ Separately, `JoinFlow.tsx:189,200-202` collapses every non-2xx to `common.error.
 discarding the `{code, field}` the server sends for an invalid national id
 (`app/routers/onboarding.py:365-369`).
 
+**RESOLVED 2026-09-03 (the redesign pass).** Both fixed. The rebuilt `JoinFamilyStep.tsx`
+(the empty-by-default flat list) has an always-clickable forward button from the start —
+`submit()` runs, `setShowErrors(true)` is reachable, and inline errors render — matching
+`ClubTermsStep`'s already-correct pattern, per this section's own diagnosis of the
+difference. `JoinFlow.tsx`'s `submitFamily` now parses the response body on a non-2xx and
+shows the national-id-specific message when the server's `code` matches, falling back to
+the generic message otherwise.
+
 ### 6.3 Back is broken three different ways
 
 - **Step 3 → 2** works but **destroys all 18 fields** — `JoinFamilyStep` unmounts and
@@ -411,12 +487,32 @@ discarding the `{code, field}` the server sends for an invalid national id
   back to payment. The button visibly does nothing.
 - `JoinHealthStep` renders back twice — chrome (`:47`) and a second button (`:98`).
 
+**RESOLVED 2026-09-03 (the redesign pass), all four.** The step-3→2 field-loss and the
+step-4→3 duplicate trap are both superseded by the flat-list rebuild (Step 2) and the
+cross-family-scoped guard fix (`app/services/people/onboarding.py::_apply_family_details`,
+tested in `tests/people/test_onboarding.py`) rather than patched individually, per the
+redesign spec's own framing. The step numbering that made "step 5→4" inert is gone — the
+wizard is 4 steps now, and the payment step still has no back target for the same
+structural reason (health is complete-by-construction once payment renders), but the
+double-back-button bug (`JoinHealthStep` rendering chrome's button plus its own) was fixed
+in this pass's own rebuild of that component.
+
 ### 6.4 Nothing is saved between steps
 
 No `localStorage`, no `sessionStorage`, no server draft anywhere in `features/onboarding/`,
 `ConsentGate.tsx`, `ClubTermsStep.tsx` or `DeclarationForm.tsx`. Close the tab at the
 health step and step 3's 18 fields, the terms tick and every health answer are gone.
 Reopening `/join/<token>` restarts at `step = 'terms'`. **There is no resume path.**
+
+**RESOLVED 2026-09-03 (the redesign pass).** `joinDraftStorage.ts` persists the family
+form's working state and every kid's held-in-draft health answers/signature to
+`sessionStorage`, keyed per token — restored on mount, saved on every change, cleared only
+once the final flush succeeds. Still no `localStorage` anywhere, a deliberate privacy
+choice the redesign spec carries forward explicitly (a draft that outlives the tab is not
+just a convenience decision for data that includes children's national ids and health
+answers). Welcome-step consent is not part of the draft and is re-asked on a same-tab
+return, which is intentional, not a gap — see the redesign spec's Step 1 section
+("forceReview"-equivalent behavior).
 
 ### 6.5 The adult-student question is asked, badly
 
@@ -427,6 +523,12 @@ relation control, the other-parent card and the pickup card all remain. `adultOn
 becomes true after the parent manually deletes the blank child — which makes
 `join.selfChip`, `join.soloNote` and the `yourDetailsSolo` title unreachable on the
 default path.
+
+**SUPERSEDED 2026-09-03 (the redesign pass).** Not fixed as a standalone patch — the flat
+list starts empty, and "I train too" / "+ add a child" are two symmetric adds with no
+pre-seeded blank row to interact badly with either. The `adultOnly`/`selfChip`/`soloNote`
+UI this finding describes was removed entirely rather than repaired; a solo adult member
+is just a subject list with one `self` row, no special-cased chip or note.
 
 ### 6.6 The three entrances share nothing
 
@@ -449,6 +551,16 @@ Consent *is* rendered at position 1 inside the same chrome (`ConsentGate.tsx:255
 agree. The rail is **absent** on the sign-in wall (`JoinFlow.tsx:145-155`) and the
 expired-token screen (`:134-142`).
 
+**RESOLVED 2026-09-03 (the redesign pass).** `JoinFamilyStep.tsx`'s hardcoded
+`position={3}` (the last surviving second source of truth this finding names) was found
+still present in the working tree when this pass started — it had drifted from merely
+"agreeing by coincidence" to actively wrong the moment the step list was renumbered from 5
+steps to 4, since the hardcoded `3` no longer matched `stepPosition('family')`'s answer of
+`2`. Fixed to read through `stepPosition()` like every other step already does, closing
+the two-sources-of-truth gap this finding warned about. The expired-token screen still has
+no rail (unchanged, out of this pass's scope); the sign-in wall is now inside Step 1's own
+chrome (`JoinWelcomeStep.tsx`), so it shows the rail correctly rather than being absent.
+
 ### 6.8 Two dead ends where a parent can never finish
 
 - If `client.consents()` rejects, `ConsentGate` stands aside (`:120`) but `JoinShell`'s
@@ -460,6 +572,54 @@ expired-token screen (`:134-142`).
   child forever. The parent signs the declaration, sees the green "submitted" alert, and
   **the wizard never advances to payment.** That is exactly the trial-family funnel
   `app/routers/onboarding.py:303-310` says this door exists to serve.
+
+**RESOLVED 2026-09-03 (the redesign pass), both.** The blank-page dead end is gone with
+the architecture that caused it — `JoinShell` no longer wraps `JoinFlow` in an external
+`ConsentGate` at all (Step 1 owns sign-in and consent internally), so there is no
+`consentReviewed ? <JoinFlow/> : null` expression left to collapse to `null` on a failed
+read. The all-duplicates dead end is closed by the same cross-family guard fix noted under
+§6.3 above: `_apply_family_details` now writes registration details for a duplicate match
+that is this same parent's own child (the actual bug this finding describes), which is
+what lets `registration_complete` become true and the wizard advance. The guard added
+alongside that fix (skip a duplicate match that belongs to a *different* family) is a
+separate, new safety property the original bug report did not anticipate — see the
+redesign spec's "Corrections found before implementation" table and
+`tests/people/test_onboarding.py`'s two new tests for both directions.
+
+### 6.9 Two dependencies the redesign found and flagged, not built
+
+Both are cross-vertical/schema territory this lane (people/health) does not have standing
+to build unilaterally — recorded here, in the register, so whoever picks them up next
+does not have to re-derive the requirement from the implementation plan or the spec.
+
+- **The plan picker (Step 2, per-row).** The redesign spec's Step 2 originally called for
+  a plan picker per subject row, defaulting from the chosen groups' derived volume with a
+  visible mismatch display when the parent overrides it (mirroring
+  `app/models/billing.py:91`'s manager-facing version of the same pattern). Building it
+  needs two things this lane does not own: a read endpoint listing a studio's live
+  `PricePlan`s for a parent-facing screen (nothing today exposes this outside the manager
+  dashboard), and `OnboardingService.register()`/`add_child()` accepting an optional
+  `price_plan_id` per child instead of always deriving one internally. Neither exists.
+  Step 2 as built keeps today's actual pricing behavior (auto-derived via
+  `plan_for_volume`, unchanged) and carries no plan-picker UI at all — this is a scope
+  reduction from the spec's original text, made explicitly rather than silently, pending
+  agreement with whichever lane owns billing.
+- **The health-template required-field migration.** `chronic_illness_details`,
+  `allergy_details`, `medication_details` and `other_details`
+  (`alembic/versions/0018_the_clubs_own_registration_agreement.py`) still carry
+  `"required": false` in the seeded schema, despite the redesign requiring them
+  required-when-visible (a parent answering "yes, chronic illness" must elaborate before
+  signing). This pass enforces the rule client-side only —
+  `web/apps/parent/src/features/onboarding/healthDraft.ts::healthAnswersComplete`
+  identifies the 4 fields structurally (text-type questions with a `visible_if`, which
+  uniquely picks them out from every other text question in the schema) and blocks
+  signing until they're filled. The backend schema itself is unchanged: flipping
+  `"required": false` to `true` for those 4 rows is a migration, schema-owning territory
+  `main` needs to author (one revision per wave, per this repo's own convention) — or, if
+  the template is row-level editable without a migration, a data update through whatever
+  path already lets a manager edit it. Until either lands, a request that bypasses the
+  client (a direct API call, a future non-web client) can still submit an unelaborated
+  "yes."
 
 ---
 
@@ -484,6 +644,16 @@ carries no order ref, so `verify_ipn` raises `NotAnOrderIpnError`
 (`reconciliation.py:162-166`) and settles nothing until a human presses ✓ in the
 reconciliation queue.
 
+**Already resolved before this pass** (not by it — noted here for accuracy, since the
+paragraph above reads as a live bug). `PaymentSetup.tsx` already carries a
+`recordStandingOrder()` function, separate from `tellTheManager()`, that writes exactly
+the promise this finding says is missing, called from `finishSetup()` whenever any child
+in the summary is on the standing-order route. `tellTheManager()` itself still loops only
+`['cash', 'cheque']`, which is correct now rather than the gap this finding named — the
+standing-order write is a second, separate call site, not a fix to that loop. This
+2026-09-03 pass did not touch `recordStandingOrder()` or `tellTheManager()`; it only
+changed how the resulting mandate link is *opened* (see §7.2 below).
+
 ### 7.2 In the wizard, standing order hands out zero links
 
 `App.tsx` fetches `/me/standing-order-links` on `[session.status]` — **before the children
@@ -491,6 +661,20 @@ exist** — and never refetches after registration, so `PaymentSetup.tsx:363` al
 and every child shows the wrong fallback sentence. The links also carry no `target`/`rel`
 (`:372-384`), so from `/join/<token>` they navigate the tab away and returning restarts the
 wizard.
+
+**PARTIALLY RESOLVED 2026-09-03 (the redesign pass, Step 4 addendum).** The
+navigate-the-tab-away half is fixed: a standing-order link now opens inside the in-app
+payment overlay (`PaymentOverlay.tsx`) instead of a new tab, so following it no longer
+restarts the wizard — the `target="_blank"`/`rel="noopener"` anchor this finding names is
+gone, replaced by a button that opens the overlay. This also reached `PaymentsSection.tsx`
+(the ordinary, non-onboarding payments screen), whose own card-pay handoff got the same
+treatment, though its ordinary standing-order links (rendered by `PaymentsScreen.tsx`,
+which this pass deliberately did not touch — see the redesign implementation plan's Global
+Constraints) still open in a new tab; that inconsistency is now the more precise
+description of what remains. **Still open, not touched by this pass:** the
+before-the-children-exist fetch timing in `App.tsx` and the resulting fallback-sentence
+mismatch in `PaymentSetup.tsx` — the overlay changes how a link is opened, not whether the
+right link is found in the first place.
 
 ### 7.3 It is a dead end on the payments screen too
 
@@ -821,6 +1005,13 @@ Ranked by how badly each bites a live club.
    zero failures, and each has business-level evidence of real work. See §0 #1.
 2. **No outbound channel to a human at all.** No push transport, no user mailer. Every
    message lands only as an in-app inbox row.
+
+   **Push half resolved 2026-09-02 (fix-notifications, `HB-push-transport`).** Web Push
+   with VAPID is now real — see §2.1. **Still true:** there is no user mailer of any kind
+   (only the operator alert mailer in `app/services/ops/alerts.py`, which is a different
+   thing addressed to a different audience). §5.11 permits no email/SMS/WhatsApp channel
+   to a family by design, so this half is not a gap to close but the product's own answer:
+   a family unreachable by push is reachable only by telephone, via the delivery report.
 3. **`STORAGE_ROOT` defaults to a relative path and nothing checks the volume — but
    production does not run on the default.** `var/storage` against `WORKDIR /srv` is an
    in-image directory, and `FilesystemObjectStore.put` `mkdir`s an unmounted path and
@@ -881,11 +1072,31 @@ Ranked by how badly each bites a live club.
     Asia/Jerusalem. Everything fires three hours late — health chases at 12:30, follow-ups
     at noon. The careful 08:30 argument about not dunning a family at 03:15 still holds:
     the shift makes messages late, not rude.
+
+    **RESOLVED 2026-09-02 (fix-notifications).** The five daily, fixed-hour jobs
+    (`demo-reset`, `plan-changes`, `billing-run`, `people-followups`, `health-reminders`)
+    are shifted -3h in `infra/railway/jobs.json` to land on the Jerusalem hour their own
+    `why:` argues for; the runbook's two schedule tables are corrected to match, and
+    `tests/config/test_jobs_config.py::test_daily_jobs_fire_at_their_documented_jerusalem_hour`
+    locks it. The shift is exact only during Israel Daylight Time (UTC+3, which includes
+    today) — during Israel Standard Time (UTC+2) every shifted job runs one hour early.
+    That is the accepted cost of a static shift, documented in `jobs.json`'s own
+    `$comment`, over teaching each worker to read the studio clock.
 11. **Quiet hours protect 4 paths of 17.** `ReminderService._send` refuses 21:00–08:00 and
     dedupes per (kind, subject) within 24h (`reminders.py:109-113`). Everything else goes
     straight to `enqueue`: the debt ladder, health chases, trial follow-ups, injuries,
     announcements. **Scheduled announcements have no quiet-hours gate at all**
     (`notify.py:104-106`) — a manager can schedule one for 03:00.
+
+    **RESOLVED 2026-09-02 (fix-notifications).** One gate at the seam every push actually
+    passes through, not fifteen call sites each remembering to ask:
+    `app/workers/notify.py::drain_queued` now refuses between 21:00 and 08:00 Jerusalem for
+    every kind, including scheduled announcements — the inbox row is unaffected (a
+    preference silences the doorbell, never the letter, and quiet hours are the same kind
+    of silence), and a push that arrives during the window stays `queued` until the next
+    run after 08:00 rather than being lost. `ReminderService`'s own refusal is unchanged
+    and still gives its four callers an immediate, user-facing error rather than a silent
+    delay.
 
 **Correct and worth recording:** the production DB role is `studio_app` and the app
 **refuses to boot production otherwise** (`app/main.py:51`, `db_roles.py:125`), so the
