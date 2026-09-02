@@ -58,7 +58,6 @@ function setup(props: Partial<Parameters<typeof PaymentSetup>[0]> = {}) {
       client={stub()}
       students={[DANA, YOAV]}
       standingOrderLinks={LINKS}
-      onOrderOpened={vi.fn()}
       onFinish={vi.fn()}
       {...props}
     />,
@@ -80,12 +79,12 @@ describe('the onboarding payment step', () => {
     expect(await screen.findByTestId('setup-card')).toHaveTextContent('700')
   })
 
-  it('settles every card child in ONE checkout', async () => {
+  it('settles every card child in ONE checkout, opened in the in-app overlay', async () => {
     // Money is held per PAYER, not per child, so one order covers them both — a two-child
-    // family enters their card once rather than twice.
+    // family enters their card once rather than twice. 2026-09-03 addendum: opened in the
+    // overlay instead of navigating the tab away, so the family never leaves the wizard.
     const createOrder = vi.fn().mockResolvedValue({ public_ref: 'ref-1' })
-    const onOrderOpened = vi.fn()
-    setup({ client: stub({ createOrder }), onOrderOpened })
+    setup({ client: stub({ createOrder }) })
 
     await answer('card')
 
@@ -93,26 +92,35 @@ describe('the onboarding payment step', () => {
     expect(await screen.findByTestId('setup-card')).toHaveTextContent('700')
     await userEvent.click(screen.getByTestId('setup-pay-card'))
     await waitFor(() => expect(createOrder).toHaveBeenCalledWith(['c1', 'c2'], 1, 0))
-    await waitFor(() => expect(onOrderOpened).toHaveBeenCalled())
+    await screen.findByTestId('payment-overlay')
+    expect(document.querySelector('form[target]')).not.toBeNull()
   })
 
-  it('gives הוראת קבע a separate link per child', async () => {
+  it('gives הוראת קבע a separate link per child, each opened in the in-app overlay', async () => {
     // A uPay shared link charges a FIXED amount, so two children need two mandates — one
     // link for both would underpay for the second every month (owner, 2026-08-30).
+    // 2026-09-03 addendum: opened in the overlay instead of a new tab.
     setup()
     await answer('standing_order')
 
     const first = await screen.findByTestId('setup-standing-link-s1')
     const second = screen.getByTestId('setup-standing-link-s2')
-    expect(first).toHaveAttribute('href', 'https://app.upay.co.il/r/300')
-    expect(second).toHaveAttribute('href', 'https://app.upay.co.il/r/400')
-    // Told apart by name, because two anchors with the same words are two links a screen
+    // Told apart by name, because two controls with the same words are two links a screen
     // reader cannot distinguish.
     expect(first).toHaveAccessibleName(
       t('he', 'schedule.setup.linkFor').replace('{name}', 'דנה'),
     )
     // Nothing is charged by this route, so no card total appears.
     expect(screen.queryByTestId('setup-card')).toBeNull()
+
+    await userEvent.click(first)
+    const iframe = (await screen.findByTitle(/./)) as HTMLIFrameElement
+    expect(iframe.src).toBe('https://app.upay.co.il/r/300')
+
+    await userEvent.click(screen.getByTestId('payment-overlay-close'))
+    await userEvent.click(second)
+    const iframe2 = (await screen.findByTitle(/./)) as HTMLIFrameElement
+    expect(iframe2.src).toBe('https://app.upay.co.il/r/400')
   })
 
   it('tells the manager about cash and cheques, one promise per method', async () => {
@@ -172,6 +180,80 @@ describe('the onboarding payment step', () => {
     setup({ client: stub({ openCharges: vi.fn().mockResolvedValue([]) }), onFinish })
     await userEvent.click(await screen.findByTestId('setup-finish'))
     expect(onFinish).toHaveBeenCalled()
+  })
+
+  it('tells the manager about a standing-order mandate too, on finish', async () => {
+    // §7.1 — `tellTheManager()` only loops cash/cheque, so a family who picks standing
+    // order for every child pressed סיום and the manager's queue never got a row. The
+    // manager's own payments screen already lists a `standing_order` promise
+    // (PaymentPromisesPanel.tsx); this is what writes one.
+    const createPromise = vi.fn().mockResolvedValue(undefined)
+    const onFinish = vi.fn()
+    setup({ client: stub({ createPromise }), onFinish })
+
+    await answer('standing_order')
+    await userEvent.click(await screen.findByTestId('setup-finish'))
+
+    await waitFor(() => expect(createPromise).toHaveBeenCalledTimes(1))
+    expect(createPromise).toHaveBeenCalledWith(['c1', 'c2'], 'standing_order', 0)
+    await waitFor(() => expect(onFinish).toHaveBeenCalled())
+  })
+
+  it('does not write a second standing-order promise for a family also paying by cash', async () => {
+    // Mixed families are the common case (owner spec). Only the standing-order rows go
+    // into this promise; the cash rows still go through `tellTheManager`'s own button.
+    const createPromise = vi.fn().mockResolvedValue(undefined)
+    setup({ client: stub({ createPromise }) })
+
+    await answer('card')
+    await userEvent.click(await screen.findByTestId('setup-change-s2'))
+    await answer('standing_order')
+    await userEvent.click(screen.getByTestId('setup-change-s1'))
+    await answer('cash')
+
+    await userEvent.click(await screen.findByTestId('setup-tell-manager'))
+    await waitFor(() => expect(createPromise).toHaveBeenCalledWith(['c1'], 'cash', 0))
+
+    await userEvent.click(screen.getByTestId('setup-finish'))
+    await waitFor(() => expect(createPromise).toHaveBeenCalledWith(['c2'], 'standing_order', 0))
+    expect(createPromise).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not treat a failed charges read as nothing owed', async () => {
+    // §7.6 — a transient 500 on `openCharges` silently became `rows = []`, then
+    // `payable.length === 0`, then `onNothingToPay()`, then `finishWizard`: a family with
+    // an unpaid first month bounced out of onboarding entirely by a network blip.
+    const onNothingToPay = vi.fn()
+    setup({
+      client: stub({ openCharges: vi.fn().mockRejectedValue(new Error('boom')) }),
+      onNothingToPay,
+    })
+    expect(await screen.findByTestId('load-failed')).toBeInTheDocument()
+    expect(onNothingToPay).not.toHaveBeenCalled()
+  })
+
+  it('retries the charges read from the failed state', async () => {
+    const openCharges = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('boom'))
+      .mockResolvedValueOnce([charge('c1', 's1', 30_000), charge('c2', 's2', 40_000)])
+    setup({ client: stub({ openCharges }) })
+    await userEvent.click(await screen.findByTestId('load-failed-retry'))
+    expect(await screen.findByTestId('setup-family-method')).toBeInTheDocument()
+  })
+
+  it('shows a loading state rather than a bare screen while charges load', async () => {
+    let resolve: (value: ChargeOut[]) => void = () => {}
+    const openCharges = vi.fn().mockReturnValue(
+      new Promise<ChargeOut[]>((r) => {
+        resolve = r
+      }),
+    )
+    const { container } = setup({ client: stub({ openCharges }) })
+    expect(screen.getByTestId('payment-setup-loading')).toBeInTheDocument()
+    expect(container).not.toBeEmptyDOMElement()
+    resolve([])
+    await waitFor(() => expect(screen.queryByTestId('payment-setup-loading')).toBeNull())
   })
 
   it('keeps the card out of the promise queue', () => {

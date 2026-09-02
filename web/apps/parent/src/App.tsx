@@ -69,7 +69,7 @@ import { TrainingPlanSection } from './features/billing/TrainingPlanSection'
 // the first-run sequence reached it, so a family finished signup with no plan at all.
 import { PaymentSetupGate } from './features/billing/PaymentSetup'
 import type { SetupChild, StandingOrderLink } from './features/billing/PaymentSetup'
-import { makeParentBillingClient, submitUpayForm } from './features/billing/PaymentsSection'
+import { makeParentBillingClient } from './features/billing/PaymentsSection'
 import { ShopSection } from './features/billing'
 // §6.1 step 6 — the BLOCKING declaration. Mounted here because nothing imported it
 // (HB-w6-health-gate-unmounted): the gate, the form and the pad were built and tested in
@@ -682,7 +682,6 @@ function AuthedApp() {
           <PaymentSetupGate
             client={billingClient}
             locale={locale}
-            onOrderOpened={submitUpayForm}
             standingOrderLinks={mandateLinks}
             students={setupChildren}
           >

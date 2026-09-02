@@ -10,7 +10,6 @@ import type { Locale } from '@studio/i18n'
 import { PaymentSetup } from '../billing/PaymentSetup'
 import type { StandingOrderLink } from '../billing/PaymentSetup'
 import type { BillingClient } from '../billing/billingClient'
-import { submitUpayForm } from '../billing/PaymentsSection'
 import {
   firstStudentNeedingDeclaration,
   needsFullDeclaration,
@@ -294,7 +293,6 @@ export function JoinFlow({
           locale={locale}
           onFinish={finishWizard}
           onNothingToPay={finishWizard}
-          onOrderOpened={submitUpayForm}
           standingOrderLinks={standingOrderLinks}
           students={setupChildren}
         />

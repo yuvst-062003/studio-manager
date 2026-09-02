@@ -30,9 +30,11 @@
 //                     every month and nobody would notice until reconciliation.
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
-import { Alert, Button, Card, EmptyState, MoneyDisplay, StatusChip } from '@studio/ui'
+import { Alert, Button, Card, EmptyState, LoadFailed, MoneyDisplay, StatusChip } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
+import { PaymentOverlay } from './PaymentOverlay'
+import type { PaymentOverlayRequest } from './PaymentOverlay'
 import type { BillingClient, ChargeOut, PromiseMethod } from './billingClient'
 import { selectionTotal } from './billingClient'
 
@@ -95,8 +97,6 @@ export type PaymentSetupProps = {
   students: readonly SetupChild[]
   /** `GET /me/standing-order-links` — one per child, by name. */
   standingOrderLinks: readonly StandingOrderLink[]
-  /** Hands uPay's form to the caller, which builds and submits the POST. */
-  onOrderOpened: (form: { action: string; fields: Record<string, string> }) => void
   /** Pressed סיום, or אחר כך. The caller lets the app through. */
   onFinish: () => void
   /**
@@ -114,11 +114,14 @@ export function PaymentSetup({
   client,
   students,
   standingOrderLinks,
-  onOrderOpened,
   onFinish,
   onNothingToPay,
 }: PaymentSetupProps) {
   const [rows, setRows] = useState<ChildRow[] | null>(null)
+  // The in-app payment overlay's current request, or none. Card checkout and every
+  // standing-order link both route through this one piece of state (2026-09-03
+  // addendum) instead of navigating the tab away.
+  const [overlay, setOverlay] = useState<PaymentOverlayRequest | null>(null)
   // Before this is true the screen asks once for the family. Child positions are used only
   // for overrides opened from the summary.
   const [familyAnswered, setFamilyAnswered] = useState(false)
@@ -126,17 +129,24 @@ export function PaymentSetup({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [handSent, setHandSent] = useState(false)
+  const [standingSent, setStandingSent] = useState(false)
+  // §7.6 -- a failed read used to become `rows = []` indistinguishably from a family who
+  // genuinely owes nothing, which fired `onNothingToPay` and bounced them out of
+  // onboarding on a transient 500. This is a THIRD state, not a fourth branch of `rows`,
+  // so a retry can tell "still loading" apart from "loaded and empty".
+  const [failed, setFailed] = useState(false)
+  const [reloads, setReloads] = useState(0)
 
   useEffect(() => {
     let live = true
     void client
       .openCharges('')
       .then((charges) => live && setRows(rowsFor(students, charges)))
-      .catch(() => live && setRows(rowsFor(students, [])))
+      .catch(() => live && setFailed(true))
     return () => {
       live = false
     }
-  }, [client, students])
+  }, [client, students, reloads])
 
   // A child the club could not price has nothing to answer, so the walk skips them — but
   // the summary still lists them, which is the point of showing them at all.
@@ -173,7 +183,31 @@ export function PaymentSetup({
       .finally(() => setBusy(false))
   }
 
-  if (rows === null) return null
+  if (failed) {
+    // Never `onNothingToPay` here: that verb means "the club has nothing to ask this
+    // family for", and a read that never completed has not established that.
+    return (
+      <div style={pageStyle} data-testid="payment-setup">
+        <LoadFailed
+          locale={locale}
+          onRetry={() => {
+            setFailed(false)
+            setReloads((n) => n + 1)
+          }}
+        />
+      </div>
+    )
+  }
+
+  if (rows === null) {
+    // §7.9 -- this gate wraps the whole app, so a bare `null` here blanked every screen
+    // behind it while the first read was in flight, not just this step.
+    return (
+      <div style={pageStyle} data-testid="payment-setup">
+        <p data-testid="payment-setup-loading">{t(locale, 'common.setup.loading')}</p>
+      </div>
+    )
+  }
 
   if (payable.length === 0) {
     // Nothing owed: a family in good standing, or one the club has not priced yet. The
@@ -274,7 +308,18 @@ export function PaymentSetup({
       1,
       0,
     )
-    onOrderOpened(await client.orderForm(order.public_ref))
+    setOverlay({ kind: 'checkout', form: await client.orderForm(order.public_ref) })
+  }
+
+  function closeOverlay() {
+    setOverlay(null)
+  }
+
+  function overlayComplete() {
+    setOverlay(null)
+    // Re-reads openCharges so the summary reflects whatever the overlay just settled --
+    // same reload mechanism `LoadFailed`'s retry already uses.
+    setReloads((n) => n + 1)
   }
 
   async function tellTheManager() {
@@ -287,6 +332,30 @@ export function PaymentSetup({
       if (ids.length > 0) await client.createPromise(ids, method, 0)
     }
     setHandSent(true)
+  }
+
+  // §7.1 -- a family who picks הוראת קבע today presses סיום and the club learns nothing:
+  // no promise, no flag, no note. `PaymentPromisesPanel.tsx`'s standing-order filter can
+  // never show a row that came from here. This is that write, raised the same way the
+  // hand-carried routes already are -- one promise across every standing-order child,
+  // never charged (§8 / G8: our provider cannot create a mandate programmatically), so the
+  // manager sees it as money expected rather than money collected.
+  async function recordStandingOrder() {
+    if (standingSent || standingRows.length === 0) return
+    const ids = standingRows.flatMap((row) => row.charges.map((charge) => charge.id))
+    await client.createPromise(ids, 'standing_order', 0)
+    setStandingSent(true)
+  }
+
+  function finishSetup() {
+    if (standingRows.length === 0 || standingSent) {
+      onFinish()
+      return
+    }
+    run(async () => {
+      await recordStandingOrder()
+      onFinish()
+    })
   }
 
   return (
@@ -370,18 +439,24 @@ export function PaymentSetup({
                   </span>
                   <MoneyDisplay agorot={row.amountAgorot} label={row.child.first_name} />
                   {link ? (
-                    <a
-                      // Two anchors reading the same words are two links a screen reader
+                    <Button
+                      // Two controls reading the same words are two links a screen reader
                       // cannot tell apart, and telling them apart is the whole point here.
                       aria-label={t(locale, 'schedule.setup.linkFor').replace(
                         '{name}',
                         row.child.first_name,
                       )}
                       data-testid={`setup-standing-link-${row.child.id}`}
-                      href={link.url}
+                      // 2026-09-03 addendum -- opens in the in-app overlay instead of a
+                      // new tab. §7.2's old failure mode (following the link navigated
+                      // the ONE tab `/join/<token>` runs in away, restarting the wizard
+                      // on return) is exactly what the overlay exists to prevent.
+                      onClick={() => setOverlay({ kind: 'link', url: link.url })}
+                      type="button"
+                      variant="ghost"
                     >
                       {t(locale, 'billing.standingOrder.link')}
-                    </a>
+                    </Button>
                   ) : (
                     <span style={mutedStyle}>
                       {t(locale, 'billing.standingOrder.notConfirmable')}
@@ -421,9 +496,18 @@ export function PaymentSetup({
         </Card>
       ) : null}
 
-      <Button data-testid="setup-finish" onClick={onFinish} variant="secondary">
+      <Button data-testid="setup-finish" disabled={busy} onClick={finishSetup} variant="secondary">
         {t(locale, 'schedule.setup.finish')}
       </Button>
+
+      {overlay ? (
+        <PaymentOverlay
+          locale={locale}
+          onClose={closeOverlay}
+          onComplete={overlayComplete}
+          request={overlay}
+        />
+      ) : null}
     </div>
   )
 }
