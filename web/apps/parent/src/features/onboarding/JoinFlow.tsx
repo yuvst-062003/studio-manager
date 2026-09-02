@@ -179,7 +179,21 @@ export function JoinFlow({
           })),
         }),
       })
-      if (!response.ok) throw new Error(String(response.status))
+      if (!response.ok) {
+        let code: string | undefined
+        try {
+          const errorBody = (await response.json()) as { detail?: { code?: string } }
+          code = errorBody.detail?.code
+        } catch {
+          code = undefined
+        }
+        setFailed(
+          code === 'national_id_invalid'
+            ? t(locale, 'people.join.nationalIdInvalid')
+            : t(locale, 'common.error.generic'),
+        )
+        return
+      }
       const body = (await response.json()) as { student_ids: string[] }
       if (clubTermsAccepted && body.student_ids[0]) {
         await acceptClubTermsForFamily(body.student_ids[0])

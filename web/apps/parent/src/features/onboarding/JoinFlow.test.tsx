@@ -185,6 +185,67 @@ describe('JoinFlow', () => {
     expect(screen.queryByTestId('join-done')).toBeNull()
   })
 
+  it('shows the national-id-specific message when the server rejects the id', async () => {
+    const user = userEvent.setup()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input)
+        if (url.includes('/api/v1/public/onboarding/live-token-123456')) {
+          return new Response(
+            JSON.stringify({
+              studio_name: 'מועדון הדגמה',
+              email: null,
+              groups: [{ id: 'g1', name: 'ילדים א', weekdays: [0, 2] }],
+            }),
+            { status: 200 },
+          )
+        }
+        if (
+          url.includes('/api/v1/onboarding/live-token-123456/register') &&
+          init?.method === 'POST'
+        ) {
+          return new Response(
+            JSON.stringify({
+              detail: { code: 'national_id_invalid', field: 'signer_national_id' },
+            }),
+            { status: 422 },
+          )
+        }
+        return new Response(JSON.stringify({ items: [] }), { status: 200 })
+      }),
+    )
+
+    render(
+      <JoinFlow
+        billingClient={billingClient}
+        healthClient={healthClient}
+        locale="he"
+        standingOrderLinks={[]}
+        token="live-token-123456"
+      />,
+    )
+
+    await screen.findByTestId('join-terms-step')
+    await user.click(screen.getByRole('checkbox', { name: t('he', 'health.clubTerms.accept') }))
+    await user.click(screen.getByRole('button', { name: t('he', 'health.agreement.next') }))
+
+    await screen.findByTestId('join-family-step')
+    await user.type(screen.getAllByLabelText(t('he', 'people.join.nationalId'))[0]!, '100000017')
+    await user.type(screen.getByLabelText(t('he', 'people.join.address')), 'הרצל 12')
+    await user.type(screen.getByLabelText(t('he', 'people.join.city')), 'רעננה')
+    await user.type(screen.getAllByLabelText(t('he', 'people.join.phone'))[0]!, '0548123456')
+    await user.type(screen.getAllByLabelText(t('he', 'people.join.fullName'))[2]!, 'דנה כהן')
+    await user.type(screen.getByLabelText(t('he', 'people.join.birthdate')), '2016-03-14')
+    await user.type(screen.getAllByLabelText(t('he', 'people.join.nationalId'))[2]!, '100000009')
+    await user.type(screen.getByLabelText(t('he', 'people.join.grade')), 'ד')
+    await user.click(screen.getByRole('checkbox', { name: 'ילדים א · ראשון·שלישי' }))
+    await user.click(screen.getByTestId('join-submit'))
+
+    await screen.findByText(t('he', 'people.join.nationalIdInvalid'))
+    expect(screen.queryByText(t('he', 'common.error.generic'))).toBeNull()
+  })
+
   it('can step back from club terms to consent', async () => {
     const user = userEvent.setup()
     const onBackToConsent = vi.fn()
