@@ -231,4 +231,9 @@ export const health: Bundle = {
   'onboarding.step.family': 'הפרטים שלכם',
   'onboarding.step.health': 'הצהרות בריאות',
   'onboarding.step.payment': 'תשלום',
+  'onboarding.openingQuestion': 'יש משהו שכדאי שנדע?',
+  'onboarding.openingHealthy': 'אין מגבלות ידועות',
+  'onboarding.openingReporting': 'יש משהו שצריך לדעת',
+  'onboarding.allMarkedHealthy': '13 שאלות סומנו "לא"',
+  'onboarding.signAndContinue': 'חתימה והמשך',
 }

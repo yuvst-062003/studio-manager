@@ -183,4 +183,9 @@ export const health: Bundle = {
   'onboarding.step.family': 'Ваши данные',
   'onboarding.step.health': 'Медицинские декларации',
   'onboarding.step.payment': 'Оплата',
+  'onboarding.openingQuestion': 'Есть что-то, что нам стоит знать?',
+  'onboarding.openingHealthy': 'Известных ограничений нет',
+  'onboarding.openingReporting': 'Есть что сообщить',
+  'onboarding.allMarkedHealthy': '13 вопросов отмечены "нет"',
+  'onboarding.signAndContinue': 'Подписать и продолжить',
 }
