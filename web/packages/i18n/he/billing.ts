@@ -21,12 +21,18 @@ import type { Bundle } from '../types'
  *    sends the wrong parent a debt reminder.
  */
 export const billing: Bundle = {
+  // -- the in-app payment overlay (2026-09-03 addendum) --------------------------
+  'overlay.title': 'תשלום',
   // -- the parent payments screen (parent 12f ▲ D9.3, 1b) -----------------------
   'title': 'תשלומים',
   'openDebts.title': 'חובות פתוחים',
   'openDebts.empty': 'אין חובות פתוחים',
   'openDebts.total': 'סה״כ חוב',
   'openDebts.forStudent': 'עבור {{name}}',
+  // §3.2 -- the total still counts a charge already covered by an open payment elsewhere
+  // (nothing is settled yet), but three rows saying so with no relationship to the total
+  // read as a contradiction. This names the gap between the two numbers.
+  'openDebts.coveredElsewhereTotal': 'מתוך זה, כלול בתשלום שכבר נפתח',
   'howToPay.title': 'איך תרצה לשלם?',
 
   // §5.10 — the three routes, always all three, never one hidden.
@@ -109,7 +115,10 @@ export const billing: Bundle = {
   'promise.manager.empty': 'אין בקשות תשלום פתוחות.',
   'promise.manager.confirm': 'התשלום התקבל',
   'promise.manager.decline': 'לא התקבל',
-  'promise.manager.charges': 'חיובים',
+  // §3.4 -- `1 חיובים` is not a word. Two forms, chosen by count, the same way
+  // `card.splitSingle`/`card.splitEqual` already do a few lines below.
+  'promise.manager.chargesOne': 'חיוב אחד',
+  'promise.manager.charges': '{{count}} חיובים',
   'promise.manager.method': 'אמצעי תשלום',
   'promise.manager.filterAll': 'הכול',
   'promise.manager.forPlan': 'עבור מסלול',
@@ -305,7 +314,10 @@ export const billing: Bundle = {
   'debt.monthsInDebt': 'חודשים בחוב',
   'debt.sortBy': 'מיון',
   'debt.collectedThisMonth': 'נגבה החודש',
-  'debt.collectedShare': '{{percent}}% מהצפוי',
+  // §3.3 -- no `{{percent}}` here any more. The KPI card composes the number through
+  // `PercentDisplay` (an isolated left-to-right run) and this string is only the trailing
+  // words, so the "0₪" beside it can no longer fuse with an un-isolated "0%".
+  'debt.collectedShare': 'מהצפוי',
   'debt.sendReminderToCount': 'שליחת תזכורת ל־{{count}} משקי בית',
   'debt.household': 'משק בית',
   'run.confirm': 'אישור הפקת חיובים',

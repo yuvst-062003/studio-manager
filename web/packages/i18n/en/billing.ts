@@ -3,11 +3,13 @@ import type { Bundle } from '../types'
 /** Mirror of `he/billing.ts`. `en` is `strict` in the parity policy — a gap fails the build. */
 export const billing: Bundle = {
   // -- the parent payments screen (parent 12f ▲ D9.3, 1b) -----------------------
+  'overlay.title': 'Payment',
   'title': 'Payments',
   'openDebts.title': 'Outstanding balance',
   'openDebts.empty': 'Nothing outstanding',
   'openDebts.total': 'Total owed',
   'openDebts.forStudent': 'For {{name}}',
+  'openDebts.coveredElsewhereTotal': 'Of that, already covered by a payment in progress',
   'howToPay.title': 'How would you like to pay?',
 
   'method.card': 'Credit card',
@@ -75,7 +77,8 @@ export const billing: Bundle = {
   'promise.manager.empty': 'No open payment requests.',
   'promise.manager.confirm': 'Payment received',
   'promise.manager.decline': 'Not received',
-  'promise.manager.charges': 'charges',
+  'promise.manager.chargesOne': '1 charge',
+  'promise.manager.charges': '{{count}} charges',
   'promise.manager.method': 'Method',
   'promise.manager.filterAll': 'All',
   'promise.manager.forPlan': 'For plan',
@@ -255,7 +258,7 @@ export const billing: Bundle = {
   'debt.monthsInDebt': 'Months in debt',
   'debt.sortBy': 'Sort by',
   'debt.collectedThisMonth': 'Collected this month',
-  'debt.collectedShare': '{{percent}}% of expected',
+  'debt.collectedShare': 'of expected',
   'debt.sendReminderToCount': 'Remind {{count}} households',
   'debt.household': 'Household',
   'run.confirm': 'Confirm charge generation',

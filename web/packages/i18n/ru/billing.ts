@@ -7,11 +7,13 @@ import type { Bundle } from '../types'
  */
 export const billing: Bundle = {
   // -- the parent payments screen (parent 12f ▲ D9.3, 1b) -----------------------
+  'overlay.title': 'Оплата',
   'title': 'Платежи',
   'openDebts.title': 'Открытая задолженность',
   'openDebts.empty': 'Задолженности нет',
   'openDebts.total': 'Всего к оплате',
   'openDebts.forStudent': 'За {{name}}',
+  'openDebts.coveredElsewhereTotal': 'Из них уже покрыто начатым платежом',
   'howToPay.title': 'Как вы хотите оплатить?',
 
   'method.card': 'Кредитная карта',
@@ -79,7 +81,8 @@ export const billing: Bundle = {
   'promise.manager.empty': 'Открытых запросов нет.',
   'promise.manager.confirm': 'Оплата получена',
   'promise.manager.decline': 'Не получены',
-  'promise.manager.charges': 'счетов',
+  'promise.manager.chargesOne': '1 счёт',
+  'promise.manager.charges': '{{count}} счетов',
   'promise.manager.method': 'Способ оплаты',
   'promise.manager.filterAll': 'Все',
   'promise.manager.forPlan': 'За тариф',
@@ -250,7 +253,7 @@ export const billing: Bundle = {
   'debt.monthsInDebt': 'Месяцев долга',
   'debt.sortBy': 'Сортировка',
   'debt.collectedThisMonth': 'Собрано в этом месяце',
-  'debt.collectedShare': '{{percent}}% от ожидаемого',
+  'debt.collectedShare': 'от ожидаемого',
   'debt.sendReminderToCount': 'Напомнить {{count}} семьям',
   'debt.household': 'Семья',
   'run.confirm': 'Подтвердить создание счетов',
