@@ -45,7 +45,7 @@ export type ClubTermsStepProps = {
 }
 
 /** The three clauses the club supplied, in the order the club wrote them. */
-const PAYMENT_CLAUSE_KEYS = [
+export const PAYMENT_CLAUSE_KEYS = [
   'health.clubTerms.payment.cheques',
   'health.clubTerms.payment.cancellation',
   'health.clubTerms.payment.proRata',
@@ -70,9 +70,20 @@ export function ClubTermsStep({
 
   return (
     <form onSubmit={submit} style={formStyle}>
-      <header>
-        <h2>{t(locale, 'health.clubTerms.title')}</h2>
-      </header>
+      <p
+        style={{
+          alignSelf: 'flex-start',
+          background: 'color-mix(in srgb, var(--accent) 12%, var(--surface))',
+          borderRadius: '999px',
+          color: 'var(--accent)',
+          fontSize: 'var(--text-caption)',
+          fontWeight: 500,
+          margin: 0,
+          padding: 'var(--space-1) var(--space-3)',
+        }}
+      >
+        {t(locale, 'health.clubTerms.onceForFamily')}
+      </p>
 
       <Card>
         <h3>{t(locale, 'health.clubTerms.payment.title')}</h3>
