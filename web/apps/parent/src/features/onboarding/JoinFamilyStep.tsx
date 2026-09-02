@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { Alert, Button, Card, Checkbox, SegmentedControl, TextField } from '@studio/ui'
 import { t } from '@studio/i18n'
@@ -9,6 +9,7 @@ import {
   familyFormValid,
   hasSharedMinors,
   toJoinFamilyPayload,
+  type FamilyPayloadState,
   type SubjectRow,
 } from './familyDraft'
 import { OnboardingWizardChrome, stepPosition } from './OnboardingWizardChrome'
@@ -86,8 +87,15 @@ export type JoinFamilyStepProps = {
   error?: string | null
   groups: JoinGroup[]
   inFlight?: boolean
+  /** Restores a draft saved before the tab closed (Phase 5's sessionStorage draft).
+   *  Seeds every field's initial state; ignored after the first render. */
+  initialValue?: FamilyPayloadState | null
   locale: Locale
   onBack: () => void
+  /** Fired on every change, so the caller can save a draft as the family types --
+   *  not just on submit. Not required: a caller with no draft persistence (there is
+   *  currently only the one) can leave it out. */
+  onChange?: (state: FamilyPayloadState) => void
   onSubmit: (payload: JoinFamilyPayload) => void
 }
 
@@ -102,22 +110,24 @@ export function JoinFamilyStep({
   error,
   groups,
   inFlight = false,
+  initialValue,
   locale,
   onBack,
+  onChange,
   onSubmit,
 }: JoinFamilyStepProps) {
-  const [phone, setPhone] = useState('')
-  const [signerNationalId, setSignerNationalId] = useState('')
-  const [address, setAddress] = useState('')
-  const [city, setCity] = useState('')
-  const [phoneHome, setPhoneHome] = useState('')
-  const [aliyahYear, setAliyahYear] = useState('')
-  const [relation, setRelation] = useState<GuardianRelation>('mother')
-  const [otherFullName, setOtherFullName] = useState('')
-  const [otherNationalId, setOtherNationalId] = useState('')
-  const [otherPhone, setOtherPhone] = useState('')
-  const [pickups, setPickups] = useState([{ name: '', phone: '' }])
-  const [rows, setRows] = useState<SubjectRow[]>([])
+  const [phone, setPhone] = useState(initialValue?.phone ?? '')
+  const [signerNationalId, setSignerNationalId] = useState(initialValue?.signerNationalId ?? '')
+  const [address, setAddress] = useState(initialValue?.address ?? '')
+  const [city, setCity] = useState(initialValue?.city ?? '')
+  const [phoneHome, setPhoneHome] = useState(initialValue?.phoneHome ?? '')
+  const [aliyahYear, setAliyahYear] = useState(initialValue?.aliyahYear ?? '')
+  const [relation, setRelation] = useState<GuardianRelation>(initialValue?.relation ?? 'mother')
+  const [otherFullName, setOtherFullName] = useState(initialValue?.otherFullName ?? '')
+  const [otherNationalId, setOtherNationalId] = useState(initialValue?.otherNationalId ?? '')
+  const [otherPhone, setOtherPhone] = useState(initialValue?.otherPhone ?? '')
+  const [pickups, setPickups] = useState(initialValue?.pickups ?? [{ name: '', phone: '' }])
+  const [rows, setRows] = useState<SubjectRow[]>(initialValue?.rows ?? [])
   const [showErrors, setShowErrors] = useState(false)
 
   const shared = hasSharedMinors(rows)
@@ -139,6 +149,28 @@ export function JoinFamilyStep({
     pickups,
   }
   const valid = familyFormValid(state)
+
+  useEffect(() => {
+    onChange?.(state)
+    // `state` is a fresh object every render; the primitives/arrays it is built from
+    // are the real dependency list, so listing `state` itself would fire on every
+    // render regardless of whether anything changed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    signerNationalId,
+    address,
+    city,
+    phone,
+    rows,
+    otherFullName,
+    otherNationalId,
+    relation,
+    phoneHome,
+    aliyahYear,
+    otherPhone,
+    pickups,
+    onChange,
+  ])
 
   const otherParentLabel =
     relation === 'mother'

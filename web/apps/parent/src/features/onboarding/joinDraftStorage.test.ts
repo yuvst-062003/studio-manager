@@ -1,11 +1,26 @@
 import { afterEach, describe, expect, it } from 'vitest'
+import type { JoinDraft } from './joinDraftStorage'
 import { clearJoinDraft, loadJoinDraft, saveJoinDraft } from './joinDraftStorage'
 
 afterEach(() => sessionStorage.clear())
 
+const sampleDraft: JoinDraft = {
+  family: {
+    signerNationalId: '100000017',
+    address: 'הרצל 12',
+    city: 'רעננה',
+    phone: '0548123456',
+    rows: [],
+    otherFullName: '',
+    otherNationalId: '',
+    relation: 'mother',
+  },
+  healthDrafts: {},
+}
+
 describe('joinDraftStorage', () => {
   it('round-trips a draft through sessionStorage, keyed per token', () => {
-    const draft = { family: { first_name: 'מיכל' }, healthDrafts: {} }
+    const draft = sampleDraft
     saveJoinDraft('tok-a', draft)
     expect(loadJoinDraft('tok-a')).toEqual(draft)
     expect(loadJoinDraft('tok-b')).toBeNull()

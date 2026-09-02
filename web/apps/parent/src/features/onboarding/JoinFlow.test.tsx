@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { t } from '@studio/i18n'
@@ -117,6 +117,11 @@ async function acceptWelcomeStep(user: ReturnType<typeof userEvent.setup>) {
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  // Several tests reuse the same token ('live-token-123456'), and JoinFlow now persists
+  // a real sessionStorage draft under it (Phase 5). Without this, a test that never
+  // reaches a successful completion (the national-id-error test, deliberately) leaves
+  // its draft behind for the next test using the same token to restore by accident.
+  sessionStorage.clear()
 })
 
 beforeEach(() => {
@@ -588,5 +593,70 @@ describe('JoinFlow', () => {
     await screen.findByText(t('he', 'people.join.done.flushFailed'))
     expect(screen.getByTestId('join-done-screen')).toBeInTheDocument()
     expect(onComplete).not.toHaveBeenCalled()
+  })
+
+  it('persists the family draft to sessionStorage as it is typed, and restores it on a same-tab return', async () => {
+    const user = userEvent.setup()
+    const token = 'draft-token-654321'
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input)
+        if (url.includes(`/api/v1/public/onboarding/${token}`)) {
+          return new Response(
+            JSON.stringify({
+              studio_name: 'מועדון הדגמה',
+              email: null,
+              groups: [{ id: 'g1', name: 'ילדים א', weekdays: [0, 2] }],
+            }),
+            { status: 200 },
+          )
+        }
+        return new Response(JSON.stringify({ items: [] }), { status: 200 })
+      }),
+    )
+
+    const { unmount } = render(
+      <JoinFlow
+        billingClient={billingClient}
+        healthClient={healthClient}
+        locale="he"
+        privacyClient={makePrivacyClient()}
+        standingOrderLinks={[]}
+        token={token}
+      />,
+    )
+
+    await acceptWelcomeStep(user)
+    await screen.findByTestId('join-family-step')
+    await user.type(screen.getByLabelText(t('he', 'people.join.nationalId')), '100000017')
+    await user.type(screen.getByLabelText(t('he', 'people.join.address')), 'הרצל 12')
+
+    await waitFor(() => {
+      const saved = sessionStorage.getItem(`join-draft:${token}`)
+      expect(saved).not.toBeNull()
+      const parsed = JSON.parse(saved!) as { family: { signerNationalId: string; address: string } }
+      expect(parsed.family.signerNationalId).toBe('100000017')
+      expect(parsed.family.address).toBe('הרצל 12')
+    })
+
+    unmount()
+    cleanup()
+
+    render(
+      <JoinFlow
+        billingClient={billingClient}
+        healthClient={healthClient}
+        locale="he"
+        privacyClient={makePrivacyClient()}
+        standingOrderLinks={[]}
+        token={token}
+      />,
+    )
+
+    await acceptWelcomeStep(user)
+    const restoredField = await screen.findByLabelText(t('he', 'people.join.nationalId'))
+    await waitFor(() => expect(restoredField).toHaveValue('100000017'))
+    expect(screen.getByLabelText(t('he', 'people.join.address'))).toHaveValue('הרצל 12')
   })
 })
