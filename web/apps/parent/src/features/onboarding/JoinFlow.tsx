@@ -1,27 +1,28 @@
-// §5.4b — the shared member onboarding link. The link itself knows no family yet, so it
-// shows only the studio sign-in before auth. After sign-in the family walks one five-step
-// wizard: consent, club terms, the family form, health declarations, then payment.
+// §5.4b — the shared member onboarding link. The link itself knows no family yet, so
+// the wizard's own first step shows the studio sign-in before auth. After sign-in the
+// family walks one four-step wizard: welcome + agreements, family, health, payment.
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { apiFetch, useSession } from '@studio/core'
-import { EmptyState, SignIn } from '@studio/ui'
+import { EmptyState } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { PaymentSetup } from '../billing/PaymentSetup'
 import type { StandingOrderLink } from '../billing/PaymentSetup'
 import type { BillingClient } from '../billing/billingClient'
 import { submitUpayForm } from '../billing/PaymentsSection'
-import { ClubTermsStep } from '../health/ClubTermsStep'
 import { firstStudentNeedingDeclaration, type GatedStudent } from '../health/HealthGate'
 import type { HealthClient } from '../health/healthClient'
+import type { PrivacyClient } from '../privacy/privacyClient'
 import { JoinFamilyStep, type JoinFamilyPayload } from './JoinFamilyStep'
 import { JoinHealthStep } from './JoinHealthStep'
+import { JoinWelcomeStep } from './JoinWelcomeStep'
 import { OnboardingWizardChrome, stepPosition } from './OnboardingWizardChrome'
 
 type JoinGroup = { id: string; name: string; weekdays: number[] }
 type JoinInfo = { studio_name: string; groups: JoinGroup[]; email: string | null }
 
-type JoinStep = 'terms' | 'family' | 'health' | 'payment'
+type JoinStep = 'welcome' | 'family' | 'health' | 'payment'
 
 const pageStyle: CSSProperties = {
   display: 'flex',
@@ -59,22 +60,22 @@ export function JoinFlow({
   billingClient,
   healthClient,
   locale,
-  onBackToConsent,
   onComplete,
+  privacyClient,
   standingOrderLinks,
   token,
 }: {
   billingClient: BillingClient
   healthClient: HealthClient
   locale: Locale
-  onBackToConsent?: () => void
   onComplete?: () => void
+  privacyClient: PrivacyClient
   standingOrderLinks: readonly StandingOrderLink[]
   token: string
 }) {
   const session = useSession()
   const [info, setInfo] = useState<JoinInfo | null | 'invalid'>(null)
-  const [step, setStep] = useState<JoinStep>('terms')
+  const [step, setStep] = useState<JoinStep>('welcome')
   const [students, setStudents] = useState<readonly GatedStudent[]>([])
   const [clubTermsAccepted, setClubTermsAccepted] = useState(false)
   const [inFlight, setInFlight] = useState(false)
@@ -131,18 +132,6 @@ export function JoinFlow({
           title={t(locale, 'people.join.expired')}
           description={t(locale, 'people.join.expiredHint')}
         />
-      </div>
-    )
-  }
-
-  if (session.status !== 'signed-in') {
-    return (
-      <div style={pageStyle} data-testid="join-signin">
-        <div className="studio-page-header">
-          <h1>{info.studio_name}</h1>
-        </div>
-        <p style={{ margin: 0 }}>{t(locale, 'health.onboarding.title')}</p>
-        <SignIn locale={locale} app="parent" returnPath={`/join/${token}`} />
       </div>
     )
   }
@@ -219,24 +208,18 @@ export function JoinFlow({
     globalThis.location.assign('/')
   }
 
-  if (step === 'terms') {
+  if (step === 'welcome') {
     return (
-      <div style={pageStyle} data-testid="join-terms-step">
-        <OnboardingWizardChrome
-          locale={locale}
-          onBack={onBackToConsent}
-          position={stepPosition('terms')}
-          title={t(locale, 'health.clubTerms.title')}
-        >
-          <ClubTermsStep
-            locale={locale}
-            onAccept={() => {
-              setClubTermsAccepted(true)
-              setStep('family')
-            }}
-          />
-        </OnboardingWizardChrome>
-      </div>
+      <JoinWelcomeStep
+        locale={locale}
+        privacyClient={privacyClient}
+        studioName={info.studio_name}
+        onAccept={(accepted) => {
+          setClubTermsAccepted(accepted)
+          setStep('family')
+        }}
+        token={token}
+      />
     )
   }
 
@@ -249,7 +232,7 @@ export function JoinFlow({
         groups={info.groups}
         inFlight={inFlight}
         locale={locale}
-        onBack={() => setStep('terms')}
+        onBack={() => setStep('welcome')}
         onSubmit={(payload) => void submitFamily(payload)}
       />
     )

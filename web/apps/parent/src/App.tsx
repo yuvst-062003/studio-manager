@@ -27,6 +27,7 @@ import { DevBar } from '@studio/ui/dev-bar'
 import type { InstallPromptEvent } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
+import { AccessGate } from './features/identity/AccessGate'
 import { Resolve } from './features/identity/Resolve'
 import { ScheduleSection, isCalendarRoute } from './features/schedule/ScheduleSection'
 // `12a` — the absence pre-report (P1). Every layer of this feature existed except a line
@@ -204,21 +205,58 @@ function LandingShell({ slug }: { slug: string }) {
 
 function JoinShell({ token }: { token: string }) {
   const [locale, setLocale] = useState<Locale>('he')
+  const [mandateLinks, setMandateLinks] = useState<readonly StandingOrderLink[]>([])
   const session = useSession()
   const privacyClient = useMemo(() => makePrivacyClient(apiFetch), [])
+  const healthClient = useMemo(() => makeHealthClient(apiFetch), [])
+  const billingClient = useMemo(() => makeParentBillingClient(apiFetch), [])
   useDocumentLocale(locale)
-  const join = <JoinFlow locale={locale} token={token} />
+
+  useEffect(() => {
+    if (session.status !== 'signed-in') return
+    let live = true
+    void apiFetch('/api/v1/me/standing-order-links')
+      .then(async (response) =>
+        response.ok
+          ? ((await response.json()) as {
+              items: { student_id: string; amount_agorot: number; url: string }[]
+            })
+          : { items: [] },
+      )
+      .then((body) => {
+        if (!live) return
+        setMandateLinks(
+          body.items.map((row) => ({
+            studentId: row.student_id,
+            amountAgorot: row.amount_agorot,
+            url: row.url,
+          })),
+        )
+      })
+      .catch(() => undefined)
+    return () => {
+      live = false
+    }
+  }, [session.status])
+
+  // `JoinFlow` owns sign-in AND consent internally now (its own Step 1) -- no external
+  // `ConsentGate` wrapper. `ConsentGate.tsx` itself is unchanged and still gates the
+  // regular app below; this shell just no longer uses it for this route.
   return (
     <ThemeProvider>
       <AccessibilityMenu locale={locale} />
       <LanguagePicker locale={locale} onChoose={setLocale} />
-      {session.status === 'signed-in' ? (
-        <ConsentGate client={privacyClient} locale={locale}>
-          {join}
-        </ConsentGate>
-      ) : (
-        join
-      )}
+      <JoinFlow
+        billingClient={billingClient}
+        healthClient={healthClient}
+        locale={locale}
+        onComplete={() => {
+          globalThis.location.assign('/')
+        }}
+        privacyClient={privacyClient}
+        standingOrderLinks={mandateLinks}
+        token={token}
+      />
     </ThemeProvider>
   )
 }
@@ -495,6 +533,11 @@ function AuthedApp() {
       ) : null}
 
       {session.status === 'signed-in' ? (
+        // §6.1 step 3's refusal, and the mid-join spinner in front of it, render OUTSIDE
+        // `AppShell` — see `AccessGate`'s header. `AppShell` mounts only once it has
+        // confirmed `session.access.parent`, so a hash typed by a refused visitor
+        // (`#/absence`, `#/student/<id>`, …) can no longer reach a screen behind it either.
+        <AccessGate session={session} locale={locale}>
         <AppShell
           title={session.activeStudioName ?? ''}
           items={NAV}
@@ -606,9 +649,13 @@ function AuthedApp() {
               already, since a person with no guardian row never reaches this shell. */}
           {/* §6.1 step 6 wraps EVERY routed branch, not the default one: "no other
               screen is reachable", and every drawer link and typed hash routes through
-              this expression. `null` while the children are still loading — see the
-              fetch above. */}
-          {gatedChildren === null ? null : (
+              this expression. Loading, not `null`, while the children are still loading
+              — see the fetch above. §7.9: `AppShell`'s own chrome (title, drawer, tab
+              bar) already renders around this, but the content area itself read as an
+              empty page with nothing on it for as long as the fetch took. */}
+          {gatedChildren === null ? (
+            <p data-testid="gated-children-loading">{t(locale, 'common.setup.loading')}</p>
+          ) : (
           /* §6.1 step 5 OUTSIDE step 6, because 5 precedes 6 and the ordering carries an
              argument: the privacy policy is what permits the club to collect a medical
              record about a child at all, so asking for the record first and the permission
@@ -777,6 +824,7 @@ function AuthedApp() {
           </ConsentGate>
           )}
         </AppShell>
+        </AccessGate>
       ) : null}
     </ThemeProvider>
   )

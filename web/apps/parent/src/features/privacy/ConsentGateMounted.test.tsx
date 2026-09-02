@@ -161,14 +161,36 @@ describe('§6.1 step 5, mounted in the shell', () => {
     expect(screen.queryByTestId('privacy-screen')).toBeNull()
   })
 
-  it('puts the shared join link behind consent before the family form can write people', async () => {
+  it('puts the shared join link behind its own welcome+agreements step before the family form can write people', async () => {
+    // §6.1's original claim (an external ConsentGate wraps the join wizard) is
+    // superseded by the 2026-09 redesign: `JoinFlow`'s own Step 1 now owns both
+    // sign-in and consent, and no external ConsentGate mounts for this route at all
+    // (ConsentGate.tsx itself is unchanged -- only this route stopped using it). This
+    // test asserts the surviving requirement -- the family form is unreachable before
+    // agreements are accepted -- against the new step, not the removed wrapper.
     stub({ outstanding: ['terms', 'privacy'] })
     globalThis.history.pushState({}, '', '/join/live-token-123456')
 
     render(<App />)
 
-    await waitFor(() => expect(screen.getByTestId('consent-gate')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByTestId('join-welcome')).toBeInTheDocument())
     expect(screen.queryByTestId('join-form')).toBeNull()
+    expect(screen.queryByTestId('join-family-step')).toBeNull()
+    globalThis.history.pushState({}, '', '/')
+  })
+
+  it('starts the shared join link on its own welcome+agreements step even when the app would pass the regular gate', async () => {
+    // `JoinWelcomeStep` always shows both cards regardless of prior acceptance --
+    // the same "forceReview" behavior the old external ConsentGate wrapper enforced --
+    // so a family that already holds the current policy at the app level still meets
+    // this step on the join link.
+    stub({ outstanding: [] })
+    globalThis.history.pushState({}, '', '/join/live-token-123456')
+
+    render(<App />)
+
+    await waitFor(() => expect(screen.getByTestId('join-welcome')).toBeInTheDocument())
+    expect(screen.queryByTestId('join-family-step')).toBeNull()
     globalThis.history.pushState({}, '', '/')
   })
 })

@@ -4,7 +4,7 @@ import { Alert, Button, Card, Checkbox, SegmentedControl, TextField } from '@stu
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { isValidNationalId } from '../health/nationalId'
-import { OnboardingWizardChrome } from './OnboardingWizardChrome'
+import { OnboardingWizardChrome, stepPosition } from './OnboardingWizardChrome'
 import { WizardNavButtons } from './WizardNavButtons'
 
 type JoinGroup = { id: string; name: string; weekdays: number[] }
@@ -267,7 +267,7 @@ export function JoinFamilyStep({
       <OnboardingWizardChrome
         locale={locale}
         onBack={onBack}
-        position={3}
+        position={stepPosition('family')}
         title={
           adultOnly
             ? t(locale, 'people.join.yourDetailsSolo')

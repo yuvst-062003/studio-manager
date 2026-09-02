@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { t } from '@studio/i18n'
 import type { BillingClient } from '../billing/billingClient'
 import type { HealthClient } from '../health/healthClient'
+import type { PrivacyClient } from '../privacy/privacyClient'
 import { JoinFlow } from './JoinFlow'
 
 vi.mock('@studio/core', async (importOriginal) => {
@@ -53,6 +54,30 @@ const billingClient = {
   orderForm: vi.fn(),
   createPromise: vi.fn(),
 } as unknown as BillingClient
+
+function makePrivacyClient(): PrivacyClient {
+  return {
+    consents: vi.fn(async () => ({
+      outstanding: ['terms', 'privacy'],
+      policy_version: 1,
+      policy_version_label: 'v1',
+      policy_is_draft: false,
+    })),
+    grant: vi.fn(async () => ({
+      outstanding: [],
+      policy_version: 1,
+      policy_version_label: 'v1',
+      policy_is_draft: false,
+    })),
+  } as unknown as PrivacyClient
+}
+
+async function acceptWelcomeStep(user: ReturnType<typeof userEvent.setup>) {
+  await screen.findByTestId('join-welcome')
+  await user.click(screen.getByTestId('join-welcome-app-check'))
+  await user.click(screen.getByTestId('join-welcome-club-check'))
+  await user.click(screen.getByTestId('join-welcome-continue'))
+}
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -119,18 +144,19 @@ describe('JoinFlow', () => {
         healthClient={healthClient}
         locale="he"
         onComplete={onComplete}
+        privacyClient={makePrivacyClient()}
         standingOrderLinks={[]}
         token="live-token-123456"
       />,
     )
 
-    await screen.findByTestId('join-terms-step')
+    await screen.findByTestId('join-welcome')
     expect(screen.queryByText(t('he', 'people.join.title'))).toBeNull()
     expect(screen.queryByTestId('join-form')).toBeNull()
     expect(screen.queryByTestId('join-family-step')).toBeNull()
     expect(screen.getByTestId('join-onboarding-rail')).toBeInTheDocument()
-    expect(screen.getByTestId('join-step-position')).toHaveTextContent('שלב 2 מתוך 5')
-    expect(screen.getByTestId('join-onboarding-rail-terms')).toHaveAttribute(
+    expect(screen.getByTestId('join-step-position')).toHaveTextContent('שלב 1 מתוך 4')
+    expect(screen.getByTestId('join-onboarding-rail-welcome')).toHaveAttribute(
       'aria-current',
       'step',
     )
@@ -139,11 +165,10 @@ describe('JoinFlow', () => {
       'step',
     )
 
-    await user.click(screen.getByRole('checkbox', { name: t('he', 'health.clubTerms.accept') }))
-    await user.click(screen.getByRole('button', { name: t('he', 'health.agreement.next') }))
+    await acceptWelcomeStep(user)
 
     await screen.findByTestId('join-family-step')
-    expect(screen.getByTestId('join-step-position')).toHaveTextContent('שלב 3 מתוך 5')
+    expect(screen.getByTestId('join-step-position')).toHaveTextContent('שלב 2 מתוך 4')
     expect(screen.getByTestId('join-onboarding-rail-family')).toHaveAttribute(
       'aria-current',
       'step',
@@ -221,14 +246,13 @@ describe('JoinFlow', () => {
         billingClient={billingClient}
         healthClient={healthClient}
         locale="he"
+        privacyClient={makePrivacyClient()}
         standingOrderLinks={[]}
         token="live-token-123456"
       />,
     )
 
-    await screen.findByTestId('join-terms-step')
-    await user.click(screen.getByRole('checkbox', { name: t('he', 'health.clubTerms.accept') }))
-    await user.click(screen.getByRole('button', { name: t('he', 'health.agreement.next') }))
+    await acceptWelcomeStep(user)
 
     await screen.findByTestId('join-family-step')
     await user.type(screen.getAllByLabelText(t('he', 'people.join.nationalId'))[0]!, '100000017')
@@ -246,9 +270,7 @@ describe('JoinFlow', () => {
     expect(screen.queryByText(t('he', 'common.error.generic'))).toBeNull()
   })
 
-  it('can step back from club terms to consent', async () => {
-    const user = userEvent.setup()
-    const onBackToConsent = vi.fn()
+  it('the first step has no back button', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async (input: RequestInfo | URL) => {
@@ -272,14 +294,13 @@ describe('JoinFlow', () => {
         billingClient={billingClient}
         healthClient={healthClient}
         locale="he"
-        onBackToConsent={onBackToConsent}
+        privacyClient={makePrivacyClient()}
         standingOrderLinks={[]}
         token="live-token-123456"
       />,
     )
 
-    await screen.findByTestId('join-terms-step')
-    await user.click(screen.getByTestId('onboarding-wizard-back'))
-    expect(onBackToConsent).toHaveBeenCalledTimes(1)
+    await screen.findByTestId('join-welcome')
+    expect(screen.queryByTestId('onboarding-wizard-back')).toBeNull()
   })
 })
