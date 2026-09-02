@@ -135,6 +135,7 @@ export const health: Bundle = {
   'clubTerms.accept': 'I have read the club terms and payment terms and I accept them',
   'clubTerms.required': 'The club terms and payment terms must be accepted to continue',
   'clubTerms.alreadyAccepted': 'You have accepted the club terms and payment terms',
+  'clubTerms.onceForFamily': 'Once, for the whole family',
 
   'declaration.clause.none':
     'I declare that the person named above has no medical limitations or sensitivities of any kind and is able to withstand the effort required by the class they have joined. Should any medical limitation arise, I undertake to report it promptly to the coach and/or the club manager.',
@@ -172,9 +173,11 @@ export const health: Bundle = {
   'agreement.next': 'Continue',
   'agreement.back': 'Back',
   'agreement.submit': 'Sign and send',
+  'onboarding.stepOf': 'Step {current} of {total}',
   'onboarding.title': 'Join the club',
   'onboarding.rail': 'Onboarding steps',
   'onboarding.healthQueue': 'Health declaration queue',
+  'onboarding.step.welcome': 'Join',
   'onboarding.step.consent': 'Consent',
   'onboarding.step.terms': 'Terms',
   'onboarding.step.family': 'Your details',

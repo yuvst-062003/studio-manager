@@ -181,6 +181,7 @@ export const health: Bundle = {
   'clubTerms.accept': 'קראתי את התקנון ותנאי התשלום ואני מאשר/ת אותם',
   'clubTerms.required': 'יש לאשר את התקנון ותנאי התשלום כדי להמשיך',
   'clubTerms.alreadyAccepted': 'אישרתם את התקנון ותנאי התשלום',
+  'clubTerms.onceForFamily': 'פעם אחת, עבור כל המשפחה',
 
   // The club's two health clauses. ALTERNATIVES, not options: which one applies follows
   // from the answers, and the parent confirms the one that follows rather than choosing.
@@ -220,9 +221,11 @@ export const health: Bundle = {
   'agreement.next': 'המשך',
   'agreement.back': 'חזרה',
   'agreement.submit': 'חתימה ושליחה',
+  'onboarding.stepOf': 'שלב {current} מתוך {total}',
   'onboarding.title': 'הצטרפות למועדון',
   'onboarding.rail': 'שלבי ההצטרפות',
   'onboarding.healthQueue': 'תור הצהרות הבריאות',
+  'onboarding.step.welcome': 'הצטרפות',
   'onboarding.step.consent': 'הסכמה',
   'onboarding.step.terms': 'תקנון',
   'onboarding.step.family': 'הפרטים שלכם',

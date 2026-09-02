@@ -4,8 +4,7 @@ import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 
 export const ONBOARDING_WIZARD_STEPS = [
-  { key: 'consent', label: 'health.onboarding.step.consent' },
-  { key: 'terms', label: 'health.onboarding.step.terms' },
+  { key: 'welcome', label: 'health.onboarding.step.welcome' },
   { key: 'family', label: 'health.onboarding.step.family' },
   { key: 'health', label: 'health.onboarding.step.health' },
   { key: 'payment', label: 'health.onboarding.step.payment' },
