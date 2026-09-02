@@ -2,6 +2,7 @@
 // flight. This gate wraps the whole app (`App.tsx`), so that blank moment was not a blank
 // section, it was a blank screen with nothing on it at all.
 import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PaymentsSection, submitUpayForm } from './PaymentsSection'
 
@@ -67,6 +68,50 @@ describe('submitUpayForm', () => {
     const form = document.body.querySelector('form')
     expect(form).not.toBeNull()
     expect(form?.target).toBe('upay-overlay-frame')
+  })
+})
+
+describe("the payments screen's own card-pay handoff", () => {
+  it('opens the overlay instead of navigating away when a real card order opens', async () => {
+    const user = userEvent.setup()
+    const { apiFetch } = await import('@studio/core')
+    vi.mocked(apiFetch).mockImplementation(async (path: string) => {
+      if (path === '/api/v1/me/charges?status=open') {
+        return jsonResponse({
+          items: [
+            {
+              id: 'c1',
+              payer_person_id: 'payer-1',
+              student_id: null,
+              kind: 'tuition',
+              period_year: 2026,
+              period_month: 9,
+              amount_agorot: 30_000,
+              original_amount_agorot: null,
+              proration_note: null,
+              due_date: '2026-09-28',
+              status: 'open',
+              created_by: 'billing_run',
+              allocated_agorot: 0,
+              is_covered_elsewhere: false,
+            },
+          ],
+        })
+      }
+      if (path.startsWith('/api/v1/payment-orders') && path.includes('/form')) {
+        return jsonResponse({ action: 'https://app.upay.co.il/checkout', fields: { a: '1' } })
+      }
+      if (path.startsWith('/api/v1/payment-orders')) {
+        return jsonResponse({ public_ref: 'ref-1' })
+      }
+      return respond(path)
+    })
+
+    render(<PaymentsSection locale={LOCALE} />)
+    await user.click(await screen.findByTestId('pay-button'))
+
+    await screen.findByTestId('payment-overlay')
+    expect(document.querySelector('form[target]')).not.toBeNull()
   })
 })
 

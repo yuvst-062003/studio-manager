@@ -14,6 +14,8 @@ import { apiFetch } from '@studio/core'
 import { LoadFailed } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
+import { PaymentOverlay } from './PaymentOverlay'
+import type { PaymentOverlayRequest } from './PaymentOverlay'
 import { PaymentsScreen } from './PaymentsScreen'
 import type { DebtRow, PrepayTerms, StandingOrderLink } from './PaymentsScreen'
 import type {
@@ -181,6 +183,10 @@ export function PaymentsSection({ locale }: { locale: Locale }) {
   // racing the first would leave the screen showing a list nobody asked for.
   const [reloads, setReloads] = useState(0)
   const [failed, setFailed] = useState(false)
+  // The in-app payment overlay's current request, or none. 2026-09-03 addendum: a real
+  // (non-demo) card order opens here instead of navigating the tab away, the same
+  // change PaymentSetup.tsx's join-wizard card button already got.
+  const [overlay, setOverlay] = useState<PaymentOverlayRequest | null>(null)
 
   useEffect(() => {
     let alive = true
@@ -298,37 +304,50 @@ export function PaymentsSection({ locale }: { locale: Locale }) {
   }
 
   return (
-    <PaymentsScreen
-      locale={locale}
-      client={client}
-      debts={debts}
-      hasActiveSubscription={standingOrder}
-      standingOrderLinks={standingOrderLinks}
-      prepayTerms={prepayTerms}
-      creditAgorot={creditAgorot}
-      // `GET /billing/settings` is manager-only, so the studio's own cash instructions
-      // still have no payer-facing source. The screen falls back to the default copy
-      // rather than showing a parent a 403. The standing-order link no longer falls back
-      // to anything: it has a source of its own now, one per plan, per §13's refusal to
-      // have a single studio-wide link at one amount.
-      cashInstructions={null}
-      promises={promises}
-      onPaymentPromise={async (chargeIds, promiseMethod, prepayMonths) => {
-        await client.createPromise(chargeIds, promiseMethod, prepayMonths)
-        refresh()
-      }}
-      onOrderOpened={(form) => {
-        if (form.action === DEMO_SIMULATOR.action) {
-          // Nothing to submit: no live form exists here by design. The order is open and
-          // the IPN is what settles it, which is exactly §5.10 step 5's point.
+    <>
+      <PaymentsScreen
+        locale={locale}
+        client={client}
+        debts={debts}
+        hasActiveSubscription={standingOrder}
+        standingOrderLinks={standingOrderLinks}
+        prepayTerms={prepayTerms}
+        creditAgorot={creditAgorot}
+        // `GET /billing/settings` is manager-only, so the studio's own cash instructions
+        // still have no payer-facing source. The screen falls back to the default copy
+        // rather than showing a parent a 403. The standing-order link no longer falls back
+        // to anything: it has a source of its own now, one per plan, per §13's refusal to
+        // have a single studio-wide link at one amount.
+        cashInstructions={null}
+        promises={promises}
+        onPaymentPromise={async (chargeIds, promiseMethod, prepayMonths) => {
+          await client.createPromise(chargeIds, promiseMethod, prepayMonths)
           refresh()
-          return
-        }
-        submitUpayForm(form)
-      }}
-      onOpenHistory={() => {
-        globalThis.location.hash = '#/payments/history'
-      }}
-    />
+        }}
+        onOrderOpened={(form) => {
+          if (form.action === DEMO_SIMULATOR.action) {
+            // Nothing to submit: no live form exists here by design. The order is open and
+            // the IPN is what settles it, which is exactly §5.10 step 5's point.
+            refresh()
+            return
+          }
+          setOverlay({ kind: 'checkout', form })
+        }}
+        onOpenHistory={() => {
+          globalThis.location.hash = '#/payments/history'
+        }}
+      />
+      {overlay ? (
+        <PaymentOverlay
+          locale={locale}
+          onClose={() => setOverlay(null)}
+          onComplete={() => {
+            setOverlay(null)
+            refresh()
+          }}
+          request={overlay}
+        />
+      ) : null}
+    </>
   )
 }
