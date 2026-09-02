@@ -17,7 +17,7 @@
 // Styles are inline `CSSProperties`, as everywhere else in this app's screens. The shared
 // stylesheet is being rewritten by the student-card pass running alongside this one, and a
 // second session editing the same file on the same day is how both passes lose work.
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import { Button, LanguagePicker, StatusChip, Switch, TextField, ThemeControl, useSlot } from '@studio/ui'
 import { t } from '@studio/i18n'
@@ -345,11 +345,18 @@ export function GuardianSettings({
 }: GuardianSettingsProps) {
   const [editing, setEditing] = useState(false)
   const [current, setCurrent] = useState(profile)
+  // Resets `current` to a fresh `profile` (a save round-trip, a different guardian)
+  // during render rather than in an effect -- the react-hooks/set-state-in-effect rule
+  // this replaced flags exactly the cascading-render risk of syncing a prop into state
+  // after the fact. See https://react.dev/learn/you-might-not-need-an-effect.
+  const [previousProfile, setPreviousProfile] = useState(profile)
+  if (profile !== previousProfile) {
+    setPreviousProfile(profile)
+    setCurrent(profile)
+  }
   const [pickingLanguage, setPickingLanguage] = useState(false)
   const profileSections = useSlot<ProfileSectionProps>('parent-profile')
   const notSet = t(locale, 'people.profile.notSet')
-
-  useEffect(() => setCurrent(profile), [profile])
 
   return (
     <section aria-labelledby="profile-title" data-testid="guardian-settings" style={pageStyle}>
