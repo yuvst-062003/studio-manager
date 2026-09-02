@@ -249,7 +249,11 @@ export function JoinHealthStep({
   signerName,
   students,
 }: JoinHealthStepProps) {
-  const queue = students.filter(needsFullDeclaration)
+  // Server truth (`needsFullDeclaration`) alone would loop forever under the deferred
+  // model: a signed kid's `health_status` stays 'missing' until the final flush, which
+  // hasn't happened yet. A kid already holding a local draft is done from this queue's
+  // point of view even though the server does not know it yet.
+  const queue = students.filter(needsFullDeclaration).filter((student) => !drafts[student.id])
   const current = queue[0] ?? null
 
   if (!current) return null

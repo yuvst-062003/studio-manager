@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { t } from '@studio/i18n'
 import type { BillingClient } from '../billing/billingClient'
 import type { HealthClient } from '../health/healthClient'
@@ -27,6 +27,40 @@ vi.mock('@studio/core', async (importOriginal) => {
   }
 })
 
+const HEALTH_SCHEMA = {
+  sections: [
+    {
+      id: 'medical_history',
+      title: 'רקע רפואי',
+      questions: [{ id: 'asthma', type: 'boolean' as const, label: 'אסתמה', flag: true }],
+    },
+    {
+      id: 'other',
+      title: 'נוסף',
+      questions: [
+        {
+          id: 'emergency_contact',
+          type: 'phone' as const,
+          label: 'טלפון חירום',
+          required: true,
+        },
+      ],
+    },
+    {
+      id: 'declaration',
+      title: 'הצהרה',
+      questions: [
+        {
+          id: 'clause_confirmed',
+          type: 'clause' as const,
+          label: 'אני מאשר/ת',
+          required: true,
+        },
+      ],
+    },
+  ],
+}
+
 const healthClient = {
   agreementStatus: vi.fn(async () => ({
     complete: false,
@@ -46,6 +80,8 @@ const healthClient = {
     registration_defaults: {},
     school_class_required: true,
   })),
+  template: vi.fn(async () => ({ id: 'tmpl1', version: 1, schema: HEALTH_SCHEMA })),
+  submit: vi.fn(async () => ({}) as never),
 } as unknown as HealthClient
 
 const billingClient = {
@@ -81,6 +117,28 @@ async function acceptWelcomeStep(user: ReturnType<typeof userEvent.setup>) {
 
 afterEach(() => {
   vi.unstubAllGlobals()
+})
+
+beforeEach(() => {
+  HTMLCanvasElement.prototype.getContext = vi.fn(() => ({
+    lineWidth: 0,
+    lineCap: '',
+    lineJoin: '',
+    strokeStyle: '',
+    beginPath: vi.fn(),
+    moveTo: vi.fn(),
+    lineTo: vi.fn(),
+    stroke: vi.fn(),
+    clearRect: vi.fn(),
+    save: vi.fn(),
+    restore: vi.fn(),
+    fillText: vi.fn(),
+    fillStyle: '',
+    font: '',
+    textAlign: '',
+    textBaseline: '',
+  })) as unknown as typeof HTMLCanvasElement.prototype.getContext
+  HTMLCanvasElement.prototype.toDataURL = vi.fn(() => 'data:image/png;base64,AAAA')
 })
 
 describe('JoinFlow', () => {
@@ -304,5 +362,120 @@ describe('JoinFlow', () => {
 
     await screen.findByTestId('join-welcome')
     expect(screen.queryByTestId('onboarding-wizard-back')).toBeNull()
+  })
+
+  it('advances the health queue from local drafts, never from the server, and reaches payment once every kid is signed', async () => {
+    const user = userEvent.setup()
+    // The mocked /me/students response NEVER reports either kid as 'signed' -- that is
+    // exactly what proves the queue advance is computed locally (from healthDrafts),
+    // not re-derived from a server read that the deferred model never triggers.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input)
+        if (url.includes('/api/v1/public/onboarding/live-token-123456')) {
+          return new Response(
+            JSON.stringify({
+              studio_name: 'מועדון הדגמה',
+              email: null,
+              groups: [{ id: 'g1', name: 'ילדים א', weekdays: [0, 2] }],
+            }),
+            { status: 200 },
+          )
+        }
+        if (
+          url.includes('/api/v1/onboarding/live-token-123456/register') &&
+          init?.method === 'POST'
+        ) {
+          return new Response(
+            JSON.stringify({ student_ids: ['st1', 'st2'] }),
+            { status: 201 },
+          )
+        }
+        if (url.includes('/api/v1/me/students')) {
+          return new Response(
+            JSON.stringify({
+              items: [
+                {
+                  id: 'st1',
+                  first_name: 'מיכל',
+                  last_name: 'כהן',
+                  status: 'active',
+                  health_status: 'missing',
+                },
+                {
+                  id: 'st2',
+                  first_name: 'דנה',
+                  last_name: 'כהן',
+                  status: 'active',
+                  health_status: 'missing',
+                },
+              ],
+            }),
+            { status: 200 },
+          )
+        }
+        return new Response(JSON.stringify({ items: [] }), { status: 200 })
+      }),
+    )
+
+    render(
+      <JoinFlow
+        billingClient={billingClient}
+        healthClient={healthClient}
+        locale="he"
+        privacyClient={makePrivacyClient()}
+        standingOrderLinks={[]}
+        token="live-token-123456"
+      />,
+    )
+
+    await acceptWelcomeStep(user)
+    await screen.findByTestId('join-family-step')
+    await user.type(screen.getByLabelText(t('he', 'people.join.nationalId')), '100000017')
+    await user.type(screen.getByLabelText(t('he', 'people.join.address')), 'הרצל 12')
+    await user.type(screen.getByLabelText(t('he', 'people.join.city')), 'רעננה')
+    await user.type(screen.getByLabelText(t('he', 'people.join.phone')), '0548123456')
+    await user.click(screen.getByTestId('join-add-self'))
+    await user.click(
+      screen.getAllByRole('checkbox', { name: 'ילדים א · ראשון·שלישי' })[0]!,
+    )
+    await user.click(screen.getByTestId('join-add-child'))
+    await user.type(screen.getAllByLabelText(t('he', 'people.join.fullName'))[2]!, 'דנה כהן')
+    await user.type(screen.getByLabelText(t('he', 'people.join.birthdate')), '2016-03-14')
+    await user.type(screen.getAllByLabelText(t('he', 'people.join.nationalId'))[2]!, '100000009')
+    await user.type(screen.getByLabelText(t('he', 'people.join.grade')), 'ד')
+    await user.click(
+      screen.getAllByRole('checkbox', { name: 'ילדים א · ראשון·שלישי' })[1]!,
+    )
+    await user.click(screen.getByTestId('join-submit'))
+
+    // Kid 1 (the self row).
+    await screen.findByTestId('health-opening-question')
+    await user.click(screen.getByTestId('health-opening-healthy'))
+    await user.type(
+      screen.getByLabelText(t('he', 'health.declaration.signatureTyped')),
+      'מיכל כהן',
+    )
+    await user.type(screen.getByLabelText('טלפון חירום'), '0501111111')
+    await user.click(screen.getByRole('checkbox', { name: /אני מאשר/ }))
+    await user.click(screen.getByTestId('health-sign-continue'))
+
+    // Still on the health step -- kid 2's turn -- even though /me/students never
+    // changed either kid's health_status server-side.
+    await screen.findByTestId('health-opening-question')
+    expect(screen.queryByTestId('join-payment-step')).toBeNull()
+
+    await user.click(screen.getByTestId('health-opening-healthy'))
+    await user.type(
+      screen.getByLabelText(t('he', 'health.declaration.signatureTyped')),
+      'מיכל כהן',
+    )
+    await user.type(screen.getByLabelText('טלפון חירום'), '0502222222')
+    await user.click(screen.getByRole('checkbox', { name: /אני מאשר/ }))
+    await user.click(screen.getByTestId('health-sign-continue'))
+
+    await screen.findByTestId('join-payment-step')
+    expect(healthClient.submit).not.toHaveBeenCalled()
   })
 })

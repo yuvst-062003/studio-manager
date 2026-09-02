@@ -11,9 +11,14 @@ import { PaymentSetup } from '../billing/PaymentSetup'
 import type { StandingOrderLink } from '../billing/PaymentSetup'
 import type { BillingClient } from '../billing/billingClient'
 import { submitUpayForm } from '../billing/PaymentsSection'
-import { firstStudentNeedingDeclaration, type GatedStudent } from '../health/HealthGate'
+import {
+  firstStudentNeedingDeclaration,
+  needsFullDeclaration,
+  type GatedStudent,
+} from '../health/HealthGate'
 import type { HealthClient } from '../health/healthClient'
 import type { PrivacyClient } from '../privacy/privacyClient'
+import type { SubjectHealthDraft } from './healthDraft'
 import { JoinFamilyStep, type JoinFamilyPayload } from './JoinFamilyStep'
 import { JoinHealthStep } from './JoinHealthStep'
 import { JoinWelcomeStep } from './JoinWelcomeStep'
@@ -77,6 +82,7 @@ export function JoinFlow({
   const [info, setInfo] = useState<JoinInfo | null | 'invalid'>(null)
   const [step, setStep] = useState<JoinStep>('welcome')
   const [students, setStudents] = useState<readonly GatedStudent[]>([])
+  const [healthDrafts, setHealthDrafts] = useState<Record<string, SubjectHealthDraft>>({})
   const [clubTermsAccepted, setClubTermsAccepted] = useState(false)
   const [inFlight, setInFlight] = useState(false)
   const [failed, setFailed] = useState<string | null>(null)
@@ -113,16 +119,15 @@ export function JoinFlow({
     [students],
   )
 
+  // Loads `students` once on entering the health step. Deliberately does NOT decide
+  // whether to advance to payment here -- under the deferred-submission model the
+  // server never learns a kid is done until the final flush (Step 4's "enter the
+  // app"), so `students`' own `health_status` stays 'missing' through the whole
+  // queue. `handleHealthSigned` below is what decides, from `healthDrafts`.
   useEffect(() => {
-    if (step !== 'health') return
-    if (students.length === 0) {
-      void refreshStudents()
-      return
-    }
-    if (!firstStudentNeedingDeclaration(students)) {
-      setStep('payment')
-    }
-  }, [refreshStudents, step, students])
+    if (step !== 'health' || students.length > 0) return
+    void refreshStudents()
+  }, [refreshStudents, step, students.length])
 
   if (info === null) return null
   if (info === 'invalid') {
@@ -134,6 +139,25 @@ export function JoinFlow({
         />
       </div>
     )
+  }
+
+  /** A kid still needing a declaration, by the rule that survives the deferred model:
+   *  server truth (`needsFullDeclaration`) says so, AND there is no local draft for
+   *  them yet. A signed kid's `health_status` never flips to 'signed' server-side
+   *  until the final flush, so server truth alone would loop forever. */
+  function stillNeedsDeclaration(
+    list: readonly GatedStudent[],
+    drafts: Record<string, SubjectHealthDraft>,
+  ) {
+    return list.filter(needsFullDeclaration).filter((student) => !drafts[student.id])
+  }
+
+  function handleHealthSigned(draft: SubjectHealthDraft) {
+    const nextDrafts = { ...healthDrafts, [draft.studentId]: draft }
+    setHealthDrafts(nextDrafts)
+    if (stillNeedsDeclaration(students, nextDrafts).length === 0) {
+      setStep('payment')
+    }
   }
 
   async function acceptClubTermsForFamily(studentId: string) {
@@ -243,14 +267,10 @@ export function JoinFlow({
       <div style={pageStyle}>
         <JoinHealthStep
           client={healthClient}
+          drafts={healthDrafts}
           locale={locale}
           onBack={() => setStep('family')}
-          onSigned={() => {
-            void refreshStudents().then((next) => {
-              if (firstStudentNeedingDeclaration(next)) return
-              setStep('payment')
-            })
-          }}
+          onSigned={handleHealthSigned}
           signerName={session.displayName ?? undefined}
           students={students}
         />
