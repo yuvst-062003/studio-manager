@@ -1,26 +1,22 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import type { CSSProperties } from 'react'
 import { Alert, Button, Card, Checkbox, SegmentedControl, TextField } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { isValidNationalId } from '../health/nationalId'
+import {
+  emptySubjectRow,
+  familyFormValid,
+  hasSharedMinors,
+  toJoinFamilyPayload,
+  type SubjectRow,
+} from './familyDraft'
 import { OnboardingWizardChrome, stepPosition } from './OnboardingWizardChrome'
 import { WizardNavButtons } from './WizardNavButtons'
 
 type JoinGroup = { id: string; name: string; weekdays: number[] }
 
 export type GuardianRelation = 'mother' | 'father' | 'other'
-
-export type ChildDraft = {
-  key: string
-  firstName: string
-  lastName: string
-  birthdate: string
-  groupIds: string[]
-  selfStudent: boolean
-  nationalId: string
-  grade: string
-}
 
 export type JoinFamilyPayload = {
   first_name: string
@@ -58,16 +54,6 @@ const cardTint: CSSProperties = {
 
 const muted: CSSProperties = { color: 'var(--text-muted)', margin: 0 }
 
-const chipStyle: CSSProperties = {
-  alignSelf: 'flex-start',
-  background: 'color-mix(in srgb, var(--accent) 12%, var(--surface))',
-  borderRadius: '999px',
-  color: 'var(--accent)',
-  fontSize: 'var(--text-caption)',
-  fontWeight: 500,
-  padding: 'var(--space-1) var(--space-3)',
-}
-
 const rowStyle: CSSProperties = {
   alignItems: 'center',
   display: 'flex',
@@ -80,25 +66,6 @@ const pickupRowStyle: CSSProperties = {
   display: 'flex',
   flexWrap: 'wrap',
   gap: 'var(--space-2)',
-}
-
-function emptyChild(): ChildDraft {
-  return {
-    key: crypto.randomUUID(),
-    firstName: '',
-    lastName: '',
-    birthdate: '',
-    groupIds: [],
-    selfStudent: false,
-    nationalId: '',
-    grade: '',
-  }
-}
-
-function splitName(displayName: string): { first: string; last: string } {
-  const parts = displayName.trim().split(/\s+/)
-  if (parts.length === 0) return { first: '', last: '' }
-  return { first: parts[0] ?? '', last: parts.slice(1).join(' ') }
 }
 
 function weekdaysLabel(locale: Locale, weekdays: number[]): string {
@@ -124,6 +91,11 @@ export type JoinFamilyStepProps = {
   onSubmit: (payload: JoinFamilyPayload) => void
 }
 
+const ageOptions = (locale: Locale) => [
+  { value: 'yes', label: t(locale, 'health.declaration.yes') },
+  { value: 'no', label: t(locale, 'health.declaration.no') },
+]
+
 export function JoinFamilyStep({
   displayName,
   email,
@@ -134,7 +106,6 @@ export function JoinFamilyStep({
   onBack,
   onSubmit,
 }: JoinFamilyStepProps) {
-  const parsed = useMemo(() => splitName(displayName), [displayName])
   const [phone, setPhone] = useState('')
   const [signerNationalId, setSignerNationalId] = useState('')
   const [address, setAddress] = useState('')
@@ -146,12 +117,28 @@ export function JoinFamilyStep({
   const [otherNationalId, setOtherNationalId] = useState('')
   const [otherPhone, setOtherPhone] = useState('')
   const [pickups, setPickups] = useState([{ name: '', phone: '' }])
-  const [children, setChildren] = useState<ChildDraft[]>([emptyChild()])
+  const [rows, setRows] = useState<SubjectRow[]>([])
   const [showErrors, setShowErrors] = useState(false)
 
-  const hasMinorChildren = children.some((child) => !child.selfStudent)
-  const adultOnly = children.length > 0 && children.every((child) => child.selfStudent)
+  const shared = hasSharedMinors(rows)
+  const hasSelf = rows.some((row) => row.kind === 'self')
   const optional = t(locale, 'people.join.optional')
+
+  const state = {
+    signerNationalId,
+    address,
+    city,
+    phone,
+    rows,
+    otherFullName,
+    otherNationalId,
+    relation,
+    phoneHome,
+    aliyahYear,
+    otherPhone,
+    pickups,
+  }
+  const valid = familyFormValid(state)
 
   const otherParentLabel =
     relation === 'mother'
@@ -169,97 +156,14 @@ export function JoinFamilyStep({
   const requiredError = (value: string): string | undefined =>
     showErrors && value.trim() === '' ? t(locale, 'people.join.required') : undefined
 
-  const valid = useMemo(() => {
-    if (
-      !isValidNationalId(signerNationalId) ||
-      address.trim() === '' ||
-      city.trim() === '' ||
-      phone.trim() === ''
-    ) {
-      return false
-    }
-    if (hasMinorChildren) {
-      if (relation === 'other') {
-        if (otherFullName.trim() === '' || !isValidNationalId(otherNationalId)) return false
-      } else if (otherNationalId.trim() !== '' && !isValidNationalId(otherNationalId)) {
-        return false
-      }
-    }
-    return children.every((child) => {
-      if (child.groupIds.length === 0) return false
-      if (child.selfStudent) return true
-      return (
-        child.firstName.trim() !== '' &&
-        child.birthdate.trim() !== '' &&
-        isValidNationalId(child.nationalId) &&
-        child.grade.trim() !== ''
-      )
-    })
-  }, [
-    address,
-    children,
-    city,
-    hasMinorChildren,
-    otherFullName,
-    otherNationalId,
-    phone,
-    relation,
-    signerNationalId,
-  ])
+  function updateRow(key: string, patch: Partial<SubjectRow>) {
+    setRows((previous) => previous.map((row) => (row.key === key ? { ...row, ...patch } : row)))
+  }
 
   function submit() {
     setShowErrors(true)
     if (!valid || inFlight) return
-    const [otherFirst = '', ...otherRest] = otherFullName.trim().split(/\s+/)
-    const pickupContacts = pickups
-      .map((entry) => ({ name: entry.name.trim(), phone: entry.phone.trim() }))
-      .filter((entry) => entry.name !== '')
-    onSubmit({
-      first_name: parsed.first,
-      last_name: parsed.last,
-      phone: phone.trim() || null,
-      signer: {
-        national_id: signerNationalId.trim(),
-        address: address.trim(),
-        city: city.trim(),
-        phone_home: phoneHome.trim() || null,
-        aliyah_year: aliyahYear.trim() || null,
-        relation,
-      },
-      other_parent:
-        hasMinorChildren && (otherFullName.trim() || relation === 'other')
-          ? {
-              first_name: otherFirst,
-              last_name: otherRest.join(' ') || null,
-              national_id: otherNationalId.trim() || null,
-              phone: otherPhone.trim() || null,
-            }
-          : null,
-      pickup_contacts: hasMinorChildren ? pickupContacts : [],
-      children: children.map((child) => {
-        if (child.selfStudent) {
-          return {
-            first_name: parsed.first,
-            last_name: parsed.last,
-            birthdate: null,
-            group_ids: child.groupIds,
-            self_student: true,
-            national_id: null,
-            grade: null,
-          }
-        }
-        const [first = '', ...rest] = child.firstName.trim().split(/\s+/)
-        return {
-          first_name: first,
-          last_name: rest.join(' ') || parsed.last,
-          birthdate: child.birthdate || null,
-          group_ids: child.groupIds,
-          self_student: false,
-          national_id: child.nationalId.trim() || null,
-          grade: child.grade.trim() || null,
-        }
-      }),
-    })
+    onSubmit(toJoinFamilyPayload(displayName, state))
   }
 
   return (
@@ -268,14 +172,8 @@ export function JoinFamilyStep({
         locale={locale}
         onBack={onBack}
         position={stepPosition('family')}
-        title={
-          adultOnly
-            ? t(locale, 'people.join.yourDetailsSolo')
-            : t(locale, 'people.join.yourDetails')
-        }
+        title={t(locale, 'people.join.yourDetails')}
       >
-        {adultOnly ? <span style={chipStyle}>{t(locale, 'people.join.selfChip')}</span> : null}
-
         <Card>
           <h2 style={{ marginBlockStart: 0 }}>{t(locale, 'people.join.yourDetails')}</h2>
           <p style={rowStyle}>
@@ -287,7 +185,7 @@ export function JoinFamilyStep({
               {t(locale, 'people.join.fromSignIn')}
             </span>
           </p>
-          {hasMinorChildren ? (
+          {shared ? (
             <SegmentedControl
               legend={t(locale, 'people.join.iAm')}
               onValueChange={(value) => setRelation(value as GuardianRelation)}
@@ -346,7 +244,12 @@ export function JoinFamilyStep({
           ) : null}
         </Card>
 
-        {hasMinorChildren ? (
+        {/* Shared parent-info + pickup, once for every minor in the list -- no
+            per-row "same as / different" toggle. `JoinFamilyPayload` carries exactly
+            one `other_parent`/`pickup_contacts` pair for the whole submission, so a
+            per-child divergence has nowhere to send its answer (2026-09-03
+            correction). */}
+        {shared ? (
           <Card>
             <div style={rowStyle}>
               <h2 style={{ margin: 0 }}>{otherParentLabel}</h2>
@@ -382,7 +285,7 @@ export function JoinFamilyStep({
           </Card>
         ) : null}
 
-        {hasMinorChildren ? (
+        {shared ? (
           <Card>
             <h2 style={{ marginBlockStart: 0 }}>{t(locale, 'people.join.pickupTitle')}</h2>
             <p style={{ ...muted, fontSize: 'var(--text-caption)' }}>
@@ -441,155 +344,115 @@ export function JoinFamilyStep({
           </Card>
         ) : null}
 
+        {/* The subject list -- empty by default (§Step 2 point 2). Two symmetric adds:
+            "I train too" (reuses the signer's own name/id/address, only asks groups)
+            and "+ add a child" (a full row). */}
         <div style={cardTint}>
           <Card>
             <h2 style={{ marginBlockStart: 0 }}>{t(locale, 'people.join.studentsTitle')}</h2>
-            {children.map((child, index) => (
-              <div key={child.key} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-              {index > 0 ? <hr style={{ border: 0, borderTop: '1px solid var(--border)' }} /> : null}
-              <div style={rowStyle}>
-                <h3 style={{ margin: 0, marginInlineEnd: 'auto' }}>
-                  {child.selfStudent
-                    ? t(locale, 'people.join.selfStudentAlso')
-                    : `${t(locale, 'people.join.child')}${children.length > 1 ? ` ${index + 1}` : ''}`}
-                </h3>
-                {children.length > 1 && !child.selfStudent ? (
+            {rows.map((row, index) => (
+              <div
+                key={row.key}
+                style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}
+              >
+                {index > 0 ? <hr style={{ border: 0, borderTop: '1px solid var(--border)' }} /> : null}
+                <div style={rowStyle}>
+                  <h3 style={{ margin: 0, marginInlineEnd: 'auto' }}>
+                    {row.kind === 'self'
+                      ? t(locale, 'people.join.selfStudentAlso')
+                      : `${t(locale, 'people.join.child')}`}
+                  </h3>
                   <Button
-                    onClick={() => setChildren((rows) => rows.filter((row) => row.key !== child.key))}
+                    onClick={() => setRows((prev) => prev.filter((entry) => entry.key !== row.key))}
                     type="button"
                     variant="ghost"
                   >
                     {t(locale, 'people.join.removeChild')}
                   </Button>
-                ) : null}
-              </div>
-              {!child.selfStudent ? (
-                <>
-                  <div style={{ display: 'grid', gap: 'var(--space-3)', gridTemplateColumns: '1fr 1fr' }}>
-                    <TextField
-                      error={requiredError(child.firstName)}
-                      label={t(locale, 'people.join.fullName')}
-                      onChange={(event) =>
-                        setChildren((rows) =>
-                          rows.map((row) =>
-                            row.key === child.key ? { ...row, firstName: event.target.value } : row,
-                          ),
-                        )
-                      }
-                      value={child.firstName}
+                </div>
+                {row.kind === 'child' ? (
+                  <>
+                    <SegmentedControl
+                      legend={t(locale, 'people.join.age18Question')}
+                      onValueChange={(value) => updateRow(row.key, { isAdult: value === 'yes' })}
+                      options={ageOptions(locale)}
+                      value={row.isAdult ? 'yes' : 'no'}
                     />
-                    <TextField
-                      error={requiredError(child.birthdate)}
-                      label={t(locale, 'people.join.birthdate')}
-                      type="date"
-                      onChange={(event) =>
-                        setChildren((rows) =>
-                          rows.map((row) =>
-                            row.key === child.key ? { ...row, birthdate: event.target.value } : row,
-                          ),
-                        )
-                      }
-                      value={child.birthdate}
-                    />
-                  </div>
-                  <div style={{ display: 'grid', gap: 'var(--space-3)', gridTemplateColumns: '1fr 1fr' }}>
-                    <TextField
-                      error={idError(child.nationalId, true)}
-                      inputMode="numeric"
-                      label={t(locale, 'people.join.nationalId')}
-                      onChange={(event) =>
-                        setChildren((rows) =>
-                          rows.map((row) =>
-                            row.key === child.key ? { ...row, nationalId: event.target.value } : row,
-                          ),
-                        )
-                      }
-                      value={child.nationalId}
-                    />
-                    <TextField
-                      error={requiredError(child.grade)}
-                      label={t(locale, 'people.join.grade')}
-                      onChange={(event) =>
-                        setChildren((rows) =>
-                          rows.map((row) =>
-                            row.key === child.key ? { ...row, grade: event.target.value } : row,
-                          ),
-                        )
-                      }
-                      value={child.grade}
-                    />
-                  </div>
-                </>
-              ) : (
-                <p style={{ ...muted, fontSize: 'var(--text-caption)' }}>
-                  {t(locale, 'people.join.selfStudentHint')}
-                </p>
-              )}
-              <p style={{ margin: 0, fontWeight: 500 }}>{t(locale, 'people.join.groups')}</p>
-              {groups.map((group) => (
-                <Checkbox
-                  key={group.id}
-                  label={`${group.name} · ${weekdaysLabel(locale, group.weekdays)}`}
-                  checked={child.groupIds.includes(group.id)}
-                  onChange={(event) =>
-                    setChildren((rows) =>
-                      rows.map((row) =>
-                        row.key === child.key
-                          ? {
-                              ...row,
-                              groupIds: event.target.checked
-                                ? [...row.groupIds, group.id]
-                                : row.groupIds.filter((id) => id !== group.id),
-                            }
-                          : row,
-                      ),
-                    )
-                  }
-                />
-              ))}
+                    <div style={{ display: 'grid', gap: 'var(--space-3)', gridTemplateColumns: '1fr 1fr' }}>
+                      <TextField
+                        error={requiredError(row.firstName)}
+                        label={t(locale, 'people.join.fullName')}
+                        onChange={(event) => updateRow(row.key, { firstName: event.target.value })}
+                        value={row.firstName}
+                      />
+                      <TextField
+                        error={requiredError(row.birthdate)}
+                        label={t(locale, 'people.join.birthdate')}
+                        type="date"
+                        onChange={(event) => updateRow(row.key, { birthdate: event.target.value })}
+                        value={row.birthdate}
+                      />
+                    </div>
+                    <div style={{ display: 'grid', gap: 'var(--space-3)', gridTemplateColumns: '1fr 1fr' }}>
+                      <TextField
+                        error={idError(row.nationalId, true)}
+                        inputMode="numeric"
+                        label={t(locale, 'people.join.nationalId')}
+                        onChange={(event) => updateRow(row.key, { nationalId: event.target.value })}
+                        value={row.nationalId}
+                      />
+                      <TextField
+                        error={requiredError(row.grade)}
+                        label={t(locale, 'people.join.grade')}
+                        onChange={(event) => updateRow(row.key, { grade: event.target.value })}
+                        value={row.grade}
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <p style={{ ...muted, fontSize: 'var(--text-caption)' }}>
+                    {t(locale, 'people.join.selfStudentHint')}
+                  </p>
+                )}
+                <p style={{ margin: 0, fontWeight: 500 }}>{t(locale, 'people.join.groups')}</p>
+                {groups.map((group) => (
+                  <Checkbox
+                    key={group.id}
+                    label={`${group.name} · ${weekdaysLabel(locale, group.weekdays)}`}
+                    checked={row.groupIds.includes(group.id)}
+                    onChange={(event) =>
+                      updateRow(row.key, {
+                        groupIds: event.target.checked
+                          ? [...row.groupIds, group.id]
+                          : row.groupIds.filter((id) => id !== group.id),
+                      })
+                    }
+                  />
+                ))}
               </div>
             ))}
-            <Button
-              onClick={() => setChildren((rows) => [...rows, emptyChild()])}
-              type="button"
-              variant="secondary"
-            >
-              {t(locale, 'people.join.addChild')}
-            </Button>
-            <Checkbox
-              checked={children.some((child) => child.selfStudent)}
-              label={t(locale, 'people.join.selfStudentAlso')}
-              onChange={(event) => {
-                const checked = event.target.checked
-                setChildren((rows) => {
-                  const withoutSelf = rows.filter((row) => !row.selfStudent)
-                  if (!checked) return withoutSelf.length > 0 ? withoutSelf : [emptyChild()]
-                  return [
-                    ...withoutSelf,
-                    {
-                      key: crypto.randomUUID(),
-                      firstName: parsed.first,
-                      lastName: parsed.last,
-                      birthdate: '',
-                      groupIds: [],
-                      selfStudent: true,
-                      nationalId: '',
-                      grade: '',
-                    },
-                  ]
-                })
-              }}
-            />
+            <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+              <Button
+                data-testid="join-add-child"
+                onClick={() => setRows((prev) => [...prev, emptySubjectRow('child')])}
+                type="button"
+                variant="secondary"
+              >
+                {t(locale, 'people.join.addChild')}
+              </Button>
+              {!hasSelf ? (
+                <Button
+                  data-testid="join-add-self"
+                  onClick={() => setRows((prev) => [...prev, emptySubjectRow('self')])}
+                  type="button"
+                  variant="secondary"
+                >
+                  {t(locale, 'people.join.selfStudentAlso')}
+                </Button>
+              ) : null}
+            </div>
           </Card>
         </div>
-
-        {adultOnly ? (
-          <div style={cardTint}>
-            <Card>
-              <p style={{ ...muted, lineHeight: 1.65 }}>{t(locale, 'people.join.soloNote')}</p>
-            </Card>
-          </div>
-        ) : null}
 
         {showErrors && !valid ? (
           <Alert iconLabel={t(locale, 'people.join.required')} live tone="danger">
@@ -603,7 +466,7 @@ export function JoinFamilyStep({
         ) : null}
 
         <WizardNavButtons
-          forwardDisabled={!valid || inFlight}
+          forwardDisabled={inFlight}
           forwardTestId="join-submit"
           locale={locale}
           onBack={onBack}

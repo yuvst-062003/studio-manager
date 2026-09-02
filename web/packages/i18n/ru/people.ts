@@ -199,6 +199,7 @@ export const people: Bundle = {
   'join.fromSignIn': 'Из входа',
   'join.verifiedEmail': 'Подтверждён',
   'join.iAm': 'Я',
+  'join.age18Question': '18 лет или больше?',
   'join.relation.mother': 'Мать',
   'join.relation.father': 'Отец',
   'join.relation.other': 'Другой родственник',

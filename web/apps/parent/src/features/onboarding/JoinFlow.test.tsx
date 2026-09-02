@@ -173,10 +173,11 @@ describe('JoinFlow', () => {
       'aria-current',
       'step',
     )
-    await user.type(screen.getAllByLabelText(t('he', 'people.join.nationalId'))[0]!, '100000017')
+    await user.type(screen.getByLabelText(t('he', 'people.join.nationalId')), '100000017')
     await user.type(screen.getByLabelText(t('he', 'people.join.address')), 'הרצל 12')
     await user.type(screen.getByLabelText(t('he', 'people.join.city')), 'רעננה')
-    await user.type(screen.getAllByLabelText(t('he', 'people.join.phone'))[0]!, '0548123456')
+    await user.type(screen.getByLabelText(t('he', 'people.join.phone')), '0548123456')
+    await user.click(screen.getByTestId('join-add-child'))
     await user.type(screen.getAllByLabelText(t('he', 'people.join.fullName'))[2]!, 'דנה כהן')
     await user.type(screen.getByLabelText(t('he', 'people.join.birthdate')), '2016-03-14')
     await user.type(screen.getAllByLabelText(t('he', 'people.join.nationalId'))[2]!, '100000009')
@@ -255,10 +256,11 @@ describe('JoinFlow', () => {
     await acceptWelcomeStep(user)
 
     await screen.findByTestId('join-family-step')
-    await user.type(screen.getAllByLabelText(t('he', 'people.join.nationalId'))[0]!, '100000017')
+    await user.type(screen.getByLabelText(t('he', 'people.join.nationalId')), '100000017')
     await user.type(screen.getByLabelText(t('he', 'people.join.address')), 'הרצל 12')
     await user.type(screen.getByLabelText(t('he', 'people.join.city')), 'רעננה')
-    await user.type(screen.getAllByLabelText(t('he', 'people.join.phone'))[0]!, '0548123456')
+    await user.type(screen.getByLabelText(t('he', 'people.join.phone')), '0548123456')
+    await user.click(screen.getByTestId('join-add-child'))
     await user.type(screen.getAllByLabelText(t('he', 'people.join.fullName'))[2]!, 'דנה כהן')
     await user.type(screen.getByLabelText(t('he', 'people.join.birthdate')), '2016-03-14')
     await user.type(screen.getAllByLabelText(t('he', 'people.join.nationalId'))[2]!, '100000009')

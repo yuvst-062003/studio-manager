@@ -227,6 +227,7 @@ export const people: Bundle = {
   'join.fromSignIn': 'מהכניסה',
   'join.verifiedEmail': 'מאומת',
   'join.iAm': 'אני',
+  'join.age18Question': 'בן/בת 18 ומעלה?',
   'join.relation.mother': 'האם',
   'join.relation.father': 'האב',
   'join.relation.other': 'קרוב אחר',
