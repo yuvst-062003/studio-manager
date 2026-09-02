@@ -342,8 +342,12 @@ class OnboardingService:
         phone: str | None,
         email: str | None,
         children: list[dict[str, Any]],
+        signer: dict[str, Any] | None = None,
+        other_parent: dict[str, Any] | None = None,
+        pickup_contacts: list[dict[str, Any]] | None = None,
         at: datetime,
         schedule: ScheduleReader,
+        actor_identity_id: uuid.UUID | None = None,
     ) -> tuple[Person, list[uuid.UUID], int]:
         """One transaction: the parent, the children, the enrollments, the price, the
         first charge. Returns (parent person, student ids, charges created).
@@ -398,29 +402,53 @@ class OnboardingService:
         billing_run = BillingRunService(session)
         tally = _Tally()
         student_ids: list[uuid.UUID] = []
+        # Every child this submission touches, freshly created or already on the roster.
+        # `_apply_family_details` writes the household facts (address, pickup, ...) from
+        # THIS submission onto whichever row the student actually is -- a resubmission of
+        # an all-duplicate family is still a family telling the club its address, and
+        # skipping that write is what left `registration_complete` false forever (§6.8).
+        applied_pairs: list[tuple[dict[str, Any], uuid.UUID]] = []
 
         for child in children:
             try:
-                student_ids.append(
-                    OnboardingService.add_child(
-                        session,
-                        studio_id=studio_id,
-                        parent=parent,
-                        child=child,
-                        at=at,
-                        schedule=schedule,
-                        billing_run=billing_run,
-                        tally=tally,
-                    )
+                student_id = OnboardingService.add_child(
+                    session,
+                    studio_id=studio_id,
+                    parent=parent,
+                    child=child,
+                    at=at,
+                    schedule=schedule,
+                    billing_run=billing_run,
+                    tally=tally,
                 )
-            except DuplicateStudentError:
+            except DuplicateStudentError as exc:
                 # A no-op, not a refusal, and only on THIS door. A parent resubmitting the
                 # link with three children of whom two are already on the account must still
                 # get the third; refusing the whole submission would make the rest of the
                 # family unreachable through the club's own link. `+ הוסף ילד` submits one
                 # child at a time and there the refusal is the useful answer -- it can offer
                 # them the child they already have.
+                #
+                # The existing student still belongs in `applied_pairs`: this submission is
+                # exactly where the parent typed the address, the other parent and the
+                # pickup list, and that student is not on file for them until it is written.
+                applied_pairs.append((child, exc.student_id))
                 continue
+            student_ids.append(student_id)
+            applied_pairs.append((child, student_id))
+
+        if signer is not None and applied_pairs:
+            OnboardingService._apply_family_details(
+                session,
+                parent=parent,
+                created_pairs=applied_pairs,
+                signer=signer,
+                other_parent=other_parent,
+                pickup_contacts=pickup_contacts or [],
+                at=at,
+                actor_person_id=parent.id,
+                actor_identity_id=actor_identity_id,
+            )
 
         AuditService.record(
             session,
@@ -433,3 +461,71 @@ class OnboardingService:
         )
         session.flush()
         return parent, student_ids, tally.charged
+
+    @staticmethod
+    def _apply_family_details(
+        session: Session,
+        *,
+        parent: Person,
+        created_pairs: list[tuple[dict[str, Any], uuid.UUID]],
+        signer: dict[str, Any],
+        other_parent: dict[str, Any] | None,
+        pickup_contacts: list[dict[str, Any]],
+        at: datetime,
+        actor_person_id: uuid.UUID,
+        actor_identity_id: uuid.UUID | None,
+    ) -> None:
+        """Write the household facts collected on step 3 onto the rows they belong to."""
+        from typing import cast
+
+        from app.core.tenancy import TenantSession
+        from app.services.health.agreement import AgreementService, is_self_guarding
+
+        has_minor_children = any(not child.get("self") for child, _ in created_pairs)
+        tenant_session = cast(TenantSession, session)
+
+        for child, student_id in created_pairs:
+            student = session.get(Student, student_id)
+            if student is None:
+                continue
+            guardian = session.execute(
+                select(Guardian).where(
+                    Guardian.student_id == student.id,
+                    Guardian.person_id == parent.id,
+                )
+            ).scalar_one_or_none()
+            if guardian is None:
+                # A freshly created child always has this row (add_child creates it in
+                # the same transaction). A duplicate match with no guardian link here
+                # is a same-name collision with a stranger's kid, not this family
+                # resubmitting -- leave it untouched, same as today's existing safe
+                # behavior for a child that never made it into created_pairs at all.
+                continue
+            is_self = child.get("self") or is_self_guarding(tenant_session, student)
+            child_payload = {
+                "national_id": signer["national_id"] if is_self else child.get("national_id"),
+                "address": signer["address"],
+                "city": signer["city"],
+                "grade": "" if is_self else str(child.get("grade") or ""),
+                "phone_home": signer.get("phone_home"),
+                "phone": parent.phone,
+                "email": parent.email,
+            }
+            signer_payload = {
+                "national_id": signer["national_id"],
+                "aliyah_year": signer.get("aliyah_year"),
+            }
+            AgreementService.save_registration(
+                tenant_session,
+                student,
+                child=child_payload,
+                signer=signer_payload,
+                other_parent=other_parent if has_minor_children else None,
+                pickup_contacts=pickup_contacts if has_minor_children else [],
+                subject_person_id=parent.id,
+                actor_person_id=actor_person_id,
+                at=at,
+                actor_identity_id=actor_identity_id,
+            )
+            guardian.relation = "self" if is_self else str(signer.get("relation") or "parent")
+        session.flush()

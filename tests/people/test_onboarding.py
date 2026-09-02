@@ -502,6 +502,176 @@ def test_resubmitting_the_link_adds_the_missing_child_and_skips_the_existing_one
     assert second_ids[0] not in first_ids
 
 
+def test_a_resubmitted_same_name_child_never_overwrites_a_different_familys_student(
+    tenant_session, app_session, studio, a_group, twice_weekly
+):
+    """duplicate_student() matches by name studio-wide, with no concept of "this
+    parent's own kids" -- so when Family A's submission happens to name-collide with
+    Family B's real, unrelated child, `_apply_family_details` must not write Family A's
+    grade, pickup contacts or other-parent details onto Family B's student just because
+    the server correctly reported a duplicate.
+    """
+    from app.models.identity import AuthIdentity
+
+    identity_b = AuthIdentity(
+        provider="google",
+        provider_subject=f"family-b-{uuid.uuid4().hex[:8]}",
+        email="family-b@example.invalid",
+        email_verified=True,
+        is_private_relay=False,
+        is_developer=False,
+    )
+    app_session.add(identity_b)
+    app_session.commit()
+    yossi = {
+        "first_name": "יוסי",
+        "last_name": "כהן",
+        "birthdate": date(2015, 5, 5),
+        "group_ids": [a_group],
+        "self": False,
+        "grade": "ג",
+        "national_id": "100000009",
+    }
+    parent_b, ids_b, _ = OnboardingService.register(
+        tenant_session,
+        studio_id=studio.id,
+        identity_id=identity_b.id,
+        first_name="דנה",
+        last_name="לוי",
+        phone=None,
+        email="family-b@example.invalid",
+        children=[yossi],
+        signer={
+            "national_id": "100000025",
+            "address": "יפו 1",
+            "city": "תל אביב",
+            "relation": "mother",
+        },
+        other_parent=None,
+        pickup_contacts=[],
+        at=T0,
+        schedule=twice_weekly,
+    )
+    tenant_session.commit()
+    student_b_id = ids_b[0]
+
+    identity_a = AuthIdentity(
+        provider="google",
+        provider_subject=f"family-a-{uuid.uuid4().hex[:8]}",
+        email="family-a@example.invalid",
+        email_verified=True,
+        is_private_relay=False,
+        is_developer=False,
+    )
+    app_session.add(identity_a)
+    app_session.commit()
+    colliding_yossi = {
+        "first_name": "יוסי",
+        "last_name": "כהן",
+        "birthdate": date(2015, 5, 5),
+        "group_ids": [a_group],
+        "self": False,
+        "grade": "א",
+        "national_id": "100000017",
+    }
+    parent_a, ids_a, _ = OnboardingService.register(
+        tenant_session,
+        studio_id=studio.id,
+        identity_id=identity_a.id,
+        first_name="מיכל",
+        last_name="כהן",
+        phone=None,
+        email="family-a@example.invalid",
+        children=[colliding_yossi],
+        signer={
+            "national_id": "100000033",
+            "address": "הרצל 1",
+            "city": "רעננה",
+            "relation": "mother",
+        },
+        other_parent=None,
+        pickup_contacts=[{"name": "סבתא", "phone": "0500000000"}],
+        at=T0,
+        schedule=twice_weekly,
+    )
+    tenant_session.commit()
+
+    assert ids_a == [], "the server correctly reported a duplicate; nothing new was created"
+    assert parent_a.id != parent_b.id
+
+    student_b = tenant_session.get(Student, student_b_id)
+    assert student_b.grade == "ג", "Family A's grade must not overwrite Family B's real child"
+    guardians = (
+        tenant_session.execute(select(Guardian).where(Guardian.student_id == student_b.id))
+        .scalars()
+        .all()
+    )
+    assert len(guardians) == 1
+    assert guardians[0].person_id == parent_b.id
+
+
+def test_a_same_family_resubmission_still_writes_its_own_childs_details(
+    tenant_session, app_session, studio, a_group, twice_weekly
+):
+    """The original bug's actual scenario: registration hiccups, the parent resubmits
+    the same family. The cross-family guard must not turn into a blanket refusal for
+    the family's own child.
+    """
+    from app.models.identity import AuthIdentity
+
+    identity = AuthIdentity(
+        provider="google",
+        provider_subject=f"same-family-{uuid.uuid4().hex[:8]}",
+        email="same-family@example.invalid",
+        email_verified=True,
+        is_private_relay=False,
+        is_developer=False,
+    )
+    app_session.add(identity)
+    app_session.commit()
+
+    common = dict(
+        studio_id=studio.id,
+        identity_id=identity.id,
+        first_name="מיכל",
+        last_name="כהן",
+        phone=None,
+        email="same-family@example.invalid",
+        signer={
+            "national_id": "100000017",
+            "address": "הרצל 12",
+            "city": "רעננה",
+            "relation": "mother",
+        },
+        other_parent=None,
+        pickup_contacts=[],
+        at=T0,
+        schedule=twice_weekly,
+    )
+    dana = {
+        "first_name": "דנה",
+        "last_name": "כהן",
+        "birthdate": date(2016, 3, 14),
+        "group_ids": [a_group],
+        "self": False,
+        "grade": "ג",
+        "national_id": "100000009",
+    }
+    parent, first_ids, _ = OnboardingService.register(tenant_session, children=[dana], **common)
+    tenant_session.commit()
+
+    again_dana = {**dana, "grade": "ד"}
+    again_parent, second_ids, _ = OnboardingService.register(
+        tenant_session, children=[again_dana], **common
+    )
+    tenant_session.commit()
+
+    assert again_parent.id == parent.id
+    assert second_ids == [], "no new student -- this is the same child resubmitting"
+    student = tenant_session.get(Student, first_ids[0])
+    assert student.grade == "ד", "the resubmission must still write this family's own update"
+
+
 def test_the_add_a_child_route_names_the_existing_child_for_its_own_guardian(
     client, as_guardian, tenant_session, studio, a_group, monkeypatch
 ):
