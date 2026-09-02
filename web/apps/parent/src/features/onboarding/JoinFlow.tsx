@@ -84,9 +84,16 @@ export function JoinFlow({
   const [info, setInfo] = useState<JoinInfo | null | 'invalid'>(null)
   const [step, setStep] = useState<JoinStep>('welcome')
   const [students, setStudents] = useState<readonly GatedStudent[]>([])
-  const [healthDrafts, setHealthDrafts] = useState<Record<string, SubjectHealthDraft>>({})
-  const [familyDraft, setFamilyDraft] = useState<FamilyPayloadState | null>(null)
-  const [draftLoaded, setDraftLoaded] = useState(false)
+  // Restore-on-mount lives in these two lazy initializers rather than an effect: `token`
+  // does not change over this component's lifetime, so reading the saved draft is a
+  // one-time, synchronous part of the first render, not a synchronization with an
+  // external system that changes later (the case an effect is actually for).
+  const [healthDrafts, setHealthDrafts] = useState<Record<string, SubjectHealthDraft>>(
+    () => loadJoinDraft(token)?.healthDrafts ?? {},
+  )
+  const [familyDraft, setFamilyDraft] = useState<FamilyPayloadState | null>(
+    () => loadJoinDraft(token)?.family ?? null,
+  )
   const [doneRows, setDoneRows] = useState<PaymentSummaryRow[]>([])
   const [flushing, setFlushing] = useState(false)
   const [flushError, setFlushError] = useState<string | null>(null)
@@ -136,26 +143,11 @@ export function JoinFlow({
     void refreshStudents()
   }, [refreshStudents, step, students.length])
 
-  // Restore-on-mount: a same-tab return after closing mid-wizard picks up right where
-  // the family left off. `draftLoaded` gates the save effect below so an empty initial
-  // render cannot overwrite a real saved draft before this has had a chance to read it.
-  useEffect(() => {
-    const loaded = loadJoinDraft(token)
-    if (loaded) {
-      setFamilyDraft(loaded.family)
-      setHealthDrafts(loaded.healthDrafts)
-    }
-    setDraftLoaded(true)
-    // Runs once, on mount, against this token -- not on every family/health change.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token])
-
   // Save-on-change: every edit to the family form or a kid's health answers persists
   // immediately, so a closed tab loses nothing typed since the last keystroke.
   useEffect(() => {
-    if (!draftLoaded) return
     saveJoinDraft(token, { family: familyDraft, healthDrafts })
-  }, [draftLoaded, token, familyDraft, healthDrafts])
+  }, [token, familyDraft, healthDrafts])
 
   if (info === null) return null
   if (info === 'invalid') {
