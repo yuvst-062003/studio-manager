@@ -13,36 +13,108 @@ by *kind of failure*, not by what to fix first.
 | **Evidence** | `docs/screenshots/{dashboard,parent app,staff app}/` — 28 captures, 2026-09-02 20:35–20:49. Dashboard from production; parent and staff from staging. `docs/qa/2026-08-28-staging-verification/` — 95 older captures. |
 | **Scale** | ~125 findings in 22 groups. |
 
-> **Read [§0](#0-verify-these-first) before anything else.** Three checks take minutes and any
-> one of them reorders this whole document.
+> **Read [§0](#0-verified-2026-09-02) first.** Three checks that once looked open turned
+> out to already be resolved, and reorder this whole document.
 
 ---
 
-## 0. Verify these first
+## 0. Verified 2026-09-02
 
-These are not findings. They are questions the code cannot answer, whose answers change the
-severity of everything below.
+These were questions the code could not answer on its own. Answered directly against
+production; every line names the command that produced it.
 
-1. **Are the eight production cron services actually attached?**
-   `docs/deploy/railway-runbook.md:200-224` lists attaching source, start command and
-   schedule to each as *"Still to do by hand"*, and `docs/plan/state.yaml` does not record
-   it done. If they are not attached: nobody has ever been billed, no session has ever
-   moved to `completed`, no reminder or health chase has fired — and because `ops-check` is
-   one of the eight, **nothing detects any of it**.
-2. **Does a 2026-27 training year exist for the live club?** There is none in any seed,
-   fixture or migration; every club must create its own. Without one, sessions stop
-   generating *silently* (§4.2). Production screenshots show a schedule board for
-   30 Aug–5 Sep, so one probably exists — confirm rather than assume.
-3. **Does `/api/v1/health` report `"env":"production"`?** The `/dev/*` guard reads
-   `settings.ENV`, and the runbook warns Railway's `--duplicate` copies `ENV=staging`
-   verbatim. If it reports staging, `GET /dev/sign-in-as/platform` hands out a
-   platform-admin session from a URL bar.
+1. **The eight cron services are attached and have been running successfully since
+   2026-08-30/31 — not "may never have been attached."** `railway status` (linked to the
+   production environment) lists all eight cron services with source, start command and
+   schedule already configured, each `● Completed`. The database confirms it independently:
+   `job_run` — the heartbeat every worker writes via `record_run` (`app/core/jobs.py`) —
+   holds 811 rows across all eight job names, **zero of them `failed`**. Earliest row per
+   job falls between 2026-08-30 11:00 UTC and 2026-08-31 09:34 UTC, i.e. two to three days
+   before this document was written; `docs/plan/state.yaml` and the runbook's "Still to do
+   by hand" section were simply never updated after someone attached them. Business-level
+   evidence, queried scoped to the real club (`f74f825c-72ee-468b-96a9-af924ef984d6`), not
+   the demo studio, via `railway ssh --service api --environment production`:
 
-Also worth confirming: production is at Alembic head `0020` (migrations do not run on
-deploy — the Dockerfile CMD is uvicorn only), and production really is on the custom
-subdomains (`infra/railway/domains.json` says yes as of 2026-08-30; the runbook's Hosts
-section still says generated Railway domains, and those would break the refresh cookie on
-Safari outright).
+   | Job | Last successful run (UTC, 2026-09-02) | Business evidence |
+   |---|---|---|
+   | `ops-check` | 18:45:48 | `ops_event` empty — correct, it only writes on a regression and there has been none |
+   | `comms-notify` | 18:46:22 | `notification_delivery`: 1 `inapp`/`delivered`, 1 `push`/`no_token`; `push_token` has 0 rows — push really has never been registered, §2 stands |
+   | `sessions-complete` | 18:02:48 | 7 sessions at `status='completed'`, most recent `2026-09-02 14:00` — a real class, not a stub |
+   | `privacy-requests` | 18:22:45 | Runs, finds nothing pending — no export/deletion request has been submitted yet; the `NotImplementedError` stub behaviour is by design (worker docstring) |
+   | `health-reminders` | 09:32:00 | Correlates with the one `inapp` delivery above |
+   | `people-followups` | 09:02:04 | — |
+   | `plan-changes` | 02:31:54 | — |
+   | `billing-run` | 08:31:32 | One `billing_run` row (period 2026-09, `completed`, ran 2026-09-01 08:34 UTC) produced one real `charge`: 30000 agorot (₪300), `status='open'`. `payment` is empty for the studio — a charge exists and nothing has been paid against it yet, which is a materially smaller problem than "nobody has ever been billed." |
+
+   **This inverts §13 #1 and #4 and most of the urgency behind §1's "worried about
+   payments/notifications" framing.** The delivery pipeline works end to end for the one
+   channel that has a token to deliver to; the real gaps are that no push token has ever
+   been created (§2 stands unmodified) and that the one real charge is still unpaid (§3
+   stands unmodified). Commands: `railway status`;
+   `SELECT DISTINCT ON (job_name) job_name, started_at, finished_at, status FROM job_run
+   ORDER BY job_name, started_at DESC`, plus the per-job business queries above, run over
+   `railway ssh --service api --environment production 'python -c "..."'` (no `psql` in the
+   image).
+
+2. **A 2026-27 training year exists for the live club, and it does not end early.**
+   `training_year` for studio `f74f825c-…`: name `2026–2027`, `starts_on 2026-09-01`,
+   `ends_on 2027-08-20`, `status active`. The worry that an `ends_on` of `2026-08-31` would
+   silently no-op every later schedule edit does not apply. Command:
+   `SELECT id, studio_id, name, starts_on, ends_on, status FROM training_year` over
+   `railway ssh --service api --environment production`.
+
+3. **`/api/v1/health` reports `"env":"production"`. No open door.**
+   `curl -fsS https://api.gladiatorclub.co.il/api/v1/health` →
+   `{"status":"ok","env":"production","revision":"0020","started_at":"2026-09-01T03:35:12.233351Z"}`.
+   `app/main.py:157-159` gates the `dev` router mount on exactly this value, so `/dev/*` is
+   genuinely absent from production's routing table — §13 #7's "residual risk" is closed.
+
+**Also confirmed, and one of them overturns a register finding:**
+
+- **Alembic head.** The same `/health` call reports `"revision":"0020"`, read live from
+  `SELECT version_num FROM alembic_version` (`app/routers/health.py:34-36`, not from the
+  image), and `.venv/bin/alembic heads` on `main` also says `0020`. Production is at head.
+- **Migrations DO run automatically on deploy. §13 #9 is wrong, and the runbook
+  contradicts itself.** `railway logs --service api --deployment --since
+  2026-09-01T03:30:00Z --until 2026-09-01T03:40:00Z` — the window covering the deploy that
+  produced the instance currently serving traffic — shows, in order: `[alembic.runtime.
+  migration] Context impl PostgresqlImpl` / `Will assume transactional DDL`, **then**
+  `Starting Container`. That is Railway's pre-deploy step running `alembic upgrade head`
+  against the new image before the container that serves traffic starts — exactly what
+  `docs/deploy/railway-runbook.md:178-181` already says elsewhere ("Railway's pre-deploy
+  step executes `alembic upgrade head`"), and the opposite of
+  `docs/deploy/railway-runbook.md:461-472` ("Migrations do not run on deploy... `railway
+  ssh` ... `alembic upgrade head`"). The latter section was true only for the very first
+  bootstrap migration (`00cc140ce237`), written before the pre-deploy step existed, and was
+  never updated after it did. Corrected in the runbook.
+- **`STORAGE_ROOT` points at a real, mounted, persistent volume. §13 #3's incident is
+  fixed, not open.** Production env: `STORAGE_ROOT=/data`. `railway status` shows
+  `volume: api-volume · /data · 0.1 GB / 4.9 GB`. `railway ssh` confirms `/dev/zd11216`
+  mounted at `/data`, and inside it `studios/f74f825c-…/logo.png` — created 2026-08-31,
+  still present after the 2026-09-01 deploy. `GET /api/v1/studio/logo` returns 200 in
+  production traffic. The logo has survived a redeploy; §13 #3 needs downgrading from
+  "already a three-round incident" (read as current) to "fixed; no boot check or health
+  probe yet, so a future misconfiguration would still fail silently."
+- **`ENCRYPTION_KEYS` is set.** `railway variables --service api --environment production
+  --kv` shows a real key under `"1"`. The lazy-failure landmine in §13 #6 is a real design
+  risk but is not live in production today.
+- **The domains.** Production is genuinely on `gladiatorclub.co.il` subdomains, not
+  generated Railway domains. `railway status` lists `api.gladiatorclub.co.il`,
+  `app.gladiatorclub.co.il`, `staff.gladiatorclub.co.il`, `admin.gladiatorclub.co.il`,
+  matching `infra/railway/domains.json`'s `production` block exactly.
+  `docs/deploy/railway-runbook.md`'s "Hosts" section (still claiming generated domains) was
+  stale; corrected there.
+
+**Answered by the user rather than a command, recorded for the next session:**
+
+- **`POLICY_VERSION` 0 → 1.** The manager is not carrying a real family register yet —
+  production holds **1 guardian, 2 people** for the live club
+  (`SELECT count(*) FROM guardian|person WHERE studio_id = 'f74f825c-…'`), so the re-gate
+  affects at most one account. Confirmed intended; no rollback, no special warning needed
+  ahead of the 2026-09-03 trial.
+- **Cron attach authority.** Moot — see #1 above; nothing needed attaching.
+- **General production authority for this session.** Read-only plus config fixes,
+  approved; no config fix ended up being needed.
 
 ---
 
@@ -744,38 +816,50 @@ fact that no test can prove data is gone.
 
 Ranked by how badly each bites a live club.
 
-1. **The eight cron services may never have been attached.** See §0.
+1. ~~The eight cron services may never have been attached.~~ **Verified 2026-09-02: false.**
+   All eight have been attached and running since 2026-08-30/31, `job_run` has 811 rows and
+   zero failures, and each has business-level evidence of real work. See §0 #1.
 2. **No outbound channel to a human at all.** No push transport, no user mailer. Every
    message lands only as an in-app inbox row.
-3. **`STORAGE_ROOT` defaults to a relative path and nothing checks the volume.**
-   `var/storage` against `WORKDIR /srv` is an in-image directory.
-   `FilesystemObjectStore.put` `mkdir`s an unmounted path and returns 200
-   (`app/core/storage.py:178`), so uploads succeed and vanish on redeploy. **Permanently
-   lost: the studio logo, landing photos, health-template source PDFs.** Self-healing:
-   health declaration PDFs, which re-render from the encrypted answers
-   (`app/routers/health_declarations.py:341-346`). No boot check, no health probe, no ops
-   signal — the only detector is one `logger.warning` on the logo read path
-   (`app/services/structure/logo.py:103-106`). Already a three-round production incident
-   (runbook:59-93). It also pins the API to one instance forever.
-4. **`ops-check` would be a wall of red, emailing nothing.** A job with no successful run
-   is overdue from declaration (`checks.py:129-136`) = 8 reds;
-   `api.unhandled_exceptions` likely green; `billing.zero_charge_run` green by vacuity;
-   `upay.callback_silence` correctly **unknown** (`checks.py:224`).
+3. **`STORAGE_ROOT` defaults to a relative path and nothing checks the volume — but
+   production does not run on the default.** `var/storage` against `WORKDIR /srv` is an
+   in-image directory, and `FilesystemObjectStore.put` `mkdir`s an unmounted path and
+   returns 200 (`app/core/storage.py:178`) if a deploy ever left `STORAGE_ROOT` unset. It
+   did not: production sets `STORAGE_ROOT=/data`, a real mounted volume (`railway status`:
+   `api-volume · /data · 0.1 GB / 4.9 GB`), and the studio logo written 2026-08-31 was still
+   there after the 2026-09-01 deploy — verified 2026-09-02 over `railway ssh`. The three-round
+   incident (runbook:59-93) is **fixed in production today**, not open. What is still true
+   and still worth fixing: no boot check, no health probe, no ops signal ties `STORAGE_ROOT`
+   to volume presence — the only detector is one `logger.warning` on the logo read path
+   (`app/services/structure/logo.py:103-106`) — so a future environment (a new duplicate, a
+   service rebuild) can silently regress into the unmounted default. See §0.
+4. ~~`ops-check` would be a wall of red, emailing nothing.~~ **Verified 2026-09-02: false,
+   because its premise (#1) was false.** All eight jobs have successful runs; `ops_event` is
+   empty because there has been no regression to alert on, not because alerting is broken.
+   See §0 #1.
 5. **`POLICY_VERSION` moved 0 → 1 on 2026-09-01** (`app/services/privacy/policy.py:33`,
    commit c211c45). `ConsentService.outstanding` requires a grant at the current version,
-   so **every existing family is re-gated and must re-accept terms and privacy on next
-   login.** Intended — but unwarned, the manager reads it as a regression.
-6. **One config landmine is lazy rather than loud.** `JWT_SIGNING_KEY` unset → 503
-   `auth_unconfigured`, refused not defaulted (`app/routers/identity.py:103-113`). Google
-   OAuth unset → no provider offered, nobody signs in (`providers.py:311`).
-   `UPAY_MERCHANT_EMAIL` unset → clean `MerchantEmailMissingError` (`orders.py:364`). But
-   **`ENCRYPTION_KEYS` empty boots fine and then raises on the first health-declaration
-   write** (`app/core/encryption.py:93-98`). `OAUTH_REDIRECT_BASE_URL` defaults to
-   `localhost:8000` and also builds public calendar-feed URLs (`feeds.py:75`).
+   so every existing family is re-gated and must re-accept terms and privacy on next login.
+   **Confirmed intended, and low-stakes for the trial:** production carries 1 guardian and
+   2 people for the live club (verified 2026-09-02), so the re-gate affects at most one
+   account. No rollback, no manager warning needed. See §0.
+6. **One config landmine is lazy rather than loud — a design risk, not a live one.**
+   `JWT_SIGNING_KEY` unset → 503 `auth_unconfigured`, refused not defaulted
+   (`app/routers/identity.py:103-113`). Google OAuth unset → no provider offered, nobody
+   signs in (`providers.py:311`). `UPAY_MERCHANT_EMAIL` unset → clean
+   `MerchantEmailMissingError` (`orders.py:364`). But **`ENCRYPTION_KEYS` empty boots fine
+   and then raises on the first health-declaration write** (`app/core/encryption.py:93-98`)
+   — verified 2026-09-02 that production's `ENCRYPTION_KEYS` is in fact set, so this
+   landmine is real for the *next* environment stood up, not for the one running today.
+   `OAUTH_REDIRECT_BASE_URL` defaults to `localhost:8000` and also builds public
+   calendar-feed URLs (`feeds.py:75`) — production's is correctly set to
+   `https://api.gladiatorclub.co.il` (verified 2026-09-02).
 7. **`/dev/*` in production is genuinely gone** — never imported (`app/main.py:157-159`),
    so absent from the routing table and OpenAPI; empty/whitespace `DEV_TOOLS_TOKEN`
    normalises to `None` and never reaches `compare_digest` (`dev_account.py:79-84`). The
-   one residual risk is `settings.ENV` — see §0.
+   one residual risk was `settings.ENV` misreporting staging — **closed**: `curl
+   https://api.gladiatorclub.co.il/api/v1/health` reports `"env":"production"`, verified
+   2026-09-02. See §0 #3.
 8. **`with_all_tenants` — no leak today, weak by construction.** All 16 sites are
    identity/token/slug-keyed logins, platform-console work behind `require_platform_admin`,
    aggregates, the unmounted dev switcher, or the bootstrap CLI. But the hatch authorises
@@ -783,8 +867,16 @@ Ranked by how badly each bites a live club.
    silently disables the cross-tenant **write** guard too (`:172`). Highest blast radius:
    `DemoStudioService.wipe` deletes every tenant table for a caller-supplied `studio_id`
    behind one `is_demo is not True` check (`app/services/demo/service.py:96-109`).
-9. **Migrations do not run on deploy** — Dockerfile CMD is uvicorn only; `alembic upgrade
-   head` is manual over `railway ssh` (runbook:461-472). Single linear head at `0020`.
+9. ~~Migrations do not run on deploy — Dockerfile CMD is uvicorn only; `alembic upgrade
+   head` is manual over `railway ssh`.~~ **Verified 2026-09-02: false.** Railway's
+   pre-deploy step runs `alembic upgrade head` automatically before each new container
+   starts serving traffic — confirmed from the 2026-09-01T03:35 deploy's logs, which show
+   Alembic's runtime lines immediately before `Starting Container`. `runbook:461-472`
+   ("Applying the migration") described only the one-off bootstrap of `00cc140ce237`,
+   before the pre-deploy step existed, and was never updated; it directly contradicted
+   `runbook:178-181` in the same document, which had it right. Corrected in the runbook.
+   Single linear head, confirmed at `0020` in both the repo and the live database
+   (`/api/v1/health`'s `revision` field, read from `alembic_version`). See §0.
 10. **Cron runs in UTC** while every `why:` in `infra/railway/jobs.json` reasons in
     Asia/Jerusalem. Everything fires three hours late — health chases at 12:30, follow-ups
     at noon. The careful 08:30 argument about not dunning a family at 03:15 still holds:
@@ -865,6 +957,14 @@ Recorded so a later session does not chase them.
 | "Prices differ between apps" | **Not a defect.** Dashboard captures are production, parent and staff are staging. All three wrong-money findings (§3.1, §3.3, §3.4) are internal to a single screenshot and stand. |
 | Coach "told to enter a code with nowhere to enter it" | **Fixed** 2026-08-31 (`be13efb`) — but the fix introduced the silent-failure bug (§11). |
 | Raw key `common.setup.staff.role.owner` on screen | **Fixed** (`1655304`). |
+| §0/§13 #1: "The eight cron services may never have been attached" | **Wrong.** Attached and running since 2026-08-30/31, three days before this document was written. `docs/plan/state.yaml` and the runbook were never updated to say so. Verified against `job_run` (811 rows, 0 failures) and per-job business tables, 2026-09-02. |
+| §13 #4: "`ops-check` would be a wall of red, emailing nothing" | **Wrong**, and its premise (#1) was wrong too. All eight jobs are green; `ops_event` is empty because nothing has regressed, not because alerting is broken. |
+| §13 #3: "`STORAGE_ROOT`... uploads succeed and vanish on redeploy... already a three-round production incident" | **Stale.** Production sets `STORAGE_ROOT=/data`, a genuinely mounted volume; the studio logo has survived a redeploy. Fixed in the running environment; the missing boot check/health probe is still a real gap for any *future* environment. |
+| §13 #6: "`ENCRYPTION_KEYS` empty boots fine and then raises on the first health-declaration write" | **Not live.** Production's `ENCRYPTION_KEYS` is set. The lazy-failure design risk is real for a future environment stood up without it, not for production today. |
+| §13 #9 / runbook:461-472: "Migrations do not run on deploy... manual over `railway ssh`" | **Wrong**, and self-contradicted elsewhere in the same runbook (`runbook:178-181`). Railway's pre-deploy step runs `alembic upgrade head` automatically before each new container serves traffic — confirmed from the 2026-09-01 deploy log. `runbook:461-472` described only the one-off first migration, before the pre-deploy step existed; corrected. |
+| §0 (original): "production really is on custom subdomains... runbook's Hosts section still says generated Railway domains" | **Confirmed true as stated** — the finding was correct, not a correction. `railway status` matches `infra/railway/domains.json` exactly; the runbook's "Hosts" section was stale and is corrected there. |
+| §13 #7: "the one residual risk is `settings.ENV`" | **Closed.** `/api/v1/health` reports `"env":"production"`, verified 2026-09-02; `/dev/*` cannot mount. |
+| §13 #5: "`POLICY_VERSION` moved 0 → 1... unwarned, the manager reads it as a regression" | **Lower stakes than framed.** Production carries 1 guardian, 2 people for the live club — the re-gate affects at most one account, not "every existing family" in any practical sense yet. User confirmed intended; no warning needed for the 2026-09-03 trial. |
 
 ---
 

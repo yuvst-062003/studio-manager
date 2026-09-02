@@ -162,14 +162,16 @@ was handled. Two things it copies verbatim and you must fix immediately:
 
 ### Hosts
 
-Production is on Railway's **generated** domains, not custom subdomains of `base_domain`.
-That is a deliberate staging point: a custom host needs a CNAME at LiveDNS, and until DNS
-resolves the environment is unreachable. A working production on an ugly hostname beats a
-pretty one that 404s. The four hosts are in `infra/railway/domains.json`; `app/core/cors.py`
-reads that file **at import**, so changing them means redeploying the api.
+**Production moved to the custom subdomains on 2026-08-30** — confirmed 2026-09-02 via
+`railway status` (`api.gladiatorclub.co.il`, `app.gladiatorclub.co.il`,
+`staff.gladiatorclub.co.il`, `admin.gladiatorclub.co.il`), matching
+`infra/railway/domains.json`'s `production` block exactly. This section previously said
+production was still on generated Railway domains; that was stale. The four hosts are in
+`infra/railway/domains.json`; `app/core/cors.py` reads that file **at import**, so changing
+them means redeploying the api.
 
-To move to custom domains later: add the domain in Railway, change the four hosts in
-`domains.json`, redeploy the api so CORS re-reads it, then set `VITE_API_ORIGIN` on the
+To move an environment to custom domains: add the domain in Railway, change its four hosts
+in `domains.json`, redeploy the api so CORS re-reads it, then set `VITE_API_ORIGIN` on the
 three frontends and rebuild them — the origin is baked in at build time, so a variable
 change alone does nothing.
 
@@ -197,10 +199,19 @@ boots, which is what lets you deploy, migrate, create the role, and only then re
 Deploy → migrate → `ALTER ROLE studio_app WITH LOGIN PASSWORD` → repoint `DATABASE_URL` →
 redeploy. The password is generated at the terminal and never committed.
 
-### Still to do by hand — the cron schedules
+### The cron schedules — attached and running
 
-The eight production cron services exist as **empty shells** with every variable already
-set (`ENV`, both DSNs, `APP_DB_ROLE`, the alert and SMTP keys, `RAILWAY_DOCKERFILE_PATH`):
+**Done, as of 2026-08-30/31; confirmed 2026-09-02.** This section previously described the
+eight production cron services as empty shells still needing source, start command and
+schedule attached by hand, and `docs/plan/state.yaml` never recorded it done. Verified
+2026-09-02: `railway status` lists all eight with source, start command and schedule
+already configured (`● Completed`), and `job_run` in the database has 811 rows across all
+eight job names with zero failures, the earliest dated 2026-08-30/31 — someone attached
+them days before this note was corrected. For each, in the Railway dashboard: attach the
+source, set the start command, set the cron schedule. The CLI cannot do any of the three —
+there is no `railway cron`, and no variable equivalent — so if a ninth job is ever added to
+`infra/railway/jobs.json`, it needs this same by-hand step, and this section should flip
+back to describing it as pending until it is confirmed the same way.
 
 | Service | Start command | Schedule |
 |---|---|---|
@@ -213,11 +224,10 @@ set (`ENV`, both DSNs, `APP_DB_ROLE`, the alert and SMTP keys, `RAILWAY_DOCKERFI
 | `cron-privacy-requests` | `python -m app.workers.privacy` | `20 * * * *` |
 | `cron-ops-check` | `python -m app.workers.ops_check` | `*/15 * * * *` |
 
-They have **no source attached, deliberately.** Attaching the repo would make each one boot
-the Dockerfile's uvicorn CMD and bill continuously until its start command was overridden;
-an empty shell costs nothing while it waits. For each, in the Railway dashboard: attach the
-source, set the start command, set the cron schedule. The CLI cannot do any of the three —
-there is no `railway cron`, and no variable equivalent.
+Each was given **no source attached, deliberately**, until configured: attaching the repo
+would make it boot the Dockerfile's uvicorn CMD and bill continuously until its start
+command was overridden, so an empty shell costs nothing while it waits for the by-hand
+step above. All eight have since had that step done.
 
 `demo-reset` is **not** among them: `jobs.json` scopes it to staging, and the worker refuses
 to run anywhere else. Staging separately needs `cron-demo-reset` and `cron-ops-check`.
@@ -460,15 +470,24 @@ operator must have signed in once first so their `auth_identity` exists.
 
 ### Applying the migration
 
-Migrations do not run on deploy — the Dockerfile CMD is uvicorn only, and the database
-host is private to Railway's network. Deploy the image FIRST (it carries the revision),
-then:
+**Historical note, corrected 2026-09-02.** This section originally said migrations do not
+run on deploy and must be applied by hand over `railway ssh`. That was true only for this
+one bootstrap migration (`00cc140ce237`, applied before the pre-deploy step below existed)
+and was never updated — it directly contradicted "The database role" section above, which
+has always had it right. Confirmed from the 2026-09-01 deploy's logs (Alembic's runtime
+lines immediately precede `Starting Container`): **Railway's pre-deploy step runs `alembic
+upgrade head` automatically on every deploy**, against the new image, before the container
+that serves traffic starts. The Dockerfile CMD is still uvicorn-only by design — the
+pre-deploy command is configured separately, in the Railway dashboard, per service.
+
+The manual path below remains correct for the rare case of applying a migration *without* a
+new deploy (e.g. a hotfix migration against the currently-running image):
 
 ```bash
 railway ssh --service api
 python -m alembic upgrade head
 ```
 
-`00cc140ce237` adds `job_run` and `ops_event`. Until it is applied, `#/platform` answers
-500 on its board — the tables it reads do not exist yet.
+`00cc140ce237` added `job_run` and `ops_event`. Until it was applied, `#/platform` answered
+500 on its board — the tables it read did not exist yet.
 
