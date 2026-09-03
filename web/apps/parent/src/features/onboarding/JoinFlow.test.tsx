@@ -7,25 +7,11 @@ import type { HealthClient } from '../health/healthClient'
 import type { PrivacyClient } from '../privacy/privacyClient'
 import { JoinFlow } from './JoinFlow'
 
-vi.mock('@studio/core', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@studio/core')>()
-  return {
-    ...actual,
-    useSession: () => ({
-      status: 'signed-in',
-      access: { parent: true, staff: false },
-      studios: [],
-      activeStudioId: null,
-      devTools: false,
-      actingAsPersonId: null,
-      actingAsLabel: null,
-      activeStudioName: null,
-      displayName: 'מיכל כהן',
-      reload: vi.fn(async () => {}),
-      signOut: vi.fn(async () => {}),
-    }),
-  }
-})
+// No `useSession()` mock -- F1/F10's fix means `JoinFlow` no longer calls the hook at
+// all. The shell (`JoinShell` in `App.tsx`) reads it once and passes down what this
+// component needs, so every render below supplies `displayName` directly, the way the
+// shell would.
+const DISPLAY_NAME = 'מיכל כהן'
 
 const HEALTH_SCHEMA = {
   sections: [
@@ -204,6 +190,7 @@ describe('JoinFlow', () => {
     render(
       <JoinFlow
         billingClient={billingClient}
+        displayName={DISPLAY_NAME}
         healthClient={healthClient}
         locale="he"
         onComplete={onComplete}
@@ -313,6 +300,7 @@ describe('JoinFlow', () => {
     render(
       <JoinFlow
         billingClient={billingClient}
+        displayName={DISPLAY_NAME}
         healthClient={healthClient}
         locale="he"
         privacyClient={makePrivacyClient()}
@@ -362,6 +350,7 @@ describe('JoinFlow', () => {
     render(
       <JoinFlow
         billingClient={billingClient}
+        displayName={DISPLAY_NAME}
         healthClient={healthClient}
         locale="he"
         privacyClient={makePrivacyClient()}
@@ -372,6 +361,117 @@ describe('JoinFlow', () => {
 
     await screen.findByTestId('join-welcome')
     expect(screen.queryByTestId('onboarding-wizard-back')).toBeNull()
+  })
+
+  // F1 -- `JoinWelcomeStep` used to call its own `useSession()`, so back-navigation
+  // remounted it and it restarted at `status: 'loading'`, which its render treated as
+  // "not signed in" and showed a sign-in wall for one tick before flipping back. Fixed
+  // by moving the sign-in fork to the shell (`JoinShell`, `App.tsx`) and removing the
+  // hook call from this step entirely -- this test mounts the flow the way the shell
+  // does (already signed in, via the `displayName` prop, never `useSession()`), so the
+  // symptom -- a sign-in wall flashing on back-navigation -- has nothing left to trigger
+  // it from. Asserted as the SYMPTOM, not the absence of an import: step 1 renders
+  // synchronously on back-navigation, and `SignIn`'s own testid never appears.
+  it('renders step 1 immediately on back-navigation, never a sign-in wall (F1)', async () => {
+    const user = userEvent.setup()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input)
+        if (url.includes('/api/v1/public/onboarding/live-token-123456')) {
+          return new Response(
+            JSON.stringify({
+              studio_name: 'מועדון הדגמה',
+              email: null,
+              groups: [{ id: 'g1', name: 'ילדים א', weekdays: [0, 2] }],
+            }),
+            { status: 200 },
+          )
+        }
+        return new Response(JSON.stringify({ items: [] }), { status: 200 })
+      }),
+    )
+
+    render(
+      <JoinFlow
+        billingClient={billingClient}
+        displayName={DISPLAY_NAME}
+        healthClient={healthClient}
+        locale="he"
+        privacyClient={makePrivacyClient()}
+        standingOrderLinks={[]}
+        token="live-token-123456"
+      />,
+    )
+
+    await acceptWelcomeStep(user)
+    await screen.findByTestId('join-family-step')
+
+    // `getAllByTestId`, not `getByTestId`: `JoinFamilyStep` (not this piece's file --
+    // see the prompt's file list) renders the chrome's own back button AND
+    // `WizardNavButtons`'s, both under the same testid. Either one triggers the same
+    // `onBack`.
+    await user.click(screen.getAllByTestId('onboarding-wizard-back')[0]!)
+
+    // Step 1, right away -- not a loading gap, not a sign-in wall.
+    expect(screen.getByTestId('join-welcome')).toBeInTheDocument()
+    expect(screen.queryByTestId('sign-in')).toBeNull()
+    expect(screen.getByTestId('join-welcome-app-check')).toBeInTheDocument()
+  })
+
+  // F5 -- `welcome` and `family` used to render bare (no `pageStyle` container), while
+  // `health`, `payment` and `done` were each wrapped individually. The primary button on
+  // the unwrapped two landed flush in the corner, underneath the accessibility FAB, and
+  // Playwright could not click it. Fixed by computing every step's content once and
+  // wrapping it in exactly ONE place -- asserted here by checking the padding actually
+  // lands on the DOM, not by re-reading the source.
+  it('wraps steps 1 and 2 in the same padded container as the later steps (F5)', async () => {
+    const user = userEvent.setup()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input)
+        if (url.includes('/api/v1/public/onboarding/live-token-123456')) {
+          return new Response(
+            JSON.stringify({
+              studio_name: 'מועדון הדגמה',
+              email: null,
+              groups: [{ id: 'g1', name: 'ילדים א', weekdays: [0, 2] }],
+            }),
+            { status: 200 },
+          )
+        }
+        return new Response(JSON.stringify({ items: [] }), { status: 200 })
+      }),
+    )
+
+    render(
+      <JoinFlow
+        billingClient={billingClient}
+        displayName={DISPLAY_NAME}
+        healthClient={healthClient}
+        locale="he"
+        privacyClient={makePrivacyClient()}
+        standingOrderLinks={[]}
+        token="live-token-123456"
+      />,
+    )
+
+    // Checked against the raw `style` attribute rather than `toHaveStyle` -- jsdom's CSS
+    // engine does not resolve `var(...)` custom properties, so a computed-style
+    // assertion reads back "0" for every one of them regardless of what was actually
+    // set. The attribute is what real browsers (and Playwright, per §"LOOK AT IT")
+    // receive, and it is what proves the wrapper is there.
+    await screen.findByTestId('join-welcome')
+    expect(screen.getByTestId('join-welcome').parentElement?.getAttribute('style')).toContain(
+      'padding: var(--space-4)',
+    )
+
+    await acceptWelcomeStep(user)
+    await screen.findByTestId('join-family-step')
+    expect(
+      screen.getByTestId('join-family-step').parentElement?.getAttribute('style'),
+    ).toContain('padding: var(--space-4)')
   })
 
   it('advances the health queue from local drafts, never from the server, reaches payment, and flushes both drafts exactly once on "enter the app"', async () => {
@@ -433,6 +533,7 @@ describe('JoinFlow', () => {
     render(
       <JoinFlow
         billingClient={billingClient}
+        displayName={DISPLAY_NAME}
         healthClient={healthClient}
         locale="he"
         onComplete={onComplete}
@@ -560,6 +661,7 @@ describe('JoinFlow', () => {
     render(
       <JoinFlow
         billingClient={billingClient}
+        displayName={DISPLAY_NAME}
         healthClient={failingHealthClient}
         locale="he"
         onComplete={onComplete}
@@ -619,6 +721,7 @@ describe('JoinFlow', () => {
     const { unmount } = render(
       <JoinFlow
         billingClient={billingClient}
+        displayName={DISPLAY_NAME}
         healthClient={healthClient}
         locale="he"
         privacyClient={makePrivacyClient()}
@@ -646,6 +749,7 @@ describe('JoinFlow', () => {
     render(
       <JoinFlow
         billingClient={billingClient}
+        displayName={DISPLAY_NAME}
         healthClient={healthClient}
         locale="he"
         privacyClient={makePrivacyClient()}

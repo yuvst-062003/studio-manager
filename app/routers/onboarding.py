@@ -40,6 +40,7 @@ from app.services.health.agreement import (
 from app.services.people.errors import NotFoundError, RefusedError
 from app.services.people.landing import LandingService
 from app.services.people.onboarding import OnboardingService
+from app.services.people.onboarding_status import OnboardingStatusService, OnboardingStepKey
 from app.services.schedule import ScheduleService
 
 router = APIRouter(tags=["people"])
@@ -87,6 +88,15 @@ class OnboardingInfoOut(BaseModel):
     #: unverified and can be wrong; the verified one already exists). Null when the
     #: caller is anonymous -- the screen asks them to sign in first.
     email: str | None
+    #: The studio's own slug -- what lets a caller who has not signed in yet still be
+    #: shown the club's shop window (`/t/<slug>`) if the wizard ever needs to link there.
+    slug: str
+    #: Same shape and same route as `PublicLandingOut.logo_url` (`app/routers/public.py`):
+    #: an API PATH, not a public URL, null when the studio has no uploaded logo. This is
+    #: what lets the sign-in wall AND the welcome screen show the club's own logo before
+    #: anyone has signed in -- reusing the existing unauthenticated
+    #: `GET /public/studios/{slug}/logo` rather than inventing a second logo route.
+    logo_url: str | None
 
 
 class OnboardingPickupIn(BaseModel):
@@ -268,6 +278,8 @@ def onboarding_info(token: str, request: Request, session: SessionDep) -> Onboar
             for group in groups
         ],
         email=email,
+        slug=studio.slug,
+        logo_url=(f"/api/v1/public/studios/{studio.slug}/logo" if studio.logo_object_key else None),
     )
 
 
@@ -394,3 +406,74 @@ def register(
             charges_created=charged,
             already_registered=existing is not None,
         )
+
+
+# -- "what is left" ------------------------------------------------------------
+class OnboardingStepOut(BaseModel):
+    key: OnboardingStepKey
+    complete: bool
+
+
+class OnboardingStatusOut(BaseModel):
+    """§3's one read that replaces four screens each guessing from a different pile of
+    facts (`student.status`, `health_status`, `agreement_complete`, `price_plan_id` being
+    null, consent records, `trial_booking.attended`, `session.access.parent`) -- their
+    disagreement is the cause of the dead end where a parent signs the same health form
+    forever.
+
+    **These flags describe the family's EXISTING state, and nothing else.** They have no
+    idea a wizard run in progress is about to create a NEW student -- decision 6 scopes
+    `health` and `payment` to "the students THIS run is creating," and that scoping is
+    the job of whichever screen calls this route (wave D/E), layered on top rather than
+    answered here. A parent with existing children who all hold current declarations
+    reads `health: complete` here even while a brand-new child mid-wizard still needs
+    one -- do not skip a step on the strength of this flag alone once a new student is in
+    play.
+    """
+
+    steps: list[OnboardingStepOut]
+    #: The first step in `steps` whose `complete` is `False`, or `None` when every step
+    #: is -- §3: "if nothing is needed it does not open at all."
+    next: OnboardingStepKey | None
+
+
+@router.get("/me/onboarding-status", response_model=OnboardingStatusOut)
+def onboarding_status(request: Request) -> OnboardingStatusOut:
+    """The signed-in caller's own onboarding status in their ACTIVE studio.
+
+    No `TenantSessionDep`, deliberately -- that dependency 401s before this function's
+    body ever runs when there is no active studio, and F9's exact caller (signed in,
+    seconds after OAuth, not yet a member of any studio -- the moment before a fresh
+    `/join/<token>` visitor submits step 2) is precisely that. Rather than surface that
+    as an error, this resolves the studio itself and, when there is none, answers with
+    `OnboardingStatusService.empty()` -- an honest "nothing done yet," not a failure.
+    """
+    identity_id = getattr(request.state, "identity_id", None)
+    if not isinstance(identity_id, uuid.UUID):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={"code": "unauthenticated", "message": "sign in first"},
+        )
+
+    studio_id = getattr(request.state, "studio_id", None)
+    person_id = getattr(request.state, "person_id", None)
+    if isinstance(studio_id, uuid.UUID) and isinstance(person_id, uuid.UUID):
+        with (
+            use_studio(studio_id),
+            TenantSession(bind=get_engine(), expire_on_commit=False) as scoped,
+        ):
+            result = OnboardingStatusService.compute(scoped, person_id=person_id)
+            # Read-only -- never leaves a transaction open, same rule onboarding_info()
+            # follows above.
+            scoped.rollback()
+    else:
+        # F9 -- see this function's own docstring.
+        result = OnboardingStatusService.empty()
+
+    return OnboardingStatusOut(
+        steps=[
+            OnboardingStepOut(key=key, complete=result.steps[key])
+            for key in OnboardingStatusService.STEP_ORDER
+        ],
+        next=result.next,
+    )

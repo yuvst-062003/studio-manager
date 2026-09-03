@@ -8,7 +8,7 @@
 // and §5.11 permits no email or SMS fallback, so that parent is reachable only by
 // telephone."
 import { useEffect, useMemo, useState } from 'react'
-import { apiFetch, getAccessToken, refresh, useDisplayMode, useSession, switchStudio } from '@studio/core'
+import { apiFetch, apiUrl, getAccessToken, refresh, useDisplayMode, useSession, switchStudio } from '@studio/core'
 import {
   AccessibilityMenu,
   AccountDrawerFooter,
@@ -203,10 +203,25 @@ function LandingShell({ slug }: { slug: string }) {
   )
 }
 
+/** What the sign-in wall needs to show the club's own branding before anyone has signed
+ *  in -- §6's `slug`/`logo_url` additions to `OnboardingInfoOut`, read from the same
+ *  public, unauthenticated `GET /public/onboarding/{token}` the wizard itself reads once
+ *  signed in (kept as a separate fetch here rather than threaded through as a prop, so
+ *  neither this shell nor `JoinFlow` has to wait on the other's request). */
+type JoinWallInfo = { studio_name: string; logo_url: string | null }
+
 function JoinShell({ token }: { token: string }) {
   const [locale, setLocale] = useState<Locale>('he')
   const [mandateLinks, setMandateLinks] = useState<readonly StandingOrderLink[]>([])
+  // F1/F10 -- the ONE `useSession()` call for this whole route. `JoinFlow` and
+  // `JoinWelcomeStep` used to each mount their own, and every mount's `refresh()` call
+  // rotates the refresh token -- three (with this one, four) rotations for one page load,
+  // and a REMOUNT of any of them (e.g. `JoinWelcomeStep` on back-navigation) restarted
+  // that instance at `status: 'loading'`, which its own render treated as "not signed
+  // in" and flashed a sign-in wall for ~120ms. Read once, here, and pass down what the
+  // children need -- neither child calls `useSession()` any more.
   const session = useSession()
+  const [wallInfo, setWallInfo] = useState<JoinWallInfo | null>(null)
   const privacyClient = useMemo(() => makePrivacyClient(apiFetch), [])
   const healthClient = useMemo(() => makeHealthClient(apiFetch), [])
   const billingClient = useMemo(() => makeParentBillingClient(apiFetch), [])
@@ -239,15 +254,67 @@ function JoinShell({ token }: { token: string }) {
     }
   }, [session.status])
 
-  // `JoinFlow` owns sign-in AND consent internally now (its own Step 1) -- no external
-  // `ConsentGate` wrapper. `ConsentGate.tsx` itself is unchanged and still gates the
-  // regular app below; this shell just no longer uses it for this route.
+  // Fetched once on mount, unconditionally -- not gated on `session.status`, so it is
+  // already resolved by the time `status` settles to `anonymous` and the wall below
+  // never itself flashes from "no branding" to "branding". A stranger reading this is
+  // exactly who §5.4a's public read is already built for: anonymous, unauthenticated,
+  // no side effects (the server rolls the read back).
+  useEffect(() => {
+    let alive = true
+    void apiFetch(`/api/v1/public/onboarding/${token}`)
+      .then(async (response) => {
+        if (!alive || !response.ok) return
+        const body = (await response.json()) as JoinWallInfo
+        setWallInfo({ studio_name: body.studio_name, logo_url: body.logo_url })
+      })
+      .catch(() => undefined)
+    return () => {
+      alive = false
+    }
+  }, [token])
+
+  // No flash while the session resolves (mirrors `AuthedApp` below: neither branch
+  // matches while `status === 'loading'`, so nothing renders for that one tick).
+  if (session.status === 'loading') return null
+
+  if (session.status !== 'signed-in') {
+    // §3's Redirect rule: "Not signed in → the SHELL shows the sign-in wall above the
+    // wizard, with the club's logo and name. Never inside step 1" (F1). The wizard
+    // (`JoinFlow`, starting at `JoinWelcomeStep`) is not rendered at all until this
+    // branch is no longer taken.
+    return (
+      <ThemeProvider>
+        <AccessibilityMenu locale={locale} />
+        <LanguagePicker locale={locale} onChoose={setLocale} />
+        <div data-testid="join-sign-in-wall">
+          {wallInfo ? (
+            <div className="studio-page-header" data-testid="join-wall-studio">
+              {wallInfo.logo_url ? (
+                <img
+                  alt={wallInfo.studio_name}
+                  data-testid="join-wall-logo"
+                  src={apiUrl(wallInfo.logo_url)}
+                />
+              ) : null}
+              <h1>{wallInfo.studio_name}</h1>
+            </div>
+          ) : null}
+          <SignIn app="parent" locale={locale} returnPath={`/join/${token}`} />
+        </div>
+      </ThemeProvider>
+    )
+  }
+
+  // `JoinFlow` owns consent internally now (its own Step 1) -- no external `ConsentGate`
+  // wrapper. `ConsentGate.tsx` itself is unchanged and still gates the regular app
+  // below; this shell just no longer uses it for this route.
   return (
     <ThemeProvider>
       <AccessibilityMenu locale={locale} />
       <LanguagePicker locale={locale} onChoose={setLocale} />
       <JoinFlow
         billingClient={billingClient}
+        displayName={session.displayName}
         healthClient={healthClient}
         locale={locale}
         onComplete={() => {

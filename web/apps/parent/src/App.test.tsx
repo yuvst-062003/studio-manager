@@ -465,3 +465,67 @@ describe('12g — adding a sibling refreshes the family it just grew', () => {
     await waitFor(() => expect(studentsGetCalls).toBeGreaterThan(before))
   })
 })
+
+describe('B1 -- the join shell decides sign-in-or-wizard, not step 1 (F1)', () => {
+  const JOIN_TOKEN = 'live-token-123456'
+  const JOIN_INFO = {
+    studio_name: 'מועדון הדגמה',
+    slug: 'demo-club',
+    logo_url: '/api/v1/public/studios/demo-club/logo',
+    email: null,
+    groups: [],
+  }
+
+  it('a signed-out visitor gets the shell\'s sign-in wall, with the club name and logo -- never step 1\'s', async () => {
+    globalThis.history.pushState({}, '', `/join/${JOIN_TOKEN}`)
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input)
+        if (url.includes('/auth/refresh')) {
+          // Anonymous: `refresh()` treats any non-2xx as "nobody is signed in".
+          return new Response(JSON.stringify({ detail: 'no session' }), { status: 401 })
+        }
+        if (url.includes(`/api/v1/public/onboarding/${JOIN_TOKEN}`)) {
+          return new Response(JSON.stringify(JOIN_INFO), { status: 200 })
+        }
+        return new Response(JSON.stringify({ items: [] }), { status: 200 })
+      }),
+    )
+
+    render(<App />)
+
+    // The seam: fetch -> state -> component. The logo's `src` is built from the SAME
+    // `logo_url` the wire body carried (via `apiUrl`), not a hand-built prop -- proving
+    // the field actually reaches the DOM rather than being dropped between the fetch and
+    // the render.
+    const wall = await screen.findByTestId('join-sign-in-wall')
+    expect(within(wall).getByText(JOIN_INFO.studio_name)).toBeInTheDocument()
+    const logo = within(wall).getByTestId('join-wall-logo')
+    expect(logo).toHaveAttribute('src', expect.stringContaining(JOIN_INFO.logo_url))
+    expect(logo).toHaveAttribute('alt', JOIN_INFO.studio_name)
+
+    // Step 1 never renders for a signed-out visitor -- the shell is the sole authority
+    // on this fork now.
+    expect(screen.queryByTestId('join-welcome')).toBeNull()
+
+    globalThis.history.pushState({}, '', '/')
+  })
+
+  it('a signed-in visitor reaches the wizard directly, never the shell\'s sign-in wall', async () => {
+    globalThis.history.pushState({}, '', `/join/${JOIN_TOKEN}`)
+    vi.stubGlobal('fetch', stubAuthed((url) => {
+      if (url.includes(`/api/v1/public/onboarding/${JOIN_TOKEN}`)) {
+        return new Response(JSON.stringify(JOIN_INFO), { status: 200 })
+      }
+      return null
+    }))
+
+    render(<App />)
+
+    await screen.findByTestId('join-welcome')
+    expect(screen.queryByTestId('join-sign-in-wall')).toBeNull()
+
+    globalThis.history.pushState({}, '', '/')
+  })
+})

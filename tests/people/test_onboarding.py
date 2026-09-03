@@ -829,3 +829,142 @@ def test_the_join_link_leaves_the_new_parent_with_an_active_studio(
     )
     assert mine.status_code == 200, mine.text
     assert [row["first_name"] for row in mine.json()["items"]] == ["נועה"]
+
+
+# -- the public read carries the studio's own branding (B1 item 4) -------------
+def test_the_public_read_carries_slug_and_logo_url(client, as_manager):
+    """§6's addition to `OnboardingInfoOut` -- what lets the sign-in wall and the welcome
+    screen show the club's own logo (decision 11) before anyone has signed in, reusing
+    the existing unauthenticated `GET /public/studios/{slug}/logo` rather than a second
+    logo route."""
+    created = client.post("/api/v1/onboarding-link", headers=as_manager.headers)
+    token = created.json()["url"].rsplit("/join/", 1)[1]
+
+    info = client.get(f"/api/v1/public/onboarding/{token}")
+    assert info.status_code == 200, info.text
+    body = info.json()
+    assert body["slug"], "the studio's own slug, so the caller can be told which club this is"
+    # No logo uploaded in this test's studio -- null, not a missing key or a 500.
+    assert "logo_url" in body
+    assert body["logo_url"] is None
+
+
+# -- /me/onboarding-status -- §3's one answer to "what is left" (B1 item 5) ----
+def test_onboarding_status_is_incomplete_for_consents_at_the_pre_bump_version(
+    client, as_guardian, tenant_session
+):
+    """`POLICY_VERSION` and `CLUB_TERMS_VERSION` were both bumped to 2 today (decision
+    24) -- a family who accepted the OLD text holds rows at version 1, and that reads as
+    outstanding. Written directly, the way that acceptance actually looked:
+    `ConsentService.record` itself refuses anything but the currently published version,
+    so a real family in this state could only have gotten there before the bump."""
+    from app.models.health import ConsentRecord
+    from app.services.health.club_terms import CLUB_TERMS_CONSENT_TYPE
+
+    pre_bump_version = 1
+    for consent_type in ("terms", "privacy", CLUB_TERMS_CONSENT_TYPE):
+        tenant_session.add(
+            ConsentRecord(
+                subject_type="person",
+                subject_id=as_guardian.person_id,
+                consent_type=consent_type,
+                version=pre_bump_version,
+                granted=True,
+                granted_at=T0,
+            )
+        )
+    tenant_session.commit()
+
+    response = client.get("/api/v1/me/onboarding-status", headers=as_guardian.headers)
+    assert response.status_code == 200, response.text
+    body = response.json()
+    steps = {row["key"]: row["complete"] for row in body["steps"]}
+    assert steps["agreements"] is False
+    assert body["next"] == "agreements"
+
+
+def test_onboarding_status_next_is_null_when_nothing_is_left(
+    client, as_guardian, tenant_session, studio, a_group, twice_weekly
+):
+    """The other end of §3's rule: 'if nothing is needed it does not open at all.'"""
+    from app.models.health import ConsentRecord, HealthDeclaration
+    from app.services.health.club_terms import CLUB_TERMS_CONSENT_TYPE, CLUB_TERMS_VERSION
+    from app.services.privacy.policy import POLICY_VERSION
+    from app.services.structure.health_templates import ensure_full_template
+
+    for consent_type, version in (
+        ("terms", POLICY_VERSION),
+        ("privacy", POLICY_VERSION),
+        (CLUB_TERMS_CONSENT_TYPE, CLUB_TERMS_VERSION),
+    ):
+        tenant_session.add(
+            ConsentRecord(
+                subject_type="person",
+                subject_id=as_guardian.person_id,
+                consent_type=consent_type,
+                version=version,
+                granted=True,
+                granted_at=T0,
+            )
+        )
+
+    # A real student under this same guardian. No `PricePlan` exists in this studio, so
+    # (mirroring `test_no_matching_plan_means_no_charge_and_no_guess` above) registering
+    # creates no charge at all -- `payment` reads complete with no further plumbing.
+    parent_person = tenant_session.get(Person, as_guardian.person_id)
+    student_id = OnboardingService.add_child(
+        tenant_session,
+        studio_id=studio.id,
+        parent=parent_person,
+        child={
+            "first_name": "ילד",
+            "last_name": "בודק",
+            "birthdate": None,
+            "group_ids": [a_group],
+            "self": False,
+        },
+        at=T0,
+        schedule=twice_weekly,
+    )
+    tenant_session.flush()
+    student = tenant_session.get(Student, student_id)
+
+    template = ensure_full_template(tenant_session, studio.id, at=T0)
+    tenant_session.add(
+        HealthDeclaration(
+            studio_id=studio.id,
+            student_id=student.id,
+            template_id=template.id,
+            template_version=template.version,
+            answers_encrypted={"asthma": False},
+            derived_flags={},
+            signed_by_person_id=as_guardian.person_id,
+            signed_at=T0,
+        )
+    )
+    student.health_status = "signed"
+    tenant_session.commit()
+
+    response = client.get("/api/v1/me/onboarding-status", headers=as_guardian.headers)
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert all(row["complete"] for row in body["steps"]), body["steps"]
+    assert body["next"] is None
+
+
+def test_onboarding_status_does_not_500_with_no_active_studio(client, fake_provider):
+    """F9 -- signed in seconds after OAuth, before ever completing the join wizard's own
+    family step: no membership anywhere yet, so the JWT carries no active studio and no
+    `person_id` (same precondition `test_the_join_link_leaves_the_new_parent_with_an_active_studio`
+    asserts above). The honest answer is 'nothing done yet,' never a crash."""
+    subject = f"status-{uuid.uuid4()}"
+    fake_provider.register(code="c-status", subject=subject, email=f"{subject}@example.invalid")
+    signed = sign_in(client, code="c-status").json()
+    assert signed["active_studio_id"] is None, "precondition: no membership yet, so no studio"
+    headers = {"Authorization": f"Bearer {signed['access_token']}"}
+
+    response = client.get("/api/v1/me/onboarding-status", headers=headers)
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["next"] == "agreements"
+    assert all(row["complete"] is False for row in body["steps"]), body["steps"]

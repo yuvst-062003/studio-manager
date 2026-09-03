@@ -5,26 +5,6 @@ import { t } from '@studio/i18n'
 import type { PrivacyClient } from '../privacy/privacyClient'
 import { JoinWelcomeStep } from './JoinWelcomeStep'
 
-vi.mock('@studio/core', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@studio/core')>()
-  return {
-    ...actual,
-    useSession: () => ({
-      status: 'signed-in',
-      access: { parent: true, staff: false },
-      studios: [],
-      activeStudioId: null,
-      devTools: false,
-      actingAsPersonId: null,
-      actingAsLabel: null,
-      activeStudioName: null,
-      displayName: 'מיכל כהן',
-      reload: vi.fn(async () => {}),
-      signOut: vi.fn(async () => {}),
-    }),
-  }
-})
-
 function makeClient(): PrivacyClient {
   return {
     consents: vi.fn(async () => ({
@@ -54,7 +34,6 @@ describe('JoinWelcomeStep', () => {
         studioName="מועדון הדגמה"
         privacyClient={client}
         onAccept={onAccept}
-        token="live-token-123456"
       />,
     )
 
@@ -85,7 +64,6 @@ describe('JoinWelcomeStep', () => {
         studioName="מועדון הדגמה"
         privacyClient={client}
         onAccept={vi.fn()}
-        token="live-token-123456"
       />,
     )
     await screen.findByTestId('health.clubTerms.payment.cheques')
@@ -100,10 +78,32 @@ describe('JoinWelcomeStep', () => {
         studioName="מועדון הדגמה"
         privacyClient={client}
         onAccept={vi.fn()}
-        token="live-token-123456"
       />,
     )
     await screen.findByText('מועדון הדגמה')
     expect(screen.queryByTestId('onboarding-wizard-back')).toBeNull()
+  })
+
+  // F1 -- this step no longer owns "am I signed in?" at all: it takes no `token` prop
+  // (nothing here needs a `returnPath` any more) and mounts no `useSession()`, so there
+  // is nothing to remount, nothing to restart at `status: 'loading'`, and nothing that
+  // could ever render a sign-in wall from inside this component. The shell is the sole
+  // authority on that fork now (§3's redirect rule) -- proven here as the ABSENCE of any
+  // sign-in affordance, immediately, on a component that received no session at all.
+  it('never renders a sign-in wall itself -- the shell owns that fork (F1)', async () => {
+    const client = makeClient()
+    render(
+      <JoinWelcomeStep
+        locale="he"
+        studioName="מועדון הדגמה"
+        privacyClient={client}
+        onAccept={vi.fn()}
+      />,
+    )
+    await screen.findByTestId('join-welcome')
+    expect(screen.queryByTestId('sign-in')).toBeNull()
+    // The agreements content is there immediately -- no async "which screen am I"
+    // resolution stands between mount and the real content.
+    expect(screen.getByTestId('join-welcome-app-check')).toBeInTheDocument()
   })
 })

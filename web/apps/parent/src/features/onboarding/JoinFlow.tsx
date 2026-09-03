@@ -1,9 +1,10 @@
-// §5.4b — the shared member onboarding link. The link itself knows no family yet, so
-// the wizard's own first step shows the studio sign-in before auth. After sign-in the
+// §5.4b — the shared member onboarding link. The shell (`JoinShell` in `App.tsx`) reads
+// the session ONCE and shows its own sign-in wall before this ever mounts (F1/F10) — by
+// the time this component exists, the family is already signed in. After sign-in the
 // family walks one four-step wizard: welcome + agreements, family, health, payment.
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { CSSProperties } from 'react'
-import { apiFetch, useSession } from '@studio/core'
+import type { CSSProperties, ReactNode } from 'react'
+import { apiFetch } from '@studio/core'
 import { EmptyState } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
@@ -65,6 +66,7 @@ async function loadStudents(): Promise<GatedStudent[]> {
 
 export function JoinFlow({
   billingClient,
+  displayName,
   healthClient,
   locale,
   onComplete,
@@ -73,6 +75,9 @@ export function JoinFlow({
   token,
 }: {
   billingClient: BillingClient
+  //: The signed-in caller's own name, read ONCE by the shell (F1/F10) and passed down --
+  //: this component no longer calls `useSession()` itself.
+  displayName: string | null
   healthClient: HealthClient
   locale: Locale
   onComplete?: () => void
@@ -80,7 +85,6 @@ export function JoinFlow({
   standingOrderLinks: readonly StandingOrderLink[]
   token: string
 }) {
-  const session = useSession()
   const [info, setInfo] = useState<JoinInfo | null | 'invalid'>(null)
   const [step, setStep] = useState<JoinStep>('welcome')
   const [students, setStudents] = useState<readonly GatedStudent[]>([])
@@ -116,7 +120,12 @@ export function JoinFlow({
     return () => {
       alive = false
     }
-  }, [token, session.status])
+    // `token` only. This used to also depend on `session.status`, back when this
+    // component read its own session and re-fetched as sign-in resolved -- the shell now
+    // gates rendering this component until `status === 'signed-in'` (F1/F10), so by the
+    // time this effect first runs sign-in has already happened and there is no later
+    // status change to react to.
+  }, [token])
 
   const refreshStudents = useCallback(async () => {
     const next = await loadStudents()
@@ -158,16 +167,6 @@ export function JoinFlow({
   }, [token, familyDraft, healthDrafts])
 
   if (info === null) return null
-  if (info === 'invalid') {
-    return (
-      <div style={pageStyle} data-testid="join-invalid">
-        <EmptyState
-          title={t(locale, 'people.join.expired')}
-          description={t(locale, 'people.join.expiredHint')}
-        />
-      </div>
-    )
-  }
 
   /** A kid still needing a declaration, by the rule that survives the deferred model:
    *  server truth (`needsFullDeclaration`) says so, AND there is no local draft for
@@ -290,8 +289,25 @@ export function JoinFlow({
     }
   }
 
-  if (step === 'welcome') {
-    return (
+  // F5 -- every step's content is computed here and wrapped exactly ONCE, below, in
+  // `pageStyle`'s padded container. Before this, `welcome` and `family` returned their
+  // step component bare (no padding), so their primary button landed flush in the
+  // corner, underneath the accessibility FAB, and Playwright could not click it. Adding
+  // the wrapper to those two branches would have fixed today's symptom and left the same
+  // trap for the next step anyone adds; a single wrap point means a step CANNOT be
+  // rendered unwrapped.
+  let content: ReactNode
+  let testId: string | undefined
+  if (info === 'invalid') {
+    testId = 'join-invalid'
+    content = (
+      <EmptyState
+        title={t(locale, 'people.join.expired')}
+        description={t(locale, 'people.join.expiredHint')}
+      />
+    )
+  } else if (step === 'welcome') {
+    content = (
       <JoinWelcomeStep
         locale={locale}
         privacyClient={privacyClient}
@@ -300,15 +316,12 @@ export function JoinFlow({
           setClubTermsAccepted(accepted)
           setStep('family')
         }}
-        token={token}
       />
     )
-  }
-
-  if (step === 'family') {
-    return (
+  } else if (step === 'family') {
+    content = (
       <JoinFamilyStep
-        displayName={session.displayName ?? ''}
+        displayName={displayName ?? ''}
         email={info.email}
         error={failed}
         groups={info.groups}
@@ -320,52 +333,44 @@ export function JoinFlow({
         onSubmit={(payload) => void submitFamily(payload)}
       />
     )
-  }
-
-  if (step === 'health') {
-    return (
-      <div style={pageStyle}>
-        <JoinHealthStep
-          client={healthClient}
-          drafts={healthDrafts}
+  } else if (step === 'health') {
+    content = (
+      <JoinHealthStep
+        client={healthClient}
+        drafts={healthDrafts}
+        locale={locale}
+        onBack={() => setStep('family')}
+        onSigned={handleHealthSigned}
+        signerName={displayName ?? undefined}
+        students={students}
+      />
+    )
+  } else if (step === 'payment') {
+    testId = 'join-payment-step'
+    content = (
+      <OnboardingWizardChrome
+        locale={locale}
+        // No `onBack`: health is complete by construction once this step renders — the
+        // effect above only advances here when no student still needs a declaration — so
+        // "back" would land on the health step's own effect, which immediately bounces
+        // forward again. A button that visibly does nothing is worse than no button.
+        position={stepPosition('payment')}
+        title={t(locale, 'health.onboarding.step.payment')}
+      >
+        <PaymentSetup
+          client={billingClient}
           locale={locale}
-          onBack={() => setStep('family')}
-          onSigned={handleHealthSigned}
-          signerName={session.displayName ?? undefined}
-          students={students}
+          onFinish={() => setStep('done')}
+          onNothingToPay={() => setStep('done')}
+          onSummary={setDoneRows}
+          standingOrderLinks={standingOrderLinks}
+          students={setupChildren}
         />
-      </div>
+      </OnboardingWizardChrome>
     )
-  }
-
-  if (step === 'payment') {
-    return (
-      <div style={pageStyle} data-testid="join-payment-step">
-        <OnboardingWizardChrome
-          locale={locale}
-          // No `onBack`: health is complete by construction once this step renders — the
-          // effect above only advances here when no student still needs a declaration — so
-          // "back" would land on the health step's own effect, which immediately bounces
-          // forward again. A button that visibly does nothing is worse than no button.
-          position={stepPosition('payment')}
-          title={t(locale, 'health.onboarding.step.payment')}
-        >
-          <PaymentSetup
-            client={billingClient}
-            locale={locale}
-            onFinish={() => setStep('done')}
-            onNothingToPay={() => setStep('done')}
-            onSummary={setDoneRows}
-            standingOrderLinks={standingOrderLinks}
-            students={setupChildren}
-          />
-        </OnboardingWizardChrome>
-      </div>
-    )
-  }
-
-  return (
-    <div style={pageStyle} data-testid="join-done-step">
+  } else {
+    testId = 'join-done-step'
+    content = (
       <OnboardingWizardChrome
         locale={locale}
         position={stepPosition('payment')}
@@ -379,6 +384,12 @@ export function JoinFlow({
           rows={doneRows}
         />
       </OnboardingWizardChrome>
+    )
+  }
+
+  return (
+    <div style={pageStyle} data-testid={testId}>
+      {content}
     </div>
   )
 }

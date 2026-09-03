@@ -5,15 +5,21 @@
 // redesign, and `ClubTermsStep` has no other caller so its exported clause list is
 // safe to reuse directly.
 //
-// Two inner panels under one step number: welcome (sign-in if needed) then agreements
-// (both cards), not two separate wizard steps. Submitting records both consent grants
-// -- the app-level `client.grant(...)` (the same call `ConsentGate` makes) and the
-// club-level acceptance the caller finishes once a student exists -- from one combined
-// action.
+// **This step no longer decides sign-in-or-not (F1).** §3's redirect rule puts that
+// fork in the SHELL (`JoinShell` in `App.tsx`): not signed in shows the shell's own
+// sign-in wall, above the whole wizard; signed in shows the wizard, starting here. This
+// component is never rendered for a signed-out visitor, so it calls no `useSession()`
+// of its own -- the bug F1 names is exactly a step component re-deciding "am I signed
+// in?" for itself, which used to remount on back-navigation, restart at
+// `status: 'loading'`, and flash the sign-in wall for ~120ms before flipping back.
+//
+// Two inner panels under one step number: welcome copy then agreements (both cards),
+// not two separate wizard steps. Submitting records both consent grants -- the
+// app-level `client.grant(...)` (the same call `ConsentGate` makes) and the club-level
+// acceptance the caller finishes once a student exists -- from one combined action.
 import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { useSession } from '@studio/core'
-import { Alert, Button, Card, Checkbox, PolicyDocument, SignIn } from '@studio/ui'
+import { Alert, Button, Card, Checkbox, PolicyDocument } from '@studio/ui'
 import type { PolicyDoc } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
@@ -35,7 +41,6 @@ export type JoinWelcomeStepProps = {
    *  boolean keeps the call site symmetrical with `JoinFlow`'s existing
    *  `clubTermsAccepted` state rather than hardcoding `true` two files apart. */
   onAccept: (clubTermsAccepted: boolean) => void
-  token: string
 }
 
 export function JoinWelcomeStep({
@@ -43,9 +48,7 @@ export function JoinWelcomeStep({
   studioName,
   privacyClient,
   onAccept,
-  token,
 }: JoinWelcomeStepProps) {
-  const session = useSession()
   const [state, setState] = useState<ConsentState | null | undefined>(undefined)
   const [accepted, setAccepted] = useState({ app: false, club: false })
   const [openDoc, setOpenDoc] = useState<PolicyDoc | null>(null)
@@ -97,94 +100,90 @@ export function JoinWelcomeStep({
         </div>
         <p style={{ margin: 0 }}>{t(locale, 'health.onboarding.title')}</p>
 
-        {session.status !== 'signed-in' ? (
-          <SignIn locale={locale} app="parent" returnPath={`/join/${token}`} />
-        ) : (
-          <>
-            <Card>
-              <h2 style={{ marginBlockStart: 0 }}>{t(locale, 'people.join.welcome.appCardTitle')}</h2>
-              <Checkbox
-                block
-                checked={accepted.app}
-                data-testid="join-welcome-app-check"
-                label={t(locale, 'people.join.welcome.appCardLabel')}
-                onChange={(event) =>
-                  setAccepted((prev) => ({ ...prev, app: event.target.checked }))
-                }
+        {/* No sign-in fork here (F1) -- the shell renders this component only once
+            `session.status === 'signed-in'`, so there is nothing to branch on. */}
+        <Card>
+          <h2 style={{ marginBlockStart: 0 }}>{t(locale, 'people.join.welcome.appCardTitle')}</h2>
+          <Checkbox
+            block
+            checked={accepted.app}
+            data-testid="join-welcome-app-check"
+            label={t(locale, 'people.join.welcome.appCardLabel')}
+            onChange={(event) =>
+              setAccepted((prev) => ({ ...prev, app: event.target.checked }))
+            }
+          />
+          <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+            <Button
+              data-testid="join-welcome-read-terms"
+              onClick={() => setOpenDoc('terms')}
+              type="button"
+              variant="ghost"
+            >
+              {t(locale, 'reports.privacy.terms.title')} · {t(locale, 'reports.privacy.gate.readFull')}
+            </Button>
+            <Button
+              data-testid="join-welcome-read-privacy"
+              onClick={() => setOpenDoc('policy')}
+              type="button"
+              variant="ghost"
+            >
+              {t(locale, 'reports.privacy.policy.title')} · {t(locale, 'reports.privacy.gate.readFull')}
+            </Button>
+          </div>
+        </Card>
+
+        {openDoc && state ? (
+          <Card>
+            <div data-testid="join-welcome-document-sheet">
+              <Button onClick={() => setOpenDoc(null)} type="button" variant="ghost">
+                {t(locale, 'reports.privacy.gate.closeFull')}
+              </Button>
+              <PolicyDocument
+                isDraft={state.policy_is_draft}
+                locale={locale}
+                only={openDoc}
+                versionLabel={state.policy_version_label}
               />
-              <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-                <Button
-                  data-testid="join-welcome-read-terms"
-                  onClick={() => setOpenDoc('terms')}
-                  type="button"
-                  variant="ghost"
-                >
-                  {t(locale, 'reports.privacy.terms.title')} · {t(locale, 'reports.privacy.gate.readFull')}
-                </Button>
-                <Button
-                  data-testid="join-welcome-read-privacy"
-                  onClick={() => setOpenDoc('policy')}
-                  type="button"
-                  variant="ghost"
-                >
-                  {t(locale, 'reports.privacy.policy.title')} · {t(locale, 'reports.privacy.gate.readFull')}
-                </Button>
-              </div>
-            </Card>
+            </div>
+          </Card>
+        ) : null}
 
-            {openDoc && state ? (
-              <Card>
-                <div data-testid="join-welcome-document-sheet">
-                  <Button onClick={() => setOpenDoc(null)} type="button" variant="ghost">
-                    {t(locale, 'reports.privacy.gate.closeFull')}
-                  </Button>
-                  <PolicyDocument
-                    isDraft={state.policy_is_draft}
-                    locale={locale}
-                    only={openDoc}
-                    versionLabel={state.policy_version_label}
-                  />
-                </div>
-              </Card>
-            ) : null}
+        {/* The club card -- per the 2026-09-03 correction, this is exactly
+            ClubTermsStep's own shape (inline clauses, one checkbox, no links), not
+            the "two links" phrasing the original spec text used before the
+            correction was found against the actual component. */}
+        <Card>
+          <h2 style={{ marginBlockStart: 0 }}>{t(locale, 'health.clubTerms.title')}</h2>
+          {PAYMENT_CLAUSE_KEYS.map((key) => (
+            <p data-testid={key} key={key} style={clauseStyle}>
+              {t(locale, key)}
+            </p>
+          ))}
+          <Checkbox
+            block
+            checked={accepted.club}
+            data-testid="join-welcome-club-check"
+            label={t(locale, 'health.clubTerms.accept')}
+            onChange={(event) =>
+              setAccepted((prev) => ({ ...prev, club: event.target.checked }))
+            }
+          />
+        </Card>
 
-            {/* The club card -- per the 2026-09-03 correction, this is exactly
-                ClubTermsStep's own shape (inline clauses, one checkbox, no links), not
-                the "two links" phrasing the original spec text used before the
-                correction was found against the actual component. */}
-            <Card>
-              <h2 style={{ marginBlockStart: 0 }}>{t(locale, 'health.clubTerms.title')}</h2>
-              {PAYMENT_CLAUSE_KEYS.map((key) => (
-                <p data-testid={key} key={key} style={clauseStyle}>
-                  {t(locale, key)}
-                </p>
-              ))}
-              <Checkbox
-                block
-                checked={accepted.club}
-                data-testid="join-welcome-club-check"
-                label={t(locale, 'health.clubTerms.accept')}
-                onChange={(event) =>
-                  setAccepted((prev) => ({ ...prev, club: event.target.checked }))
-                }
-              />
-            </Card>
+        {failed ? (
+          <Alert iconLabel={t(locale, 'people.join.title')} live tone="danger">
+            {t(locale, 'common.error.generic')}
+          </Alert>
+        ) : null}
 
-            {failed ? (
-              <Alert iconLabel={t(locale, 'people.join.title')} live tone="danger">
-                {t(locale, 'common.error.generic')}
-              </Alert>
-            ) : null}
-
-            <WizardNavButtons
-              forwardDisabled={!both || saving || state === undefined}
-              forwardLabel={saving ? t(locale, 'reports.privacy.gate.working') : undefined}
-              forwardTestId="join-welcome-continue"
-              locale={locale}
-              onForward={() => void submit()}
-            />
-          </>
-        )}
+        <WizardNavButtons
+          forwardDisabled={!both || saving || state === undefined}
+          forwardLabel={saving ? t(locale, 'reports.privacy.gate.working') : undefined}
+          forwardTestId="join-welcome-continue"
+          locale={locale}
+          onForward={() => void submit()}
+        />
       </OnboardingWizardChrome>
     </div>
   )
