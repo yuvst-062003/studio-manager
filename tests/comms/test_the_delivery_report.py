@@ -167,14 +167,19 @@ def test_a_preference_denial_reads_as_denied_to_the_office(
 def test_a_family_who_got_it_is_not_on_the_list_to_phone(
     client, tenant_session, studio, as_manager, a_guardian_for, an_enrolled_student, a_push_token
 ) -> None:
+    """`sent` means the provider accepted it, not that a phone buzzed -- so it does not count
+    as received (only a confirmed `delivered` does, per §2.1's "make the report say what it
+    actually knows"), but it is just as much not a family to phone. It reads as in flight,
+    honestly, rather than as either extreme."""
     parent = a_guardian_for(an_enrolled_student, name="קיבלה")
     a_push_token(parent)
     announcement_id = _publish_to(client, as_manager)
     _set_push(tenant_session, announcement_id, parent, "sent")
 
     body = _report(client, as_manager, announcement_id).json()
-    assert body["received_count"] == 1
+    assert body["received_count"] == 0
     assert body["missed"] == []
+    assert body["sent_count"] - body["received_count"] - body["missed_count"] == 1
 
 
 def test_the_report_names_the_notifications_it_counted(

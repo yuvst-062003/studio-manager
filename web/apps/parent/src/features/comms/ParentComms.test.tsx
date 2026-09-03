@@ -19,12 +19,17 @@ import { CalendarSync } from './CalendarSync'
 import { EventCalendarButtons, eventIcsUrl } from './EventCalendarButtons'
 import { InboxScreen } from './InboxScreen'
 import { PushDisabledBanner } from './PushDisabledBanner'
-import { platformOf } from './usePushRegistration'
+import { platformOf, urlBase64ToUint8Array } from './usePushRegistration'
 import type { NotificationOut, ParentCommsClient } from './commsClient'
 import { googleSubscribeUrl, webcalUrl } from './commsClient'
 
 const IPHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15'
 const ANDROID = 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/120'
+
+//: A syntactically valid VAPID public key shape (base64url, no padding) -- not a real key,
+//: just long enough that `urlBase64ToUint8Array` has real bytes to decode.
+const FAKE_VAPID_PUBLIC_KEY =
+  'BMBSB_lN3YIV7yLYWgOrfmzIoKyIHn5aJTenMlE99lC_DhRMryn3tcVzr3LuHLXFLIfIv_-tpfUSBE51uKeNbZY'
 
 function note(over: Partial<NotificationOut> = {}): NotificationOut {
   return {
@@ -44,6 +49,7 @@ function makeClient(over: Partial<ParentCommsClient> = {}): ParentCommsClient {
     inbox: vi.fn().mockResolvedValue({ items: [], next_cursor: null, has_more: false }),
     markRead: vi.fn().mockResolvedValue(note({ read_at: '2026-11-12T16:00:00Z' })),
     markAllRead: vi.fn().mockResolvedValue({ marked: 0 }),
+    vapidPublicKey: vi.fn().mockResolvedValue({ public_key: FAKE_VAPID_PUBLIC_KEY }),
     registerPush: vi.fn().mockResolvedValue({
       id: 'p1',
       app: 'parent',
@@ -71,6 +77,16 @@ beforeEach(() => {
   setDisplayMode('standalone')
   vi.stubGlobal('Notification', { permission: 'default', requestPermission: vi.fn() })
 })
+
+/** jsdom carries no `navigator.serviceWorker` -- defined narrowly rather than through
+ * `vi.stubGlobal('navigator', ...)`, which would replace the whole object other fixtures
+ * (like the user-agent prop) do not go through `navigator` for in the first place. */
+function stubServiceWorker(subscribe: (options: unknown) => unknown) {
+  Object.defineProperty(globalThis.navigator, 'serviceWorker', {
+    value: { ready: Promise.resolve({ pushManager: { subscribe } }) },
+    configurable: true,
+  })
+}
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -456,6 +472,54 @@ describe('asking for push permission', () => {
     expect(platformOf(ANDROID)).toBe('android')
     expect(platformOf('Mozilla/5.0 (Macintosh) Chrome/120')).toBe('web')
   })
+
+  it('subscribes with the fetched VAPID key as applicationServerKey', async () => {
+    // HB-push-transport's second break: `pushManager.subscribe` was called with no
+    // `applicationServerKey` at all, which Chrome and Safari both reject outright.
+    const requestPermission = vi.fn().mockResolvedValue('granted')
+    vi.stubGlobal('Notification', { permission: 'default', requestPermission })
+    const subscription = { endpoint: 'https://push.example.invalid/abcd', keys: { p256dh: 'x', auth: 'y' } }
+    const subscribe = vi.fn().mockResolvedValue(subscription)
+    stubServiceWorker(subscribe)
+    const client = makeClient()
+
+    render(<InboxScreen client={client} locale="he" userAgent={ANDROID} />)
+    await userEvent.click(await screen.findByRole('button', { name: t('he', 'comms.push.enable') }))
+    await userEvent.click(
+      screen.getByRole('button', { name: t('he', 'comms.push.prePrompt.accept') }),
+    )
+
+    await waitFor(() => expect(subscribe).toHaveBeenCalledTimes(1))
+    expect(subscribe.mock.calls[0]![0]).toEqual({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(FAKE_VAPID_PUBLIC_KEY),
+    })
+    await waitFor(() =>
+      expect(client.registerPush).toHaveBeenCalledWith(JSON.stringify(subscription), 'android'),
+    )
+  })
+
+  it('does not attempt to subscribe with no VAPID key configured, and says so', async () => {
+    // The other half of the same break: a browser CAN reject a keyless subscribe with an
+    // error the catch swallows into `error` anyway, but asking at all when this environment
+    // was never given a key is a request that can only fail -- and doing it silently is
+    // how "push is off" reads as "push is broken", which is a worse conversation.
+    const requestPermission = vi.fn().mockResolvedValue('granted')
+    vi.stubGlobal('Notification', { permission: 'default', requestPermission })
+    const subscribe = vi.fn()
+    stubServiceWorker(subscribe)
+    const client = makeClient({ vapidPublicKey: vi.fn().mockResolvedValue({ public_key: null }) })
+
+    render(<InboxScreen client={client} locale="he" userAgent={ANDROID} />)
+    await userEvent.click(await screen.findByRole('button', { name: t('he', 'comms.push.enable') }))
+    await userEvent.click(
+      screen.getByRole('button', { name: t('he', 'comms.push.prePrompt.accept') }),
+    )
+
+    await waitFor(() => expect(screen.getByTestId('push-disabled-banner')).toBeInTheDocument())
+    expect(subscribe).not.toHaveBeenCalled()
+    expect(client.registerPush).not.toHaveBeenCalled()
+  })
 })
 
 // -- §5.11's persistent banner ------------------------------------------------
@@ -488,6 +552,14 @@ describe('the push-disabled banner', () => {
     // Telling that parent their notifications are "off" would blame them for their browser.
     render(<PushDisabledBanner state="unsupported" locale="he" />)
     expect(screen.queryByTestId('push-disabled-banner')).toBeNull()
+  })
+
+  it('shows once granted but not registered, instead of telling the parent nothing', () => {
+    // §2.1 of the 2026-09-02 findings register: granted-but-not-registered rendered `null`
+    // here, so a parent who granted permission had no way to know push was still off --
+    // worse than the OS-refused case, which at least shows the banner.
+    render(<PushDisabledBanner state="error" locale="he" />)
+    expect(screen.getByTestId('push-disabled-banner')).toBeInTheDocument()
   })
 })
 

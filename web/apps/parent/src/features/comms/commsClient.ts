@@ -12,6 +12,7 @@ export type NotificationOut = components['schemas']['NotificationOut']
 export type CalendarFeedOut = components['schemas']['CalendarFeedOut']
 export type NotificationPreferencesOut = components['schemas']['NotificationPreferencesOut']
 export type PushTokenOut = components['schemas']['PushTokenOut']
+export type VapidPublicKeyOut = components['schemas']['VapidPublicKeyOut']
 
 export type Page<T> = { items: T[]; next_cursor: string | null; has_more: boolean }
 
@@ -36,6 +37,14 @@ export function makeParentCommsClient(fetcher: Fetcher) {
 
     markAllRead: async (): Promise<{ marked: number }> =>
       json(await fetcher('/api/v1/notifications/read-all', { method: 'POST' })),
+
+    /**
+     * HB-push-transport's public half, so `usePushRegistration.ts` can pass it as
+     * `applicationServerKey`. `null` when this environment has no VAPID key pair configured
+     * -- see `app/core/config.py`.
+     */
+    vapidPublicKey: async (): Promise<VapidPublicKeyOut> =>
+      json(await fetcher('/api/v1/push/vapid-public-key')),
 
     /** §7's `POST /push-tokens`. Called after the OS grants permission, never before. */
     registerPush: async (

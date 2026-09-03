@@ -98,6 +98,7 @@ def test_the_board_answers_an_operator(client: TestClient, platform_admin: Admin
         "api.unhandled_exceptions",
         "billing.zero_charge_run",
         "upay.callback_silence",
+        "comms.push_transport",
     }
     # Nothing is configured in a test environment, and the screen must be able to say so:
     # "no alerts" and "no delivery" look identical from an empty inbox.

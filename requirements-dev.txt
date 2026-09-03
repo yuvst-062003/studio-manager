@@ -24,3 +24,7 @@ psycopg[binary]
 cryptography
 pyjwt[crypto]
 types-PyYAML
+# HB-push-transport -- Web Push with VAPID (app/services/comms/push.py). Wraps the VAPID
+# JWT signing and the RFC 8291 payload encryption; both already rest on `cryptography`,
+# which was already a dependency here.
+pywebpush

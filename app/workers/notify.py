@@ -56,7 +56,13 @@ from app.models.comms import Announcement, Notification, NotificationDelivery, P
 from app.models.studio import Studio
 from app.services.comms.announcements import AnnouncementService
 from app.services.comms.errors import AnnouncementAlreadyPublishedError
-from app.services.comms.push import PushSender, PushSendError, RecordingPushSender
+from app.services.comms.push import (
+    PushSender,
+    PushSendError,
+    default_push_sender,
+    push_transport_name,
+)
+from app.services.comms.reminders import in_quiet_hours
 
 logger = logging.getLogger(__name__)
 
@@ -134,8 +140,19 @@ def drain_queued(
     One delivery row can have several devices behind it (§5.11 counts families, not handsets).
     Any accepted send makes the row `sent`; only an all-devices failure makes it `failed`,
     because a parent whose phone buzzed does not care that their tablet's token was stale.
+
+    **§13.11's single quiet-hours gate.** `ReminderService._send` only ever protected its
+    own four callers; the debt ladder, health chases, cancellations and scheduled
+    announcements all enqueue straight through and reach this drain with nothing checking
+    the clock. This is the seam every one of them shares before a phone actually buzzes, so
+    refusing here -- leaving the rows `queued` rather than touching them -- is what makes
+    every kind inherit the same window without fifteen call sites each remembering to ask.
+    The inbox delivery is untouched either way: a preference silences the doorbell, never
+    the letter, and quiet hours are the same kind of silence.
     """
-    push = sender if sender is not None else RecordingPushSender()
+    if in_quiet_hours(at):
+        return
+    push = sender if sender is not None else default_push_sender()
     rows = list(
         session.execute(
             select(NotificationDelivery, Notification)
@@ -191,9 +208,11 @@ def _send_to_any(
 
 
 # -- the run ------------------------------------------------------------------
-def run_for_studio(session: TenantSession, *, at: datetime, tally: Tally) -> None:
+def run_for_studio(
+    session: TenantSession, *, at: datetime, tally: Tally, sender: PushSender | None = None
+) -> None:
     publish_due(session, at=at, tally=tally)
-    drain_queued(session, at=at, tally=tally)
+    drain_queued(session, at=at, tally=tally, sender=sender)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -209,9 +228,32 @@ def main(argv: list[str] | None = None) -> int:
     return 0
 
 
-def _run_job(argv: list[str] | None = None) -> dict[str, int]:
+def _tally_counts(tally: Tally, sender: PushSender) -> dict[str, int | str]:
+    """The dict a log line and the job's own heartbeat both carry.
+
+    `push_transport` is `webpush` or `recording` -- see
+    `app/services/comms/push.py::push_transport_name`. A run that never says which
+    transport it used is a run `app/services/ops/checks.py` cannot tell apart from a real
+    one, which is the whole failure mode §2.8/§13.2 named: a notify run that "sends" pushes
+    to nobody reading as a green heartbeat.
+    """
+    return {
+        "studios": len(tally.studios),
+        "published": tally.published,
+        "fanned_out": tally.fanned_out,
+        "pushed": tally.pushed,
+        "push_failed": tally.push_failed,
+        "push_transport": push_transport_name(sender),
+    }
+
+
+def _run_job(argv: list[str] | None = None) -> dict[str, int | str]:
     at = now()
     tally = Tally()
+    # One sender for the whole run, resolved once rather than per studio: which transport
+    # is configured cannot change mid-run, and §2.8/§13.2's ops check reads the label off
+    # this run's own heartbeat, not off any one studio's slice of it.
+    sender = default_push_sender()
 
     with Session(bind=get_engine()) as unscoped:
         studios = list(
@@ -224,17 +266,9 @@ def _run_job(argv: list[str] | None = None) -> dict[str, int]:
 
     for studio_id, slug in studios:
         tally.studios.append(slug)
-        _run_one(studio_id, at=at, tally=tally)
+        _run_one(studio_id, at=at, tally=tally, sender=sender)
 
-    # Counts only, and the same dict feeds the heartbeat -- which an operator reads on a
-    # screen and receives by email when a check goes red (app/models/ops.py).
-    counts = {
-        "studios": len(tally.studios),
-        "published": tally.published,
-        "fanned_out": tally.fanned_out,
-        "pushed": tally.pushed,
-        "push_failed": tally.push_failed,
-    }
+    counts = _tally_counts(tally, sender)
     logger.info("notify complete", extra=counts)
     if tally.push_failed:
         # Not a failure of the run: the announcements still published and the inbox rows are
@@ -247,12 +281,14 @@ def _run_job(argv: list[str] | None = None) -> dict[str, int]:
     return counts
 
 
-def _run_one(studio_id: uuid.UUID, *, at: datetime, tally: Tally) -> None:
+def _run_one(
+    studio_id: uuid.UUID, *, at: datetime, tally: Tally, sender: PushSender | None = None
+) -> None:
     with (
         use_studio(studio_id),
         TenantSession(bind=get_engine(), expire_on_commit=False) as scoped,
     ):
-        run_for_studio(scoped, at=at, tally=tally)
+        run_for_studio(scoped, at=at, tally=tally, sender=sender)
         scoped.commit()
 
 

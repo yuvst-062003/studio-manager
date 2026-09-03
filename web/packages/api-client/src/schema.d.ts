@@ -295,6 +295,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/attendance/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Attendance Settings
+         * @description Register §2.3's at-risk threshold, manager-only for the same reason
+         *     `attendance_report` above is: a studio-wide policy number, not a coach's own view of
+         *     the mat. `app/services/attendance/settings.py` is why this and `PUT` below exist as
+         *     their own small pair rather than another field on `PATCH /studio` — a different
+         *     vertical's endpoint and whitelist.
+         */
+        get: operations["get_attendance_settings_api_v1_attendance_settings_get"];
+        /** Put Attendance Settings */
+        put: operations["put_attendance_settings_api_v1_attendance_settings_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/accept-invitation": {
         parameters: {
             query?: never;
@@ -3323,6 +3348,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/push/vapid-public-key": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Vapid Public Key
+         * @description `None` until HB-push-transport's key pair is configured in this environment, so a
+         *     browser gets a clear "not yet" rather than `pushManager.subscribe` throwing on a missing
+         *     `applicationServerKey`.
+         *
+         *     Signed in, like every route in this file -- not because the key is a secret (every
+         *     subscribing browser is handed the same one), but because there is no reason for it to
+         *     be reachable before the parent or coach it is for has signed in.
+         */
+        get: operations["vapid_public_key_api_v1_push_vapid_public_key_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/reconciliation/match": {
         parameters: {
             query?: never;
@@ -5356,6 +5407,16 @@ export interface components {
             parent: boolean;
             /** Staff */
             staff: boolean;
+        };
+        /** AtRiskSettingsIn */
+        AtRiskSettingsIn: {
+            /** Threshold */
+            threshold: number;
+        };
+        /** AtRiskSettingsOut */
+        AtRiskSettingsOut: {
+            /** Threshold */
+            threshold: number;
         };
         /**
          * AttendanceConflictOut
@@ -10018,6 +10079,8 @@ export interface components {
              * @enum {string}
              */
             health_status: "missing" | "trial_signed" | "signed";
+            /** Plan Name */
+            plan_name?: string | null;
             /** Source */
             source?: ("coach" | "parent" | "bulk" | "system") | null;
             /**
@@ -11771,6 +11834,16 @@ export interface components {
             /** Error Type */
             type: string;
         };
+        /**
+         * VapidPublicKeyOut
+         * @description §6.5's registration step needs the public half of HB-push-transport's key pair to
+         *     pass as `applicationServerKey`. Declared here rather than in `app/schemas/comms.py` for
+         *     the same reason `InstallStateOut` is: W5's contract commit did not anticipate it.
+         */
+        VapidPublicKeyOut: {
+            /** Public Key */
+            public_key: string | null;
+        };
         /** EnrollmentMoveIn */
         app__routers__students__EnrollmentMoveIn: {
             /**
@@ -12406,6 +12479,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AttendanceReportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_attendance_settings_api_v1_attendance_settings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AtRiskSettingsOut"];
+                };
+            };
+        };
+    };
+    put_attendance_settings_api_v1_attendance_settings_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AtRiskSettingsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AtRiskSettingsOut"];
                 };
             };
             /** @description Validation Error */
@@ -17007,6 +17133,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    vapid_public_key_api_v1_push_vapid_public_key_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VapidPublicKeyOut"];
                 };
             };
         };

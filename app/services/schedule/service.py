@@ -20,10 +20,12 @@ from __future__ import annotations
 import uuid
 from collections.abc import Sequence
 from datetime import UTC, date, datetime, timedelta
+from typing import cast
 
 from sqlalchemy import Select, func, select
 from sqlalchemy.orm import Session as OrmSession
 
+from app.core.tenancy import TenantSession
 from app.models.people import Enrollment
 from app.models.person import Guardian, Person
 from app.models.schedule import (
@@ -46,6 +48,7 @@ from app.schemas.schedule import (
     SessionStaffOut,
 )
 from app.services.audit import AuditService
+from app.services.comms import NotificationService
 from app.services.schedule.impact import (
     SYSTEM_CANCEL_CLOSURE,
     SYSTEM_CANCEL_SCHEDULE_CHANGE,
@@ -55,6 +58,7 @@ from app.services.schedule.impact import (
     students_left_unscheduled,
 )
 from app.services.schedule.rules import (
+    STUDIO_TZ,
     ClosureSpec,
     RuleSpec,
     expand_rules,
@@ -959,7 +963,44 @@ class ScheduleService:
         row.is_manually_edited = True
         row.updated_at = at
         self.session.flush()
+        self._notify_cancellation(row)
         return row
+
+    def _notify_cancellation(self, row: Session) -> None:
+        """§2.2 of the 2026-09-02 findings register: the producer §5.11's own worked
+        example argues the `*/15` comms-notify cron exists for -- 'ביטול שיעור, היום
+        17:00' -- and which never existed. Every guardian of every student still enrolled
+        in this session's group, deduplicated so a family with two children in the same
+        class hears it once rather than twice.
+
+        The router hands this service a TenantSession (TenantSessionDep); the class
+        annotation is the broader OrmSession because every other method needs no more.
+        The cast states the runtime fact rather than widening `NotificationService`'s own
+        frozen signature -- the same shape `app/services/attendance/service.py` already
+        uses to reach this seam from a class with the same annotation.
+        """
+        group = self.session.get(Group, row.group_id)
+        group_name = group.name if group is not None else ""
+        local = row.starts_at.astimezone(STUDIO_TZ)
+        when = f"{local:%d/%m} בשעה {local:%H:%M}"
+        body = f"השיעור {group_name} ב-{when} מבוטל" if group_name else f"השיעור ב-{when} מבוטל"
+
+        guardian_ids = set(
+            self.session.execute(
+                select(Guardian.person_id)
+                .join(Enrollment, Enrollment.student_id == Guardian.student_id)
+                .where(Enrollment.group_id == row.group_id, Enrollment.ended_on.is_(None))
+            ).scalars()
+        )
+        notifier = NotificationService(cast(TenantSession, self.session))
+        for guardian_person_id in sorted(guardian_ids, key=str):
+            notifier.enqueue(
+                person_id=guardian_person_id,
+                kind="session.cancelled",
+                title="ביטול שיעור",
+                body=body,
+                payload={"session_id": str(row.id), "group_id": str(row.group_id)},
+            )
 
     def delete_session(self, session_id: uuid.UUID) -> None:
         """F3's decision, enforced on the server rather than only in the UI that hides

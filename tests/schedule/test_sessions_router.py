@@ -382,6 +382,69 @@ def test_cancelling_one_session_needs_a_reason_and_marks_it_edited(client, as_ma
     assert response.json()["is_manually_edited"] is True
 
 
+def test_cancelling_a_session_notifies_the_enrolled_guardians(
+    client, app_session, studio, as_manager, a_group, a_session
+):
+    """§2.2 of the 2026-09-02 findings register: `cancel_session` never notified anyone --
+    the single case §5.11's own worked example argues the */15 comms-notify cron exists
+    for, 'ביטול שיעור, היום 17:00'."""
+    from app.models.comms import Notification
+
+    student_person = Person(studio_id=studio.id, first_name="דנה", last_name="כהן")
+    app_session.add(student_person)
+    app_session.flush()
+    student = Student(
+        studio_id=studio.id,
+        person_id=student_person.id,
+        status="active",
+        health_status="signed",
+        joined_on=date(2026, 9, 1),
+    )
+    app_session.add(student)
+    app_session.flush()
+    app_session.add(
+        Enrollment(
+            studio_id=studio.id,
+            student_id=student.id,
+            group_id=a_group,
+            status="active",
+            started_on=date(2026, 9, 1),
+        )
+    )
+    guardian_person = Person(studio_id=studio.id, first_name="הורה", last_name="כהן")
+    app_session.add(guardian_person)
+    app_session.flush()
+    app_session.add(
+        Guardian(
+            studio_id=studio.id,
+            student_id=student.id,
+            person_id=guardian_person.id,
+            is_primary=True,
+            relation="parent",
+        )
+    )
+    app_session.commit()
+
+    response = client.post(
+        f"{API}/sessions/{a_session.id}/cancel",
+        headers=as_manager.headers,
+        json={"reason": "אין חשמל באולם"},
+    )
+    assert response.status_code == 200, response.text
+
+    app_session.expire_all()
+    notes = list(
+        app_session.execute(
+            select(Notification).where(
+                Notification.person_id == guardian_person.id,
+                Notification.kind == "session.cancelled",
+            )
+        ).scalars()
+    )
+    assert len(notes) == 1
+    assert notes[0].payload["session_id"] == str(a_session.id)
+
+
 def test_an_assistant_coach_may_read_a_session_but_not_move_it(
     client, as_assistant_coach, a_session
 ):

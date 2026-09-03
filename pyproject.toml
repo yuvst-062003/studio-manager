@@ -38,3 +38,9 @@ strict = false
 # Alembic generates these; `op` and `sa` are untyped at the call sites it writes.
 module = "alembic.versions.*"
 ignore_errors = true
+
+[[tool.mypy.overrides]]
+# HB-push-transport. No stubs and no py.typed marker upstream; app/services/comms/push.py
+# is the only file that imports it, and its own functions are still fully typed.
+module = "pywebpush"
+ignore_missing_imports = true

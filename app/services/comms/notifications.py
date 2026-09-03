@@ -278,10 +278,16 @@ class DeliveryReporter:
     a cancelled class without telling them which five.
     """
 
-    #: A push that landed, as far as anything on our side can know. `sent` is "the provider
-    #: accepted it" and `delivered` is "the device acknowledged"; §5.11's report counts both
-    #: as received, because the action a manager would take is the same for either.
-    RECEIVED = ("sent", "delivered")
+    #: A push that landed, as far as anything on our side can know. **Only `delivered`** --
+    #: §2.1 of the 2026-09-02 findings register named the previous `("sent", "delivered")`
+    #: as an overclaim: `sent` is "the provider accepted it", nothing more, and counting it
+    #: as received is what let this screen say `delivery.allReceived` -- "every family
+    #: received the message" -- for a run where nobody's phone had necessarily buzzed yet.
+    #: There is no `delivered` producer today (no push service hands back a device receipt
+    #: this app reads), so until one exists `sent` falls out of `RECEIVED` and into the same
+    #: derived in-flight bucket as `queued` -- an honest "we don't know yet" rather than a
+    #: confident "everyone got it".
+    RECEIVED = ("delivered",)
     #: `MissedReason`, and the order §5.11's ⚠ list reads in.
     MISSED = ("no_token", "denied", "failed")
 

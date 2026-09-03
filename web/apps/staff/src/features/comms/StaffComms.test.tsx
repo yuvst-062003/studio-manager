@@ -4,7 +4,7 @@
 // Both are places where a screen that looked right would be wrong: a phone number rendered as
 // text is not one tap, and a switch that silently refuses to move teaches a coach the screen
 // is broken.
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, renderHook, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { clearSlot, useSlot } from '@studio/ui'
@@ -13,11 +13,24 @@ import { AtRiskAlert, byMostMissed } from './AtRiskAlert'
 import { CoachCalendarFeed } from './CoachCalendarFeed'
 import { NotificationPreferences } from './NotificationPreferences'
 import { registerCommsSections, AT_RISK_ORDER } from './register'
-import { staffPlatformOf } from './useStaffPushRegistration'
+import { staffPlatformOf, urlBase64ToUint8Array, useStaffPushRegistration } from './useStaffPushRegistration'
 import type { NotificationOut, StaffCommsClient } from './staffCommsClient'
 import { AT_RISK_KIND, webcalUrl } from './staffCommsClient'
 
 const IPHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15'
+const ANDROID = 'Mozilla/5.0 (Linux; Android 14) Chrome/120'
+
+//: A syntactically valid VAPID public key shape (base64url, no padding) -- not a real key.
+const FAKE_VAPID_PUBLIC_KEY =
+  'BMBSB_lN3YIV7yLYWgOrfmzIoKyIHn5aJTenMlE99lC_DhRMryn3tcVzr3LuHLXFLIfIv_-tpfUSBE51uKeNbZY'
+
+/** jsdom carries no `navigator.serviceWorker`. */
+function stubServiceWorker(subscribe: (options: unknown) => unknown) {
+  Object.defineProperty(globalThis.navigator, 'serviceWorker', {
+    value: { ready: Promise.resolve({ pushManager: { subscribe } }) },
+    configurable: true,
+  })
+}
 
 function alert(over: Partial<NotificationOut> = {}): NotificationOut {
   return {
@@ -42,6 +55,7 @@ function makeClient(over: Partial<StaffCommsClient> = {}): StaffCommsClient {
   return {
     atRisk: vi.fn().mockResolvedValue({ items: [] }),
     markRead: vi.fn().mockResolvedValue(alert()),
+    vapidPublicKey: vi.fn().mockResolvedValue({ public_key: FAKE_VAPID_PUBLIC_KEY }),
     registerPush: vi.fn().mockResolvedValue({}),
     preferences: vi.fn().mockResolvedValue({ groups: [] }),
     setPreference: vi.fn().mockResolvedValue({ groups: [] }),
@@ -257,6 +271,45 @@ describe('push registration', () => {
   it('reads the platform off the user agent', () => {
     expect(staffPlatformOf(IPHONE)).toBe('ios')
     expect(staffPlatformOf('Mozilla/5.0 (Linux; Android 14) Chrome/120')).toBe('android')
+  })
+
+  it('subscribes with the fetched VAPID key as applicationServerKey', async () => {
+    // HB-push-transport's second break, same as the parent app's: `pushManager.subscribe`
+    // was called with no `applicationServerKey` at all.
+    const requestPermission = vi.fn().mockResolvedValue('granted')
+    vi.stubGlobal('Notification', { permission: 'default', requestPermission })
+    const subscription = {
+      endpoint: 'https://push.example.invalid/abcd',
+      keys: { p256dh: 'x', auth: 'y' },
+    }
+    const subscribe = vi.fn().mockResolvedValue(subscription)
+    stubServiceWorker(subscribe)
+    const client = makeClient()
+
+    const { result } = renderHook(() => useStaffPushRegistration(client, { userAgent: ANDROID }))
+    await act(() => result.current.ask())
+
+    expect(subscribe).toHaveBeenCalledWith({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(FAKE_VAPID_PUBLIC_KEY),
+    })
+    expect(client.registerPush).toHaveBeenCalledWith(JSON.stringify(subscription), 'android')
+    expect(result.current.state).toBe('registered')
+  })
+
+  it('does not attempt to subscribe with no VAPID key configured, and says so', async () => {
+    const requestPermission = vi.fn().mockResolvedValue('granted')
+    vi.stubGlobal('Notification', { permission: 'default', requestPermission })
+    const subscribe = vi.fn()
+    stubServiceWorker(subscribe)
+    const client = makeClient({ vapidPublicKey: vi.fn().mockResolvedValue({ public_key: null }) })
+
+    const { result } = renderHook(() => useStaffPushRegistration(client, { userAgent: ANDROID }))
+    await act(() => result.current.ask())
+
+    expect(subscribe).not.toHaveBeenCalled()
+    expect(client.registerPush).not.toHaveBeenCalled()
+    expect(result.current.state).toBe('error')
   })
 })
 

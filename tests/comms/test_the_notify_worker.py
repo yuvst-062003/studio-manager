@@ -17,7 +17,7 @@ three workers already follow.
 
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 
 from app.core.tenancy import use_studio
 from app.models.comms import Announcement, NotificationDelivery
@@ -186,6 +186,83 @@ def test_a_provider_error_becomes_failed_with_its_reason(
     assert "סודי" not in (row.error or "")
 
 
+def test_the_drain_refuses_during_quiet_hours(
+    tenant_session, studio, as_manager, a_push_token
+) -> None:
+    """§13.11 -- quiet hours protected only 4 of 17 paths, because they were checked inside
+    `ReminderService._send` rather than at the seam every push actually passes through. This
+    is that seam: the debt ladder, health chases, cancellations and scheduled announcements
+    all drain here, so gating it once is what makes every kind inherit the same window,
+    without changing what `enqueue` writes -- the inbox row already exists; only whether a
+    phone buzzes moves."""
+    a_push_token(as_manager.person_id)
+    with use_studio(studio.id):
+        note = NotificationService(tenant_session).enqueue(
+            as_manager.person_id, "belt.awarded", "t", "b", {}
+        )
+    tenant_session.commit()
+
+    quiet = datetime(2026, 11, 12, 19, 30, tzinfo=UTC)  # 21:30 Jerusalem
+    tally = notify.Tally()
+    notify.drain_queued(tenant_session, at=quiet, tally=tally)
+    tenant_session.expire_all()
+
+    assert tally.pushed == 0
+    assert _push(tenant_session, note.id).status == "queued"
+
+
+def test_the_drain_sends_once_quiet_hours_end(
+    tenant_session, studio, as_manager, a_push_token
+) -> None:
+    """The control: the same queued row, drained the next time the job runs after 08:00,
+    goes out normally. Quiet hours delay a push -- they do not lose it."""
+    a_push_token(as_manager.person_id)
+    with use_studio(studio.id):
+        note = NotificationService(tenant_session).enqueue(
+            as_manager.person_id, "belt.awarded", "t", "b", {}
+        )
+    tenant_session.commit()
+
+    quiet = datetime(2026, 11, 12, 19, 30, tzinfo=UTC)  # 21:30 Jerusalem
+    notify.drain_queued(tenant_session, at=quiet, tally=notify.Tally())
+    tenant_session.expire_all()
+    assert _push(tenant_session, note.id).status == "queued"
+
+    morning = datetime(2026, 11, 12, 6, 30, tzinfo=UTC)  # 08:30 Jerusalem
+    tally = notify.Tally()
+    notify.drain_queued(tenant_session, at=morning, tally=tally)
+    tenant_session.expire_all()
+
+    assert tally.pushed == 1
+    assert _push(tenant_session, note.id).status == "sent"
+
+
+def test_an_announcement_still_publishes_during_quiet_hours_only_its_push_waits(
+    tenant_session, studio, as_manager, a_guardian_for, an_enrolled_student, a_push_token
+) -> None:
+    """§13.11's sharpest example: a manager can schedule an announcement for 03:00 and
+    nothing gated it. Publishing on the scheduled moment is what the manager asked for and
+    still happens; only the doorbell -- the push -- waits for morning."""
+    parent = a_guardian_for(an_enrolled_student)
+    a_push_token(parent)
+    night = datetime(2026, 11, 12, 1, 0, tzinfo=UTC)  # 03:00 Jerusalem
+    _draft(tenant_session, studio, as_manager, scheduled_for=night - timedelta(minutes=1))
+
+    tally = notify.Tally()
+    notify.publish_due(tenant_session, at=night, tally=tally)
+    notify.drain_queued(tenant_session, at=night, tally=tally)
+    tenant_session.expire_all()
+
+    assert tally.published == 1
+    assert tally.pushed == 0
+    rows = list(
+        tenant_session.execute(
+            select(NotificationDelivery).where(NotificationDelivery.channel == "push")
+        ).scalars()
+    )
+    assert [row.status for row in rows] == ["queued"]
+
+
 def test_the_drain_leaves_no_token_and_denied_alone(tenant_session, studio, as_manager) -> None:
     """Neither is queued, and neither is something a drain can act on. A job that "retried"
     them would rewrite the delivery report's reasons into `failed` and destroy the only
@@ -270,3 +347,19 @@ def test_the_tally_reports_every_pass() -> None:
     other three workers follow, and the reason each of them counts refusals."""
     tally = notify.Tally()
     assert (tally.published, tally.fanned_out, tally.pushed, tally.push_failed) == (0, 0, 0, 0)
+
+
+def test_the_job_names_the_push_transport_it_used() -> None:
+    """§2.8/§13.2 -- a notify run that "sends" pushes to nobody must not read as a green
+    heartbeat. `app/services/ops/checks.py` tells a real send apart from
+    `RecordingPushSender` by reading this off the job's own detail, so a run that omits it
+    is a run the check cannot watch."""
+    from app.services.comms.push import RecordingPushSender, WebPushSender
+
+    recording_counts = notify._tally_counts(notify.Tally(), RecordingPushSender())
+    assert recording_counts["push_transport"] == "recording"
+
+    webpush_counts = notify._tally_counts(
+        notify.Tally(), WebPushSender(private_key="x", subject="mailto:ops@example.invalid")
+    )
+    assert webpush_counts["push_transport"] == "webpush"

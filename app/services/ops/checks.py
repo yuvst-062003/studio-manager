@@ -232,11 +232,41 @@ def _upay_callback_silence(session: Session, *, at: datetime) -> Signal:
     )
 
 
+def _push_transport_unconfigured(session: Session, *, at: datetime) -> Signal:
+    """§2.1/§2.8/§13.2 -- the exact gap the register named: a notify run can "send" hundreds
+    of pushes to nobody and still read as a green heartbeat, because `RecordingPushSender`
+    accepts everything and invents an id shaped like a real one.
+
+    `app/workers/notify.py` stamps which transport it used on its own heartbeat
+    (`job_run.detail['push_transport']`, `webpush` or `recording`) -- this is the check that
+    reads it back. Red only when the latest run BOTH attempted at least one push and did so
+    through anything other than the real transport; a run with nothing queued proves nothing
+    about whether the transport works, and `unknown` — not `red` — is what a fresh
+    environment with no `comms-notify` history yet gets, for the same reason
+    `_upay_callback_silence` does not fire on a studio's first quiet week.
+    """
+    latest = _latest_run(session, "comms-notify")
+    # A missing key is as `unknown` as no row at all: a `job_run` written before this
+    # signal existed made no claim about its transport, and reading that silence as `red`
+    # would fire on every environment for one deploy before its first post-upgrade run.
+    if latest is None or not latest.detail or "push_transport" not in latest.detail:
+        return Signal(id="comms.push_transport", status="unknown", value=None, since=None)
+    attempted = int(latest.detail.get("pushed", 0)) + int(latest.detail.get("push_failed", 0))
+    red = attempted > 0 and latest.detail.get("push_transport") != "webpush"
+    return Signal(
+        id="comms.push_transport",
+        status="red" if red else "ok",
+        value=attempted,
+        since=latest.started_at,
+    )
+
+
 def signals(session: Session, *, at: datetime) -> list[Signal]:
     return [
         _unhandled_exceptions(session, at=at),
         _zero_charge_billing_run(session, at=at),
         _upay_callback_silence(session, at=at),
+        _push_transport_unconfigured(session, at=at),
     ]
 
 

@@ -27,6 +27,7 @@ from datetime import date
 
 from app.models.people import Student
 from app.models.person import Person
+from sqlalchemy import select
 from tests.belts.conftest import TODAY, YEAR_STARTS
 
 
@@ -46,6 +47,35 @@ def test_awarding_writes_the_history_row_and_the_cache_together(
 
     app_session.expire_all()
     assert app_session.get(Student, a_student).current_belt_id == a_belt_ladder[1]
+
+
+def test_awarding_a_belt_notifies_the_guardians(
+    client, app_session, as_manager, as_guardian_of, a_student, a_belt_ladder
+):
+    """§5.9 step 4 -- 'the guardians receive a notification' -- and the 2026-09-02 findings
+    register's §2.2: this producer never existed, so `belt` was one of three preference
+    switches (`app/models/comms.py:87-96`) that governed nothing because nothing was ever
+    sent."""
+    from app.models.comms import Notification
+
+    guardian = as_guardian_of(a_student)
+    response = client.post(
+        f"/api/v1/students/{a_student}/belts",
+        headers=as_manager.headers,
+        json={"belt_rank_id": str(a_belt_ladder[1]), "awarded_on": TODAY.isoformat()},
+    )
+    assert response.status_code == 201, response.text
+
+    notes = list(
+        app_session.execute(
+            select(Notification).where(
+                Notification.person_id == guardian.person_id,
+                Notification.kind == "belt.awarded",
+            )
+        ).scalars()
+    )
+    assert len(notes) == 1
+    assert notes[0].payload["belt_rank_id"] == str(a_belt_ladder[1])
 
 
 def test_a_belt_is_awarded_without_an_exam(client, as_lead_coach, a_student, a_belt_ladder):

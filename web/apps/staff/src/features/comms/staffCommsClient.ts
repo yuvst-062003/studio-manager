@@ -10,6 +10,7 @@ import type { components } from '@studio/api-client'
 export type NotificationOut = components['schemas']['NotificationOut']
 export type CalendarFeedOut = components['schemas']['CalendarFeedOut']
 export type NotificationPreferencesOut = components['schemas']['NotificationPreferencesOut']
+export type VapidPublicKeyOut = components['schemas']['VapidPublicKeyOut']
 
 export type Fetcher = (path: string, init?: RequestInit) => Promise<Response>
 
@@ -45,6 +46,11 @@ export function makeStaffCommsClient(fetcher: Fetcher) {
 
     markRead: async (notificationId: string): Promise<NotificationOut> =>
       json(await fetcher(`/api/v1/notifications/${notificationId}/read`, { method: 'POST' })),
+
+    /** HB-push-transport's public half. `null` when this environment has no VAPID key pair
+     * configured -- see `app/core/config.py`. */
+    vapidPublicKey: async (): Promise<VapidPublicKeyOut> =>
+      json(await fetcher('/api/v1/push/vapid-public-key')),
 
     registerPush: async (token: string, platform: 'ios' | 'android' | 'web') =>
       json(

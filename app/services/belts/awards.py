@@ -26,8 +26,10 @@ from sqlalchemy import select
 from app.core.tenancy import TenantSession
 from app.models.belts import BeltRank, StudentBelt
 from app.models.people import Student
+from app.models.person import Guardian, Person
 from app.schemas.belts import StudentBeltIn
 from app.services.belts.errors import BeltAlreadyAwardedError, BeltRankNotFoundError
+from app.services.comms import NotificationService
 
 
 class BeltAwardService:
@@ -89,7 +91,45 @@ class BeltAwardService:
         session.flush()
         BeltAwardService._refresh_cache(session, student_id)
         session.flush()
+        # SPEC §5.9 step 4 -- "the guardians receive a notification." Not committed here:
+        # both callers (this router and `app/services/events/exams.py`'s pass path) commit
+        # once after `award` returns, so the belt row and the notifications land as one
+        # transaction the same way the history row and the cache do.
+        BeltAwardService._notify_guardians(session, student_id, rank)
         return row, rank
+
+    @staticmethod
+    def _notify_guardians(session: TenantSession, student_id: uuid.UUID, rank: BeltRank) -> None:
+        """The producer §2.2 of the 2026-09-02 findings register found missing: `belt`
+        (`app/services/comms/kinds.py`'s `"belt": "belt"` prefix map) was one of three
+        preference switches governing nothing, because nothing ever called `enqueue` with
+        a `belt.*` kind.
+
+        Every guardian, not only the primary — the same §5.3 rule
+        `app/workers/billing.py::_guardians_of` and `app/workers/followups.py::_guardians_of`
+        already state for their own fan-outs.
+        """
+        student = session.get(Student, student_id)
+        child_name = ""
+        if student is not None:
+            person = session.get(Person, student.person_id)
+            if person is not None:
+                child_name = f"{person.first_name} {person.last_name}".strip()
+        guardian_ids = session.execute(
+            select(Guardian.person_id).where(Guardian.student_id == student_id)
+        ).scalars()
+        notifier = NotificationService(session)
+        body = (
+            f"{child_name} קיבל/ה חגורה {rank.name}" if child_name else f"חגורה חדשה: {rank.name}"
+        )
+        for guardian_person_id in guardian_ids:
+            notifier.enqueue(
+                person_id=guardian_person_id,
+                kind="belt.awarded",
+                title="חגורה חדשה!",
+                body=body,
+                payload={"student_id": str(student_id), "belt_rank_id": str(rank.id)},
+            )
 
     @staticmethod
     def _refresh_cache(session: TenantSession, student_id: uuid.UUID) -> None:

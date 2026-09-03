@@ -1,32 +1,40 @@
-"""The push boundary: a device registry, and a port with no wire behind it yet.
+"""The push boundary: a device registry, and the wire behind it.
 
-**There is no FCM transport in this repo, and that is a holdback rather than an omission.**
-§6.5 names Web Push over FCM as the channel, but `app/core/config.py` carries no FCM or VAPID
-setting and that file belongs to `core` rather than to this lane -- so there is nowhere to
-put a server key without a cross-lane edit, and §15's "required from you" list never asked
-for one. Recorded as `HB-push-transport`.
+**HB-push-transport, closed.** Web Push with VAPID -- §6.5 named it over FCM, and the
+2026-09-02 findings register's §2.1 found two independent breaks: no credential existed
+anywhere in this repo, and separately, the registration hooks called `pushManager.subscribe`
+with no `applicationServerKey` even if one had. This file is the first half; the second is
+`usePushRegistration.ts` and `useStaffPushRegistration.ts`, which now read the public half
+of the same pair from `GET /push/vapid-public-key`.
 
-What that does and does not cost is worth being exact about, because "push is not wired" is
-easy to read as "none of this works". Everything either side of the wire is real and tested:
-the registration (§7's `POST /push-tokens`), the per-channel record, §5.11's delivery report,
-§6.5's install-state list, and the push-disabled banner. What is missing is the HTTP call to
-FCM and the service worker's `push` event handler -- and the second of those lives in each
-app's service-worker entry, which this lane also does not own.
+No Google/Firebase project, no vendor account, no per-message cost: a Web Push endpoint is
+whatever push service the subscribing BROWSER chose (Chrome's, Mozilla's, or Apple's for an
+installed iOS PWA), and the VAPID key pair is only how this server proves to that service
+which sender it is. `app/core/config.py`'s `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` /
+`VAPID_SUBJECT` carry it -- unset in development and test, where `default_push_sender`
+falls back to `RecordingPushSender` rather than either crashing or reaching a real push
+service nobody asked it to.
 
-`RecordingPushSender` is what `app/workers/notify.py` drains through until a credential
-exists. It is deliberately not a silent no-op: it returns a message id shaped like a real
-one, so the delivery report exercises its `sent` path rather than only its failure paths.
+`RecordingPushSender` remains what `app/workers/notify.py` drains through absent a
+credential. It is deliberately not a silent no-op: it returns a message id shaped like a
+real one, so the delivery report still exercises its `sent` path. `app/services/ops/checks.py`
+is what stops that from being mistaken for the real thing in production -- it reads
+`push_transport` off the latest `comms-notify` job_run and turns red if pushes were
+attempted through anything other than `webpush`.
 """
 
 from __future__ import annotations
 
+import json
 import uuid
 from datetime import datetime
 from typing import Any, Protocol
 
+from pywebpush import WebPushException, webpush
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.db import get_engine
 from app.core.tenancy import TenantSession
 from app.models.comms import PushToken
@@ -71,6 +79,87 @@ class RecordingPushSender:
         message_id = f"rec-{uuid.uuid4().hex}"
         self.sent.append((token, message_id))
         return message_id
+
+
+class WebPushSender:
+    """The real transport. One HTTP POST per device, straight to whatever push service the
+    browser subscribed through -- there is no vendor account and no per-message cost, only
+    the key pair `default_push_sender` reads from settings.
+
+    `token` is `JSON.stringify(subscription)`, exactly as `usePushRegistration.ts` sent it to
+    `POST /push-tokens` -- `{endpoint, keys: {p256dh, auth}}` is precisely what `pywebpush`
+    calls `subscription_info`.
+    """
+
+    def __init__(self, *, private_key: str, subject: str) -> None:
+        self._private_key = private_key
+        self._subject = subject
+
+    def send(self, *, token: str, title: str, body: str, payload: dict[str, Any]) -> str:
+        try:
+            subscription_info = json.loads(token)
+        except ValueError as exc:
+            raise PushSendError("malformed subscription") from exc
+        try:
+            response = webpush(
+                subscription_info=subscription_info,
+                # Encrypted end to end (aes128gcm, RFC 8291) before it leaves this process --
+                # §18.3's title and body reach the device, never the push service in between.
+                data=json.dumps({"title": title, "body": body, "payload": payload}),
+                vapid_private_key=self._private_key,
+                vapid_claims={"sub": self._subject},
+                # A push service that never answers must not hang the drain that every other
+                # queued family is waiting behind.
+                timeout=10,
+            )
+        except WebPushException as exc:
+            raise PushSendError(_provider_reason(exc)) from exc
+        # Most push services answer 201 with no `Location` -- that header is a leftover from
+        # the pre-VAPID GCM API. Either way §5.11 only needs an opaque id a support
+        # conversation can be traced through, not one the provider issued.
+        location = response.headers.get("Location")
+        return location or f"wp-{uuid.uuid4().hex}"
+
+
+def _provider_reason(exc: WebPushException) -> str:
+    """The push service's status line, never the payload it was refusing.
+
+    `WebPushException`'s own message embeds the response BODY, and although that body is the
+    provider's error text rather than anything from `data=` (which left this process already
+    encrypted), §18.3's rule is to never assume what ends up in a field named `error` --
+    status and reason are enough to tell `failed` apart from a permanent refusal.
+    """
+    response = getattr(exc, "response", None)
+    if response is None:
+        return "unavailable"
+    return f"{response.status_code} {response.reason}".strip()
+
+
+def default_push_sender() -> PushSender:
+    """Which transport `app/workers/notify.py`'s drain uses, absent a test double.
+
+    Real once all three VAPID settings are configured; `RecordingPushSender` otherwise, so a
+    laptop with an empty `.env` runs the worker without crashing OR silently reaching a real
+    push service. A partial pair (one key set, not the other) is not a working pair either --
+    see `app/core/config.py`.
+    """
+    if settings.VAPID_PUBLIC_KEY and settings.VAPID_PRIVATE_KEY and settings.VAPID_SUBJECT:
+        return WebPushSender(
+            private_key=settings.VAPID_PRIVATE_KEY.get_secret_value(),
+            subject=settings.VAPID_SUBJECT,
+        )
+    return RecordingPushSender()
+
+
+def push_transport_name(sender: PushSender) -> str:
+    """A stable label for §2.8/§13.2's ops check -- not `type(sender).__name__`, which would
+    silently stop matching the string `app/services/ops/checks.py` compares against the
+    moment this module's classes are renamed."""
+    if isinstance(sender, WebPushSender):
+        return "webpush"
+    if isinstance(sender, RecordingPushSender):
+        return "recording"
+    return "custom"
 
 
 class PushTokenService:

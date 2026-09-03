@@ -48,7 +48,14 @@ export function PushDisabledBanner({
   // Registered, unasked, or mid-prompt: nothing to warn about yet. `unsupported` is a browser
   // with no Push API at all — a desktop that never had one — and telling that parent their
   // notifications are "off" would be blaming them for their browser.
-  if (state !== 'denied' && state !== 'unsupported-ios-tab') return null
+  //
+  // `error` used to fall into this same "nothing to warn about" bucket and render `null` --
+  // the 2026-09-02 findings register's §2.1: a parent who granted the OS permission but
+  // whose `subscribe()` failed (no VAPID key, a stale service worker) was told nothing at
+  // all, which is worse than the OS-refused case that at least shows this banner. Same
+  // copy as `denied` rather than new copy of its own -- the fix is that it renders,
+  // not what it looks like once it does.
+  if (state !== 'denied' && state !== 'unsupported-ios-tab' && state !== 'error') return null
 
   const iosTab = state === 'unsupported-ios-tab'
   return (

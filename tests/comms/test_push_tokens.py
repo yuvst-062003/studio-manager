@@ -230,3 +230,28 @@ def test_a_parent_cannot_deregister_someone_elses_device(
     app_session.expire_all()
     rows = app_session.scalars(select(PushToken).where(PushToken.token == token)).all()
     assert len(rows) == 1, "another person's device must survive"
+
+
+# -- HB-push-transport's public half -------------------------------------------
+def test_the_vapid_public_key_is_served_once_configured(client, as_manager, monkeypatch) -> None:
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "VAPID_PUBLIC_KEY", "BMBS...fake-public-key")
+    response = client.get("/api/v1/push/vapid-public-key", headers=as_manager.headers)
+    assert response.status_code == 200, response.text
+    assert response.json() == {"public_key": "BMBS...fake-public-key"}
+
+
+def test_the_vapid_public_key_is_null_when_unconfigured(client, as_manager, monkeypatch) -> None:
+    """No credential in this environment is an honest `null`, not a crash and not a fake
+    key that would make `pushManager.subscribe` fail with no diagnosable reason."""
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "VAPID_PUBLIC_KEY", None)
+    response = client.get("/api/v1/push/vapid-public-key", headers=as_manager.headers)
+    assert response.status_code == 200, response.text
+    assert response.json() == {"public_key": None}
+
+
+def test_reading_the_vapid_public_key_requires_a_signed_in_person(client) -> None:
+    assert client.get("/api/v1/push/vapid-public-key").status_code == 401

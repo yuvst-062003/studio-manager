@@ -133,6 +133,26 @@ class Settings(BaseSettings):
     #: fires on a quiet week gets muted before it is ever right.
     UPAY_CALLBACK_SILENCE_HOURS: int = 72
 
+    # -- push notifications (app/services/comms/push.py) -------------------------------
+    #
+    # HB-push-transport: Web Push with VAPID rather than FCM. No Google/Firebase project to
+    # create, and it already works on Chrome and on iOS 16.4+ installed PWAs -- see §6.5's
+    # "on iOS, Web Push exists only for a home-screen web app". Unset means
+    # `app/services/comms/push.py::default_push_sender` falls back to `RecordingPushSender`,
+    # which invents an id and writes `sent` without a message going anywhere;
+    # `app/services/ops/checks.py` watches for that combination so the gap stays visible.
+
+    #: The base64url, unpadded raw EC point a browser decodes into `applicationServerKey`.
+    #: Not secret -- every subscribing browser is handed it, over `GET
+    #: /push/vapid-public-key` -- but generated and rotated together with its private half.
+    VAPID_PUBLIC_KEY: str | None = None
+    #: The base64url, unpadded raw private scalar `pywebpush` signs VAPID JWTs with. Never
+    #: logged, never reaches a browser.
+    VAPID_PRIVATE_KEY: SecretStr | None = None
+    #: RFC 8292's contact claim, `mailto:` or `https:` -- so a push service that needs to
+    #: reach whoever runs this deployment about abuse or a misconfigured key has an address.
+    VAPID_SUBJECT: str | None = None
+
     @model_validator(mode="before")
     @classmethod
     def _blank_optional_is_unset(cls, data: Any) -> Any:

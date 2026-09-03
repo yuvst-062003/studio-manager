@@ -379,6 +379,34 @@
         "title": "AppAccessOut",
         "type": "object"
       },
+      "AtRiskSettingsIn": {
+        "properties": {
+          "threshold": {
+            "maximum": 20.0,
+            "minimum": 1.0,
+            "title": "Threshold",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "threshold"
+        ],
+        "title": "AtRiskSettingsIn",
+        "type": "object"
+      },
+      "AtRiskSettingsOut": {
+        "properties": {
+          "threshold": {
+            "title": "Threshold",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "threshold"
+        ],
+        "title": "AtRiskSettingsOut",
+        "type": "object"
+      },
       "AttendanceConflictOut": {
         "description": "One dismissible card. §10.5: \"nothing is silently dropped\".\n\nA card is raised **beside** stored marks, never instead of them. `count` is how many\nmarks it concerns, which is what artboard `1c`'s copy interpolates\n(`השיעור בוטל — התקבלו 22 סימוני נוכחות`).",
         "properties": {
@@ -10441,6 +10469,17 @@
             "title": "Health Status",
             "type": "string"
           },
+          "plan_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan Name"
+          },
           "source": {
             "anyOf": [
               {
@@ -14406,6 +14445,27 @@
         "title": "ValidationError",
         "type": "object"
       },
+      "VapidPublicKeyOut": {
+        "description": "§6.5's registration step needs the public half of HB-push-transport's key pair to\npass as `applicationServerKey`. Declared here rather than in `app/schemas/comms.py` for\nthe same reason `InstallStateOut` is: W5's contract commit did not anticipate it.",
+        "properties": {
+          "public_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Public Key"
+          }
+        },
+        "required": [
+          "public_key"
+        ],
+        "title": "VapidPublicKeyOut",
+        "type": "object"
+      },
       "app__routers__students__EnrollmentMoveIn": {
         "properties": {
           "enrollment_id": {
@@ -15617,6 +15677,69 @@
           }
         },
         "summary": "Attendance Report",
+        "tags": [
+          "coach",
+          "attendance"
+        ]
+      }
+    },
+    "/api/v1/attendance/settings": {
+      "get": {
+        "description": "Register §2.3's at-risk threshold, manager-only for the same reason\n`attendance_report` above is: a studio-wide policy number, not a coach's own view of\nthe mat. `app/services/attendance/settings.py` is why this and `PUT` below exist as\ntheir own small pair rather than another field on `PATCH /studio` — a different\nvertical's endpoint and whitelist.",
+        "operationId": "get_attendance_settings_api_v1_attendance_settings_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AtRiskSettingsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Attendance Settings",
+        "tags": [
+          "coach",
+          "attendance"
+        ]
+      },
+      "put": {
+        "operationId": "put_attendance_settings_api_v1_attendance_settings_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AtRiskSettingsIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AtRiskSettingsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Attendance Settings",
         "tags": [
           "coach",
           "attendance"
@@ -23006,6 +23129,29 @@
           }
         },
         "summary": "Register Push Token",
+        "tags": [
+          "coach",
+          "comms"
+        ]
+      }
+    },
+    "/api/v1/push/vapid-public-key": {
+      "get": {
+        "description": "`None` until HB-push-transport's key pair is configured in this environment, so a\nbrowser gets a clear \"not yet\" rather than `pushManager.subscribe` throwing on a missing\n`applicationServerKey`.\n\nSigned in, like every route in this file -- not because the key is a secret (every\nsubscribing browser is handed the same one), but because there is no reason for it to\nbe reachable before the parent or coach it is for has signed in.",
+        "operationId": "vapid_public_key_api_v1_push_vapid_public_key_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VapidPublicKeyOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Vapid Public Key",
         "tags": [
           "coach",
           "comms"

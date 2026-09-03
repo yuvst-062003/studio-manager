@@ -1848,3 +1848,35 @@ holdbacks:
     opened: 2026-08-24
     closed: 2026-08-26
     source: docs/plan/milestone-plan.md Part 5 · D9
+  - id: HB-push-transport
+    kind: carried
+    title: Push notifications had no transport, and no token was ever created either
+    why: >-
+      app/services/comms/push.py shipped 2026-08-26 with RecordingPushSender standing in
+      for a credential that did not exist anywhere in this repo, and the comment recorded
+      the reason: app/core/config.py belongs to core, not to this lane, so there was
+      nowhere to put a server key without a cross-lane edit, and no session had asked for
+      one. Independently, both push registration hooks called pushManager.subscribe with
+      no applicationServerKey, which Chrome and Safari both reject — and the resulting
+      'error' state rendered PushDisabledBanner as null, so a parent who granted the OS
+      permission was told nothing at all. The 2026-09-02 findings register's §2.1 found
+      both breaks and traced their business cost: every push landed as no_token, which
+      renders as "האפליקציה לא הותקנה" and sent the manager to phone families whose only
+      problem was a missing key on the server.
+
+      CLOSED 2026-09-02. Web Push with VAPID (§6.5's own choice over FCM), decided via
+      AskUserQuestion in the fix-notifications lane: no Google/Firebase project, works on
+      Chrome and on iOS 16.4+ installed PWAs. app/core/config.py now carries
+      VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY / VAPID_SUBJECT (empty falls back to
+      RecordingPushSender rather than crashing); app/services/comms/push.py's
+      WebPushSender signs and encrypts for real through pywebpush; GET
+      /push/vapid-public-key hands the public half to a signed-in browser; both
+      registration hooks pass it as applicationServerKey; PushDisabledBanner renders for
+      'error' as well as 'denied'. app/services/ops/checks.py's new comms.push_transport
+      signal reads app/workers/notify.py's own job_run.detail to catch a future
+      regression back to the recording fallback before it reads as a green heartbeat.
+    blocks: M8
+    status: closed
+    opened: 2026-08-26
+    closed: 2026-09-02
+    source: docs/superpowers/specs/2026-09-02-completion-findings-register.md §2.1, §13.2

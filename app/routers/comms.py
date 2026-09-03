@@ -24,6 +24,7 @@ from pydantic import BaseModel, Field
 
 from app.core.auth_context import require_roles
 from app.core.clock import now
+from app.core.config import settings
 from app.core.tenancy import TenantSessionDep
 from app.models.comms import PREFERENCE_GROUPS, Notification
 from app.schemas._pagination import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, IdempotencyKey
@@ -154,6 +155,28 @@ def deregister_push_token(
     caller as well as the token.
     """
     PushTokenService(session).deregister(_person_id(request), token=body.token)
+
+
+class VapidPublicKeyOut(BaseModel):
+    """§6.5's registration step needs the public half of HB-push-transport's key pair to
+    pass as `applicationServerKey`. Declared here rather than in `app/schemas/comms.py` for
+    the same reason `InstallStateOut` is: W5's contract commit did not anticipate it."""
+
+    public_key: str | None
+
+
+@router.get("/push/vapid-public-key", response_model=VapidPublicKeyOut)
+def vapid_public_key(request: Request) -> VapidPublicKeyOut:
+    """`None` until HB-push-transport's key pair is configured in this environment, so a
+    browser gets a clear "not yet" rather than `pushManager.subscribe` throwing on a missing
+    `applicationServerKey`.
+
+    Signed in, like every route in this file -- not because the key is a secret (every
+    subscribing browser is handed the same one), but because there is no reason for it to
+    be reachable before the parent or coach it is for has signed in.
+    """
+    _person_id(request)
+    return VapidPublicKeyOut(public_key=settings.VAPID_PUBLIC_KEY)
 
 
 # -- §5.11's announcements (dashboard 4f) -------------------------------------

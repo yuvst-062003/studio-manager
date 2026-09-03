@@ -50,6 +50,25 @@ export function platformOf(userAgent: string): 'ios' | 'android' | 'web' {
 }
 
 /**
+ * `PushManager.subscribe`'s `applicationServerKey` wants raw bytes, and the server hands
+ * back the VAPID public key as base64url (RFC 4648 §5, no padding) -- the standard MDN
+ * conversion, exported so `useStaffPushRegistration.ts` and this hook's own tests read the
+ * exact same bytes rather than two implementations that could quietly drift apart.
+ */
+export function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
+  const rawData = globalThis.atob(base64)
+  // `new Uint8Array(length)`, not `.from()` -- `.from()` infers `Uint8Array<ArrayBufferLike>`,
+  // which `PushSubscriptionOptionsInit.applicationServerKey` (`BufferSource`) rejects because
+  // `ArrayBufferLike` admits a `SharedArrayBuffer`. Allocating the length up front is backed
+  // by a real `ArrayBuffer`.
+  const bytes = new Uint8Array(rawData.length)
+  for (let i = 0; i < rawData.length; i += 1) bytes[i] = rawData.charCodeAt(i)
+  return bytes
+}
+
+/**
  * `useDisplayMode()` is read rather than a build flag, and `app/../App.tsx` says why it must
  * stay that way: "M8 reports install rates from it, and a measurement that lies to make a dev
  * tab convenient is worse than the gate."
@@ -98,10 +117,20 @@ export function usePushRegistration(
       return
     }
     try {
+      // HB-push-transport's second break: this used to call `subscribe` with no
+      // `applicationServerKey` at all, which Chrome and Safari both reject outright. Fetched
+      // rather than baked in at build time, so rotating the key pair needs no rebuild of
+      // three separate PWA bundles.
+      const { public_key: publicKey } = await client.vapidPublicKey()
+      if (!publicKey) {
+        setState('error')
+        return
+      }
       const navigatorWithSW = globalThis.navigator as PushCapableNavigator
       const registration = await navigatorWithSW.serviceWorker?.ready
       const subscription = await registration?.pushManager.subscribe({
         userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(publicKey),
       })
       if (!subscription) {
         setState('error')
