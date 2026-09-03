@@ -169,10 +169,11 @@ export function TodayScreen({
   // client can already ask, and asking on every non-empty day would be a query nobody needs
   // the answer to.
   useEffect(() => {
-    if (onThisDay.length > 0) {
-      setNoTrainingYear(false)
-      return
-    }
+    // `noTrainingYear` is read only inside the `onThisDay.length === 0` branch below, so
+    // a non-empty day has nothing to reset -- the effect re-runs on every transition of
+    // `onThisDay.length`, including back to 0, and the fetch below sets the current
+    // answer fresh each time that happens.
+    if (onThisDay.length > 0) return
     let live = true
     client
       .listTrainingYears()

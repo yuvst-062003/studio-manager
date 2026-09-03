@@ -75,10 +75,14 @@ describe('S5 — offline → queue → reconnect → flush → conflict', () => 
       t('he', 'attendance.network.offline'),
     )
 
-    // A mark taken offline lands in pending_ops and the badge counts it.
+    // A mark taken offline lands in pending_ops and the badge counts it. Hebrew plural
+    // rule (attendance vertical, register §10): a bare '1' was never correct Hebrew, and
+    // the count now renders through the singular form.
     await markOne()
     queueChanged()
-    expect(await screen.findByTestId('network-status-pending')).toHaveTextContent('1')
+    expect(await screen.findByTestId('network-status-pending')).toHaveTextContent(
+      t('he', 'attendance.sync.pendingCount.one'),
+    )
 
     // Back upstairs. The flusher's job, exercised here with the server refusing the
     // session: the mark is STORED server-side and a card is raised — §10.5's "nothing is
