@@ -504,8 +504,8 @@ export function PaymentSetup({
                         data-testid={`setup-standing-link-${row.child.id}`}
                         // 2026-09-03 addendum -- opens in the in-app overlay instead of a
                         // new tab. §7.2's old failure mode (following the link navigated
-                        // the ONE tab `/join/<token>` runs in away, restarting the wizard
-                        // on return) is exactly what the overlay exists to prevent.
+                        // the ONE tab the join wizard runs in away, restarting it on
+                        // return) is exactly what the overlay exists to prevent.
                         onClick={() => setOverlay({ kind: 'link', url: link.url })}
                         type="button"
                         variant="ghost"

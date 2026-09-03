@@ -140,8 +140,16 @@ export function JoinFlow({
   // queue. `handleHealthSigned` below is what decides, from `healthDrafts`.
   useEffect(() => {
     if (step !== 'health' || students.length > 0) return
-    void refreshStudents()
-  }, [refreshStudents, step, students.length])
+    // Fetched directly rather than through `refreshStudents` (still used by
+    // `handleHealthSigned` below) -- calling a setState-carrying callback from an effect
+    // is the same cascading-render risk the fetch above (line 104) already avoids by
+    // setting state from its own `.then`, not from a function an effect merely invokes.
+    let alive = true
+    void loadStudents().then((next) => alive && setStudents(next))
+    return () => {
+      alive = false
+    }
+  }, [step, students.length])
 
   // Save-on-change: every edit to the family form or a kid's health answers persists
   // immediately, so a closed tab loses nothing typed since the last keystroke.
