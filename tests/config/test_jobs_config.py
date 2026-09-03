@@ -21,13 +21,37 @@ import ast
 import importlib
 import json
 import re
+from datetime import UTC, datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 ROOT = Path(__file__).resolve().parents[2]
 JOBS = ROOT / "infra/railway/jobs.json"
 WORKERS = ROOT / "app/workers"
 
 CRON = re.compile(r"^\S+ \S+ \S+ \S+ \S+$")
+
+#: §13.10 -- Railway's cron runs in UTC while every `why:` in jobs.json reasons in
+#: Asia/Jerusalem, so an unshifted expression fires three hours late during Israel
+#: Daylight Time (the season this repository was audited in, and roughly seven months of
+#: the year). Only the daily, fixed-hour jobs are listed: `*/15` and hourly entries fire
+#: on the same minutes regardless of which zone you read them in, so shifting them would
+#: be a no-op dressed up as a fix.
+INTENDED_JERUSALEM_HOUR = {
+    "demo-reset": (2, 0),
+    "plan-changes": (2, 30),
+    "billing-run": (8, 30),
+    "people-followups": (9, 0),
+    "health-reminders": (9, 30),
+    "attendance-at-risk": (7, 0),
+}
+
+#: A date inside Israel Daylight Time (IDT, UTC+3), which is what "Verified 2026-09-02"
+#: in the findings register was written under. A static cron shift is only ever exact for
+#: one side of the DST boundary -- IST (UTC+2) runs the other five months -- and that
+#: imprecision is the accepted cost of "shift the cron expressions and document that they
+#: are UTC" rather than teaching the worker to read the clock itself.
+_SAMPLE_IDT_DATE = (2026, 9, 2)
 
 
 def _jobs() -> list[dict]:
@@ -120,3 +144,21 @@ def test_every_runnable_worker_is_declared():
 def test_every_job_cites_the_spec_section_that_asks_for_it():
     for job in _jobs():
         assert job["spec"].startswith("SPEC §"), job
+
+
+def test_daily_jobs_fire_at_their_documented_jerusalem_hour():
+    """§13.10 -- production ran every daily job three hours late for as long as the eight
+    cron services have existed, because `schedule` is interpreted as UTC while the `why:`
+    beside each one argues in Asia/Jerusalem. `billing-run` at `30 8 * * *` UTC is 11:30
+    Jerusalem, not the 08:30 the job's own `why:` leans on to argue it runs after the
+    quiet-hours band -- so the argument was correct and the schedule silently missed it."""
+    year, month, day = _SAMPLE_IDT_DATE
+    for name, (hour, minute) in INTENDED_JERUSALEM_HOUR.items():
+        job = next(j for j in _jobs() if j["name"] == name)
+        cron_minute, cron_hour = job["schedule"].split()[:2]
+        fired_at = datetime(year, month, day, int(cron_hour), int(cron_minute), tzinfo=UTC)
+        local = fired_at.astimezone(ZoneInfo("Asia/Jerusalem"))
+        assert (local.hour, local.minute) == (hour, minute), (
+            f"{name}: {job['schedule']} (UTC) lands at {local:%H:%M} Jerusalem during IDT, "
+            f"not the documented {hour:02d}:{minute:02d}"
+        )

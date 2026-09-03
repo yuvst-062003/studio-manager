@@ -213,16 +213,21 @@ there is no `railway cron`, and no variable equivalent — so if a ninth job is 
 `infra/railway/jobs.json`, it needs this same by-hand step, and this section should flip
 back to describing it as pending until it is confirmed the same way.
 
-| Service | Start command | Schedule |
-|---|---|---|
-| `cron-plan-changes` | `python -m app.workers.plan_changes` | `30 2 * * *` |
-| `cron-billing-run` | `python -m app.workers.billing` | `30 8 * * *` |
-| `cron-people-followups` | `python -m app.workers.followups` | `0 9 * * *` |
-| `cron-health-reminders` | `python -m app.workers.health_reminders` | `30 9 * * *` |
-| `cron-comms-notify` | `python -m app.workers.notify` | `*/15 * * * *` |
-| `cron-sessions-complete` | `python -m app.workers.schedule` | `0 * * * *` |
-| `cron-privacy-requests` | `python -m app.workers.privacy` | `20 * * * *` |
-| `cron-ops-check` | `python -m app.workers.ops_check` | `*/15 * * * *` |
+**`schedule` is UTC, not Asia/Jerusalem** (verified 2026-09-02, §13.10 of the 2026-09-02
+findings register). The five daily jobs below are shifted -3h from what their `why:` in
+`infra/railway/jobs.json` names, so the UTC value here matches the Jerusalem hour the job
+was actually designed for -- see that file's `$comment` for the DST caveat.
+
+| Service | Start command | Schedule (UTC) | Intended (Asia/Jerusalem, IDT) |
+|---|---|---|---|
+| `cron-plan-changes` | `python -m app.workers.plan_changes` | `30 23 * * *` | 02:30 |
+| `cron-billing-run` | `python -m app.workers.billing` | `30 5 * * *` | 08:30 |
+| `cron-people-followups` | `python -m app.workers.followups` | `0 6 * * *` | 09:00 |
+| `cron-health-reminders` | `python -m app.workers.health_reminders` | `30 6 * * *` | 09:30 |
+| `cron-comms-notify` | `python -m app.workers.notify` | `*/15 * * * *` | every 15 min, any zone |
+| `cron-sessions-complete` | `python -m app.workers.schedule` | `0 * * * *` | hourly, any zone |
+| `cron-privacy-requests` | `python -m app.workers.privacy` | `20 * * * *` | hourly, any zone |
+| `cron-ops-check` | `python -m app.workers.ops_check` | `*/15 * * * *` | every 15 min, any zone |
 
 Each was given **no source attached, deliberately**, until configured: attaching the repo
 would make it boot the Dockerfile's uvicorn CMD and bill continuously until its start
@@ -392,26 +397,31 @@ staging-only, the other seven are production — using its `schedule` and `comma
 verbatim. A `jobs.json` entry on its own schedules nothing. This is the one half of the
 mechanism no test can reach; if the dashboard and the file disagree, the file is right.
 
-Current entries, and where each must exist:
+Current entries, and where each must exist. **`schedule` is verbatim UTC** — see
+`infra/railway/jobs.json`'s `$comment` for why the five daily jobs are shifted -3h from
+the Jerusalem hour their `why:` argues for, and its DST caveat:
 
-| Job | Environment | Schedule (Asia/Jerusalem) |
-|---|---|---|
-| `demo-reset` | staging | `0 2 * * *` |
-| `plan-changes` | production | `30 2 * * *` |
-| `billing-run` | production | `30 8 * * *` |
-| `people-followups` | production | `0 9 * * *` |
-| `health-reminders` | production | `30 9 * * *` |
-| `comms-notify` | production | `*/15 * * * *` |
-| `sessions-complete` | production | `0 * * * *` |
-| `privacy-requests` | production | `20 * * * *` |
-| `ops-check` | **every environment** | `*/15 * * * *` |
+| Job | Environment | Schedule (UTC, verbatim from `jobs.json`) | Intended (Asia/Jerusalem, IDT) |
+|---|---|---|---|
+| `demo-reset` | staging | `0 23 * * *` | 02:00 |
+| `plan-changes` | production | `30 23 * * *` | 02:30 |
+| `billing-run` | production | `30 5 * * *` | 08:30 |
+| `people-followups` | production | `0 6 * * *` | 09:00 |
+| `health-reminders` | production | `30 6 * * *` | 09:30 |
+| `comms-notify` | production | `*/15 * * * *` | every 15 min |
+| `sessions-complete` | production | `0 * * * *` | hourly |
+| `privacy-requests` | production | `20 * * * *` | hourly |
+| `ops-check` | **every environment** | `*/15 * * * *` | every 15 min |
 
 The order of the first four is load-bearing, not cosmetic: `plan-changes` must apply a
 downgrade before `billing-run` bills the month, and `billing-run` and `health-reminders`
-must both sit after 08:00 because they enqueue notifications directly and `comms-notify`
-drains them within fifteen minutes — the quiet-hours refusal lives in `ReminderService`,
-which neither path goes through, so for those two the cron hour is the hour a parent's
-phone lights up.
+must both sit after 08:00 Jerusalem because they enqueue notifications directly and
+`comms-notify` drains them within fifteen minutes. As of §13.11, `drain_queued` itself
+now refuses between 21:00 and 08:00 Jerusalem for every kind — not only the four that
+already routed through `ReminderService` — so a notification enqueued by either job stays
+`queued` rather than reaching a phone even if a schedule ever drifted back into the quiet
+band; the 08:30/09:30 placement is still correct, it is no longer the only thing standing
+between these two jobs and a 3am buzz.
 
 ---
 
