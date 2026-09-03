@@ -544,12 +544,82 @@ def test_the_payload_never_reaches_the_logs(client, a_stranger, bookable, a_grou
 
 
 def test_a_second_free_trial_is_refused(client, a_stranger, bookable, a_group):
-    """§5.4a -- 'One free lesson per student, full stop.'"""
+    """§5.4a -- 'One free lesson per student, full stop.' The SAME child, booked twice by
+    the same guardian, is refused the second time.
+
+    Fixed names on both calls, deliberately -- `_book`'s default `children` tags each call
+    with a fresh random suffix, which under F17's per-student rule would make the two
+    calls two DIFFERENT children and this test would stop proving anything.
+    """
     session_id = bookable.sessions[a_group][0].id
-    assert _book(client, a_stranger, a_group, session_id).status_code == 201
-    second = _book(client, a_stranger, a_group, session_id)
+    child = [{"first_name": "נועה", "last_name": "לוי", "birthdate": "2019-04-01"}]
+    assert _book(client, a_stranger, a_group, session_id, children=child).status_code == 201
+    second = _book(client, a_stranger, a_group, session_id, children=child)
     assert second.status_code == 409
     assert second.json()["detail"]["code"] == "trial_already_used"
+
+
+def test_a_different_child_of_the_same_guardian_still_gets_a_free_trial(
+    client, a_stranger, bookable, a_group
+):
+    """F17's proving test. `has_used_a_free_trial` used to ask the GUARDIAN rather than
+    the child, so a parent whose first child had already had a trial was refused `409`
+    for a second, entirely different child -- the sibling in F17's bug report. Counting
+    per student instead means a different name and a different birthdate is a different
+    identity, and gets its own free lesson.
+    """
+    session_id = bookable.sessions[a_group][0].id
+    first_child = [{"first_name": "נועה", "last_name": "לוי", "birthdate": "2019-04-01"}]
+    sibling = [{"first_name": "דנה", "last_name": "כהן", "birthdate": "2015-02-11"}]
+    assert _book(client, a_stranger, a_group, session_id, children=first_child).status_code == 201
+    second = _book(client, a_stranger, a_group, session_id, children=sibling)
+    assert second.status_code == 201, second.text
+
+
+def test_the_same_child_is_still_refused_even_with_a_new_person_row(
+    client, a_stranger, bookable, a_group
+):
+    """The other half of F17: counting per student is not counting per REQUEST or per
+    `Person` row. `book_for_self` gives every trial child a brand-new `Person` (there is
+    no student id to match on yet), so the guard has to be the honest proxy -- normalised
+    full name and birthdate against the guardian's existing children -- and it has to
+    survive incidental whitespace, which is exactly what `_normalize_name` is for.
+    """
+    session_id = bookable.sessions[a_group][0].id
+    first_child = [{"first_name": "נועה", "last_name": "לוי", "birthdate": "2019-04-01"}]
+    same_child_again = [{"first_name": " נועה ", "last_name": "לוי", "birthdate": "2019-04-01"}]
+    assert _book(client, a_stranger, a_group, session_id, children=first_child).status_code == 201
+    second = _book(client, a_stranger, a_group, session_id, children=same_child_again)
+    assert second.status_code == 409
+    assert second.json()["detail"]["code"] == "trial_already_used"
+
+
+def test_an_override_does_not_count_against_that_student(
+    client, a_stranger, bookable, a_group, as_manager, app_session
+):
+    """`is_override=True` is the manager's decision to allow a second look, and does not
+    itself count as the student's used trial -- so the same child can be booked again
+    afterwards without a second manager tap. `has_used_a_free_trial` has excluded override
+    rows from the count since before F17; this proves it still holds now that the match is
+    per student rather than per guardian.
+    """
+    session_id = bookable.sessions[a_group][0].id
+    child = [{"first_name": "נועה", "last_name": "לוי", "birthdate": "2019-04-01"}]
+    first = _book(client, a_stranger, a_group, session_id, children=child)
+    assert first.status_code == 201
+
+    booking = app_session.execute(
+        select(TrialBooking).where(
+            TrialBooking.student_id == uuid.UUID(first.json()["students"][0]["id"])
+        )
+    ).scalar_one()
+    granted = client.post(
+        f"/api/v1/trial-bookings/{booking.id}/grant-override", headers=as_manager.headers
+    )
+    assert granted.status_code == 200, granted.text
+
+    third = _book(client, a_stranger, a_group, session_id, children=child)
+    assert third.status_code == 201, third.text
 
 
 def test_a_different_family_is_unaffected(client, fake_provider, a_stranger, bookable, a_group):

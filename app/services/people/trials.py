@@ -32,7 +32,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 from sqlalchemy import select
@@ -46,6 +46,13 @@ from app.services.audit import AuditService
 from app.services.people.errors import ConflictError, NotFoundError
 from app.services.people.matching import match_person
 from app.services.people.status import StudentStatusService
+
+
+def _normalize_name(value: str) -> str:
+    """Collapse whitespace and casefold, so 'Yossi  Cohen' and 'yossi cohen' are one
+    identity. The same normalisation on both sides of a comparison is what makes it safe --
+    see `has_used_a_free_trial`."""
+    return " ".join(value.split()).casefold()
 
 
 @dataclass
@@ -82,29 +89,71 @@ class BookedTrial:
 
 class TrialService:
     @staticmethod
-    def has_used_a_free_trial(session: Session, *, guardian_person_id: uuid.UUID) -> bool:
+    def has_used_a_free_trial(
+        session: Session,
+        *,
+        guardian_person_id: uuid.UUID,
+        student_id: uuid.UUID | None = None,
+        first_name: str = "",
+        last_name: str = "",
+        birthdate: date | None = None,
+    ) -> bool:
         """§5.4a -- 'One free lesson per student, full stop.'
 
-        Asked of the GUARDIAN rather than of the child, because a child booking a second
-        trial arrives as a brand-new Person with the same name -- there is nothing to match
-        on yet. The parent is the stable identity, and `is_override` exists for the honest
-        case where the same family genuinely needs a second look.
+        Matched on the STUDENT, not the guardian (F17). Counting per guardian refused a
+        second child outright: a parent whose first child had already had a trial got
+        `409` for a sibling who had never had one, because the check only ever asked
+        whether the PARENT had booked before. `is_override` still exists for the honest
+        case where the same child genuinely needs a second look, and a booking a manager
+        already granted an override for does not count against them again -- the override
+        is the decision, and re-charging it would make one tap into a permanent block.
 
-        A booking a manager already granted an override for does not count against them
-        again: the override is the decision, and re-charging it would make one tap into a
-        permanent block.
+        There are two ways to name the student, because a trial booking may or may not
+        have one yet:
+
+        * `student_id` given -- the child is an existing student row, so the prior
+          booking that counts is one for exactly that student. (No caller passes this
+          today: `book_for_self` always creates a fresh `Person` per child. It is here
+          for the caller that books an already-known student.)
+        * `student_id` absent -- the common case, and the one `book_for_self` hits every
+          time: the anonymous and signed-in booking flows both create a brand-new
+          `Person` per child, so there is no id to match on yet. The proxy is the
+          guardian's existing children on normalised full name and birthdate -- the same
+          pair `duplicate_student` (`app/services/people/matching.py`) uses to stop a
+          second registration for a child the roster already has. That pair is what stops
+          THIS child booking twice under a new `Person`, while a genuinely different
+          child -- a different name, or the same name and a different birthdate -- still
+          gets their own free lesson.
         """
-        return (
-            session.execute(
-                select(TrialBooking.id)
-                .join(Guardian, Guardian.student_id == TrialBooking.student_id)
-                .where(
-                    Guardian.person_id == guardian_person_id,
-                    TrialBooking.is_override.is_(False),
-                )
-                .limit(1)
-            ).first()
-            is not None
+        if student_id is not None:
+            return (
+                session.execute(
+                    select(TrialBooking.id)
+                    .where(
+                        TrialBooking.student_id == student_id,
+                        TrialBooking.is_override.is_(False),
+                    )
+                    .limit(1)
+                ).first()
+                is not None
+            )
+
+        normalized_first, normalized_last = _normalize_name(first_name), _normalize_name(last_name)
+        rows = session.execute(
+            select(Person.first_name, Person.last_name, Person.birthdate)
+            .join(Student, Student.person_id == Person.id)
+            .join(TrialBooking, TrialBooking.student_id == Student.id)
+            .join(Guardian, Guardian.student_id == Student.id)
+            .where(
+                Guardian.person_id == guardian_person_id,
+                TrialBooking.is_override.is_(False),
+            )
+        ).all()
+        return any(
+            _normalize_name(existing_first) == normalized_first
+            and _normalize_name(existing_last) == normalized_last
+            and existing_birthdate == birthdate
+            for existing_first, existing_last, existing_birthdate in rows
         )
 
     @staticmethod
@@ -226,12 +275,23 @@ class TrialService:
             at=at,
         )
 
-        if not allow_override and TrialService.has_used_a_free_trial(
-            session, guardian_person_id=parent.id
-        ):
-            raise ConflictError(
-                "this family has already used a free trial lesson; a manager can grant another"
-            )
+        # Per child, not once for the whole request (F17) -- and checked for EVERY child
+        # before any of them is written, the same reason `choices` above is resolved
+        # up front: one child in the request having already used a trial must not leave
+        # their siblings half-booked.
+        if not allow_override:
+            for child in children:
+                if TrialService.has_used_a_free_trial(
+                    session,
+                    guardian_person_id=parent.id,
+                    first_name=str(child.get("first_name", "")),
+                    last_name=str(child.get("last_name", "")),
+                    birthdate=child.get("birthdate"),
+                ):
+                    raise ConflictError(
+                        "this child has already used a free trial lesson; "
+                        "a manager can grant another"
+                    )
 
         booked: list[BookedChild] = []
         for child, (group, session_row) in zip(children, choices, strict=True):
