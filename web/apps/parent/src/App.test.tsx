@@ -103,6 +103,11 @@ describe('parent app', () => {
     expect(screen.queryByTestId('install-walkthrough')).toBeNull()
   })
 
+  // This test mounts the whole app and waits through two rendering passes (banner, then
+  // the walkthrough it opens) and legitimately takes the better part of a second. Under
+  // a loaded, full parallel test run that pushes past vitest's default 5s `testTimeout`
+  // and the test times out even though nothing is hung. Give it real headroom instead of
+  // a global bump that would mask an unrelated test hanging. Do not "tidy" this away.
   it('nudges with a reason, and the nudge opens the walkthrough on demand', async () => {
     // §6.5 still gets its pitch — push on iOS exists only for a home-screen app — it
     // just no longer blocks. The banner's CTA routes to #/install, where the original
@@ -115,7 +120,7 @@ describe('parent app', () => {
     cta.click()
     await waitFor(() => expect(screen.getByTestId('install-walkthrough')).toBeInTheDocument())
     expect(screen.getByText(t('he', 'common.install.why'))).toBeInTheDocument()
-  })
+  }, 15000)
 
   it('renders the sign-in screen in a tab when nobody is signed in', async () => {
     // The other half of removing the wall: §6.1 step 2 is now reachable from a plain
@@ -214,6 +219,11 @@ describe('the P1 routes — screens that were built and rendered by nothing', ()
     await waitFor(() => expect(screen.getByTestId('payment-history')).toBeInTheDocument())
   })
 
+  // Fast in isolation, but confirmed flaky under a loaded, full parallel test run --
+  // mounting the whole app plus a real fetch round trip is enough to cross vitest's
+  // default 5s `testTimeout` when the machine is contended, even though nothing here is
+  // hung. Give it real headroom instead of a global bump that would mask an unrelated
+  // test hanging. Do not "tidy" this away.
   it('routes the uPay return leg to the payment-complete screen', async () => {
     globalThis.location.hash = '#/payment-complete/some-ref'
     vi.stubGlobal(
@@ -226,7 +236,7 @@ describe('the P1 routes — screens that were built and rendered by nothing', ()
     )
     render(<App />)
     await waitFor(() => expect(screen.getByTestId('payment-complete')).toBeInTheDocument())
-  })
+  }, 15000)
 
   it('strips uPay\'s appended payload off the ref on the return leg', async () => {
     // upay-integration.md round one: 'The customer's browser is ALSO redirected to
@@ -335,6 +345,12 @@ describe('L6 — the anonymous landing touches no session', () => {
     globalThis.history.pushState({}, '', '/')
   })
 
+  // This test mounts the whole app, drives a session refresh, then walks the wizard's
+  // real step 1 through several `userEvent` clicks -- measured as high as 2.1s under
+  // ordinary machine contention. Under a loaded, full parallel test run that pushes past
+  // vitest's default 5s `testTimeout` and the test times out even though nothing is
+  // hung. Give it real headroom instead of a global bump that would mask an unrelated
+  // test hanging. Do not "tidy" this away.
   it('returning from the OAuth callback with signed_in=1 restores the session and resumes the booking', async () => {
     // A full-page OAuth return is a fresh JS context: the in-memory token is empty, and
     // the landing never refreshes for anonymous visitors. The callback's marker is the
@@ -445,10 +461,15 @@ describe('L6 — the anonymous landing touches no session', () => {
     // it — while `book` survives the strip; it is what resumed the flow just now.
     expect(globalThis.location.search).toBe('?book=g1')
     globalThis.history.pushState({}, '', '/')
-  })
+  }, 15000)
 })
 
 describe('P7 — the belt link resolves or refuses, never silently home', () => {
+  // Both tests in this block mount the whole app and resolve a real hash route through a
+  // stubbed fetch; fast in isolation but confirmed flaky under a loaded, full parallel
+  // test run, where that round trip is enough to cross vitest's default 5s
+  // `testTimeout` even though nothing here is hung. Give them real headroom instead of a
+  // global bump that would mask an unrelated test hanging. Do not "tidy" this away.
   it('completes a single-segment link from the child’s belt history', async () => {
     globalThis.location.hash = '#/belts/st1'
     vi.stubGlobal(
@@ -480,16 +501,22 @@ describe('P7 — the belt link resolves or refuses, never silently home', () => 
     )
     render(<App />)
     await waitFor(() => expect(globalThis.location.hash).toBe('#/belts/st1/c9'))
-  })
+  }, 15000)
 
   it('refuses a bare #/belts/ visibly, with a way forward', async () => {
     globalThis.location.hash = '#/belts/'
     render(<App />)
     expect(await screen.findByText(t('he', 'events.belt.noneYet'))).toBeInTheDocument()
-  })
+  }, 15000)
 })
 
 describe('§3 Door D — #/add-child opens the shared wizard, not the old 3-field form', () => {
+  // This test drives the whole multi-step wizard through real `userEvent` interactions --
+  // filling a full student panel, submitting, signing a health declaration, then
+  // confirming -- and legitimately takes over a second (measured up to 1.7s). Under a
+  // loaded, full parallel test run that pushes past vitest's default 5s `testTimeout`
+  // and the test times out even though nothing is hung. Give it real headroom instead of
+  // a global bump that would mask an unrelated test hanging. Do not "tidy" this away.
   it('F18 replaced: the wizard writes the new child through /me/students/register and refreshes the family without a reload', async () => {
     // The old `AddSibling` (F18) wrote first/last/group_ids straight to `POST
     // /me/students` with no ת.ז., no plan, no health step and no payment step. Door D
@@ -606,7 +633,7 @@ describe('§3 Door D — #/add-child opens the shared wizard, not the old 3-fiel
     await waitFor(() => expect(registerCalled).toBe(true))
     // Refreshed without a reload -- the same seam the old test proved for `AddSibling`.
     await waitFor(() => expect(studentsGetCalls).toBeGreaterThan(before))
-  })
+  }, 15000)
 })
 
 describe('B1 -- the join shell decides sign-in-or-wizard, not step 1 (F1)', () => {
