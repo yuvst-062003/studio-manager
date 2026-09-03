@@ -802,6 +802,121 @@ describe('JoinFlow', () => {
     await waitFor(() => expect(onComplete).toHaveBeenCalledTimes(1))
   })
 
+  // -- wave E / F19 / decision 6 ---------------------------------------------------
+  it('scopes health and payment to the students THIS run created, never the whole family', async () => {
+    // A RETURNING family: `/me/students` (read after the write, via `refresh()`) reports
+    // an EXISTING sibling who already owes money, alongside the new student this
+    // submission just created. Before the fix, `JoinFlow` handed `PaymentSetup` every
+    // row `/me/students` returned; decision 6 says it must hand it only what THIS run's
+    // `register()` response (`student_ids`) says it created.
+    const user = userEvent.setup()
+    const onComplete = vi.fn()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input)
+        if (url.includes('/api/v1/public/onboarding/live-token-123456')) {
+          return new Response(
+            JSON.stringify({
+              studio_name: 'מועדון הדגמה',
+              email: 'parent@example.invalid',
+              groups: [{ id: 'g1', name: 'ילדים א', weekdays: [0, 2] }],
+            }),
+            { status: 200 },
+          )
+        }
+        if (
+          url.includes('/api/v1/onboarding/live-token-123456/register') &&
+          init?.method === 'POST'
+        ) {
+          // ONLY the new child -- an existing sibling ('st-existing') is not part of
+          // what this submission created, even though the family already has one.
+          return new Response(JSON.stringify({ student_ids: ['st-new'] }), { status: 201 })
+        }
+        if (url.includes('/api/v1/auth/refresh') && init?.method === 'POST') {
+          return new Response(
+            JSON.stringify({
+              access_token: 'tok-after-refresh',
+              expires_in: 900,
+              access: { staff: false, parent: true },
+              studios: [
+                {
+                  studio_id: 's1',
+                  studio_name: 'מועדון הדגמה',
+                  studio_is_demo: false,
+                  person_id: 'p1',
+                  roles: [],
+                  is_guardian: true,
+                },
+              ],
+              active_studio_id: 's1',
+            }),
+            { status: 200 },
+          )
+        }
+        if (url.includes('/api/v1/me/students')) {
+          // The WHOLE family: the pre-existing sibling AND the new child.
+          return new Response(
+            JSON.stringify({
+              items: [
+                {
+                  id: 'st-existing',
+                  first_name: 'דנה',
+                  last_name: 'כהן',
+                  status: 'active',
+                  health_status: 'signed',
+                  agreement_complete: true,
+                },
+                {
+                  id: 'st-new',
+                  first_name: 'מיכל',
+                  last_name: 'כהן',
+                  status: 'active',
+                  health_status: 'signed',
+                  agreement_complete: true,
+                },
+              ],
+            }),
+            { status: 200 },
+          )
+        }
+        return new Response(JSON.stringify({ items: [] }), { status: 200 })
+      }),
+    )
+    // Both children owe money -- if the sibling's charge is ever shown, the scoping
+    // fix has not landed.
+    vi.mocked(billingClient.openCharges).mockResolvedValueOnce([
+      { id: 'c-existing', student_id: 'st-existing', amount_agorot: 30_000 } as never,
+      { id: 'c-new', student_id: 'st-new', amount_agorot: 30_000 } as never,
+    ])
+
+    render(
+      <JoinFlow
+        billingClient={billingClient}
+        displayName={DISPLAY_NAME}
+        healthClient={healthClient}
+        locale="he"
+        onComplete={onComplete}
+        privacyClient={makePrivacyClient()}
+        standingOrderLinks={[]}
+        token="live-token-123456"
+      />,
+    )
+
+    await acceptWelcomeStep(user)
+    await fillFamilyStepForSelf(user)
+    await signCurrentHealthDeclaration(user, '0501111111')
+    await screen.findByTestId('join-confirm-step')
+    await user.click(screen.getByTestId('join-confirm-submit'))
+
+    await screen.findByTestId('payment-setup')
+    // One answer for the family (the sibling's charge would make this "multiple").
+    await user.click(screen.getByTestId('setup-method-cash'))
+
+    await screen.findByTestId('setup-row-st-new')
+    expect(screen.queryByTestId('setup-row-st-existing')).toBeNull()
+  })
+
   it('a failed write keeps the family on the confirm gate, with an error, and never reaches done', async () => {
     const user = userEvent.setup()
     const onComplete = vi.fn()

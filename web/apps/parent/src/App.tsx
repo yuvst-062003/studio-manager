@@ -41,6 +41,7 @@ import { makeParentScheduleClient } from './features/schedule/client'
 import { useToday } from './features/schedule/useToday'
 import { PublicLanding, makeLandingClient, matchLandingPath } from './features/landing'
 import { JoinFlow, matchJoinPath } from './features/onboarding/JoinFlow'
+import { SelfServeJoinFlow } from './features/onboarding/SelfServeJoinFlow'
 // §2 decision 3 -- "cleared ... on sign-out": a stale draft (children's national ids,
 // health answers) must not survive into whoever signs in on this device next.
 import { clearAllJoinDrafts } from './features/onboarding/joinDraftStorage'
@@ -52,7 +53,7 @@ import {
 import { BeltProgressScreen, makeParentBeltsClient, registerBeltSections } from './features/belts'
 import { BeltRouteResolver } from './features/belts/BeltRouteResolver'
 import { InboxScreen, makeParentCommsClient } from './features/comms'
-import { AddSibling, JoinClubSection, ProfileSection, makePeopleClient, registerPeopleSections } from './features/people'
+import { JoinClubSection, ProfileSection, makePeopleClient, registerPeopleSections } from './features/people'
 // `2c` behind `#/student/<id>` — the composite card the slot system was built for (P2).
 import { StudentCardSection } from './features/people/StudentCardSection'
 import { registerBillingSections } from './features/billing/StudentCardBillingSection'
@@ -366,6 +367,56 @@ function AuthedApp() {
   const healthClient = useMemo(() => makeHealthClient(apiFetch), [])
   const absenceClient = useMemo(() => makeAbsenceClient(apiFetch), [])
   const privacyClient = useMemo(() => makePrivacyClient(apiFetch), [])
+  // §3 Door C -- the manager's invitation (`/?invite=<token>`). `AccessGate` redeems the
+  // token and reloads the session on arrival (see its own header); by the time this
+  // component ever renders, `session.access.parent` is already true and the query
+  // string is the only thing left that still says "this visit came from that link" --
+  // `AccessGate`'s own `arrivedWithInvite` flips false the instant redemption succeeds,
+  // so it cannot be reused here as a standing "is this door C" signal. Computed once:
+  // the param is not expected to change over this component's lifetime.
+  const arrivedWithInvite = useMemo(
+    () => new URLSearchParams(globalThis.location?.search ?? '').has('invite'),
+    [],
+  )
+  // `null` while the read is in flight, so the fork below can show the wizard's own
+  // loading state instead of flashing the old gate stack first (see the render).
+  const [inviteNeedsWizard, setInviteNeedsWizard] = useState<boolean | null>(null)
+  useEffect(() => {
+    if (!arrivedWithInvite || session.status !== 'signed-in' || !session.access.parent) return
+    let alive = true
+    void apiFetch('/api/v1/me/onboarding-status')
+      .then(async (response) =>
+        response.ok ? ((await response.json()) as { next: string | null }) : null,
+      )
+      .then((body) => alive && setInviteNeedsWizard(body ? body.next !== null : false))
+      .catch(() => alive && setInviteNeedsWizard(false))
+    return () => {
+      alive = false
+    }
+  }, [arrivedWithInvite, session.status, session.access.parent])
+  // §3 Door C: "one row pre-filled" -- the manager's stub, name only. Read once,
+  // independent of `gatedChildren`'s own fetch below (that one is gated on more state
+  // and would otherwise race this door's own wizard mount).
+  const [inviteStubName, setInviteStubName] = useState<string | null>(null)
+  useEffect(() => {
+    if (!arrivedWithInvite || inviteNeedsWizard !== true) return
+    let alive = true
+    void apiFetch('/api/v1/me/students')
+      .then(async (response) =>
+        response.ok
+          ? ((await response.json()) as { items: { first_name: string; last_name: string }[] })
+          : { items: [] },
+      )
+      .then((body) => {
+        if (!alive || body.items.length !== 1) return
+        const [only] = body.items
+        if (only) setInviteStubName(`${only.first_name} ${only.last_name}`.trim())
+      })
+      .catch(() => undefined)
+    return () => {
+      alive = false
+    }
+  }, [arrivedWithInvite, inviteNeedsWizard])
   // §6.1 step 5's gate reports its own state up, because the TAB BAR has to hide with it
   // and the bar is a prop of `AppShell`, rendered outside the gate's children. `loading`
   // until the answer arrives: a bar drawn during the fetch is a bar a fast finger uses
@@ -723,15 +774,41 @@ function AuthedApp() {
 
               `access.parent` guards lane SCHEDULE's branch because a hash is typed by
               whoever is holding the phone, so the check cannot live in the link. Lane
-              PEOPLE's branch needs no such guard — `AddSibling` is behind §6.1's refusal
-              already, since a person with no guardian row never reaches this shell. */}
+              PEOPLE's branch needs no such guard — Door D's `SelfServeJoinFlow` is
+              behind §6.1's refusal already, since a person with no guardian row never
+              reaches this shell. */}
           {/* §6.1 step 6 wraps EVERY routed branch, not the default one: "no other
               screen is reachable", and every drawer link and typed hash routes through
               this expression. Loading, not `null`, while the children are still loading
               — see the fetch above. §7.9: `AppShell`'s own chrome (title, drawer, tab
               bar) already renders around this, but the content area itself read as an
               empty page with nothing on it for as long as the fetch took. */}
-          {gatedChildren === null ? (
+          {arrivedWithInvite && inviteNeedsWizard !== false ? (
+            // §3 Door C -- "Door C is Door B with one row pre-filled, not a separate
+            // 'gaps only' step list." The invited parent has agreed to nothing and
+            // signed nothing yet, so the OLD ConsentGate/HealthGate/PaymentSetupGate
+            // stack below must never run first -- that IS the redundant "gaps only"
+            // list the spec rules out, and it would ask through a different screen
+            // than the one this door's own wizard already opens on. `inviteNeedsWizard
+            // !== false` (not `!== null`) is deliberate: while the `/me/onboarding-
+            // status` read is still in flight this renders the wizard's OWN loading
+            // state rather than flashing the old gates first and correcting a moment
+            // later -- see `SelfServeJoinFlow`'s own `step === 'loading'` branch.
+            <SelfServeJoinFlow
+              billingClient={billingClient}
+              displayName={session.displayName}
+              door="invite"
+              healthClient={healthClient}
+              locale={locale}
+              onComplete={() => {
+                setInviteNeedsWizard(false)
+                setFamilyJoined((n) => n + 1)
+              }}
+              prefillFirstRowName={inviteStubName ?? undefined}
+              privacyClient={privacyClient}
+              standingOrderLinks={mandateLinks}
+            />
+          ) : gatedChildren === null ? (
             <p data-testid="gated-children-loading">{t(locale, 'common.setup.loading')}</p>
           ) : (
           /* §6.1 step 5 OUTSIDE step 6, because 5 precedes 6 and the ordering carries an
@@ -845,10 +922,21 @@ function AuthedApp() {
               onJoined={() => setFamilyJoined((n) => n + 1)}
             />
           ) : addingChild ? (
-            <AddSibling
+            // §3 Door D -- replaces the old 3-field `AddSibling` wholesale (F18: "writes
+            // the most on the least"). Nested inside the same gates `AddSibling` was --
+            // unlike Door C's invited stranger, this family has already passed them for
+            // their EXISTING children, and an unrelated unpaid balance is still this
+            // family's own gate to clear before adding a fourth child, not a wizard
+            // Door D exists to route around.
+            <SelfServeJoinFlow
+              billingClient={billingClient}
+              displayName={session.displayName}
+              door="addChild"
+              healthClient={healthClient}
               locale={locale}
-              client={peopleClient}
-              onAdded={() => setFamilyJoined((n) => n + 1)}
+              onComplete={() => setFamilyJoined((n) => n + 1)}
+              privacyClient={privacyClient}
+              standingOrderLinks={mandateLinks}
             />
           ) : belts.length === 2 ? (
             <BeltProgressScreen

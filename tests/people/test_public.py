@@ -391,3 +391,70 @@ def test_the_schedule_reader_is_handed_a_tenant_scoped_session(
             "a TenantSession with no studio in context fails closed rather than scoping, "
             "so the studio resolved from the URL has to be in context too"
         )
+
+
+# -- wave E, Door A: the trial door needs the real health form, unauthenticated ------
+def test_the_public_health_template_needs_no_token(client, studio, app_session):
+    """§2 decision 7 -- 'one health form for everybody... asked through the popup, here
+    as everywhere.' `GET /health-templates` is guardian-or-manager only
+    (`TemplateReader`), which an anonymous trial booker can never satisfy -- this is the
+    same shape, unauthenticated, resolved from the studio's own slug like every other
+    `/public/*` read."""
+    from app.services.structure.health_templates import ensure_full_template
+
+    template = ensure_full_template(app_session, studio.id, at=SUNDAY)
+    app_session.commit()
+    response = client.get(f"/api/v1/public/studios/{studio.slug}/health-template")
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["id"] == str(template.id)
+    assert body["kind"] == "full"
+    assert body["schema"]["sections"], "the questions, not just the envelope"
+
+
+def test_the_public_health_template_404s_for_an_unknown_slug(client):
+    response = client.get("/api/v1/public/studios/never-existed/health-template")
+    assert response.status_code == 404
+
+
+def test_the_public_health_template_404s_when_none_is_published(client, studio):
+    """A studio that has never had `ensure_full_template` run for it (or a demo reset
+    mid-flight) has no full template yet -- a 404 the client can retry, never a 500."""
+    response = client.get(f"/api/v1/public/studios/{studio.slug}/health-template")
+    assert response.status_code == 404
+
+
+# -- wave E, Door A: a parent-readable plan list with no join token -----------------
+def test_the_public_price_plan_list_needs_no_token(client, studio, app_session):
+    """§6's parent-readable plan list, reachable from the studio's own slug -- Door A and
+    Door D both need it and neither carries a join token."""
+    from app.models.billing import PricePlan
+
+    live = PricePlan(
+        studio_id=studio.id,
+        name="חודשי",
+        sessions_per_week=2,
+        monthly_amount_agorot=30_000,
+        registration_fee_agorot=5_000,
+        active_from=SUNDAY.date().replace(day=1),
+        standing_order_link_url="https://pay.upay.co.il/x",
+    )
+    app_session.add(live)
+    app_session.commit()
+
+    response = client.get(f"/api/v1/public/studios/{studio.slug}/price-plans")
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["items"] == [
+        {
+            "id": str(live.id),
+            "name": "חודשי",
+            "monthly_amount_agorot": 30_000,
+            "sessions_per_week": 2,
+        }
+    ]
+
+
+def test_the_public_price_plan_list_404s_for_an_unknown_slug(client):
+    response = client.get("/api/v1/public/studios/never-existed/price-plans")
+    assert response.status_code == 404

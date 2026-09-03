@@ -295,9 +295,19 @@ class TrialBookingSelfIn(BaseModel):
     group_id: uuid.UUID | None = None
     session_id: uuid.UUID | None = None
     children: list[TrialChildIn] = Field(min_length=1, max_length=10)
-    #: One per child, same order. Booleans and short answers only — never free text about
-    #: a condition, which is what the full declaration (W3) is for.
+    #: One per child, same order. §2 decision 7 -- one health form for everybody, so this
+    #: now carries the SAME shape `OnboardingHealthDeclarationIn` does (`template_id`,
+    #: `answers`, `signature_image_base64`), collected through the real form rather than
+    #: the retired short trial questionnaire. Left as a raw dict rather than a nested
+    #: model: `_store_trial_declarations` parks it, unvalidated, in
+    #: `registration_request.payload_encrypted` — the same holding pen it has always used
+    #: — so there is no schema here to drift from that one's.
     trial_health_declarations: list[dict[str, Any]] = Field(default_factory=list)
+    #: §2 decision 5 -- the welcome screen's three ticks. An anonymous caller can never
+    #: reach the authenticated `POST /privacy/consents` (or the club-terms equivalent), so
+    #: for THIS door the wizard defers all three into the one write that already creates
+    #: the lead `Person`, and `TrialService.book_for_self` records them against it.
+    agreements_accepted: bool = False
 
     @model_validator(mode="after")
     def _resolve_per_child_choices(self) -> TrialBookingSelfIn:

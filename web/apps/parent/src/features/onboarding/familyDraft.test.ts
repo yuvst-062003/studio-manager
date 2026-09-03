@@ -10,6 +10,7 @@ import {
   preselectedPlanId,
   resolveRowFamily,
   toJoinFamilyPayload,
+  toTrialChildPayloads,
   weeklyVolumeForGroups,
   type PlanOption,
   type SubjectRow,
@@ -355,5 +356,119 @@ describe('coveringPlans / preselectedPlanId', () => {
   it('is null when nothing at all covers the volume', () => {
     const noOpenPlan = plans.filter((plan) => plan.sessionsPerWeek !== null)
     expect(preselectedPlanId(10, noOpenPlan)).toBeNull()
+  })
+})
+
+// -- wave E: decision 8's trial field set --------------------------------------
+describe('trial field set', () => {
+  function trialRow(overrides: Partial<SubjectRow> = {}): SubjectRow {
+    return {
+      ...emptySubjectRow('child', false, 'trial'),
+      firstName: 'נועה כהן',
+      birthdate: '2019-04-01',
+      groupIds: ['g1'],
+      ...overrides,
+    }
+  }
+
+  it('emptySubjectRow defaults to the member field set, and trial is opt-in', () => {
+    expect(emptySubjectRow('child').fieldSet).toBe('member')
+    expect(emptySubjectRow('child', false, 'trial').fieldSet).toBe('trial')
+  })
+
+  it('a trial row is valid with only a name, a birthdate and a group -- no ת.ז., no address', () => {
+    const valid = { ...baseState, rows: [trialRow()] }
+    expect(familyFormValid(valid, TODAY, { requireSignerDetails: false })).toBe(true)
+  })
+
+  it('a trial row needs no national id, grade or second-parent details to be valid', () => {
+    const row = trialRow({ birthdate: '2016-01-01' }) // a minor by age, same as minorRow()
+    expect(row.nationalId).toBe('')
+    expect(row.grade).toBe('')
+    const state = { ...baseState, rows: [row] }
+    expect(familyFormValid(state, TODAY, { requireSignerDetails: false })).toBe(true)
+  })
+
+  it('still requires a name, a birthdate and at least one group', () => {
+    const state = { ...baseState, rows: [trialRow({ firstName: '' })] }
+    expect(familyFormValid(state, TODAY, { requireSignerDetails: false })).toBe(false)
+    expect(
+      familyFormValid({ ...baseState, rows: [trialRow({ birthdate: '' })] }, TODAY, {
+        requireSignerDetails: false,
+      }),
+    ).toBe(false)
+    expect(
+      familyFormValid({ ...baseState, rows: [trialRow({ groupIds: [] })] }, TODAY, {
+        requireSignerDetails: false,
+      }),
+    ).toBe(false)
+  })
+
+  it('requireSignerDetails: false skips the signer ת.ז./address/city/phone checks entirely (Door D)', () => {
+    const state = {
+      signerNationalId: '',
+      address: '',
+      city: '',
+      phone: '',
+      relation: 'mother' as const,
+      rows: [
+        { ...emptySubjectRow('child'), firstName: 'א', birthdate: '2016-01-01', nationalId: '100000009', grade: 'ד', groupIds: ['g1'] },
+      ],
+    }
+    expect(familyFormValid(state, TODAY, { requireSignerDetails: false })).toBe(true)
+    expect(familyFormValid(state, TODAY)).toBe(false) // default still requires them
+  })
+
+  it('an adult trial self-row needs only a group -- decision 9, no children-only step', () => {
+    const self = { ...emptySubjectRow('self', false, 'trial'), groupIds: ['g1'] }
+    const state = { ...baseState, rows: [self] }
+    expect(familyFormValid(state, TODAY, { requireSignerDetails: false })).toBe(true)
+  })
+})
+
+describe('toJoinFamilyPayload excludes trial rows', () => {
+  it('a mixed member+trial submission sends only the member rows to the member shape', () => {
+    const member = minorRow({ firstName: 'דנה' })
+    const trial = {
+      ...emptySubjectRow('child', false, 'trial' as const),
+      firstName: 'יוסי',
+      birthdate: '2019-01-01',
+      groupIds: ['g1'],
+    }
+    const payload = toJoinFamilyPayload('מיכל כהן', { ...baseState, rows: [member, trial] }, TODAY)
+    expect(payload.children).toHaveLength(1)
+    expect(payload.children[0]?.first_name).toBe('דנה')
+  })
+})
+
+describe('toTrialChildPayloads', () => {
+  it('extracts only the trial rows, one group and one slot each, splitting the full name', () => {
+    const member = minorRow({ firstName: 'דנה' })
+    const trial = {
+      ...emptySubjectRow('child', false, 'trial' as const),
+      firstName: 'יוסי כהן',
+      birthdate: '2019-01-01',
+      groupIds: ['g1'],
+      sessionId: 's1',
+    }
+    const payloads = toTrialChildPayloads([member, trial])
+    expect(payloads).toHaveLength(1)
+    expect(payloads[0]).toEqual({
+      first_name: 'יוסי',
+      last_name: 'כהן',
+      birthdate: '2019-01-01',
+      group_id: 'g1',
+      session_id: 's1',
+    })
+  })
+
+  it('a trial self row reuses the contact name it was given, never asks twice', () => {
+    const self = {
+      ...emptySubjectRow('self', false, 'trial' as const),
+      groupIds: ['g1'],
+      sessionId: null,
+    }
+    const payloads = toTrialChildPayloads([self], { firstName: 'רותי', lastName: 'מזרחי' })
+    expect(payloads[0]).toMatchObject({ first_name: 'רותי', last_name: 'מזרחי', session_id: null })
   })
 })

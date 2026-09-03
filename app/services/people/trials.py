@@ -245,6 +245,9 @@ class TrialService:
         parent_phone: str | None = None,
         at: datetime,
         allow_override: bool = False,
+        agreements_accepted: bool = False,
+        signed_ip: str | None = None,
+        actor_identity_id: uuid.UUID | None = None,
     ) -> BookedTrial:
         """§5.4a steps 1-5, as one transaction. Does not commit -- the router does.
 
@@ -359,6 +362,40 @@ class TrialService:
                 children=children,
                 declarations=declarations,
                 at=at,
+            )
+
+        # §2 decision 5 -- the welcome screen's three ticks, deferred all the way to this
+        # one write because an anonymous caller has no authenticated route to record them
+        # through. Recorded against the CURRENT versions: the wizard always renders the
+        # live documents fresh (no cached, possibly-stale version to echo back), the same
+        # reasoning `OnboardingRegisterIn.club_terms_accepted` gives for the member door.
+        if agreements_accepted:
+            from typing import cast
+
+            from app.core.tenancy import TenantSession
+            from app.services.health.agreement import AgreementService
+            from app.services.health.club_terms import CLUB_TERMS_VERSION
+            from app.services.privacy.consent import ConsentService
+            from app.services.privacy.policy import POLICY_VERSION
+
+            ConsentService.record(
+                session,
+                person_id=parent.id,
+                grants={"terms": True, "privacy": True},
+                version=POLICY_VERSION,
+                at=at,
+                ip=signed_ip,
+                actor_identity_id=actor_identity_id,
+                studio_id=studio_id,
+            )
+            AgreementService.accept_club_terms(
+                cast(TenantSession, session),
+                studio_id=studio_id,
+                person_id=parent.id,
+                version=CLUB_TERMS_VERSION,
+                at=at,
+                ip=signed_ip,
+                actor_identity_id=actor_identity_id,
             )
 
         AuditService.record(

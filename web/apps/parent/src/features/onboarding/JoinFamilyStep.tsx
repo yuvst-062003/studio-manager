@@ -15,12 +15,15 @@ import {
   preselectedPlanId,
   resolveRowFamily,
   toJoinFamilyPayload,
+  toTrialChildPayloads,
   weeklyVolumeForGroups,
   type FamilyPayloadState,
   type PlanOption,
+  type StudentFieldSet,
   type SubjectRow,
+  type TrialChildPayload,
 } from './familyDraft'
-import { OnboardingWizardChrome, stepPosition } from './OnboardingWizardChrome'
+import { OnboardingWizardChrome, stepPosition, type WizardStepKey } from './OnboardingWizardChrome'
 import { WizardNavButtons } from './WizardNavButtons'
 
 type JoinGroup = { id: string; name: string; weekdays: number[] }
@@ -136,10 +139,39 @@ export type JoinFamilyStepProps = {
    *  not just on submit. Not required: a caller with no draft persistence (there is
    *  currently only the one) can leave it out. */
   onChange?: (state: FamilyPayloadState) => void
-  onSubmit: (payload: JoinFamilyPayload) => void
+  /** `trialChildren` is always `[]` for Doors B/C, which never set `allowTrialFieldSet`
+   *  -- wave E's Door D is the only caller that reads it, to route those rows through
+   *  the trial-booking write instead of the member one (`toTrialChildPayloads`). */
+  onSubmit: (payload: JoinFamilyPayload, trialChildren: TrialChildPayload[]) => void
   /** §6 -- the join token, resolving this studio's own live plan list
-   *  (`GET /public/onboarding/{token}/price-plans`), the plan picker's data source. */
+   *  (`GET /public/onboarding/{token}/price-plans`), the plan picker's data source.
+   *  Door D (wave E) has no token at all -- pass `pricePlansPath` there instead and
+   *  leave this as any non-empty placeholder (it is otherwise unused). */
   token: string
+  /** Wave E -- overrides where the plan picker's data comes from. Doors B/C's default
+   *  (unset) keeps fetching `/public/onboarding/{token}/price-plans`; Door C/D's own
+   *  orchestrator passes `/public/studios/{slug}/price-plans` instead, since it has a
+   *  studio slug and no join token. */
+  pricePlansPath?: string
+  /** Door D (wave E): the caller already belongs to this studio, so their own
+   *  ת.ז./address/city/phone are on file from an earlier registration and this door
+   *  never asks for them again (§3: "there is nothing to copy them from" names only the
+   *  CHILD's own fields). Hides the whole signer card and skips those fields in
+   *  `familyFormValid`. Defaults to `true` -- Doors B/C's existing behaviour,
+   *  unchanged. */
+  showSignerDetails?: boolean
+  /** Door D only (§3: "member or trial is a control inside that panel"): each row's
+   *  panel opens with a control choosing "הצטרפות למועדון" vs "שיעור ניסיון חינם",
+   *  swapping ת.ז./grade/plan for decision 8's narrower trial set. Doors A/B/C never
+   *  set this -- their whole run is one field set, decided by the door itself rather
+   *  than a per-row control. */
+  allowTrialFieldSet?: boolean
+  /** Wave E's door → step-list mapping (`doorSteps.ts`). Defaults to the full 4-step
+   *  list -- Doors B/C's existing rail, unchanged. */
+  steps?: readonly WizardStepKey[]
+  /** Door C/D only -- see `editingKey`'s own comment. `false` (Doors B's existing
+   *  behaviour) never forces a panel open regardless of what `initialValue` carries. */
+  autoOpenSoleRow?: boolean
 }
 
 export function JoinFamilyStep({
@@ -154,6 +186,11 @@ export function JoinFamilyStep({
   onChange,
   onSubmit,
   token,
+  pricePlansPath,
+  showSignerDetails = true,
+  allowTrialFieldSet = false,
+  steps,
+  autoOpenSoleRow = false,
 }: JoinFamilyStepProps) {
   const [phone, setPhone] = useState(initialValue?.phone ?? '')
   const [signerNationalId, setSignerNationalId] = useState(initialValue?.signerNationalId ?? '')
@@ -165,12 +202,20 @@ export function JoinFamilyStep({
   const [rows, setRows] = useState<SubjectRow[]>(initialValue?.rows ?? [])
   const [showErrors, setShowErrors] = useState(false)
   // F6 -- one panel open at a time. `null` means every row renders collapsed, in the list.
-  const [editingKey, setEditingKey] = useState<string | null>(null)
+  // Door D (wave E): "it opens straight into the wizard, at the students step... with
+  // one empty panel already open" -- `autoOpenSoleRow` is what seeds THAT, once, from
+  // whatever single row `initialValue` was pre-built with (a fresh Door D entry, or
+  // Door C's one pre-filled row). A restored draft with more than one row -- or none --
+  // is left collapsed as always; nothing about resuming a part-filled family should
+  // force a panel open that the parent had already closed.
+  const [editingKey, setEditingKey] = useState<string | null>(() =>
+    autoOpenSoleRow && initialValue?.rows.length === 1 ? (initialValue.rows[0]?.key ?? null) : null,
+  )
   const [plans, setPlans] = useState<PlanOption[]>([])
 
   useEffect(() => {
     let alive = true
-    void apiFetch(`/api/v1/public/onboarding/${token}/price-plans`)
+    void apiFetch(pricePlansPath ?? `/api/v1/public/onboarding/${token}/price-plans`)
       .then(async (response) => {
         if (!alive || !response.ok) return
         const body = (await response.json()) as {
@@ -199,14 +244,14 @@ export function JoinFamilyStep({
     return () => {
       alive = false
     }
-  }, [token])
+  }, [token, pricePlansPath])
 
   const shared = hasSharedMinors(rows)
   const hasSelf = rows.some((row) => row.kind === 'self')
   const optional = t(locale, 'people.join.optional')
 
   const state = { signerNationalId, address, city, phone, rows, relation, phoneHome, aliyahYear }
-  const valid = familyFormValid(state)
+  const valid = familyFormValid(state, new Date(), { requireSignerDetails: showSignerDetails })
 
   useEffect(() => {
     onChange?.(state)
@@ -265,7 +310,7 @@ export function JoinFamilyStep({
   function submit() {
     setShowErrors(true)
     if (!valid || inFlight) return
-    onSubmit(toJoinFamilyPayload(displayName, state))
+    onSubmit(toJoinFamilyPayload(displayName, state), toTrialChildPayloads(rows))
   }
 
   return (
@@ -273,9 +318,11 @@ export function JoinFamilyStep({
       <OnboardingWizardChrome
         locale={locale}
         onBack={onBack}
-        position={stepPosition('family')}
+        position={stepPosition('family', steps)}
+        steps={steps}
         title={t(locale, 'people.join.yourDetails')}
       >
+        {showSignerDetails ? (
         <Card>
           <h2 style={{ marginBlockStart: 0 }}>{t(locale, 'people.join.yourDetails')}</h2>
           <p style={rowStyle}>
@@ -345,6 +392,7 @@ export function JoinFamilyStep({
             </p>
           ) : null}
         </Card>
+        ) : null}
 
         {/* F6 -- a list of saved (collapsed) students, "+ הוספת תלמיד" opens one panel at
             a time. Save returns to the list; the next add opens the next panel. */}
@@ -352,7 +400,8 @@ export function JoinFamilyStep({
           <Card>
             <h2 style={{ marginBlockStart: 0 }}>{t(locale, 'people.join.studentsTitle')}</h2>
             {rows.map((row, index) => {
-              const isMinor = row.kind === 'child' && !isRowAdult(row)
+              const isTrial = row.fieldSet === 'trial'
+              const isMinor = row.kind === 'child' && !isRowAdult(row) && !isTrial
               const volume = weeklyVolumeForGroups(row.groupIds, groups)
               const covering = coveringPlans(volume, plans)
               const family = resolveRowFamily(rows, index)
@@ -406,6 +455,37 @@ export function JoinFamilyStep({
                       ? t(locale, 'people.join.selfStudentAlso')
                       : t(locale, 'people.join.child')}
                   </h3>
+                  {/* Door D only (§3: "member or trial is a control inside that
+                      panel"). Switching TO 'trial' drops whatever ת.ז./grade/plan was
+                      typed -- those fields disappear along with the switch, and
+                      decision 8 never asks for them on a trial row anyway. */}
+                  {allowTrialFieldSet ? (
+                    <SegmentedControl
+                      legend={t(locale, 'people.join.memberOrTrial')}
+                      onValueChange={(value) => {
+                        const fieldSet = value as StudentFieldSet
+                        updateRow(row.key, {
+                          fieldSet,
+                          ...(fieldSet === 'trial'
+                            ? {
+                                nationalId: '',
+                                grade: '',
+                                pricePlanId: null,
+                                otherFullName: '',
+                                otherNationalId: '',
+                                otherPhone: '',
+                                pickups: [],
+                              }
+                            : {}),
+                        })
+                      }}
+                      options={[
+                        { value: 'member', label: t(locale, 'people.join.memberChoice') },
+                        { value: 'trial', label: t(locale, 'people.join.trialChoice') },
+                      ]}
+                      value={row.fieldSet}
+                    />
+                  ) : null}
                   {row.kind === 'child' ? (
                     <>
                       <div style={fieldGrid2}>
@@ -423,6 +503,7 @@ export function JoinFamilyStep({
                           value={row.birthdate}
                         />
                       </div>
+                      {!isTrial ? (
                       <div style={fieldGrid2}>
                         <TextField
                           error={idError(row.nationalId, true)}
@@ -438,6 +519,7 @@ export function JoinFamilyStep({
                           value={row.grade}
                         />
                       </div>
+                      ) : null}
 
                       {/* Decision 12/F8 -- no 18+ question. `isMinor` is derived from
                           `row.birthdate` above; the family/pickup block below appears or
@@ -599,8 +681,10 @@ export function JoinFamilyStep({
                   ))}
 
                   {/* Decision 14 -- each student picks their own plan, only among plans
-                      that cover the groups just chosen. */}
-                  {volume > 0 ? (
+                      that cover the groups just chosen. Never for a trial row (decision
+                      8): a stranger -- or, on Door D, a child not joining the club at
+                      all this run -- is asked no plan. */}
+                  {volume > 0 && !isTrial ? (
                     <div>
                       <p style={{ margin: 0, fontWeight: 500 }}>{t(locale, 'people.join.planTitle')}</p>
                       {covering.length > 0 ? (

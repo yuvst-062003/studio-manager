@@ -218,6 +218,17 @@ export const people: Bundle = {
   'join.studentGroup': 'Группа',
   'join.selfStudentAlso': 'Я тоже тренируюсь',
   'join.selfStudentHint': 'Имя, удостоверение и адрес уже указаны выше.',
+  // -- wave E, Door D: "member or trial" is a control inside the student panel --------
+  'join.memberOrTrial': 'Как присоединяется?',
+  'join.memberChoice': 'Вступление в клуб',
+  'join.trialChoice': 'Бесплатный пробный урок',
+  'join.duplicateTitle': 'Похоже, этот ребёнок уже есть в системе',
+  'join.slotTitle': 'Выбор времени',
+  'join.noSlotsForGroup': 'В этой группе сейчас нет свободного времени',
+  'join.emergencyPhoneNote': 'Телефон для экстренной связи будет запрошен в декларации здоровья ниже.',
+  'join.trialStudentsTitle': 'Кто приходит на урок?',
+  'join.iTrain': 'Я тренируюсь',
+  'join.contactDetails': 'Контактные данные',
   'join.selfChip': 'Регистрация на себя',
   'join.soloNote':
     'Данные родителей, контакты для забора и класс не требуются, если в списке нет детей.',

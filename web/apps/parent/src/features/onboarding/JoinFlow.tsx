@@ -11,7 +11,7 @@
 // top of the `payment` step. Before this, `submitFamily` posted `/register` the moment
 // step 2 was submitted, and health was flushed separately, one call per kid, from the
 // done screen's "enter the app" — two write points where the spec names one.
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import { apiFetch, refresh } from '@studio/core'
 import { Alert, EmptyState } from '@studio/ui'
@@ -177,10 +177,21 @@ export function JoinFlow({
     // status change to react to.
   }, [token])
 
+  // F19/decision 6 -- "the wizard only ever asks about the students it is creating in
+  // this run." `submitRegistration` fills this from the write's own response
+  // (`student_ids`) the moment it succeeds; `refreshStudents` then narrows the full
+  // `/me/students` list down to exactly those ids before this component's `students`
+  // state ever sees it. `null` means "no scope yet" (nothing filtered, pre-write local
+  // placeholders pass through untouched); an EMPTY array is a real, if odd, answer (a
+  // pure resubmission that created nothing new) and must still filter to nothing.
+  const createdStudentIdsRef = useRef<readonly string[] | null>(null)
+
   const refreshStudents = useCallback(async () => {
     const next = await loadStudents()
-    setStudents(next)
-    return next
+    const scope = createdStudentIdsRef.current
+    const scoped = scope === null ? next : next.filter((student) => scope.includes(student.id))
+    setStudents(scoped)
+    return scoped
   }, [])
 
   const setupChildren = useMemo(
@@ -293,6 +304,13 @@ export function JoinFlow({
         )
         return
       }
+      // F19/decision 6 -- exactly what THIS write created, read off its own response
+      // rather than re-derived. `refreshStudents` (called a few lines below) narrows
+      // the full `/me/students` read to this set before health or payment ever see it
+      // -- a returning family's existing children, and whatever they owe, never
+      // reach this run's health or payment step.
+      const registerBody = (await response.json()) as { student_ids?: string[] }
+      createdStudentIdsRef.current = registerBody.student_ids ?? []
       // F9 -- reload the session BEFORE asking `/me/students`. The write above just
       // created this family's first membership in this studio; the access token still
       // in memory is the one minted at sign-in, carrying no active studio at all

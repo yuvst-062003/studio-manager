@@ -322,6 +322,121 @@ def test_a_sibling_may_not_be_booked_into_another_studio_s_group(
     )
 
 
+# -- wave E, decision 5: an anonymous booking still records all three agreements ----
+def test_agreements_accepted_records_consent_for_an_anonymous_lead(
+    client, bookable, a_group, app_session, studio
+):
+    """§2 decision 5 -- 'an anonymous booker still reads and ticks the three documents,
+    and the consent attaches to the identity-less lead Person the booking creates.'
+
+    F21's door reused the short trial questionnaire AND asked nothing about the club's
+    terms or the privacy policy at all -- the wizard now sends one flag alongside the
+    real health answers, and the trial write is the only place that flag can land, since
+    an anonymous caller can never reach the authenticated `/privacy/consents` route.
+    """
+    from app.models.health import ConsentRecord
+    from app.services.health.club_terms import CLUB_TERMS_CONSENT_TYPE, CLUB_TERMS_VERSION
+    from app.services.privacy.policy import POLICY_VERSION
+
+    tag = uuid.uuid4().hex[:6]
+    session_id = bookable.sessions[a_group][0].id
+    response = client.post(
+        "/api/v1/trial-bookings/self",
+        json={
+            "guardian": {
+                "first_name": "רותי",
+                "last_name": f"מזרחי{tag}",
+                "email": f"anon-{tag}@example.invalid",
+            },
+            "children": [
+                {
+                    "first_name": f"דנה{tag}",
+                    "last_name": f"כהן{tag}",
+                    "birthdate": "2019-04-01",
+                    "group_id": str(a_group),
+                    "session_id": str(session_id),
+                }
+            ],
+            "trial_health_declarations": [
+                {
+                    "template_id": str(uuid.uuid4()),
+                    "answers": {"asthma": False},
+                    "signature_image_base64": "",
+                }
+            ],
+            "agreements_accepted": True,
+        },
+    )
+    assert response.status_code == 201, response.text
+    student_id = uuid.UUID(response.json()["students"][0]["id"])
+    guardian = app_session.execute(
+        select(Guardian).where(Guardian.student_id == student_id)
+    ).scalar_one()
+
+    granted = {
+        row.consent_type: row.version
+        for row in app_session.execute(
+            select(ConsentRecord).where(
+                ConsentRecord.subject_type == "person",
+                ConsentRecord.subject_id == guardian.person_id,
+                ConsentRecord.granted.is_(True),
+            )
+        ).scalars()
+    }
+    assert granted.get("terms") == POLICY_VERSION
+    assert granted.get("privacy") == POLICY_VERSION
+    assert granted.get(CLUB_TERMS_CONSENT_TYPE) == CLUB_TERMS_VERSION
+
+
+def test_declining_to_tick_agreements_records_nothing(client, bookable, a_group, app_session):
+    """The flag is honoured both ways -- a request that never sets it (the default) must
+    not silently grant consent nobody gave."""
+    from app.models.health import ConsentRecord
+
+    tag = uuid.uuid4().hex[:6]
+    session_id = bookable.sessions[a_group][0].id
+    response = client.post(
+        "/api/v1/trial-bookings/self",
+        json={
+            "guardian": {
+                "first_name": "רותי",
+                "last_name": f"מזרחי{tag}",
+                "email": f"anon2-{tag}@example.invalid",
+            },
+            "children": [
+                {
+                    "first_name": f"נועה{tag}",
+                    "last_name": f"כהן{tag}",
+                    "birthdate": "2019-04-01",
+                    "group_id": str(a_group),
+                    "session_id": str(session_id),
+                }
+            ],
+            "trial_health_declarations": [
+                {
+                    "template_id": str(uuid.uuid4()),
+                    "answers": {"asthma": False},
+                    "signature_image_base64": "",
+                }
+            ],
+        },
+    )
+    assert response.status_code == 201, response.text
+    student_id = uuid.UUID(response.json()["students"][0]["id"])
+    guardian = app_session.execute(
+        select(Guardian).where(Guardian.student_id == student_id)
+    ).scalar_one()
+    assert (
+        app_session.execute(
+            select(ConsentRecord).where(
+                ConsentRecord.subject_type == "person",
+                ConsentRecord.subject_id == guardian.person_id,
+            )
+        ).first()
+        is None
+    )
+
+
 def test_the_parent_lands_in_the_app_already_signed_in(client, a_stranger, bookable, a_group):
     """§5.4a -- 'the parent lands DIRECTLY in the parent app, already signed in.' The
     response carries what `13b` renders, because the parent's token still has no studio in

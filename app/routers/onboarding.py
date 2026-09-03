@@ -29,8 +29,9 @@ from app.core.clock import now
 from app.core.config import settings
 from app.core.cors import app_origin
 from app.core.db import SessionDep, get_engine
-from app.core.tenancy import TenantSession, TenantSessionDep, use_studio
+from app.core.tenancy import TenantSession, TenantSessionDep, require_current_studio_id, use_studio
 from app.models.identity import AuthIdentity
+from app.models.person import Person
 from app.models.studio import Studio
 from app.schemas._pagination import MAX_PAGE_SIZE
 from app.services.billing.catalogue import CatalogueService
@@ -215,7 +216,6 @@ def _share_url(token: str) -> str:
 
 # -- the manager card ---------------------------------------------------------
 def _landing_url(session: TenantSession) -> str | None:
-    from app.core.tenancy import require_current_studio_id
 
     studio = session.get(Studio, require_current_studio_id())
     if studio is None:
@@ -243,7 +243,6 @@ def link_status(_: ManagerOrOwner, session: TenantSessionDep) -> OnboardingLinkS
 def regenerate_link(
     _: ManagerOrOwner, request: Request, session: TenantSessionDep
 ) -> OnboardingLinkCreatedOut:
-    from app.core.tenancy import require_current_studio_id
 
     studio_id = require_current_studio_id()
     row, token = OnboardingService.regenerate(
@@ -580,6 +579,213 @@ def register(
             charges_created=charged,
             already_registered=existing is not None,
         )
+
+
+# -- doors C and D: the same write, with no token --------------------------------
+class OnboardingSelfRegisterIn(BaseModel):
+    """§3 Doors C and D's final write. Door B/C's shape (`OnboardingRegisterIn`) resolves
+    its studio from a TOKEN because the caller belongs to nowhere yet; this caller already
+    belongs HERE (`TenantSessionDep` below fails closed otherwise), so there is no token to
+    carry and no parent identity to introduce -- both are read off the session.
+
+    `children` reuses `OnboardingChildIn` exactly -- decision 6/F19's member fork of a
+    Door D row (ת.ז., plan, health) is that shape end to end, and Door C's manager stub
+    is completed through the exact same `add_child` duplicate-adopt path Door B already
+    exercises, not a second mechanism.
+    """
+
+    children: list[OnboardingChildIn] = Field(min_length=1, max_length=4)
+    #: §3 -- "skipped, not absent... reappears only when CLUB_TERMS_VERSION or
+    #: POLICY_VERSION has moved". `False` costs nothing when the status already marked
+    #: the step done and the wizard never showed it.
+    club_terms_accepted: bool = False
+
+
+def _signer_from_existing_person(parent: Person) -> dict[str, Any] | None:
+    """The parent's own on-file details, reused rather than re-asked.
+
+    §3 Door D: "Birthdate and ת.ז. are asked; there is nothing to copy them from" names
+    only the CHILD's own fields -- the PARENT's address and ת.ז. were already collected
+    the first time this family registered (`AgreementService.save_registration` writes
+    them onto the signing guardian's own `Person` row, never the child's), so Door D does
+    not ask for them a second time.
+
+    `None` when nothing is on file yet -- honest for a caller who somehow reaches this
+    door before ever completing Door B/C (not a state today's UI can produce, since
+    `/me/onboarding-status` only opens Door D past the `students` step for a family with
+    at least one existing child, but a route must answer honestly rather than 500 on it).
+    `OnboardingService.register` treats a `None` signer as "skip the household write"
+    for this run, same as any other caller who submits no signer block.
+    """
+    national_id = parent.national_id_encrypted.decode() if parent.national_id_encrypted else None
+    if not national_id or not parent.address or not parent.city:
+        return None
+    return {
+        "national_id": national_id,
+        "address": parent.address,
+        "city": parent.city,
+        "phone_home": parent.phone_home,
+        "aliyah_year": (
+            parent.aliyah_year_encrypted.decode()
+            if isinstance(parent.aliyah_year_encrypted, bytes)
+            else None
+        ),
+        "relation": "mother",
+    }
+
+
+@router.post(
+    "/me/students/register",
+    response_model=OnboardingRegisterOut,
+    status_code=status.HTTP_201_CREATED,
+)
+def register_additional_child(
+    body: OnboardingSelfRegisterIn, request: Request, session: TenantSessionDep
+) -> OnboardingRegisterOut:
+    """§3 Doors C and D -- the wizard's one write, reached by a parent who ALREADY belongs
+    to this studio. `TenantSessionDep` is what makes that safe to assume: it fails closed
+    (401) the moment there is no active studio, the same guarantee the token-based
+    `register()` above re-derives by hand for a caller who has none yet.
+
+    Reuses `OnboardingService.register` end to end -- the same pricing, enrollment,
+    health-declaration and club-terms-acceptance code the join link runs -- so a
+    manager-created stub (Door C: "the student, name only") is completed rather than
+    duplicated by the very same duplicate-adopt path `register` already has, and decision
+    6/F19 (health and payment scoped to only the student THIS call creates) falls out of
+    `student_ids` being exactly what this submission created, same as every other door.
+    """
+    identity_id = getattr(request.state, "identity_id", None)
+    person_id = getattr(request.state, "person_id", None)
+    if not isinstance(person_id, uuid.UUID) or not isinstance(identity_id, uuid.UUID):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={"code": "unauthenticated", "message": "sign in first"},
+        )
+    parent = session.get(Person, person_id)
+    if parent is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "not_found", "message": "no such person"},
+        )
+    studio_id = require_current_studio_id()
+
+    try:
+        parent, student_ids, charged = OnboardingService.register(
+            session,
+            studio_id=studio_id,
+            identity_id=identity_id,
+            first_name=parent.first_name,
+            last_name=parent.last_name,
+            phone=parent.phone,
+            email=parent.email,
+            children=[
+                {
+                    "first_name": child.first_name,
+                    "last_name": child.last_name,
+                    "birthdate": child.birthdate,
+                    "group_ids": child.group_ids,
+                    "self": child.self_student,
+                    "national_id": child.national_id,
+                    "grade": child.grade,
+                    "health": (
+                        {
+                            "template_id": child.health.template_id,
+                            "answers": child.health.answers,
+                            "signature_image_base64": child.health.signature_image_base64,
+                        }
+                        if child.health is not None
+                        else None
+                    ),
+                    "other_parent": (
+                        {
+                            "first_name": child.other_parent.first_name,
+                            "last_name": child.other_parent.last_name,
+                            "national_id": child.other_parent.national_id,
+                            "phone": child.other_parent.phone,
+                        }
+                        if child.other_parent is not None
+                        else None
+                    ),
+                    "pickup_contacts": [
+                        {"name": contact.name, "phone": contact.phone, "relation": None}
+                        for contact in child.pickup_contacts
+                    ],
+                    "price_plan_id": child.price_plan_id,
+                }
+                for child in body.children
+            ],
+            club_terms_accepted=body.club_terms_accepted,
+            signed_ip=request.client.host if request.client else None,
+            signed_user_agent=request.headers.get("user-agent"),
+            signer=_signer_from_existing_person(parent),
+            other_parent=None,
+            pickup_contacts=[],
+            at=now(),
+            schedule=ScheduleService(session),
+            actor_identity_id=identity_id,
+        )
+    except NationalIdInvalidError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={"code": "national_id_invalid", "field": exc.field},
+        ) from exc
+    except RegistrationIncompleteError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={"code": "registration_incomplete", "fields": exc.fields},
+        ) from exc
+    except AgreementError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={"code": "agreement_error", "message": str(exc)},
+        ) from exc
+    except NotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "not_found", "message": str(exc)},
+        ) from exc
+    except RefusedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={"code": "refused", "message": str(exc)},
+        ) from exc
+    except DeclarationNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "not_found", "message": str(exc)},
+        ) from exc
+    except SignatureRequiredError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={"code": "signature_required", "message": str(exc)},
+        ) from exc
+    except SignatureNotAPngError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={"code": "signature_not_a_png", "message": str(exc)},
+        ) from exc
+    except AnswersIncompleteError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={"code": "answers_incomplete", "message": f"unanswered: {exc}"},
+        ) from exc
+    except TemplateSupersededError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={"code": "template_superseded", "message": str(exc)},
+        ) from exc
+    except ClauseMismatchError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={"code": "clause_mismatch", "message": str(exc)},
+        ) from exc
+    session.commit()
+    return OnboardingRegisterOut(
+        person_id=parent.id,
+        student_ids=student_ids,
+        charges_created=charged,
+        already_registered=True,
+    )
 
 
 # -- "what is left" ------------------------------------------------------------

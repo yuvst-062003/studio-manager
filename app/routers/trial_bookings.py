@@ -208,6 +208,9 @@ def book_trial_for_self(
                 parent_last_name=parent_last,
                 parent_phone=parent_phone,
                 at=at,
+                agreements_accepted=body.agreements_accepted,
+                signed_ip=client_ip,
+                actor_identity_id=identity_id,
             )
         except ConflictError as exc:
             raise HTTPException(

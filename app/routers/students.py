@@ -27,6 +27,7 @@ not merely forbidden, and a 403 would confirm it exists.
 from __future__ import annotations
 
 import uuid
+from datetime import date
 from enum import Enum
 from typing import Annotated
 
@@ -79,6 +80,7 @@ from app.services.people.errors import NotFoundError as OnboardingNotFound
 from app.services.people.errors import RefusedError as OnboardingRefused
 from app.services.people.group_days import ScheduleReader
 from app.services.people.invitations import email_configured, send_invitation_email
+from app.services.people.matching import duplicate_student
 from app.services.people.onboarding import OnboardingService
 from app.services.people.profile import ProfileService
 from app.services.people.students import StudentRow, StudentService
@@ -1118,3 +1120,37 @@ def add_a_child(
     # `_project` is what `for_guardian` rows are built from, so the shape the parent app
     # receives here is the same one `GET /me/students` will hand back a moment later.
     return _summary(StudentService._project(session, student, person))  # noqa: SLF001
+
+
+class DuplicateCheckOut(BaseModel):
+    duplicate: bool
+
+
+@router.get("/me/students/duplicate-check", response_model=DuplicateCheckOut)
+def duplicate_check(
+    request: Request,
+    session: TenantSessionDep,
+    first_name: str = Query(min_length=1, max_length=100),
+    last_name: str = Query(min_length=1, max_length=100),
+    birthdate: date | None = None,
+) -> DuplicateCheckOut:
+    """§3 Door D -- 'The duplicate check must run in the students panel, not at the final
+    write... So the name-and-birthdate check fires as soon as the panel is saved.'
+    CLAUDE.md's own rule: refuse rather than accept, when accepting creates a dead end. A
+    refusal that arrived only from `add_child` at the very end of the wizard would land
+    after the parent had already filled a health declaration and picked a payment method.
+
+    **Answers `duplicate: bool` and nothing else** (§3: 'never leaking other families'
+    data'). `duplicate_student` matches at the STUDIO level, same as `add_child`'s own
+    check, but this read narrows the answer to whether the match is a child THIS caller
+    already guards -- a coincidence with a stranger's same-named kid must read exactly
+    like no match at all, never confirm that a child of that name trains here (§11.1).
+    """
+    person_id = _person_id(request)
+    match = duplicate_student(
+        session, first_name=first_name, last_name=last_name, birthdate=birthdate
+    )
+    mine = match is not None and match.student_id in StudentService.guardian_student_ids(
+        session, person_id=person_id
+    )
+    return DuplicateCheckOut(duplicate=mine)

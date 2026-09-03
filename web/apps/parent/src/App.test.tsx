@@ -22,6 +22,34 @@ const STUDIO = {
   is_guardian: true,
 }
 
+/** §3 Door D's test: the REAL `makeHealthClient(apiFetch)` this app builds (no injected
+ *  mock, unlike the onboarding feature's own test files) hits `/api/v1/health-templates`
+ *  for real through the stubbed `fetch` below, so it needs a real-shaped schema to parse
+ *  rather than the file-wide `{items: []}` default. */
+const HEALTH_SCHEMA = {
+  sections: [
+    {
+      id: 'medical_history',
+      title: 'רקע רפואי',
+      questions: [{ id: 'asthma', type: 'boolean' as const, label: 'אסתמה', flag: true }],
+    },
+    {
+      id: 'other',
+      title: 'נוסף',
+      questions: [
+        { id: 'emergency_contact', type: 'phone' as const, label: 'טלפון חירום', required: true },
+      ],
+    },
+    {
+      id: 'declaration',
+      title: 'הצהרה',
+      questions: [
+        { id: 'clause_confirmed', type: 'clause' as const, label: 'אני מאשר/ת', required: true },
+      ],
+    },
+  ],
+}
+
 /** The shape `useSession` needs to call this a signed-in guardian WITH access — see
  *  `features/schedule/mounted.test.tsx`'s `signedInAs`, which this mirrors. `/auth/me`
  *  carries the full shape and not only `dev_tools`: `useSession` REPLACES the refresh's
@@ -410,22 +438,63 @@ describe('P7 — the belt link resolves or refuses, never silently home', () => 
   })
 })
 
-describe('12g — adding a sibling refreshes the family it just grew', () => {
-  it('refetches /me/students once the child is added, instead of waiting for a reload', async () => {
-    // AddSibling calls `onAdded` on a successful submit, but the shell never passed it
-    // one — the family queue kept showing the roster from before the add until the
-    // parent reloaded the tab by hand. The seam is the wiring, not the component: the
-    // component's own tests already cover that `onAdded` fires.
+describe('§3 Door D — #/add-child opens the shared wizard, not the old 3-field form', () => {
+  it('F18 replaced: the wizard writes the new child through /me/students/register and refreshes the family without a reload', async () => {
+    // The old `AddSibling` (F18) wrote first/last/group_ids straight to `POST
+    // /me/students` with no ת.ז., no plan, no health step and no payment step. Door D
+    // replaces it wholesale: `#/add-child` now mounts `SelfServeJoinFlow`, the same
+    // wizard every other self-service door shares.
     const user = userEvent.setup()
     globalThis.location.hash = '#/add-child'
+    globalThis.HTMLCanvasElement.prototype.getContext = vi.fn(() => ({
+      lineWidth: 0,
+      lineCap: '',
+      lineJoin: '',
+      strokeStyle: '',
+      beginPath: vi.fn(),
+      moveTo: vi.fn(),
+      lineTo: vi.fn(),
+      stroke: vi.fn(),
+      clearRect: vi.fn(),
+      save: vi.fn(),
+      restore: vi.fn(),
+      fillText: vi.fn(),
+      fillStyle: '',
+      font: '',
+      textAlign: '',
+      textBaseline: '',
+    })) as unknown as typeof HTMLCanvasElement.prototype.getContext
+    globalThis.HTMLCanvasElement.prototype.toDataURL = vi.fn(() => 'data:image/png;base64,AAAA')
+
     let studentsGetCalls = 0
+    let registerCalled = false
     vi.stubGlobal(
       'fetch',
       stubAuthed((url, init) => {
+        // eslint-disable-next-line no-console
+        console.log('FETCH', url)
+        if (url.includes('/api/v1/me/students/register') && init?.method === 'POST') {
+          registerCalled = true
+          return new Response(JSON.stringify({ student_ids: ['st-new'] }), { status: 201 })
+        }
+        if (url.includes('/api/v1/me/students/duplicate-check')) {
+          return new Response(JSON.stringify({ duplicate: false }), { status: 200 })
+        }
+        if (url.includes('/api/v1/me/onboarding-status')) {
+          return new Response(
+            JSON.stringify({
+              steps: [
+                { key: 'agreements', complete: true },
+                { key: 'students', complete: true },
+                { key: 'health', complete: true },
+                { key: 'payment', complete: true },
+              ],
+              next: null,
+            }),
+            { status: 200 },
+          )
+        }
         if (url.includes('/api/v1/me/students')) {
-          if ((init?.method ?? 'GET') === 'POST') {
-            return new Response(JSON.stringify({ id: 'st-new' }), { status: 201 })
-          }
           studentsGetCalls += 1
           return new Response(JSON.stringify({ items: [] }), { status: 200 })
         }
@@ -434,34 +503,65 @@ describe('12g — adding a sibling refreshes the family it just grew', () => {
         }
         if (url.includes('/api/v1/public/studios/demo/groups')) {
           return new Response(
+            JSON.stringify({ items: [{ id: 'g1', name: 'מתחילים', weekdays: [0, 2] }] }),
+            { status: 200 },
+          )
+        }
+        if (url.includes('/api/v1/public/studios/demo/price-plans')) {
+          return new Response(JSON.stringify({ items: [] }), { status: 200 })
+        }
+        if (url.includes('/api/v1/health-templates')) {
+          return new Response(
             JSON.stringify({
-              items: [
-                {
-                  id: 'g1',
-                  name: 'מתחילים',
-                  description: null,
-                  age_min: null,
-                  age_max: null,
-                  training_weekdays: [],
-                },
-              ],
+              items: [{ id: 'tmpl1', kind: 'full', version: 1, schema: HEALTH_SCHEMA }],
             }),
             { status: 200 },
           )
+        }
+        if (url.includes('/api/v1/students/') && url.endsWith('/health-declaration')) {
+          return new Response(JSON.stringify({}), { status: 201 })
         }
         return null
       }),
     )
     render(<App />)
-    await screen.findByTestId('sibling-group-g1')
+
+    // Straight to the students step, one panel already open (agreements already
+    // current) -- never the old form's bare 3 fields.
+    const panel = await screen.findByTestId(/^join-family-panel-/)
+    await user.type(within(panel).getByLabelText(t('he', 'people.join.birthdate')), '1990-01-01')
+    await user.type(within(panel).getByLabelText(t('he', 'people.join.fullName')), 'דניאל לוי')
+    await user.type(within(panel).getByLabelText(t('he', 'people.join.nationalId')), '100000009')
+    await user.type(within(panel).getByLabelText(t('he', 'people.join.grade')), 'ד')
+    await user.click(within(panel).getByRole('checkbox', { name: 'מתחילים · ראשון·שלישי' }))
+    await user.click(within(panel).getByTestId(/^join-family-save-/))
     const before = studentsGetCalls
+    await user.click(screen.getByTestId('join-submit'))
+    for (const delay of [50, 200, 400, 800]) {
+      // eslint-disable-next-line no-await-in-loop
+      await new Promise((resolve) => setTimeout(resolve, delay))
+      // eslint-disable-next-line no-console
+      console.log(
+        `DEBUG@${delay}`,
+        document.querySelector('main')?.textContent?.slice(0, 200),
+        document.body.querySelector('[data-testid]')?.getAttribute('data-testid'),
+      )
+    }
 
-    await user.type(screen.getByLabelText(t('he', 'people.student.firstName')), 'דניאל')
-    await user.type(screen.getByLabelText(t('he', 'people.student.lastName')), 'לוי')
-    await user.click(screen.getByTestId('sibling-group-g1'))
-    await user.click(screen.getByTestId('sibling-submit'))
+    // The health step, still local -- nothing written yet.
+    await screen.findByTestId('health-opening-question')
+    expect(registerCalled).toBe(false)
+    await user.click(screen.getByTestId('health-opening-healthy'))
+    await user.type(screen.getByLabelText(t('he', 'health.declaration.signatureTyped')), 'מיכל כהן')
+    await user.type(screen.getByLabelText('טלפון חירום'), '0501111111')
+    await user.click(screen.getByRole('checkbox', { name: /אני מאשר/ }))
+    await user.click(screen.getByTestId('health-sign-continue'))
 
-    await screen.findByTestId('sibling-submitted')
+    await screen.findByTestId('self-serve-confirm-step')
+    await user.click(screen.getByTestId('self-serve-confirm-submit'))
+
+    await waitFor(() => expect(registerCalled).toBe(true))
+    // Refreshed without a reload -- the same seam the old test proved for `AddSibling`.
     await waitFor(() => expect(studentsGetCalls).toBeGreaterThan(before))
   })
 })

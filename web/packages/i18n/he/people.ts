@@ -252,6 +252,17 @@ export const people: Bundle = {
   'join.studentGroup': 'קבוצה',
   'join.selfStudentAlso': 'אני מתאמנ/ת גם',
   'join.selfStudentHint': 'שם, ת.ז. וכתובת — כבר למעלה.',
+  // -- wave E, Door D: "member or trial" is a control inside the student panel --------
+  'join.memberOrTrial': 'סוג ההצטרפות',
+  'join.memberChoice': 'הצטרפות למועדון',
+  'join.trialChoice': 'שיעור ניסיון חינם',
+  'join.duplicateTitle': 'נראה שהילד/ה כבר במערכת',
+  'join.slotTitle': 'בחירת מועד',
+  'join.noSlotsForGroup': 'אין מועדים פנויים בקבוצה הזו כרגע',
+  'join.emergencyPhoneNote': 'טלפון חירום ייבדק בהצהרת הבריאות שבהמשך.',
+  'join.trialStudentsTitle': 'מי מגיע לשיעור?',
+  'join.iTrain': 'אני מתאמן/ת',
+  'join.contactDetails': 'פרטי יצירת קשר',
   'join.selfChip': 'נרשם לעצמו',
   'join.soloNote':
     'פרטי הורים, מורשי איסוף וכיתה אינם נדרשים כשאין ילדים ברשימה.',

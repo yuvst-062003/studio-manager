@@ -1533,3 +1533,145 @@ def test_the_price_plan_list_is_parent_readable_and_narrow(client, as_manager, a
 def test_the_price_plan_list_404s_on_an_invalid_token(client):
     response = client.get("/api/v1/public/onboarding/never-existed/price-plans")
     assert response.status_code == 404
+
+
+# -- wave E, Door D: the panel-level duplicate check (CLAUDE.md's "refuse rather than
+# accept, when accepting creates a dead end") ----------------------------------------
+def test_duplicate_check_says_yes_for_the_callers_own_child(
+    client, as_guardian, tenant_session, studio, a_group, twice_weekly
+):
+    """The check must fire BEFORE the health declaration and the payment step are ever
+    shown, so it has to be its own read -- reusing `add_child`'s refusal would mean
+    writing the child first."""
+    parent_person = tenant_session.get(Person, as_guardian.person_id)
+    OnboardingService.add_child(
+        tenant_session,
+        studio_id=studio.id,
+        parent=parent_person,
+        child={
+            "first_name": "נועה",
+            "last_name": "לוי",
+            "birthdate": date(2016, 4, 1),
+            "group_ids": [a_group],
+        },
+        at=T0,
+        schedule=twice_weekly,
+    )
+    tenant_session.commit()
+
+    response = client.get(
+        "/api/v1/me/students/duplicate-check",
+        params={"first_name": "נועה", "last_name": "לוי", "birthdate": "2016-04-01"},
+        headers=as_guardian.headers,
+    )
+    assert response.status_code == 200, response.text
+    assert response.json() == {"duplicate": True}
+
+
+def test_duplicate_check_says_no_for_a_new_name(client, as_guardian):
+    response = client.get(
+        "/api/v1/me/students/duplicate-check",
+        params={"first_name": "אורי", "last_name": "כהן", "birthdate": "2018-01-01"},
+        headers=as_guardian.headers,
+    )
+    assert response.status_code == 200, response.text
+    assert response.json() == {"duplicate": False}
+
+
+def test_duplicate_check_never_discloses_another_familys_child(
+    client, as_guardian, tenant_session, studio, a_group, twice_weekly
+):
+    """§11.1, the same rule `POST /me/students` already follows for its own duplicate
+    refusal: a same-named child belonging to a stranger must read as 'no duplicate of
+    YOURS', never leak that a child of that name trains here."""
+    stranger = Person(studio_id=studio.id, first_name="הורה", last_name="אחר")
+    tenant_session.add(stranger)
+    tenant_session.flush()
+    OnboardingService.add_child(
+        tenant_session,
+        studio_id=studio.id,
+        parent=stranger,
+        child={
+            "first_name": "יעל",
+            "last_name": "כהן",
+            "birthdate": date(2015, 3, 3),
+            "group_ids": [a_group],
+        },
+        at=T0,
+        schedule=twice_weekly,
+    )
+    tenant_session.commit()
+
+    response = client.get(
+        "/api/v1/me/students/duplicate-check",
+        params={"first_name": "יעל", "last_name": "כהן", "birthdate": "2015-03-03"},
+        headers=as_guardian.headers,
+    )
+    assert response.status_code == 200, response.text
+    assert response.json() == {"duplicate": False}
+
+
+# -- wave E, Door D/C: the shared self-service register (F18, F19) -------------------
+def test_self_register_writes_the_new_child_with_no_token(
+    client, as_guardian, tenant_session, studio, a_group, twice_weekly, a_live_plan, monkeypatch
+):
+    """§3 Door D -- 'It opens straight into the wizard, at the students step.' Reuses
+    `OnboardingService.register` exactly like the join-link door, but resolves the studio
+    from the caller's own ACTIVE membership rather than a token -- there is no token on
+    this door at all."""
+    import app.routers.onboarding as onboarding_router
+
+    monkeypatch.setattr(onboarding_router, "ScheduleService", lambda session: twice_weekly)
+    # The parent must already have signer details on file, same as the club's own
+    # register() would have written on an earlier door -- this is what lets Door D skip
+    # asking for them again (§3: "there is nothing to copy them from" applies only to the
+    # CHILD's own ת.ז./birthdate).
+    parent_person = tenant_session.get(Person, as_guardian.person_id)
+    parent_person.address = "הרצל 1"
+    parent_person.city = "רעננה"
+    parent_person.national_id_encrypted = b"100000033"
+    tenant_session.commit()
+
+    response = client.post(
+        "/api/v1/me/students/register",
+        headers=as_guardian.headers,
+        json={
+            "children": [
+                {
+                    "first_name": "דנה",
+                    "last_name": "כהן",
+                    "birthdate": "2016-03-14",
+                    "group_ids": [str(a_group)],
+                    "national_id": "100000058",
+                    "grade": "ג",
+                }
+            ]
+        },
+    )
+    assert response.status_code == 201, response.text
+    body = response.json()
+    assert len(body["student_ids"]) == 1
+    student = tenant_session.get(Student, uuid.UUID(body["student_ids"][0]))
+    assert student.status == "active"
+    assert student.price_plan_id == a_live_plan.id
+    guardian = tenant_session.execute(
+        select(Guardian).where(Guardian.student_id == student.id)
+    ).scalar_one()
+    assert guardian.person_id == as_guardian.person_id
+
+
+def test_self_register_requires_an_active_studio(client, fake_provider):
+    """No token, no membership -- 401, the same shape every other `/me/*` route answers,
+    never a 500 from a missing tenant scope."""
+    subject = f"noone-{uuid.uuid4()}"
+    fake_provider.register(code="c-noone", subject=subject, email=f"{subject}@example.invalid")
+    signed = sign_in(client, code="c-noone").json()
+    headers = {"Authorization": f"Bearer {signed['access_token']}"}
+    response = client.post(
+        "/api/v1/me/students/register",
+        headers=headers,
+        json={
+            "children": [{"first_name": "א", "last_name": "ב", "group_ids": [str(uuid.uuid4())]}]
+        },
+    )
+    assert response.status_code == 401, response.text

@@ -45,6 +45,7 @@ from contextlib import contextmanager
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -53,7 +54,10 @@ from app.core.db import SessionDep, get_engine
 from app.core.storage import ObjectNotFoundError, ObjectStore, build_object_store
 from app.core.tenancy import TenantSession, use_studio
 from app.models.belts import BeltRank
+from app.models.health import HealthFormTemplate
 from app.models.structure import Class
+from app.schemas._pagination import MAX_PAGE_SIZE
+from app.schemas.health import HealthFormTemplateOut
 from app.schemas.people import (
     PublicBeltOut,
     PublicGroupListResponse,
@@ -62,11 +66,33 @@ from app.schemas.people import (
     TrialSlotListResponse,
 )
 from app.schemas.schedule import TrialSlotOut
+from app.services.billing.catalogue import CatalogueService
 from app.services.people.errors import NotFoundError
 from app.services.people.group_days import ScheduleReader
 from app.services.people.landing import LandingService, PublicGroup
 from app.services.schedule import ScheduleService
 from app.services.structure import landing_photos
+
+
+class OnboardingPricePlanOut(BaseModel):
+    """§6's narrower read for a stranger with no manager session: name, price,
+    sessions-per-week and nothing else -- `PricePlanOut` (`app/routers/billing.py`) also
+    carries the registration fee and the standing-order link, both fine for a manager and
+    neither for a stranger on the open internet. Mirrors
+    `app/routers/onboarding.py::OnboardingPricePlanOut` exactly (same shape, same reason);
+    this door has no join token to resolve a studio from, so it needs its own route
+    rather than reusing that one's path.
+    """
+
+    id: uuid.UUID
+    name: str
+    monthly_amount_agorot: int
+    sessions_per_week: int | None
+
+
+class OnboardingPricePlanListOut(BaseModel):
+    items: list[OnboardingPricePlanOut]
+
 
 router = APIRouter(tags=["public"])
 
@@ -244,6 +270,83 @@ def public_groups(slug: str, session: SessionDep) -> PublicGroupListResponse:
     except NotImplementedError as exc:
         raise _schedule_unavailable() from exc
     return PublicGroupListResponse(items=[_group_out(group) for group in groups])
+
+
+@router.get("/public/studios/{slug}/health-template", response_model=HealthFormTemplateOut)
+def public_health_template(slug: str, session: SessionDep) -> HealthFormTemplateOut:
+    """§2 decision 7 -- 'one health form for everybody... asked through the popup, here as
+    everywhere.' Door A (`/t/<slug>`) is anonymous and, even signed in, has no membership
+    yet -- `GET /health-templates` (`TemplateReader`: manager, owner or guardian) can never
+    answer for that caller. The questions, never the answers: `HealthFormTemplateOut`'s own
+    docstring already states 'nothing in this shape is personal data', the same posture
+    `PublicGroupOut` takes for the schedule.
+
+    Highest PUBLISHED version of the `full` kind, same ordering rule
+    `list_health_templates` uses (published first, then version desc) -- a draft in
+    progress in the manager's D11 editor must never reach a stranger filling in a trial
+    form.
+    """
+    try:
+        studio = LandingService.studio_by_slug(session, slug=slug)
+    except NotFoundError as exc:
+        raise _not_found() from exc
+    with (
+        use_studio(studio.id),
+        TenantSession(bind=get_engine(), expire_on_commit=False) as scoped,
+    ):
+        row = scoped.execute(
+            select(HealthFormTemplate)
+            .where(
+                HealthFormTemplate.kind == "full",
+                HealthFormTemplate.published_at.is_not(None),
+            )
+            .order_by(HealthFormTemplate.version.desc())
+            .limit(1)
+        ).scalar_one_or_none()
+        if row is None:
+            scoped.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"code": "not_found", "message": "no published health form yet"},
+            )
+        result = HealthFormTemplateOut.model_validate(row, from_attributes=True)
+        # Never committed -- a read must not leave rows behind, same rule every other
+        # scoped read in this module follows.
+        scoped.rollback()
+    return result
+
+
+@router.get("/public/studios/{slug}/price-plans", response_model=OnboardingPricePlanListOut)
+def public_price_plans(slug: str, session: SessionDep) -> OnboardingPricePlanListOut:
+    """§6's parent-readable plan list, resolved from the studio's own slug rather than a
+    join token -- Door A's trial-to-member fork and Door D both reach this door with no
+    token to resolve a studio from. Same narrowing and the same non-authority as
+    `app/routers/onboarding.py::onboarding_price_plans`: the picker filters client-side to
+    covering plans, and the actual write (`OnboardingService.register` /
+    `OnboardingService.add_child`) is what refuses (422) a plan that does not cover the
+    groups chosen.
+    """
+    try:
+        studio = LandingService.studio_by_slug(session, slug=slug)
+    except NotFoundError as exc:
+        raise _not_found() from exc
+    with (
+        use_studio(studio.id),
+        TenantSession(bind=get_engine(), expire_on_commit=False) as scoped,
+    ):
+        rows, _ = CatalogueService(scoped).list_price_plans(limit=MAX_PAGE_SIZE)
+        items = [
+            OnboardingPricePlanOut(
+                id=row.id,
+                name=row.name,
+                monthly_amount_agorot=row.monthly_amount_agorot,
+                sessions_per_week=row.sessions_per_week,
+            )
+            for row in rows
+            if row.active_to is None
+        ]
+        scoped.rollback()
+    return OnboardingPricePlanListOut(items=items)
 
 
 @router.get("/public/studios/{slug}/logo")

@@ -7,6 +7,17 @@
 // draft persisted to `localStorage`); this module owns what is IN each row and how a
 // finished list of rows becomes the wire payload.
 //
+// **Wave E -- the trial field set (decision 8).** §3's door table gives doors A/B/C one
+// field set for the WHOLE run, but Door D's own spec is explicit that its choice is "a
+// control INSIDE that panel" -- a member sibling and a trial sibling can share one wizard
+// run. A trial row asks full name, birthdate, ONE group and a slot -- never ת.ז., never
+// address, never a plan (decision 8: "a stranger booking a free lesson should not hand
+// over a minor's national ID"). `rowValid` branches on `fieldSet` below; `resolveRowFamily`
+// never runs for a trial row (`isMinorChildRow` treats it as never a "family" row at all,
+// so the second-parent/pickup machinery, which decision 8 does not ask of this door, is
+// simply never reached for it) -- and `toJoinFamilyPayload`/`toTrialChildPayloads` are the
+// two halves of the split at submit time.
+//
 // **Decision 12/F8 -- there is no 18+ toggle.** `isRowAdult` derives it from the row's own
 // `birthdate` (`self` rows are adult by construction -- the signer who is filling the
 // wizard). Nothing here sends the derived flag to the server either: it only decides which
@@ -32,16 +43,14 @@ export type PickupContact = { name: string; phone: string }
  *  a member sibling and a trial sibling. That is a per-STUDENT fact, not a per-step one,
  *  which is why this lives on `SubjectRow` rather than as a prop on `JoinFamilyStep`: a
  *  step-level prop cannot express Door D's per-row mix at all, and building one anyway
- *  would have to be undone rather than extended. Only `'member'` exists today (this wave
- *  builds no other field set); wave E adds `'trial'`, a control that sets it per row, and
- *  the branch in the panel that swaps ת.ז./address/plan for מועד/emergency-phone (decision
- *  8) when it is set. */
-export type StudentFieldSet = 'member'
+ *  would have to be undone rather than extended. `'trial'` (wave E, decision 8) swaps
+ *  ת.ז./grade/plan/second-parent/pickup for a single group and a slot -- see `rowValid`. */
+export type StudentFieldSet = 'member' | 'trial'
 
 export type SubjectRow = {
   key: string
   kind: 'self' | 'child'
-  /** See `StudentFieldSet`. Always `'member'` today -- wave E's extension point. */
+  /** See `StudentFieldSet`. */
   fieldSet: StudentFieldSet
   firstName: string
   lastName: string
@@ -52,12 +61,19 @@ export type SubjectRow = {
   /** Decision 14 -- this student's own plan. `null` until one is picked (or until at
    *  least one covering plan exists to preselect); a submission with no live plans in
    *  the studio leaves this `null` on every row, same as the server's own
-   *  `plan_for_volume` returning `None`. */
+   *  `plan_for_volume` returning `None`. Meaningless for a `'trial'` row -- decision 8
+   *  asks no plan of a trial student. */
   pricePlanId: string | null
+  /** Decision 8 -- a trial row's own slot, chosen "under the group that filters it",
+   *  inside the same panel. `null` until picked, or when the chosen group has no
+   *  bookable session (the server accepts a booking with no session id). Meaningless
+   *  for a `'member'` row. */
+  sessionId: string | null
   /** F7's per-row second-parent/pickup fields. Meaningless (and never shown) for a
-   *  `self` row or a row whose derived age is 18+ -- see `isRowAdult`. When
-   *  `sameAsPrevious` is true these are stale placeholders, not the effective values;
-   *  read through `resolveRowFamily`, never these fields directly. */
+   *  `self` row, a `'trial'` row (decision 8 asks none of this) or a row whose derived
+   *  age is 18+ -- see `isRowAdult`. When `sameAsPrevious` is true these are stale
+   *  placeholders, not the effective values; read through `resolveRowFamily`, never
+   *  these fields directly. */
   otherFullName: string
   otherNationalId: string
   otherPhone: string
@@ -69,11 +85,15 @@ export type SubjectRow = {
   sameAsPrevious: boolean
 }
 
-export function emptySubjectRow(kind: 'self' | 'child', sameAsPrevious = false): SubjectRow {
+export function emptySubjectRow(
+  kind: 'self' | 'child',
+  sameAsPrevious = false,
+  fieldSet: StudentFieldSet = 'member',
+): SubjectRow {
   return {
     key: crypto.randomUUID(),
     kind,
-    fieldSet: 'member',
+    fieldSet,
     firstName: '',
     lastName: '',
     birthdate: '',
@@ -81,6 +101,7 @@ export function emptySubjectRow(kind: 'self' | 'child', sameAsPrevious = false):
     nationalId: '',
     grade: '',
     pricePlanId: null,
+    sessionId: null,
     otherFullName: '',
     otherNationalId: '',
     otherPhone: '',
@@ -111,7 +132,10 @@ export function isRowAdult(row: SubjectRow, today: Date = new Date()): boolean {
 }
 
 function isMinorChildRow(row: SubjectRow, today: Date): boolean {
-  return row.kind === 'child' && !isRowAdult(row, today)
+  // A trial row (decision 8) is never a "family" row -- it asks no second parent, no
+  // pickup contacts, whatever its age. Excluding it here is what keeps
+  // `resolveRowFamily` and the whole second-parent/pickup UI from ever running for it.
+  return row.kind === 'child' && row.fieldSet !== 'trial' && !isRowAdult(row, today)
 }
 
 /** Any row still counted as a minor. Drives the signer card's "אני: האם/האב/קרוב אחר"
@@ -190,6 +214,11 @@ function rowValid(
   if (row.groupIds.length === 0) return false
   if (row.kind === 'self') return true
   if (row.firstName.trim() === '' || row.birthdate.trim() === '') return false
+  // Decision 8 -- a trial row asks full name, birthdate and a group, full stop: no
+  // ת.ז., no address, no grade, no second parent, no plan. `isMinorChildRow` already
+  // reads `false` for a trial row, so the family block below never applies to one; this
+  // is the earlier exit that skips the member-only ת.ז./grade checks too.
+  if (row.fieldSet === 'trial') return true
   if (!isValidNationalId(row.nationalId)) return false
   if (row.grade.trim() === '') return false
   if (isMinorChildRow(row, today)) {
@@ -220,13 +249,28 @@ export type FamilyFormState = {
   relation: GuardianRelation
 }
 
-export function familyFormValid(state: FamilyFormState, today: Date = new Date()): boolean {
+export type FamilyFormValidOptions = {
+  /** Door D (wave E): the signer is already a member -- their own ת.ז./address/city/
+   *  phone are on file from an earlier registration and this door never asks for them
+   *  again (there is a top signer CARD to hide along with this check; see
+   *  `JoinFamilyStep`'s `showSignerDetails` prop). `true` (the default) preserves
+   *  Doors B/C's existing behaviour exactly. */
+  requireSignerDetails?: boolean
+}
+
+export function familyFormValid(
+  state: FamilyFormState,
+  today: Date = new Date(),
+  options: FamilyFormValidOptions = {},
+): boolean {
+  const { requireSignerDetails = true } = options
   if (state.rows.length === 0) return false
   if (
-    !isValidNationalId(state.signerNationalId) ||
-    state.address.trim() === '' ||
-    state.city.trim() === '' ||
-    state.phone.trim() === ''
+    requireSignerDetails &&
+    (!isValidNationalId(state.signerNationalId) ||
+      state.address.trim() === '' ||
+      state.city.trim() === '' ||
+      state.phone.trim() === '')
   ) {
     return false
   }
@@ -259,20 +303,28 @@ export function toJoinFamilyPayload(
       aliyah_year: state.aliyahYear?.trim() || null,
       relation: state.relation,
     },
-    children: state.rows.map((row, index) => {
+    // Trial rows (decision 8) never reach the member registration shape -- see
+    // `toTrialChildPayloads` for their own, separate write. `flatMap` rather than
+    // `filter().map()` so `resolveRowFamily` still walks `state.rows` at each row's
+    // ORIGINAL index -- a filtered-then-mapped array would renumber every row after the
+    // first trial one and break the backward "same as previous" chain.
+    children: state.rows.flatMap((row, index): JoinFamilyPayload['children'] => {
+      if (row.fieldSet === 'trial') return []
       if (row.kind === 'self') {
-        return {
-          first_name: first,
-          last_name: last,
-          birthdate: null,
-          group_ids: row.groupIds,
-          self_student: true,
-          national_id: null,
-          grade: null,
-          price_plan_id: row.pricePlanId,
-          other_parent: null,
-          pickup_contacts: [],
-        }
+        return [
+          {
+            first_name: first,
+            last_name: last,
+            birthdate: null,
+            group_ids: row.groupIds,
+            self_student: true,
+            national_id: null,
+            grade: null,
+            price_plan_id: row.pricePlanId,
+            other_parent: null,
+            pickup_contacts: [],
+          },
+        ]
       }
       const [childFirst = '', ...childRest] = row.firstName.trim().split(/\s+/)
       const family = resolveRowFamily(state.rows, index, today)
@@ -280,26 +332,28 @@ export function toJoinFamilyPayload(
         .map((entry) => ({ name: entry.name.trim(), phone: entry.phone.trim() }))
         .filter((entry) => entry.name !== '')
       const [otherFirst = '', ...otherRest] = family.otherFullName.trim().split(/\s+/)
-      return {
-        first_name: childFirst,
-        last_name: childRest.join(' ') || last,
-        birthdate: row.birthdate || null,
-        group_ids: row.groupIds,
-        self_student: false,
-        national_id: row.nationalId.trim() || null,
-        grade: row.grade.trim() || null,
-        price_plan_id: row.pricePlanId,
-        other_parent:
-          family.otherFullName.trim() || state.relation === 'other'
-            ? {
-                first_name: otherFirst,
-                last_name: otherRest.join(' ') || null,
-                national_id: family.otherNationalId.trim() || null,
-                phone: family.otherPhone.trim() || null,
-              }
-            : null,
-        pickup_contacts: pickupContacts,
-      }
+      return [
+        {
+          first_name: childFirst,
+          last_name: childRest.join(' ') || last,
+          birthdate: row.birthdate || null,
+          group_ids: row.groupIds,
+          self_student: false,
+          national_id: row.nationalId.trim() || null,
+          grade: row.grade.trim() || null,
+          price_plan_id: row.pricePlanId,
+          other_parent:
+            family.otherFullName.trim() || state.relation === 'other'
+              ? {
+                  first_name: otherFirst,
+                  last_name: otherRest.join(' ') || null,
+                  national_id: family.otherNationalId.trim() || null,
+                  phone: family.otherPhone.trim() || null,
+                }
+              : null,
+          pickup_contacts: pickupContacts,
+        },
+      ]
     }),
   }
 }
@@ -349,4 +403,47 @@ export function coveringPlans(volume: number, plans: readonly PlanOption[]): Pla
  *  leaves the student unpriced, same as the server's own fallback). */
 export function preselectedPlanId(volume: number, plans: readonly PlanOption[]): string | null {
   return coveringPlans(volume, plans)[0]?.id ?? null
+}
+
+// -- decision 8: the trial fork's own write shape -------------------------------------
+export type TrialChildPayload = {
+  first_name: string
+  last_name: string
+  birthdate: string | null
+  group_id: string
+  session_id: string | null
+}
+
+/** The mirror of `toJoinFamilyPayload` for `'trial'`-fieldSet rows -- `POST
+ *  /trial-bookings/self`'s `children[]` shape (`TrialChildIn`), never the member
+ *  registration shape. One group per trial row (decision 8: "group AND slot are both
+ *  per student"), the first of `groupIds` if more than one was ever set (the panel only
+ *  ever offers one for a trial row).
+ *
+ *  `contact` is Door D's self-row shortcut ("אני מתאמנ/ת גם ... their name, ת.ז. and
+ *  address are already known") and Door A's ("`אני מתאמן/ת` ... reusing the name already
+ *  typed in the contact block", decision 9): a `self` row has no name of its own to
+ *  split, so it reuses whatever the caller already gave once, never asking twice. */
+export function toTrialChildPayloads(
+  rows: readonly SubjectRow[],
+  contact: { firstName: string; lastName: string } = { firstName: '', lastName: '' },
+): TrialChildPayload[] {
+  return rows
+    .filter((row) => row.fieldSet === 'trial')
+    .map((row) => {
+      const [first, last] =
+        row.kind === 'self'
+          ? [contact.firstName.trim(), contact.lastName.trim()]
+          : (() => {
+              const [f = '', ...rest] = row.firstName.trim().split(/\s+/)
+              return [f, rest.join(' ')]
+            })()
+      return {
+        first_name: first,
+        last_name: last,
+        birthdate: row.birthdate || null,
+        group_id: row.groupIds[0] ?? '',
+        session_id: row.sessionId,
+      }
+    })
 }

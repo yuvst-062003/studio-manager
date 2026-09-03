@@ -203,6 +203,7 @@ describe('JoinFamilyStep (per-student panels)', () => {
           }),
         ],
       }),
+      [],
     )
   })
 
@@ -279,6 +280,7 @@ describe('JoinFamilyStep (per-student panels)', () => {
           }),
         ],
       }),
+      [],
     )
   })
 
@@ -412,6 +414,7 @@ describe('JoinFamilyStep (per-student panels)', () => {
       expect.objectContaining({
         children: [expect.objectContaining({ self_student: true, price_plan_id: 'covers' })],
       }),
+      [],
     )
   })
 
@@ -438,5 +441,99 @@ describe('JoinFamilyStep (per-student panels)', () => {
       expect(within(panel).getByText(t('he', 'people.join.noCoveringPlan'))).toBeInTheDocument(),
     )
     expect(within(panel).queryByRole('radio')).toBeNull()
+  })
+
+  // -- wave E, Door D: showSignerDetails / allowTrialFieldSet -----------------------
+  describe('Door D props', () => {
+    it('showSignerDetails=false hides the whole signer card, and the form is valid with no ת.ז./address typed', async () => {
+      stubPricePlans()
+      const user = userEvent.setup()
+      const onSubmit = vi.fn()
+      render(
+        <JoinFamilyStep
+          displayName="מיכל כהן"
+          email={null}
+          groups={groups}
+          locale="he"
+          onBack={vi.fn()}
+          onSubmit={onSubmit}
+          showSignerDetails={false}
+          token="tok-1"
+        />,
+      )
+      expect(screen.queryByLabelText(t('he', 'people.join.nationalId'))).toBeNull()
+      expect(screen.queryByLabelText(t('he', 'people.join.address'))).toBeNull()
+
+      await user.click(screen.getByTestId('join-add-child'))
+      const panel = currentPanel()
+      // Birthdate FIRST: comfortably over 18, so the family block never renders at all
+      // and "שם מלא"/"ת.ז." unambiguously resolve to the child's own field.
+      await user.type(
+        within(panel).getByLabelText(t('he', 'people.join.birthdate')),
+        '1990-01-01',
+      )
+      await user.type(within(panel).getByLabelText(t('he', 'people.join.fullName')), 'עידו בוגר')
+      await user.type(
+        within(panel).getByLabelText(t('he', 'people.join.nationalId')),
+        '100000009',
+      )
+      await user.type(within(panel).getByLabelText(t('he', 'people.join.grade')), 'יב')
+      await user.click(within(panel).getByRole('checkbox', { name: 'ילדים א · ראשון·שלישי' }))
+      await user.click(within(panel).getByTestId(/^join-family-save-/))
+      await user.click(screen.getByTestId('join-submit'))
+
+      expect(onSubmit).toHaveBeenCalledTimes(1)
+    })
+
+    it('allowTrialFieldSet shows a per-row toggle; choosing "trial" hides ת.ז./grade/plan and routes the row to trialChildren, not the member payload', async () => {
+      stubPricePlans()
+      const user = userEvent.setup()
+      const onSubmit = vi.fn()
+      render(
+        <JoinFamilyStep
+          allowTrialFieldSet
+          displayName="מיכל כהן"
+          email={null}
+          groups={groups}
+          locale="he"
+          onBack={vi.fn()}
+          onSubmit={onSubmit}
+          showSignerDetails={false}
+          token="tok-1"
+        />,
+      )
+      await user.click(screen.getByTestId('join-add-child'))
+      const panel = currentPanel()
+      expect(within(panel).getByText(t('he', 'people.join.memberOrTrial'))).toBeInTheDocument()
+
+      // Member fields visible by default (fieldSet defaults to 'member').
+      expect(within(panel).getAllByLabelText(t('he', 'people.join.nationalId')).length).toBeGreaterThan(0)
+
+      await user.click(within(panel).getByRole('radio', { name: t('he', 'people.join.trialChoice') }))
+
+      // Switching to trial drops the member-only fields entirely.
+      expect(within(panel).queryByLabelText(t('he', 'people.join.nationalId'))).toBeNull()
+      expect(within(panel).queryByLabelText(t('he', 'people.join.grade'))).toBeNull()
+
+      await user.type(within(panel).getByLabelText(t('he', 'people.join.fullName')), 'נועה טרייל')
+      await user.type(
+        within(panel).getByLabelText(t('he', 'people.join.birthdate')),
+        '2018-01-01',
+      )
+      await user.click(within(panel).getByRole('checkbox', { name: 'ילדים א · ראשון·שלישי' }))
+      await user.click(within(panel).getByTestId(/^join-family-save-/))
+      await user.click(screen.getByTestId('join-submit'))
+
+      expect(onSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({ children: [] }),
+        [
+          expect.objectContaining({
+            first_name: 'נועה',
+            last_name: 'טרייל',
+            group_id: 'g1',
+          }),
+        ],
+      )
+    })
   })
 })
