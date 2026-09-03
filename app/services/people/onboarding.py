@@ -290,6 +290,79 @@ class OnboardingService:
         return student.id
 
     @staticmethod
+    def _sync_enrollments(
+        session: Session,
+        *,
+        studio_id: uuid.UUID,
+        student_id: uuid.UUID,
+        group_ids: list[uuid.UUID],
+        at: datetime,
+        schedule: ScheduleReader,
+    ) -> None:
+        """§8's open item 3: a resubmission's edited group list must be applied, not
+        dropped. `add_child` never runs a second time for a child `duplicate_student`
+        already matched -- it raises before creating anything -- so a parent who went
+        back from the done screen and added a second group to a child already on the
+        roster had that edit silently discarded; only the household details
+        (`_apply_family_details`) were written for them.
+
+        Adds any group in THIS submission the student is not already actively enrolled
+        in, and recomputes the plan from the resulting volume -- the same rule
+        `add_child` uses for a fresh child. Never REMOVES an enrollment: dropping a
+        group the family already has is a manager's decision, not a side effect of
+        resubmitting the join link with an ADDED one. Raises no new charge -- the first
+        month for this student was already billed (or correctly left unpriced) by
+        whichever submission created it; correcting that amount for a plan that changed
+        mid-onboarding is a billing-lane concern, not this one.
+        """
+        today = at.date()
+        existing_group_ids = set(
+            session.execute(
+                select(Enrollment.group_id).where(
+                    Enrollment.student_id == student_id, Enrollment.status == "active"
+                )
+            ).scalars()
+        )
+        new_group_ids = [g for g in dict.fromkeys(group_ids) if g not in existing_group_ids]
+        if not new_group_ids:
+            return
+        for group_id in new_group_ids:
+            # `self_service_weekdays` is both the validation (a group this door may not
+            # enrol into raises `NotFoundError`, same as `add_child`) and the volume
+            # input the plan recompute below needs -- one call serves both.
+            EnrollmentService.self_service_weekdays(
+                session, group_id=group_id, since=today, schedule=schedule
+            )
+            session.add(
+                Enrollment(
+                    studio_id=studio_id,
+                    student_id=student_id,
+                    group_id=group_id,
+                    status="active",
+                    started_on=today,
+                    attends_weekdays=None,
+                )
+            )
+            existing_group_ids.add(group_id)
+        session.flush()
+
+        volume_pairs = [
+            (
+                None,
+                EnrollmentService.self_service_weekdays(
+                    session, group_id=group_id, since=today, schedule=schedule
+                ),
+            )
+            for group_id in existing_group_ids
+        ]
+        plan = plan_for_volume(session, studio_id=studio_id, volume=weekly_volume(volume_pairs))
+        if plan is not None:
+            student = session.get(Student, student_id)
+            if student is not None:
+                student.price_plan_id = plan.id
+                session.flush()
+
+    @staticmethod
     def notify_managers_of_new_child(
         session: Session, *, parent: Person, student_id: uuid.UUID
     ) -> None:
@@ -348,17 +421,28 @@ class OnboardingService:
         at: datetime,
         schedule: ScheduleReader,
         actor_identity_id: uuid.UUID | None = None,
+        club_terms_accepted: bool = False,
+        signed_ip: str | None = None,
+        signed_user_agent: str | None = None,
     ) -> tuple[Person, list[uuid.UUID], int]:
         """One transaction: the parent, the children, the enrollments, the price, the
-        first charge. Returns (parent person, student ids, charges created).
+        first charge, every health declaration and the club-terms acceptance. Returns
+        (parent person, student ids, charges created).
 
-        `children` rows: {first_name, last_name, birthdate?, group_ids: [uuid], self: bool}.
-        A `self` child is §5.3's adult member -- the parent Person doubles as the student's
-        person, one human in both roles.
+        `children` rows: {first_name, last_name, birthdate?, group_ids: [uuid], self: bool,
+        health?: {template_id, answers, signature_image_base64}}. A `self` child is §5.3's
+        adult member -- the parent Person doubles as the student's person, one human in
+        both roles. `health`, when present, is submitted through the same
+        `HealthDeclarationService.submit` the standalone
+        `POST /students/{id}/health-declaration` uses -- decision 2: 'the single call
+        carries ... every health declaration,' not a second request the wizard fires once
+        this one has returned a student id to submit it against.
 
         The student ids are what THIS submission created. A child already on the account is
         skipped rather than duplicated, so a resubmission can legitimately return fewer ids
-        than it was given children -- or none at all.
+        than it was given children -- or none at all. Its GROUPS are still applied though
+        (`_sync_enrollments`, §8 open item 3): a parent who went back and added a group must
+        not have that edit silently dropped just because the child already existed.
         """
         if not children:
             raise RefusedError("a registration needs at least one child")
@@ -409,6 +493,17 @@ class OnboardingService:
         # skipping that write is what left `registration_complete` false forever (§6.8).
         applied_pairs: list[tuple[dict[str, Any], uuid.UUID]] = []
 
+        # Local imports, same reason `_apply_family_details` below gives: avoiding a
+        # module-level cycle between the health vertical and this one.
+        from typing import cast
+
+        from app.core.tenancy import TenantSession
+        from app.services.health.agreement import AgreementService
+        from app.services.health.club_terms import CLUB_TERMS_VERSION
+        from app.services.health.declarations import HealthDeclarationService
+
+        tenant_session = cast(TenantSession, session)
+
         for child in children:
             try:
                 student_id = OnboardingService.add_child(
@@ -432,10 +527,36 @@ class OnboardingService:
                 # The existing student still belongs in `applied_pairs`: this submission is
                 # exactly where the parent typed the address, the other parent and the
                 # pickup list, and that student is not on file for them until it is written.
-                applied_pairs.append((child, exc.student_id))
-                continue
-            student_ids.append(student_id)
-            applied_pairs.append((child, student_id))
+                student_id = exc.student_id
+                applied_pairs.append((child, student_id))
+                # §8 open item 3 -- the groups (and so the plan) THIS submission asked for,
+                # applied even though the child itself is not new.
+                OnboardingService._sync_enrollments(
+                    session,
+                    studio_id=studio_id,
+                    student_id=student_id,
+                    group_ids=list(child.get("group_ids") or []),
+                    at=at,
+                    schedule=schedule,
+                )
+            else:
+                student_ids.append(student_id)
+                applied_pairs.append((child, student_id))
+
+            health = child.get("health")
+            if health is not None:
+                HealthDeclarationService.submit(
+                    tenant_session,
+                    student_id,
+                    template_id=health["template_id"],
+                    answers=health["answers"],
+                    signature_image_base64=health["signature_image_base64"],
+                    signed_by_person_id=parent.id,
+                    signed_ip=signed_ip,
+                    signed_user_agent=signed_user_agent,
+                    at=at,
+                    actor_identity_id=actor_identity_id,
+                )
 
         if signer is not None and applied_pairs:
             OnboardingService._apply_family_details(
@@ -447,6 +568,17 @@ class OnboardingService:
                 pickup_contacts=pickup_contacts or [],
                 at=at,
                 actor_person_id=parent.id,
+                actor_identity_id=actor_identity_id,
+            )
+
+        if club_terms_accepted and applied_pairs:
+            AgreementService.accept_club_terms(
+                tenant_session,
+                studio_id=studio_id,
+                person_id=parent.id,
+                version=CLUB_TERMS_VERSION,
+                at=at,
+                ip=signed_ip,
                 actor_identity_id=actor_identity_id,
             )
 

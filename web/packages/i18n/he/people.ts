@@ -265,6 +265,9 @@ export const people: Bundle = {
   'join.required': 'יש למלא את כל שדות החובה',
   'join.nationalIdInvalid': 'מספר ת.ז. אינו תקין',
   'join.submit': 'שליחה',
+  // B2: step 4's own final button (§4, §2 decision 2) -- the ONE write, carrying
+  // everything typed in steps 1-3 together, fires from here.
+  'join.confirmAndPay': 'אישור ומעבר לתשלום',
   'join.done': 'נרשמתם! נשאר רק להשלים את הצהרת הבריאות באפליקציה.',
   'join.toApp': 'כניסה לאפליקציה',
   'join.done.title': 'כל הילדים רשומים',

@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import datetime
 import uuid
-from typing import Literal
+from typing import Any, Literal
 
 from fastapi import APIRouter, HTTPException, Request, status
 from pydantic import BaseModel, Field
@@ -36,6 +36,14 @@ from app.services.health.agreement import (
     AgreementError,
     NationalIdInvalidError,
     RegistrationIncompleteError,
+)
+from app.services.health.clauses import ClauseMismatchError
+from app.services.health.declarations import (
+    AnswersIncompleteError,
+    DeclarationNotFoundError,
+    SignatureNotAPngError,
+    SignatureRequiredError,
+    TemplateSupersededError,
 )
 from app.services.people.errors import NotFoundError, RefusedError
 from app.services.people.landing import LandingService
@@ -120,6 +128,18 @@ class OnboardingSignerIn(BaseModel):
     relation: Literal["mother", "father", "other"] = "mother"
 
 
+class OnboardingHealthDeclarationIn(BaseModel):
+    """B2, decision 2: the single write carries 'every health declaration' -- one of
+    these per child who needs one, in the same request that creates them. Same shape
+    `HealthDeclarationIn` already uses for the standalone
+    `POST /students/{id}/health-declaration`; not reused directly because that schema is
+    keyed to an existing student and this one arrives before the student does."""
+
+    template_id: uuid.UUID
+    answers: dict[str, Any] = Field(default_factory=dict)
+    signature_image_base64: str = Field(default="", max_length=2_000_000)
+
+
 class OnboardingChildIn(BaseModel):
     first_name: str = Field(min_length=1, max_length=80)
     last_name: str = Field(min_length=1, max_length=80)
@@ -129,6 +149,10 @@ class OnboardingChildIn(BaseModel):
     self_student: bool = False
     national_id: str | None = Field(default=None, max_length=20)
     grade: str | None = Field(default=None, max_length=20)
+    #: B2 -- null when this child's declaration is already on file (a resubmission of a
+    #: kid who signed one in an earlier pass through this same wizard run) or, for a
+    #: door that skips health entirely, never asked at all.
+    health: OnboardingHealthDeclarationIn | None = None
 
 
 class OnboardingRegisterIn(BaseModel):
@@ -139,6 +163,12 @@ class OnboardingRegisterIn(BaseModel):
     other_parent: OnboardingOtherParentIn | None = None
     pickup_contacts: list[OnboardingPickupIn] = Field(default_factory=list, max_length=10)
     children: list[OnboardingChildIn] = Field(min_length=1, max_length=8)
+    #: B2, decision 2 -- the club-terms tick from step 1, carried to the same write
+    #: rather than a separate `POST .../agreement/club-terms` the old two-write flow
+    #: made right after `register`. Recorded against today's live `CLUB_TERMS_VERSION`:
+    #: the wizard always re-fetches step 1 fresh (no cached, possibly-stale version to
+    #: echo back), so there is no stale-screen case for the client to name a version for.
+    club_terms_accepted: bool = False
 
 
 class OnboardingRegisterOut(BaseModel):
@@ -341,9 +371,21 @@ def register(
                         "self": child.self_student,
                         "national_id": child.national_id,
                         "grade": child.grade,
+                        "health": (
+                            {
+                                "template_id": child.health.template_id,
+                                "answers": child.health.answers,
+                                "signature_image_base64": child.health.signature_image_base64,
+                            }
+                            if child.health is not None
+                            else None
+                        ),
                     }
                     for child in body.children
                 ],
+                club_terms_accepted=body.club_terms_accepted,
+                signed_ip=request.client.host if request.client else None,
+                signed_user_agent=request.headers.get("user-agent"),
                 signer=(
                     {
                         "national_id": body.signer.national_id,
@@ -398,6 +440,39 @@ def register(
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail={"code": "refused", "message": str(exc)},
+            ) from exc
+        # The same error shapes `POST /students/{id}/health-declaration` answers
+        # (app/routers/health_declarations.py) -- decision 2 moved the write into this
+        # one call, not the rules a client already handles for it.
+        except DeclarationNotFoundError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"code": "not_found", "message": str(exc)},
+            ) from exc
+        except SignatureRequiredError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail={"code": "signature_required", "message": str(exc)},
+            ) from exc
+        except SignatureNotAPngError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail={"code": "signature_not_a_png", "message": str(exc)},
+            ) from exc
+        except AnswersIncompleteError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail={"code": "answers_incomplete", "message": f"unanswered: {exc}"},
+            ) from exc
+        except TemplateSupersededError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail={"code": "template_superseded", "message": str(exc)},
+            ) from exc
+        except ClauseMismatchError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail={"code": "clause_mismatch", "message": str(exc)},
             ) from exc
         scoped.commit()
         return OnboardingRegisterOut(

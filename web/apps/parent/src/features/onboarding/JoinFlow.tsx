@@ -2,20 +2,25 @@
 // the session ONCE and shows its own sign-in wall before this ever mounts (F1/F10) — by
 // the time this component exists, the family is already signed in. After sign-in the
 // family walks one four-step wizard: welcome + agreements, family, health, payment.
+//
+// **B2 — nothing is written until step 4's final button (§2 decision 2).** Steps 1-3
+// only ever touch local state (`familyPayload`, `healthDrafts`, both mirrored into
+// `localStorage` by `joinDraftStorage`). The single write — consent, club terms, the
+// parent, the students, the enrolments, the plans, the first charge and every health
+// declaration — fires from `submitRegistration` below, wired to the confirm gate at the
+// top of the `payment` step. Before this, `submitFamily` posted `/register` the moment
+// step 2 was submitted, and health was flushed separately, one call per kid, from the
+// done screen's "enter the app" — two write points where the spec names one.
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
-import { apiFetch } from '@studio/core'
-import { EmptyState } from '@studio/ui'
+import { apiFetch, refresh } from '@studio/core'
+import { Alert, EmptyState } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { PaymentSetup } from '../billing/PaymentSetup'
 import type { PaymentSummaryRow, StandingOrderLink } from '../billing/PaymentSetup'
 import type { BillingClient } from '../billing/billingClient'
-import {
-  firstStudentNeedingDeclaration,
-  needsFullDeclaration,
-  type GatedStudent,
-} from '../health/HealthGate'
+import { needsFullDeclaration, type GatedStudent } from '../health/HealthGate'
 import type { HealthClient } from '../health/healthClient'
 import type { PrivacyClient } from '../privacy/privacyClient'
 import type { FamilyPayloadState } from './familyDraft'
@@ -26,6 +31,7 @@ import { JoinHealthStep } from './JoinHealthStep'
 import { JoinWelcomeStep } from './JoinWelcomeStep'
 import { clearJoinDraft, loadJoinDraft, saveJoinDraft } from './joinDraftStorage'
 import { OnboardingWizardChrome, stepPosition } from './OnboardingWizardChrome'
+import { WizardNavButtons } from './WizardNavButtons'
 
 type JoinGroup = { id: string; name: string; weekdays: number[] }
 type JoinInfo = { studio_name: string; groups: JoinGroup[]; email: string | null }
@@ -40,6 +46,12 @@ const pageStyle: CSSProperties = {
   marginInline: 'auto',
   inlineSize: '100%',
   padding: 'var(--space-4)',
+}
+
+const confirmStyle: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 'var(--space-4)',
 }
 
 async function loadStudents(): Promise<GatedStudent[]> {
@@ -61,6 +73,25 @@ async function loadStudents(): Promise<GatedStudent[]> {
     status: student.status,
     health_status: student.health_status,
     agreement_complete: student.agreement_complete,
+  }))
+}
+
+/** Steps 2-3's own placeholder students, before anything server-side exists.
+ *
+ * **Keyed by position, not a server id** (spec §4: "health drafts are keyed by the
+ * local student row id ... this removes the need to ask the server 'list my children'
+ * mid-wizard"). `payload.children` is built from `familyDraft.ts`'s `SubjectRow[]` in
+ * the same order every time (rows are appended, never reordered), so `local-<index>`
+ * is stable across a save-to-draft/restore-from-draft round trip -- the health drafts
+ * keyed against it in `localStorage` still line up with the right child after a closed
+ * tab is reopened. */
+function localStudentsFromPayload(payload: JoinFamilyPayload): GatedStudent[] {
+  return payload.children.map((child, index) => ({
+    id: `local-${index}`,
+    display_name: `${child.first_name} ${child.last_name}`.trim(),
+    status: 'active',
+    health_status: 'missing',
+    agreement_complete: false,
   }))
 }
 
@@ -87,6 +118,8 @@ export function JoinFlow({
 }) {
   const [info, setInfo] = useState<JoinInfo | null | 'invalid'>(null)
   const [step, setStep] = useState<JoinStep>('welcome')
+  // Local placeholders (`local-0`, `local-1`, ...) until `submitRegistration` succeeds,
+  // real server rows after -- see `localStudentsFromPayload` above.
   const [students, setStudents] = useState<readonly GatedStudent[]>([])
   // Restore-on-mount lives in these two lazy initializers rather than an effect: `token`
   // does not change over this component's lifetime, so reading the saved draft is a
@@ -98,10 +131,16 @@ export function JoinFlow({
   const [familyDraft, setFamilyDraft] = useState<FamilyPayloadState | null>(
     () => loadJoinDraft(token)?.family ?? null,
   )
+  // The validated, wire-shaped payload step 2 produced -- held here rather than
+  // re-derived at write time, because the write happens two steps later, at step 4's
+  // button, and `familyDraft`'s own shape is the pre-validation working state.
+  const [familyPayload, setFamilyPayload] = useState<JoinFamilyPayload | null>(null)
   const [doneRows, setDoneRows] = useState<PaymentSummaryRow[]>([])
-  const [flushing, setFlushing] = useState(false)
-  const [flushError, setFlushError] = useState<string | null>(null)
   const [clubTermsAccepted, setClubTermsAccepted] = useState(false)
+  // Whether the ONE write (`submitRegistration`) has succeeded yet -- gates the
+  // `payment` step between its confirm gate (nothing written) and `PaymentSetup`
+  // (which needs real, server-created student ids and charges to read).
+  const [registered, setRegistered] = useState(false)
   const [inFlight, setInFlight] = useState(false)
   const [failed, setFailed] = useState<string | null>(null)
 
@@ -142,24 +181,6 @@ export function JoinFlow({
     [students],
   )
 
-  // Loads `students` once on entering the health step. Deliberately does NOT decide
-  // whether to advance to payment here -- under the deferred-submission model the
-  // server never learns a kid is done until the final flush (Step 4's "enter the
-  // app"), so `students`' own `health_status` stays 'missing' through the whole
-  // queue. `handleHealthSigned` below is what decides, from `healthDrafts`.
-  useEffect(() => {
-    if (step !== 'health' || students.length > 0) return
-    // Fetched directly rather than through `refreshStudents` (still used by
-    // `handleHealthSigned` below) -- calling a setState-carrying callback from an effect
-    // is the same cascading-render risk the fetch above (line 104) already avoids by
-    // setting state from its own `.then`, not from a function an effect merely invokes.
-    let alive = true
-    void loadStudents().then((next) => alive && setStudents(next))
-    return () => {
-      alive = false
-    }
-  }, [step, students.length])
-
   // Save-on-change: every edit to the family form or a kid's health answers persists
   // immediately, so a closed tab loses nothing typed since the last keystroke.
   useEffect(() => {
@@ -168,10 +189,11 @@ export function JoinFlow({
 
   if (info === null) return null
 
-  /** A kid still needing a declaration, by the rule that survives the deferred model:
-   *  server truth (`needsFullDeclaration`) says so, AND there is no local draft for
-   *  them yet. A signed kid's `health_status` never flips to 'signed' server-side
-   *  until the final flush, so server truth alone would loop forever. */
+  /** A kid still needing a declaration: locally-known truth only. Under "nothing is
+   *  written until step 4" there is no server read to defer to any more -- steps 1-3
+   *  never created these students, so there is nothing for the server to have an
+   *  opinion about yet. A kid already holding a local draft is done from this queue's
+   *  point of view. */
   function stillNeedsDeclaration(
     list: readonly GatedStudent[],
     drafts: Record<string, SubjectHealthDraft>,
@@ -187,14 +209,22 @@ export function JoinFlow({
     }
   }
 
-  async function acceptClubTermsForFamily(studentId: string) {
-    const status = await healthClient.agreementStatus(studentId)
-    if (status.terms_accepted) return
-    await healthClient.acceptClubTerms(studentId, status.club_terms_version)
+  /** Step 2's submit. Writes nothing -- decision 2. Builds this run's local student
+   *  placeholders, decides (from what is already locally known) whether anyone still
+   *  needs a declaration, and moves on. */
+  function handleFamilySubmit(payload: JoinFamilyPayload) {
+    setFailed(null)
+    setFamilyPayload(payload)
+    const localStudents = localStudentsFromPayload(payload)
+    setStudents(localStudents)
+    setStep(stillNeedsDeclaration(localStudents, healthDrafts).length === 0 ? 'payment' : 'health')
   }
 
-  async function submitFamily(payload: JoinFamilyPayload) {
-    if (inFlight) return
+  /** Step 4's final button ("אישור ומעבר לתשלום") — the ONE write. Carries the parent,
+   *  the students, their enrolments and plans, the club-terms tick from step 1, and
+   *  every health declaration collected in step 3, together, in this one request. */
+  async function submitRegistration() {
+    if (!familyPayload || inFlight) return
     setInFlight(true)
     setFailed(null)
     try {
@@ -202,21 +232,33 @@ export function JoinFlow({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          first_name: payload.first_name,
-          last_name: payload.last_name,
-          phone: payload.phone,
-          signer: payload.signer,
-          other_parent: payload.other_parent,
-          pickup_contacts: payload.pickup_contacts,
-          children: payload.children.map((child) => ({
-            first_name: child.first_name,
-            last_name: child.last_name,
-            birthdate: child.birthdate,
-            group_ids: child.group_ids,
-            self_student: child.self_student,
-            national_id: child.national_id,
-            grade: child.grade,
-          })),
+          first_name: familyPayload.first_name,
+          last_name: familyPayload.last_name,
+          phone: familyPayload.phone,
+          signer: familyPayload.signer,
+          other_parent: familyPayload.other_parent,
+          pickup_contacts: familyPayload.pickup_contacts,
+          club_terms_accepted: clubTermsAccepted,
+          children: familyPayload.children.map((child, index) => {
+            const draft = healthDrafts[`local-${index}`]
+            return {
+              first_name: child.first_name,
+              last_name: child.last_name,
+              birthdate: child.birthdate,
+              group_ids: child.group_ids,
+              self_student: child.self_student,
+              national_id: child.national_id,
+              grade: child.grade,
+              health:
+                draft && draft.templateId
+                  ? {
+                      template_id: draft.templateId,
+                      answers: draft.answers,
+                      signature_image_base64: draft.signatureBase64 ?? '',
+                    }
+                  : null,
+            }
+          }),
         }),
       })
       if (!response.ok) {
@@ -234,16 +276,23 @@ export function JoinFlow({
         )
         return
       }
-      const body = (await response.json()) as { student_ids: string[] }
-      if (clubTermsAccepted && body.student_ids[0]) {
-        await acceptClubTermsForFamily(body.student_ids[0])
-      }
-      const nextStudents = await refreshStudents()
-      if (firstStudentNeedingDeclaration(nextStudents)) {
-        setStep('health')
-        return
-      }
-      setStep('payment')
+      // F9 -- reload the session BEFORE asking `/me/students`. The write above just
+      // created this family's first membership in this studio; the access token still
+      // in memory is the one minted at sign-in, carrying no active studio at all
+      // (nobody belonged to a club yet). `refresh()` re-mints it from the httpOnly
+      // cookie, and `_build_session` (app/routers/identity.py) falls back to the sole
+      // membership once exactly one exists -- so the token that comes back is scoped
+      // to the studio this write just joined. Without this, `/me/students` below 401s
+      // "no active studio", and the wizard would see zero children: no health step
+      // needed, nothing to pay, done -- a family registered but never signing or
+      // paying. Decision 4: "reloads the session, so the home screen draws at once and
+      // one API request fills in the live schedule behind it."
+      await refresh()
+      await refreshStudents()
+      // Decision 3 -- "cleared the moment the submit succeeds." Everything the draft
+      // held is now on the server; there is nothing left worth re-typing from it.
+      clearJoinDraft(token)
+      setRegistered(true)
     } catch {
       setFailed(t(locale, 'common.error.generic'))
     } finally {
@@ -257,36 +306,6 @@ export function JoinFlow({
       return
     }
     globalThis.location.assign('/')
-  }
-
-  /** Step 4's "enter the app" — the ONE call site for the deferred submission's actual
-   *  `client.submit()` invocations. Every kid's held-in-draft declaration is flushed,
-   *  one call per kid, back to back, before the real navigation. A failure leaves the
-   *  drafts (and the done screen) exactly as they were -- nothing is lost, and the
-   *  family can retry rather than being silently moved on with an unsaved kid. */
-  async function handleEnterApp() {
-    if (flushing) return
-    setFlushing(true)
-    setFlushError(null)
-    try {
-      for (const draft of Object.values(healthDrafts)) {
-        // Set the moment the health step's schema loads (JoinHealthStep.tsx) — by the
-        // time a draft is signable at all its template has loaded, so a missing id
-        // here is a real bug, not a state to paper over silently.
-        if (!draft.templateId) throw new Error(`draft for ${draft.studentId} has no templateId`)
-        await healthClient.submit(draft.studentId, {
-          template_id: draft.templateId,
-          answers: draft.answers,
-          signature_image_base64: draft.signatureBase64 ?? '',
-        })
-      }
-      clearJoinDraft(token)
-      finishWizard()
-    } catch {
-      setFlushError(t(locale, 'people.join.done.flushFailed'))
-    } finally {
-      setFlushing(false)
-    }
   }
 
   // F5 -- every step's content is computed here and wrapped exactly ONCE, below, in
@@ -325,12 +344,11 @@ export function JoinFlow({
         email={info.email}
         error={failed}
         groups={info.groups}
-        inFlight={inFlight}
         initialValue={familyDraft}
         locale={locale}
         onBack={() => setStep('welcome')}
         onChange={setFamilyDraft}
-        onSubmit={(payload) => void submitFamily(payload)}
+        onSubmit={handleFamilySubmit}
       />
     )
   } else if (step === 'health') {
@@ -350,22 +368,48 @@ export function JoinFlow({
     content = (
       <OnboardingWizardChrome
         locale={locale}
-        // No `onBack`: health is complete by construction once this step renders — the
-        // effect above only advances here when no student still needs a declaration — so
-        // "back" would land on the health step's own effect, which immediately bounces
-        // forward again. A button that visibly does nothing is worse than no button.
+        // Back only before the write: once `registered`, health and the family form are
+        // complete by construction (the write already happened), so "back" would land on
+        // a step whose own effects immediately bounce forward again. A button that
+        // visibly does nothing is worse than no button.
+        onBack={registered ? undefined : () => setStep('health')}
         position={stepPosition('payment')}
         title={t(locale, 'health.onboarding.step.payment')}
       >
-        <PaymentSetup
-          client={billingClient}
-          locale={locale}
-          onFinish={() => setStep('done')}
-          onNothingToPay={() => setStep('done')}
-          onSummary={setDoneRows}
-          standingOrderLinks={standingOrderLinks}
-          students={setupChildren}
-        />
+        {registered ? (
+          <PaymentSetup
+            client={billingClient}
+            locale={locale}
+            onFinish={() => setStep('done')}
+            onNothingToPay={() => setStep('done')}
+            onSummary={setDoneRows}
+            standingOrderLinks={standingOrderLinks}
+            students={setupChildren}
+          />
+        ) : (
+          // The wizard's one write point (decision 2). Everything typed in steps 1-3
+          // lives only in `familyPayload`/`healthDrafts` until this button is pressed --
+          // wave D's actual prices-and-methods summary layout lands on top of this same
+          // gate later; this piece is the mechanism underneath it, not that screen.
+          <div data-testid="join-confirm-step" style={confirmStyle}>
+            {failed ? (
+              <Alert iconLabel={t(locale, 'people.join.title')} live tone="danger">
+                {failed}
+              </Alert>
+            ) : null}
+            <WizardNavButtons
+              forwardDisabled={inFlight}
+              forwardLabel={
+                inFlight
+                  ? t(locale, 'reports.privacy.gate.working')
+                  : t(locale, 'people.join.confirmAndPay')
+              }
+              forwardTestId="join-confirm-submit"
+              locale={locale}
+              onForward={() => void submitRegistration()}
+            />
+          </div>
+        )}
       </OnboardingWizardChrome>
     )
   } else {
@@ -377,10 +421,10 @@ export function JoinFlow({
         title={t(locale, 'health.onboarding.step.payment')}
       >
         <JoinDoneScreen
-          flushError={flushError}
-          flushing={flushing}
+          flushError={null}
+          flushing={false}
           locale={locale}
-          onEnterApp={() => void handleEnterApp()}
+          onEnterApp={finishWizard}
           rows={doneRows}
         />
       </OnboardingWizardChrome>

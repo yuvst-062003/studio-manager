@@ -67,6 +67,9 @@ const healthClient = {
     school_class_required: true,
   })),
   template: vi.fn(async () => ({ id: 'tmpl1', version: 1, schema: HEALTH_SCHEMA })),
+  // B2 -- health no longer flushes through this client at all: it travels inside the
+  // single `/register` call. Every test below that reaches a successful write asserts
+  // this was never called, which is what proves the old per-kid flush is gone.
   submit: vi.fn(async () => ({}) as never),
 } as unknown as HealthClient
 
@@ -101,13 +104,40 @@ async function acceptWelcomeStep(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByTestId('join-welcome-continue'))
 }
 
+/** Fills the family step for one self-training adult (no separate child), the
+ *  shortest path to a single local student ready for the health step. */
+async function fillFamilyStepForSelf(user: ReturnType<typeof userEvent.setup>) {
+  await screen.findByTestId('join-family-step')
+  await user.type(screen.getByLabelText(t('he', 'people.join.nationalId')), '100000017')
+  await user.type(screen.getByLabelText(t('he', 'people.join.address')), 'הרצל 12')
+  await user.type(screen.getByLabelText(t('he', 'people.join.city')), 'רעננה')
+  await user.type(screen.getByLabelText(t('he', 'people.join.phone')), '0548123456')
+  await user.click(screen.getByTestId('join-add-self'))
+  await user.click(screen.getByRole('checkbox', { name: 'ילדים א · ראשון·שלישי' }))
+  await user.click(screen.getByTestId('join-submit'))
+}
+
+/** Signs the currently-queued kid's health declaration -- the "healthy, nothing to
+ *  report" branch, same shape every existing health test in this file used. */
+async function signCurrentHealthDeclaration(
+  user: ReturnType<typeof userEvent.setup>,
+  phone: string,
+) {
+  await screen.findByTestId('health-opening-question')
+  await user.click(screen.getByTestId('health-opening-healthy'))
+  await user.type(screen.getByLabelText(t('he', 'health.declaration.signatureTyped')), 'מיכל כהן')
+  await user.type(screen.getByLabelText('טלפון חירום'), phone)
+  await user.click(screen.getByRole('checkbox', { name: /אני מאשר/ }))
+  await user.click(screen.getByTestId('health-sign-continue'))
+}
+
 afterEach(() => {
   vi.unstubAllGlobals()
-  // Several tests reuse the same token ('live-token-123456'), and JoinFlow now persists
-  // a real sessionStorage draft under it (Phase 5). Without this, a test that never
-  // reaches a successful completion (the national-id-error test, deliberately) leaves
-  // its draft behind for the next test using the same token to restore by accident.
-  sessionStorage.clear()
+  // Several tests reuse the same token ('live-token-123456'), and JoinFlow persists a
+  // real localStorage draft under it (decision 3). Without this, a test that never
+  // reaches a successful submit (the national-id-error test, deliberately) leaves its
+  // draft behind for the next test using the same token to restore by accident.
+  localStorage.clear()
 })
 
 beforeEach(() => {
@@ -133,10 +163,12 @@ beforeEach(() => {
 })
 
 describe('JoinFlow', () => {
-  it('walks the family through terms and registration, then hands back to the app', async () => {
+  it('writes nothing through steps 1-3, then fires exactly one write from step 4 carrying the family, health and club terms together', async () => {
     const user = userEvent.setup()
     const onComplete = vi.fn()
+    let registerCalls = 0
     let submittedBody: unknown = null
+    let studioActive = false
     vi.stubGlobal(
       'fetch',
       vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -155,24 +187,41 @@ describe('JoinFlow', () => {
           url.includes('/api/v1/onboarding/live-token-123456/register') &&
           init?.method === 'POST'
         ) {
+          registerCalls += 1
           submittedBody = JSON.parse(String(init.body))
+          studioActive = true
           return new Response(
             JSON.stringify({
               person_id: 'p1',
               student_ids: ['st1'],
-              charges_created: 1,
+              charges_created: 0,
               already_registered: false,
             }),
             { status: 201 },
           )
         }
+        if (url.includes('/api/v1/auth/refresh') && init?.method === 'POST') {
+          return new Response(
+            JSON.stringify({
+              access_token: 'tok-after-refresh',
+              expires_in: 900,
+              access: { staff: false, parent: true },
+              studios: studioActive
+                ? [{ studio_id: 's1', studio_name: 'מועדון הדגמה', studio_is_demo: false, person_id: 'p1', roles: [], is_guardian: true }]
+                : [],
+              active_studio_id: studioActive ? 's1' : null,
+            }),
+            { status: 200 },
+          )
+        }
         if (url.includes('/api/v1/me/students')) {
+          if (!studioActive) return new Response('', { status: 401 })
           return new Response(
             JSON.stringify({
               items: [
                 {
                   id: 'st1',
-                  first_name: 'דנה',
+                  first_name: 'מיכל',
                   last_name: 'כהן',
                   status: 'active',
                   health_status: 'signed',
@@ -200,73 +249,174 @@ describe('JoinFlow', () => {
       />,
     )
 
-    await screen.findByTestId('join-welcome')
-    expect(screen.queryByText(t('he', 'people.join.title'))).toBeNull()
-    expect(screen.queryByTestId('join-form')).toBeNull()
-    expect(screen.queryByTestId('join-family-step')).toBeNull()
-    expect(screen.getByTestId('join-onboarding-rail')).toBeInTheDocument()
-    expect(screen.getByTestId('join-step-position')).toHaveTextContent('שלב 1 מתוך 4')
-    expect(screen.getByTestId('join-onboarding-rail-welcome')).toHaveAttribute(
-      'aria-current',
-      'step',
-    )
-    expect(screen.getByTestId('join-onboarding-rail-family')).not.toHaveAttribute(
-      'aria-current',
-      'step',
-    )
-
     await acceptWelcomeStep(user)
+    await fillFamilyStepForSelf(user)
 
-    await screen.findByTestId('join-family-step')
-    expect(screen.getByTestId('join-step-position')).toHaveTextContent('שלב 2 מתוך 4')
-    expect(screen.getByTestId('join-onboarding-rail-family')).toHaveAttribute(
-      'aria-current',
-      'step',
-    )
-    await user.type(screen.getByLabelText(t('he', 'people.join.nationalId')), '100000017')
-    await user.type(screen.getByLabelText(t('he', 'people.join.address')), 'הרצל 12')
-    await user.type(screen.getByLabelText(t('he', 'people.join.city')), 'רעננה')
-    await user.type(screen.getByLabelText(t('he', 'people.join.phone')), '0548123456')
-    await user.click(screen.getByTestId('join-add-child'))
-    await user.type(screen.getAllByLabelText(t('he', 'people.join.fullName'))[2]!, 'דנה כהן')
-    await user.type(screen.getByLabelText(t('he', 'people.join.birthdate')), '2016-03-14')
-    await user.type(screen.getAllByLabelText(t('he', 'people.join.nationalId'))[2]!, '100000009')
-    await user.type(screen.getByLabelText(t('he', 'people.join.grade')), 'ד')
-    await user.click(screen.getByRole('checkbox', { name: 'ילדים א · ראשון·שלישי' }))
-    await user.click(screen.getByTestId('join-submit'))
+    // Step 2's submit must not have written anything -- decision 2.
+    expect(registerCalls).toBe(0)
 
-    // Nothing owed (openCharges resolves []) and no health draft to flush (this child
-    // is already `agreement_complete`), so the wizard lands straight on the done
-    // screen -- which still needs its own explicit "enter the app" press.
-    await user.click(await screen.findByTestId('join-done-enter'))
+    // Step 3: signs locally, still nothing written.
+    await signCurrentHealthDeclaration(user, '0501111111')
+    expect(registerCalls).toBe(0)
+    expect(healthClient.submit).not.toHaveBeenCalled()
 
-    await waitFor(() => expect(onComplete).toHaveBeenCalledTimes(1))
+    // Step 4's own gate -- confirm, not the payment methods screen (wave D's).
+    await screen.findByTestId('join-confirm-step')
+    expect(registerCalls).toBe(0)
+    await user.click(screen.getByTestId('join-confirm-submit'))
+
+    // The write, and reaching the real payment step behind it (openCharges resolves
+    // [], so PaymentSetup reports nothing owed and the wizard advances to done).
+    await screen.findByTestId('join-done-step')
+    expect(registerCalls).toBe(1)
+    expect(healthClient.submit).not.toHaveBeenCalled()
+
     expect(submittedBody).toMatchObject({
       first_name: 'מיכל',
       last_name: 'כהן',
-      phone: '0548123456',
-      signer: {
-        national_id: '100000017',
-        address: 'הרצל 12',
-        city: 'רעננה',
-        relation: 'mother',
-      },
+      club_terms_accepted: true,
+      signer: { national_id: '100000017', address: 'הרצל 12', city: 'רעננה' },
       children: [
         {
-          first_name: 'דנה',
+          first_name: 'מיכל',
           last_name: 'כהן',
-          birthdate: '2016-03-14',
-          group_ids: ['g1'],
-          self_student: false,
-          national_id: '100000009',
-          grade: 'ד',
+          self_student: true,
+          health: expect.objectContaining({ template_id: 'tmpl1' }),
         },
       ],
     })
-    expect(screen.queryByTestId('join-done')).toBeNull()
+
+    await user.click(await screen.findByTestId('join-done-enter'))
+    await waitFor(() => expect(onComplete).toHaveBeenCalledTimes(1))
   })
 
-  it('shows the national-id-specific message when the server rejects the id', async () => {
+  // F9 -- "a brand-new family is registered but never signs or pays." Their session had
+  // no active studio (nobody belonged to a club at sign-in); before this fix `/register`
+  // succeeded and the very next read, `/me/students`, ran on the STALE token and 401'd
+  // "no active studio" -- the fix reloads the session (`refresh()`) BEFORE that read.
+  // Asserted on the real network call sequence (real `apiFetch`/`refresh`, only `fetch`
+  // itself is stubbed), not by mocking `/me/students` to hand back data -- that would
+  // prove the component can render a list, not that the session gap is closed.
+  it('F9 -- reloads the session before /me/students, so /me/students never sees a stale-token 401', async () => {
+    const user = userEvent.setup()
+    const calls: string[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input)
+        if (url.includes('/api/v1/public/onboarding/live-token-123456')) {
+          return new Response(
+            JSON.stringify({
+              studio_name: 'מועדון הדגמה',
+              email: null,
+              groups: [{ id: 'g1', name: 'ילדים א', weekdays: [0, 2] }],
+            }),
+            { status: 200 },
+          )
+        }
+        if (
+          url.includes('/api/v1/onboarding/live-token-123456/register') &&
+          init?.method === 'POST'
+        ) {
+          calls.push('register')
+          // The write itself is what creates this family's first membership --
+          // mirroring `_build_session`'s real fallback (app/routers/identity.py):
+          // the studio only becomes resolvable AFTER this call returns. The access
+          // token already in the browser (minted at sign-in, before any membership
+          // existed) still carries none of this -- it is not reissued by this call.
+          return new Response(JSON.stringify({ student_ids: ['st1'] }), { status: 201 })
+        }
+        if (url.includes('/api/v1/auth/refresh') && init?.method === 'POST') {
+          calls.push('refresh')
+          // The real endpoint re-derives the active studio from the DATABASE, not
+          // from whatever token was presented -- so a refresh AFTER the write above
+          // always comes back correctly scoped, regardless of what was stale before it.
+          return new Response(
+            JSON.stringify({
+              access_token: 'tok-scoped-to-studio',
+              expires_in: 900,
+              access: { staff: false, parent: true },
+              studios: [
+                {
+                  studio_id: 's1',
+                  studio_name: 'מועדון הדגמה',
+                  studio_is_demo: false,
+                  person_id: 'p1',
+                  roles: [],
+                  is_guardian: true,
+                },
+              ],
+              active_studio_id: 's1',
+            }),
+            { status: 200 },
+          )
+        }
+        if (url.includes('/api/v1/me/students')) {
+          // The real `TenantSessionDep` decodes `studio_id` OUT OF THE PRESENTED
+          // TOKEN (`app/core/tenancy.py`) -- it does not re-query the database for
+          // "does this identity have a studio now." A request carrying anything other
+          // than the freshly-refreshed, studio-scoped token is exactly the stale
+          // caller F9 describes, and fails closed with a 401.
+          const headers = init?.headers as Record<string, string> | undefined
+          if (headers?.Authorization !== 'Bearer tok-scoped-to-studio') {
+            calls.push('me/students:401')
+            return new Response(JSON.stringify({ detail: { code: 'no_active_studio' } }), {
+              status: 401,
+            })
+          }
+          calls.push('me/students:ok')
+          return new Response(
+            JSON.stringify({
+              items: [
+                {
+                  id: 'st1',
+                  first_name: 'דנה',
+                  last_name: 'כהן',
+                  status: 'active',
+                  health_status: 'missing',
+                },
+              ],
+            }),
+            { status: 200 },
+          )
+        }
+        return new Response(JSON.stringify({ items: [] }), { status: 200 })
+      }),
+    )
+
+    render(
+      <JoinFlow
+        billingClient={billingClient}
+        displayName={DISPLAY_NAME}
+        healthClient={healthClient}
+        locale="he"
+        privacyClient={makePrivacyClient()}
+        standingOrderLinks={[]}
+        token="live-token-123456"
+      />,
+    )
+
+    await acceptWelcomeStep(user)
+    await fillFamilyStepForSelf(user)
+    await signCurrentHealthDeclaration(user, '0501111111')
+    await screen.findByTestId('join-confirm-step')
+    await user.click(screen.getByTestId('join-confirm-submit'))
+
+    // Reaches the done step -- proving the family's own new children were actually
+    // found (an empty/failed `/me/students` read would have left `PaymentSetup`
+    // reading `students=[]`, indistinguishable from "nothing to configure").
+    await screen.findByTestId('join-done-step')
+
+    expect(calls).toContain('refresh')
+    expect(calls).toContain('me/students:ok')
+    // The proof: /me/students is never asked before the session carries the new
+    // studio. A pre-fix JoinFlow called `refreshStudents()` immediately after
+    // `register` with no reload in between, so this would contain 'me/students:401'.
+    expect(calls).not.toContain('me/students:401')
+    expect(calls.indexOf('refresh')).toBeLessThan(calls.indexOf('me/students:ok'))
+  })
+
+  it('shows the national-id-specific message when the server rejects the id, on the confirm gate', async () => {
     const user = userEvent.setup()
     vi.stubGlobal(
       'fetch',
@@ -310,22 +460,15 @@ describe('JoinFlow', () => {
     )
 
     await acceptWelcomeStep(user)
-
-    await screen.findByTestId('join-family-step')
-    await user.type(screen.getByLabelText(t('he', 'people.join.nationalId')), '100000017')
-    await user.type(screen.getByLabelText(t('he', 'people.join.address')), 'הרצל 12')
-    await user.type(screen.getByLabelText(t('he', 'people.join.city')), 'רעננה')
-    await user.type(screen.getByLabelText(t('he', 'people.join.phone')), '0548123456')
-    await user.click(screen.getByTestId('join-add-child'))
-    await user.type(screen.getAllByLabelText(t('he', 'people.join.fullName'))[2]!, 'דנה כהן')
-    await user.type(screen.getByLabelText(t('he', 'people.join.birthdate')), '2016-03-14')
-    await user.type(screen.getAllByLabelText(t('he', 'people.join.nationalId'))[2]!, '100000009')
-    await user.type(screen.getByLabelText(t('he', 'people.join.grade')), 'ד')
-    await user.click(screen.getByRole('checkbox', { name: 'ילדים א · ראשון·שלישי' }))
-    await user.click(screen.getByTestId('join-submit'))
+    await fillFamilyStepForSelf(user)
+    await signCurrentHealthDeclaration(user, '0501111111')
+    await screen.findByTestId('join-confirm-step')
+    await user.click(screen.getByTestId('join-confirm-submit'))
 
     await screen.findByText(t('he', 'people.join.nationalIdInvalid'))
     expect(screen.queryByText(t('he', 'common.error.generic'))).toBeNull()
+    // Never advanced past the confirm gate on a failed write.
+    expect(screen.getByTestId('join-confirm-step')).toBeInTheDocument()
   })
 
   it('the first step has no back button', async () => {
@@ -474,12 +617,12 @@ describe('JoinFlow', () => {
     ).toContain('padding: var(--space-4)')
   })
 
-  it('advances the health queue from local drafts, never from the server, reaches payment, and flushes both drafts exactly once on "enter the app"', async () => {
+  it('advances the health queue from local drafts for both kids, then writes both declarations in the same single request', async () => {
     const user = userEvent.setup()
     const onComplete = vi.fn()
-    // The mocked /me/students response NEVER reports either kid as 'signed' -- that is
-    // exactly what proves the queue advance is computed locally (from healthDrafts),
-    // not re-derived from a server read that the deferred model never triggers.
+    let registerCalls = 0
+    let submittedBody: unknown = null
+    let studioActive = false
     vi.stubGlobal(
       'fetch',
       vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -498,9 +641,21 @@ describe('JoinFlow', () => {
           url.includes('/api/v1/onboarding/live-token-123456/register') &&
           init?.method === 'POST'
         ) {
+          registerCalls += 1
+          submittedBody = JSON.parse(String(init.body))
+          studioActive = true
+          return new Response(JSON.stringify({ student_ids: ['st1', 'st2'] }), { status: 201 })
+        }
+        if (url.includes('/api/v1/auth/refresh')) {
           return new Response(
-            JSON.stringify({ student_ids: ['st1', 'st2'] }),
-            { status: 201 },
+            JSON.stringify({
+              access_token: 'tok',
+              expires_in: 900,
+              access: { staff: false, parent: true },
+              studios: [],
+              active_studio_id: studioActive ? 's1' : null,
+            }),
+            { status: 200 },
           )
         }
         if (url.includes('/api/v1/me/students')) {
@@ -512,14 +667,16 @@ describe('JoinFlow', () => {
                   first_name: 'מיכל',
                   last_name: 'כהן',
                   status: 'active',
-                  health_status: 'missing',
+                  health_status: 'signed',
+                  agreement_complete: true,
                 },
                 {
                   id: 'st2',
                   first_name: 'דנה',
                   last_name: 'כהן',
                   status: 'active',
-                  health_status: 'missing',
+                  health_status: 'signed',
+                  agreement_complete: true,
                 },
               ],
             }),
@@ -550,74 +707,48 @@ describe('JoinFlow', () => {
     await user.type(screen.getByLabelText(t('he', 'people.join.city')), 'רעננה')
     await user.type(screen.getByLabelText(t('he', 'people.join.phone')), '0548123456')
     await user.click(screen.getByTestId('join-add-self'))
-    await user.click(
-      screen.getAllByRole('checkbox', { name: 'ילדים א · ראשון·שלישי' })[0]!,
-    )
+    await user.click(screen.getAllByRole('checkbox', { name: 'ילדים א · ראשון·שלישי' })[0]!)
     await user.click(screen.getByTestId('join-add-child'))
     await user.type(screen.getAllByLabelText(t('he', 'people.join.fullName'))[2]!, 'דנה כהן')
     await user.type(screen.getByLabelText(t('he', 'people.join.birthdate')), '2016-03-14')
     await user.type(screen.getAllByLabelText(t('he', 'people.join.nationalId'))[2]!, '100000009')
     await user.type(screen.getByLabelText(t('he', 'people.join.grade')), 'ד')
-    await user.click(
-      screen.getAllByRole('checkbox', { name: 'ילדים א · ראשון·שלישי' })[1]!,
-    )
+    await user.click(screen.getAllByRole('checkbox', { name: 'ילדים א · ראשון·שלישי' })[1]!)
     await user.click(screen.getByTestId('join-submit'))
 
-    // Kid 1 (the self row).
+    // Kid 1 (the self row). Local queue advance -- the mocked /me/students above
+    // reports BOTH kids already 'signed', which would end the queue instantly if it
+    // were consulted; it never is until the write.
+    await signCurrentHealthDeclaration(user, '0501111111')
+
+    // Still local, kid 2's turn.
     await screen.findByTestId('health-opening-question')
-    await user.click(screen.getByTestId('health-opening-healthy'))
-    await user.type(
-      screen.getByLabelText(t('he', 'health.declaration.signatureTyped')),
-      'מיכל כהן',
-    )
-    await user.type(screen.getByLabelText('טלפון חירום'), '0501111111')
-    await user.click(screen.getByRole('checkbox', { name: /אני מאשר/ }))
-    await user.click(screen.getByTestId('health-sign-continue'))
+    expect(screen.queryByTestId('join-confirm-step')).toBeNull()
+    expect(registerCalls).toBe(0)
 
-    // Still on the health step -- kid 2's turn -- even though /me/students never
-    // changed either kid's health_status server-side.
-    await screen.findByTestId('health-opening-question')
-    expect(screen.queryByTestId('join-payment-step')).toBeNull()
+    await signCurrentHealthDeclaration(user, '0502222222')
 
-    await user.click(screen.getByTestId('health-opening-healthy'))
-    await user.type(
-      screen.getByLabelText(t('he', 'health.declaration.signatureTyped')),
-      'מיכל כהן',
-    )
-    await user.type(screen.getByLabelText('טלפון חירום'), '0502222222')
-    await user.click(screen.getByRole('checkbox', { name: /אני מאשר/ }))
-    await user.click(screen.getByTestId('health-sign-continue'))
-
-    // billingClient.openCharges resolves [] (this file's default mock), so PaymentSetup
-    // reports nothing owed and the wizard advances straight through the payment step to
-    // the done screen -- which must still flush both kids' drafts once "enter the app"
-    // is pressed. (The payment step itself is not asserted here: with charges resolving
-    // near-instantly, it never sits still long enough to reliably observe.)
-    await screen.findByTestId('join-done-step')
+    await screen.findByTestId('join-confirm-step')
+    expect(registerCalls).toBe(0)
     expect(healthClient.submit).not.toHaveBeenCalled()
-    await user.click(screen.getByTestId('join-done-enter'))
 
+    await user.click(screen.getByTestId('join-confirm-submit'))
+
+    await screen.findByTestId('join-done-step')
+    expect(registerCalls).toBe(1)
+    expect(healthClient.submit).not.toHaveBeenCalled()
+    const body = submittedBody as { children: { health?: unknown }[] }
+    expect(body.children).toHaveLength(2)
+    expect(body.children[0]?.health).toEqual(expect.objectContaining({ template_id: 'tmpl1' }))
+    expect(body.children[1]?.health).toEqual(expect.objectContaining({ template_id: 'tmpl1' }))
+
+    await user.click(screen.getByTestId('join-done-enter'))
     await waitFor(() => expect(onComplete).toHaveBeenCalledTimes(1))
-    expect(healthClient.submit).toHaveBeenCalledTimes(2)
-    expect(healthClient.submit).toHaveBeenCalledWith(
-      'st1',
-      expect.objectContaining({ template_id: 'tmpl1' }),
-    )
-    expect(healthClient.submit).toHaveBeenCalledWith(
-      'st2',
-      expect.objectContaining({ template_id: 'tmpl1' }),
-    )
   })
 
-  it('a failed flush leaves the done screen up, with an error, and never calls onComplete', async () => {
+  it('a failed write keeps the family on the confirm gate, with an error, and never reaches done', async () => {
     const user = userEvent.setup()
     const onComplete = vi.fn()
-    const failingHealthClient = {
-      ...healthClient,
-      submit: vi.fn(async () => {
-        throw new Error('boom')
-      }),
-    } as unknown as HealthClient
     vi.stubGlobal(
       'fetch',
       vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -636,23 +767,7 @@ describe('JoinFlow', () => {
           url.includes('/api/v1/onboarding/live-token-123456/register') &&
           init?.method === 'POST'
         ) {
-          return new Response(JSON.stringify({ student_ids: ['st1'] }), { status: 201 })
-        }
-        if (url.includes('/api/v1/me/students')) {
-          return new Response(
-            JSON.stringify({
-              items: [
-                {
-                  id: 'st1',
-                  first_name: 'מיכל',
-                  last_name: 'כהן',
-                  status: 'active',
-                  health_status: 'missing',
-                },
-              ],
-            }),
-            { status: 200 },
-          )
+          return new Response(JSON.stringify({ detail: { code: 'refused' } }), { status: 422 })
         }
         return new Response(JSON.stringify({ items: [] }), { status: 200 })
       }),
@@ -662,7 +777,7 @@ describe('JoinFlow', () => {
       <JoinFlow
         billingClient={billingClient}
         displayName={DISPLAY_NAME}
-        healthClient={failingHealthClient}
+        healthClient={healthClient}
         locale="he"
         onComplete={onComplete}
         privacyClient={makePrivacyClient()}
@@ -672,32 +787,19 @@ describe('JoinFlow', () => {
     )
 
     await acceptWelcomeStep(user)
-    await screen.findByTestId('join-family-step')
-    await user.type(screen.getByLabelText(t('he', 'people.join.nationalId')), '100000017')
-    await user.type(screen.getByLabelText(t('he', 'people.join.address')), 'הרצל 12')
-    await user.type(screen.getByLabelText(t('he', 'people.join.city')), 'רעננה')
-    await user.type(screen.getByLabelText(t('he', 'people.join.phone')), '0548123456')
-    await user.click(screen.getByTestId('join-add-self'))
-    await user.click(screen.getByRole('checkbox', { name: 'ילדים א · ראשון·שלישי' }))
-    await user.click(screen.getByTestId('join-submit'))
+    await fillFamilyStepForSelf(user)
+    await signCurrentHealthDeclaration(user, '0501111111')
 
-    await user.click(await screen.findByTestId('health-opening-healthy'))
-    await user.type(
-      screen.getByLabelText(t('he', 'health.declaration.signatureTyped')),
-      'מיכל כהן',
-    )
-    await user.type(screen.getByLabelText('טלפון חירום'), '0501111111')
-    await user.click(screen.getByRole('checkbox', { name: /אני מאשר/ }))
-    await user.click(screen.getByTestId('health-sign-continue'))
+    await screen.findByTestId('join-confirm-step')
+    await user.click(screen.getByTestId('join-confirm-submit'))
 
-    await user.click(await screen.findByTestId('join-done-enter'))
-
-    await screen.findByText(t('he', 'people.join.done.flushFailed'))
-    expect(screen.getByTestId('join-done-screen')).toBeInTheDocument()
+    await screen.findByText(t('he', 'common.error.generic'))
+    expect(screen.getByTestId('join-confirm-step')).toBeInTheDocument()
+    expect(screen.queryByTestId('join-done-step')).toBeNull()
     expect(onComplete).not.toHaveBeenCalled()
   })
 
-  it('persists the family draft to sessionStorage as it is typed, and restores it on a same-tab return', async () => {
+  it('persists the family draft to localStorage as it is typed, and restores it on a same-tab return', async () => {
     const user = userEvent.setup()
     const token = 'draft-token-654321'
     vi.stubGlobal(
@@ -736,12 +838,20 @@ describe('JoinFlow', () => {
     await user.type(screen.getByLabelText(t('he', 'people.join.address')), 'הרצל 12')
 
     await waitFor(() => {
-      const saved = sessionStorage.getItem(`join-draft:${token}`)
+      // localStorage, not sessionStorage (decision 3) -- a closed-tab simulation
+      // clears sessionStorage first to prove the draft does not live there.
+      const saved = localStorage.getItem(`join-draft:${token}`)
       expect(saved).not.toBeNull()
       const parsed = JSON.parse(saved!) as { family: { signerNationalId: string; address: string } }
       expect(parsed.family.signerNationalId).toBe('100000017')
       expect(parsed.family.address).toBe('הרצל 12')
     })
+    expect(sessionStorage.getItem(`join-draft:${token}`)).toBeNull()
+
+    // The closed-tab simulation itself: sessionStorage really would be gone at this
+    // point in a real browser; localStorage (what the draft actually lives in) is not
+    // touched by it.
+    sessionStorage.clear()
 
     unmount()
     cleanup()

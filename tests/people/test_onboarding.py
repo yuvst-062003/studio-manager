@@ -968,3 +968,201 @@ def test_onboarding_status_does_not_500_with_no_active_studio(client, fake_provi
     body = response.json()
     assert body["next"] == "agreements"
     assert all(row["complete"] is False for row in body["steps"]), body["steps"]
+
+
+# -- B2: one transaction (decision 2) -------------------------------------------
+#: The smallest valid PNG -- a finger-drawn signature is a PNG data URL from a canvas,
+#: and the sniffing in app/core/storage.py reads the first bytes rather than the header.
+_ONE_PIXEL_PNG_B64 = (
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk"
+    "+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+)
+
+_HEALTH_ANSWERS = {
+    "asthma": False,
+    "allergy": False,
+    "medication": False,
+    "epilepsy": False,
+    "heart": False,
+    "diabetes": False,
+    "injury": False,
+    "other": False,
+    "emergency_contact": "050-0000000",
+    "clause_confirmed": "none",
+}
+
+
+def test_the_register_endpoint_carries_health_and_club_terms_in_one_call(
+    client, fake_provider, app_session, studio, a_group, twice_weekly, a_live_plan, as_manager
+):
+    """Decision 2: 'the single call carries: consent, club terms, the parent, the
+    students, the enrolments, the plans, the first charge, and every health
+    declaration.' Before this, a family signed the health form through a SECOND request
+    (`POST /students/{id}/health-declaration`) after `register` had already created
+    everything else -- this asserts the seam carries it all in the ONE call the wizard's
+    step 4 button fires.
+    """
+    from app.models.health import ConsentRecord, HealthDeclaration
+    from app.models.people import Student
+    from app.services.health.club_terms import CLUB_TERMS_CONSENT_TYPE, CLUB_TERMS_VERSION
+    from app.services.structure.health_templates import ensure_full_template
+
+    template = ensure_full_template(app_session, studio.id, at=T0)
+    app_session.commit()
+
+    created = client.post("/api/v1/onboarding-link", headers=as_manager.headers)
+    token = created.json()["url"].rsplit("/join/", 1)[1]
+
+    from app.routers import onboarding as onboarding_router
+
+    monkeypatch_target = onboarding_router.ScheduleService
+    try:
+        onboarding_router.ScheduleService = lambda session: twice_weekly  # type: ignore[assignment]
+
+        client.cookies.clear()
+        subject = f"health-in-one-{uuid.uuid4()}"
+        fake_provider.register(
+            code="c-health-1", subject=subject, email=f"{subject}@example.invalid"
+        )
+        signed = sign_in(client, code="c-health-1").json()
+        headers = {"Authorization": f"Bearer {signed['access_token']}"}
+
+        response = client.post(
+            f"/api/v1/onboarding/{token}/register",
+            headers=headers,
+            json={
+                "first_name": "שירה",
+                "last_name": "לוי",
+                "phone": "050-1234567",
+                "club_terms_accepted": True,
+                "signer": {
+                    "national_id": "100000017",
+                    "address": "הרצל 12",
+                    "city": "רעננה",
+                    "relation": "mother",
+                },
+                "children": [
+                    {
+                        "first_name": "נועה",
+                        "last_name": "לוי",
+                        "birthdate": "2016-04-01",
+                        "group_ids": [str(a_group)],
+                        "national_id": "100000009",
+                        "grade": "ד",
+                        "health": {
+                            "template_id": str(template.id),
+                            "answers": _HEALTH_ANSWERS,
+                            "signature_image_base64": _ONE_PIXEL_PNG_B64,
+                        },
+                    }
+                ],
+            },
+        )
+    finally:
+        onboarding_router.ScheduleService = monkeypatch_target
+
+    assert response.status_code == 201, response.text
+    student_id = uuid.UUID(response.json()["student_ids"][0])
+
+    student = app_session.get(Student, student_id)
+    assert student.health_status == "signed", "the declaration carried in the same call must land"
+
+    declaration = app_session.execute(
+        select(HealthDeclaration).where(HealthDeclaration.student_id == student_id)
+    ).scalar_one()
+    assert declaration.template_id == template.id
+
+    parent_id = uuid.UUID(response.json()["person_id"])
+    club_terms = app_session.execute(
+        select(ConsentRecord).where(
+            ConsentRecord.subject_id == parent_id,
+            ConsentRecord.consent_type == CLUB_TERMS_CONSENT_TYPE,
+        )
+    ).scalar_one()
+    assert club_terms.version == CLUB_TERMS_VERSION
+    assert club_terms.granted is True
+
+
+# -- B2: an edited group/plan on resubmission (§8 open item 3) -----------------
+def test_a_resubmission_applies_a_changed_group_rather_than_dropping_it(
+    tenant_session, app_session, studio, a_group, a_second_group, twice_weekly, a_live_plan
+):
+    """§8's open item 3: 'whether a CHANGED name, group or plan is applied needs
+    checking before it is promised.' Before this fix, `add_child`'s duplicate branch
+    (`register`'s `except DuplicateStudentError`) only carried the household details
+    (`_apply_family_details`) onto the existing student -- the submitted `group_ids`
+    were read, matched against nothing, and thrown away. A parent going back from the
+    done screen, adding a second group and resubmitting saw no group added at all.
+    """
+    from app.models.identity import AuthIdentity
+
+    twice_weekly.sessions[a_second_group] = [
+        make_session(
+            studio_id=studio.id,
+            group_id=a_second_group,
+            training_year_id=uuid.uuid4(),
+            starts_at=moment,
+        )
+        for moment in (SUNDAY, SUNDAY + timedelta(days=3))
+    ]
+
+    identity_row = AuthIdentity(
+        provider="google",
+        provider_subject=f"re-edit-{uuid.uuid4().hex[:8]}",
+        email="re-edit@example.invalid",
+        email_verified=True,
+        is_private_relay=False,
+        is_developer=False,
+    )
+    app_session.add(identity_row)
+    app_session.commit()
+
+    common = dict(
+        studio_id=studio.id,
+        identity_id=identity_row.id,
+        first_name="שירה",
+        last_name="לוי",
+        phone=None,
+        email="re-edit@example.invalid",
+        at=T0,
+        schedule=twice_weekly,
+    )
+    child = {
+        "first_name": "נועה",
+        "last_name": "לוי",
+        "birthdate": date(2016, 4, 1),
+        "group_ids": [a_group],
+        "self": False,
+    }
+    _, first_ids, _ = OnboardingService.register(tenant_session, children=[child], **common)
+    tenant_session.commit()
+    student_id = first_ids[0]
+
+    before = (
+        tenant_session.execute(
+            select(Enrollment.group_id).where(Enrollment.student_id == student_id)
+        )
+        .scalars()
+        .all()
+    )
+    assert before == [a_group], "precondition: enrolled in exactly the first group"
+
+    # The same child, name and birthdate unchanged (so it matches as a duplicate), but
+    # this time enrolled in BOTH groups -- the parent went back and added a group.
+    edited_child = {**child, "group_ids": [a_group, a_second_group]}
+    again_parent, second_ids, _ = OnboardingService.register(
+        tenant_session, children=[edited_child], **common
+    )
+    tenant_session.commit()
+
+    assert second_ids == [], "still the same child -- no second student"
+    after = set(
+        tenant_session.execute(
+            select(Enrollment.group_id).where(
+                Enrollment.student_id == student_id, Enrollment.status == "active"
+            )
+        ).scalars()
+    )
+    assert after == {a_group, a_second_group}, (
+        "the resubmission's edited group list must be applied, not dropped"
+    )

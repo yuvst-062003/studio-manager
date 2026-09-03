@@ -227,6 +227,7 @@ export const people: Bundle = {
   'join.required': 'Please fill in all required fields',
   'join.nationalIdInvalid': 'National ID is not valid',
   'join.submit': 'Submit',
+  'join.confirmAndPay': 'Confirm and continue to payment',
   'join.done': 'Registered! All that is left is the health declaration in the app.',
   'join.toApp': 'Open the app',
   'join.done.title': 'Every child is registered',

@@ -232,6 +232,7 @@ export const people: Bundle = {
   'join.required': 'Заполните все обязательные поля',
   'join.nationalIdInvalid': 'Недействительный номер удостоверения',
   'join.submit': 'Отправить',
+  'join.confirmAndPay': 'Подтвердить и перейти к оплате',
   'join.done': 'Готово! Осталась только декларация здоровья в приложении.',
   'join.toApp': 'Открыть приложение',
   'join.done.title': 'Все дети зарегистрированы',

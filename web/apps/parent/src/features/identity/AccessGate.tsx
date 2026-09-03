@@ -18,6 +18,9 @@ import type { Session } from '@studio/core'
 import { apiFetch } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
+// §2 decision 3 -- "cleared ... on sign-out," the second of this app's two sign-out
+// call sites (App.tsx's account drawer is the other).
+import { clearAllJoinDrafts } from '../onboarding/joinDraftStorage'
 
 /** Where the staff app lives, so §6.1's second refusal is a link rather than a dead end. */
 const STAFF_APP_URL = '/staff'
@@ -82,7 +85,10 @@ export function AccessGate({
         <RefusalScreen
           which="parent"
           otherAppUrl={STAFF_APP_URL}
-          onSignOut={() => void session.signOut()}
+          onSignOut={() => {
+            clearAllJoinDrafts()
+            void session.signOut()
+          }}
           locale={locale}
           email={session.email}
         />

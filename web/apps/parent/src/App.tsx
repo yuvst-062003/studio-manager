@@ -41,6 +41,9 @@ import { makeParentScheduleClient } from './features/schedule/client'
 import { useToday } from './features/schedule/useToday'
 import { PublicLanding, makeLandingClient, matchLandingPath } from './features/landing'
 import { JoinFlow, matchJoinPath } from './features/onboarding/JoinFlow'
+// §2 decision 3 -- "cleared ... on sign-out": a stale draft (children's national ids,
+// health answers) must not survive into whoever signs in on this device next.
+import { clearAllJoinDrafts } from './features/onboarding/joinDraftStorage'
 import {
   EventInviteScreen,
   ParentEventsScreen,
@@ -683,7 +686,10 @@ function AuthedApp() {
               <AccountDrawerFooter
                 locale={locale}
                 onChooseLocale={setLocale}
-                onSignOut={() => void session.signOut()}
+                onSignOut={() => {
+                  clearAllJoinDrafts()
+                  void session.signOut()
+                }}
                 accountName={session.displayName}
               />
             </>
