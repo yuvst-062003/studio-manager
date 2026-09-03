@@ -518,6 +518,17 @@ class StudentCreateResult(BaseModel):
     #: send. None when no invitation was minted, or the environment's parent host is
     #: still a PENDING placeholder.
     invitation_url: str | None = None
+    #: Decision 21 — the copyable link above always works; this and
+    #: `invitation_email_sent` describe the SECOND, additive channel. False when this
+    #: deployment cannot send mail at all (`SMTP_HOST` and `SMTP_PASSWORD` both set is
+    #: what "configured" means) — visible here rather than silent, because
+    #: `SMTP_PASSWORD` is the one unset on production today.
+    invitation_email_configured: bool = False
+    #: True only when the invitation email was actually handed to the SMTP server.
+    #: False for every other reason — unconfigured, no guardian email, the guardian was
+    #: matched to an existing account so there was no invitation to send, or delivery
+    #: raised — none of which fail student creation.
+    invitation_email_sent: bool = False
 
 
 class StudentStatusHistoryListResponse(BaseModel):

@@ -42,6 +42,7 @@ from app.core.tenancy import TenantSession, TenantSessionDep, require_current_st
 from app.models.belts import BeltRank
 from app.models.people import Student
 from app.models.person import Person
+from app.models.studio import Studio
 from app.schemas._pagination import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, IdempotencyKey
 from app.schemas.people import (
     GuardianCreate,
@@ -77,6 +78,7 @@ from app.services.people.errors import (
 from app.services.people.errors import NotFoundError as OnboardingNotFound
 from app.services.people.errors import RefusedError as OnboardingRefused
 from app.services.people.group_days import ScheduleReader
+from app.services.people.invitations import email_configured, send_invitation_email
 from app.services.people.onboarding import OnboardingService
 from app.services.people.profile import ProfileService
 from app.services.people.students import StudentRow, StudentService
@@ -379,10 +381,26 @@ def create_student(
     # redeems `?invite=` after sign-in; the origin comes from domains.json through the
     # same table the OAuth callback trusts, so this can never point anywhere else.
     origin = app_origin("parent", settings.ENV)
+    invitation_url = f"{origin}/?invite={token}" if token and origin else None
+    # decision 21 — the link above is the channel that always works; email is a second,
+    # additive one. Everything it could touch (student, guardian, token) is already
+    # committed, so a send that fails here must not turn into a failed request — it is
+    # caught and swallowed inside `send_invitation_email`, same as
+    # `app/services/ops/alerts.py`'s `send()`.
+    invitation_email_sent = False
+    if invitation_url and body.guardian.email:
+        studio_row = session.get(Studio, require_current_studio_id())
+        invitation_email_sent = send_invitation_email(
+            to_email=body.guardian.email,
+            studio_name=studio_row.name if studio_row is not None else "",
+            invitation_url=invitation_url,
+        )
     return StudentCreateResult(
         student=_out(session, student, person),
         invitation_token=token,
-        invitation_url=f"{origin}/?invite={token}" if token and origin else None,
+        invitation_url=invitation_url,
+        invitation_email_configured=email_configured(),
+        invitation_email_sent=invitation_email_sent,
     )
 
 
