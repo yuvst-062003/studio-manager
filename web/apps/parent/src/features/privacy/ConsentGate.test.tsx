@@ -163,4 +163,39 @@ describe('the §6.1 step 5 consent gate', () => {
     await waitFor(() => expect(screen.getByTestId('the-app')).toBeInTheDocument())
     expect(screen.queryByTestId('consent-gate')).toBeNull()
   })
+
+  it('can be forced visible for a join-link wizard without recording duplicate consent', async () => {
+    const c = client({ consents: vi.fn(async () => accepted()) })
+    render(
+      <ConsentGate client={c} forceReview locale="he">
+        <p data-testid="the-app" />
+      </ConsentGate>,
+    )
+    await waitFor(() => expect(screen.getByTestId('consent-gate')).toBeInTheDocument())
+    expect(screen.queryByTestId('the-app')).toBeNull()
+
+    await userEvent.click(screen.getByTestId('consent-check-terms'))
+    await userEvent.click(screen.getByTestId('consent-check-privacy'))
+    await userEvent.click(screen.getByTestId('consent-accept'))
+
+    await waitFor(() => expect(screen.getByTestId('the-app')).toBeInTheDocument())
+    expect(c.grant).not.toHaveBeenCalled()
+  })
+
+  it('opens after one forced-review submit when consent was genuinely outstanding', async () => {
+    const c = client()
+    render(
+      <ConsentGate client={c} forceReview locale="he">
+        <p data-testid="the-app" />
+      </ConsentGate>,
+    )
+    await waitFor(() => expect(screen.getByTestId('consent-gate')).toBeInTheDocument())
+
+    await userEvent.click(screen.getByTestId('consent-check-terms'))
+    await userEvent.click(screen.getByTestId('consent-check-privacy'))
+    await userEvent.click(screen.getByTestId('consent-accept'))
+
+    await waitFor(() => expect(screen.getByTestId('the-app')).toBeInTheDocument())
+    expect(c.grant).toHaveBeenCalledWith(0, { terms: true, privacy: true })
+  })
 })

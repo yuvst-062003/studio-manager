@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import datetime
 import uuid
+from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Request, status
 from pydantic import BaseModel, Field
@@ -31,6 +32,11 @@ from app.core.db import SessionDep, get_engine
 from app.core.tenancy import TenantSession, TenantSessionDep, use_studio
 from app.models.identity import AuthIdentity
 from app.models.studio import Studio
+from app.services.health.agreement import (
+    AgreementError,
+    NationalIdInvalidError,
+    RegistrationIncompleteError,
+)
 from app.services.people.errors import NotFoundError, RefusedError
 from app.services.people.landing import LandingService
 from app.services.people.onboarding import OnboardingService
@@ -83,6 +89,27 @@ class OnboardingInfoOut(BaseModel):
     email: str | None
 
 
+class OnboardingPickupIn(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    phone: str = Field(default="", max_length=32)
+
+
+class OnboardingOtherParentIn(BaseModel):
+    first_name: str = Field(min_length=1, max_length=80)
+    last_name: str | None = Field(default=None, max_length=80)
+    national_id: str | None = Field(default=None, max_length=20)
+    phone: str | None = Field(default=None, max_length=32)
+
+
+class OnboardingSignerIn(BaseModel):
+    national_id: str = Field(min_length=1, max_length=20)
+    address: str = Field(min_length=1, max_length=200)
+    city: str = Field(min_length=1, max_length=80)
+    phone_home: str | None = Field(default=None, max_length=32)
+    aliyah_year: str | None = Field(default=None, max_length=8)
+    relation: Literal["mother", "father", "other"] = "mother"
+
+
 class OnboardingChildIn(BaseModel):
     first_name: str = Field(min_length=1, max_length=80)
     last_name: str = Field(min_length=1, max_length=80)
@@ -90,12 +117,17 @@ class OnboardingChildIn(BaseModel):
     group_ids: list[uuid.UUID] = Field(min_length=1, max_length=6)
     #: §5.3's adult member -- "אני התלמיד". One Person, both roles.
     self_student: bool = False
+    national_id: str | None = Field(default=None, max_length=20)
+    grade: str | None = Field(default=None, max_length=20)
 
 
 class OnboardingRegisterIn(BaseModel):
     first_name: str = Field(min_length=1, max_length=80)
     last_name: str = Field(min_length=1, max_length=80)
     phone: str | None = Field(default=None, max_length=32)
+    signer: OnboardingSignerIn | None = None
+    other_parent: OnboardingOtherParentIn | None = None
+    pickup_contacts: list[OnboardingPickupIn] = Field(default_factory=list, max_length=10)
     children: list[OnboardingChildIn] = Field(min_length=1, max_length=8)
 
 
@@ -295,12 +327,56 @@ def register(
                         "birthdate": child.birthdate,
                         "group_ids": child.group_ids,
                         "self": child.self_student,
+                        "national_id": child.national_id,
+                        "grade": child.grade,
                     }
                     for child in body.children
                 ],
+                signer=(
+                    {
+                        "national_id": body.signer.national_id,
+                        "address": body.signer.address,
+                        "city": body.signer.city,
+                        "phone_home": body.signer.phone_home,
+                        "aliyah_year": body.signer.aliyah_year,
+                        "relation": body.signer.relation,
+                    }
+                    if body.signer is not None
+                    else None
+                ),
+                other_parent=(
+                    {
+                        "first_name": body.other_parent.first_name,
+                        "last_name": body.other_parent.last_name,
+                        "national_id": body.other_parent.national_id,
+                        "phone": body.other_parent.phone,
+                    }
+                    if body.other_parent is not None
+                    else None
+                ),
+                pickup_contacts=[
+                    {"name": contact.name, "phone": contact.phone, "relation": None}
+                    for contact in body.pickup_contacts
+                ],
                 at=now(),
                 schedule=ScheduleService(scoped),
+                actor_identity_id=identity_id,
             )
+        except NationalIdInvalidError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail={"code": "national_id_invalid", "field": exc.field},
+            ) from exc
+        except RegistrationIncompleteError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail={"code": "registration_incomplete", "fields": exc.fields},
+            ) from exc
+        except AgreementError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail={"code": "agreement_error", "message": str(exc)},
+            ) from exc
         except NotFoundError as exc:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,

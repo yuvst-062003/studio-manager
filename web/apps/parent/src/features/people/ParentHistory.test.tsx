@@ -63,6 +63,7 @@ const trialFamily = (): Session =>
     actingAsPersonId: null,
     actingAsLabel: null,
     displayName: 'יעל לוי',
+    email: 'yael@example.invalid',
     reload: vi.fn(),
     signOut: vi.fn(),
   }) as Session

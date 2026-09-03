@@ -29,7 +29,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from sqlalchemy import select
@@ -595,7 +595,7 @@ class AgreementService:
             session.delete(existing)
         session.flush()
 
-        for contact in contacts:
+        for index, contact in enumerate(contacts):
             name = str(contact.get("name") or "").strip()
             if not name:
                 continue
@@ -608,7 +608,7 @@ class AgreementService:
                         "phone": str(contact.get("phone") or "").strip(),
                         "relation": str(contact.get("relation") or "").strip() or None,
                     },
-                    created_at=at,
+                    created_at=at + timedelta(microseconds=index),
                 )
             )
 

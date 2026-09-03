@@ -7,6 +7,10 @@
 > the completion run. (An earlier header said "Nothing here is implemented"; it was
 > written before the build and never revisited — corrected by P0, because a spec that
 > mis-states its own status is worse than no spec.)
+>
+> **2026-09-02:** added "Inside each step" (the sub-screens within each of the five wizard
+> steps, not previously written down) and, under Payment, the standing-order shared-link
+> copy gap — a requirement, not yet implemented.
 
 ## Purpose and scope
 
@@ -102,6 +106,85 @@ That one bolded line is the cheapest duplicate-prevention in the whole feature.
             Home. The manager typed nothing.
 ```
 
+## Inside each step
+
+The five-step rail (`OnboardingWizardChrome`, `ONBOARDING_WIZARD_STEPS` in
+`web/apps/parent/src/features/onboarding/OnboardingWizardChrome.tsx`) is **consent → club
+terms → family → health → payment** — payment is step 5, not step 4; health is step 4.
+Each is one entry on the rail but its own small sequence underneath. Recorded here so a
+session touching one step does not have to reverse-engineer the others from the code.
+
+### 1. Consent (`ConsentGate`, wizard mode)
+
+1. Two checkboxes — תקנון (terms) and מדיניות פרטיות (privacy) — each with a one-line
+   summary and a "קריאת המסמך המלא" button that opens the full text inline in the same
+   card stack (`openDoc` state), not a new screen.
+2. אישור is disabled until both are checked. On submit, the version the SCREEN rendered is
+   posted back (`state.policy_version`); the server 409s if the published wording moved on
+   while the tab was open — what stops an agreement being recorded against text nobody
+   actually saw.
+3. A failed write leaves the gate up with an inline error and both checkboxes still
+   checked — never a blank retry.
+
+Skipped entirely (falls straight through to step 2) for a family that already holds the
+current `POLICY_VERSION`.
+
+### 2. Club terms (`ClubTermsStep`)
+
+One screen, three fixed clauses the club itself supplied (cheques, cancellation, pro-rata),
+one checkbox, one "המשך". No sub-screens. Recorded once per signing person, not per child,
+so a second child added later never sees this step again (§11.6's `consent_record`).
+
+### 3. Family (`JoinFamilyStep`)
+
+One long form, submitted once, not a wizard-within-a-wizard — but three visually distinct
+zones:
+
+1. **Your details** — name from sign-in (read-only), national ID, address, phone; the
+   "who am I" segmented control (mother/father/other) appears only once a minor child
+   exists, since a solo adult member has no relation to declare.
+2. **The other parent + pickup contacts** — optional unless the signer picked "other",
+   hidden entirely for an adult-only registration.
+3. **Children**, repeatable — name, birthdate, national ID, grade, and a per-child group
+   multi-select (weekday schedule shown, never the database name). "אני התלמיד" merges the
+   signer and one child into one Person. "הוספת ילד" appends another block.
+
+One submit posts the whole family in the one transaction the "What one submission creates"
+table below describes, after client-side validation of all of it at once.
+
+### 4. Health (`JoinHealthStep`)
+
+A **queue**, not a single screen: every child still needing a declaration, one
+`DeclarationForm` at a time. More than one child in the queue shows a pill row above the
+form (1/3, 2/3…) so the length of what is left is never a surprise. Signing one advances to
+the next; once none remain, the wizard moves to payment on its own. A family whose children
+all already hold a current declaration never sees this step at all.
+
+### 5. Payment (`PaymentSetup`, step 5 — `health.onboarding.step.payment`)
+
+Not one screen either:
+
+1. **Pick a method, once for the family.** One tap of card / cash / cheque / הוראת קבע
+   applies to every child with an open charge; a per-child override is reached later, from
+   the summary, not offered up front.
+2. **Summary.** Every child with an open charge, its amount, the method chosen for it
+   (changeable per row), and any child the club has not priced yet (shown, never hidden).
+   Card, cash/cheque and הוראת קבע split into their own cards here, because the three
+   routes do not combine the same way — see below.
+3. **"לתשלום בכרטיס"** (today's button text — not "אישור ומעבר לתשלום", which is the
+   confirm button on **uPay's own hosted checkout page**, outside this app). One tap opens
+   one order over every card child's charges and hands off to uPay by posting a form; the
+   whole tab navigates there. Money is held per payer, not per child — a three-child family
+   enters a card once, not three times.
+4. **Back in the app, `PaymentCompleteScreen`** is the summary the family sees after
+   paying, and it is deliberately honest that it does not yet know the outcome: uPay's IPN,
+   not the redirect, is the source of truth, and arrives roughly five minutes later. States
+   shown: verifying (default), paid, amount_mismatch, failed, expired.
+5. **Cash / cheque** never leaves the app: one promise per method, across every child
+   paying that way; the manager marks it received later.
+6. **הוראת קבע** never leaves the app either, in a different way that the copy currently
+   under-explains — see the next section.
+
 ## What one submission creates
 
 | Row | Values that matter |
@@ -150,6 +233,48 @@ charge, debt escalation, and the manager's dashboard showing who has not paid.
 
 Managers should mark known standing-order families in `recurring_subscription` as they
 do today; the existing double-payment warning then covers them.
+
+### One shared link, multiple children — a copy gap, not a code gap
+
+`StandingOrderLinkOut.url` (`app/routers/billing.py:715`) is `plan.standing_order_link_url`
+— **a URL that lives on the price plan, not on the student.** uPay's own product is a
+fixed-amount shared link (§8/G8: our provider cannot create a mandate programmatically),
+so this is the closest thing to automated recurring billing this product has. The
+consequence, stated plainly: **two children on the same plan get the literal same URL.** A
+family with three children who are all "once a week" (₪300) sees three rows in the
+summary's הוראת קבע card, each with a link — and it is the *same link*, three times.
+
+That is correct and intentional (`PaymentSetup.tsx:18-30`, the owner's own words: "for the
+same price need to pay twice or for different links"), but the copy does not say so today:
+
+```
+setup.standingTitle  "הוראת קבע — קישור לכל ילד"
+setup.standingHint   "לכל ילד קישור נפרד, כי הוראת קבע נחתמת על סכום קבוע."
+```
+
+"קישור נפרד" ("a separate link") reads as *a different link* to a parent who has not
+opened the actual URLs to compare them character by character — exactly the parent who,
+having tapped it once for the first child, believes all three are now covered. Nothing in
+the product catches that: three mandates were never signed, the club is short two
+children's worth of standing orders every month, and nobody notices until reconciliation —
+the same failure mode `PaymentSetup.tsx:26-30`'s comment already names for the *design*,
+now showing up in the *copy*.
+
+**What needs to change.** `setup.standingHint` needs to say, in one short sentence, that
+the link must be opened and completed **separately for each child even when it looks
+identical** — not merely that a link exists per child. It is copy-only: `amount_agorot`
+and `student_name` already travel with every row (`StandingOrderLinkOut`,
+`billing.py:711-715`), and how many children share one URL is already computable
+client-side (group `standingRows` by the matched link's `url`) — no schema or backend
+change, no new field. Suggested Hebrew, kept to the same register and length as today's
+hint, shown once above the group rather than reworded per row:
+
+> "שימו לב: לכמה מהילדים שלכם אותה עלות, ולכן הקישור זהה. יש להיכנס אליו בנפרד לכל ילד
+> ({count} פעמים בסה״כ) — כל הרשמה קובעת סכום קבוע ולא יודעת עבור כמה ילדים היא נחתמת."
+
+This belongs in the same lane as the rest of the payment step's behaviour
+(register §2/§13.2), not a schema change — implementation is not part of this update, which
+only records the requirement and the reasoning behind it.
 
 ## The manager's checklist (not an approval queue)
 

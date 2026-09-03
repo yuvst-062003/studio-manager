@@ -80,6 +80,33 @@ function stubChildren(
 
 afterEach(() => vi.unstubAllGlobals())
 
+describe('§7.9 — the shell while gatedChildren is still loading', () => {
+  it('shows a loading state rather than a bare page while /me/students is in flight', async () => {
+    let releaseStudents: (value: Response) => void = () => {}
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input)
+        if (url.includes('/api/v1/me/students')) {
+          return new Promise<Response>((resolve) => {
+            releaseStudents = resolve
+          })
+        }
+        return new Response(JSON.stringify({ items: [] }), { status: 200 })
+      }),
+    )
+    const { container } = render(<App />)
+    await waitFor(() => expect(screen.getByTestId('gated-children-loading')).toBeInTheDocument())
+    // AppShell's own chrome (title, drawer) still renders around it -- this is not the
+    // whole-app blank that PaymentSetup/PaymentsSection went through, just the routed
+    // content area -- but the page is not empty either way.
+    expect(container).not.toBeEmptyDOMElement()
+
+    releaseStudents(new Response(JSON.stringify({ items: [] }), { status: 200 }))
+    await waitFor(() => expect(screen.queryByTestId('gated-children-loading')).toBeNull())
+  })
+})
+
 describe('the §6.1 health gate, mounted in the shell', () => {
   it('routes a guardian with a missing declaration to the gate and nowhere else', async () => {
     stubChildren('missing')
