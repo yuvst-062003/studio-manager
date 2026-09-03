@@ -318,7 +318,7 @@ describe('ClubTermsStep', () => {
   it('shows all three payment clauses the club supplied', async () => {
     render(<ClubTermsStep locale="he" onAccept={vi.fn()} />)
     expect(screen.getByTestId('health.clubTerms.payment.cheques')).toHaveTextContent(
-      'עמותת מכבי נתניה סיף ואגרוף',
+      'בריין בילדינג (ע״ר)',
     )
     expect(screen.getByTestId('health.clubTerms.payment.cancellation')).toHaveTextContent('27')
     expect(screen.getByTestId('health.clubTerms.payment.proRata')).toBeInTheDocument()

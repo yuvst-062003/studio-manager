@@ -649,6 +649,56 @@ def test_accepting_twice_does_not_stack_rows(tenant_session, studio, signer):
     assert len(rows) == 1
 
 
+def test_a_club_terms_acceptance_at_the_pre_bump_version_is_no_longer_current(
+    tenant_session, studio, signer
+):
+    """Decision 24 raises `CLUB_TERMS_VERSION` from 1 to 2 alongside `POLICY_VERSION`, for
+    the same stated reason: change the text (the cheque payee, decision 22), raise the
+    version, every family is asked again. A family who accepted the payee clause before the
+    wording changed holds a row at version 1 -- written directly here, the way that
+    acceptance actually looked, since `accept_club_terms` itself refuses to record anything
+    but the version currently published.
+
+    `ConsentService.holds_current` is what the registration flow asks before deciding
+    whether to render the terms step at all, so this is the behaviour the bump exists to
+    change, not just the number.
+    """
+    from app.services.health.club_terms import CLUB_TERMS_CONSENT_TYPE
+    from app.services.privacy.consent import ConsentService
+
+    PRE_BUMP_VERSION = 1
+    tenant_session.add(
+        ConsentRecord(
+            subject_type="person",
+            subject_id=signer.id,
+            consent_type=CLUB_TERMS_CONSENT_TYPE,
+            version=PRE_BUMP_VERSION,
+            granted=True,
+            granted_at=T0,
+        )
+    )
+    tenant_session.flush()
+
+    assert (
+        ConsentService.holds_current(
+            tenant_session, person_id=signer.id, consent_type=CLUB_TERMS_CONSENT_TYPE
+        )
+        is False
+    )
+
+    # And the flow's own entry point agrees: accepting at the now-current version appends a
+    # fresh row rather than treating the stale one as sufficient (contrast
+    # `test_accepting_twice_does_not_stack_rows`, where it correctly does).
+    row = AgreementService.accept_club_terms(
+        tenant_session,
+        studio_id=studio.id,
+        person_id=signer.id,
+        version=CLUB_TERMS_VERSION,
+        at=T0,
+    )
+    assert row is not None
+
+
 # -- the gate ---------------------------------------------------------------------------
 def test_each_clause_of_the_gate_blocks_independently(tenant_session, student_row, signer, studio):
     """A family failing only the terms clause is blocked exactly as hard as one with no

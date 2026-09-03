@@ -1,11 +1,17 @@
 """The version of the terms and privacy policy a consent row records, and its label.
 
 **The text now shipping has been reviewed and approved** (2026-09-01) -- it is no longer
-the unreviewed draft this module was written against. `POLICY_VERSION` moves from 0 to 1
+the unreviewed draft this module was written against. `POLICY_VERSION` moved from 0 to 1
 for exactly the reason `consent_record.version` exists: a family who agreed to the draft
 wording did not agree to the reviewed one, and `ConsentService.outstanding` requires a
 grant AT the current version -- so the version bump itself is what re-gates every family
 and asks them again, honestly, against the text a lawyer has actually read.
+
+**Raised again, 1 to 2, for decision 24 (2026-09-03).** The onboarding spec's decision 23
+removes Apple from `privacy.terms.s2.body` and `privacy.policy.s6.body` -- `AppleProvider`
+exists in code but has never been configured, so naming it as a sign-in option alongside
+Google was never true. Same rule, same module: change the text, raise `POLICY_VERSION`,
+every family is asked again. Approved because there are no live users yet.
 
 **Why an integer, and why 0 was the draft.** `consent_record.version` is an INTEGER column
 (`app/models/health.py`), so a label like the old `0.1-draft` could never be stored in it,
@@ -30,10 +36,11 @@ from __future__ import annotations
 
 #: `consent_record.version` for every acceptance of the current, reviewed text. 0 is
 #: permanently reserved for the pre-review draft -- see the module docstring.
-POLICY_VERSION = 1
+POLICY_VERSION = 2
 
-#: What the screen and the API say out loud. Never parsed, never stored.
-POLICY_VERSION_LABEL = "1.0"
+#: What the screen and the API say out loud. Never parsed, never stored. Moves with
+#: `POLICY_VERSION` -- a label reading "1.0" beside a version of 2 would be a lie on screen.
+POLICY_VERSION_LABEL = "2.0"
 
 #: True only while `POLICY_VERSION` is 0. Read by the API so a draft notice can never be
 #: left behind on a screen after the reviewed text lands -- the banner is data, not markup.

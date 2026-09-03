@@ -127,7 +127,7 @@ export const health: Bundle = {
   'clubTerms.title': 'Club terms and payment terms',
   'clubTerms.payment.title': 'Payment terms',
   'clubTerms.payment.cheques':
-    'Cheques are made payable to "עמותת מכבי נתניה סיף ואגרוף". The cheque date must be no later than the 10th of each month.',
+    'Cheques are made payable to "בריין בילדינג (ע״ר)". The cheque date must be no later than the 10th of each month.',
   'clubTerms.payment.cancellation':
     'Cancellation must be given in writing by the 27th of the month, and takes effect for future months only.',
   'clubTerms.payment.proRata':

@@ -94,7 +94,7 @@ export const reports: Bundle = {
     'The app is operated for the club your children are enrolled in, and is used for enrolment, the timetable, attendance, payments, health declarations and messages from the club.',
   'privacy.terms.s2.title': 'Who may use it',
   'privacy.terms.s2.body':
-    'The account is for the guardian of an enrolled student, or for an adult student. You sign in with a Google or Apple account; we neither create nor store a password.',
+    'The account is for the guardian of an enrolled student, or for an adult student. You sign in with a Google account; we neither create nor store a password.',
   'privacy.terms.s3.title': 'Your responsibilities',
   'privacy.terms.s3.body':
     'The information you provide — the health declaration above all — must be accurate and current. The coach on the mat sees health flags only, and those flags are derived from your answers. A missing or wrong answer is a safety risk to your child.',
@@ -132,7 +132,7 @@ export const reports: Bundle = {
     'A health declaration is sensitive data under the law, so it is collected only with the guardian’s explicit consent. The answers and the signature are encrypted in the database and the encryption keys are held outside it. Only a manager may open the full declaration, and every such opening is written to a log that cannot be altered. A coach sees flags only — asthma, allergy — and never the text of an answer.',
   'privacy.policy.s6.title': 'Who we share it with',
   'privacy.policy.s6.body':
-    'uPay, the payment provider, for the purpose of taking a payment and nothing else; the infrastructure and storage provider the service runs on; and the sign-in provider you chose, Google or Apple, which verifies who you are. One club’s data is not reachable from another club. We pass data to no one else without your consent, unless the law requires it.',
+    'uPay, the payment provider, for the purpose of taking a payment and nothing else; the infrastructure and storage provider the service runs on; and the sign-in provider you chose, Google, which verifies who you are. One club’s data is not reachable from another club. We pass data to no one else without your consent, unless the law requires it.',
   'privacy.policy.s7.title': 'How long we keep it',
   'privacy.policy.s7.body':
     'For as long as the student is enrolled, and afterwards for as long as running the club requires. Financial records are kept for about seven years as tax law requires, which is why an erasure request removes the identifying details and leaves the financial record without a name. Automatic deletion after a period of inactivity is planned and is not in service today — until it is, data is deleted only on request.',

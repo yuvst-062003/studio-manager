@@ -103,8 +103,8 @@ export const reports: Bundle = {
   // **THE TEXT BELOW IS AN UNREVIEWED DRAFT.** No lawyer has read a word of it. It was
   // written against what the code actually does -- tenancy-isolated records, health
   // declarations encrypted with `EncryptedJSON`/`EncryptedBytes` and keys held outside the
-  // database, uPay as the payment processor, an append-only audit log, Google/Apple as the
-  // sign-in providers -- and against the disclosure list Israel's Privacy Protection Law
+  // database, uPay as the payment processor, an append-only audit log, Google as the
+  // sign-in provider -- and against the disclosure list Israel's Privacy Protection Law
   // has required since Amendment 13 came into force on 14 August 2025: whether the data is
   // mandatory or voluntary, the purpose, the retention period, every third party and why,
   // the controller's identity, the consequences of refusing, and the rights of access and
@@ -131,7 +131,7 @@ export const reports: Bundle = {
     'האפליקציה מופעלת עבור המועדון שבו רשומים ילדיכם, ומשמשת להרשמה, למערכת השעות, לנוכחות, לתשלומים, להצהרות בריאות ולהודעות מהמועדון.',
   'privacy.terms.s2.title': 'מי רשאי להשתמש',
   'privacy.terms.s2.body':
-    'החשבון נועד לאפוטרופוס של חניך רשום, או לחניך בגיר. ההתחברות נעשית באמצעות חשבון Google או Apple; איננו יוצרים סיסמה ואיננו שומרים אחת.',
+    'החשבון נועד לאפוטרופוס של חניך רשום, או לחניך בגיר. ההתחברות נעשית באמצעות חשבון Google; איננו יוצרים סיסמה ואיננו שומרים אחת.',
   'privacy.terms.s3.title': 'האחריות שלכם',
   'privacy.terms.s3.body':
     'המידע שאתם מוסרים — ובמיוחד הצהרת הבריאות — חייב להיות נכון ומעודכן. המאמן על המזרן רואה סימוני בריאות בלבד, והם נגזרים מהתשובות שמסרתם. תשובה חסרה או שגויה היא סיכון בטיחותי לילד.',
@@ -169,7 +169,7 @@ export const reports: Bundle = {
     'הצהרת הבריאות היא מידע רגיש בחוק, ולכן היא נאספת רק בהסכמה מפורשת של האפוטרופוס. התשובות והחתימה מוצפנות במסד הנתונים ומפתחות ההצפנה נשמרים מחוץ אליו. מנהל בלבד רשאי לפתוח את ההצהרה המלאה, וכל פתיחה כזו נרשמת ביומן שלא ניתן לשנות. מאמן רואה סימונים בלבד — למשל אסתמה או אלרגיה — ולעולם לא את נוסח התשובות.',
   'privacy.policy.s6.title': 'עם מי המידע משותף',
   'privacy.policy.s6.body':
-    'ספק הסליקה uPay, לצורך ביצוע תשלום בלבד; ספק התשתית והאחסון שעליו פועל השירות; וספק ההתחברות שבחרתם, Google או Apple, המאמת את זהותכם. המידע של מועדון אחד אינו נגיש למועדון אחר. איננו מעבירים מידע לגורם נוסף אלא בהסכמתכם או כשהדין מחייב.',
+    'ספק הסליקה uPay, לצורך ביצוע תשלום בלבד; ספק התשתית והאחסון שעליו פועל השירות; וספק ההתחברות שבחרתם, Google, המאמת את זהותכם. המידע של מועדון אחד אינו נגיש למועדון אחר. איננו מעבירים מידע לגורם נוסף אלא בהסכמתכם או כשהדין מחייב.',
   'privacy.policy.s7.title': 'כמה זמן המידע נשמר',
   'privacy.policy.s7.body':
     'כל עוד החניך רשום במועדון, ולאחר מכן ככל שנדרש לניהולו. רשומות כספיות נשמרות כשבע שנים כנדרש בדיני המס, ולכן בקשת מחיקה מוחקת את הפרטים המזהים ומשאירה את הרשומה הכספית ללא שם. מחיקה אוטומטית לאחר תקופת אי-פעילות מתוכננת ואינה פעילה כיום — עד שתופעל, מידע נמחק רק לפי בקשה.',

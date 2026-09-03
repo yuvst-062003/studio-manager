@@ -31,9 +31,11 @@ from __future__ import annotations
 #: §4.3's `consent_record.consent_type` value these grants carry.
 CLUB_TERMS_CONSENT_TYPE = "club_terms"
 
-#: The club's reviewed text. See the module docstring for why this starts at 1 and
-#: `POLICY_VERSION` starts at 0.
-CLUB_TERMS_VERSION = 1
+#: The club's reviewed text. See the module docstring for why this started at 1 while
+#: `POLICY_VERSION` started at 0. Raised to 2 alongside `POLICY_VERSION` for decision 24
+#: (2026-09-03): the cheque payee clause changed (decision 22), so every family is asked
+#: again -- the rule this module's docstring states above.
+CLUB_TERMS_VERSION = 2
 
 
 # ---------------------------------------------------------------------------------------
@@ -54,14 +56,13 @@ CLUB_TERMS_VERSION = 1
 #: billing reads it; automating it is explicitly out of scope (design §13).
 PAYMENT_TERMS: dict[str, tuple[str, ...]] = {
     "he": (
-        'תשלום בצ\'קים יתבצע לטובת "עמותת מכבי נתניה סיף ואגרוף". '
-        "תאריך הצ'ק לא יאוחר מה-10 לכל חודש.",
+        "תשלום בצ'קים יתבצע לטובת \"בריין בילדינג (ע״ר)\". תאריך הצ'ק לא יאוחר מה-10 לכל חודש.",
         "ביטול מנוי יבוצע בכתב עד ה-27 לחודש, ויהיה תקף לגבי חודשים עתידיים בלבד.",
         "בעת ביטול מנוי שנתי, התעריף החודשי יחושב בהתאם לניצול החודשים בפועל של המנוי "
         "(לדוגמה: אם המנוי ניצל שלושה חודשים, החישוב יבוצע לפי תעריף מנוי לשלושה חודשים).",
     ),
     "en": (
-        'Cheques are made payable to "עמותת מכבי נתניה סיף ואגרוף". '
+        'Cheques are made payable to "בריין בילדינג (ע״ר)". '
         "The cheque date must be no later than the 10th of each month.",
         "Cancellation must be given in writing by the 27th of the month, and takes effect "
         "for future months only.",
@@ -70,7 +71,7 @@ PAYMENT_TERMS: dict[str, tuple[str, ...]] = {
         "three-month rate).",
     ),
     "ru": (
-        'Оплата чеками производится в пользу "עמותת מכבי נתניה סיף ואגרוף". '
+        'Оплата чеками производится в пользу "בריין בילדינג (ע״ר)". '
         "Дата чека — не позднее 10-го числа каждого месяца.",
         "Отмена абонемента подаётся в письменном виде до 27-го числа месяца и действует "
         "только в отношении будущих месяцев.",

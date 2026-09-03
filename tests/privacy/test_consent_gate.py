@@ -27,7 +27,7 @@ from app.models.audit import AuditLog
 from app.models.health import ConsentRecord
 from app.services.privacy import POLICY_VERSION, POLICY_VERSION_LABEL
 from sqlalchemy import select
-from tests.privacy.conftest import Caller
+from tests.privacy.conftest import T0, Caller
 
 
 def test_a_fresh_guardian_owes_both_consents(client, as_guardian: Caller):
@@ -38,7 +38,7 @@ def test_a_fresh_guardian_owes_both_consents(client, as_guardian: Caller):
     assert body["outstanding"] == ["terms", "privacy"]
     assert body["required"] == ["terms", "privacy"]
     assert body["policy_version"] == POLICY_VERSION
-    # The text is reviewed now (POLICY_VERSION == 1), so the screen must NOT say "draft" --
+    # The text is reviewed now (POLICY_VERSION > 0), so the screen must NOT say "draft" --
     # and it reads that from here rather than from a hardcoded client constant that the
     # next draft would leave lying.
     assert body["policy_is_draft"] is False
@@ -250,3 +250,35 @@ def test_consents_need_a_signed_in_caller(client):
         ).status_code
         == 401
     )
+
+
+def test_a_grant_at_the_pre_bump_version_no_longer_clears_the_gate(
+    client, as_guardian: Caller, tenant_session
+):
+    """Decision 24 raises `POLICY_VERSION` from 1 to 2, precisely so a family who accepted
+    the OLD text is asked again. The POST route itself refuses to record anything but the
+    version currently on screen (`test_accepting_a_version_that_is_not_on_screen_is_
+    refused`), so the only way to represent "a family who agreed under the old copy" is to
+    write the row directly, the way that acceptance actually looked: `version=1`, granted,
+    and nothing since.
+
+    This proves the BEHAVIOUR the bump exists for -- that the gate stands again -- not just
+    that the constant now reads 2.
+    """
+    PRE_BUMP_VERSION = 1
+    for consent_type in ("terms", "privacy"):
+        tenant_session.add(
+            ConsentRecord(
+                subject_type="person",
+                subject_id=as_guardian.person_id,
+                consent_type=consent_type,
+                version=PRE_BUMP_VERSION,
+                granted=True,
+                granted_at=T0,
+            )
+        )
+    tenant_session.commit()
+
+    response = client.get("/api/v1/privacy/consents", headers=as_guardian.headers)
+    assert response.status_code == 200, response.text
+    assert response.json()["outstanding"] == ["terms", "privacy"]

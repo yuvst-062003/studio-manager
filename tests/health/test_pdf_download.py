@@ -215,7 +215,7 @@ def test_the_payment_terms_reach_the_rendered_sections():
     are terms the club cannot show anyone afterwards."""
     sections = build_terms_sections({"clause_confirmed": "none"}, "he")
     prose = " ".join(p for section in sections for p in section.paragraphs)
-    assert "עמותת מכבי נתניה סיף ואגרוף" in prose
+    assert "בריין בילדינג (ע״ר)" in prose
     assert "27" in prose and "10" in prose
 
 

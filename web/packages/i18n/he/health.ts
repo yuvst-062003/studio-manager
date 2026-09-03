@@ -173,7 +173,7 @@ export const health: Bundle = {
   'clubTerms.title': 'תקנון ותנאי תשלום',
   'clubTerms.payment.title': 'תנאי תשלום',
   'clubTerms.payment.cheques':
-    'תשלום בצ\'קים יתבצע לטובת "עמותת מכבי נתניה סיף ואגרוף". תאריך הצ\'ק לא יאוחר מה-10 לכל חודש.',
+    'תשלום בצ\'קים יתבצע לטובת "בריין בילדינג (ע״ר)". תאריך הצ\'ק לא יאוחר מה-10 לכל חודש.',
   'clubTerms.payment.cancellation':
     'ביטול מנוי יבוצע בכתב עד ה-27 לחודש, ויהיה תקף לגבי חודשים עתידיים בלבד.',
   'clubTerms.payment.proRata':
