@@ -39,9 +39,11 @@
   cursor: default;
 }
 
-/* Must not mirror: every count and time on both artboards (4c and 1e RTL sections). */
+/* Must not mirror: every count and time on both artboards (4c and 1e RTL sections). B1.1's
+ * datetime moved from a `<span>` to the `<bdi dir="ltr">` this selector now also names. */
 [data-testid='quickview-summary'],
-[data-testid='unmarked-list'] span {
+[data-testid='unmarked-list'] span,
+[data-testid='unmarked-list'] bdi[dir='ltr'] {
   font-variant-numeric: tabular-nums;
 }
 
@@ -61,17 +63,62 @@
   list-style: none;
 }
 
+/* B1.2 — a real grid, `select · group · when · actions`, replacing the flex row where a
+ * row's later cells started wherever the group name's text happened to end (the
+ * "staircase" the owner's screenshot showed). The group name is the only column that
+ * grows, so `when` and `actions` line up down the column regardless of name length. */
 [data-testid='unmarked-list'] li {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
   gap: var(--space-3);
   align-items: center;
+  min-block-size: 48px;
   padding-block: var(--space-2);
 }
 
-[data-testid='group-rates'] ul {
-  margin: 0;
-  padding: 0;
-  list-style: none;
+[data-testid='unmarked-list'] li + li {
+  border-block-start: var(--border-width-hairline) solid var(--border);
+}
+
+/* B1.1 — the datetime cell. The visible content is the single `<bdi dir="ltr">` this rule
+ * does not need to touch (tabular-nums on it is inherited from the `[data-testid='unmarked-
+ * list'] span` rule below); this is only its wrapper's layout. */
+.unmarked-list__when {
+  display: inline-flex;
+  align-items: center;
+}
+
+/* B1.3 — the actions cell: the reminder outcome (a result) beside the `⋯` trigger (the one
+ * action), never stacked into a second row. */
+.unmarked-list__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* B1.4 — `QuickViewRoster` opened in place. Same shape as the week board's equivalent
+ * (`schedule/SessionPopover.tsx`): a fixed backdrop and a centered, scrollable panel, both
+ * token-built. No cross-origin link — the popover is this screen's own DOM. */
+.attendance-quickview__backdrop {
+  position: fixed;
+  inset-block: 0;
+  inset-inline: 0;
+  background: color-mix(in srgb, var(--fg) 40%, transparent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  z-index: 30;
+}
+
+.attendance-quickview__panel {
+  background: var(--ground);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  max-block-size: 85vh;
+  overflow-y: auto;
+  inline-size: min(28rem, 100%);
 }
 
 /* 4c's header holds three things that are one decision: the title, the range the manager
@@ -107,21 +154,22 @@
   font-size: var(--text-caption);
 }
 
-[data-testid='group-rates'] li {
-  display: flex;
-  gap: var(--space-3);
-  align-items: center;
-  padding-block: var(--space-2);
-}
-
-[data-testid='group-rates'] li > .studio-progress {
-  flex: 1 1 8rem;
-}
-
-/* Must not mirror, and must not jump: the coverage counts sit beside a bar that animates,
- * and proportional digits make them slide sideways as the number changes. */
-[data-testid='group-rates'] li > span {
+/* B1.5 — the per-group card as a `Table` (group · rate · coverage), replacing the bulleted
+ * list whose spans shared no column boundary — the run-on `אין סימונים בטווח הזהסומנו 0/1
+ * שיעורים` the owner's screenshot showed. `Table`'s own `<col>` widths now decide where
+ * each column begins, so every row's coverage cell starts at the same inline offset
+ * regardless of how many digits `marked_sessions`/`sessions` holds; nothing here needs to. */
+.attendance-report__coverage {
+  display: block;
   color: var(--text-secondary);
   font-size: var(--text-caption);
   font-variant-numeric: tabular-nums;
+
+  /* Logical "end", not `text-align: right`: the coverage counts sit flush against the
+   * column's trailing edge in both directions, never a hard-coded side (D10). */
+  text-align: end;
+}
+
+[data-testid='group-rates'] .studio-progress {
+  min-inline-size: 8rem;
 }

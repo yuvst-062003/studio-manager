@@ -28,11 +28,20 @@
 //
 // Direction is inherited: rendered in `order_index` order, lowest rank first, and RTL puts
 // the first column at the reading start. `4g`: "Low-to-high in reading order."
+//
+// **B5.7 — above eight belts, `.dash-belts__name` truncates to a single glyph.** A
+// thirteen-column grid at this width has no room to keep a full rank name horizontal, so
+// past eight ranks the chart flags itself `data-dense` and `reports.css` rotates the name
+// onto the block axis instead — `writing-mode` rather than a hand-picked `transform`
+// origin, so it stays correct without a physical left/right guess in an RTL layout.
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import type { BeltPromotion } from './client'
 
 const MIN_VISIBLE = '3px'
+
+/** Past this many columns, a horizontal name has nowhere left to go. */
+const DENSE_THRESHOLD = 8
 
 /** `5b` allows bi-colour grades; a chart that could not draw one would push the next lane
  *  into writing its own bar. Identical to `BeltBar`'s own gradient. */
@@ -48,6 +57,7 @@ export function BeltPromotionsChart({ locale, belts }: { locale: Locale; belts: 
   return (
     <ol
       className="dash-belts"
+      data-dense={String(belts.length > DENSE_THRESHOLD)}
       data-testid="belt-chart"
       aria-label={t(locale, 'reports.belts.chartLabel')}
     >

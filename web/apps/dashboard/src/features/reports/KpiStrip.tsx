@@ -11,13 +11,17 @@
 // **The tile is feature-specific, as `4g`'s primitives table says.** `StatTile` is the
 // near miss: it tones the VALUE, and this artboard leaves every figure in ink and tones
 // only the delta. Adding a second tone axis to a shared primitive for one screen is how a
-// design system starts meaning nothing.
+// design system starts meaning nothing. B5.2 gives `.dash-kpi` the same
+// `.studio-tile-shell` surface/hairline/radius/padding `StatTile` wears — the shell and
+// the tone are separate decisions, and taking the shell does not reopen the tone argument
+// above.
 //
 // **Colour per the artboard's own table**: `--paid` on the active-students delta,
 // `--danger` on churn's, and **none** on revenue's or attendance's. There is no tone
 // prop that means "emphasis" — a delta is coloured by what it says about the club or not
 // at all (D3).
 import type { ReactNode } from 'react'
+import { fill } from '@studio/core'
 import { MoneyDisplay } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
@@ -28,29 +32,35 @@ type DeltaTone = 'neutral' | 'paid' | 'danger'
 
 function KpiTile({
   label,
+  labelInfo,
   value,
   delta,
   deltaTone = 'neutral',
-  note,
   testId,
 }: {
   label: string
+  /** B5.3 — the ⓘ affordance, rendered beside the label rather than as a footnote under
+   *  the whole tile. Only the attendance tile passes one. */
+  labelInfo?: ReactNode
   value: ReactNode
   delta: ReactNode
   deltaTone?: DeltaTone
-  note?: ReactNode
   testId: string
 }) {
   return (
     // A div, not a link. `4g`: "Everything else is read-only. No KPI card, no chart, no
     // retention row carries a pointer."
-    <div className="dash-kpi" data-testid={testId}>
-      <span className="dash-kpi__label">{label}</span>
+    // B5.2 — `.studio-tile-shell` is the surface/hairline/radius/padding shared with
+    // `StatTile` (`packages/ui/src/primitives/primitives.css`), so the two cannot drift.
+    <div className="dash-kpi studio-tile-shell" data-testid={testId}>
+      <span className="dash-kpi__label">
+        {label}
+        {labelInfo}
+      </span>
       <span className="dash-kpi__value">{value}</span>
       <span className="dash-kpi__delta" data-testid={`${testId}-delta`} data-tone={deltaTone}>
         {delta}
       </span>
-      {note}
     </div>
   )
 }
@@ -60,6 +70,44 @@ function KpiTile({
  *  `RangeText` exists to stop for ranges. */
 function Digits({ children }: { children: ReactNode }) {
   return <bdi dir="ltr">{children}</bdi>
+}
+
+/** B5.3 — §5.14's rule, moved off the tile and onto a `ⓘ` beside its label.
+ *
+ * A native `<details>`/`<summary>` disclosure rather than a tooltip: keyboard-operable
+ * with no ARIA state to get wrong, the same reasoning `AccessibilityMenu`'s own
+ * accessibility statement gives for using the same element. `aria-label` on the summary
+ * carries `reports.attendance.basisLabel` as its accessible name regardless of the ⓘ
+ * glyph's own text, and the rule plus both counts — `reports.attendance.unmarkedExcluded`,
+ * `decidedCount`, `unmarkedCount` — are exactly what the three-sentence footnote used to
+ * say; only their location moved. */
+function AttendanceInfo({ locale, kpi }: { locale: Locale; kpi: Kpi }) {
+  return (
+    <details className="dash-kpi__info">
+      <summary
+        aria-label={t(locale, 'reports.attendance.basisLabel')}
+        className="dash-kpi__info-toggle"
+        data-testid="kpi-attendance-info-toggle"
+      >
+        <span aria-hidden="true">ⓘ</span>
+      </summary>
+      <span className="dash-kpi__note dash-kpi__info-content" data-testid="kpi-attendance-basis">
+        <span data-testid="unmarked-excluded">
+          {t(locale, 'reports.attendance.unmarkedExcluded')}
+        </span>{' '}
+        <span>
+          {fill(t(locale, 'reports.attendance.decidedCount'), {
+            count: kpi.attendance_decided_marks,
+          })}
+        </span>{' '}
+        <span>
+          {fill(t(locale, 'reports.attendance.unmarkedCount'), {
+            count: kpi.attendance_unmarked_marks,
+          })}
+        </span>
+      </span>
+    </details>
+  )
 }
 
 export function KpiStrip({ locale, kpi }: { locale: Locale; kpi: Kpi }) {
@@ -146,47 +194,35 @@ export function KpiStrip({ locale, kpi }: { locale: Locale; kpi: Kpi }) {
 
       <KpiTile
         label={t(locale, 'reports.overview.avgAttendance')}
+        labelInfo={<AttendanceInfo kpi={kpi} locale={locale} />}
         testId="kpi-attendance"
         value={
           kpi.attendance_percent === null ? noValue : <Digits>{kpi.attendance_percent}%</Digits>
         }
+        // ▲ §5.14, stated where the number is published. `4g` finding 5: the rule is
+        // "neither stated nor visible" on the one screen that publishes this figure, and
+        // `reports.attendance.unmarkedExcluded` existed with nothing using it. B5.3 moves
+        // the rule itself into the ⓘ above and keeps the two counts here, on the delta
+        // line every other tile already has — three sentences under the tile shrink to
+        // the same one line the other three tiles get.
         delta={
           kpi.attendance_percent === null ? (
             t(locale, 'reports.attendance.noData')
-          ) : kpi.attendance_percent_delta === null ? (
-            t(locale, 'reports.delta.noComparison')
-          ) : kpi.attendance_percent_delta === 0 ? (
-            t(locale, 'reports.delta.noChange')
           ) : (
             <>
-              <Digits>{signed(kpi.attendance_percent_delta)}</Digits>
-              <span>{t(locale, 'reports.delta.vsPrevious')}</span>
+              <span>
+                {fill(t(locale, 'reports.attendance.decidedShort'), {
+                  count: kpi.attendance_decided_marks,
+                })}
+              </span>
+              <span aria-hidden="true">·</span>
+              <span>
+                {fill(t(locale, 'reports.attendance.unmarkedShort'), {
+                  count: kpi.attendance_unmarked_marks,
+                })}
+              </span>
             </>
           )
-        }
-        // ▲ §5.14, stated where the number is published. `4g` finding 5: the rule is
-        // "neither stated nor visible" on the one screen that publishes this figure, and
-        // `reports.attendance.unmarkedExcluded` existed with nothing using it. The rule is
-        // in the metric's definition (the server divides by decided marks only) AND said
-        // here, with the two counts beside it so it is evidence rather than a slogan.
-        note={
-          <span className="dash-kpi__note" data-testid="kpi-attendance-basis">
-            <span data-testid="unmarked-excluded">
-              {t(locale, 'reports.attendance.unmarkedExcluded')}
-            </span>{' '}
-            <span>
-              {t(locale, 'reports.attendance.decidedCount').replace(
-                '{{count}}',
-                String(kpi.attendance_decided_marks),
-              )}
-            </span>{' '}
-            <span>
-              {t(locale, 'reports.attendance.unmarkedCount').replace(
-                '{{count}}',
-                String(kpi.attendance_unmarked_marks),
-              )}
-            </span>
-          </span>
         }
       />
     </div>

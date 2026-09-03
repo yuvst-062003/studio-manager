@@ -860,6 +860,158 @@ waves:
           the alternative. Recorded in the spec's Provenance table as such.
         status: shipped
         on: 2026-09-01
+  - id: W9E
+    milestone: design
+    title: The dashboard's five worst screens — a redesign
+    mode: sequential
+    lanes: []
+    exit_gate: the six screenshotted screens rebuilt against the proposal; the six shared defects fixed once; every screen re-captured at 1440 and looked at
+    status: active
+    opened: 2026-09-03
+    source: docs/design/proposals/dashboard-screens-redesign.md
+    pieces:
+      - id: A
+        title: Part A — six shared defects, fixed once, five screens improve
+        why: >-
+          Five of the six were mechanical, and they are why the screens looked unfinished
+          rather than merely plain. attendance.css existed, was 127 lines, was carefully
+          written and was imported by nobody — every complaint on #/attendance followed
+          from that one absent line. .studio-btn set padding and never set display, so an
+          <a> wearing it stayed inline and its block padding painted over whatever came
+          next; that is what the owner reported as "buttons that unfold on each other",
+          and it was one declaration. <main> had no maximum width, so a table row stretched
+          across a 2400-pixel monitor.
+
+          Each fix carries the test that makes its class of bug impossible rather than just
+          the fix: a stylesheet-reachability walk over every dashboard feature stylesheet,
+          and an assertion that .studio-btn declares a non-inline display. Neither could be
+          written the obvious way — jsdom loads no stylesheet, so a getComputedStyle
+          assertion would have passed whatever the CSS said. Both read the rule from the
+          source file instead, following tokens.test.ts's existing precedent, and the
+          weaker-but-real claim is recorded in the test rather than dressed up as the
+          stronger one.
+
+          Table's caption became clipped by default, which is a behaviour change for every
+          caller in every app. Enumerating them found one — OpsHealthPanel — whose caption
+          was that panel's only visible heading, and which would have lost it silently. It
+          opts in explicitly, and a test now fails if the default changes under it again.
+
+          fill() moved into @studio/core because four screens needed the interpolation
+          helper that existed only as two private copies inside feature clients. The two
+          copies are deliberately still there: collapsing them reaches into files this
+          change does not own, and the comment says so rather than implying a tidiness
+          that did not happen.
+        status: shipped
+        on: 2026-09-03
+      - id: B1
+        title: נוכחות — one datetime island, a grid row, and the register in place
+        why: >-
+          "The time is opposite" was a real bidi bug that survived the stylesheet fix: the
+          row rendered time and date as two left-to-right runs with neutral text between
+          them, and a right-to-left paragraph is free to reorder them. One <bdi dir="ltr">
+          holding day, date and time together is the only construct that survives, which is
+          the lesson RangeText's docstring already recorded three times.
+
+          סימון עכשיו had called an onMarkNow that nothing ever supplied, so the button did
+          nothing at all. It now opens QuickViewRoster in place, which already existed and
+          was built for exactly this, rather than guessing a hostname for the staff app.
+        status: shipped
+        on: 2026-09-03
+      - id: B2
+        title: חניכים — the add control into the header, and a count that cannot lie
+        why: >-
+          The owner's complaint was the black הוספת חניך box painted across the search
+          label, which Part A's one declaration fixed at the source; the screen work was
+          moving it into the header's actions slot where it belongs.
+
+          The filter row gained a result count, and the count is the piece worth recording:
+          the endpoint returns no total, so the denominator is latched only from an
+          unfiltered page that reported has_more false, and otherwise the screen prints the
+          count alone. A denominator drawn from one page would read "5 מתוך 20" for a club
+          of 400, which defeats the section it implements — a filtered view is supposed to
+          say how much it is hiding.
+        status: shipped
+        on: 2026-09-03
+      - id: B3
+        title: קבוצות ומחזורים — one identity column, and a stated gap instead of an empty one
+        why: >-
+          The first column packed a link, a second link-button, and a discipline caption
+          with no layout. The לו״ז שבועי button was deleted rather than restyled: it existed
+          because a comment said the name link did not look like a door, and the fix for a
+          link that does not look like a link is to style the link.
+
+          The belt-range column was cut. It was headed שיעור, filled with something else,
+          and empty in every row because no group has belt data. The gap moved into the
+          subtitle as one sentence. The proposal contradicted itself here — B3.3 assigns
+          the subtitle to the gap note, while B3.6 and Part A's shape assign it to the
+          screen's description — and the contradiction dissolved once PageHeader's subtitle
+          turned out to be a ReactNode: it carries both, the description first and the gap
+          note beneath it in caption weight.
+        status: shipped
+        on: 2026-09-03
+      - id: B4
+        title: צוות — three tiles, six columns, and permissions where they are edited
+        why: >-
+          Ten permission pills and nine group names joined with separators made every row
+          about 200px tall and neither cell readable. Permissions left the table entirely —
+          ten per person is the content of a row's detail, not a cell — and moved into the
+          roles panel where they are edited anyway; groups became a capped chip list showing
+          two and a count.
+
+          The proposal says ten permissions. The catalogue has nine: ROLE_PERMISSIONS'
+          union across all four roles is studio_settings, staff, students, attendance,
+          money, reports, own_groups, sessions and events. The proposal's count came from a
+          screenshot; the test asserts the nine that exist.
+
+          A latent bug surfaced while rewriting the row: editingRoles === member.person_id
+          matched when both were null, and the INVITED fixture had no invitation_id, so no
+          test had ever opened that column for a pending invitation to notice.
+        status: shipped
+        on: 2026-09-03
+      - id: B5
+        title: דוחות — a screen that had no design for a club whose numbers are all zero
+        why: >-
+          reports.css was already thorough and correct. What failed is that almost every
+          number in this club is zero or null and nothing was drawn for that: eleven empty
+          chart columns, thirteen zero-height bars truncated to single letters, four
+          identical rows repeating one sentence, and a 0% progress track that read as a
+          loading state. Each became an empty state that says the thing once.
+
+          The period had been printing raw ISO because two YYYY-MM-DD strings went straight
+          into RangeText, which formats nothing.
+
+          .dash-kpi took StatTile's shell without taking its tone. KpiStrip's reasoning —
+          that this artboard tones the delta while StatTile tones the value — is sound and
+          argues against reusing the tone, not against having a card; the shell is now one
+          class both wear so they cannot drift.
+        status: shipped
+        on: 2026-09-03
+      - id: B6
+        title: לוח המנהל — the healthiest screen, which needed a shape and a width
+        why: >-
+          This screen already used the right primitives; its problem was four full-width
+          cards stacked down a very wide page. The width cap alone changed it more than
+          anything else, and the body became the same two-column grid #/reports already
+          used rather than a second rule that happened to look the same. Today's classes
+          moved to the top of the wide column, because it answers what needs the manager
+          today and it was the last thing on the page.
+
+          The attendance chart's no-data state distinguishes every group being null from
+          some being null. Only the first collapses to one empty state; a blanket one would
+          have been a regression, since the per-column treatment is correct when there is
+          anything to show.
+        status: shipped
+        on: 2026-09-03
+      - id: C
+        title: Part C — the new keys, in he, en and ru
+        why: >-
+          Twenty-two keys across five namespaces, plus one the proposal named in B6's prose
+          and omitted from its table. Two retirements were deliberately split from the
+          additions: a key removed while its call site still stands renders the raw key on
+          screen, so groups.openSchedule went with the control that used it rather than
+          ahead of it.
+        status: shipped
+        on: 2026-09-03
 holdbacks:
   - id: HB-w6-health-gate-unmounted
     kind: carried

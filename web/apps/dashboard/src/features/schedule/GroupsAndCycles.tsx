@@ -1,11 +1,13 @@
-// Dashboard artboard 4b — קבוצות ומחזורים: תפוסה, טווח חגורות ולו״ז.
+// Dashboard artboard 4b — קבוצות ומחזורים: לו״ז ומחזורים.
 //
-// **Two of those three columns belong to milestones that have not run.** Belt ranges are
-// M7's (`belt_rank` is a W4 contract model) and capacity is M3's (the roster). They ship as
-// stated gaps rather than as empty cells or invented numbers — the discipline
-// `apps/parent/src/features/home/ParentHome.tsx` set for artboard 1a: a manager who opens
-// this before those milestones should read when the column arrives, not see a blank that
-// looks broken.
+// **The belt-range column is a stated gap, not a column.** Belt ranges are M7's
+// (`belt_rank` is a W4 contract model): a manager who opens this before that milestone
+// should read when the range arrives, not see a column of dashes mislabelled `שיעור`
+// (B3.3). The one sentence lives in `PageHeader`'s subtitle
+// (`schedule.groups.beltRangeLater`) instead. Capacity is DELIBERATELY absent
+// altogether: the 2026-08-27 decision cut group capacity from the product entirely (a
+// group has no cap; 7d's 42/54 is an EVENT cap), so that promise is deleted rather than
+// kept.
 //
 // The schedule column is this lane's, and so is the fourth thing on the row: **C12's count
 // of students left with no training day**, surfaced where a manager browses groups rather
@@ -15,8 +17,8 @@
 // that writes is the worst possible bug on a read-only screen.
 import { useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { Button, EmptyState, Table, TextField } from '@studio/ui'
-import { apiFetch, formatDateInStudioZone, formatTimeInStudioZone } from '@studio/core'
+import { Button, EmptyState, PageHeader, RowActions, Table, TextField } from '@studio/ui'
+import { apiFetch, fill, formatDateInStudioZone, formatTimeInStudioZone } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import type { GroupSummary, ScheduleClient, ScheduleRule, SessionRow } from './client'
@@ -26,8 +28,6 @@ interface GroupFacts {
   next: SessionRow | null
   unscheduled: number
 }
-
-
 
 const laterStyle: CSSProperties = {
   color: 'var(--text-muted)',
@@ -75,28 +75,6 @@ export function GroupsAndCycles({
   const [renaming, setRenaming] = useState<string | null>(null)
   const [renameTo, setRenameTo] = useState('')
   const [writeFailed, setWriteFailed] = useState(false)
-  // F8 — 4b's belt range, measured from enrolled students' current belts.
-  const [beltRanges, setBeltRanges] = useState<
-    Record<string, { min_name: string; max_name: string }>
-  >({})
-
-  useEffect(() => {
-    let alive = true
-    void apiFetch('/api/v1/belt-ranges/by-group')
-      .then(async (r) =>
-        r.ok
-          ? ((await r.json()) as { items: { group_id: string; min_name: string; max_name: string }[] })
-              .items
-          : [],
-      )
-      .then((rows) => {
-        if (alive) setBeltRanges(Object.fromEntries(rows.map((row) => [row.group_id, row])))
-      })
-      .catch(() => undefined)
-    return () => {
-      alive = false
-    }
-  }, [])
 
   useEffect(() => {
     if (!onChanged) return
@@ -232,11 +210,38 @@ export function GroupsAndCycles({
     )
   ) : null
 
+  // A4/A5 (B3.6) — one header row for every branch this section can return: the title,
+  // the create button in the actions slot, and a two-line subtitle. `PageHeader.subtitle`
+  // is typed `ReactNode`, not `string`, precisely so a screen can carry more than one
+  // sentence there (its own docstring: "a range of dates has to arrive as `RangeText`").
+  // Line one is the screen's own description (currently the loose `<p>` B3.6/A4 say
+  // prints under the CREATE button instead of the title — dropping it would leave the
+  // screen with no visible description at all, which neither B3.3 nor B3.6 asks for).
+  // Line two is B3.3's stated gap, at caption weight so it reads as a footnote about a
+  // missing column rather than a second description. `groups.caption` is ALSO `Table`'s
+  // accessible name (A5 clips that copy out of the visual flow), so the same string
+  // appears twice in the DOM but only once on screen.
+  const header = (
+    <PageHeader
+      actions={createForm}
+      subtitle={
+        <>
+          {t(locale, 'schedule.groups.caption')}
+          <br />
+          <span className="groups-table__subtitle-note">
+            {t(locale, 'schedule.groups.beltRangeLater')}
+          </span>
+        </>
+      }
+      title={t(locale, 'schedule.groups.title')}
+      titleId="groups-title"
+    />
+  )
+
   if (groups.length === 0) {
     return (
       <section aria-labelledby="groups-title">
-        <h2 id="groups-title">{t(locale, 'schedule.groups.title')}</h2>
-        {createForm}
+        {header}
         <EmptyState title={t(locale, 'schedule.groups.empty')} />
       </section>
     )
@@ -244,8 +249,7 @@ export function GroupsAndCycles({
 
   return (
     <section aria-labelledby="groups-title">
-      <h2 id="groups-title">{t(locale, 'schedule.groups.title')}</h2>
-      {createForm}
+      {header}
       {writeFailed ? (
         <p data-testid="groups-write-failed">{t(locale, 'common.loadFailed.body')}</p>
       ) : null}
@@ -256,24 +260,24 @@ export function GroupsAndCycles({
         columns={[
           {
             id: 'group',
-            header: t(locale, 'schedule.groups.title'),
+            // B3.2 — the identity column, headed by what it holds. Not `groups.title`:
+            // that is the page title and the (hidden) table caption already, and a
+            // 12rem column is not the place for it a third time.
+            header: t(locale, 'schedule.groups.col.name'),
             width: '12rem',
             cell: (group) => (
               <>
+                {/* B3.1 — the name link IS the door to the schedule editor. It used to
+                    stand beside a second, `לו״ז שבועי`-labelled link-button because a
+                    comment here said the name link "does not look like the door" — the
+                    fix for a link that does not look like a link is to style the link,
+                    not add a second one. `.groups-table__name` (schedule.css) gives it
+                    the app's standard underline-on-hover affordance; the weekly-schedule
+                    column right beside it already shows what is behind the door. */}
                 {hrefForGroup ? (
-                  <>
-                    <a href={hrefForGroup(group.id)}>{group.name}</a>{' '}
-                    {/* The name-link exists but does not LOOK like the door to the
-                        schedule editor; this says it in words. */}
-                    <a
-                      className="studio-btn"
-                      data-variant="ghost"
-                      data-testid={`group-schedule-link-${group.id}`}
-                      href={hrefForGroup(group.id)}
-                    >
-                      {t(locale, 'schedule.groups.openSchedule')}
-                    </a>
-                  </>
+                  <a className="groups-table__name" href={hrefForGroup(group.id)}>
+                    {group.name}
+                  </a>
                 ) : (
                   group.name
                 )}
@@ -318,12 +322,22 @@ export function GroupsAndCycles({
           },
           {
             id: 'unscheduled',
-            header: t(locale, 'schedule.groups.unscheduledStudents'),
+            // B3.5 — shortened from `groups.unscheduledStudents`. `.groups-table__align-end`
+            // (schedule.css) end-aligns BOTH the header and the count — a right-aligned
+            // number under a start-aligned header floats away from the label that names
+            // it — and `.groups-table__unscheduled` adds the tabular-numeral formatting
+            // the count alone needs. The `--danger` tone for a non-zero count is unchanged.
+            header: (
+              <span className="groups-table__align-end">
+                {t(locale, 'schedule.groups.col.unscheduledShort')}
+              </span>
+            ),
             width: '8rem',
             cell: (group) => {
               const fact = facts[group.id]
               return (
                 <span
+                  className="groups-table__align-end groups-table__unscheduled"
                   data-testid={`unscheduled-${group.id}`}
                   style={fact && fact.unscheduled > 0 ? warnStyle : undefined}
                 >
@@ -332,32 +346,19 @@ export function GroupsAndCycles({
               )
             },
           },
-          {
-            id: 'session',
-            header: t(locale, 'schedule.session.title'),
-            width: '12rem',
-            cell: (group) => {
-              // F8 — the belt range is measured now. Capacity is DELIBERATELY absent:
-              // the 2026-08-27 decision cut group capacity from the product entirely
-              // (a group has no cap; 7d's 42/54 is an EVENT cap), so the promise is
-              // deleted rather than kept.
-              const range = beltRanges[group.id]
-              return range ? (
-                <span data-testid={`belt-range-${group.id}`}>
-                  {range.min_name === range.max_name
-                    ? range.min_name
-                    : `${range.min_name} – ${range.max_name}`}
-                </span>
-              ) : (
-                <span style={laterStyle}>—</span>
-              )
-            },
-          },
+          // B3.3 — the belt-range column is cut. It was `schedule.session.title` (`שיעור`)
+          // over a `—` in every row, because no group has belt data yet: a column empty
+          // in every row and mislabelled in its header is worse than an absent one. The
+          // stated gap that column used to carry now lives in `header`'s subtitle above,
+          // as one sentence. It returns as `schedule.groups.col.beltRange` once
+          // `belt_rank` has rows (Part F) — not built here.
           ...(onChanged
             ? [
                 {
                   id: 'actions',
-                  header: t(locale, 'schedule.groups.create'),
+                  // A6 — headed by what the column holds, not by the create-group
+                  // button's own label.
+                  header: t(locale, 'schedule.groups.col.actions'),
                   width: '14rem',
                   cell: (group: GroupSummary) =>
                     renaming === group.id ? (
@@ -376,35 +377,34 @@ export function GroupsAndCycles({
                         </Button>
                       </span>
                     ) : (
-                      <span style={{ display: 'flex', gap: 'var(--space-1)', flexWrap: 'wrap' }}>
-                        <Button
-                          data-testid={`rename-${group.id}`}
-                          onClick={() => {
-                            setRenaming(group.id)
-                            setRenameTo(group.name)
-                          }}
-                          variant="ghost"
-                        >
-                          {t(locale, 'schedule.groups.rename')}
-                        </Button>
-                        {group.isActive ? (
-                          <Button
-                            data-testid={`retire-${group.id}`}
-                            onClick={() => patchGroup(group.id, { is_active: false })}
-                            variant="ghost"
-                          >
-                            {t(locale, 'schedule.groups.retire')}
-                          </Button>
-                        ) : (
-                          <Button
-                            data-testid={`revive-${group.id}`}
-                            onClick={() => patchGroup(group.id, { is_active: true })}
-                            variant="ghost"
-                          >
-                            {t(locale, 'schedule.groups.revive')}
-                          </Button>
-                        )}
-                      </span>
+                      // B3.4 — `שינוי שם` and `העברה לארכיון` / `החזרה מהארכיון` behind
+                      // one `⋯`, instead of two ghost buttons stacked into a ~140px row.
+                      <RowActions
+                        actions={[
+                          {
+                            id: 'rename',
+                            label: t(locale, 'schedule.groups.rename'),
+                            onSelect: () => {
+                              setRenaming(group.id)
+                              setRenameTo(group.name)
+                            },
+                          },
+                          group.isActive
+                            ? {
+                                id: 'retire',
+                                label: t(locale, 'schedule.groups.retire'),
+                                onSelect: () => patchGroup(group.id, { is_active: false }),
+                              }
+                            : {
+                                id: 'revive',
+                                label: t(locale, 'schedule.groups.revive'),
+                                onSelect: () => patchGroup(group.id, { is_active: true }),
+                              },
+                        ]}
+                        triggerLabel={fill(t(locale, 'schedule.groups.rowActions'), {
+                          name: group.name,
+                        })}
+                      />
                     ),
                 },
               ]

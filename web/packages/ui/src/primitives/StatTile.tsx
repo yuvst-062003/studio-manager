@@ -44,7 +44,10 @@ export function StatTile({
       {hint ? <span className="studio-stat-tile__hint">{hint}</span> : null}
     </>
   )
-  const classes = className ? `studio-stat-tile ${className}` : 'studio-stat-tile'
+  // `.studio-tile-shell` is the surface/hairline/radius/padding shared with the reports
+  // screen's `.dash-kpi` (B5.2) — one definition so the two tiles cannot drift apart.
+  // `.studio-stat-tile` layers this component's own layout and tone on top of it.
+  const classes = ['studio-tile-shell', 'studio-stat-tile', className].filter(Boolean).join(' ')
   return href ? (
     <a className={classes} data-tone={tone} href={href}>
       {body}

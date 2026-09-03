@@ -3,6 +3,7 @@ import {
   STUDIO_TIMEZONE,
   formatDateInStudioZone,
   formatMonthLabel,
+  formatSessionWhen,
   formatTimeInStudioZone,
   studioDayKey,
   studioWallTimeToUtc,
@@ -100,6 +101,53 @@ describe('formatDateInStudioZone', () => {
     // …but both must name the 15th, because that is the Jerusalem day.
     expect(he).toContain('15')
     expect(en).toContain('15')
+  })
+})
+
+/**
+ * B1.1 — the dashboard's unmarked-session row used to render weekday, date and time as
+ * three separate siblings (a `<span>` for the time, a `<bdi>` for the group name between
+ * them, a `<span>` for the date). In an RTL paragraph that is three independently
+ * reorderable fragments, and the owner's screenshot showed exactly the failure
+ * `RangeText`'s docstring already names three times: `16:00קבוצה 14 בספטמבר 2026` — the
+ * time jumped across the group name and glued itself to the date.
+ *
+ * `formatSessionWhen` composes weekday, date and time into ONE string, so the caller has
+ * exactly one thing to hand a single `<bdi dir="ltr">` rather than three.
+ */
+describe('formatSessionWhen', () => {
+  // Monday 14 September 2026, 16:00 Israel Daylight Time (UTC+3) — the exact session the
+  // proposal's mock-up draws: "יום שני, 14 בספטמבר · 16:00".
+  const session = '2026-09-14T13:00:00Z'
+
+  it('renders weekday, date and time as one string, in that order', () => {
+    expect(formatSessionWhen(session, 'he')).toBe('יום שני, 14 בספטמבר · 16:00')
+  })
+
+  it('renders the studio wall-clock time, not the host zone, in every locale', () => {
+    // Same instant, three locales — the hour must never move, only the words around it.
+    expect(formatSessionWhen(session, 'he')).toContain('16:00')
+    expect(formatSessionWhen(session, 'en')).toContain('16:00')
+    expect(formatSessionWhen(session, 'ru')).toContain('16:00')
+  })
+
+  it('carries the weekday and the day-of-month in every locale', () => {
+    expect(formatSessionWhen(session, 'en')).toContain('Monday')
+    expect(formatSessionWhen(session, 'en')).toContain('14')
+  })
+
+  it('does not follow the host timezone', () => {
+    // Same guard `formatTimeInStudioZone` carries: vitest runs in whatever zone the
+    // machine is in, and pinning `timeZone` in the formatter is what makes that not matter.
+    const original = process.env.TZ
+    try {
+      process.env.TZ = 'America/New_York'
+      expect(formatSessionWhen(session, 'he')).toBe('יום שני, 14 בספטמבר · 16:00')
+      process.env.TZ = 'Asia/Tokyo'
+      expect(formatSessionWhen(session, 'he')).toBe('יום שני, 14 בספטמבר · 16:00')
+    } finally {
+      process.env.TZ = original
+    }
   })
 })
 

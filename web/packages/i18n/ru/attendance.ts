@@ -103,10 +103,17 @@ export const attendance: Bundle = {
   'conflict.review': 'Разобрать конфликт',
 
   'report.unmarkedNotAbsence': 'Неотмеченные занятия не считаются пропусками',
-  'report.markNow': 'Отметить сейчас',
   'report.remindCoach': 'Напомнить тренеру',
   'report.coachReminded': 'Тренеру отправлено напоминание',
   'report.byGroup': 'Посещаемость по группам',
+  // B1.5 — карточка по группам стала настоящей `Table` (группа · процент · охват), и
+  // каждому столбцу нужен доступный заголовок. Ключи остаются в этом пространстве имён, а
+  // не заимствованы из `schedule.groups.col.name`, согласно правилу CLAUDE.md, что строки
+  // вертикали живут в её собственном файле.
+  'report.col.group': 'Группа',
+  'report.col.rate': 'Процент посещаемости',
+  'report.col.coverage': 'Охват',
+  'report.rowActions': 'Действия для {{group}}',
   // -- 9g's injury report (S2): immediate, online-only, never queued -------------
   'summary.injury.title': 'Сообщение о травме',
   'summary.injury.who': 'Кто пострадал?',
@@ -124,8 +131,10 @@ export const attendance: Bundle = {
   'card.markPresent': 'Отметить присутствие',
   'card.markAbsent': 'Отметить отсутствие',
   'quickView.close': 'Закрыть быстрый просмотр',
+  'report.markHere': 'Отметить здесь',
   'report.title': 'Посещаемость',
   'report.unmarkedSessions': 'Неотмеченные занятия',
+  'report.when': 'Когда',
   'report.consecutiveAbsences': 'Пропуски подряд',
   'report.attendanceRate': 'Процент посещаемости',
   'report.sessionsHeld': 'Проведено занятий',

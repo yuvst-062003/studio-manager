@@ -3,10 +3,13 @@
 // Two things are asserted harder than the rest: the payment column on `3b` is EXPLICITLY
 // empty rather than invented, and `6c` hardcodes no alert this lane does not own. Both are
 // failures that look like features until somebody acts on them.
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { clearSlot, registerSlot } from '@studio/ui'
+import { fill } from '@studio/core'
 import { t } from '@studio/i18n'
 import { StudentsScreen, documentLabelKey } from './StudentsScreen'
 import { AddStudentScreen } from './AddStudentScreen'
@@ -265,6 +268,236 @@ describe('StudentsScreen — 3b', () => {
     const { container } = render(<StudentsScreen locale="en" client={makeClient()} />)
     await screen.findByTestId('students-table')
     noPhysicalCss(container)
+  })
+
+  it('keeps the table caption off-screen while it stays the table\'s accessible name (A5, confirmed on this screen)', async () => {
+    render(<StudentsScreen locale="he" client={makeClient()} />)
+    const table = await screen.findByRole('table', { name: t('he', 'people.student.plural') })
+    const caption = table.querySelector('caption')
+    expect(caption).not.toBeNull()
+    // Table.tsx defaults `captionVisible` to false and this screen never opts in — so
+    // the caption clips out of the visual flow (A5) while remaining the accessible name
+    // `getByRole` just matched on.
+    expect(caption).toHaveClass('studio-visually-hidden')
+  })
+})
+
+// -- B2 — the page header, filter bar, selection column and sharing cards ------------
+
+describe('B2.1 — the add-student control lives in PageHeader\'s actions slot', () => {
+  it('renders inside the page header, not floating between it and the filter row', async () => {
+    render(<StudentsScreen locale="he" client={makeClient()} />)
+    const header = document.querySelector('.studio-page-header')
+    expect(header).not.toBeNull()
+    const add = screen.getByTestId('students-add')
+    // Inside the header's own actions slot, not merely a sibling somewhere on the page.
+    expect(add.closest('.studio-page-header__actions')).not.toBeNull()
+    expect(header?.contains(add)).toBe(true)
+    // The dead `alignSelf: 'start'` inline style is gone — the parent was never a flex
+    // container, so it never did anything, and now there is no style at all to carry it.
+    expect(add).not.toHaveAttribute('style')
+  })
+
+  it('carries the loaded count in the subtitle, printed nowhere before this change', async () => {
+    render(<StudentsScreen locale="he" client={makeClient()} />)
+    await screen.findByTestId('students-table')
+    const subtitle = document.querySelector('.studio-page-header__subtitle')
+    expect(subtitle).toHaveTextContent(
+      fill(t('he', 'people.student.countSubtitle'), { count: 1 }),
+    )
+  })
+
+  it('omits the subtitle rather than claiming a total it cannot know, when the baseline load could not see the whole roster', async () => {
+    // The same failure the filter row's result count was fixed for, one widget up:
+    // `page.items.length` is whatever page happens to be loaded, not the club's size.
+    // `has_more: true` means this IS only a fragment — a club of 400 must never read
+    // "20 חניכים" in its own page header.
+    const client = makeClient({
+      students: vi.fn(() =>
+        Promise.resolve({
+          items: [summary(), summary({ id: 'st2', first_name: 'יוסי' })],
+          next_cursor: 'st2',
+          has_more: true,
+        }),
+      ),
+    })
+    render(<StudentsScreen locale="he" client={client} />)
+    await screen.findByTestId('students-table')
+    expect(document.querySelector('.studio-page-header__subtitle')).toBeNull()
+  })
+
+  it('declares a non-inline display for .studio-btn in primitives.css (A2), so the moved anchor still cannot overflow', () => {
+    // Not asserted via getComputedStyle: this suite's jsdom never loads primitives.css
+    // (no bundler runs here), so `getComputedStyle(anchor).display` would report the
+    // browser's inline-by-default value NO MATTER what the stylesheet says —
+    // SegmentedControl.test.tsx documents the same limitation, and Button.test.tsx (A2)
+    // is the precedent this mirrors: assert the element wears the class the rule
+    // targets, then read the rule itself from the source file that ships it.
+    render(<StudentsScreen locale="he" client={makeClient()} />)
+    const add = screen.getByTestId('students-add')
+    expect(add).toHaveClass('studio-btn')
+    const raw = readFileSync(
+      resolve(process.cwd(), 'packages/ui/src/primitives/primitives.css'),
+      'utf-8',
+    )
+    // Strip comments first (tokens.test.ts's precedent, Button.test.tsx's for this exact
+    // rule) — the rule's own comment names the bug it fixes ("defaults to `display:
+    // inline`") and would otherwise be indistinguishable from a real declaration.
+    const css = raw.replace(/\/\*[\s\S]*?\*\//g, '')
+    const block = css.match(/\.studio-btn\s*\{([^}]*)\}/)?.[1] ?? ''
+    const display = block.match(/display:\s*([a-z-]+)/)?.[1]
+    expect(display).toBeDefined()
+    expect(display).not.toBe('inline')
+  })
+})
+
+describe('B2.2 — the filter bar', () => {
+  it('uses the shared .studio-filter-bar row instead of the hand-written filterRowStyle', async () => {
+    render(<StudentsScreen locale="he" client={makeClient()} />)
+    const bar = screen.getByTestId('students-search').closest('.studio-filter-bar')
+    expect(bar).not.toBeNull()
+    expect(bar?.contains(screen.getByTestId('students-status-filter'))).toBe(true)
+  })
+
+  it('shows a result count on the filter row\'s inline-end edge', async () => {
+    const client = makeClient({
+      students: vi.fn(() =>
+        Promise.resolve({
+          items: [summary(), summary({ id: 'st2', first_name: 'יוסי' })],
+          next_cursor: null,
+          has_more: false,
+        }),
+      ),
+    })
+    render(<StudentsScreen locale="he" client={client} />)
+    await screen.findByTestId('students-table')
+    const bar = screen.getByTestId('students-search').closest('.studio-filter-bar')
+    const count = screen.getByTestId('students-result-count')
+    expect(bar?.contains(count)).toBe(true)
+    expect(count).toHaveTextContent(
+      fill(t('he', 'people.filter.resultCount'), { count: 2, total: 2 }),
+    )
+  })
+
+  it('keeps the unfiltered baseline as "total" once a status filter narrows the shown count — so a filtered view says how much it is hiding', async () => {
+    const client = makeClient({
+      students: vi
+        .fn()
+        .mockResolvedValueOnce({
+          items: [summary(), summary({ id: 'st2' })],
+          next_cursor: null,
+          has_more: false,
+        })
+        .mockResolvedValueOnce({ items: [summary()], next_cursor: null, has_more: false }),
+    })
+    render(<StudentsScreen locale="he" client={client} />)
+    await screen.findByTestId('students-table')
+    expect(screen.getByTestId('students-result-count')).toHaveTextContent(
+      fill(t('he', 'people.filter.resultCount'), { count: 2, total: 2 }),
+    )
+    await userEvent.selectOptions(screen.getByTestId('students-status-filter'), 'trial')
+    await waitFor(() =>
+      expect(screen.getByTestId('students-result-count')).toHaveTextContent(
+        fill(t('he', 'people.filter.resultCount'), { count: 1, total: 2 }),
+      ),
+    )
+  })
+
+  it('renders the count alone — never a denominator — when the baseline load could not see the whole roster', async () => {
+    // `has_more: true` on the unfiltered baseline means the club has more students than
+    // this one page, so `items.length` is a fragment, not a total. A denominator built
+    // from it would UNDERSTATE what a filter hides (a club of 400 reading "5 מתוך 20"),
+    // and a wrong number on screen is worse than no number — so no denominator renders.
+    const client = makeClient({
+      students: vi.fn(() =>
+        Promise.resolve({
+          items: [summary(), summary({ id: 'st2', first_name: 'יוסי' })],
+          next_cursor: 'st2',
+          has_more: true,
+        }),
+      ),
+    })
+    render(<StudentsScreen locale="he" client={client} />)
+    await screen.findByTestId('students-table')
+    const count = screen.getByTestId('students-result-count')
+    expect(count).toHaveTextContent(fill(t('he', 'people.student.countSubtitle'), { count: 2 }))
+    // The literal claim this guards against: "מתוך" ("out of") is the denominator word
+    // `people.filter.resultCount` alone carries — asserting its absence is what proves
+    // no (wrong) total rendered, not merely that some plausible-looking text did.
+    expect(count.textContent ?? '').not.toContain('מתוך')
+  })
+
+  it('re-latches the baseline after a bulk mutation changes the roster, instead of keeping the count from before it', async () => {
+    // Write-once cuts both ways (the reviewer's phrase): `baselineCount` must not merely
+    // resist a WRONG total forever, it must also stop defending a total that was once
+    // right and a bulk leave has since made wrong. `reload()` clears the latch, and the
+    // unfiltered refetch it triggers (bulk actions never touch query/status) re-latches
+    // from the fresh response — asserted here on both widgets the latch feeds.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(JSON.stringify({ items: [] }), { status: 200 })),
+    )
+    const client = makeClient({
+      students: vi
+        .fn()
+        // The initial, complete, unfiltered baseline: two students.
+        .mockResolvedValueOnce({
+          items: [summary(), summary({ id: 'st2', first_name: 'יוסי' })],
+          next_cursor: null,
+          has_more: false,
+        })
+        // After the bulk leave reloads: the roster has actually shrunk to one.
+        .mockResolvedValueOnce({ items: [summary()], next_cursor: null, has_more: false }),
+    })
+    render(<StudentsScreen locale="he" client={client} />)
+    await screen.findByTestId('students-table')
+    expect(document.querySelector('.studio-page-header__subtitle')).toHaveTextContent(
+      fill(t('he', 'people.student.countSubtitle'), { count: 2 }),
+    )
+    expect(screen.getByTestId('students-result-count')).toHaveTextContent(
+      fill(t('he', 'people.filter.resultCount'), { count: 2, total: 2 }),
+    )
+    await userEvent.click(await screen.findByTestId('select-st1'))
+    await userEvent.click(screen.getByTestId('bulk-leave'))
+    await userEvent.click(await screen.findByTestId('confirm-bulk-confirm'))
+    await waitFor(() =>
+      expect(document.querySelector('.studio-page-header__subtitle')).toHaveTextContent(
+        fill(t('he', 'people.student.countSubtitle'), { count: 1 }),
+      ),
+    )
+    expect(screen.getByTestId('students-result-count')).toHaveTextContent(
+      fill(t('he', 'people.filter.resultCount'), { count: 1, total: 1 }),
+    )
+    vi.unstubAllGlobals()
+  })
+})
+
+describe('B2.3 — the selection column', () => {
+  it('carries no visible header text, only an accessible name — the old header named one bulk action, not the column', async () => {
+    render(<StudentsScreen locale="he" client={makeClient()} />)
+    await screen.findByTestId('students-table')
+    const headerCell = screen.getAllByRole('columnheader')[0]
+    expect(headerCell).toBeDefined()
+    expect(headerCell).toHaveTextContent(t('he', 'people.student.selectColumn'))
+    expect(headerCell?.querySelector('.studio-visually-hidden')).not.toBeNull()
+    expect(headerCell).not.toHaveTextContent(t('he', 'people.bulk.move'))
+  })
+
+  it('makes the bulk bar sticky to the block-end edge of the viewport once something is selected', async () => {
+    render(<StudentsScreen locale="he" client={makeClient()} />)
+    await userEvent.click(await screen.findByTestId('select-st1'))
+    expect(screen.getByTestId('students-bulk-bar')).toHaveClass('people-bulk-bar')
+    // Same limitation as the A2 test above: jsdom never loads people.css, so the rule
+    // itself is read from the source rather than faked through getComputedStyle. The
+    // true "does it visually float above the table" claim is a Playwright concern.
+    const raw = readFileSync(
+      resolve(process.cwd(), 'apps/dashboard/src/features/people/people.css'),
+      'utf-8',
+    )
+    const css = raw.replace(/\/\*[\s\S]*?\*\//g, '')
+    const block = css.match(/\.people-bulk-bar\s*\{([^}]*)\}/)?.[1] ?? ''
+    expect(block).toMatch(/position:\s*sticky/)
+    expect(block).toMatch(/inset-block-end:\s*0/)
   })
 })
 

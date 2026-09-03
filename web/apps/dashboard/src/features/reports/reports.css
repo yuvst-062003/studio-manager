@@ -66,7 +66,9 @@
 /* -- the KPI tile ------------------------------------------------------------------
  * Feature-specific, as `4g`'s primitives table says. `StatTile` is close and is the
  * wrong shape here: it tones the VALUE, and `4g` tones the DELTA and leaves every figure
- * in ink. */
+ * in ink. B5.2 — the shell (surface, hairline, radius, padding) is shared with
+ * `StatTile` through `.studio-tile-shell` (`primitives.css`), so only the layout and the
+ * delta-toning stay here. */
 .dash-kpi {
   display: flex;
   flex-direction: column;
@@ -74,9 +76,50 @@
 }
 
 .dash-kpi__label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
   color: var(--text-secondary);
   font-size: var(--text-label);
   font-weight: var(--weight-medium);
+}
+
+/* B5.3 — the `ⓘ` affordance that replaced the three-sentence footnote under the
+ * attendance tile. A native `<details>`/`<summary>` disclosure: keyboard-operable with
+ * no ARIA state to get wrong, the same reasoning `AccessibilityMenu`'s own accessibility
+ * statement gives for the same element. */
+.dash-kpi__info {
+  display: inline-flex;
+}
+
+.dash-kpi__info-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 1.125rem;
+  block-size: 1.125rem;
+  border-radius: var(--radius-circle);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: var(--text-caption);
+  line-height: 1;
+  list-style: none;
+}
+
+.dash-kpi__info-toggle::-webkit-details-marker {
+  display: none;
+}
+
+.dash-kpi__info-toggle:hover {
+  color: var(--fg);
+}
+
+/* The disclosure's content — the same rule and the same two counts the old footnote
+ * printed, now reachable rather than always taking up the row's height. */
+.dash-kpi__info-content {
+  display: block;
+  margin-block-start: var(--space-1);
+  max-inline-size: 16rem;
 }
 
 .dash-kpi__value {
@@ -154,6 +197,12 @@
   flex-direction: column;
   gap: var(--space-2);
   min-inline-size: 0;
+
+  /* B5.4 — the column is its own container, so `.dash-chart__month`'s query below reads
+   * that ONE column's width rather than the whole chart's — the only number that
+   * actually answers "does the full month name fit here". */
+  container-name: dash-chart-column;
+  container-type: inline-size;
 }
 
 /* No y-axis and no per-bar label, by the artboard. The height is the whole encoding, so
@@ -185,6 +234,25 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* B5.4 — `אוקטובר`, `נובמבר 5…`: the full name ellipsis-truncates at ~55px per column.
+ * Both forms are always in the DOM (`RevenueChart`); this container query is the only
+ * thing that knows the column's real width and picks between them. The full name is the
+ * default — most windows have room for it — and the short one (`ספט׳`) takes over once
+ * the column drops below 80px. */
+.dash-chart__month-short {
+  display: none;
+}
+
+@container dash-chart-column (width < 80px) {
+  .dash-chart__month-full {
+    display: none;
+  }
+
+  .dash-chart__month-short {
+    display: inline;
+  }
 }
 
 /* -- retention ---------------------------------------------------------------------- */
@@ -279,4 +347,17 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* B5.7 — past eight columns `.dash-belts__name` truncates to a single glyph, which says
+ * nothing. `writing-mode` rather than `transform: rotate()` with a hand-picked origin:
+ * it reads the row's own `direction` instead of a guessed physical corner, so it is
+ * correct in RTL without a separate rule for it. */
+.dash-belts[data-dense='true'] .dash-belts__name {
+  writing-mode: vertical-rl;
+  overflow: visible;
+  text-overflow: clip;
+  max-block-size: 7rem;
+  margin-block-start: var(--space-1);
+  align-self: center;
 }

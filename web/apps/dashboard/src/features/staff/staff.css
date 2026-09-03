@@ -1,0 +1,79 @@
+/* Dashboard artboard 3d — צוות (B4 of docs/design/proposals/dashboard-screens-redesign.md).
+ *
+ * Imported from `StaffScreen.tsx` itself, not `App.tsx` — the pattern `ReportsSection.tsx`
+ * already uses, and what `App.stylesheets.test.ts` checks for: a screen module owns its
+ * own stylesheet's reachability.
+ */
+
+/* B4.1 — the three StatTiles that replace the old <h2>/<p> summary. Same shape as the
+ * reports screen's `.dash-reports__kpis` and the home screen's `.dash-home__money`: a
+ * grid that fits three tiles side by side above ~40rem and stacks below it, rather than
+ * a bespoke breakpoint here. */
+.staff-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: var(--space-4);
+  margin-block-end: var(--space-4);
+}
+
+/* The Alert's per-group links keep a gap between them — logical, not `margin-right`. */
+.staff-uncovered-link {
+  margin-inline-end: var(--space-2);
+}
+
+/* B4.3 — the `קבוצות` cell. `ChipList` already wraps by default so a long overflow list
+ * never clips; the staff table cell is deliberately capped at two visible chips plus a
+ * "+N", so this scoped override keeps that short run on one line instead of letting it
+ * wrap to a second — the acceptance criterion this whole lane is judged on. Scoped to
+ * `.staff-table` rather than added to the shared primitive, so no other screen's table
+ * inherits it. */
+.staff-table .studio-chip-list {
+  flex-wrap: nowrap;
+}
+
+/* B4.2/B4.4 — the role editor that opens from RowActions' `עריכת תפקידים`. It now carries
+ * both the role checkboxes (writable) and the permission list (read-only, moved out of
+ * its own table column) — the row's detail, not a seven-column table cell. */
+.staff-role-editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-inline-size: 16rem;
+  padding-block: var(--space-2);
+}
+
+.staff-role-editor__roles {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.staff-role-editor__permissions-label {
+  margin: 0 0 var(--space-1);
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+}
+
+/* A read-only list, deliberately not `ChipList` — B4.2's acceptance is that every
+ * permission stays reachable here, not capped behind a "+N" the way `קבוצות` is. */
+.staff-permission-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.staff-permission-list__item {
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-pill);
+  padding-block: var(--space-1);
+  padding-inline: var(--space-2);
+  font-size: var(--text-caption);
+  color: var(--text-secondary);
+}

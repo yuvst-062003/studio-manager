@@ -35,9 +35,15 @@ export const people: Bundle = {
   'bulk.refused.already_in_destination': 'כבר בקבוצת היעד',
   'bulk.refused.not_found': 'לא נמצא',
   'bulk.refused.failed': 'נכשל — נסו שוב',
+  // B2.3 — the selection column's accessible name. Visually hidden: the column is a
+  // bare checkbox, and its old header (`bulk.move`) wrongly named ONE of the two bulk
+  // actions the selection enables, not the column itself.
+  'student.selectColumn': 'בחירה',
   'student.one': 'חניך',
   'student.plural': 'חניכים',
   'student.add': 'הוספת חניך',
+  // B2.1 — `PageHeader`'s subtitle, once `הוספת חניך` moves into the actions slot.
+  'student.countSubtitle': '{{count}} חניכים',
   'student.search': 'חיפוש חניך',
   'student.empty': 'אין חניכים להצגה',
   'student.emptyFiltered': 'אין חניכים שמתאימים לסינון',
@@ -460,6 +466,9 @@ export const people: Bundle = {
   'error.forbidden': 'אין לכם הרשאה לפעולה הזו',
   'error.generic': 'משהו השתבש. נסו שוב',
   'search.placeholder': 'חיפוש לפי שם חניך או הורה',
+  // B2.2 — the filter bar's own result count, on its inline-end edge, so a filtered
+  // view says how much it is hiding.
+  'filter.resultCount': '{{count}} מתוך {{total}}',
   'tabs.allStudents': 'כל החניכים',
   'tabs.myClasses': 'הכיתות שלי · {{count}}',
   'tabs.allClasses': 'כל הכיתות · {{count}}',

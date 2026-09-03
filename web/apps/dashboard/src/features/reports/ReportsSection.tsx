@@ -25,7 +25,7 @@
 // the screen are the period switcher, the CSV button and the monthly email.
 import { useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { apiFetch, downloadFile, formatMonthLabel } from '@studio/core'
+import { apiFetch, downloadFile, fill, formatDateInStudioZone, formatMonthLabel } from '@studio/core'
 import {
   Alert,
   Button,
@@ -35,6 +35,7 @@ import {
   MoneyDisplay,
   ProgressBar,
   RangeText,
+  SectionHeader,
   SegmentedControl,
   useModalDialog,
 } from '@studio/ui'
@@ -45,8 +46,20 @@ import { KpiStrip } from './KpiStrip'
 import { RetentionPanel } from './RetentionPanel'
 import { RevenueChart } from './RevenueChart'
 import { PERIODS, fetchOverview, overviewCsvPath } from './client'
-import type { PeriodKind, ReportsOverview } from './client'
+import type { PeriodKind, ReportsOverview, RevenueMonth } from './client'
 import './reports.css'
+
+/** B5.4 — a window that never had activity draws no columns for the months before it
+ *  existed. Trims only the LEADING run of months with no billing and no collection;
+ *  a quiet month in the middle or at the end of real activity still draws its (empty)
+ *  column, because trimming those would silently shorten the window the switcher asked
+ *  for. */
+function trimLeadingEmptyMonths(months: RevenueMonth[]): RevenueMonth[] {
+  const firstActive = months.findIndex(
+    (candidate) => candidate.billed_agorot !== 0 || candidate.collected_agorot !== 0,
+  )
+  return firstActive === -1 ? [] : months.slice(firstActive)
+}
 
 const statRowStyle: CSSProperties = {
   display: 'grid',
@@ -206,6 +219,18 @@ export function ReportsSection({
   const monthLabel = billing
     ? formatMonthLabel(billing.period_year, billing.period_month, locale)
     : ''
+  // B5.4 — the decision, not the drawing: `RevenueChart` still renders whatever it is
+  // given (its own tests pass it short windows on purpose), so trimming and the
+  // fewer-than-three cutoff live here, one level up.
+  const activeRevenueMonths = trimLeadingEmptyMonths(overview?.revenue ?? [])
+  // B5.6 — a 0% track carries no information and reads as a loading state.
+  const collectionRateUnknown =
+    billing !== null && (billing.total_agorot === 0 || billing.settled_agorot === 0)
+  // B5.7 — `belts.length === 0` already caught an empty array; a studio with belt ranks
+  // configured but nobody promoted this period is thirteen present-but-zero bars, which
+  // the same "nothing to show" rule now also covers.
+  const belts = overview?.belts ?? []
+  const beltsAllZero = belts.length > 0 && belts.every((rank) => rank.promotions === 0)
 
   async function send() {
     if (selfPersonId === null || billing === null) return
@@ -265,7 +290,16 @@ export function ReportsSection({
               // One element, explicitly ltr, holding both ends and the dash. Two sibling
               // <bdi> ends are each internally correct and still laid out end-then-start
               // by the row around them.
-              <RangeText from={overview.period.from_date} to={overview.period.to_date} />
+              //
+              // B5.1 — `from_date`/`to_date` are `YYYY-MM-DD`, and `RangeText` formats
+              // nothing: it only joins two strings. Both ends go through
+              // `formatDateInStudioZone` first, anchored at midday UTC like every other
+              // date-only string on this dashboard (`ClosuresPanel`, `ImpactDialog`) so a
+              // studio east of UTC never rolls onto the wrong calendar day.
+              <RangeText
+                from={formatDateInStudioZone(`${overview.period.from_date}T12:00:00Z`, locale)}
+                to={formatDateInStudioZone(`${overview.period.to_date}T12:00:00Z`, locale)}
+              />
             )}
           </span>
         ) : null}
@@ -331,26 +365,42 @@ export function ReportsSection({
           {overview.kpi ? <KpiStrip kpi={overview.kpi} locale={locale} /> : null}
 
           <div className="dash-reports__body">
+            {/* B5.5 — three headed groups (the trend, this month, the email) instead of
+                eight loose blocks stacked with no internal rhythm. Still one `Card`, one
+                region: the three `SectionHeader`s are its internal structure, not three
+                regions of their own. */}
             <Card caption={t(locale, 'reports.financial.collectedVsDebt')}>
-              <p style={statLabelStyle}>{t(locale, 'reports.financial.trend12m')}</p>
-              <Legend
-                items={[
-                  { part: 'collected', label: t(locale, 'reports.financial.collected') },
-                  { part: 'outstanding', label: t(locale, 'reports.financial.outstanding') },
-                ]}
-              />
-              <RevenueChart locale={locale} months={overview.revenue} />
-              <p className="dash-kpi__note" data-testid="revenue-basis">
-                {t(locale, 'reports.financial.chartBasis')}
-              </p>
+              <SectionHeader level={3} title={t(locale, 'reports.financial.trend12m')} />
+              {/* B5.4 — trimmed to the months that actually happened; below three, a
+                  chart with one real bar and no axis says less than the sentence
+                  replacing it. */}
+              {activeRevenueMonths.length < 3 ? (
+                <EmptyState title={t(locale, 'reports.financial.chartEmpty')} />
+              ) : (
+                <>
+                  <Legend
+                    items={[
+                      { part: 'collected', label: t(locale, 'reports.financial.collected') },
+                      { part: 'outstanding', label: t(locale, 'reports.financial.outstanding') },
+                    ]}
+                  />
+                  <RevenueChart locale={locale} months={activeRevenueMonths} />
+                  <p className="dash-kpi__note" data-testid="revenue-basis">
+                    {t(locale, 'reports.financial.chartBasis')}
+                  </p>
+                </>
+              )}
 
               {/* The four money cards this screen shipped with, kept and demoted. Same
                   figures, same source, now under the chart they belong to. */}
               {billing ? (
                 <>
-                  <p style={statLabelStyle} data-testid="billing-month-caption">
-                    {t(locale, 'reports.financial.monthSummary').replace('{{month}}', monthLabel)}
-                  </p>
+                  <SectionHeader
+                    level={3}
+                    title={fill(t(locale, 'reports.financial.monthSummary'), {
+                      month: monthLabel,
+                    })}
+                  />
                   <div style={statRowStyle} data-testid="reports-stats">
                     <div>
                       <div style={statLabelStyle}>{t(locale, 'reports.financial.expected')}</div>
@@ -379,24 +429,39 @@ export function ReportsSection({
                       </div>
                     </div>
                   </div>
-                  <ProgressBar
-                    label={t(locale, 'reports.financial.collectionRate')}
-                    max={billing.total_agorot}
-                    value={billing.settled_agorot}
-                  />
+                  {/* B5.6 — a 0% track carries no information and reads as a loading
+                      state, so the rate is a printed sentence rather than an empty grey
+                      bar whenever there was nothing to bill or nothing has arrived yet. */}
+                  {collectionRateUnknown ? (
+                    <p className="dash-kpi__note" data-testid="collection-rate-empty">
+                      {t(locale, 'reports.financial.noCollection')}
+                    </p>
+                  ) : (
+                    <ProgressBar
+                      label={t(locale, 'reports.financial.collectionRate')}
+                      max={billing.total_agorot}
+                      value={billing.settled_agorot}
+                    />
+                  )}
                   <p className="dash-kpi__note">
                     {t(locale, 'reports.financial.studentsBilled')}:{' '}
                     <bdi dir="ltr">{billing.total_students}</bdi>
                   </p>
                   {selfPersonId !== null ? (
-                    <Button
-                      variant="secondary"
-                      data-testid="send-monthly"
-                      disabled={sendState === 'sending'}
-                      onClick={() => setConfirming(true)}
-                    >
-                      {t(locale, 'reports.send.button')}
-                    </Button>
+                    <>
+                      <SectionHeader
+                        level={3}
+                        title={t(locale, 'reports.financial.emailSection')}
+                      />
+                      <Button
+                        variant="secondary"
+                        data-testid="send-monthly"
+                        disabled={sendState === 'sending'}
+                        onClick={() => setConfirming(true)}
+                      >
+                        {t(locale, 'reports.send.button')}
+                      </Button>
+                    </>
                   ) : null}
                 </>
               ) : null}
@@ -411,10 +476,14 @@ export function ReportsSection({
                 />
               </Card>
               <Card caption={t(locale, 'reports.belts.title')}>
-                {overview.belts.length === 0 ? (
+                {belts.length === 0 ? (
                   <EmptyState title={t(locale, 'reports.belts.empty')} />
+                ) : beltsAllZero ? (
+                  // B5.7 — thirteen present-but-zero bars with single-letter labels said
+                  // nothing; one sentence says the same nothing honestly.
+                  <EmptyState title={t(locale, 'reports.belts.allZero')} />
                 ) : (
-                  <BeltPromotionsChart belts={overview.belts} locale={locale} />
+                  <BeltPromotionsChart belts={belts} locale={locale} />
                 )}
               </Card>
             </div>

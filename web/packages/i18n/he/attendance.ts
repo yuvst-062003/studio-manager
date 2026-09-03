@@ -140,10 +140,19 @@ export const attendance: Bundle = {
   // §5.14 — 'this is why `unmarked` must be a real state'. `4c` finding 1: the rule is
   // encoded in the sequence strip and stated nowhere on the screen.
   'report.unmarkedNotAbsence': 'שיעורים שלא סומנו אינם נספרים כהיעדרות',
-  'report.markNow': 'סימון עכשיו',
   'report.remindCoach': 'תזכורת למאמן',
   'report.coachReminded': 'נשלחה תזכורת למאמן',
   'report.byGroup': 'אחוז נוכחות לפי קבוצה',
+  // B1.5 — Part C did not name these three; the per-group card became a real `Table`
+  // (group · rate · coverage) and each column needs an accessible header. Kept in this
+  // namespace rather than borrowed from `schedule.groups.col.name`, per CLAUDE.md's rule
+  // that a vertical's strings live in its own file.
+  'report.col.group': 'קבוצה',
+  'report.col.rate': 'אחוז נוכחות',
+  'report.col.coverage': 'כיסוי',
+  // B1.3 — the unmarked row's `⋯` overflow control, once `סימון עכשיו` and
+  // `תזכורת למאמן` move behind it. Accessible name, not visible text.
+  'report.rowActions': 'פעולות עבור {{group}}',
   // -- 9g's injury report (S2): immediate, online-only, never queued -------------
   'summary.injury.title': 'דיווח פציעה',
   'summary.injury.who': 'מי נפצע?',
@@ -167,8 +176,13 @@ export const attendance: Bundle = {
   // dismissal is undecided on the artboard. Decided here, and it needs an accessible name:
   // `common` has only `nav.closeMenu`, which is the drawer's.
   'quickView.close': 'סגירת התצוגה המהירה',
+  // B1.4 — the register lives in the staff app on a hostname this app must not guess,
+  // so `סימון עכשיו` opens `QuickViewRoster` in place instead. The popover's own action.
+  'report.markHere': 'סימון כאן',
   'report.title': 'נוכחות',
   'report.unmarkedSessions': 'שיעורים שלא סומנו',
+  // B1.2 — the unmarked row's third grid column: select · group · when · actions.
+  'report.when': 'מועד',
   'report.consecutiveAbsences': 'נעדרים ברצף',
   'report.attendanceRate': 'אחוז נוכחות',
   'report.sessionsHeld': 'שיעורים שהתקיימו',

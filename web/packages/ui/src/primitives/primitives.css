@@ -111,6 +111,16 @@
   padding-block: var(--control-pad-block);
   padding-inline: var(--control-pad-inline);
   transition: background var(--motion-fast) var(--ease-standard);
+
+  /* An <a> wearing this class defaults to `display: inline` — block padding on an inline
+   * box overflows the line box instead of growing it, which is what "buttons that unfold
+   * on each other" turned out to be (A2). `<button>` already got inline-block for free. */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  text-decoration: none;
+  min-block-size: 44px;
 }
 
 .studio-btn[data-variant="primary"] {
@@ -1505,15 +1515,21 @@ a {
   flex: 0 0 auto;
 }
 
-.studio-stat-tile {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
+/* B5.2 — the tile shell `StatTile` and the reports screen's `.dash-kpi` both wear, so the
+ * two cannot drift apart. Surface, hairline, radius and padding only: layout, tone and
+ * (for `.dash-kpi`) the delta-toning stay with each caller's own class. */
+.studio-tile-shell {
   background: var(--surface);
   border: var(--border-width-hairline) solid var(--border);
   border-radius: var(--radius-lg);
   padding-block: var(--space-4);
   padding-inline: var(--space-5);
+}
+
+.studio-stat-tile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
   text-decoration: none;
   color: inherit;
 }
@@ -1842,4 +1858,136 @@ a.studio-stat-tile:focus-visible {
  * rule draws the rest. Stated here because the header is not a DetailRow. */
 .studio-student-card__rows > *:first-child {
   border-block-start: var(--border-width-hairline) solid var(--border);
+}
+
+/* A4 — the filter row that sits BELOW `PageHeader`, never inside it (its own row, its own
+ * concern). Wraps rather than truncates its controls at narrow widths; `align-items: end`
+ * so a labelled field and a bare button still meet at the same baseline. Replaces the
+ * three hand-written `filterRowStyle` objects (StudentsScreen.tsx:21, and the inline ones
+ * in GroupsAndCycles and StaffScreen) — those screens adopt this class in a later phase. */
+.studio-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--space-3);
+}
+
+/* A7 — ChipList. A read-only capped list, so a table cell shows a shape (two or three
+ * chips and a count) instead of the whole thing joined into a run-on string. */
+.studio-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.studio-chip-list__chip {
+  background: var(--ground);
+  border-radius: var(--radius-pill);
+  color: var(--text-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--leading-tight);
+  padding-block: 2px;
+  padding-inline: var(--space-2);
+  white-space: nowrap;
+}
+
+/* Muted rather than a plain chip's own colour — the `+N` chip is a count, not one more
+ * value of the same kind as its siblings. */
+.studio-chip-list__chip--more {
+  color: var(--text-muted);
+}
+
+/* RowActions — the `⋯` overflow menu B1, B3 and B4 all need (one control instead of two
+ * or three ghost buttons stacked into a 140px-tall row). `position: relative` anchors the
+ * menu to the trigger that opened it; the menu itself is `position: absolute` so it never
+ * pushes the row's own layout around when it opens. */
+.studio-row-actions {
+  display: inline-flex;
+  position: relative;
+}
+
+.studio-row-actions__trigger {
+  align-items: center;
+  background: transparent;
+  border: var(--border-width-hairline) solid transparent;
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: inline-flex;
+  inline-size: 32px;
+  block-size: 32px;
+  justify-content: center;
+  padding: 0;
+}
+
+.studio-row-actions__trigger:hover {
+  background: var(--ground);
+  color: var(--fg);
+}
+
+.studio-row-actions__trigger:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.studio-row-actions__trigger[aria-expanded="true"] {
+  background: var(--ground);
+  border-color: var(--border-strong);
+  color: var(--fg);
+}
+
+/* Anchored to the trigger's own corner. `inset-inline-end: 0` rather than a physical
+ * `right` — in RTL the menu opens toward the reading start, in LTR toward the end, and
+ * both fall out of the same declaration (D10/G12). */
+.studio-row-actions__menu {
+  background: var(--surface-raised);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 28px rgb(23 21 15 / 18%);
+  display: flex;
+  flex-direction: column;
+  inset-block-start: calc(100% + var(--space-1));
+  inset-inline-end: 0;
+  min-inline-size: 11rem;
+  padding: var(--space-1);
+  position: absolute;
+  z-index: 20;
+}
+
+.studio-row-actions__item {
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--fg);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--text-body);
+  padding-block: var(--space-2);
+  padding-inline: var(--space-3);
+  text-align: start;
+}
+
+.studio-row-actions__item:hover,
+.studio-row-actions__item:focus-visible {
+  background: var(--ground);
+}
+
+.studio-row-actions__item:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+/* Distance, not a permanent red button on every row (B4.4): the destructive action keeps
+ * `--danger` only here, separated from the rest by the rule below. */
+.studio-row-actions__item[data-destructive="true"] {
+  color: var(--danger);
+}
+
+.studio-row-actions__separator {
+  border-block-start: var(--border-width-hairline) solid var(--border);
+  margin-block: var(--space-1);
 }

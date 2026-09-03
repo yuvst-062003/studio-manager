@@ -133,6 +133,23 @@ describe('the operations board', () => {
     const ltr = [...container.querySelectorAll('[dir="ltr"]')].map((node) => node.textContent)
     expect(ltr).toContain('30 8 * * *')
   })
+
+  it('shows the jobs table caption as this panel\'s own visible heading', () => {
+    // The Card around this Table carries no caption of its own (see the comment at
+    // OpsHealthPanel.tsx:148) — the Table's <caption> IS the section's only visible
+    // title, so it must opt into `captionVisible` rather than take Table's default.
+    //
+    // `getByText` alone would pass whether the caption is visible or clipped — the text
+    // is in the DOM either way, since Table's clipping (like the theme control's
+    // off-screen radio before it) keeps the caption in the accessibility tree on
+    // purpose. The class is what actually differs between the two states, so that is
+    // what this test has to assert. Same distinction Table.test.tsx itself draws between
+    // its `captionVisible` cases.
+    const { container } = render(<OpsHealthPanel health={health()} locale="he" />)
+    const caption = container.querySelector('table caption')
+    expect(caption).not.toBeNull()
+    expect(caption).not.toHaveClass('studio-visually-hidden')
+  })
 })
 
 describe('the platform console', () => {

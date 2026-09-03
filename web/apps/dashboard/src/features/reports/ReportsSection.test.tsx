@@ -6,7 +6,8 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { downloadFile } from '@studio/core'
+import { downloadFile, formatDateInStudioZone, formatMonthLabel } from '@studio/core'
+import { t } from '@studio/i18n'
 import { BeltPromotionsChart } from './BeltPromotionsChart'
 import { KpiStrip } from './KpiStrip'
 import { ReportsSection } from './ReportsSection'
@@ -176,6 +177,18 @@ describe('the belt distribution', () => {
     render(<BeltPromotionsChart belts={[belt({ color_hex: '#d9a800' })]} locale="he" />)
     expect(screen.getByTestId('belt-bar-rank-white').style.background).toContain('rgb(217, 168, 0)')
   })
+
+  it('B5.7 — flags itself dense above eight belts, so CSS can rotate the names instead of truncating them', () => {
+    const eight = Array.from({ length: 8 }, (_, index) =>
+      belt({ belt_rank_id: `r${index}`, order_index: index }),
+    )
+    const { rerender } = render(<BeltPromotionsChart belts={eight} locale="he" />)
+    expect(screen.getByTestId('belt-chart')).toHaveAttribute('data-dense', 'false')
+
+    const nine = [...eight, belt({ belt_rank_id: 'r8', order_index: 8 })]
+    rerender(<BeltPromotionsChart belts={nine} locale="he" />)
+    expect(screen.getByTestId('belt-chart')).toHaveAttribute('data-dense', 'true')
+  })
 })
 
 describe('the twelve-month revenue chart', () => {
@@ -216,22 +229,39 @@ describe('the twelve-month revenue chart', () => {
     expect(hidden?.textContent).toContain('נגבה')
     expect(hidden?.textContent).toContain('נותר בחוב')
   })
+
+  it('B5.4 — carries both a full and a short month label, so CSS can pick per column width', () => {
+    render(<RevenueChart locale="he" months={[month(2026, 9, 25_000, 5_000)]} />)
+    const wrapper = screen.getByTestId('revenue-month-2026-9')
+    expect(wrapper.querySelector('.dash-chart__month-full')?.textContent).toBe(
+      formatMonthLabel(2026, 9, 'he'),
+    )
+    // `ספט׳`, not the ellipsis-truncated `ספטמבר` the artboard produced at ~55px.
+    expect(wrapper.querySelector('.dash-chart__month-short')?.textContent).toBe('ספט׳')
+  })
 })
 
 // ── retention ────────────────────────────────────────────────────────────────────────
 
 describe('retention by tenure', () => {
   it('draws no bar for a bucket with no cohort', () => {
-    // A bar at 0% is a claim about students who never had the chance to leave.
+    // A bar at 0% is a claim about students who never had the chance to leave. A second,
+    // measured bucket keeps this scenario short of B5.8's all-null collapse, so it is
+    // this row's own behaviour under test rather than the panel-level empty state.
     render(
       <RetentionPanel
-        buckets={[bucket({ cohort: 0, retained: 0, percent: null })]}
+        buckets={[
+          bucket({ key: 'm0_3', cohort: 0, retained: 0, percent: null }),
+          bucket({ key: 'm3_6', lower_months: 3, upper_months: 6, percent: 62 }),
+        ]}
         locale="he"
         undatedDepartures={0}
       />,
     )
     expect(screen.getByTestId('retention-empty-m0_3')).toBeInTheDocument()
-    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument()
+    expect(
+      within(screen.getByTestId('retention-m0_3')).queryByRole('progressbar'),
+    ).not.toBeInTheDocument()
   })
 
   it('marks the weakest measured bucket, and never an unmeasured one', () => {
@@ -278,6 +308,24 @@ describe('retention by tenure', () => {
   it('publishes departures it could not date rather than swallowing them', () => {
     render(<RetentionPanel buckets={[bucket()]} locale="he" undatedDepartures={3} />)
     expect(screen.getByTestId('retention-undated')).toHaveTextContent('3')
+  })
+
+  it('B5.8 — collapses to one empty state when no bucket has a measurable percent, not four repeated rows', () => {
+    render(
+      <RetentionPanel
+        buckets={[
+          bucket({ key: 'm0_3', cohort: 0, percent: null }),
+          bucket({ key: 'm3_6', lower_months: 3, upper_months: 6, cohort: 0, percent: null }),
+          bucket({ key: 'm6_12', lower_months: 6, upper_months: 12, cohort: 0, percent: null }),
+          bucket({ key: 'm12_plus', lower_months: 12, upper_months: null, cohort: 0, percent: null }),
+        ]}
+        locale="he"
+        undatedDepartures={0}
+      />,
+    )
+    expect(screen.getByText(t('he', 'reports.retention.emptyAll'))).toBeInTheDocument()
+    expect(screen.queryByTestId('retention-m0_3')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('retention-empty-m0_3')).not.toBeInTheDocument()
   })
 })
 
@@ -340,6 +388,30 @@ describe('the KPI strip', () => {
     expect(within(screen.getByTestId('reports-kpis')).queryByRole('link')).not.toBeInTheDocument()
     expect(within(screen.getByTestId('reports-kpis')).queryByRole('button')).not.toBeInTheDocument()
   })
+
+  it('B5.2 — wears the shared tile shell rather than four columns of naked text', () => {
+    render(<KpiStrip kpi={kpi()} locale="he" />)
+    for (const testId of ['kpi-active-students', 'kpi-churn', 'kpi-revenue', 'kpi-attendance']) {
+      expect(screen.getByTestId(testId)).toHaveClass('studio-tile-shell')
+    }
+  })
+
+  it('B5.3 — moves the footnote to an info affordance on the label, and prints both counts on the delta line', () => {
+    render(<KpiStrip kpi={kpi()} locale="he" />)
+    // The rule and both counts are still reachable — just behind the toggle now, not
+    // three sentences under the tile.
+    const toggle = screen.getByTestId('kpi-attendance-info-toggle')
+    expect(toggle).toHaveAccessibleName(t('he', 'reports.attendance.basisLabel'))
+    expect(screen.getByTestId('unmarked-excluded')).toHaveTextContent(
+      'שיעורים שלא סומנו אינם נספרים כהיעדרות',
+    )
+    expect(screen.getByTestId('kpi-attendance-basis')).toHaveTextContent('480')
+    expect(screen.getByTestId('kpi-attendance-basis')).toHaveTextContent('12')
+    // The delta line is the tile's own short line, not the note.
+    const delta = screen.getByTestId('kpi-attendance-delta')
+    expect(delta).toHaveTextContent('480')
+    expect(delta).toHaveTextContent('12')
+  })
 })
 
 // ── the screen ───────────────────────────────────────────────────────────────────────
@@ -363,8 +435,195 @@ describe('the reports screen', () => {
     render(<ReportsSection locale="he" selfPersonId="p1" studioId="s1" />)
 
     await waitFor(() => expect(screen.getByTestId('reports-stats')).toBeInTheDocument())
-    expect(screen.getByTestId('billing-month-caption')).toBeInTheDocument()
     expect(screen.getByTestId('send-monthly')).toBeInTheDocument()
+  })
+
+  it('B5.5 — splits the financial card into three headed sections: the trend, this month, the email', async () => {
+    mockOverview(overview())
+    render(<ReportsSection locale="he" selfPersonId="p1" studioId="s1" />)
+    await waitFor(() => expect(screen.getByTestId('reports-stats')).toBeInTheDocument())
+
+    expect(
+      screen.getByRole('heading', { level: 3, name: t('he', 'reports.financial.trend12m') }),
+    ).toBeInTheDocument()
+    const monthHeading = t('he', 'reports.financial.monthSummary').replace(
+      '{{month}}',
+      formatMonthLabel(2026, 11, 'he'),
+    )
+    expect(screen.getByRole('heading', { level: 3, name: monthHeading })).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { level: 3, name: t('he', 'reports.financial.emailSection') }),
+    ).toBeInTheDocument()
+  })
+
+  it('B5.1 — formats the period range in Hebrew rather than raw ISO', async () => {
+    mockOverview(overview())
+    render(<ReportsSection locale="he" selfPersonId="p1" studioId="s1" />)
+    await waitFor(() => expect(screen.getByTestId('reports-range')).toBeInTheDocument())
+
+    const range = screen.getByTestId('reports-range')
+    expect(range.textContent).not.toContain('2026-11-01')
+    expect(range.textContent).not.toContain('2026-11-12')
+    expect(range.textContent).toBe(
+      `${formatDateInStudioZone('2026-11-01T12:00:00Z', 'he')}–${formatDateInStudioZone(
+        '2026-11-12T12:00:00Z',
+        'he',
+      )}`,
+    )
+  })
+
+  it('B5.4 — trims leading months with no billing or collection, keeping a real trend once three remain', async () => {
+    mockOverview(
+      overview({
+        revenue: [
+          month(2026, 6, 0, 0),
+          month(2026, 7, 0, 0),
+          month(2026, 8, 40_000, 0),
+          month(2026, 9, 50_000, 0),
+          month(2026, 10, 60_000, 0),
+          month(2026, 11, 70_000, 0),
+        ],
+      }),
+    )
+    render(<ReportsSection locale="he" selfPersonId="p1" studioId="s1" />)
+    await waitFor(() => expect(screen.getByTestId('revenue-chart')).toBeInTheDocument())
+
+    const columns = screen
+      .getByTestId('revenue-chart')
+      .querySelectorAll('.dash-chart__column')
+    expect(columns).toHaveLength(4)
+  })
+
+  it('B5.4 — renders one empty state instead of a chart when fewer than three months have activity', async () => {
+    mockOverview(
+      overview({
+        revenue: [month(2026, 9, 0, 0), month(2026, 10, 0, 0), month(2026, 11, 50_000, 0)],
+      }),
+    )
+    render(<ReportsSection locale="he" selfPersonId="p1" studioId="s1" />)
+    await waitFor(() => expect(screen.getByTestId('reports-kpis')).toBeInTheDocument())
+
+    expect(screen.queryByTestId('revenue-chart')).not.toBeInTheDocument()
+    expect(screen.getByText(t('he', 'reports.financial.chartEmpty'))).toBeInTheDocument()
+  })
+
+  it('B5.6 — still renders the collection-rate bar when billing and settlement are both non-zero', async () => {
+    // The regression this guards: a `collectionRateUnknown` that hardcoded `true` would
+    // pass every other test in this file (all of them either assert the empty text or
+    // assert the bar's absence) while silently deleting the bar for every studio with
+    // real billing. The default fixture bills 300_000 and settles 200_000.
+    mockOverview(overview())
+    render(<ReportsSection locale="he" selfPersonId="p1" studioId="s1" />)
+    await waitFor(() => expect(screen.getByTestId('reports-stats')).toBeInTheDocument())
+
+    expect(
+      screen.getByRole('progressbar', { name: t('he', 'reports.financial.collectionRate') }),
+    ).toBeInTheDocument()
+    expect(screen.queryByTestId('collection-rate-empty')).not.toBeInTheDocument()
+    expect(screen.queryByText(t('he', 'reports.financial.noCollection'))).not.toBeInTheDocument()
+  })
+
+  it('B5.6 — prints a percentage rather than an empty track when nothing was billed or collected', async () => {
+    mockOverview(
+      overview({
+        billing_month: {
+          period_year: 2026,
+          period_month: 11,
+          total_students: 12,
+          total_agorot: 0,
+          settled_agorot: 0,
+          overdue_agorot: 0,
+          pending_agorot: 0,
+        },
+      }),
+    )
+    render(<ReportsSection locale="he" selfPersonId="p1" studioId="s1" />)
+    await waitFor(() => expect(screen.getByTestId('reports-stats')).toBeInTheDocument())
+
+    expect(
+      screen.queryByRole('progressbar', { name: t('he', 'reports.financial.collectionRate') }),
+    ).not.toBeInTheDocument()
+    expect(screen.getByTestId('collection-rate-empty')).toHaveTextContent(
+      t('he', 'reports.financial.noCollection'),
+    )
+  })
+
+  it('B5.7 — renders one empty state when every belt count is zero, not thirteen empty columns', async () => {
+    mockOverview(
+      overview({
+        belts: [
+          belt({ belt_rank_id: 'r0', promotions: 0 }),
+          belt({ belt_rank_id: 'r1', promotions: 0 }),
+        ],
+      }),
+    )
+    render(<ReportsSection locale="he" selfPersonId="p1" studioId="s1" />)
+    await waitFor(() => expect(screen.getByTestId('reports-kpis')).toBeInTheDocument())
+
+    expect(screen.queryByTestId('belt-chart')).not.toBeInTheDocument()
+    expect(screen.getByText(t('he', 'reports.belts.allZero'))).toBeInTheDocument()
+  })
+
+  it('B5.8 — retention collapses to one empty state on the full screen too, when every bucket is unmeasured', async () => {
+    mockOverview(
+      overview({
+        retention: [
+          bucket({ key: 'm0_3', cohort: 0, percent: null }),
+          bucket({ key: 'm3_6', lower_months: 3, upper_months: 6, cohort: 0, percent: null }),
+          bucket({ key: 'm6_12', lower_months: 6, upper_months: 12, cohort: 0, percent: null }),
+          bucket({ key: 'm12_plus', lower_months: 12, upper_months: null, cohort: 0, percent: null }),
+        ],
+      }),
+    )
+    render(<ReportsSection locale="he" selfPersonId="p1" studioId="s1" />)
+    await waitFor(() => expect(screen.getByTestId('reports-kpis')).toBeInTheDocument())
+
+    expect(screen.getByText(t('he', 'reports.retention.emptyAll'))).toBeInTheDocument()
+  })
+
+  it('B5 — a studio one day old shows four KPI tiles and exactly three empty states', async () => {
+    mockOverview(
+      overview({
+        kpi: kpi({
+          churn_permille: null,
+          churn_permille_delta: null,
+          revenue_per_student_agorot: null,
+          attendance_percent: null,
+          attendance_percent_delta: null,
+        }),
+        billing_month: {
+          period_year: 2026,
+          period_month: 11,
+          total_students: 0,
+          total_agorot: 0,
+          settled_agorot: 0,
+          overdue_agorot: 0,
+          pending_agorot: 0,
+        },
+        revenue: [month(2026, 11, 0, 0)],
+        retention: [
+          bucket({ key: 'm0_3', cohort: 0, percent: null }),
+          bucket({ key: 'm3_6', lower_months: 3, upper_months: 6, cohort: 0, percent: null }),
+          bucket({ key: 'm6_12', lower_months: 6, upper_months: 12, cohort: 0, percent: null }),
+          bucket({ key: 'm12_plus', lower_months: 12, upper_months: null, cohort: 0, percent: null }),
+        ],
+        belts: [
+          belt({ belt_rank_id: 'r0', promotions: 0 }),
+          belt({ belt_rank_id: 'r1', promotions: 0 }),
+        ],
+      }),
+    )
+    render(<ReportsSection locale="he" selfPersonId="p1" studioId="s1" />)
+    await waitFor(() => expect(screen.getByTestId('reports-kpis')).toBeInTheDocument())
+
+    // churn's value, attendance's value, and revenue-per-student on the revenue delta.
+    expect(screen.getAllByText('אין נתון')).toHaveLength(3)
+    expect(document.querySelectorAll('.studio-empty')).toHaveLength(3)
+    expect(screen.queryByTestId('revenue-chart')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('belt-chart')).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('progressbar', { name: t('he', 'reports.financial.collectionRate') }),
+    ).not.toBeInTheDocument()
   })
 
   it('refetches when the period switcher moves', async () => {

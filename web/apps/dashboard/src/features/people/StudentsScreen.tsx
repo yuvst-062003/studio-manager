@@ -8,24 +8,24 @@
 // A plausible-looking payment column in a manager's decision-making screen would be a
 // fabrication — so the column exists, is labelled, and says when it fills in.
 import { useEffect, useState } from 'react'
-import type { CSSProperties } from 'react'
-import { Button, EmptyState, PlanBadge, SelectField, StatusChip, Table, TextField } from '@studio/ui'
-import { apiFetch, appendPage } from '@studio/core'
+import {
+  Button,
+  EmptyState,
+  PageHeader,
+  PlanBadge,
+  SelectField,
+  StatusChip,
+  Table,
+  TextField,
+} from '@studio/ui'
+import { apiFetch, appendPage, fill } from '@studio/core'
 import { usePlanBadges } from '../billing/usePlanBadges'
 import type { CursorPage } from '@studio/core'
 import { ConfirmDialog } from '../rollover/ConfirmDialog'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import type { DashboardPeopleClient, StudentSummary } from './peopleClient'
-
-const filterRowStyle: CSSProperties = {
-  display: 'flex',
-  flexWrap: 'wrap',
-  gap: 'var(--space-3)',
-  alignItems: 'end',
-  // Two fields on one line, each wide enough to read but neither taking the whole row.
-  maxInlineSize: '32rem',
-}
+import './people.css'
 
 const STATUSES = [
   'lead',
@@ -187,7 +187,34 @@ export function StudentsScreen({
   const [version, setVersion] = useState(0)
   const asked = `${query}\u0000${status}\u0000${version}`
   const loaded = answered === asked
-  const reload = () => setVersion((n) => n + 1)
+
+  // B2.1's subtitle and B2.2's "{{count}} מתוך {{total}}" both need a real total, and
+  // `CursorPage` has no total-headcount field — G16 deliberately never counts, only
+  // positions (no new API field; every number here is already fetched). The one honest
+  // number available without a second network call is the very first, unfiltered page
+  // this same effect already loads on mount (query and status both start empty):
+  // captured once, it holds until a bulk mutation invalidates it (`reload` below), so a
+  // later filter narrows `count` against a real `total` instead of an invented one.
+  //
+  // That baseline is only trustworthy when it is the WHOLE roster. `students()` already
+  // returns `has_more` — when the unfiltered baseline came back with `has_more: true`,
+  // the club has more students than one page and `items.length` is not the total, it is
+  // a fragment. Latching it anyway would make both the header and the denominator LIE (a
+  // club of 400 reading "20 חניכים" or "5 מתוך 20"), and a wrong number on screen is
+  // worse than no number — so `baselineCount` stays null in that case, and both the
+  // subtitle and the result count render without a total at all (below), never with an
+  // understated one.
+  const [baselineCount, setBaselineCount] = useState<number | null>(null)
+
+  const reload = () => {
+    setVersion((n) => n + 1)
+    // F12's bulk move/leave can change the roster size. Write-once cuts both ways: a
+    // total latched before the mutation would drift into a wrong one after it, silently,
+    // for the rest of the component's life — so the mutation that invalidates it also
+    // clears the latch, and the next unfiltered load (query/status are untouched by a
+    // bulk action, so this reload's own refetch already qualifies) re-latches the truth.
+    setBaselineCount(null)
+  }
 
   useEffect(() => {
     let live = true
@@ -198,6 +225,9 @@ export function StudentsScreen({
         if (!live) return
         setPage(fresh)
         setAnswered(key)
+        setBaselineCount((current) =>
+          current === null && !query && !status && !fresh.has_more ? fresh.items.length : current,
+        )
       })
       .catch(() => live && setAnswered(key))
     return () => {
@@ -221,25 +251,50 @@ export function StudentsScreen({
 
   return (
     <section aria-labelledby="students-title" data-testid="students-screen">
-      <h1 id="students-title">{t(locale, 'people.student.plural')}</h1>
-
-      {/* 3c's entry point. The add-student screen shipped reachable only by TYPING
-          #/students/new — a screen with no inbound link is a screen that does not exist
-          to the person the audit calls "a human at 2am". */}
-      <a
-        className="studio-btn"
-        data-variant="primary"
-        href="#/students/new"
-        data-testid="students-add"
-        style={{ alignSelf: 'start' }}
-      >
-        {t(locale, 'people.student.add')}
-      </a>
+      {/* B2.1 — A4's page-header shape. The subtitle carries the count the screen
+          already fetches and used to print nowhere; `הוספת חניך` moves out of the bare
+          `<a class="studio-btn">` that used to float between the title and the filter
+          row (A2's overflow) and into the actions slot that shape belongs in. */}
+      <PageHeader
+        actions={
+          // 3c's entry point. The add-student screen shipped reachable only by TYPING
+          // #/students/new — a screen with no inbound link is a screen that does not
+          // exist to the person the audit calls "a human at 2am".
+          <a
+            className="studio-btn"
+            data-variant="primary"
+            href="#/students/new"
+            data-testid="students-add"
+          >
+            {t(locale, 'people.student.add')}
+          </a>
+        }
+        subtitle={
+          // Gated on the same `baselineCount` latch as the filter row's result count,
+          // and for the same reason: `page.items.length` is whatever page or filter
+          // happens to be loaded, not the club's size, and a club of 400 reading
+          // "20 חניכים" is the same wrong-number-on-screen failure the result count was
+          // already fixed for, one widget up. When the total is not known to be
+          // complete, the subtitle is omitted rather than asserting a total it cannot
+          // back up — the club's size is not urgent enough to guess at.
+          baselineCount !== null
+            ? fill(t(locale, 'people.student.countSubtitle'), { count: baselineCount })
+            : undefined
+        }
+        title={t(locale, 'people.student.plural')}
+        titleId="students-title"
+      />
 
       {/* Both were bare `<label>`s wrapped round raw controls, so they rendered at the
           UA's own size: a 158×22 search box beside a 95×20 status filter with their
-          baselines two pixels apart. The primitives put them on one baseline at one size. */}
-      <div style={filterRowStyle}>
+          baselines two pixels apart. The primitives put them on one baseline at one size.
+          B2.2 — `.studio-filter-bar` replaces the hand-written `filterRowStyle`, and the
+          result count sits on the row's own inline-end edge via `.people-filter-result`'s
+          `margin-inline-start: auto`, so a filtered view says how much it is hiding. Only
+          while `baselineCount` is a real, whole-roster number: an unknown total renders
+          the count alone (`people.student.countSubtitle`) rather than a denominator that
+          understates what is hidden — a wrong number is worse than none. */}
+      <div className="studio-filter-bar">
         <TextField
           data-testid="students-search"
           label={t(locale, 'people.student.search')}
@@ -261,6 +316,16 @@ export function StudentsScreen({
             </option>
           ))}
         </SelectField>
+        {loaded ? (
+          <span className="people-filter-result" data-testid="students-result-count">
+            {baselineCount !== null
+              ? fill(t(locale, 'people.filter.resultCount'), {
+                  count: page.items.length,
+                  total: baselineCount,
+                })
+              : fill(t(locale, 'people.student.countSubtitle'), { count: page.items.length })}
+          </span>
+        ) : null}
       </div>
 
       {loaded && page.items.length === 0 ? (
@@ -273,7 +338,12 @@ export function StudentsScreen({
       ) : (
         <>
         {selected.length > 0 ? (
-          <div data-testid="students-bulk-bar" style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'end', flexWrap: 'wrap' }}>
+          // B2.3 — sticky to the block-end edge of the viewport while a selection
+          // exists (`.people-bulk-bar`), so the controls stay reachable instead of
+          // scrolling away with the table. The `העברת קבוצה` heading that used to
+          // mislabel the selection column's header lives correctly here, where it
+          // names one of the two bulk actions the selection actually enables.
+          <div className="people-bulk-bar" data-testid="students-bulk-bar">
             <span>{t(locale, 'people.bulk.selected').replace('{n}', String(selected.length))}</span>
             <label>
               {t(locale, 'people.bulk.move')}
@@ -351,7 +421,15 @@ export function StudentsScreen({
             columns={[
               {
                 id: 'select',
-                header: t(locale, 'people.bulk.move'),
+                // B2.3 — unlabelled and narrow. `העברת קבוצה` (`people.bulk.move`) named
+                // only one of the two bulk actions the selection enables and belongs in
+                // the bulk bar, not here — the column's own name is generic and visually
+                // hidden, the same technique the table's own caption already uses (A5).
+                header: (
+                  <span className="studio-visually-hidden">
+                    {t(locale, 'people.student.selectColumn')}
+                  </span>
+                ),
                 width: '3rem',
                 cell: (student) => (
                   <input

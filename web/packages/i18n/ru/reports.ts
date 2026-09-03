@@ -297,6 +297,10 @@ export const reports: Bundle = {
   'attendance.decidedCount': 'из {{count}} учтённых отметок',
   'attendance.unmarkedCount': '{{count}} отметок не проставлены',
   'attendance.noData': 'Нет данных о посещаемости за период',
+  'attendance.basisLabel': 'На чём основан процент',
+  // B5.3, не в Part C — короткая строка для строки дельты плитки.
+  'attendance.decidedShort': '{{count}} отметок',
+  'attendance.unmarkedShort': '{{count}} без отметки',
 
   'financial.collectedVsDebt': 'Доход и задолженность',
   'financial.billed': 'Начислено',
@@ -304,6 +308,11 @@ export const reports: Bundle = {
   'financial.chartBasis': 'Высота столбца — вся сумма начислений за месяц',
   'financial.chartLabel': 'Доход и задолженность по месяцам',
   'financial.monthSummary': 'Итоги начислений за {{month}}',
+  'financial.noCollection': 'В этом месяце пока ничего не собрано',
+  // B5.4, не в Part C.
+  'financial.chartEmpty': 'Пока недостаточно месяцев для отображения тренда',
+  // B5.5, не в Part C.
+  'financial.emailSection': 'Ежемесячный отчёт по почте',
 
   'retention.title': 'Удержание по стажу',
   'retention.basis': 'Из тех, кто достиг этого стажа, — сколько дошли до его конца',
@@ -317,11 +326,13 @@ export const reports: Bundle = {
   'retention.insightEarly':
     'Большинство уходов приходится на первые три месяца — там и стоит вести наблюдение.',
   'retention.undatedDepartures': '{{count}} уходов без даты не учитываются',
+  'retention.emptyAll': 'Пока недостаточно стажа для расчёта удержания',
 
   'belts.title': 'Присвоения поясов за период',
   'belts.chartLabel': 'Присвоения поясов по степеням',
   'belts.promotions': '{{count}} присвоений',
   'belts.empty': 'За период пояса не присваивались',
+  'belts.allZero': 'За этот период присвоений поясов не было',
 
   'export.failed': 'Экспорт не удался. Попробуйте ещё раз.',
   'export.nothing': 'Нечего экспортировать',

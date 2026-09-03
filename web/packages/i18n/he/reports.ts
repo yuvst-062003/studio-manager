@@ -372,6 +372,14 @@ export const reports: Bundle = {
   'attendance.decidedCount': 'מתוך {{count}} סימונים שהוכרעו',
   'attendance.unmarkedCount': '{{count}} סימונים לא הושלמו',
   'attendance.noData': 'אין נתוני נוכחות לתקופה',
+  // B5.3 — the footnote that used to deform the KPI tile's row moves behind a `ⓘ`
+  // affordance on the tile's label; this is the affordance's own accessible name.
+  'attendance.basisLabel': 'על מה מבוסס האחוז',
+  // B5.3, not in Part C — the same two counts, short enough to be the tile's own delta
+  // line instead of a footnote. decidedCount/unmarkedCount above still carry the long
+  // form, now inside the info affordance.
+  'attendance.decidedShort': '{{count}} סימונים',
+  'attendance.unmarkedShort': '{{count}} ללא סימון',
 
   // Finding 3 — the chart compares collected against DEBT, and
   // `financial.collectedVsExpected` above compares against EXPECTED. Two different
@@ -382,6 +390,16 @@ export const reports: Bundle = {
   'financial.chartBasis': 'גובה העמודה הוא סך החיוב באותו חודש',
   'financial.chartLabel': 'הכנסות מול חוב, לפי חודש',
   'financial.monthSummary': 'סיכום החיוב לחודש {{month}}',
+  // B5.6 — a 0% track carries no information and reads as a loading state, so a month
+  // with nothing collected prints this instead of an empty grey bar.
+  'financial.noCollection': 'טרם נגבה תשלום החודש',
+  // B5.4, not in Part C — the trend section's own empty state, once trimming the leading
+  // months with no billing leaves fewer than three to draw.
+  'financial.chartEmpty': 'אין עדיין מספיק חודשים להצגת המגמה',
+  // B5.5, not in Part C — the third of the financial card's three SectionHeaders, over
+  // the `send.button` control. A noun phrase rather than the button's own imperative, so
+  // the heading and the control under it do not read as the same sentence twice.
+  'financial.emailSection': 'דוח חודשי במייל',
 
   'retention.title': 'שימור לפי ותק',
   'retention.basis': 'מתוך מי שהגיע לוותק הזה — כמה נשארו עד סופו',
@@ -394,11 +412,17 @@ export const reports: Bundle = {
   'retention.weakest': 'הוותק החלש ביותר',
   'retention.insightEarly': 'רוב הנשירה מתרחשת בשלושת החודשים הראשונים — שם כדאי למקד מעקב.',
   'retention.undatedDepartures': '{{count}} עזיבות ללא תאריך אינן נכללות בחישוב',
+  // B5.8 — four rows of `retention.noCohort` is not more honest than one. This
+  // replaces all four when EVERY bucket's `percent` is null.
+  'retention.emptyAll': 'אין עדיין מספיק ותק לחישוב שימור',
 
   'belts.title': 'קידומי חגורה בתקופה',
   'belts.chartLabel': 'קידומי חגורה לפי דרגה',
   'belts.promotions': '{{count}} קידומים',
   'belts.empty': 'לא הוענקו חגורות בתקופה',
+  // B5.7 — `belts.empty` covers an empty `belts` array; this covers the array being
+  // present but every count in it zero, which reads as an error without this state.
+  'belts.allZero': 'לא נרשמו קידומי חגורה בתקופה זו',
 
   'export.failed': 'הייצוא נכשל. נסו שוב.',
   'export.nothing': 'אין נתונים לייצוא',

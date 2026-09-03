@@ -294,6 +294,10 @@ export const reports: Bundle = {
   'attendance.decidedCount': 'of {{count}} decided marks',
   'attendance.unmarkedCount': '{{count}} marks left unmarked',
   'attendance.noData': 'No attendance data for this period',
+  'attendance.basisLabel': 'What the percentage is based on',
+  // B5.3, not in Part C — the tile's own delta line.
+  'attendance.decidedShort': '{{count}} marks',
+  'attendance.unmarkedShort': '{{count}} unmarked',
 
   'financial.collectedVsDebt': 'Revenue vs debt',
   'financial.billed': 'Billed',
@@ -301,6 +305,11 @@ export const reports: Bundle = {
   'financial.chartBasis': 'Each column is that month’s total billing',
   'financial.chartLabel': 'Revenue vs debt, by month',
   'financial.monthSummary': 'Billing summary for {{month}}',
+  'financial.noCollection': 'Nothing collected this month yet',
+  // B5.4, not in Part C.
+  'financial.chartEmpty': 'Not enough months yet to show a trend',
+  // B5.5, not in Part C.
+  'financial.emailSection': 'Monthly report by email',
 
   'retention.title': 'Retention by tenure',
   'retention.basis': 'Of those who reached this much tenure, how many made it to the end of it',
@@ -314,11 +323,13 @@ export const reports: Bundle = {
   'retention.insightEarly':
     'Most departures happen in the first three months — that is where follow-up pays.',
   'retention.undatedDepartures': '{{count}} departures carry no date and are excluded',
+  'retention.emptyAll': 'Not enough tenure yet to calculate retention',
 
   'belts.title': 'Belt promotions this period',
   'belts.chartLabel': 'Belt promotions by rank',
   'belts.promotions': '{{count}} promotions',
   'belts.empty': 'No belts were awarded in this period',
+  'belts.allZero': 'No belt promotions were recorded this period',
 
   'export.failed': 'The export failed. Try again.',
   'export.nothing': 'Nothing to export',

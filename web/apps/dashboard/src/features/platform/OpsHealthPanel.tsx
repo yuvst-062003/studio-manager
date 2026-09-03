@@ -146,9 +146,13 @@ export function OpsHealthPanel({ health, locale }: { health: OpsHealth; locale: 
       )}
 
       {/* The Card carries no caption of its own: the Table's <caption> is the visible
-          title, and the pair rendered the same heading twice, stacked (2026-08-30). */}
+          title, and the pair rendered the same heading twice, stacked (2026-08-30).
+          `Table`'s caption is clipped by default since A5, so this one opts in with
+          `captionVisible` — without it this section would have no visible heading at
+          all, not a duplicated one. */}
       <Card>
         <Table
+          captionVisible
           caption={t(locale, 'common.ops.jobs.title')}
           columns={jobColumns}
           rowKey={(job) => job.name}

@@ -40,10 +40,13 @@ export function AttendanceSection({ locale, today }: { locale: Locale; today?: s
   // `today` is optional so a test can pin the clock; the app passes nothing and gets now.
   const [window, setWindow] = useState(() => defaultWindow(today ?? new Date().toISOString()))
 
-  // `onMarkNow` is deliberately absent. §5.14's chase ends on the register, which lives in
-  // the STAFF app on another origin — and this app has no business knowing that hostname:
-  // `infra/railway/domains.json` is the one place a hostname is written, and it is read
-  // server-side. Offering a link built from a guessed origin would be the second place.
+  // B1.4 — `AttendanceReport` used to take an `onMarkNow` callback nobody supplied. §5.14's
+  // chase ends on the register, which lives in the STAFF app on another origin — and this
+  // app has no business knowing that hostname: `infra/railway/domains.json` is the one
+  // place a hostname is written, and it is read server-side. A link built from a guessed
+  // origin would have been the second place. `AttendanceReport` now opens `QuickViewRoster`
+  // in place instead, through the same `client` this section already hands it, so there is
+  // no callback left for this section to decline to pass.
   return (
     <AttendanceReport
       client={client}

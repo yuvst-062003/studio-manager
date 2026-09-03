@@ -64,6 +64,23 @@ describe('Table', () => {
     expect(screen.queryByTestId('table')).toBeNull()
   })
 
+  it('clips the caption out of the visual flow by default, keeping it in the a11y tree (A5)', () => {
+    renderIn(<Table caption="חניכים" columns={COLUMNS} rowKey={(r) => r.id} rows={ROWS} />)
+    const caption = within(screen.getByTestId('table')).getByText('חניכים')
+    expect(caption.tagName).toBe('CAPTION')
+    // Same technique as home.css's now-deleted local override: never display:none, which
+    // would remove it from the accessibility tree along with the visual flow.
+    expect(caption).toHaveClass('studio-visually-hidden')
+  })
+
+  it('prints the caption on screen when a caller opts in with captionVisible', () => {
+    renderIn(
+      <Table captionVisible caption="חניכים" columns={COLUMNS} rowKey={(r) => r.id} rows={ROWS} />,
+    )
+    const caption = within(screen.getByTestId('table')).getByText('חניכים')
+    expect(caption).not.toHaveClass('studio-visually-hidden')
+  })
+
   it('below stackBelow renders labelled cards, identity first', () => {
     stackedMatchMedia()
     renderIn(<Table caption="חניכים" columns={COLUMNS} rowKey={(r) => r.id} rows={ROWS} />)

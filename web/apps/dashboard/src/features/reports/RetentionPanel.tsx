@@ -14,7 +14,12 @@
 // leaves "authored or generated" open, and generated text is a Hebrew string the i18n
 // layer cannot reach and no translator ever sees. So the sentence lives in three locale
 // files and renders only while the first three months really are the weakest stretch.
-import { ProgressBar } from '@studio/ui'
+//
+// **B5.8 — four identical rows is not more honest than one.** A studio too young for any
+// bucket to have a cohort renders `retention.noCohort` four times, which reads as an
+// error repeated rather than one honest fact. When every bucket has no measurable
+// percent, the whole list collapses to one `EmptyState`.
+import { EmptyState, ProgressBar } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import type { RetentionBucket } from './client'
@@ -42,6 +47,15 @@ export function RetentionPanel({
   undatedDepartures: number
 }) {
   const weakest = weakestBucket(buckets)
+
+  // B5.8 — no bucket has a cohort old enough to measure. One sentence, not four.
+  if (buckets.every((bucket) => bucket.percent === null)) {
+    return (
+      <div data-testid="retention-panel">
+        <EmptyState title={t(locale, 'reports.retention.emptyAll')} />
+      </div>
+    )
+  }
 
   return (
     <div data-testid="retention-panel">

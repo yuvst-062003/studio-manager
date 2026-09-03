@@ -1,11 +1,14 @@
-// Dashboard artboard 4b — קבוצות ומחזורים: תפוסה, טווח חגורות ולו״ז.
+// Dashboard artboard 4b — קבוצות ומחזורים: לו״ז ומחזורים.
 //
-// Two of those three columns belong to milestones that have not run: belts are M7 and the
-// roster is M3. They ship as stated gaps, not as invented numbers — the discipline
-// ParentHome.tsx set for artboard 1a.
-import { render, screen, waitFor } from '@testing-library/react'
+// Belt ranges belong to a milestone that has not run (M7 / `belt_rank`, a W4 contract
+// model). B3.3 ships that as a stated gap in `PageHeader`'s subtitle, not as an invented
+// number or an empty, mislabelled column — the discipline ParentHome.tsx set for
+// artboard 1a. Capacity was cut from the product outright (2026-08-27) and is not a gap
+// at all.
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { fill } from '@studio/core'
 import { t } from '@studio/i18n'
 import { GroupsAndCycles } from './GroupsAndCycles'
 import type { GroupSummary, ScheduleClient } from './client'
@@ -164,7 +167,9 @@ describe('GroupsAndCycles (4b)', () => {
     renderTable()
     await waitFor(() => expect(screen.getAllByRole('rowheader')).toHaveLength(2))
     expect(screen.getByRole('table')).toHaveAccessibleName(t('he', 'schedule.groups.caption'))
-    expect(screen.getAllByRole('columnheader').length).toBeGreaterThanOrEqual(5)
+    // group / schedule / next / unscheduled — the belt-range column (B3.3) is cut, and
+    // `renderTable` passes no `onChanged`, so the actions column (B3.4) is absent too.
+    expect(screen.getAllByRole('columnheader').length).toBeGreaterThanOrEqual(4)
   })
 
   it.each(['he', 'en'] as const)('renders in %s with no physical CSS', async (locale) => {
@@ -231,7 +236,7 @@ describe('the door to the schedule editor (2026-08-28)', () => {
     await waitFor(() => expect(globalThis.location.hash).toBe('#/groups/g-new'))
   })
 
-  it('offers an explicit weekly-schedule link on every row', async () => {
+  it('B3.1 — the group name IS the door, with no second link-button beside it', async () => {
     render(
       <GroupsAndCycles
         locale="he"
@@ -241,8 +246,230 @@ describe('the door to the schedule editor (2026-08-28)', () => {
         hrefForGroup={(id) => `#/groups/${id}`}
       />,
     )
-    const links = await screen.findAllByText(t('he', 'schedule.groups.openSchedule'))
-    // At least one per row — the Table primitive may render its card fallback too.
-    expect(links.length).toBeGreaterThanOrEqual(GROUPS.length)
+    await waitFor(() => expect(screen.getAllByRole('rowheader')).toHaveLength(2))
+    // The old ghost-button link beside the name is gone.
+    expect(screen.queryByTestId('group-schedule-link-g1')).not.toBeInTheDocument()
+    // The name itself is the (only) link to the group's page.
+    const nameLink = screen.getByRole('link', { name: 'מתחילים' })
+    expect(nameLink).toHaveAttribute('href', '#/groups/g1')
+    expect(nameLink).toHaveClass('groups-table__name')
+    const linksToG1 = screen
+      .getAllByRole('link')
+      .filter((link) => link.getAttribute('href') === '#/groups/g1')
+    expect(linksToG1).toHaveLength(1)
+  })
+})
+
+describe('B3.2 — the identity column header names what it holds', () => {
+  it('heads the column "קבוצה", not the page title repeated a third time', async () => {
+    renderTable()
+    await waitFor(() => expect(screen.getAllByRole('rowheader')).toHaveLength(2))
+    expect(
+      screen.getByRole('columnheader', { name: t('he', 'schedule.groups.col.name') }),
+    ).toBeInTheDocument()
+    // `schedule.groups.title` is the <h1> now (B3.6) — a column header must not repeat it.
+    expect(
+      screen.queryByRole('columnheader', { name: t('he', 'schedule.groups.title') }),
+    ).not.toBeInTheDocument()
+  })
+})
+
+describe('B3.3 — the belt-range column is cut until it has data', () => {
+  it('renders no belt-range column, and states the gap in the header instead', async () => {
+    renderTable()
+    await waitFor(() => expect(screen.getAllByRole('rowheader')).toHaveLength(2))
+    expect(
+      screen.queryByRole('columnheader', { name: t('he', 'schedule.session.title') }),
+    ).not.toBeInTheDocument()
+    expect(screen.queryByTestId('belt-range-g1')).not.toBeInTheDocument()
+    expect(screen.getByText(t('he', 'schedule.groups.beltRangeLater'))).toBeInTheDocument()
+  })
+})
+
+describe('B3.4 — one overflow control per row, headed "actions"', () => {
+  // `onChanged` turns on the classes fetch (for the create form's <select>) and
+  // `patchGroup`'s PATCH — both go through `apiFetch`, i.e. the real global `fetch`.
+  // Stubbed here the same way the "door to the schedule editor" tests above stub it,
+  // so no test in this block makes a real network call.
+  let patchCalls: { method?: string; body?: string }[]
+
+  beforeEach(() => {
+    patchCalls = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+        if (init?.method === 'PATCH') {
+          patchCalls.push({ method: init.method, body: init.body as string })
+          return new Response('{}', { status: 200 })
+        }
+        return new Response(JSON.stringify({ items: [] }), { status: 200 })
+      }),
+    )
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  function renderWithActions() {
+    render(
+      <GroupsAndCycles
+        client={stub()}
+        groups={GROUPS}
+        locale="he"
+        onChanged={() => undefined}
+        today="2026-11-03T12:00:00Z"
+      />,
+    )
+  }
+
+  it('heads the column "פעולות", not the create-group button’s own label', async () => {
+    renderWithActions()
+    await waitFor(() => expect(screen.getAllByRole('rowheader')).toHaveLength(2))
+    expect(
+      screen.getByRole('columnheader', { name: t('he', 'schedule.groups.col.actions') }),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole('columnheader', { name: t('he', 'schedule.groups.create') }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('replaces the two stacked ghost buttons with one ⋯ menu per row', async () => {
+    renderWithActions()
+    await waitFor(() => expect(screen.getAllByRole('rowheader')).toHaveLength(2))
+    expect(screen.queryByTestId('rename-g1')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('retire-g1')).not.toBeInTheDocument()
+    const trigger = screen.getByRole('button', {
+      name: fill(t('he', 'schedule.groups.rowActions'), { name: 'מתחילים' }),
+    })
+    await userEvent.click(trigger)
+    expect(
+      screen.getByRole('menuitem', { name: t('he', 'schedule.groups.rename') }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('menuitem', { name: t('he', 'schedule.groups.retire') }),
+    ).toBeInTheDocument()
+  })
+
+  it('still opens the inline rename form, which replaces the row’s cells', async () => {
+    renderWithActions()
+    await waitFor(() => expect(screen.getAllByRole('rowheader')).toHaveLength(2))
+    await userEvent.click(
+      screen.getByRole('button', {
+        name: fill(t('he', 'schedule.groups.rowActions'), { name: 'מתחילים' }),
+      }),
+    )
+    await userEvent.click(screen.getByRole('menuitem', { name: t('he', 'schedule.groups.rename') }))
+    expect(screen.getByTestId('rename-save-g1')).toBeInTheDocument()
+  })
+
+  it('sends the archive PATCH the old button used to send, from the row menu', async () => {
+    renderWithActions()
+    await waitFor(() => expect(screen.getAllByRole('rowheader')).toHaveLength(2))
+    await userEvent.click(
+      screen.getByRole('button', {
+        name: fill(t('he', 'schedule.groups.rowActions'), { name: 'מתחילים' }),
+      }),
+    )
+    await userEvent.click(screen.getByRole('menuitem', { name: t('he', 'schedule.groups.retire') }))
+    await waitFor(() =>
+      expect(
+        patchCalls.some(
+          (call) => call.method === 'PATCH' && call.body === JSON.stringify({ is_active: false }),
+        ),
+      ).toBe(true),
+    )
+  })
+})
+
+describe('B3.5 — the unscheduled column is shorter and right-aligned', () => {
+  it('heads it "ללא יום" and right-aligns the tabular-numeral, danger-toned count', async () => {
+    renderTable()
+    await waitFor(() => expect(screen.getAllByRole('rowheader')).toHaveLength(2))
+    const columnHeader = screen.getByRole('columnheader', {
+      name: t('he', 'schedule.groups.col.unscheduledShort'),
+    })
+    expect(columnHeader).toBeInTheDocument()
+    expect(
+      screen.queryByRole('columnheader', { name: t('he', 'schedule.groups.unscheduledStudents') }),
+    ).not.toBeInTheDocument()
+    const cell = await screen.findByTestId('unscheduled-g1')
+    expect(cell).toHaveClass('groups-table__unscheduled')
+    // The header end-aligns too, with the SAME class the count uses — a right-aligned
+    // number under a start-aligned header floats away from the label that names it.
+    expect(columnHeader.querySelector('.groups-table__align-end')).not.toBeNull()
+    expect(cell).toHaveClass('groups-table__align-end')
+    // C12's preview reports 2 unscheduled for every group in this fixture — non-zero, so
+    // the `--danger` tone still applies.
+    expect(cell.getAttribute('style') ?? '').toContain('var(--danger)')
+  })
+})
+
+describe('B3.6 — one PageHeader row: title, a two-line subtitle, and the create button in actions', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('renders the title as the page heading and the create button inside the header’s actions', async () => {
+    // `onChanged` turns on the classes fetch, which goes through the real global
+    // `fetch` — stubbed so this test makes no real network call.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(JSON.stringify({ items: [] }), { status: 200 })),
+    )
+    render(
+      <GroupsAndCycles
+        client={stub()}
+        groups={GROUPS}
+        locale="he"
+        onChanged={() => undefined}
+        today="2026-11-03T12:00:00Z"
+      />,
+    )
+    await waitFor(() => expect(screen.getAllByRole('rowheader')).toHaveLength(2))
+    expect(
+      screen.getByRole('heading', { level: 1, name: t('he', 'schedule.groups.title') }),
+    ).toBeInTheDocument()
+    const createButton = screen.getByTestId('new-group-open')
+    expect(createButton.closest('.studio-page-header__actions')).not.toBeNull()
+  })
+
+  it('carries BOTH the screen’s description and the belt-range gap, as two subtitle lines', async () => {
+    // `groups.caption` is also `Table`'s (hidden, A5) accessible name, so the same
+    // string sits twice in the DOM — scoped to the header, or `getByText` would refuse
+    // to pick between the two.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(JSON.stringify({ items: [] }), { status: 200 })),
+    )
+    render(
+      <GroupsAndCycles
+        client={stub()}
+        groups={GROUPS}
+        locale="he"
+        onChanged={() => undefined}
+        today="2026-11-03T12:00:00Z"
+      />,
+    )
+    await waitFor(() => expect(screen.getAllByRole('rowheader')).toHaveLength(2))
+    const header = screen
+      .getByRole('heading', { level: 1, name: t('he', 'schedule.groups.title') })
+      .closest('header')
+    expect(header).not.toBeNull()
+    const scoped = within(header as HTMLElement)
+    expect(scoped.getByText(t('he', 'schedule.groups.caption'))).toBeInTheDocument()
+    expect(scoped.getByText(t('he', 'schedule.groups.beltRangeLater'))).toBeInTheDocument()
+  })
+
+  it('renders the same two-line header on the empty state, not a bare <h2>', async () => {
+    renderTable(stub(), [])
+    const header = screen
+      .getByRole('heading', { level: 1, name: t('he', 'schedule.groups.title') })
+      .closest('header')
+    expect(header).not.toBeNull()
+    const scoped = within(header as HTMLElement)
+    expect(scoped.getByText(t('he', 'schedule.groups.caption'))).toBeInTheDocument()
+    expect(scoped.getByText(t('he', 'schedule.groups.beltRangeLater'))).toBeInTheDocument()
+    expect(screen.getByText(t('he', 'schedule.groups.empty'))).toBeInTheDocument()
   })
 })

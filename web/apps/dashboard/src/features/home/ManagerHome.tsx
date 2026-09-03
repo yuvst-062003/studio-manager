@@ -80,6 +80,10 @@ export function ManagerHome({
   const money = data?.money ?? null
   const attention = data?.attention ?? null
   const todaysClasses = data?.today ?? null
+  // B6.4 — every group's rate null (nobody marked anything in 30 days) is a different
+  // fact from some groups being null (mixed-marked, one column per group is correct).
+  // `data.attendance` is checked non-empty at the call site below before this is read.
+  const attendanceAllUnmarked = (data?.attendance ?? []).every((group) => group.rate_percent === null)
 
   // Only the rows with something in them. A zero row is noise on a screen whose whole job
   // is to be scannable — but the region itself never hides, because "nothing needs
@@ -161,90 +165,121 @@ export function ManagerHome({
         </div>
       ) : null}
 
-      {attention ? (
-        <Card>
-          <SectionHeader
-            action={<a href="#/alerts">{t(locale, 'common.dash.home.attention.all')}</a>}
-            title={t(locale, 'common.dash.home.attention.title')}
-          />
-          {attentionRows.length === 0 ? (
-            <p className="dash-home__quiet">{t(locale, 'common.dash.home.attention.none')}</p>
-          ) : (
-            <ul className="dash-home__alerts">
-              {attentionRows.map((row) => (
-                <li key={row.key}>
-                  <a href={row.href}>{t(locale, `common.dash.home.attention.${row.key}`)}</a>
-                  {/* The word beside the colour, never the colour alone (SC 1.4.1). */}
-                  <StatusChip
-                    label={t(
-                      locale,
-                      row.tone === 'debt'
-                        ? 'common.dash.home.severity.danger'
-                        : 'common.dash.home.severity.pending',
-                    )}
-                    status={row.tone}
-                  />
-                  <span className="dash-home__count">{row.count}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
-      ) : null}
+      {/* B6.2 — a two-column body below the money band: the wide column answers "what
+          needs me today?" (today's classes, then the attendance trend), the narrow
+          column is "what needs me at all" (open alerts). `.dash-reports__body` already
+          owns this exact grid/breakpoint rule; home.css matches it rather than inventing
+          a second one, so the two main screens share a body shape. */}
+      <div className="dash-home__body">
+        <div className="dash-home__main">
+          {/* Today's classes led the diagram but was the last card on the page — moved
+              to the top of the wide column, since it answers what needs the manager today. */}
+          {todaysClasses ? (
+            <Card>
+              <SectionHeader
+                action={<a href="#/schedule">{t(locale, 'common.dash.home.today.fullWeek')}</a>}
+                title={t(locale, 'common.dash.home.today.title')}
+              />
+              <Table
+                caption={t(locale, 'common.dash.home.today.title')}
+                columns={columns}
+                empty={<EmptyState title={t(locale, 'common.dash.home.today.none')} />}
+                rowKey={(row) => row.id}
+                rows={todaysClasses}
+              />
+            </Card>
+          ) : null}
 
-      {/* The attendance bars (owner request 2026-08-30): rate per group over the last 30
-          days, from 4c's own endpoint. A group nobody marked draws NO bar and says so —
-          0% would be a claim about children who were never counted. */}
-      {data?.attendance && data.attendance.length > 0 ? (
-        <Card>
-          <SectionHeader
-            action={<a href="#/attendance">{t(locale, 'common.dash.home.attendanceChart.all')}</a>}
-            title={t(locale, 'common.dash.home.attendanceChart.title')}
-          />
-          <ol
-            className="dash-home__attendance-chart"
-            aria-label={t(locale, 'common.dash.home.attendanceChart.title')}
-            data-testid="home-attendance-chart"
-          >
-            {data.attendance.map((group) => (
-              <li key={group.group_id} className="dash-home__attendance-column">
-                <span className="dash-home__attendance-value">
-                  {group.rate_percent === null
-                    ? t(locale, 'common.dash.home.attendanceChart.noRate')
-                    : `${Math.round(group.rate_percent)}%`}
-                </span>
-                <span className="dash-home__attendance-track" aria-hidden="true">
-                  {group.rate_percent !== null ? (
-                    <span
-                      className="dash-home__attendance-bar"
-                      style={{ blockSize: `${Math.max(2, Math.min(100, group.rate_percent))}%` }}
-                    />
-                  ) : null}
-                </span>
-                <span className="dash-home__attendance-name">
-                  <bdi>{group.group_name}</bdi>
-                </span>
-              </li>
-            ))}
-          </ol>
-        </Card>
-      ) : null}
+          {/* The attendance bars (owner request 2026-08-30): rate per group over the last
+              30 days, from 4c's own endpoint. A group nobody marked draws NO bar and says
+              so — 0% would be a claim about children who were never counted. */}
+          {data?.attendance && data.attendance.length > 0 ? (
+            <Card>
+              <SectionHeader
+                // B6.4 — once every group is null the per-column "action" link moves into
+                // the EmptyState itself; two links to the same place in one card reads as
+                // clutter rather than as two ways out.
+                action={
+                  attendanceAllUnmarked ? undefined : (
+                    <a href="#/attendance">{t(locale, 'common.dash.home.attendanceChart.all')}</a>
+                  )
+                }
+                title={t(locale, 'common.dash.home.attendanceChart.title')}
+              />
+              {attendanceAllUnmarked ? (
+                // B6.4 — seven grey tracks each captioned "אין נתונים" is seven
+                // repetitions of one fact. One EmptyState says it once.
+                <EmptyState
+                  action={<a href="#/attendance">{t(locale, 'common.dash.home.attendanceChart.all')}</a>}
+                  title={t(locale, 'common.dash.home.attendanceEmptyAll')}
+                />
+              ) : (
+                <ol
+                  className="dash-home__attendance-chart"
+                  aria-label={t(locale, 'common.dash.home.attendanceChart.title')}
+                  data-testid="home-attendance-chart"
+                >
+                  {data.attendance.map((group) => (
+                    <li key={group.group_id} className="dash-home__attendance-column">
+                      <span className="dash-home__attendance-value">
+                        {group.rate_percent === null
+                          ? t(locale, 'common.dash.home.attendanceChart.noRate')
+                          : `${Math.round(group.rate_percent)}%`}
+                      </span>
+                      <span className="dash-home__attendance-track" aria-hidden="true">
+                        {group.rate_percent !== null ? (
+                          <span
+                            className="dash-home__attendance-bar"
+                            style={{
+                              blockSize: `${Math.max(2, Math.min(100, group.rate_percent))}%`,
+                            }}
+                          />
+                        ) : null}
+                      </span>
+                      <span className="dash-home__attendance-name">
+                        <bdi>{group.group_name}</bdi>
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </Card>
+          ) : null}
+        </div>
 
-      {todaysClasses ? (
-        <Card>
-          <SectionHeader
-            action={<a href="#/schedule">{t(locale, 'common.dash.home.today.fullWeek')}</a>}
-            title={t(locale, 'common.dash.home.today.title')}
-          />
-          <Table
-            caption={t(locale, 'common.dash.home.today.title')}
-            columns={columns}
-            empty={<EmptyState title={t(locale, 'common.dash.home.today.none')} />}
-            rowKey={(row) => row.id}
-            rows={todaysClasses}
-          />
-        </Card>
-      ) : null}
+        <div className="dash-home__side">
+          {attention ? (
+            <Card>
+              <SectionHeader
+                action={<a href="#/alerts">{t(locale, 'common.dash.home.attention.all')}</a>}
+                title={t(locale, 'common.dash.home.attention.title')}
+              />
+              {attentionRows.length === 0 ? (
+                <p className="dash-home__quiet">{t(locale, 'common.dash.home.attention.none')}</p>
+              ) : (
+                <ul className="dash-home__alerts">
+                  {attentionRows.map((row) => (
+                    <li key={row.key}>
+                      <a href={row.href}>{t(locale, `common.dash.home.attention.${row.key}`)}</a>
+                      {/* The word beside the colour, never the colour alone (SC 1.4.1). */}
+                      <StatusChip
+                        label={t(
+                          locale,
+                          row.tone === 'debt'
+                            ? 'common.dash.home.severity.danger'
+                            : 'common.dash.home.severity.pending',
+                        )}
+                        status={row.tone}
+                      />
+                      <span className="dash-home__count">{row.count}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
+          ) : null}
+        </div>
+      </div>
     </div>
   )
 }

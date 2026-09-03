@@ -404,13 +404,27 @@ export const common: Bundle = {
   'dash.home.attendanceChart.title': 'נוכחות — 30 הימים האחרונים',
   'dash.home.attendanceChart.all': 'לדוח המלא',
   'dash.home.attendanceChart.noRate': 'אין נתונים',
+  // B6.4 — seven grey tracks each captioned `אין נתונים` is seven repetitions of one
+  // fact. When EVERY group's rate is null, one `EmptyState` replaces the chart, linking
+  // through to `#/attendance`. `noRate` above stays for the per-column case, where SOME
+  // groups have a rate and one column reads no data.
+  'dash.home.attendanceEmptyAll': 'עדיין אין סימוני נוכחות ב־30 הימים האחרונים',
   'dash.home.title': 'לוח המנהל',
   'dash.home.body': 'בחרו מסך מהתפריט.',
   'dash.nav.staff': 'צוות',
   'dash.nav.settings': 'הגדרות',
   'dash.nav.setup': 'אשף הקמה',
+  // A7's `ChipList` and A5/A6's row-overflow `⋯` control — shared across the staff,
+  // groups and attendance tables, so they live here rather than under any one screen.
+  'chips.more': '+{{count}}',
+  'chips.moreLabel': 'ועוד {{count}}',
+  'table.rowActions': 'פעולות',
   'staff.title': 'צוות',
   'staff.summary': '{n} אנשי צוות · {h} שעות שבועיות',
+  // B4.1 — the same header summary as `staff.summary`, split into three `StatTile`s.
+  'staff.stat.people': 'אנשי צוות',
+  'staff.stat.hours': 'שעות שבועיות',
+  'staff.stat.coverage': 'כיסוי קבוצות',
   'staff.uncovered.sessions': '{n} שיעורים השבוע ללא מאמן',
   'staff.invite.title': 'הוספת איש צוות',
   'staff.invite.email': 'אימייל',
@@ -429,6 +443,9 @@ export const common: Bundle = {
   'staff.actions.saveRoles': 'שמירת תפקידים',
   'staff.actions.deactivate': 'סיום העסקה',
   'staff.deactivate.soleLead': 'אי אפשר לסיים העסקה — זהו המאמן הראשי היחיד בקבוצות: {groups}. שבצו מאמן ראשי אחר קודם.',
+  // B4.4 — the row's `⋯` overflow control, once `עריכת תפקידים` / `קוד חדש` /
+  // `ביטול הזמנה` / `סיום העסקה` move behind it. Accessible name, not visible text.
+  'staff.rowActions': 'פעולות עבור {{name}}',
   'staff.count': '{n} אנשי צוות',
   'staff.col.person': 'איש צוות',
   'staff.col.role': 'תפקיד',
@@ -436,6 +453,9 @@ export const common: Bundle = {
   'staff.col.hours': 'שעות שבוע',
   'staff.col.permissions': 'הרשאות',
   'staff.col.status': 'סטטוס',
+  // A6 — the actions column was headed `common.staff.invite.roles` (`תפקידים`), the
+  // invite form's own legend. That key stays; only its misuse here is corrected.
+  'staff.col.actions': 'פעולות',
   'staff.noGroups': 'ללא קבוצה',
   'staff.noHours': '—',
   'staff.status.active': 'פעיל',

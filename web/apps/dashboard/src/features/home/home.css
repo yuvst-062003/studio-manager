@@ -10,14 +10,44 @@
   gap: var(--space-6);
 }
 
-/* Three tiles that stay three until the column is genuinely too narrow for them. `auto-fit`
- * with a floor rather than `repeat(3, 1fr)`: on a 1024px laptop with the nav open, three
- * money figures at display size do not fit, and wrapping is better than truncating a
- * number the manager came here to read. */
+/* B6.3 — three EQUAL columns above 60rem. `auto-fit` with a 14rem floor gave the leftover
+ * space to whichever tile wrapped last, so three money figures read as three different
+ * widths — which reads as accidental, because it was. Below 60rem — the same breakpoint
+ * `.dash-home__body` collapses at — there genuinely isn't room for three columns at
+ * display size, so it falls back to the floor-based wrap. */
 .dash-home__money {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-4);
+}
+
+@media (width <= 60rem) {
+  .dash-home__money {
+    grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  }
+}
+
+/* B6.2 — the two-column body below the money band: `.dash-reports__body` already owns
+ * this exact grid/breakpoint, so the two main screens share one body shape rather than
+ * this file inventing a second rule that happens to look the same. */
+.dash-home__body {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.dash-home__main,
+.dash-home__side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+@media (width <= 60rem) {
+  .dash-home__body {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .dash-home__alerts {
@@ -63,20 +93,6 @@
   color: var(--text-muted);
   font-size: var(--text-body);
   margin: 0;
-}
-
-
-/* `SectionHeader` already names this table on screen, so the `<caption>` printed the same
- * words a second time. It is not removed — it is the table's accessible name, and Table
- * requires it — only taken out of the visual flow. Same technique as the theme control's
- * off-screen radio: never `display: none`, which would take it out of the a11y tree too. */
-.dash-home table caption {
-  position: absolute;
-  inline-size: 1px;
-  block-size: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
 }
 
 /* The board's attendance bars (owner request 2026-08-30). Columns flow with the document

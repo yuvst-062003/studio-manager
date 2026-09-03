@@ -1,13 +1,18 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { downloadFile } from '@studio/core'
+import { apiFetch, downloadFile } from '@studio/core'
 import type { RosterRow } from '@studio/core'
 import { AttendanceReport } from './AttendanceReport'
 import { AttendanceSection, defaultWindow } from './AttendanceSection'
 import { QuickViewRoster } from './QuickViewRoster'
 import { MAX_REPORT_DAYS, consecutiveAbsences, daysBetween } from './client'
-import type { AttendanceReportData, DashboardAttendanceClient, GroupRate } from './client'
+import type {
+  AttendanceReportData,
+  DashboardAttendanceClient,
+  DashboardSessionRoster,
+  GroupRate,
+} from './client'
 
 // F7b's download goes through a blob and an anchor, neither of which jsdom can be asked
 // about afterwards. The URL it is handed is the assertion this screen actually needs — the
@@ -16,6 +21,9 @@ import type { AttendanceReportData, DashboardAttendanceClient, GroupRate } from 
 vi.mock('@studio/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@studio/core')>()),
   downloadFile: vi.fn(() => Promise.resolve()),
+  // B1.3's reminder test drives the real `remindCoach` handler, which calls this. jsdom has
+  // no server behind a relative URL, so this stays mocked the same way `downloadFile` is.
+  apiFetch: vi.fn(),
 }))
 
 const WINDOW = { from: '2026-11-03', to: '2026-11-04' }
@@ -61,9 +69,32 @@ function makeClient(
   }
 }
 
+// B1.4 — `sessionRoster`'s response shape, for the tests that drive `QuickViewRoster`
+// opened in place from the unmarked list's `⋯` menu.
+function sessionRosterOf(
+  roster: RosterRow[],
+  overrides: Partial<DashboardSessionRoster['session']> = {},
+): DashboardSessionRoster {
+  return {
+    session: {
+      id: 'session-1',
+      group_id: 'g1',
+      group_name: 'מתחילים',
+      starts_at: '2026-11-03T15:00:00.000Z',
+      ends_at: '2026-11-03T16:00:00.000Z',
+      location_name: null,
+      status: 'scheduled',
+      attendance_taken: false,
+      ...overrides,
+    },
+    roster,
+  }
+}
+
 beforeEach(() => {
   document.documentElement.dir = 'rtl'
   vi.mocked(downloadFile).mockClear()
+  vi.mocked(apiFetch).mockReset().mockResolvedValue(new Response(null, { status: 200 }))
 })
 
 describe('artboard 4c — what is unmarked', () => {
@@ -102,28 +133,6 @@ describe('artboard 4c — what is unmarked', () => {
     // `ממתין לסימון` list is the club doing well; rendering nothing looks broken instead.
     render(<AttendanceReport client={makeClient([])} locale="he" window={WINDOW} />)
     expect(await screen.findByText('אין נתוני נוכחות לתקופה הזו')).toBeInTheDocument()
-  })
-
-  it('offers a mark-now action per row', async () => {
-    const onMarkNow = vi.fn()
-    render(
-      <AttendanceReport
-        client={makeClient([
-          {
-            id: 'session-1',
-            group_name: 'מתחילים',
-            starts_at: '2026-11-03T15:00:00.000Z',
-            coach_name: null,
-            headcount: 12,
-          },
-        ])}
-        locale="he"
-        onMarkNow={onMarkNow}
-        window={WINDOW}
-      />,
-    )
-    await userEvent.click(await screen.findByRole('button', { name: 'סימון עכשיו' }))
-    expect(onMarkNow).toHaveBeenCalledWith('session-1')
   })
 
   it('renders group rates as a bar with a readout', async () => {
@@ -554,5 +563,280 @@ describe('the plan badge never reaches a coach', () => {
       />,
     )
     expect(screen.queryByTestId('plan-badge')).toBeNull()
+  })
+})
+
+// ── B1 — dashboard-screens-redesign.md's attendance redesign (2026-09-03) ───────────
+describe('B1.1 — one datetime, one island', () => {
+  it('renders weekday, date and time as one uninterrupted run, in that order', async () => {
+    // The proposal's own mock-up instant: Monday 14 September 2026, 16:00 Israel Daylight
+    // Time. Before this fix the row rendered `16:00` and `14 בספטמבר 2026` as two separate
+    // siblings either side of the group name — an RTL paragraph is free to reorder that,
+    // and the owner's screenshot showed exactly the failure: `16:00קבוצה 14 בספטמבר 2026`.
+    render(
+      <AttendanceReport
+        client={makeClient([
+          {
+            id: 'session-1',
+            group_name: 'מתחילים',
+            starts_at: '2026-09-14T13:00:00.000Z',
+            coach_name: null,
+            headcount: 12,
+          },
+        ])}
+        locale="he"
+        window={WINDOW}
+      />,
+    )
+    const when = await screen.findByTestId('unmarked-when-session-1')
+    expect(when.textContent).toBe('יום שני, 14 בספטמבר · 16:00')
+    // One element, explicitly `ltr` — `RangeText`'s lesson, applied to a datetime.
+    expect(when.tagName).toBe('BDI')
+    expect(when).toHaveAttribute('dir', 'ltr')
+  })
+})
+
+describe('B1.2/B1.3 — the row is a grid, and two actions become one ⋯', () => {
+  it('has exactly one visible button per row: the ⋯ trigger', async () => {
+    render(
+      <AttendanceReport
+        client={makeClient([
+          {
+            id: 'session-1',
+            group_name: 'מתחילים',
+            starts_at: '2026-11-03T15:00:00.000Z',
+            coach_name: null,
+            headcount: 12,
+          },
+        ])}
+        locale="he"
+        window={WINDOW}
+      />,
+    )
+    const rowEl = await screen.findByTestId('unmarked-session-1')
+    // Fourteen pills became seven quiet controls — one row, one button. The checkbox is a
+    // selection control, not an action, and is not a `button`.
+    expect(within(rowEl).getAllByRole('button')).toHaveLength(1)
+    expect(
+      within(rowEl).getByRole('button', { name: 'פעולות עבור מתחילים' }),
+    ).toBeInTheDocument()
+  })
+
+  it('opens a menu holding both former per-row actions, reminder first', async () => {
+    render(
+      <AttendanceReport
+        client={makeClient([
+          {
+            id: 'session-1',
+            group_name: 'מתחילים',
+            starts_at: '2026-11-03T15:00:00.000Z',
+            coach_name: null,
+            headcount: 12,
+          },
+        ])}
+        locale="he"
+        window={WINDOW}
+      />,
+    )
+    await userEvent.click(await screen.findByRole('button', { name: 'פעולות עבור מתחילים' }))
+    const menu = screen.getByRole('menu', { name: 'פעולות עבור מתחילים' })
+    expect(within(menu).getAllByRole('menuitem').map((item) => item.textContent)).toEqual([
+      'תזכורת למאמן',
+      'סימון כאן',
+    ])
+  })
+
+  it('keeps the reminder outcome inline as a result, not a third action', async () => {
+    // F7a/F7b — the outcome is a `StatusChip`, a `<span>` with no interactive role, so it
+    // never counts against "one visible action control per row".
+    const client = makeClient([
+      {
+        id: 'session-1',
+        group_name: 'מתחילים',
+        starts_at: '2026-11-03T15:00:00.000Z',
+        coach_name: null,
+        headcount: 12,
+      },
+    ])
+    render(<AttendanceReport client={client} locale="he" window={WINDOW} />)
+    await userEvent.click(await screen.findByRole('button', { name: 'פעולות עבור מתחילים' }))
+    await userEvent.click(screen.getByRole('menuitem', { name: 'תזכורת למאמן' }))
+    const rowEl = await screen.findByTestId('unmarked-session-1')
+    await waitFor(() => expect(within(rowEl).getByText('נשלחה תזכורת למאמן')).toBeInTheDocument())
+    expect(within(rowEl).getAllByRole('button')).toHaveLength(1)
+  })
+})
+
+describe('B1.4 — סימון כאן opens QuickViewRoster in place', () => {
+  it('fetches that session’s roster and renders it in a dialog, rather than navigating away', async () => {
+    const client = makeClient([
+      {
+        id: 'session-1',
+        group_name: 'מתחילים',
+        starts_at: '2026-11-03T15:00:00.000Z',
+        coach_name: null,
+        headcount: 12,
+      },
+    ])
+    client.sessionRoster = vi
+      .fn()
+      .mockResolvedValue(sessionRosterOf([row({ student_id: 's1', display_name: 'דנה כהן' })]))
+    render(<AttendanceReport client={client} locale="he" window={WINDOW} />)
+    await userEvent.click(await screen.findByRole('button', { name: 'פעולות עבור מתחילים' }))
+    await userEvent.click(screen.getByRole('menuitem', { name: 'סימון כאן' }))
+    expect(client.sessionRoster).toHaveBeenCalledWith('session-1')
+    expect(await screen.findByTestId('quickview-roster')).toBeInTheDocument()
+    expect(within(screen.getByTestId('quickview-roster')).getByText('דנה כהן')).toBeInTheDocument()
+    // No cross-origin link — the whole point of B1.4.
+    expect(screen.queryByRole('link')).toBeNull()
+  })
+
+  it('writes a mark through the client and refreshes the roster from the server', async () => {
+    const client = makeClient([
+      {
+        id: 'session-1',
+        group_name: 'מתחילים',
+        starts_at: '2026-11-03T15:00:00.000Z',
+        coach_name: null,
+        headcount: 12,
+      },
+    ])
+    client.sessionRoster = vi
+      .fn()
+      .mockResolvedValueOnce(
+        sessionRosterOf([row({ student_id: 's1', display_name: 'דנה כהן', status: 'unmarked' })]),
+      )
+      .mockResolvedValueOnce(
+        sessionRosterOf([row({ student_id: 's1', display_name: 'דנה כהן', status: 'present' })]),
+      )
+    client.mark = vi.fn().mockResolvedValue(undefined)
+    render(<AttendanceReport client={client} locale="he" window={WINDOW} />)
+    await userEvent.click(await screen.findByRole('button', { name: 'פעולות עבור מתחילים' }))
+    await userEvent.click(screen.getByRole('menuitem', { name: 'סימון כאן' }))
+    await screen.findByTestId('quickview-roster')
+    await userEvent.click(screen.getByTestId('quickview-row-s1'))
+    await waitFor(() =>
+      expect(client.mark).toHaveBeenCalledWith('session-1', { studentId: 's1', status: 'present' }),
+    )
+    await waitFor(() => expect(client.sessionRoster).toHaveBeenCalledTimes(2))
+  })
+
+  it('writes a bulk-present through the client and refreshes the roster from the server', async () => {
+    // Same shape as the `mark` seam test above — `bulkPresentInQuickView` is the other half
+    // of B1.4's wiring, and `onBulkPresent` had never been driven through the real
+    // component before this: every other test hands `QuickViewRoster` a bare `vi.fn()` in
+    // isolation, which proves the popover calls its prop but not that this screen's own
+    // handler calls `client.bulkPresent` with the right session id.
+    const client = makeClient([
+      {
+        id: 'session-1',
+        group_name: 'מתחילים',
+        starts_at: '2026-11-03T15:00:00.000Z',
+        coach_name: null,
+        headcount: 12,
+      },
+    ])
+    client.sessionRoster = vi
+      .fn()
+      .mockResolvedValueOnce(
+        sessionRosterOf([
+          row({ student_id: 's1', display_name: 'דנה כהן', status: 'unmarked' }),
+          row({ student_id: 's2', display_name: 'נועה לוי', status: 'unmarked' }),
+        ]),
+      )
+      .mockResolvedValueOnce(
+        sessionRosterOf([
+          row({ student_id: 's1', display_name: 'דנה כהן', status: 'present' }),
+          row({ student_id: 's2', display_name: 'נועה לוי', status: 'present' }),
+        ]),
+      )
+    client.bulkPresent = vi.fn().mockResolvedValue(undefined)
+    render(<AttendanceReport client={client} locale="he" window={WINDOW} />)
+    await userEvent.click(await screen.findByRole('button', { name: 'פעולות עבור מתחילים' }))
+    await userEvent.click(screen.getByRole('menuitem', { name: 'סימון כאן' }))
+    const dialog = await screen.findByTestId('quickview-roster')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'סימון כולם כנוכחים' }))
+    await waitFor(() => expect(client.bulkPresent).toHaveBeenCalledWith('session-1'))
+    await waitFor(() => expect(client.sessionRoster).toHaveBeenCalledTimes(2))
+    // The seam, not just the call: the roster the popover shows reflects the server's
+    // answer after the bulk write, not the pre-write snapshot still sitting in state.
+    await waitFor(() =>
+      expect(within(dialog).getAllByLabelText('נוכח')).toHaveLength(2),
+    )
+  })
+
+  it('re-asks the report on close, so a fully marked session can leave the unmarked list', async () => {
+    const client = makeClient([
+      {
+        id: 'session-1',
+        group_name: 'מתחילים',
+        starts_at: '2026-11-03T15:00:00.000Z',
+        coach_name: null,
+        headcount: 12,
+      },
+    ])
+    client.sessionRoster = vi.fn().mockResolvedValue(sessionRosterOf([]))
+    render(<AttendanceReport client={client} locale="he" window={WINDOW} />)
+    await waitFor(() => expect(client.report).toHaveBeenCalledTimes(1))
+    await userEvent.click(await screen.findByRole('button', { name: 'פעולות עבור מתחילים' }))
+    await userEvent.click(screen.getByRole('menuitem', { name: 'סימון כאן' }))
+    await screen.findByTestId('quickview-roster')
+    await userEvent.click(screen.getByRole('button', { name: 'סגירת התצוגה המהירה' }))
+    await waitFor(() => expect(client.report).toHaveBeenCalledTimes(2))
+    expect(screen.queryByTestId('unmarked-quickview-panel')).not.toBeInTheDocument()
+  })
+})
+
+describe('B1.5 — the per-group card is a Table (group · rate · coverage)', () => {
+  it('has three columns with their own accessible headers', async () => {
+    render(
+      <AttendanceReport
+        client={makeClient([], [groupRate({ rate_percent: 76 })])}
+        locale="he"
+        window={WINDOW}
+      />,
+    )
+    const table = await screen.findByRole('table')
+    expect(within(table).getByRole('columnheader', { name: 'קבוצה' })).toBeInTheDocument()
+    expect(within(table).getByRole('columnheader', { name: 'אחוז נוכחות' })).toBeInTheDocument()
+    expect(within(table).getByRole('columnheader', { name: 'כיסוי' })).toBeInTheDocument()
+    // A5 — the caption repeats the section's own visible `<h2>` and stays out of the
+    // visual flow rather than printing `אחוז נוכחות לפי קבוצה` a second time.
+    const caption = table.querySelector('caption')
+    expect(caption).toHaveClass('studio-visually-hidden')
+    expect(caption).toHaveTextContent('אחוז נוכחות לפי קבוצה')
+  })
+
+  it("every row's coverage cell sits in the same column, regardless of digit count", async () => {
+    render(
+      <AttendanceReport
+        client={makeClient(
+          [],
+          [
+            groupRate({ group_id: 'g1', group_name: 'נבחרת בנות', marked_sessions: 1, sessions: 1 }),
+            groupRate({
+              group_id: 'g2',
+              group_name: 'קבוצת מתקדמים',
+              marked_sessions: 12,
+              sessions: 128,
+            }),
+          ],
+        )}
+        locale="he"
+        window={WINDOW}
+      />,
+    )
+    const table = await screen.findByRole('table')
+    // Real `<col>` widths, not content, decide where a column begins — the fix for the
+    // bulleted list where a longer coverage string pushed everything after it sideways.
+    const cols = table.querySelectorAll('col')
+    expect(cols).toHaveLength(3)
+    for (const col of cols) expect((col as HTMLElement).style.width).not.toBe('')
+    const bodyRows = within(table).getAllByRole('row').slice(1)
+    expect(bodyRows).toHaveLength(2)
+    for (const tableRow of bodyRows) {
+      const coverageCell = tableRow.children[2]
+      expect(coverageCell?.querySelector("[data-testid^='group-coverage-']")).toBeTruthy()
+    }
   })
 })

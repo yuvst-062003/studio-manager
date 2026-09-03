@@ -30,6 +30,7 @@ export type Locale = 'he' | 'en' | 'ru'
 const timeFormatters = new Map<string, Intl.DateTimeFormat>()
 const dateFormatters = new Map<string, Intl.DateTimeFormat>()
 const monthFormatters = new Map<string, Intl.DateTimeFormat>()
+const weekdayDateFormatters = new Map<string, Intl.DateTimeFormat>()
 
 function timeFormatter(locale: Locale): Intl.DateTimeFormat {
   let formatter = timeFormatters.get(locale)
@@ -58,6 +59,20 @@ function dateFormatter(locale: Locale): Intl.DateTimeFormat {
       year: 'numeric',
     })
     dateFormatters.set(locale, formatter)
+  }
+  return formatter
+}
+
+function weekdayDateFormatter(locale: Locale): Intl.DateTimeFormat {
+  let formatter = weekdayDateFormatters.get(locale)
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat(locale, {
+      timeZone: STUDIO_TIMEZONE,
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+    })
+    weekdayDateFormatters.set(locale, formatter)
   }
   return formatter
 }
@@ -96,6 +111,29 @@ export function formatTimeInStudioZone(iso: string | Date, locale: Locale): stri
 /** A UTC instant → a localized date label, still in the studio's zone. */
 export function formatDateInStudioZone(iso: string | Date, locale: Locale): string {
   return dateFormatter(locale).format(toDate(iso))
+}
+
+/**
+ * A UTC instant → weekday, date and time, composed into **one string**, e.g.
+ * `'יום שני, 14 בספטמבר · 16:00'`.
+ *
+ * B1.1 (`docs/design/proposals/dashboard-screens-redesign.md`) — the dashboard's unmarked
+ * register list used to render the time and the date as two separate sibling elements,
+ * with the group name between them. `RangeText`'s docstring already records this exact
+ * failure three times: digits are a left-to-right run, the characters around them are
+ * directionally neutral, and a right-to-left paragraph is free to reorder the whole
+ * sequence — the owner's screenshot showed `16:00קבוצה 14 בספטמבר 2026`, the time having
+ * jumped across the group name and glued itself to the date.
+ *
+ * This function does not fix that by itself — a caller still has to put the result in one
+ * `<bdi dir="ltr">`, the way `RangeText` puts a range in one — but it gives the caller
+ * exactly one string to do that with, rather than three fragments to keep in order.
+ * Composed from two already-memoized formatters, so it costs one extra `Intl` construction
+ * cached per locale, not two extra calls per row.
+ */
+export function formatSessionWhen(iso: string | Date, locale: Locale): string {
+  const date = toDate(iso)
+  return `${weekdayDateFormatter(locale).format(date)} · ${timeFormatter(locale).format(date)}`
 }
 
 /**

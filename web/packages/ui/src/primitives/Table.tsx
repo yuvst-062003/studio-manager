@@ -49,6 +49,7 @@ export function Table<Row>({
   rowKey,
   stackBelow = 768,
   empty,
+  captionVisible = false,
 }: {
   caption: string
   columns: TableColumn<Row>[]
@@ -57,6 +58,16 @@ export function Table<Row>({
   stackBelow?: number
   /** Rendered instead of the table when there are no rows. */
   empty?: ReactNode
+  /**
+   * The caption is the table's required accessible name, but four screens passed the
+   * same string the heading right above the table already says (A5). Defaults to
+   * `false`: the caption stays in the accessibility tree and is clipped out of the
+   * visual flow — never `display: none`, which would remove it from both. A caller
+   * that genuinely wants the caption printed opts in explicitly — `OpsHealthPanel`'s
+   * jobs table is the one caller that does, because its `Card` deliberately carries no
+   * caption of its own and the table's caption is that section's only visible heading.
+   */
+  captionVisible?: boolean
 }) {
   const stacked = useStacked(stackBelow)
 
@@ -87,7 +98,9 @@ export function Table<Row>({
   return (
     <div className="studio-table-scroll">
       <table className="studio-table" data-testid="table">
-        <caption>{caption}</caption>
+        <caption className={captionVisible ? undefined : 'studio-visually-hidden'}>
+          {caption}
+        </caption>
         <colgroup>
           {columns.map((column) => (
             <col key={column.id} style={{ width: column.width }} />

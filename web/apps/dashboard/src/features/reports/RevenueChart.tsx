@@ -14,16 +14,39 @@
 // the server sent it, oldest first, and `grid-auto-flow: column` puts the first column at
 // the inline start — the right, in Hebrew. `4g`: "The trend reads oldest-to-newest in
 // reading order. Do not reverse it."
+//
+// **B5.4 — a full month name at ~55px per column truncates to an ellipsis.** Every column
+// carries both a full label (`ספטמבר 2026`) and a short one (`ספט׳`); `reports.css`
+// picks between them with a container query keyed to the column's own inline size, which
+// is the only thing here that knows how narrow a column actually got. The full label
+// stays reachable either way, through the visually-hidden description beside it.
 import { MoneyDisplay } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
-import { formatMonthLabel } from '@studio/core'
+import { STUDIO_TIMEZONE, formatMonthLabel } from '@studio/core'
 import type { RevenueMonth } from './client'
 
 /** A hairline of colour for a month that billed something too small to see. Without it a
  *  month with one ₪20 charge draws as an empty column, which reads as a month with no
  *  billing at all. */
 const MIN_VISIBLE = '2px'
+
+/** `Intl.DateTimeFormat` is expensive to construct and this runs once per column — same
+ *  reasoning `@studio/core`'s own formatters give for caching one instance per locale. */
+const shortMonthFormatters = new Map<Locale, Intl.DateTimeFormat>()
+
+/** `ספט׳` rather than `ספטמבר` — the short form a narrow column can hold without an
+ *  ellipsis. Anchored at midday UTC like `formatMonthLabel`, so a month built from a
+ *  year/month pair never rolls onto a neighbouring day in a negative- or positive-offset
+ *  zone. */
+function shortMonthLabel(year: number, month: number, locale: Locale): string {
+  let formatter = shortMonthFormatters.get(locale)
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat(locale, { timeZone: STUDIO_TIMEZONE, month: 'short' })
+    shortMonthFormatters.set(locale, formatter)
+  }
+  return formatter.format(new Date(Date.UTC(year, month - 1, 1, 12)))
+}
 
 function segmentSize(value: number, scale: number): string | undefined {
   if (value <= 0) return undefined
@@ -66,9 +89,16 @@ export function RevenueChart({ locale, months }: { locale: Locale; months: Reven
               style={{ blockSize: segmentSize(month.collected_agorot, scale) }}
             />
           </span>
-          {/* Visible: the month, at D8's muted floor. The artboard's month-axis labels. */}
-          <span className="dash-chart__month">
-            {formatMonthLabel(month.year, month.month, locale)}
+          {/* Visible: the month, at D8's muted floor. The artboard's month-axis labels.
+              Both forms are always in the DOM; `reports.css`'s container query shows
+              exactly one, per column. */}
+          <span className="dash-chart__month" data-testid={`revenue-month-${month.year}-${month.month}`}>
+            <span className="dash-chart__month-full">
+              {formatMonthLabel(month.year, month.month, locale)}
+            </span>
+            <span className="dash-chart__month-short">
+              {shortMonthLabel(month.year, month.month, locale)}
+            </span>
           </span>
           {/* Not visible, and not optional. "No per-bar labels, no tooltip" is a rule
               about the drawing; a chart whose only encoding is a pixel height is unusable

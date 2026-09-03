@@ -101,10 +101,17 @@ export const attendance: Bundle = {
   'conflict.review': 'Review the conflict',
 
   'report.unmarkedNotAbsence': 'Unmarked sessions are not counted as absences',
-  'report.markNow': 'Mark now',
   'report.remindCoach': 'Remind the coach',
   'report.coachReminded': 'The coach was reminded',
   'report.byGroup': 'Attendance rate by group',
+  // B1.5 — the per-group card became a real `Table` (group · rate · coverage); each column
+  // needs an accessible header. Kept in this namespace rather than borrowed from
+  // `schedule.groups.col.name`, per CLAUDE.md's rule that a vertical's strings live in its
+  // own file.
+  'report.col.group': 'Group',
+  'report.col.rate': 'Attendance rate',
+  'report.col.coverage': 'Coverage',
+  'report.rowActions': 'Actions for {{group}}',
   // -- 9g's injury report (S2): immediate, online-only, never queued -------------
   'summary.injury.title': 'Injury report',
   'summary.injury.who': 'Who was hurt?',
@@ -122,8 +129,10 @@ export const attendance: Bundle = {
   'card.markPresent': 'Mark present',
   'card.markAbsent': 'Mark absent',
   'quickView.close': 'Close the quick view',
+  'report.markHere': 'Mark here',
   'report.title': 'Attendance',
   'report.unmarkedSessions': 'Classes not marked',
+  'report.when': 'When',
   'report.consecutiveAbsences': 'Absent in a row',
   'report.attendanceRate': 'Attendance rate',
   'report.sessionsHeld': 'Classes held',

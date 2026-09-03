@@ -400,3 +400,51 @@
   outline: 2px solid var(--focus-ring);
   outline-offset: 1px;
 }
+
+/* Artboard `4b` — קבוצות ומחזורים (B3, `GroupsAndCycles.tsx`). Owns the classes below,
+ * however many there are; `3a`'s week/month board above is a different component in
+ * the same file. */
+
+/* B3.1 — the identity column's name link. A bare `<a>` already carries the app's accent
+ * colour (`primitives.css:935`) and the UA default underline, which is what made a
+ * SECOND link-button beside it redundant. This still gives it the app's own
+ * underline-on-hover affordance (the same shape as `msignin__legal a`) rather than
+ * leaving the browser default always-on: an always-underlined name reads noisier next
+ * to a table full of plain text than a name that underlines when the pointer or focus
+ * says "this one, specifically". */
+.groups-table__name {
+  text-decoration: none;
+}
+
+.groups-table__name:hover,
+.groups-table__name:focus-visible {
+  text-decoration: underline;
+}
+
+/* B3.5 — the `ללא יום` column: its header AND its count both end-align, so a
+ * right-aligned number sits under a right-aligned label instead of floating away from
+ * it. `.groups-table__align-end` is the shared shape (`text-align: end` — never
+ * `right`, so it flips with `dir` — and `inline-size: 100%` so a `text-align` on an
+ * inline `<span>`/`<th>` child has a box to align inside); `.groups-table__unscheduled`
+ * adds the tabular-numeral formatting the count alone needs. The cell's own default
+ * `text-align: start` and the header's are both `primitives.css`'s and stay out of
+ * this file's set — these classes align a wrapper INSIDE the cell/header, not the
+ * `<td>`/`<th>` itself. */
+.groups-table__align-end {
+  display: block;
+  inline-size: 100%;
+  text-align: end;
+}
+
+.groups-table__unscheduled {
+  font-variant-numeric: tabular-nums;
+}
+
+/* B3.3/B3.6 — the stated gap's line inside the header's two-line subtitle. Caption
+ * weight and the muted token, so it reads as a footnote about a column that is not
+ * there yet rather than as a second sentence describing the screen. */
+.groups-table__subtitle-note {
+  display: inline-block;
+  font-size: var(--text-caption);
+  color: var(--text-muted);
+}

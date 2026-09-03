@@ -32,6 +32,11 @@ describe('StatTile', () => {
     expect(screen.queryByRole('link')).not.toBeInTheDocument()
   })
 
+  it('wears the shared tile shell so it cannot drift from the reports screen\'s .dash-kpi (B5.2)', () => {
+    const { container } = renderIn(<StatTile label="Collected" value="0" />)
+    expect(container.querySelector('.studio-stat-tile')).toHaveClass('studio-tile-shell')
+  })
+
   it('carries its tone as a semantic state, defaulting to neutral', () => {
     const { container } = renderIn(<StatTile label="Collected" value="0" />)
     expect(container.querySelector('.studio-stat-tile')).toHaveAttribute('data-tone', 'neutral')

@@ -279,7 +279,6 @@ export const schedule: Bundle = {
   'group.coaches.empty': 'לא שובץ מאמן לקבוצה',
   'group.coaches.person': 'איש צוות',
   'groups.create': 'קבוצה חדשה',
-  'groups.openSchedule': 'לו״ז שבועי',
   'groups.form.name': 'שם הקבוצה',
   'groups.form.class': 'כיתה',
   'groups.form.submit': 'יצירה',
@@ -294,6 +293,15 @@ export const schedule: Bundle = {
   'groups.unscheduledStudents': 'תלמידים ללא יום',
   'groups.empty': 'לא הוגדרו קבוצות',
   'groups.caption': 'קבוצות המועדון והלו״ז שלהן',
+  // B3.2/A6/B3.3/B3.5 — the redesigned table's own column headers, distinct from the
+  // page title (`groups.title`) a column header must never repeat, and the stated gap
+  // that replaces an empty belt-range column until `belt_rank` has rows.
+  'groups.col.name': 'קבוצה',
+  'groups.col.actions': 'פעולות',
+  'groups.col.unscheduledShort': 'ללא יום',
+  'groups.beltRangeLater': 'טווח חגורות יתווסף עם מערכת החגורות',
+  // The row's `⋯` overflow control (B3.4) — its accessible name, not visible text.
+  'groups.rowActions': 'פעולות עבור {{name}}',
 
   // -- the group page (6a) ---------------------------------------------------------
   'group.scheduleTitle': 'לו״ז הקבוצה',

@@ -43,6 +43,7 @@ export {
   STUDIO_TIMEZONE,
   formatDateInStudioZone,
   formatMonthLabel,
+  formatSessionWhen,
   formatTimeInStudioZone,
   studioDayKey,
   studioWallTimeToUtc,
@@ -53,3 +54,8 @@ export { downloadFile } from './download'
 export type { CursorPage } from './pagination'
 export { CAPABILITIES, MONEY_CAPABILITIES, can, isCoach } from './permissions'
 export type { Actor, Capability, Role, Scope } from './permissions'
+// `t()` returns the raw string with no interpolation. This is the shared home for that
+// fill-in going forward; the private copies in the schedule and rollover clients still
+// exist and were left untouched on purpose — see `./text.ts` for why. New callers use
+// this one.
+export { fill } from './text'

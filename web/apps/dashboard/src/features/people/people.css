@@ -1,0 +1,52 @@
+/* Dashboard artboard 3b — חניכים (`docs/design/proposals/dashboard-screens-redesign.md`,
+ * B2). Layout only. Every colour, size and space is a token; nothing here is a hex, and
+ * nothing here is a physical property (D10 — a physical `left` in an RTL document is a
+ * bug an LTR reviewer cannot see). `.studio-filter-bar`, `.studio-btn` and the caption's
+ * `.studio-visually-hidden` are Part A's, already in `primitives.css`; this file is only
+ * the shapes specific to this screen.
+ */
+
+/* B2.2 — the filter bar's own result count, pinned to the row's inline-end edge (the
+ * `auto` margin absorbs whatever space `.studio-filter-bar`'s own `flex-wrap` leaves) so
+ * a filtered view reads "5 מתוך 42" instead of leaving the manager to count rows. */
+.people-filter-result {
+  margin-inline-start: auto;
+  color: var(--text-muted);
+  font-size: var(--text-label);
+  white-space: nowrap;
+}
+
+/* B2.3 — the bulk bar. `display/gap/align-items/flex-wrap` carry forward the row this
+ * replaced (`StudentsScreen.tsx`'s old inline style); `position: sticky` is the new part
+ * — the bar floats at the block-end edge of the viewport for as long as a selection
+ * exists, instead of scrolling away with the table (Pencil & Paper's floating-toolbar
+ * pattern). A surface and a hairline keep it legible over whatever row is behind it. */
+.people-bulk-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--space-2);
+  position: sticky;
+  inset-block-end: 0;
+  z-index: 10;
+  background: var(--surface);
+  border-block-start: var(--border-width-hairline) solid var(--border);
+  padding-block: var(--space-3);
+  padding-inline: var(--space-3);
+}
+
+/* B2.4 — the two sharing cards. `StudentsScreen.tsx`'s `cardsStyle` puts both cards in
+ * one grid row with `align-items: stretch`; each card's own content becomes a column so
+ * its `ActionBar` lands at the same block-end edge in both cards regardless of how much
+ * status text sits above it — the join card carries a status line the landing card does
+ * not, which is what made them different heights for no reason a reader could see. */
+.people-sharing-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  block-size: 100%;
+}
+
+.people-sharing-card__actions {
+  margin-block-start: auto;
+}

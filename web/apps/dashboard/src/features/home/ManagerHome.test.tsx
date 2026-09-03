@@ -218,4 +218,65 @@ describe('the attendance bars (2026-08-30)', () => {
     await screen.findByTestId('home-attendance-chart').catch(() => undefined)
     expect(screen.queryByTestId('home-attendance-chart')).toBeNull()
   })
+
+  // B6.4 — some groups null keeps the per-column treatment (already exercised above by
+  // the mixed fixture); every group null collapses seven "אין נתונים" repetitions into
+  // one EmptyState rather than seven identical grey tracks.
+  it('renders one EmptyState instead of a track per group when every group is unmarked', async () => {
+    renderHome(
+      data({
+        attendance: [
+          { group_id: 'g1', group_name: 'א', rate_percent: null },
+          { group_id: 'g2', group_name: 'ב', rate_percent: null },
+          { group_id: 'g3', group_name: 'ג', rate_percent: null },
+        ],
+      }),
+    )
+    await screen.findByText(t('he', 'common.dash.home.attendanceEmptyAll'))
+    // The seven-track chart is gone entirely — not rendered empty, not rendered hidden.
+    expect(screen.queryByTestId('home-attendance-chart')).toBeNull()
+    const link = screen.getByRole('link', { name: t('he', 'common.dash.home.attendanceChart.all') })
+    expect(link).toHaveAttribute('href', '#/attendance')
+  })
+
+  it('keeps the per-column bars when only some groups are unmarked', async () => {
+    // The mixed fixture from `data()` — one real rate, one null — must NOT collapse into
+    // the blanket empty state; that would hide the one group that does have a bar.
+    renderHome(data())
+    const chart = await screen.findByTestId('home-attendance-chart')
+    expect(chart).toBeInTheDocument()
+    expect(screen.queryByText(t('he', 'common.dash.home.attendanceEmptyAll'))).toBeNull()
+  })
+})
+
+describe('B6.2 — the two-column body', () => {
+  it('puts today\'s classes ahead of the attendance chart, both in the wide column', async () => {
+    // B6.2: "today's classes moves to the top of the wide column" — it is currently the
+    // last thing on the page and answers "what needs me today?"
+    const { container } = renderHome(data())
+    await screen.findByText('מתחילים')
+    const main = container.querySelector('.dash-home__main')
+    expect(main).not.toBeNull()
+    const todayHeading = screen.getByRole('heading', { name: t('he', 'common.dash.home.today.title') })
+    const chartHeading = screen.getByRole('heading', {
+      name: t('he', 'common.dash.home.attendanceChart.title'),
+    })
+    expect(main?.contains(todayHeading)).toBe(true)
+    expect(main?.contains(chartHeading)).toBe(true)
+    const position = todayHeading.compareDocumentPosition(chartHeading)
+    expect(position & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('keeps "requires attention" in the narrow side column', async () => {
+    // `attention.title` and `money.overdueHint` are both "דורש טיפול" by design (the hint
+    // under the overdue-families tile echoes the section it links to) — so this asserts
+    // by heading role, not by text, to find the section rather than the tile's hint.
+    const { container } = renderHome(data())
+    const heading = await screen.findByRole('heading', {
+      name: t('he', 'common.dash.home.attention.title'),
+    })
+    const side = container.querySelector('.dash-home__side')
+    expect(side).not.toBeNull()
+    expect(side?.contains(heading)).toBe(true)
+  })
 })

@@ -48,8 +48,11 @@ const logoStyle: CSSProperties = {
 }
 
 const mainStyle: CSSProperties = {
-  padding: 'var(--space-4)',
+  padding: 'var(--space-6) var(--space-4)',
   flex: 1,
+  inlineSize: '100%',
+  maxInlineSize: '1200px',
+  marginInline: 'auto',
 }
 
 /**

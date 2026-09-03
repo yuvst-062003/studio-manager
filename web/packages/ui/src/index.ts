@@ -45,6 +45,11 @@ export type { SlotChipOption } from './primitives/SlotChips'
 export { Button } from './primitives/Button'
 export type { ButtonVariant } from './primitives/Button'
 export { Card } from './primitives/Card'
+// A7 — a read-only capped list, so a table cell shows a shape instead of a run-on string.
+export { ChipList } from './primitives/ChipList'
+// The `⋯` overflow menu B1, B3 and B4 all share (docs/design/proposals/dashboard-screens-redesign.md).
+export { RowActions } from './primitives/RowActions'
+export type { RowAction } from './primitives/RowActions'
 // The composition layer — how primitives sit next to each other. See
 // docs/design/proposals/manager-home.md; ActionBar is the fix for RolloverWizard.tsx:366.
 export { ActionBar } from './primitives/ActionBar'

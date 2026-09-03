@@ -241,4 +241,20 @@ describe('AppShell', () => {
     )
     expect(screen.queryByRole('combobox')).toBeNull()
   })
+
+  it('caps <main> at 1200px and centres it, so content stops stretching edge to edge on a wide monitor (A3)', () => {
+    // Uncapped, a manager's 2400px monitor turned one table row into a 2000px-wide line
+    // and floated the attendance list in the middle of an empty field. `marginInline: auto`
+    // is the logical form — correct in both directions — of centering within the cap.
+    render(
+      <AppShell title="היום" items={ITEMS} locale="he">
+        <p>תוכן</p>
+      </AppShell>,
+    )
+    expect(screen.getByRole('main')).toHaveStyle({
+      inlineSize: '100%',
+      maxInlineSize: '1200px',
+      marginInline: 'auto',
+    })
+  })
 })
