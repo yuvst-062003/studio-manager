@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { t } from '@studio/i18n'
@@ -120,6 +120,19 @@ async function fillFamilyStepForSelf(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByTestId('join-submit'))
 }
 
+/** Decision 13: the typed-name fallback is gone -- drawing is the only way to sign. Fires a
+ *  real pointer path on the canvas rather than typing into a field that no longer exists.
+ *  `fireEvent`, not a raw `dispatchEvent`: each call is wrapped in `act()`, so the pad's
+ *  `hasInk` state has actually flushed by the time the next event fires. Firing all three
+ *  natively in one synchronous block leaves `pointerup`'s handler closed over the
+ *  pre-update `hasInk`, and the draw never emits a signature. */
+function signByDrawing() {
+  const canvas = screen.getByTestId('signature-canvas')
+  fireEvent.pointerDown(canvas, { clientX: 100, clientY: 100, pointerId: 1 })
+  fireEvent.pointerMove(canvas, { clientX: 200, clientY: 100, pointerId: 1 })
+  fireEvent.pointerUp(canvas, { clientX: 200, clientY: 100, pointerId: 1 })
+}
+
 /** Signs the currently-queued kid's health declaration -- the "healthy, nothing to
  *  report" branch, same shape every existing health test in this file used. */
 async function signCurrentHealthDeclaration(
@@ -128,7 +141,7 @@ async function signCurrentHealthDeclaration(
 ) {
   await screen.findByTestId('health-opening-question')
   await user.click(screen.getByTestId('health-opening-healthy'))
-  await user.type(screen.getByLabelText(t('he', 'health.declaration.signatureTyped')), 'מיכל כהן')
+  signByDrawing()
   await user.type(screen.getByLabelText('טלפון חירום'), phone)
   await user.click(screen.getByRole('checkbox', { name: /אני מאשר/ }))
   await user.click(screen.getByTestId('health-sign-continue'))
@@ -174,6 +187,98 @@ describe('JoinFlow', () => {
   // though nothing is hung. Each such test carries an explicit, generous per-test
   // timeout for that reason; do not "tidy" those away, and do not raise the global
   // default instead -- that would hide a real hang in some unrelated fast test.
+  // F16 -- "הוראת קבע links are ALWAYS missing." `/me/standing-order-links` is fetched by
+  // the SHELL (`App.tsx`), once, keyed on `session.status` in `JoinShell` and on `[]` in
+  // `AuthedApp` -- in both cases strictly BEFORE this write creates the children the links
+  // belong to. So by the done screen the list is still empty and every standing-order
+  // child renders "לא ניתן לאשר". Decision 15 moves the mandate queue to the done screen
+  // "after the write, which is the only point at which the links can exist" -- which is
+  // only true if something tells the shell to read them AGAIN once the write has returned.
+  // This asserts that signal exists and fires after the write, never before it.
+  it('tells the shell to re-read the mandate links after the write, not before (F16)', async () => {
+    const user = userEvent.setup()
+    const calls: string[] = []
+    const onRegistered = vi.fn(() => calls.push('re-read-links'))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input)
+        if (url.includes('/api/v1/public/onboarding/live-token-123456')) {
+          return new Response(
+            JSON.stringify({
+              studio_name: 'מועדון הדגמה',
+              email: null,
+              groups: [{ id: 'g1', name: 'ילדים א', weekdays: [0, 2] }],
+            }),
+            { status: 200 },
+          )
+        }
+        if (url.includes('/register') && init?.method === 'POST') {
+          calls.push('register')
+          return new Response(JSON.stringify({ student_ids: ['st1'] }), { status: 201 })
+        }
+        if (url.includes('/api/v1/auth/refresh')) {
+          return new Response(
+            JSON.stringify({
+              access_token: 'tok',
+              expires_in: 900,
+              access: { staff: false, parent: true },
+              studios: [],
+              active_studio_id: 's1',
+            }),
+            { status: 200 },
+          )
+        }
+        if (url.includes('/api/v1/me/students')) {
+          return new Response(
+            JSON.stringify({
+              items: [
+                {
+                  id: 'st1',
+                  first_name: 'דנה',
+                  last_name: 'כהן',
+                  status: 'active',
+                  health_status: 'signed',
+                },
+              ],
+            }),
+            { status: 200 },
+          )
+        }
+        return new Response(JSON.stringify({ items: [] }), { status: 200 })
+      }),
+    )
+
+    render(
+      <JoinFlow
+        billingClient={billingClient}
+        displayName={DISPLAY_NAME}
+        healthClient={healthClient}
+        locale="he"
+        onRegistered={onRegistered}
+        privacyClient={makePrivacyClient()}
+        standingOrderLinks={[]}
+        token="live-token-123456"
+      />,
+    )
+
+    await acceptWelcomeStep(user)
+    await fillFamilyStepForSelf(user)
+    await signCurrentHealthDeclaration(user, '0501111111')
+    await screen.findByTestId('join-confirm-step')
+
+    // Nothing has been written, so there is nothing to re-read yet.
+    expect(onRegistered).not.toHaveBeenCalled()
+
+    await user.click(screen.getByTestId('join-confirm-submit'))
+    await screen.findByTestId('join-done-step')
+
+    // The signal fired, and strictly AFTER the write -- a re-read that raced the write
+    // would read the same empty list the shell already has.
+    expect(onRegistered).toHaveBeenCalled()
+    expect(calls.indexOf('register')).toBeLessThan(calls.indexOf('re-read-links'))
+  }, 15000)
+
   it('writes nothing through steps 1-3, then fires exactly one write from step 4 carrying the family, health and club terms together', async () => {
     const user = userEvent.setup()
     const onComplete = vi.fn()

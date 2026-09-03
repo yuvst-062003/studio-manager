@@ -124,6 +124,11 @@ export type SelfServeJoinFlowProps = {
   healthClient: HealthClient
   locale: Locale
   onComplete?: () => void
+  /** F16 -- fired once the single write has RETURNED, so the shell can re-read
+   *  `/me/standing-order-links`. `AuthedApp` fetches those on mount (`[]` deps), long
+   *  before Door D's write creates the child they belong to, so without this the
+   *  mandate queue on the done screen is always empty (decision 15, F16). */
+  onRegistered?: () => void
   privacyClient: PrivacyClient
   standingOrderLinks: readonly StandingOrderLink[]
 }
@@ -145,6 +150,7 @@ export function SelfServeJoinFlow({
   healthClient,
   locale,
   onComplete,
+  onRegistered,
   privacyClient,
   standingOrderLinks,
 }: SelfServeJoinFlowProps) {
@@ -400,6 +406,8 @@ export function SelfServeJoinFlow({
       await refreshStudents()
       clearJoinDraft(token)
       setRegistered(true)
+      // F16 -- only now can the mandate links exist. See `onRegistered`'s own note.
+      onRegistered?.()
     } catch {
       setFailed(t(locale, 'common.error.generic'))
     } finally {

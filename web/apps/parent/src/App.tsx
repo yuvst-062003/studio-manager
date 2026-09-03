@@ -217,6 +217,13 @@ type JoinWallInfo = { studio_name: string; logo_url: string | null }
 function JoinShell({ token }: { token: string }) {
   const [locale, setLocale] = useState<Locale>('he')
   const [mandateLinks, setMandateLinks] = useState<readonly StandingOrderLink[]>([])
+  // F16 -- bumped by `JoinFlow`'s `onRegistered` once the single write has returned.
+  // The links below are one per child at that child's own amount, so they cannot
+  // exist until that write has created the children; the fetch's own `session.status`
+  // dependency never changes across it (signed-in before, signed-in after), so
+  // without this counter the effect never re-runs and every הוראת קבע child reads
+  // "לא ניתן לאשר" on the done screen -- which is exactly F16.
+  const [mandateReloads, setMandateReloads] = useState(0)
   // F1/F10 -- the ONE `useSession()` call for this whole route. `JoinFlow` and
   // `JoinWelcomeStep` used to each mount their own, and every mount's `refresh()` call
   // rotates the refresh token -- three (with this one, four) rotations for one page load,
@@ -256,7 +263,7 @@ function JoinShell({ token }: { token: string }) {
     return () => {
       live = false
     }
-  }, [session.status])
+  }, [session.status, mandateReloads])
 
   // Fetched once on mount, unconditionally -- not gated on `session.status`, so it is
   // already resolved by the time `status` settles to `anonymous` and the wall below
@@ -324,6 +331,7 @@ function JoinShell({ token }: { token: string }) {
         onComplete={() => {
           globalThis.location.assign('/')
         }}
+        onRegistered={() => setMandateReloads((n) => n + 1)}
         privacyClient={privacyClient}
         standingOrderLinks={mandateLinks}
         token={token}
@@ -434,6 +442,10 @@ function AuthedApp() {
   /** §5.10's mandate links, one per child. Read live and never cached: a stale link signs
    *  a family up at the wrong amount and nobody finds out for months. */
   const [mandateLinks, setMandateLinks] = useState<readonly StandingOrderLink[]>([])
+  // F16 -- bumped by `SelfServeJoinFlow`'s `onRegistered` once Door D's write returns.
+  // The fetch below runs on mount and never again, so a child added through Door D had
+  // its mandate link created strictly AFTER the only read that would have found it.
+  const [mandateReloads, setMandateReloads] = useState(0)
   useEffect(() => {
     let live = true
     void apiFetch('/api/v1/me/standing-order-links')
@@ -458,7 +470,7 @@ function AuthedApp() {
     return () => {
       live = false
     }
-  }, [])
+  }, [mandateReloads])
   const [declarationsSigned, setDeclarationsSigned] = useState(0)
   // Bumped when a trial family joins the club. The child goes `trial` -> `active` while
   // still holding the short health form, so §5.5's gate must fire on the very next
@@ -804,6 +816,7 @@ function AuthedApp() {
                 setInviteNeedsWizard(false)
                 setFamilyJoined((n) => n + 1)
               }}
+              onRegistered={() => setMandateReloads((n) => n + 1)}
               prefillFirstRowName={inviteStubName ?? undefined}
               privacyClient={privacyClient}
               standingOrderLinks={mandateLinks}
@@ -935,6 +948,7 @@ function AuthedApp() {
               healthClient={healthClient}
               locale={locale}
               onComplete={() => setFamilyJoined((n) => n + 1)}
+              onRegistered={() => setMandateReloads((n) => n + 1)}
               privacyClient={privacyClient}
               standingOrderLinks={mandateLinks}
             />

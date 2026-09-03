@@ -112,6 +112,7 @@ export function JoinFlow({
   healthClient,
   locale,
   onComplete,
+  onRegistered,
   privacyClient,
   standingOrderLinks,
   token,
@@ -123,6 +124,12 @@ export function JoinFlow({
   healthClient: HealthClient
   locale: Locale
   onComplete?: () => void
+  /** F16 -- fired once the single write has RETURNED, so the shell can re-read
+   *  `/me/standing-order-links`. Those links are one per child at that child's own
+   *  amount, so they cannot exist until the write that creates the children has
+   *  finished; the shell's own fetch runs long before that and would otherwise leave
+   *  every הוראת קבע child on the done screen reading "לא ניתן לאשר" (decision 15). */
+  onRegistered?: () => void
   privacyClient: PrivacyClient
   standingOrderLinks: readonly StandingOrderLink[]
   token: string
@@ -328,6 +335,8 @@ export function JoinFlow({
       // held is now on the server; there is nothing left worth re-typing from it.
       clearJoinDraft(token)
       setRegistered(true)
+      // F16 -- only now can the mandate links exist. See `onRegistered`'s own note.
+      onRegistered?.()
     } catch {
       setFailed(t(locale, 'common.error.generic'))
     } finally {
