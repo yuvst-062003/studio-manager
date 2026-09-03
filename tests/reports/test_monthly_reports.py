@@ -80,10 +80,16 @@ def test_get_student_charges_requires_auth(client):
 
 def test_send_monthly_report_as_manager(
     client,
+    app_session,
     as_manager: Caller,
     twelve_students_mixed_billing,
 ):
-    """Manager can queue a monthly report for delivery."""
+    """§2.7 of the 2026-09-02 findings register: this used to hedge between `queued` and
+    `failed` because `NotificationService.enqueue` supposedly raised `NotImplementedError`
+    before COMMS shipped in W5 -- it never has, so that branch was dead and the real
+    contract is that a report send always reaches the seam and always queues."""
+    from app.models.comms import Notification
+
     response = client.post(
         f"/api/v1/reports/{as_manager.studio_id}/send-monthly",
         json={
@@ -93,12 +99,14 @@ def test_send_monthly_report_as_manager(
         },
         headers=as_manager.headers,
     )
-    # COMMS is not yet implemented, so this returns queued or failed
     assert response.status_code == 200
     data = response.json()
-    assert "status" in data
-    # Either queued (if COMMS is available) or failed (if not implemented)
-    assert data["status"] in ("queued", "failed")
+    assert data["status"] == "queued"
+    assert data["notification_id"] is not None
+
+    note = app_session.get(Notification, data["notification_id"])
+    assert note is not None
+    assert note.kind == "report.monthly"
 
 
 # ── artboard `4g`'s two endpoints ────────────────────────────────────────────────────

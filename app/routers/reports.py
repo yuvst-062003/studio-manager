@@ -106,10 +106,16 @@ class ReportDeliveryRequest(BaseModel):
 
 
 class ReportDeliveryResponse(BaseModel):
-    """Response confirming report delivery request."""
+    """Response confirming report delivery request.
+
+    `notification_id` is nullable and `status` stays a plain string rather than a Literal
+    with one member -- both are the honest shape for a seam that, as of §2.7's fix, only
+    ever succeeds or raises. A future real failure mode (the recipient's push preferences,
+    a transport error) has somewhere to report itself without a schema change.
+    """
 
     notification_id: uuid.UUID | None
-    status: str  # queued, failed
+    status: str
 
 
 @router.post("/{studio_id}/send-monthly")
@@ -119,10 +125,21 @@ def send_monthly_report(
     _: ManagerOrOwner,
     session: TenantSessionDep,
 ) -> ReportDeliveryResponse:
-    """Queue a monthly billing report for email delivery.
+    """Queue a monthly billing report for delivery through §5.11's fan-out.
 
-    Enqueues a notification through the COMMS lane's notification system.
-    The report PDF is generated and attached by the notification worker.
+    **§2.7 of the 2026-09-02 findings register.** Two things were wrong, not the one this
+    endpoint's own comment named: `NotificationService.enqueue` has never raised
+    `NotImplementedError` (COMMS shipped in W5), so the `except` below was dead and
+    `status: "failed"` could never actually be returned. The real hole was that this
+    function never called `session.commit()` -- `TenantSessionDep` closes its session on
+    the way out of the request, which discards an uncommitted flush, so the response
+    claimed `status: "queued"` for a notification that was rolled back the moment the
+    request ended and never reached anyone.
+
+    There is no inbox action for `report.monthly` yet (`app/services/comms/actions.py`)
+    and nothing attaches the report itself to the message -- the payload carries only
+    `year`/`month`. Tapping the notification today opens nothing. Named here rather than
+    fixed: building that is a new capability, not the dead-code question this walk was for.
     """
     from fastapi import HTTPException
     from sqlalchemy import select
@@ -140,27 +157,21 @@ def send_monthly_report(
     if not person:
         raise HTTPException(status_code=404, detail="Recipient not found in studio")
 
-    try:
-        notification = NotificationService(session).enqueue(
-            person_id=body.to_person_id,
-            kind="report.monthly",
-            title="Monthly Billing Report",
-            body=f"Your billing report for {body.month}/{body.year} is ready",
-            payload={
-                "year": body.year,
-                "month": body.month,
-            },
-        )
-        return ReportDeliveryResponse(
-            notification_id=notification.id,
-            status="queued",
-        )
-    except NotImplementedError:
-        # COMMS lane not yet implemented
-        return ReportDeliveryResponse(
-            notification_id=None,
-            status="failed",
-        )
+    notification = NotificationService(session).enqueue(
+        person_id=body.to_person_id,
+        kind="report.monthly",
+        title="הדוח החודשי מוכן",
+        body=f"הדוח החודשי שלך ל-{body.month:02d}/{body.year} מוכן",
+        payload={
+            "year": body.year,
+            "month": body.month,
+        },
+    )
+    session.commit()
+    return ReportDeliveryResponse(
+        notification_id=notification.id,
+        status="queued",
+    )
 
 
 # ── artboard `4g` — the whole screen, and the file version of it ─────────────────────
