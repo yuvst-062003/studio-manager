@@ -99,7 +99,7 @@ export function makeParentBillingClient(fetcher: Fetcher): BillingClient {
       const response = await fetcher('/api/v1/me/payment-promises')
       return (await json<{ items: PaymentPromiseOut[] }>(response)).items
     },
-    async createPromise(chargeIds, promiseMethod, prepayMonths) {
+    async createPromise(chargeIds, promiseMethod, prepayMonths, alreadyPaid = false) {
       // `method` in the body, not in the path: the two routes are one row and one
       // endpoint, so the server's `PROMISE_METHODS` check is the only place a third
       // method could ever be refused.
@@ -111,6 +111,7 @@ export function makeParentBillingClient(fetcher: Fetcher): BillingClient {
             charge_ids: chargeIds,
             method: promiseMethod,
             prepay_months: prepayMonths,
+            already_paid: alreadyPaid,
           }),
         }),
       )

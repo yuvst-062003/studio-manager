@@ -47,6 +47,10 @@ export type PaymentPromiseOut = {
    *  lets the payments screen leave its cash/cheque cards usable while a plan claim from
    *  the plan picker is still with the manager. */
   claimed_plan_id: string | null
+  /** The payer's own claim that this was already settled outside the app -- purely
+   *  informational, changes no arithmetic and settles nothing on its own. The manager's
+   *  `confirm` action is still the only thing that ever marks a promise `received`. */
+  already_paid: boolean
   charge_ids: string[]
   created_at: string
   decided_at: string | null
@@ -59,6 +63,7 @@ export type BillingClient = {
     chargeIds: string[],
     method: PromiseMethod,
     prepayMonths: number,
+    alreadyPaid?: boolean,
   ): Promise<PaymentPromiseOut>
   balance(payerPersonId: string): Promise<PayerBalanceOut>
   payments(payerPersonId: string): Promise<PaymentOut[]>

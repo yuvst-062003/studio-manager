@@ -30,7 +30,7 @@
 //                     every month and nobody would notice until reconciliation.
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
-import { Alert, Button, Card, EmptyState, LoadFailed, MoneyDisplay, StatusChip } from '@studio/ui'
+import { Alert, Button, Card, Checkbox, EmptyState, LoadFailed, MoneyDisplay, StatusChip } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { PaymentOverlay } from './PaymentOverlay'
@@ -59,6 +59,11 @@ export type ChildRow = {
   charges: ChargeOut[]
   amountAgorot: number
   method: SetupMethod | null
+  /** Standing-order only: the parent's own claim that they already settled this
+   *  mandate outside the app (paid the manager directly, before it cleared). Purely
+   *  informational -- it changes no arithmetic and settles nothing; the manager still
+   *  confirms from their own reconciliation queue. */
+  alreadyPaid: boolean
 }
 
 const pageStyle: CSSProperties = {
@@ -87,7 +92,13 @@ const mutedStyle: CSSProperties = { color: 'var(--text-muted)' }
 export function rowsFor(students: readonly SetupChild[], charges: readonly ChargeOut[]): ChildRow[] {
   return students.map((child) => {
     const own = charges.filter((charge) => charge.student_id === child.id)
-    return { child, charges: own, amountAgorot: selectionTotal(own), method: null }
+    return {
+      child,
+      charges: own,
+      amountAgorot: selectionTotal(own),
+      method: null,
+      alreadyPaid: false,
+    }
   })
 }
 
@@ -188,6 +199,12 @@ export function PaymentSetup({
     )
     setFamilyAnswered(true)
     setIndex(null)
+  }, [])
+
+  const toggleAlreadyPaid = useCallback((childId: string, alreadyPaid: boolean) => {
+    setRows((previous) =>
+      (previous ?? []).map((row) => (row.child.id === childId ? { ...row, alreadyPaid } : row)),
+    )
   }, [])
 
   function run(action: () => Promise<void>) {
@@ -358,8 +375,21 @@ export function PaymentSetup({
   // manager sees it as money expected rather than money collected.
   async function recordStandingOrder() {
     if (standingSent || standingRows.length === 0) return
-    const ids = standingRows.flatMap((row) => row.charges.map((charge) => charge.id))
-    await client.createPromise(ids, 'standing_order', 0)
+    // Split by the parent's own already-paid claim, not lumped into one promise: the
+    // manager needs to see a self-reported claim as its own row (`already_paid: true`),
+    // distinct from the ordinary "expect this mandate to clear" promise the rest of the
+    // family gets -- merging them would either bury the claim or falsely attach it to a
+    // child nobody claimed anything about.
+    const claimed = standingRows.filter((row) => row.alreadyPaid)
+    const pending = standingRows.filter((row) => !row.alreadyPaid)
+    if (claimed.length > 0) {
+      const ids = claimed.flatMap((row) => row.charges.map((charge) => charge.id))
+      await client.createPromise(ids, 'standing_order', 0, true)
+    }
+    if (pending.length > 0) {
+      const ids = pending.flatMap((row) => row.charges.map((charge) => charge.id))
+      await client.createPromise(ids, 'standing_order', 0, false)
+    }
     setStandingSent(true)
   }
 
@@ -457,35 +487,48 @@ export function PaymentSetup({
                 (candidate) => candidate.studentId === row.child.id,
               )
               return (
-                <div key={row.child.id} style={rowStyle}>
-                  <span style={{ flex: 1, minInlineSize: 0 }}>
-                    <bdi>{row.child.first_name}</bdi>
-                  </span>
-                  <MoneyDisplay agorot={row.amountAgorot} label={row.child.first_name} />
-                  {link ? (
-                    <Button
-                      // Two controls reading the same words are two links a screen reader
-                      // cannot tell apart, and telling them apart is the whole point here.
-                      aria-label={t(locale, 'schedule.setup.linkFor').replace(
-                        '{name}',
-                        row.child.first_name,
-                      )}
-                      data-testid={`setup-standing-link-${row.child.id}`}
-                      // 2026-09-03 addendum -- opens in the in-app overlay instead of a
-                      // new tab. §7.2's old failure mode (following the link navigated
-                      // the ONE tab `/join/<token>` runs in away, restarting the wizard
-                      // on return) is exactly what the overlay exists to prevent.
-                      onClick={() => setOverlay({ kind: 'link', url: link.url })}
-                      type="button"
-                      variant="ghost"
-                    >
-                      {t(locale, 'billing.standingOrder.link')}
-                    </Button>
-                  ) : (
-                    <span style={mutedStyle}>
-                      {t(locale, 'billing.standingOrder.notConfirmable')}
+                <div key={row.child.id} style={{ display: 'flex', flexDirection: 'column' }}>
+                  <div style={rowStyle}>
+                    <span style={{ flex: 1, minInlineSize: 0 }}>
+                      <bdi>{row.child.first_name}</bdi>
                     </span>
-                  )}
+                    <MoneyDisplay agorot={row.amountAgorot} label={row.child.first_name} />
+                    {link ? (
+                      <Button
+                        // Two controls reading the same words are two links a screen reader
+                        // cannot tell apart, and telling them apart is the whole point here.
+                        aria-label={t(locale, 'schedule.setup.linkFor').replace(
+                          '{name}',
+                          row.child.first_name,
+                        )}
+                        data-testid={`setup-standing-link-${row.child.id}`}
+                        // 2026-09-03 addendum -- opens in the in-app overlay instead of a
+                        // new tab. §7.2's old failure mode (following the link navigated
+                        // the ONE tab `/join/<token>` runs in away, restarting the wizard
+                        // on return) is exactly what the overlay exists to prevent.
+                        onClick={() => setOverlay({ kind: 'link', url: link.url })}
+                        type="button"
+                        variant="ghost"
+                      >
+                        {t(locale, 'billing.standingOrder.link')}
+                      </Button>
+                    ) : (
+                      <span style={mutedStyle}>
+                        {t(locale, 'billing.standingOrder.notConfirmable')}
+                      </span>
+                    )}
+                  </div>
+                  {/* The parent's own claim that this mandate was already settled
+                      outside the app -- e.g. handed to the manager in person before it
+                      cleared. Purely informational: it changes no arithmetic here, and
+                      it is the manager's own confirm/decline action, not this checkbox,
+                      that ever marks money as actually received. */}
+                  <Checkbox
+                    checked={row.alreadyPaid}
+                    data-testid={`setup-standing-already-paid-${row.child.id}`}
+                    label={t(locale, 'schedule.plan.alreadyPaid')}
+                    onChange={(event) => toggleAlreadyPaid(row.child.id, event.target.checked)}
+                  />
                 </div>
               )
             })}

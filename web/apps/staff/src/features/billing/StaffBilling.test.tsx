@@ -145,6 +145,7 @@ describe('the payment-promise queue on the phone', () => {
       method,
       total_agorot: 90_000,
       claimed_plan_name: null,
+      already_paid: false,
       payer_name: 'משפחת כהן',
       charge_count: 3,
       created_at: '2026-09-01T09:00:00Z',
@@ -177,6 +178,21 @@ describe('the payment-promise queue on the phone', () => {
     )
   })
 
+  it('names a single charge in the singular, not "1 חיובים"', async () => {
+    // §3.4 of the completion findings register.
+    render(
+      <PaymentPromisesSection
+        locale={LOCALE}
+        client={promiseStub({
+          pending: vi.fn().mockResolvedValue([promiseRow('r1', 'cash', { charge_count: 1 })]),
+        })}
+      />,
+    )
+    const row = await screen.findByTestId('promise-charges')
+    expect(row).toHaveTextContent(t(LOCALE, 'billing.promise.manager.chargesOne'))
+    expect(row).not.toHaveTextContent('1 חיובים')
+  })
+
   it('confirms through the promise route', async () => {
     const decide = vi.fn().mockResolvedValue(undefined)
     render(
@@ -190,5 +206,26 @@ describe('the payment-promise queue on the phone', () => {
     )
     await userEvent.click(await screen.findByTestId('promise-confirm'))
     expect(decide).toHaveBeenCalledWith('r1', 'confirm')
+  })
+
+  it('shows a distinct chip when the payer claims they already paid', async () => {
+    // The dashboard already renders this (PaymentPromisesPanel.tsx); the door -- where
+    // reconciliation actually happens -- had silently dropped the field before this
+    // fix, so a manager checking from their phone never saw a parent's self-report at
+    // all.
+    render(
+      <PaymentPromisesSection
+        locale={LOCALE}
+        client={promiseStub({
+          pending: vi.fn().mockResolvedValue([
+            promiseRow('r1', 'cash', { already_paid: true }),
+            promiseRow('r2', 'cash', { already_paid: false }),
+          ]),
+        })}
+      />,
+    )
+    await screen.findAllByTestId('payment-promise-row')
+    expect(screen.getByText(t(LOCALE, 'billing.promise.manager.saysPaid'))).toBeInTheDocument()
+    expect(screen.getByText(t(LOCALE, 'billing.promise.manager.saysWillPay'))).toBeInTheDocument()
   })
 })

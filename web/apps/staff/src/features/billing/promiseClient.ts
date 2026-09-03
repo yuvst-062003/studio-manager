@@ -16,6 +16,10 @@ export type StaffPromiseRow = {
   total_agorot: number
   /** The program a plan claim is about, or null for an ordinary promise. */
   claimed_plan_name: string | null
+  /** The payer's own claim that this was already settled outside the app. Purely
+   *  informational -- it changes no arithmetic and settles nothing; `confirm` is still
+   *  the only action that ever marks a promise received. */
+  already_paid: boolean
   payer_name: string
   charge_count: number
   created_at: string

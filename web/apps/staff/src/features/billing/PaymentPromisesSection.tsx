@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { formatDateInStudioZone, useNetworkMode } from '@studio/core'
-import { Button, Card, EmptyState, LoadFailed, MoneyDisplay } from '@studio/ui'
+import { Button, Card, EmptyState, LoadFailed, MoneyDisplay, StatusChip } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { makePromiseClient } from './promiseClient'
@@ -102,8 +102,14 @@ export function PaymentPromisesSection({
               <span data-testid="promise-method">
                 {t(locale, `billing.method.${promise.method}`)}
               </span>
-              <span style={{ color: 'var(--text-muted)' }}>
-                {promise.charge_count} {t(locale, 'billing.promise.manager.charges')}
+              <span data-testid="promise-charges" style={{ color: 'var(--text-muted)' }}>
+                {/* §3.4 -- 'X חיובים' is not a word for X === 1. */}
+                {promise.charge_count === 1
+                  ? t(locale, 'billing.promise.manager.chargesOne')
+                  : t(locale, 'billing.promise.manager.charges').replace(
+                      '{{count}}',
+                      String(promise.charge_count),
+                    )}
                 {' · '}
                 {formatDateInStudioZone(promise.created_at, locale)}
               </span>
@@ -116,6 +122,18 @@ export function PaymentPromisesSection({
                 </span>
               ) : null}
               <MoneyDisplay agorot={promise.total_agorot} tone="pending" />
+              {/* Mirrors the dashboard's own chip (PaymentPromisesPanel.tsx) -- a claim
+                  is never a settlement (G8), so this changes what the manager checks
+                  first at the door, never what is true. Both still need the same ✓. */}
+              <StatusChip
+                status={promise.already_paid ? 'pending' : 'planned'}
+                label={t(
+                  locale,
+                  promise.already_paid
+                    ? 'billing.promise.manager.saysPaid'
+                    : 'billing.promise.manager.saysWillPay',
+                )}
+              />
               <Button
                 variant="primary"
                 data-testid="promise-confirm"

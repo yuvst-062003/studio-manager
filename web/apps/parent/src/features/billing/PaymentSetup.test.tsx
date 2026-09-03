@@ -210,8 +210,26 @@ describe('the onboarding payment step', () => {
     await userEvent.click(await screen.findByTestId('setup-finish'))
 
     await waitFor(() => expect(createPromise).toHaveBeenCalledTimes(1))
-    expect(createPromise).toHaveBeenCalledWith(['c1', 'c2'], 'standing_order', 0)
+    expect(createPromise).toHaveBeenCalledWith(['c1', 'c2'], 'standing_order', 0, false)
     await waitFor(() => expect(onFinish).toHaveBeenCalled())
+  })
+
+  it('lets a parent mark a standing-order child as already paid outside the app, separately from the rest', async () => {
+    // A family who paid the manager directly (cash in hand, before the mandate cleared)
+    // still needs the manager to see and verify that claim -- distinctly from a child
+    // whose mandate is still just expected.
+    const createPromise = vi.fn().mockResolvedValue(undefined)
+    setup({ client: stub({ createPromise }) })
+
+    await answer('standing_order')
+    await userEvent.click(
+      await screen.findByTestId('setup-standing-already-paid-s1'),
+    )
+    await userEvent.click(screen.getByTestId('setup-finish'))
+
+    await waitFor(() => expect(createPromise).toHaveBeenCalledTimes(2))
+    expect(createPromise).toHaveBeenCalledWith(['c1'], 'standing_order', 0, true)
+    expect(createPromise).toHaveBeenCalledWith(['c2'], 'standing_order', 0, false)
   })
 
   it('does not write a second standing-order promise for a family also paying by cash', async () => {
@@ -230,7 +248,9 @@ describe('the onboarding payment step', () => {
     await waitFor(() => expect(createPromise).toHaveBeenCalledWith(['c1'], 'cash', 0))
 
     await userEvent.click(screen.getByTestId('setup-finish'))
-    await waitFor(() => expect(createPromise).toHaveBeenCalledWith(['c2'], 'standing_order', 0))
+    await waitFor(() =>
+      expect(createPromise).toHaveBeenCalledWith(['c2'], 'standing_order', 0, false),
+    )
     expect(createPromise).toHaveBeenCalledTimes(2)
   })
 
