@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { t } from '@studio/i18n'
@@ -103,11 +103,21 @@ beforeEach(() => {
   HTMLCanvasElement.prototype.toDataURL = vi.fn(() => 'data:image/png;base64,AAAA')
 })
 
+/** Decision 13: the typed-name fallback is gone -- drawing is the only way to sign. Fires a
+ *  real pointer path on the canvas rather than typing into a field that no longer exists.
+ *  `fireEvent`, not a raw `dispatchEvent`: each call is wrapped in `act()`, so the pad's
+ *  `hasInk` state has actually flushed by the time the next event fires. Firing all three
+ *  natively in one synchronous block leaves `pointerup`'s handler closed over the
+ *  pre-update `hasInk`, and the draw never emits a signature. */
+function signByDrawing() {
+  const canvas = screen.getByTestId('signature-canvas')
+  fireEvent.pointerDown(canvas, { clientX: 100, clientY: 100, pointerId: 1 })
+  fireEvent.pointerMove(canvas, { clientX: 200, clientY: 100, pointerId: 1 })
+  fireEvent.pointerUp(canvas, { clientX: 200, clientY: 100, pointerId: 1 })
+}
+
 async function signCurrentKid(user: ReturnType<typeof userEvent.setup>) {
-  await user.type(
-    screen.getByLabelText(t('he', 'health.declaration.signatureTyped')),
-    'דנה כהן',
-  )
+  signByDrawing()
   await user.type(screen.getByLabelText('טלפון חירום'), '0501234567')
   await user.click(screen.getByRole('checkbox', { name: /אני מאשר/ }))
 }
@@ -247,7 +257,7 @@ describe('JoinHealthStep (2-inner-step, deferred)', () => {
     expect(screen.getByRole('checkbox', { name: /אני מאשר/ })).not.toBeChecked()
 
     await user.type(screen.getByLabelText('טלפון חירום'), '0501234567')
-    await user.type(screen.getByLabelText(t('he', 'health.declaration.signatureTyped')), 'דנה כהן')
+    signByDrawing()
     await user.click(screen.getByTestId('health-sign-continue'))
 
     expect(onSigned).not.toHaveBeenCalled()
@@ -270,7 +280,7 @@ describe('JoinHealthStep (2-inner-step, deferred)', () => {
     await user.click(await screen.findByTestId('health-opening-healthy'))
     // Every other required field filled, health_fund left blank on purpose.
     await user.type(screen.getByLabelText('טלפון חירום'), '0501234567')
-    await user.type(screen.getByLabelText(t('he', 'health.declaration.signatureTyped')), 'דנה כהן')
+    signByDrawing()
     await user.click(screen.getByRole('checkbox', { name: /אני מאשר/ }))
     await user.click(screen.getByTestId('health-sign-continue'))
 
@@ -297,7 +307,7 @@ describe('JoinHealthStep (2-inner-step, deferred)', () => {
     await user.click(await screen.findByTestId('health-opening-healthy'))
     await user.type(screen.getByLabelText('קופת חולים'), 'מכבי')
     await user.type(screen.getByLabelText('טלפון חירום'), '0501234567')
-    await user.type(screen.getByLabelText(t('he', 'health.declaration.signatureTyped')), 'דנה כהן')
+    signByDrawing()
     await user.click(screen.getByRole('checkbox', { name: /אני מאשר/ }))
     await user.click(screen.getByTestId('health-sign-continue'))
 

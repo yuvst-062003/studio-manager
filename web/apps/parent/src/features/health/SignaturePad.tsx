@@ -16,7 +16,7 @@
 // into the design system is a main-owned move, not a lane one.
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react'
-import { Button, TextField } from '@studio/ui'
+import { Button } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 
@@ -81,12 +81,6 @@ const placeholderStyle: CSSProperties = {
   pointerEvents: 'none',
 }
 
-/** The keyboard route sits directly under the sheet, not behind a disclosure: a control a
- *  parent has to discover is a control a parent who needs it will not find. */
-const typedRowStyle: CSSProperties = {
-  marginBlockStart: 'var(--space-2)',
-}
-
 const controlsStyle: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
@@ -108,7 +102,6 @@ export function SignaturePad({ locale, onChange, attestation, error }: Signature
   const drawing = useRef(false)
   const last = useRef<{ x: number; y: number } | null>(null)
   const [hasInk, setHasInk] = useState(false)
-  const [typed, setTyped] = useState('')
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -180,56 +173,8 @@ export function SignaturePad({ locale, onChange, attestation, error }: Signature
     const context = canvas?.getContext('2d')
     if (canvas && context) context.clearRect(0, 0, canvas.width, canvas.height)
     setHasInk(false)
-    setTyped('')
     onChange(null)
   }, [onChange])
-
-  /**
-   * The keyboard route to signing, and it is not optional.
-   *
-   * §6.1 step 6 makes the health declaration a HARD GATE: until it is signed, no other
-   * screen in the parent app is reachable. A pad that only answers to a pointer therefore
-   * did not merely lack a keyboard affordance -- it locked a parent who cannot use a mouse,
-   * a trackpad or a touchscreen out of the entire product, with no way to report the
-   * problem from inside it. That is SC 2.1.1 at the highest possible cost.
-   *
-   * A typed name is a recognised form of electronic signature and, more to the point, it is
-   * what the attestation line under the pad already records in words. Rendering it INTO the
-   * canvas rather than storing it as text is what keeps this a fix and not a schema change:
-   * the backend still receives one base64 PNG, `signature_image` still holds ink, and the
-   * rendered PDF still shows a signature where a signature belongs.
-   *
-   * `dir="ltr"` is NOT set on the typed field, unlike on the canvas. The canvas is isolated
-   * because a STROKE PATH must not mirror; a name is text, and a Hebrew name must lay out
-   * right-to-left like every other name in the app.
-   */
-  const signWithName = useCallback(
-    (name: string) => {
-      const canvas = canvasRef.current
-      const context = canvas?.getContext('2d')
-      if (!canvas || !context) return
-      context.clearRect(0, 0, canvas.width, canvas.height)
-      const trimmed = name.trim()
-      if (!trimmed) {
-        setHasInk(false)
-        onChange(null)
-        return
-      }
-      context.save()
-      context.fillStyle = INK
-      // Sized off the canvas rather than a fixed px so a long name still fits the sheet.
-      const size = Math.min(64, Math.max(28, (canvas.width * 0.9) / trimmed.length))
-      context.font = `italic ${size}px 'Rubik Variable', Rubik, sans-serif`
-      context.textAlign = 'center'
-      context.textBaseline = 'alphabetic'
-      // Sits ON the baseline guide, which is drawn at 28% up from the bottom.
-      context.fillText(trimmed, canvas.width / 2, canvas.height * 0.72, canvas.width * 0.92)
-      context.restore()
-      setHasInk(true)
-      onChange(canvas.toDataURL('image/png'))
-    },
-    [onChange],
-  )
 
   return (
     <section aria-labelledby="signature-label">
@@ -256,18 +201,14 @@ export function SignaturePad({ locale, onChange, attestation, error }: Signature
         <div style={guideStyle} />
         {hasInk ? null : <p style={placeholderStyle}>{t(locale, 'health.declaration.signatureHint')}</p>}
       </div>
-      <div style={typedRowStyle}>
-        <TextField
-          hint={t(locale, 'health.declaration.signatureTypedHint')}
-          label={t(locale, 'health.declaration.signatureTyped')}
-          onChange={(event) => {
-            const next = event.target.value
-            setTyped(next)
-            signWithName(next)
-          }}
-          value={typed}
-        />
-      </div>
+      {/*
+       * Decision 13 (2026-09-03 onboarding spec): the typed-full-name fallback that used to
+       * sit here is deleted -- drawing is the only way to sign. Consequence, accepted: a
+       * keyboard-only parent cannot sign, and §6.1's hard gate then blocks the whole app for
+       * them. The mitigation is NOT here -- it is a line in the accessibility statement
+       * (`common.a11y.statement.signature`, AccessibilityMenu.tsx) telling that parent to call
+       * the club, who complete the declaration for them by phone.
+       */}
       <div style={controlsStyle}>
         <Button disabled={!hasInk} onClick={clear} type="button" variant="secondary">
           {t(locale, 'health.declaration.signatureClear')}

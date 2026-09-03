@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { t } from '@studio/i18n'
@@ -54,6 +54,19 @@ const billingClient = {
   orderForm: vi.fn(),
   createPromise: vi.fn(),
 } as unknown as BillingClient
+
+/** Decision 13: the typed-name fallback is gone -- drawing is the only way to sign. Fires a
+ *  real pointer path on the canvas rather than typing into a field that no longer exists.
+ *  `fireEvent`, not a raw `dispatchEvent`: each call is wrapped in `act()`, so the pad's
+ *  `hasInk` state has actually flushed by the time the next event fires. Firing all three
+ *  natively in one synchronous block leaves `pointerup`'s handler closed over the
+ *  pre-update `hasInk`, and the draw never emits a signature. */
+function signByDrawing() {
+  const canvas = screen.getByTestId('signature-canvas')
+  fireEvent.pointerDown(canvas, { clientX: 100, clientY: 100, pointerId: 1 })
+  fireEvent.pointerMove(canvas, { clientX: 200, clientY: 100, pointerId: 1 })
+  fireEvent.pointerUp(canvas, { clientX: 200, clientY: 100, pointerId: 1 })
+}
 
 function makePrivacyClient(): PrivacyClient {
   return {
@@ -329,7 +342,7 @@ describe('SelfServeJoinFlow -- Doors C and D', () => {
     // Local queue: one trial kid, healthy branch.
     await screen.findByTestId('health-opening-question')
     await user.click(screen.getByTestId('health-opening-healthy'))
-    await user.type(screen.getByLabelText(t('he', 'health.declaration.signatureTyped')), 'מיכל כהן')
+    signByDrawing()
     await user.type(screen.getByLabelText('טלפון חירום'), '0501111111')
     await user.click(screen.getByRole('checkbox', { name: /אני מאשר/ }))
     await user.click(screen.getByTestId('health-sign-continue'))

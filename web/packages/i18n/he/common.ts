@@ -41,6 +41,11 @@ export const common: Bundle = {
   'a11y.links': 'הדגשת קישורים בקו תחתון',
   'a11y.statement.title': 'הצהרת נגישות',
   'a11y.statement.body': 'האפליקציה נבנתה בהתאם לתקן הישראלי ת״י 5568 (WCAG 2.1 רמה AA): ניווט מלא במקלדת, תיאורי מסך, ניגודיות מספקת והתאמות התצוגה שבתפריט זה.',
+  // Decision 13 (2026-09-03 onboarding spec): the typed-name fallback under the signature
+  // pad was deleted -- drawing is the only way to sign. A keyboard-only parent cannot draw,
+  // and the health declaration is a hard gate that blocks the whole app, so this line is the
+  // accepted mitigation, not a nice-to-have.
+  'a11y.statement.signature': 'החתימה על הצהרת הבריאות מתבצעת בציור באצבע או בעכבר בלבד. אם אינכם יכולים לצייר חתימה, התקשרו למועדון והוא ישלים עבורכם את ההצהרה בטלפון.',
   'a11y.statement.contact': 'נתקלתם בקושי נגישות? פנו למועדון בפרטי הקשר שבמסך המועדון — ונתקן.',
   'a11y.reset': 'איפוס התאמות',
   'a11y.close': 'סגירה',

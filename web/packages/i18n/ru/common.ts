@@ -42,6 +42,11 @@ export const common: Bundle = {
   'a11y.links': 'Подчёркивать ссылки',
   'a11y.statement.title': 'Заявление о доступности',
   'a11y.statement.body': 'Приложение соответствует израильскому стандарту 5568 (WCAG 2.1 уровень AA): полная навигация с клавиатуры, подписи для экранных дикторов, достаточная контрастность и настройки отображения в этом меню.',
+  // Decision 13 (2026-09-03 onboarding spec): the typed-name fallback under the signature
+  // pad was deleted -- drawing is the only way to sign. A keyboard-only parent cannot draw,
+  // and the health declaration is a hard gate that blocks the whole app, so this line is the
+  // accepted mitigation, not a nice-to-have.
+  'a11y.statement.signature': 'Подпись под медицинской декларацией ставится только рисованием — пальцем или мышью. Если вы не можете нарисовать подпись, позвоните в клуб — там заполнят декларацию за вас по телефону.',
   'a11y.statement.contact': 'Столкнулись с проблемой доступности? Свяжитесь с клубом по контактам на экране клуба — мы исправим.',
   'a11y.reset': 'Сбросить настройки',
   'a11y.close': 'Закрыть',

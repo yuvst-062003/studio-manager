@@ -4,7 +4,7 @@
 // `dir="rtl"`, the form must NOT submit with a question unanswered, and the gate must NOT render
 // the app behind it. The fourth is 12c finding 5's third answer state, which the artboard does
 // not draw and which a two-position switch cannot express.
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { t } from '@studio/i18n'
@@ -116,55 +116,23 @@ describe('SignaturePad', () => {
       lineTo: vi.fn((x: number, y: number) => strokes.push({ x, y })),
       stroke: vi.fn(),
       clearRect: vi.fn(),
-      // Added with the typed-name route below: it renders the name INTO the canvas, so the
-      // recorder has to answer the text calls or the fallback throws instead of signing.
-      save: vi.fn(),
-      restore: vi.fn(),
-      fillText: vi.fn(),
-      fillStyle: '',
-      font: '',
-      textAlign: '',
-      textBaseline: '',
     })) as unknown as typeof HTMLCanvasElement.prototype.getContext
     HTMLCanvasElement.prototype.toDataURL = vi.fn(() => 'data:image/png;base64,AAAA')
   })
 
-  it('a parent who cannot use a pointer can still sign, by typing their name', async () => {
-    // SC 2.1.1, at the highest cost this product can charge for it. §6.1 step 6 makes the
-    // declaration a HARD GATE — until it is signed, no other screen in the parent app is
-    // reachable — so a pad that only answered to a pointer did not lack an affordance, it
-    // locked a keyboard-only parent out of the entire product with no way to report it from
-    // inside. The typed name is rendered into the canvas, so the backend still receives one
-    // base64 PNG and `signature_image` still holds ink.
-    const onChange = vi.fn()
-    render(<SignaturePad locale="he" onChange={onChange} />)
-
-    const field = screen.getByLabelText(t('he', 'health.declaration.signatureTyped'))
-    await userEvent.type(field, 'דנה כהן')
-
-    expect(onChange).toHaveBeenCalled()
-    expect(onChange.mock.calls.at(-1)?.[0]).toBe('data:image/png;base64,AAAA')
-  })
-
-  it('clearing the typed name un-signs the pad rather than leaving stale ink', async () => {
-    // Emitting `null` is what the form reads to keep its submit button disabled. A pad that
-    // kept the last PNG after the field was emptied would let a parent submit a signature
-    // they had visibly just deleted.
-    const onChange = vi.fn()
-    render(<SignaturePad locale="he" onChange={onChange} />)
-    const field = screen.getByLabelText(t('he', 'health.declaration.signatureTyped'))
-    await userEvent.type(field, 'א')
-    await userEvent.clear(field)
-    expect(onChange).toHaveBeenLastCalledWith(null)
-  })
-
-  it('the typed field is NOT direction-isolated, unlike the canvas', () => {
-    // The canvas is pinned to `ltr` because a STROKE PATH must not mirror. A name is text: a
-    // Hebrew name has to lay out right-to-left like every other name in the app, and copying
-    // the canvas's exception onto it would be cargo-culting the fix.
+  it('renders no typed-name field -- drawing is the only way to sign (decision 13)', () => {
+    // The typed-full-name fallback under the pad is deleted outright, not hidden behind a
+    // flag: a keyboard-only parent who can't draw is told, via the accessibility statement,
+    // to call the club instead. `queryByRole('textbox')` rather than a missing-label check
+    // -- the label string itself no longer exists in any locale, so asking for it would
+    // prove nothing. The canvas (role="img") and the clear button (role="button") staying
+    // present is what rules out "the whole pad failed to render" as the reason.
     render(<SignaturePad locale="he" onChange={vi.fn()} />)
-    const field = screen.getByLabelText(t('he', 'health.declaration.signatureTyped'))
-    expect(field.getAttribute('dir')).toBeNull()
+    expect(screen.queryByRole('textbox')).toBeNull()
+    expect(screen.getByTestId('signature-canvas')).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: t('he', 'health.declaration.signatureClear') }),
+    ).toBeInTheDocument()
   })
 
   it('the canvas is direction-isolated, so a stroke cannot be flipped by an RTL ancestor', () => {
@@ -312,6 +280,40 @@ describe('DeclarationForm', () => {
     )
     expect(client.submit).not.toHaveBeenCalled()
     expect(screen.getByRole('alert')).toHaveTextContent(t('he', 'health.declaration.signatureRequired'))
+  })
+
+  it('a signature drawn on the canvas carries all the way to the submit request body', async () => {
+    // The seam this decision cannot skip: not "the pad reports ink" (already covered above)
+    // and not "the form blocks with no signature" (the test just above) but the join between
+    // them -- draw, answer, submit, and the exact base64 the canvas produced is what
+    // `client.submit` receives. Typing is no longer a way to get here at all.
+    const client = makeClient()
+    render(<DeclarationForm client={client} locale="he" studentId="st1" studentName="נועה לוי" />)
+    await screen.findAllByText('האם יש אסתמה?')
+    const radios = screen.getAllByRole('radio')
+    await userEvent.click(radios[1]!)
+    await userEvent.click(radios[3]!)
+
+    const canvas = screen.getByTestId('signature-canvas')
+    // `fireEvent`, not a raw `dispatchEvent`: each call is wrapped in `act()`, so `hasInk`
+    // has actually flushed by the time the NEXT event fires. Firing all three natively in
+    // one synchronous block left `pointerup`'s handler closed over the pre-update `hasInk`
+    // -- state update and read happening in the same microtask, so the draw never emitted.
+    fireEvent.pointerDown(canvas, { clientX: 100, clientY: 100, pointerId: 1 })
+    fireEvent.pointerMove(canvas, { clientX: 200, clientY: 100, pointerId: 1 })
+    fireEvent.pointerUp(canvas, { clientX: 200, clientY: 100, pointerId: 1 })
+
+    await userEvent.click(
+      screen.getByRole('button', {
+        name: t('he', 'health.declaration.submit'),
+      }),
+    )
+
+    expect(client.submit).toHaveBeenCalledWith('st1', {
+      template_id: 'tpl-1',
+      answers: { asthma: false, allergy: false },
+      signature_image_base64: 'data:image/png;base64,AAAA',
+    })
   })
 
   it('answering yes reveals the detail field, and answering no again clears it', async () => {

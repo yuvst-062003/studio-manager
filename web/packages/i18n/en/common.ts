@@ -34,6 +34,11 @@ export const common: Bundle = {
   'a11y.links': 'Underline links',
   'a11y.statement.title': 'Accessibility statement',
   'a11y.statement.body': 'This app is built to Israeli Standard 5568 (WCAG 2.1 level AA): full keyboard navigation, screen-reader labels, sufficient contrast, and the display adjustments in this menu.',
+  // Decision 13 (2026-09-03 onboarding spec): the typed-name fallback under the signature
+  // pad was deleted -- drawing is the only way to sign. A keyboard-only parent cannot draw,
+  // and the health declaration is a hard gate that blocks the whole app, so this line is the
+  // accepted mitigation, not a nice-to-have.
+  'a11y.statement.signature': 'Signing the health declaration is by drawing only, with a finger or a mouse. If you cannot draw a signature, call the club and they will complete the declaration for you by phone.',
   'a11y.statement.contact': 'Hit an accessibility problem? Contact the club through the details on the club screen — we will fix it.',
   'a11y.reset': 'Reset adjustments',
   'a11y.close': 'Close',

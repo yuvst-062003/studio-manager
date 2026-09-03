@@ -24,6 +24,12 @@ describe('AccessibilityMenu', () => {
     expect(screen.getByText(t('he', 'common.a11y.statement.title'))).toBeInTheDocument()
   })
 
+  it('tells a keyboard-only parent to call the club, since decision 13 deleted the typed-name signature fallback', async () => {
+    renderIn(<AccessibilityMenu locale="he" />)
+    await userEvent.click(screen.getByTestId('a11y-open'))
+    expect(screen.getByText(t('he', 'common.a11y.statement.signature'))).toBeInTheDocument()
+  })
+
   it('applies text size to the ROOT, so every rem in the token layer scales', async () => {
     renderIn(<AccessibilityMenu locale="he" />)
     await userEvent.click(screen.getByTestId('a11y-open'))

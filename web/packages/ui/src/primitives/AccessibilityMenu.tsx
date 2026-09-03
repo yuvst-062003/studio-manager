@@ -173,6 +173,12 @@ export function AccessibilityMenu({ locale }: { locale: Locale }) {
           <details className="studio-a11y__statement">
             <summary>{t(locale, 'common.a11y.statement.title')}</summary>
             <p>{t(locale, 'common.a11y.statement.body')}</p>
+            {/* Decision 13 (2026-09-03 onboarding spec): the signature pad's typed-name
+                fallback is deleted -- drawing only. A keyboard-only parent cannot sign, and
+                the health declaration is a hard gate that blocks the whole app for them, so
+                this line -- call the club, they complete it by phone -- is the mitigation the
+                decision names, not optional copy. */}
+            <p>{t(locale, 'common.a11y.statement.signature')}</p>
             <p>{t(locale, 'common.a11y.statement.contact')}</p>
           </details>
 
