@@ -11,8 +11,6 @@ const sampleDraft: JoinDraft = {
     city: 'רעננה',
     phone: '0548123456',
     rows: [],
-    otherFullName: '',
-    otherNationalId: '',
     relation: 'mother',
   },
   healthDrafts: {},

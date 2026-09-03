@@ -225,6 +225,14 @@ export const people: Bundle = {
   'join.phoneHome': 'Home phone',
   'join.aliyahYear': 'Year of immigration',
   'join.grade': 'Class / kindergarten',
+  // C2 -- F6's per-student panel (list vs. one open panel), F7's per-student
+  // second-parent/pickup default, and decision 14's plan picker.
+  'join.addStudent': 'Add a student',
+  'join.editStudent': 'Edit',
+  'join.saveStudent': 'Save',
+  'join.sameAsPrevious': 'Same as the previous child',
+  'join.planTitle': 'Plan',
+  'join.noCoveringPlan': 'No plan covers the selected training load',
   'join.required': 'Please fill in all required fields',
   'join.nationalIdInvalid': 'National ID is not valid',
   'join.submit': 'Submit',

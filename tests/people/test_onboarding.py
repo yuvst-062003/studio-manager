@@ -9,7 +9,7 @@ creates belongs to the submitting parent, and nothing here touches an existing f
 from __future__ import annotations
 
 import uuid
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
 from app.models.billing import Charge, PricePlan
@@ -1166,3 +1166,291 @@ def test_a_resubmission_applies_a_changed_group_rather_than_dropping_it(
     assert after == {a_group, a_second_group}, (
         "the resubmission's edited group list must be applied, not dropped"
     )
+
+
+# -- C2: per-child other_parent/pickup, and each student's own plan (F7, decision 14) --
+def test_two_minors_in_one_submission_carry_different_second_parent_and_pickup_details(
+    tenant_session, app_session, studio, a_group, twice_weekly
+):
+    """F7: second parent and pickup used to be ONE family-wide pair
+    (`_apply_family_details`'s old `has_minor_children` gate), applied to every child in
+    the batch. A family with two minors who name different pickup people for each --
+    entirely ordinary, a grandmother collects one and an uncle the other -- had the
+    second child's answer silently overwritten by the first's. Per-child `other_parent`/
+    `pickup_contacts` on each `children` row is what fixes it; this asserts the two
+    children actually end up with DIFFERENT records, not just that the request is
+    accepted.
+    """
+    from app.models.people import StudentPickupContact
+
+    dana = {
+        "first_name": "דנה",
+        "last_name": "כהן",
+        "birthdate": date(2016, 3, 14),
+        "group_ids": [a_group],
+        "self": False,
+        "grade": "ג",
+        "national_id": "100000009",
+        "other_parent": {
+            "first_name": "דוד",
+            "last_name": "כהן",
+            "national_id": "100000041",
+            "phone": "0501112222",
+        },
+        "pickup_contacts": [{"name": "סבתא רותי", "phone": "0503334444"}],
+    }
+    yossi = {
+        "first_name": "יוסי",
+        "last_name": "כהן",
+        "birthdate": date(2017, 6, 1),
+        "group_ids": [a_group],
+        "self": False,
+        "grade": "ב",
+        "national_id": "100000058",
+        "other_parent": {
+            "first_name": "שרה",
+            "last_name": "לוי",
+            "national_id": "100000066",
+            "phone": "0505556666",
+        },
+        "pickup_contacts": [{"name": "דוד אבי", "phone": "0507778888"}],
+    }
+    parent, student_ids, _ = OnboardingService.register(
+        tenant_session,
+        studio_id=studio.id,
+        identity_id=None,
+        first_name="מיכל",
+        last_name="כהן",
+        phone=None,
+        email=None,
+        children=[dana, yossi],
+        signer={
+            "national_id": "100000017",
+            "address": "הרצל 12",
+            "city": "רעננה",
+            "relation": "mother",
+        },
+        other_parent=None,
+        pickup_contacts=[],
+        at=T0,
+        schedule=twice_weekly,
+    )
+    tenant_session.commit()
+
+    dana_id, yossi_id = student_ids
+
+    def other_parent_name(student_id: uuid.UUID) -> str | None:
+        guardian_rows = (
+            tenant_session.execute(
+                select(Guardian).where(
+                    Guardian.student_id == student_id, Guardian.person_id != parent.id
+                )
+            )
+            .scalars()
+            .all()
+        )
+        assert len(guardian_rows) == 1
+        other = tenant_session.get(Person, guardian_rows[0].person_id)
+        return other.first_name if other else None
+
+    def pickup_names(student_id: uuid.UUID) -> list[str | None]:
+        rows = (
+            tenant_session.execute(
+                select(StudentPickupContact).where(StudentPickupContact.student_id == student_id)
+            )
+            .scalars()
+            .all()
+        )
+        return sorted((row.contact_encrypted or {}).get("name") for row in rows)
+
+    assert other_parent_name(dana_id) == "דוד"
+    assert other_parent_name(yossi_id) == "שרה"
+    assert pickup_names(dana_id) == ["סבתא רותי"]
+    assert pickup_names(yossi_id) == ["דוד אבי"]
+
+
+def test_a_students_own_chosen_plan_is_applied_even_when_a_cheaper_one_also_covers(
+    tenant_session, app_session, studio, a_group, twice_weekly
+):
+    """Decision 14 -- the parent picks a plan explicitly; `add_child` must apply THAT
+    plan rather than silently falling back to `plan_for_volume`'s own cheapest-covering
+    pick, or a parent's deliberate choice (the club's open/premium plan, say) would be
+    overridden with no error and no visible reason.
+    """
+    cheap = PricePlan(
+        studio_id=studio.id,
+        name="זול",
+        sessions_per_week=2,
+        monthly_amount_agorot=20_000,
+        active_from=T0.date().replace(day=1),
+    )
+    premium = PricePlan(
+        studio_id=studio.id,
+        name="פרימיום",
+        sessions_per_week=None,
+        monthly_amount_agorot=80_000,
+        active_from=T0.date().replace(day=1),
+    )
+    app_session.add_all([cheap, premium])
+    app_session.commit()
+
+    _, student_ids, charged = OnboardingService.register(
+        tenant_session,
+        studio_id=studio.id,
+        identity_id=None,
+        first_name="שירה",
+        last_name="לוי",
+        phone=None,
+        email=None,
+        children=[
+            {
+                "first_name": "נועה",
+                "last_name": "לוי",
+                "birthdate": None,
+                "group_ids": [a_group],
+                "self": False,
+                "price_plan_id": premium.id,
+            }
+        ],
+        at=T0,
+        schedule=twice_weekly,
+    )
+    tenant_session.commit()
+
+    assert charged == 1
+    student = tenant_session.get(Student, student_ids[0])
+    assert student.price_plan_id == premium.id, (
+        "the explicit pick must win over the cheaper plan that also covers this child"
+    )
+
+
+def test_a_price_plan_that_does_not_cover_the_chosen_groups_is_refused(
+    client, fake_provider, app_session, studio, a_group, a_training_year, fake_schedule, as_manager
+):
+    """Decision 14 / §6: 'the server refuses a plan that does not cover the chosen
+    groups.' The picker only ever OFFERS a covering plan, but that is client-side
+    filtering -- CLAUDE.md's own rule is 'refuse rather than accept, when accepting
+    creates a dead end', so a submitted `price_plan_id` too small for the groups just
+    chosen must 422 through the REAL `/register` call, not merely be caught by a
+    hand-built service call a client could route around.
+
+    Scheduled from the REAL clock rather than `twice_weekly`'s `T0`-anchored fixture:
+    the register route reads `at=now()`, not the fixed test clock the service-level
+    tests pin, so `twice_weekly`'s two fixed dates can straddle "today" and read as one
+    weekly session rather than two depending on which real day the suite runs. Three
+    distinct, consecutive days from today sidesteps that -- always a volume of 3,
+    comfortably above a plan claiming to cover one session a week regardless of when
+    this test executes.
+    """
+    anchor = datetime.now(UTC)
+    fake_schedule.sessions[a_group] = [
+        make_session(
+            studio_id=studio.id,
+            group_id=a_group,
+            training_year_id=a_training_year,
+            starts_at=anchor + timedelta(days=offset),
+        )
+        for offset in (1, 2, 3)
+    ]
+
+    too_small = PricePlan(
+        studio_id=studio.id,
+        name="פעם בשבוע",
+        sessions_per_week=1,
+        monthly_amount_agorot=15_000,
+        active_from=date(2020, 1, 1),
+    )
+    app_session.add(too_small)
+    app_session.commit()
+
+    created = client.post("/api/v1/onboarding-link", headers=as_manager.headers)
+    token = created.json()["url"].rsplit("/join/", 1)[1]
+
+    from app.routers import onboarding as onboarding_router
+
+    monkeypatch_target = onboarding_router.ScheduleService
+    try:
+        onboarding_router.ScheduleService = lambda session: fake_schedule  # type: ignore[assignment]
+
+        client.cookies.clear()
+        subject = f"plan-refuse-{uuid.uuid4()}"
+        fake_provider.register(code="c-plan-1", subject=subject, email=f"{subject}@example.invalid")
+        signed = sign_in(client, code="c-plan-1").json()
+        headers = {"Authorization": f"Bearer {signed['access_token']}"}
+
+        response = client.post(
+            f"/api/v1/onboarding/{token}/register",
+            headers=headers,
+            json={
+                "first_name": "שירה",
+                "last_name": "לוי",
+                "signer": {
+                    "national_id": "100000017",
+                    "address": "הרצל 12",
+                    "city": "רעננה",
+                    "relation": "mother",
+                },
+                "children": [
+                    {
+                        "first_name": "נועה",
+                        "last_name": "לוי",
+                        "birthdate": "2016-04-01",
+                        "group_ids": [str(a_group)],
+                        "national_id": "100000009",
+                        "grade": "ד",
+                        "price_plan_id": str(too_small.id),
+                    }
+                ],
+            },
+        )
+    finally:
+        onboarding_router.ScheduleService = monkeypatch_target
+
+    assert response.status_code == 422, response.text
+
+
+def test_the_price_plan_list_is_parent_readable_and_narrow(client, as_manager, app_session, studio):
+    """§6: 'parent-readable live plan list ... returning only name, price,
+    sessions-per-week and nothing else.' Asserts both halves: reachable with no manager
+    session at all (just the join token), and the response carries none of
+    `PricePlanOut`'s manager-only fields (registration fee, standing-order link) -- and
+    excludes a closed plan, which is not one a new family can join.
+    """
+    live = PricePlan(
+        studio_id=studio.id,
+        name="חודשי",
+        sessions_per_week=2,
+        monthly_amount_agorot=30_000,
+        registration_fee_agorot=5_000,
+        active_from=T0.date().replace(day=1),
+        standing_order_link_url="https://pay.upay.co.il/x",
+    )
+    closed = PricePlan(
+        studio_id=studio.id,
+        name="ישן",
+        sessions_per_week=2,
+        monthly_amount_agorot=25_000,
+        active_from=T0.date().replace(day=1) - timedelta(days=400),
+        active_to=T0.date().replace(day=1) - timedelta(days=1),
+    )
+    app_session.add_all([live, closed])
+    app_session.commit()
+
+    created = client.post("/api/v1/onboarding-link", headers=as_manager.headers)
+    token = created.json()["url"].rsplit("/join/", 1)[1]
+
+    response = client.get(f"/api/v1/public/onboarding/{token}/price-plans")
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert [item["id"] for item in body["items"]] == [str(live.id)], "a closed plan is excluded"
+    assert body["items"][0] == {
+        "id": str(live.id),
+        "name": "חודשי",
+        "monthly_amount_agorot": 30_000,
+        "sessions_per_week": 2,
+    }
+
+
+def test_the_price_plan_list_404s_on_an_invalid_token(client):
+    response = client.get("/api/v1/public/onboarding/never-existed/price-plans")
+    assert response.status_code == 404

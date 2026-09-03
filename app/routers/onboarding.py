@@ -32,6 +32,8 @@ from app.core.db import SessionDep, get_engine
 from app.core.tenancy import TenantSession, TenantSessionDep, use_studio
 from app.models.identity import AuthIdentity
 from app.models.studio import Studio
+from app.schemas._pagination import MAX_PAGE_SIZE
+from app.services.billing.catalogue import CatalogueService
 from app.services.health.agreement import (
     AgreementError,
     NationalIdInvalidError,
@@ -153,6 +155,22 @@ class OnboardingChildIn(BaseModel):
     #: kid who signed one in an earlier pass through this same wizard run) or, for a
     #: door that skips health entirely, never asked at all.
     health: OnboardingHealthDeclarationIn | None = None
+    #: F7 -- per-child, additive on top of the register body's own top-level
+    #: `other_parent`/`pickup_contacts`. `None`/empty here falls back to those (kept for
+    #: any caller still submitting the old family-wide shape); a self-guarding child
+    #: never receives either regardless of what is sent
+    #: (`OnboardingService._apply_family_details`). This is what lets two siblings in one
+    #: submission carry DIFFERENT second-parent/pickup details -- the family-wide pair
+    #: this used to be always applied the same answer to every child in the batch.
+    other_parent: OnboardingOtherParentIn | None = None
+    pickup_contacts: list[OnboardingPickupIn] = Field(default_factory=list, max_length=10)
+    #: Decision 14 -- each student picks their own plan, in the students step. `None`
+    #: leaves the child unpriced by choice, same as no plan covering their volume
+    #: (`plan_for_volume`). A non-null id that does not cover this child's chosen groups'
+    #: weekly volume is refused (422) -- CLAUDE.md's "refuse rather than accept, when
+    #: accepting creates a dead end": the picker only ever OFFERS a covering plan, but a
+    #: stale or crafted request must not silently mis-price a family.
+    price_plan_id: uuid.UUID | None = None
 
 
 class OnboardingRegisterIn(BaseModel):
@@ -313,6 +331,70 @@ def onboarding_info(token: str, request: Request, session: SessionDep) -> Onboar
     )
 
 
+# -- the parent-readable plan list ---------------------------------------------
+class OnboardingPricePlanOut(BaseModel):
+    """§6's narrower read: name, price, sessions-per-week -- nothing else. `PricePlanOut`
+    (`app/routers/billing.py`) also carries the registration fee and the standing-order
+    link URL, both fine for a manager and neither for a stranger with a join link."""
+
+    id: uuid.UUID
+    name: str
+    monthly_amount_agorot: int
+    sessions_per_week: int | None
+
+
+class OnboardingPricePlanListOut(BaseModel):
+    items: list[OnboardingPricePlanOut]
+
+
+@router.get(
+    "/public/onboarding/{token}/price-plans",
+    response_model=OnboardingPricePlanListOut,
+)
+def onboarding_price_plans(token: str, session: SessionDep) -> OnboardingPricePlanListOut:
+    """Decision 14's plan picker, its data source. `GET /price-plans` is
+    `ManagerOrOwner`-only and its response shape leaks cost fields a parent should never
+    see -- this reuses `CatalogueService`'s own query (the one place plan selection is
+    read from) rather than a second implementation, and narrows only the auth (the join
+    token, not a manager session) and the response shape.
+
+    The picker filters client-side to plans that cover the groups chosen for one
+    student; `OnboardingService.register` is the actual authority and refuses (422) a
+    submitted plan that does not, so a stale list here costs a round trip, not a
+    mis-priced family.
+    """
+    try:
+        link = OnboardingService.resolve(session, token=token, at=now())
+    except NotFoundError as exc:
+        raise _not_valid() from exc
+
+    with (
+        use_studio(link.studio_id),
+        TenantSession(bind=get_engine(), expire_on_commit=False) as scoped,
+    ):
+        rows, _ = CatalogueService(scoped).list_price_plans(limit=MAX_PAGE_SIZE)
+        # Read every field the response needs BEFORE the rollback below: `rollback()`
+        # expires every ORM instance regardless of `expire_on_commit`, and the session
+        # closes with the `with` block, so building `OnboardingPricePlanOut` rows after
+        # either would hit a detached instance.
+        items = [
+            OnboardingPricePlanOut(
+                id=row.id,
+                name=row.name,
+                monthly_amount_agorot=row.monthly_amount_agorot,
+                sessions_per_week=row.sessions_per_week,
+            )
+            for row in rows
+            # Live only -- a closed plan is not one a new family can join.
+            if row.active_to is None
+        ]
+        # Never committed -- a read must not leave rows behind, same rule
+        # `onboarding_info` above follows.
+        scoped.rollback()
+
+    return OnboardingPricePlanListOut(items=items)
+
+
 # -- the registration ---------------------------------------------------------
 @router.post(
     "/onboarding/{token}/register",
@@ -380,6 +462,23 @@ def register(
                             if child.health is not None
                             else None
                         ),
+                        # F7 -- per child, additive. See `OnboardingChildIn`.
+                        "other_parent": (
+                            {
+                                "first_name": child.other_parent.first_name,
+                                "last_name": child.other_parent.last_name,
+                                "national_id": child.other_parent.national_id,
+                                "phone": child.other_parent.phone,
+                            }
+                            if child.other_parent is not None
+                            else None
+                        ),
+                        "pickup_contacts": [
+                            {"name": contact.name, "phone": contact.phone, "relation": None}
+                            for contact in child.pickup_contacts
+                        ],
+                        # Decision 14 -- per child. See `OnboardingChildIn`.
+                        "price_plan_id": child.price_plan_id,
                     }
                     for child in body.children
                 ],

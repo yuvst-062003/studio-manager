@@ -1,66 +1,214 @@
-// Step 2's flat-list state and its mapping to the wire format. Pure logic, kept
-// separate from the component so the validation/mapping rules are testable without
-// mounting anything -- the same split JoinFamilyStep.tsx's old inline `valid` useMemo
-// and `submit()` never had.
+// Step 2's per-student-panel state and its mapping to the wire format. Pure logic, kept
+// separate from the component so the validation/mapping/plan-coverage rules are testable
+// without mounting anything.
 //
-// Wire format unchanged (per the spec): `JoinFamilyPayload`'s shape and the
-// `POST /api/v1/onboarding/<token>/register` body do not change. The "18+" answer only
-// decides which UI sections render (parent-of-record / pickup) -- it is never sent to
-// the server, and a non-self child's required fields (name, birthdate, national id,
-// grade) are the same regardless of it: `required_registration_fields`
-// (app/services/health/agreement.py) only drops `grade` for a self-guarding student,
-// and a parent-submitted "18+" child is never self-guarding (the parent's account is
-// what registered them).
+// **F6 -- one row is a panel, not a form field.** `JoinFamilyStep.tsx` owns which row's
+// panel is currently open (`editingKey`, transient UI state that has no business in a
+// draft persisted to `localStorage`); this module owns what is IN each row and how a
+// finished list of rows becomes the wire payload.
+//
+// **Decision 12/F8 -- there is no 18+ toggle.** `isRowAdult` derives it from the row's own
+// `birthdate` (`self` rows are adult by construction -- the signer who is filling the
+// wizard). Nothing here sends the derived flag to the server either: it only decides which
+// UI a row shows and, through that, whether `other_parent`/`pickup_contacts` end up
+// non-empty in the payload -- exactly the same mechanism `isAdult` used to be, with the
+// answer read off a fact the parent already typed instead of a second question.
+//
+// **F7 -- second parent and pickup are per row**, not one family-wide pair. A row's own
+// `otherFullName`/`otherNationalId`/`otherPhone`/`pickups` are what THAT student answered.
+// `sameAsPrevious` is a live link to the nearest earlier minor row rather than a value
+// copied once: `resolveRowFamily` walks backward through the list every time it is asked,
+// so editing an earlier minor's details is reflected in every later row still linked to it,
+// and unticking a later row's checkbox is what makes it diverge (its own fields, frozen at
+// whatever they last resolved to, become editable).
 import { isValidNationalId } from '../health/nationalId'
 import type { GuardianRelation, JoinFamilyPayload } from './JoinFamilyStep'
+
+export type PickupContact = { name: string; phone: string }
+
+/** The door-variance hook (wave E). §3's door table gives doors A/B/C one field set for
+ *  the WHOLE run (trial vs member), but door D's own spec is explicit that its choice is
+ *  "a control INSIDE that panel, not a screen of its own" -- one wizard run there can mix
+ *  a member sibling and a trial sibling. That is a per-STUDENT fact, not a per-step one,
+ *  which is why this lives on `SubjectRow` rather than as a prop on `JoinFamilyStep`: a
+ *  step-level prop cannot express Door D's per-row mix at all, and building one anyway
+ *  would have to be undone rather than extended. Only `'member'` exists today (this wave
+ *  builds no other field set); wave E adds `'trial'`, a control that sets it per row, and
+ *  the branch in the panel that swaps ת.ז./address/plan for מועד/emergency-phone (decision
+ *  8) when it is set. */
+export type StudentFieldSet = 'member'
 
 export type SubjectRow = {
   key: string
   kind: 'self' | 'child'
+  /** See `StudentFieldSet`. Always `'member'` today -- wave E's extension point. */
+  fieldSet: StudentFieldSet
   firstName: string
   lastName: string
   birthdate: string
   groupIds: string[]
-  /** The explicit "18 or older?" answer for a `child` row. Meaningless for `self`
-   *  (the signer is always an adult by construction). Defaults `false` -- a fresh row
-   *  is a minor until answered otherwise, so the shared parent/pickup section shows by
-   *  default rather than a family having to opt into it. */
-  isAdult: boolean
   nationalId: string
   grade: string
+  /** Decision 14 -- this student's own plan. `null` until one is picked (or until at
+   *  least one covering plan exists to preselect); a submission with no live plans in
+   *  the studio leaves this `null` on every row, same as the server's own
+   *  `plan_for_volume` returning `None`. */
+  pricePlanId: string | null
+  /** F7's per-row second-parent/pickup fields. Meaningless (and never shown) for a
+   *  `self` row or a row whose derived age is 18+ -- see `isRowAdult`. When
+   *  `sameAsPrevious` is true these are stale placeholders, not the effective values;
+   *  read through `resolveRowFamily`, never these fields directly. */
+  otherFullName: string
+  otherNationalId: string
+  otherPhone: string
+  pickups: PickupContact[]
+  /** F7 -- "אותם פרטים כמו הקודם". Defaults to `true` at row-creation time when a
+   *  previous minor already exists in the list (`emptySubjectRow`'s caller decides
+   *  this, since only the component knows the list at the moment of adding); ticking
+   *  it off is what lets two siblings diverge. */
+  sameAsPrevious: boolean
 }
 
-export function emptySubjectRow(kind: 'self' | 'child'): SubjectRow {
+export function emptySubjectRow(kind: 'self' | 'child', sameAsPrevious = false): SubjectRow {
   return {
     key: crypto.randomUUID(),
     kind,
+    fieldSet: 'member',
     firstName: '',
     lastName: '',
     birthdate: '',
     groupIds: [],
-    isAdult: false,
     nationalId: '',
     grade: '',
+    pricePlanId: null,
+    otherFullName: '',
+    otherNationalId: '',
+    otherPhone: '',
+    pickups: [],
+    sameAsPrevious,
   }
 }
 
-/** Any row still counted as a minor (not "self", and not answered "18+"). Drives the
- *  shared parent-info/pickup section -- one section for every minor, no per-row
- *  toggle, per the 2026-09-03 correction (no backend field to write a per-child
- *  divergence to). */
-export function hasSharedMinors(rows: SubjectRow[]): boolean {
-  return rows.some((row) => row.kind === 'child' && !row.isAdult)
+/** A birthdate string (`YYYY-MM-DD`) → whether that person is 18 or older as of `today`.
+ *  An unparsable or empty birthdate reads as "not yet 18" -- a fresh row with no
+ *  birthdate typed is a minor until proven otherwise, same default the old explicit
+ *  toggle used (defaulting to "no"), so the family/pickup section a parent is about to
+ *  need does not flicker away and back as they type. */
+export function isAdultBirthdate(birthdate: string, today: Date = new Date()): boolean {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(birthdate.trim())
+  if (!match) return false
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const eighteenthBirthday = new Date(year + 18, month - 1, day)
+  return eighteenthBirthday.getTime() <= today.getTime()
 }
 
-function rowValid(row: SubjectRow): boolean {
+/** Decision 12 -- age is derived, never asked. `self` rows are always adult (the signer
+ *  filling the wizard is one, by construction); `child` rows derive it from `birthdate`. */
+export function isRowAdult(row: SubjectRow, today: Date = new Date()): boolean {
+  return row.kind === 'self' || isAdultBirthdate(row.birthdate, today)
+}
+
+function isMinorChildRow(row: SubjectRow, today: Date): boolean {
+  return row.kind === 'child' && !isRowAdult(row, today)
+}
+
+/** Any row still counted as a minor. Drives the signer card's "אני: האם/האב/קרוב אחר"
+ *  control, which is a family-wide fact (who the SIGNER is) and stays shared even though
+ *  the second-parent/pickup answers underneath it are now per row (F7). */
+export function hasSharedMinors(rows: SubjectRow[], today: Date = new Date()): boolean {
+  return rows.some((row) => isMinorChildRow(row, today))
+}
+
+/** Whether a NEW minor row, if added right now, would have an earlier minor to default
+ *  "אותם פרטים כמו הקודם" against. The component calls this once, at add-time, to seed
+ *  `emptySubjectRow`'s `sameAsPrevious` -- ticked by default exactly when this is true. */
+export function hasPreviousMinor(rows: SubjectRow[], today: Date = new Date()): boolean {
+  return hasSharedMinors(rows, today)
+}
+
+export type ResolvedFamily = {
+  otherFullName: string
+  otherNationalId: string
+  otherPhone: string
+  pickups: PickupContact[]
+}
+
+const EMPTY_FAMILY: ResolvedFamily = {
+  otherFullName: '',
+  otherNationalId: '',
+  otherPhone: '',
+  pickups: [],
+}
+
+/** The EFFECTIVE second-parent/pickup details for `rows[index]` -- what a payload or a
+ *  validation check must read, never the row's own fields directly. Not a minor, or not a
+ *  `child` row at all: empty, unconditionally (a `self` row and an 18+ "child" row never
+ *  carry this data, whatever happens to be sitting in their fields). A minor with
+ *  `sameAsPrevious` set walks backward to the nearest earlier minor row and resolves
+ *  THROUGH it recursively -- so a chain of three siblings all ticked "same as previous"
+ *  all resolve to the first one's own typed values, and editing the first is reflected in
+ *  every descendant still linked to it. Backward-only, so the recursion always
+ *  terminates -- a row can never (transitively) point at itself. */
+export function resolveRowFamily(
+  rows: SubjectRow[],
+  index: number,
+  today: Date = new Date(),
+): ResolvedFamily {
+  const row = rows[index]
+  if (!row || !isMinorChildRow(row, today)) return EMPTY_FAMILY
+  if (row.sameAsPrevious) {
+    for (let i = index - 1; i >= 0; i -= 1) {
+      const candidate = rows[i]
+      if (candidate && isMinorChildRow(candidate, today)) {
+        return resolveRowFamily(rows, i, today)
+      }
+    }
+    // Ticked, but no earlier minor exists (yet) to copy from -- an honest blank rather
+    // than falling through to this row's own (equally blank) fields, which would look
+    // identical here but diverge in intent the moment a real earlier minor DOES read
+    // non-empty and this branch should have preferred it instead.
+    return EMPTY_FAMILY
+  }
+  return {
+    otherFullName: row.otherFullName,
+    otherNationalId: row.otherNationalId,
+    otherPhone: row.otherPhone,
+    pickups: row.pickups,
+  }
+}
+
+function rowValid(
+  rows: SubjectRow[],
+  index: number,
+  relation: GuardianRelation,
+  today: Date,
+): boolean {
+  const row = rows[index]
+  if (!row) return false
   if (row.groupIds.length === 0) return false
   if (row.kind === 'self') return true
-  return (
-    row.firstName.trim() !== '' &&
-    row.birthdate.trim() !== '' &&
-    isValidNationalId(row.nationalId) &&
-    row.grade.trim() !== ''
-  )
+  if (row.firstName.trim() === '' || row.birthdate.trim() === '') return false
+  if (!isValidNationalId(row.nationalId)) return false
+  if (row.grade.trim() === '') return false
+  if (isMinorChildRow(row, today)) {
+    const family = resolveRowFamily(rows, index, today)
+    if (relation === 'other') {
+      // §Step 2: "קרוב אחר is the one case where both slots open... the club genuinely
+      // needs both names" -- neither parent is on file, so this row's second-parent
+      // block is the only place either can be recorded.
+      if (family.otherFullName.trim() === '' || !isValidNationalId(family.otherNationalId)) {
+        return false
+      }
+    } else if (
+      family.otherNationalId.trim() !== '' &&
+      !isValidNationalId(family.otherNationalId)
+    ) {
+      return false
+    }
+  }
+  return true
 }
 
 export type FamilyFormState = {
@@ -69,12 +217,10 @@ export type FamilyFormState = {
   city: string
   phone: string
   rows: SubjectRow[]
-  otherFullName: string
-  otherNationalId: string
   relation: GuardianRelation
 }
 
-export function familyFormValid(state: FamilyFormState): boolean {
+export function familyFormValid(state: FamilyFormState, today: Date = new Date()): boolean {
   if (state.rows.length === 0) return false
   if (
     !isValidNationalId(state.signerNationalId) ||
@@ -84,40 +230,22 @@ export function familyFormValid(state: FamilyFormState): boolean {
   ) {
     return false
   }
-  if (hasSharedMinors(state.rows)) {
-    if (state.relation === 'other') {
-      if (state.otherFullName.trim() === '' || !isValidNationalId(state.otherNationalId)) {
-        return false
-      }
-    } else if (
-      state.otherNationalId.trim() !== '' &&
-      !isValidNationalId(state.otherNationalId)
-    ) {
-      return false
-    }
-  }
-  return state.rows.every(rowValid)
+  return state.rows.every((_row, index) => rowValid(state.rows, index, state.relation, today))
 }
 
 export type FamilyPayloadState = FamilyFormState & {
   phoneHome?: string
   aliyahYear?: string
-  otherPhone?: string
-  pickups?: { name: string; phone: string }[]
 }
 
 export function toJoinFamilyPayload(
   displayName: string,
   state: FamilyPayloadState,
+  today: Date = new Date(),
 ): JoinFamilyPayload {
   const parts = displayName.trim().split(/\s+/)
   const first = parts[0] ?? ''
   const last = parts.slice(1).join(' ')
-  const shared = hasSharedMinors(state.rows)
-  const [otherFirst = '', ...otherRest] = state.otherFullName.trim().split(/\s+/)
-  const pickupContacts = (state.pickups ?? [])
-    .map((entry) => ({ name: entry.name.trim(), phone: entry.phone.trim() }))
-    .filter((entry) => entry.name !== '')
 
   return {
     first_name: first,
@@ -131,17 +259,7 @@ export function toJoinFamilyPayload(
       aliyah_year: state.aliyahYear?.trim() || null,
       relation: state.relation,
     },
-    other_parent:
-      shared && (state.otherFullName.trim() || state.relation === 'other')
-        ? {
-            first_name: otherFirst,
-            last_name: otherRest.join(' ') || null,
-            national_id: state.otherNationalId.trim() || null,
-            phone: state.otherPhone?.trim() || null,
-          }
-        : null,
-    pickup_contacts: shared ? pickupContacts : [],
-    children: state.rows.map((row) => {
+    children: state.rows.map((row, index) => {
       if (row.kind === 'self') {
         return {
           first_name: first,
@@ -151,9 +269,17 @@ export function toJoinFamilyPayload(
           self_student: true,
           national_id: null,
           grade: null,
+          price_plan_id: row.pricePlanId,
+          other_parent: null,
+          pickup_contacts: [],
         }
       }
       const [childFirst = '', ...childRest] = row.firstName.trim().split(/\s+/)
+      const family = resolveRowFamily(state.rows, index, today)
+      const pickupContacts = family.pickups
+        .map((entry) => ({ name: entry.name.trim(), phone: entry.phone.trim() }))
+        .filter((entry) => entry.name !== '')
+      const [otherFirst = '', ...otherRest] = family.otherFullName.trim().split(/\s+/)
       return {
         first_name: childFirst,
         last_name: childRest.join(' ') || last,
@@ -162,7 +288,65 @@ export function toJoinFamilyPayload(
         self_student: false,
         national_id: row.nationalId.trim() || null,
         grade: row.grade.trim() || null,
+        price_plan_id: row.pricePlanId,
+        other_parent:
+          family.otherFullName.trim() || state.relation === 'other'
+            ? {
+                first_name: otherFirst,
+                last_name: otherRest.join(' ') || null,
+                national_id: family.otherNationalId.trim() || null,
+                phone: family.otherPhone.trim() || null,
+              }
+            : null,
+        pickup_contacts: pickupContacts,
       }
     }),
   }
+}
+
+// -- decision 14: each student's own plan --------------------------------------------
+export type PlanOption = {
+  id: string
+  name: string
+  monthlyAmountAgorot: number
+  sessionsPerWeek: number | null
+}
+
+/** C11's volume, read client-side from the SAME input the server derives it from: the
+ *  weekdays each chosen group actually trains (`weekly_volume` in
+ *  `app/services/people/attendance_pattern.py` sums `len(expected_weekdays(...))` per
+ *  enrollment, and a fresh self-service enrollment always carries `attends_weekdays:
+ *  None` -- "every session of the group" -- so that sum is exactly the chosen groups'
+ *  weekday counts added together, which is all `JoinGroup.weekdays` already gives the
+ *  client for free). */
+export function weeklyVolumeForGroups(
+  groupIds: string[],
+  groups: readonly { id: string; weekdays: readonly number[] }[],
+): number {
+  const weekdayCountById = new Map(groups.map((group) => [group.id, group.weekdays.length]))
+  return groupIds.reduce((total, id) => total + (weekdayCountById.get(id) ?? 0), 0)
+}
+
+/** §4 step 2 item 5: "only plans that cover the groups chosen". Mirrors
+ *  `plan_for_volume`'s own coverage rule (`sessions_per_week IS NULL` is open membership
+ *  and covers everything; otherwise `sessions_per_week >= volume`) -- this is a CLIENT-
+ *  SIDE filter for what the picker offers, not the authority; `OnboardingService.register`
+ *  re-checks coverage server-side and 422s a plan that does not cover, so a stale list
+ *  here costs a round trip, never a mis-priced family. Cheapest first, name as the
+ *  tiebreak, so the preselected plan (`preselectedPlanId`) is deterministic. */
+export function coveringPlans(volume: number, plans: readonly PlanOption[]): PlanOption[] {
+  if (volume <= 0) return []
+  return plans
+    .filter((plan) => plan.sessionsPerWeek === null || plan.sessionsPerWeek >= volume)
+    .slice()
+    .sort(
+      (a, b) => a.monthlyAmountAgorot - b.monthlyAmountAgorot || a.name.localeCompare(b.name),
+    )
+}
+
+/** "the matching one preselected" -- the cheapest plan that covers this volume, or `null`
+ *  when nothing does (a real answer: a studio with no live plans, or none big enough,
+ *  leaves the student unpriced, same as the server's own fallback). */
+export function preselectedPlanId(volume: number, plans: readonly PlanOption[]): string | null {
+  return coveringPlans(volume, plans)[0]?.id ?? null
 }

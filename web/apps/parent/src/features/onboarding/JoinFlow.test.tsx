@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { t } from '@studio/i18n'
@@ -751,14 +751,25 @@ describe('JoinFlow', () => {
     await user.type(screen.getByLabelText(t('he', 'people.join.address')), 'הרצל 12')
     await user.type(screen.getByLabelText(t('he', 'people.join.city')), 'רעננה')
     await user.type(screen.getByLabelText(t('he', 'people.join.phone')), '0548123456')
+    // F6 -- each student is its own panel now: open, fill, save, then the next.
     await user.click(screen.getByTestId('join-add-self'))
-    await user.click(screen.getAllByRole('checkbox', { name: 'ילדים א · ראשון·שלישי' })[0]!)
+    let panel = screen.getByTestId(/^join-family-panel-/)
+    await user.click(within(panel).getByRole('checkbox', { name: 'ילדים א · ראשון·שלישי' }))
+    await user.click(within(panel).getByTestId(/^join-family-save-/))
+
     await user.click(screen.getByTestId('join-add-child'))
-    await user.type(screen.getAllByLabelText(t('he', 'people.join.fullName'))[2]!, 'דנה כהן')
-    await user.type(screen.getByLabelText(t('he', 'people.join.birthdate')), '2016-03-14')
-    await user.type(screen.getAllByLabelText(t('he', 'people.join.nationalId'))[2]!, '100000009')
-    await user.type(screen.getByLabelText(t('he', 'people.join.grade')), 'ד')
-    await user.click(screen.getAllByRole('checkbox', { name: 'ילדים א · ראשון·שלישי' })[1]!)
+    panel = screen.getByTestId(/^join-family-panel-/)
+    // Index [0]: a fresh row defaults to "minor" until a birthdate says otherwise, so
+    // the family block's own "שם מלא" is already on screen alongside the child's own.
+    await user.type(within(panel).getAllByLabelText(t('he', 'people.join.fullName'))[0]!, 'דנה כהן')
+    await user.type(within(panel).getByLabelText(t('he', 'people.join.birthdate')), '2016-03-14')
+    await user.type(
+      within(panel).getAllByLabelText(t('he', 'people.join.nationalId'))[0]!,
+      '100000009',
+    )
+    await user.type(within(panel).getByLabelText(t('he', 'people.join.grade')), 'ד')
+    await user.click(within(panel).getByRole('checkbox', { name: 'ילדים א · ראשון·שלישי' }))
+    await user.click(within(panel).getByTestId(/^join-family-save-/))
     await user.click(screen.getByTestId('join-submit'))
 
     // Kid 1 (the self row). Local queue advance -- the mocked /me/students above
@@ -917,5 +928,103 @@ describe('JoinFlow', () => {
     const restoredField = await screen.findByLabelText(t('he', 'people.join.nationalId'))
     await waitFor(() => expect(restoredField).toHaveValue('100000017'))
     expect(screen.getByLabelText(t('he', 'people.join.address'))).toHaveValue('הרצל 12')
+  })
+
+  // F7 -- "Assert the seam": driven through the real submit function
+  // (`submitRegistration`, fired by the confirm gate's button), not a hand-built props
+  // object, all the way from step 2's panels to the actual request body.
+  it('F7 -- two students in one submission reach the real register body with DIFFERENT other_parent data', async () => {
+    const user = userEvent.setup()
+    let submittedBody: { children: { other_parent: { first_name: string } | null }[] } | null =
+      null
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input)
+        if (url.includes('/api/v1/public/onboarding/live-token-123456')) {
+          return new Response(
+            JSON.stringify({
+              studio_name: 'מועדון הדגמה',
+              email: null,
+              groups: [{ id: 'g1', name: 'ילדים א', weekdays: [0, 2] }],
+            }),
+            { status: 200 },
+          )
+        }
+        if (
+          url.includes('/api/v1/onboarding/live-token-123456/register') &&
+          init?.method === 'POST'
+        ) {
+          submittedBody = JSON.parse(String(init.body)) as typeof submittedBody
+          return new Response(JSON.stringify({ student_ids: ['st1', 'st2'] }), { status: 201 })
+        }
+        return new Response(JSON.stringify({ items: [] }), { status: 200 })
+      }),
+    )
+
+    render(
+      <JoinFlow
+        billingClient={billingClient}
+        displayName={DISPLAY_NAME}
+        healthClient={healthClient}
+        locale="he"
+        privacyClient={makePrivacyClient()}
+        standingOrderLinks={[]}
+        token="live-token-123456"
+      />,
+    )
+
+    await acceptWelcomeStep(user)
+    await screen.findByTestId('join-family-step')
+    await user.type(screen.getByLabelText(t('he', 'people.join.nationalId')), '100000017')
+    await user.type(screen.getByLabelText(t('he', 'people.join.address')), 'הרצל 12')
+    await user.type(screen.getByLabelText(t('he', 'people.join.city')), 'רעננה')
+    await user.type(screen.getByLabelText(t('he', 'people.join.phone')), '0548123456')
+
+    // First minor -- names its own second parent.
+    await user.click(screen.getByTestId('join-add-child'))
+    let panel = screen.getByTestId(/^join-family-panel-/)
+    await user.type(within(panel).getAllByLabelText(t('he', 'people.join.fullName'))[0]!, 'דנה')
+    await user.type(within(panel).getByLabelText(t('he', 'people.join.birthdate')), '2016-01-01')
+    await user.type(
+      within(panel).getAllByLabelText(t('he', 'people.join.nationalId'))[0]!,
+      '100000009',
+    )
+    await user.type(within(panel).getByLabelText(t('he', 'people.join.grade')), 'ד')
+    await user.type(within(panel).getAllByLabelText(t('he', 'people.join.fullName'))[1]!, 'דוד כהן')
+    await user.click(within(panel).getByRole('checkbox', { name: 'ילדים א · ראשון·שלישי' }))
+    await user.click(within(panel).getByTestId(/^join-family-save-/))
+
+    // Second minor -- "same as previous" defaults on; untick it and type a different name.
+    await user.click(screen.getByTestId('join-add-child'))
+    panel = screen.getByTestId(/^join-family-panel-/)
+    await user.type(within(panel).getAllByLabelText(t('he', 'people.join.fullName'))[0]!, 'יוסי')
+    await user.type(within(panel).getByLabelText(t('he', 'people.join.birthdate')), '2017-06-01')
+    await user.type(
+      within(panel).getAllByLabelText(t('he', 'people.join.nationalId'))[0]!,
+      '100000058',
+    )
+    await user.type(within(panel).getByLabelText(t('he', 'people.join.grade')), 'ב')
+    await user.click(within(panel).getByTestId(/^join-family-same-as-previous-/))
+    await user.type(within(panel).getAllByLabelText(t('he', 'people.join.fullName'))[1]!, 'שרה לוי')
+    await user.click(within(panel).getByRole('checkbox', { name: 'ילדים א · ראשון·שלישי' }))
+    await user.click(within(panel).getByTestId(/^join-family-save-/))
+
+    await user.click(screen.getByTestId('join-submit'))
+
+    await signCurrentHealthDeclaration(user, '0501111111')
+    await signCurrentHealthDeclaration(user, '0502222222')
+
+    await screen.findByTestId('join-confirm-step')
+    await user.click(screen.getByTestId('join-confirm-submit'))
+
+    await waitFor(() => expect(submittedBody).not.toBeNull())
+    const body = submittedBody!
+    expect(body.children).toHaveLength(2)
+    expect(body.children[0]?.other_parent?.first_name).toBe('דוד')
+    expect(body.children[1]?.other_parent?.first_name).toBe('שרה')
+    expect(body.children[0]?.other_parent?.first_name).not.toBe(
+      body.children[1]?.other_parent?.first_name,
+    )
   })
 })

@@ -263,6 +263,14 @@ export const people: Bundle = {
   'join.phoneHome': 'טלפון בבית',
   'join.aliyahYear': 'שנת עליה',
   'join.grade': 'כיתה/גן',
+  // C2 -- F6's per-student panel (list vs. one open panel), F7's per-student
+  // second-parent/pickup default, and decision 14's plan picker.
+  'join.addStudent': 'הוספת תלמיד',
+  'join.editStudent': 'עריכה',
+  'join.saveStudent': 'שמירה',
+  'join.sameAsPrevious': 'אותם פרטים כמו הקודם',
+  'join.planTitle': 'מסלול',
+  'join.noCoveringPlan': 'אין מסלול מתאים למספר האימונים שנבחר',
   'join.required': 'יש למלא את כל שדות החובה',
   'join.nationalIdInvalid': 'מספר ת.ז. אינו תקין',
   'join.submit': 'שליחה',

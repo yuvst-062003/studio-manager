@@ -30,6 +30,7 @@ from typing import Any
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
+from app.models.billing import PricePlan
 from app.models.onboarding import OnboardingLink
 from app.models.people import Enrollment, Student
 from app.models.person import Guardian, Person
@@ -279,9 +280,35 @@ class OnboardingService:
             volume_pairs.append((None, weekdays))
         session.flush()
 
-        # §5.10's suggestion becomes the assignment -- there is no manager in this lane --
-        # through the one rule every self-service door shares. See `plan_for_volume`.
-        plan = plan_for_volume(session, studio_id=studio_id, volume=weekly_volume(volume_pairs))
+        volume = weekly_volume(volume_pairs)
+        plan: PricePlan | None
+        requested_plan_id = child.get("price_plan_id")
+        if requested_plan_id is not None:
+            # Decision 14 -- the parent picked a plan; the picker only ever OFFERS a
+            # covering one, but this is the actual authority (CLAUDE.md: "refuse rather
+            # than accept, when accepting creates a dead end"). A stale or crafted
+            # `price_plan_id` -- closed, another studio's, or too small for the groups
+            # just chosen -- is refused rather than silently repriced or ignored.
+            requested_plan = session.get(PricePlan, requested_plan_id)
+            if (
+                requested_plan is None
+                or requested_plan.studio_id != studio_id
+                or requested_plan.active_to is not None
+                or (
+                    requested_plan.sessions_per_week is not None
+                    and requested_plan.sessions_per_week < volume
+                )
+            ):
+                raise RefusedError(
+                    f"plan {requested_plan_id} does not cover {volume} weekly "
+                    "session(s) for this child"
+                )
+            plan = requested_plan
+        else:
+            # §5.10's suggestion becomes the assignment -- there is no manager in this
+            # lane -- through the one rule every self-service door shares. See
+            # `plan_for_volume`.
+            plan = plan_for_volume(session, studio_id=studio_id, volume=volume)
         if plan is not None:
             student.price_plan_id = plan.id
             session.flush()
@@ -430,13 +457,16 @@ class OnboardingService:
         (parent person, student ids, charges created).
 
         `children` rows: {first_name, last_name, birthdate?, group_ids: [uuid], self: bool,
-        health?: {template_id, answers, signature_image_base64}}. A `self` child is §5.3's
-        adult member -- the parent Person doubles as the student's person, one human in
-        both roles. `health`, when present, is submitted through the same
-        `HealthDeclarationService.submit` the standalone
+        health?: {template_id, answers, signature_image_base64}, other_parent?, pickup_contacts?,
+        price_plan_id?}. A `self` child is §5.3's adult member -- the parent Person doubles as
+        the student's person, one human in both roles. `health`, when present, is submitted
+        through the same `HealthDeclarationService.submit` the standalone
         `POST /students/{id}/health-declaration` uses -- decision 2: 'the single call
         carries ... every health declaration,' not a second request the wizard fires once
-        this one has returned a student id to submit it against.
+        this one has returned a student id to submit it against. `other_parent`/
+        `pickup_contacts`, when present, override the top-level params of the same name for
+        THIS child only (F7); `price_plan_id`, when present, must cover this child's chosen
+        groups' weekly volume or `add_child` refuses (decision 14).
 
         The student ids are what THIS submission created. A child already on the account is
         skipped rather than duplicated, so a resubmission can legitimately return fewer ids
@@ -607,13 +637,24 @@ class OnboardingService:
         actor_person_id: uuid.UUID,
         actor_identity_id: uuid.UUID | None,
     ) -> None:
-        """Write the household facts collected on step 3 onto the rows they belong to."""
+        """Write the household facts collected on step 3 onto the rows they belong to.
+
+        **F7 -- second parent and pickup are read PER CHILD, not once for the whole
+        batch.** `child.get("other_parent")`/`child.get("pickup_contacts")` are what a
+        per-student panel collected (a "same as previous" tick on the client is just a
+        copy at typing time; the server never links two children's records together
+        because of it). A child with no per-child value of its own falls back to these
+        params -- kept for any caller still submitting the old family-wide shape. This is
+        what lets two siblings in one submission carry genuinely different answers,
+        where the old `has_minor_children` gate applied the SAME pair to every non-self
+        child in the batch, self-training adults included whenever any other child in
+        the same submission happened to be a minor.
+        """
         from typing import cast
 
         from app.core.tenancy import TenantSession
         from app.services.health.agreement import AgreementService, is_self_guarding
 
-        has_minor_children = any(not child.get("self") for child, _ in created_pairs)
         tenant_session = cast(TenantSession, session)
 
         for child, student_id in created_pairs:
@@ -647,13 +688,21 @@ class OnboardingService:
                 "national_id": signer["national_id"],
                 "aliyah_year": signer.get("aliyah_year"),
             }
+            # Per-child, falling back to the family-wide params -- see this method's
+            # docstring. A self-guarding child never gets either: nobody else's name
+            # belongs on an adult's own registration just because a sibling in the same
+            # submission is a minor.
+            child_other_parent = None if is_self else (child.get("other_parent") or other_parent)
+            child_pickup_contacts = (
+                [] if is_self else (child.get("pickup_contacts") or pickup_contacts)
+            )
             AgreementService.save_registration(
                 tenant_session,
                 student,
                 child=child_payload,
                 signer=signer_payload,
-                other_parent=other_parent if has_minor_children else None,
-                pickup_contacts=pickup_contacts if has_minor_children else [],
+                other_parent=child_other_parent,
+                pickup_contacts=child_pickup_contacts,
                 subject_person_id=parent.id,
                 actor_person_id=actor_person_id,
                 at=at,

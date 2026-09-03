@@ -229,6 +229,14 @@ export const people: Bundle = {
   'join.phoneHome': 'Домашний телефон',
   'join.aliyahYear': 'Год репатриации',
   'join.grade': 'Класс / сад',
+  // C2 -- F6's per-student panel (list vs. one open panel), F7's per-student
+  // second-parent/pickup default, and decision 14's plan picker.
+  'join.addStudent': 'Добавить ученика',
+  'join.editStudent': 'Изменить',
+  'join.saveStudent': 'Сохранить',
+  'join.sameAsPrevious': 'Те же данные, что у предыдущего ребёнка',
+  'join.planTitle': 'Тарифный план',
+  'join.noCoveringPlan': 'Нет тарифа, покрывающего выбранную нагрузку',
   'join.required': 'Заполните все обязательные поля',
   'join.nationalIdInvalid': 'Недействительный номер удостоверения',
   'join.submit': 'Отправить',

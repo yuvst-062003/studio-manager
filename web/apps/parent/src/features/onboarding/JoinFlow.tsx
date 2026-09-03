@@ -247,9 +247,12 @@ export function JoinFlow({
           last_name: familyPayload.last_name,
           phone: familyPayload.phone,
           signer: familyPayload.signer,
-          other_parent: familyPayload.other_parent,
-          pickup_contacts: familyPayload.pickup_contacts,
           club_terms_accepted: clubTermsAccepted,
+          // F7/decision 14 -- other_parent, pickup_contacts and price_plan_id are now
+          // PER CHILD (`JoinFamilyPayload.children[].*`, built by step 2's per-student
+          // panel), not one shared pair for the whole family. Nothing is sent at the
+          // top level any more; the server's own top-level `other_parent`/
+          // `pickup_contacts` params stay only as a fallback for any other caller.
           children: familyPayload.children.map((child, index) => {
             const draft = healthDrafts[`local-${index}`]
             return {
@@ -260,6 +263,9 @@ export function JoinFlow({
               self_student: child.self_student,
               national_id: child.national_id,
               grade: child.grade,
+              price_plan_id: child.price_plan_id,
+              other_parent: child.other_parent,
+              pickup_contacts: child.pickup_contacts,
               health:
                 draft && draft.templateId
                   ? {
@@ -361,6 +367,7 @@ export function JoinFlow({
         onBack={() => setStep('welcome')}
         onChange={setFamilyDraft}
         onSubmit={handleFamilySubmit}
+        token={token}
       />
     )
   } else if (step === 'health') {
