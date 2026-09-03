@@ -346,7 +346,7 @@
   inline-size: 18px;
 }
 
-.studio-attendance[data-size="sm"] svg {
+.studio-attendance:where([data-size="sm"]) svg {
   block-size: 12px;
   inline-size: 12px;
 }
