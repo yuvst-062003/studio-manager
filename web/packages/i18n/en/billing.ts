@@ -34,6 +34,8 @@ export const billing: Bundle = {
   'card.nothingSelectable': 'No charges are available to pay by card',
   'card.oldestFirst': 'The oldest charges are selected, across every child you pay for',
   'card.monthsForward': 'Includes {{count}} months paid ahead, credited against future charges',
+  'card.demoOrderOpened': 'There is no live payment form in the demo environment. The order was opened, and payment confirmation will arrive separately.',
+  'card.merchantUnconfigured': 'Card payment is not available right now — the club has not finished setting up card processing. You can pay another way.',
 
   'standingOrder.link': 'Set up a standing order',
   'standingOrder.linkFor': 'Set up a standing order for {{name}}',

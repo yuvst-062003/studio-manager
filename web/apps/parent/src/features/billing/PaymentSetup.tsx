@@ -35,6 +35,13 @@ import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { PaymentOverlay } from './PaymentOverlay'
 import type { PaymentOverlayRequest } from './PaymentOverlay'
+// F15's model fix: PaymentsSection.tsx's own `onOrderOpened` already checks this sentinel
+// before opening an overlay. Imported rather than retyped, so the two checks share one
+// literal instead of two copies that can drift. `BillingRequestError` is that file's typed
+// error path (F15, cause 2) -- it preserves the server's `detail.code` instead of
+// discarding the response body, so a failure can be told apart by *code*, not by
+// regex-matching a status number out of a message string that is another module's detail.
+import { BillingRequestError, DEMO_SIMULATOR } from './PaymentsSection'
 import type { BillingClient, ChargeOut, PromiseMethod } from './billingClient'
 import { selectionTotal } from './billingClient'
 
@@ -155,6 +162,10 @@ export function PaymentSetup({
   const [index, setIndex] = useState<number | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // F15, cause 1 — not an error. Set when `payByCard` meets the demo sentinel below:
+  // nothing failed, there is simply no live form to post in this deployment. `run()`'s
+  // catch never touches this.
+  const [notice, setNotice] = useState<string | null>(null)
   const [handSent, setHandSent] = useState(false)
   const [standingSent, setStandingSent] = useState(false)
   // §7.6 -- a failed read used to become `rows = []` indistinguishably from a family who
@@ -211,8 +222,19 @@ export function PaymentSetup({
     if (busy) return
     setBusy(true)
     setError(null)
+    setNotice(null)
     action()
-      .catch(() => setError(t(locale, 'common.error.generic')))
+      .catch((caught: unknown) =>
+        setError(
+          // F15, cause 2 — the CODE selects the message, not the status text. This is
+          // `GET /payment-orders/{ref}/form`'s one 503 branch (its other failure, the demo
+          // studio, is the 409 the sentinel below already covers), so `code` alone tells
+          // it apart from every other failure this screen can hit.
+          caught instanceof BillingRequestError && caught.code === 'merchant_account_unconfigured'
+            ? t(locale, 'billing.card.merchantUnconfigured')
+            : t(locale, 'common.error.generic'),
+        ),
+      )
       .finally(() => setBusy(false))
   }
 
@@ -341,7 +363,20 @@ export function PaymentSetup({
       1,
       0,
     )
-    setOverlay({ kind: 'checkout', form: await client.orderForm(order.public_ref) })
+    const form = await client.orderForm(order.public_ref)
+    if (form.action === DEMO_SIMULATOR.action) {
+      // F15, cause 1. No live uPay form exists here by design (§19.6) -- whether
+      // `orderForm` resolved this sentinel directly (a demo studio) or caught the 409
+      // `demo_studio_has_no_live_form` and turned it into the same value
+      // (PaymentsSection.tsx `orderForm`), there is nothing to post into an overlay. That
+      // also closes the 409 for free: one comparison covers both origins. Nothing failed,
+      // so this is a notice, not an error, and the row list is refreshed rather than left
+      // showing data fetched before this order existed.
+      setNotice(t(locale, 'billing.card.demoOrderOpened'))
+      setReloads((n) => n + 1)
+      return
+    }
+    setOverlay({ kind: 'checkout', form })
   }
 
   function closeOverlay() {
@@ -450,6 +485,12 @@ export function PaymentSetup({
       {error ? (
         <Alert iconLabel={t(locale, 'schedule.setup.summaryTitle')} live tone="danger">
           <span data-testid="setup-error">{error}</span>
+        </Alert>
+      ) : null}
+
+      {notice ? (
+        <Alert iconLabel={t(locale, 'schedule.setup.summaryTitle')} live tone="pending">
+          <span data-testid="setup-notice">{notice}</span>
         </Alert>
       ) : null}
 

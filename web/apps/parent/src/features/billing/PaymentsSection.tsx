@@ -44,8 +44,44 @@ type WireTerms = {
 
 const JSON_HEADERS = { 'Content-Type': 'application/json' }
 
+/**
+ * F15, cause 2's proper fix. `json()` used to discard a non-ok response body entirely —
+ * `Error(\`${status} ${url}\`)` and nothing else — so a caller that wanted to tell one
+ * failure apart from another had nothing to read except the message string. That pushed
+ * an earlier attempt at this into regex-matching `/^503\b/` on the message, which is a
+ * private detail of THIS module (the exact wording) standing in for the thing that
+ * actually varies (the server's `detail.code`) — a reformat of the message would silently
+ * break the check while every test kept passing.
+ *
+ * `code` carries `detail.code` when the body has one (every structured error this API
+ * sends, e.g. `merchant_account_unconfigured` — `app/routers/payments.py`). It is
+ * `undefined` for anything else: a network failure that never reached `json()`, a body
+ * that is not JSON, or a body with no `detail.code` — those callers still only have the
+ * message, exactly as before this existed.
+ */
+export class BillingRequestError extends Error {
+  readonly code?: string
+  constructor(message: string, code?: string) {
+    super(message)
+    this.name = 'BillingRequestError'
+    this.code = code
+  }
+}
+
 async function json<T>(response: Response): Promise<T> {
-  if (!response.ok) throw new Error(`${response.status} ${response.url}`)
+  if (!response.ok) {
+    let code: string | undefined
+    try {
+      const body: unknown = await response.json()
+      const detail = (body as { detail?: unknown } | null)?.detail
+      const detailCode = (detail as { code?: unknown } | null)?.code
+      if (typeof detailCode === 'string') code = detailCode
+    } catch {
+      // No JSON body (or already consumed) — code stays undefined, message is all that
+      // survives, same as every caller got before this existed.
+    }
+    throw new BillingRequestError(`${response.status} ${response.url}`, code)
+  }
   return (await response.json()) as T
 }
 

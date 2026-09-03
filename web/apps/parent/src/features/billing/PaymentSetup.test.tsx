@@ -7,6 +7,11 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { t } from '@studio/i18n'
 import { PaymentSetup, isHandCarried, rowsFor } from './PaymentSetup'
+// The same sentinel PaymentsSection.tsx's own `onOrderOpened` already checks (F15, cause
+// 1) and the real client `makeParentBillingClient` builds (F15, cause 2) -- imported
+// rather than retyped, so a drift here is a compile error, not a second place for the
+// two checks (or the test and the fix) to disagree.
+import { DEMO_SIMULATOR, makeParentBillingClient } from './PaymentsSection'
 import type { BillingClient, ChargeOut } from './billingClient'
 
 const DANA = { id: 's1', first_name: 'דנה', last_name: 'לוי' }
@@ -94,6 +99,67 @@ describe('the onboarding payment step', () => {
     await waitFor(() => expect(createOrder).toHaveBeenCalledWith(['c1', 'c2'], 1, 0))
     await screen.findByTestId('payment-overlay')
     expect(document.querySelector('form[target]')).not.toBeNull()
+  })
+
+  it('F15 cause 1 — says so instead of opening a blank frame when the studio has no live form', async () => {
+    // `orderForm` resolves to the demo sentinel exactly the way the real client does for
+    // both a demo studio (its own explicit action) and the 409 `demo_studio_has_no_live_form`
+    // it is caught and turned into (PaymentsSection.tsx `orderForm`) -- one guard here
+    // closes both. Nothing failed, so this must read as a notice, not an error, and the
+    // row list must reload rather than staying on pre-order data.
+    const openCharges = vi
+      .fn()
+      .mockResolvedValue([charge('c1', 's1', 30_000), charge('c2', 's2', 40_000)])
+    const orderForm = vi.fn().mockResolvedValue(DEMO_SIMULATOR)
+    setup({ client: stub({ openCharges, orderForm }) })
+
+    await answer('card')
+    await userEvent.click(await screen.findByTestId('setup-pay-card'))
+
+    await waitFor(() => expect(orderForm).toHaveBeenCalled())
+    // No iframe overlay: the sentinel is never handed to the overlay-opening code.
+    expect(screen.queryByTestId('payment-overlay')).toBeNull()
+    expect(await screen.findByTestId('setup-notice')).toHaveTextContent(
+      t('he', 'billing.card.demoOrderOpened'),
+    )
+    expect(screen.queryByTestId('setup-error')).toBeNull()
+    // The initial mount read, plus one after the sentinel — the row list is refreshed
+    // rather than left showing data fetched before this order existed.
+    await waitFor(() => expect(openCharges).toHaveBeenCalledTimes(2))
+  })
+
+  it('F15 cause 2 — names the reason when card payment is not configured for this deployment', async () => {
+    // Driven through the REAL client's error path (`makeParentBillingClient`,
+    // PaymentsSection.tsx) rather than an `Error` this test builds by hand — this asserts
+    // the shape the server actually produces (`detail.code` on a 503), the same shape
+    // `GET /payment-orders/{ref}/form` sends when `UPAY_MERCHANT_EMAIL` is unset
+    // (app/routers/payments.py).
+    const fetcher = vi.fn(async (path: string) => {
+      if (path === '/api/v1/payment-orders/ref-1/form') {
+        return new Response(
+          JSON.stringify({
+            detail: {
+              code: 'merchant_account_unconfigured',
+              message: 'card payment is not configured for this deployment',
+            },
+          }),
+          { status: 503 },
+        )
+      }
+      throw new Error(`unexpected fetch in this test: ${path}`)
+    })
+    const orderForm = makeParentBillingClient(fetcher).orderForm
+    const createOrder = vi.fn().mockResolvedValue({ public_ref: 'ref-1' })
+    setup({ client: stub({ createOrder, orderForm }) })
+
+    await answer('card')
+    await userEvent.click(await screen.findByTestId('setup-pay-card'))
+
+    expect(await screen.findByTestId('setup-error')).toHaveTextContent(
+      t('he', 'billing.card.merchantUnconfigured'),
+    )
+    expect(screen.queryByTestId('payment-overlay')).toBeNull()
+    expect(screen.queryByTestId('setup-notice')).toBeNull()
   })
 
   it('gives הוראת קבע a separate link per child, each opened in the in-app overlay', async () => {

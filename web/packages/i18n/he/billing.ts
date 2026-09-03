@@ -58,6 +58,15 @@ export const billing: Bundle = {
   'card.nothingSelectable': 'אין חיובים זמינים לתשלום בכרטיס',
   'card.oldestFirst': 'נבחרים החיובים הוותיקים ביותר, לכל הילדים שאתם משלמים עבורם',
   'card.monthsForward': 'כולל {{count}} חודשים מראש, שיקוזזו מהחיובים הבאים',
+  // F15, cause 1 — the demo studio has no live uPay form (§19.6); `orderForm` resolves to
+  // the same sentinel PaymentsSection.tsx already checks, whether the reason is the demo
+  // studio's own 409 or the sentinel directly. Nothing failed — the order is open
+  // server-side and an IPN settles it later — so this reads as a notice, not an error.
+  'card.demoOrderOpened': 'בסביבת הדגמה אין טופס תשלום חי. ההזמנה נפתחה, ואישור התשלום יגיע בנפרד.',
+  // F15, cause 2 — `GET /payment-orders/{ref}/form` answers 503 `merchant_account_unconfigured`
+  // when the deployment has no uPay merchant email set. Not the family's fault, and every
+  // other route on this screen still works — said so here rather than a generic failure.
+  'card.merchantUnconfigured': 'תשלום בכרטיס אשראי אינו זמין כרגע — המועדון עדיין לא השלים את הגדרת הסליקה. אפשר לשלם באמצעי אחר.',
 
   'standingOrder.link': 'קישור להקמת הוראת קבע',
   // One link per child, so the anchor text repeats — this is the accessible name that
