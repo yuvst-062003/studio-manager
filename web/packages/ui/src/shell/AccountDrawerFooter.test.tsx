@@ -12,13 +12,17 @@ import { t } from '@studio/i18n'
 import { ThemeProvider } from '../ThemeProvider'
 import { AccountDrawerFooter } from './AccountDrawerFooter'
 
-function renderFooter(locale: 'he' | 'en' = 'he', onChooseLocale = vi.fn()) {
+function renderFooter(
+  locale: 'he' | 'en' = 'he',
+  onChooseLocale = vi.fn(),
+  onSignOut = vi.fn(),
+) {
   render(
     <ThemeProvider>
-      <AccountDrawerFooter locale={locale} onChooseLocale={onChooseLocale} />
+      <AccountDrawerFooter locale={locale} onChooseLocale={onChooseLocale} onSignOut={onSignOut} />
     </ThemeProvider>,
   )
-  return onChooseLocale
+  return { onChooseLocale, onSignOut }
 }
 
 describe('AccountDrawerFooter', () => {
@@ -50,10 +54,20 @@ describe('AccountDrawerFooter', () => {
   it('reports a language choice to the app rather than handling it internally', () => {
     // The locale lives in each app's own state and is threaded down as a prop; a footer that
     // kept its own copy would change the drawer and nothing else on the screen.
-    const onChoose = renderFooter()
+    const { onChooseLocale } = renderFooter()
     return userEvent.click(screen.getByRole('radio', { name: 'English' })).then(() => {
-      expect(onChoose).toHaveBeenCalledWith('en')
+      expect(onChooseLocale).toHaveBeenCalledWith('en')
     })
+  })
+
+  it('offers a way to sign out', async () => {
+    // 2e never drew one -- the account drawer covered club-switching, language and
+    // theme, and sign-out had no home anywhere in the signed-in app. The refusal
+    // screen's own sign-out button (RefusalScreen) is reachable only when access is
+    // denied, which is not the same control for a normally signed-in person.
+    const { onSignOut } = renderFooter()
+    await userEvent.click(screen.getByRole('button', { name: t('he', 'common.nav.signOut') }))
+    expect(onSignOut).toHaveBeenCalledTimes(1)
   })
 
   it('carries a visible state label for the theme, not colour alone', async () => {

@@ -793,6 +793,7 @@ export default function App() {
             <AccountDrawerFooter
               locale={locale}
               onChooseLocale={setLocale}
+              onSignOut={() => void session.signOut()}
               accountName={session.displayName}
             />
           }

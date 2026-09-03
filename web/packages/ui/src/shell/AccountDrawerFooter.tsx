@@ -20,6 +20,7 @@ import type { CSSProperties } from 'react'
 import { t } from '@studio/i18n'
 import { LOCALES } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
+import { Button } from '../primitives/Button'
 import { ThemeControl } from '../primitives/ThemeControl'
 // The one list of language endonyms. Re-typing them here is how the first-run picker
 // and the drawer end up disagreeing about how to spell Русский.
@@ -63,10 +64,17 @@ const optionStyle: CSSProperties = {
 export function AccountDrawerFooter({
   locale,
   onChooseLocale,
+  onSignOut,
   accountName,
 }: {
   locale: Locale
   onChooseLocale: (next: Locale) => void
+  /** Required, not optional: 2e never drew a sign-out control anywhere in the signed-in
+   *  app, only on the refusal screen a denied visitor sees. Making this a required prop
+   *  is what stops a future caller of this shared footer from reintroducing the same
+   *  gap silently -- the same reasoning the no-inert-Button guard already applies to
+   *  every `<Button>` in the tree. */
+  onSignOut: () => void
   /** 2e's header line — the signed-in person, now that /auth/me names them. */
   accountName?: string | null
 }) {
@@ -118,6 +126,10 @@ export function AccountDrawerFooter({
           dark: t(locale, 'common.theme.state.dark'),
         }}
       />
+
+      <Button onClick={onSignOut} type="button" variant="ghost">
+        {t(locale, 'common.nav.signOut')}
+      </Button>
     </div>
   )
 }

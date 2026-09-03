@@ -613,7 +613,12 @@ function AuthedApp() {
               <p style={{ margin: 0 }}>
                 <a href="#/privacy">{t(locale, 'reports.privacy.title')}</a>
               </p>
-              <AccountDrawerFooter locale={locale} onChooseLocale={setLocale} accountName={session.displayName} />
+              <AccountDrawerFooter
+                locale={locale}
+                onChooseLocale={setLocale}
+                onSignOut={() => void session.signOut()}
+                accountName={session.displayName}
+              />
             </>
           }
           studios={session.studios.map((s) => ({
