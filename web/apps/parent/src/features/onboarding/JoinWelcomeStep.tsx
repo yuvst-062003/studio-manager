@@ -30,7 +30,7 @@ import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { PAYMENT_CLAUSE_KEYS } from '../health/ClubTermsStep'
 import type { ConsentState, PrivacyClient } from '../privacy/privacyClient'
-import { OnboardingWizardChrome, stepPosition } from './OnboardingWizardChrome'
+import { OnboardingWizardChrome, stepPosition, type WizardStepKey } from './OnboardingWizardChrome'
 import { WizardNavButtons } from './WizardNavButtons'
 
 /** Mirrors `app/services/health/club_terms.py`'s `CLUB_TERMS_VERSION`. There is no
@@ -126,6 +126,16 @@ export type JoinWelcomeStepProps = {
    *  boolean keeps the call site symmetrical with `JoinFlow`'s existing
    *  `clubTermsAccepted` state rather than hardcoding `true` two files apart. */
   onAccept: (clubTermsAccepted: boolean) => void
+  /** Door A (wave E, `/t/<slug>`): an anonymous caller can never reach the
+   *  authenticated `POST /privacy/consents` this step normally writes through on
+   *  submit -- `true` skips that write entirely and calls `onAccept` the moment all
+   *  three cards are ticked, leaving the caller to carry the three ticks into its OWN
+   *  write (`agreements_accepted` on the trial booking). `false` (the default) is
+   *  every other door's existing behaviour, unchanged. */
+  deferAcceptance?: boolean
+  /** Wave E's door → step-list mapping. Defaults to the full 4-step list -- Doors
+   *  B/C/D's existing rail, unchanged; Door A passes its own 3-step list. */
+  steps?: readonly WizardStepKey[]
 }
 
 function popupTitle(locale: Locale, doc: WelcomeDoc): string {
@@ -140,6 +150,8 @@ export function JoinWelcomeStep({
   logoUrl,
   privacyClient,
   onAccept,
+  deferAcceptance = false,
+  steps,
 }: JoinWelcomeStepProps) {
   const [state, setState] = useState<ConsentState | null | undefined>(undefined)
   const [accepted, setAccepted] = useState({ terms: false, privacy: false, club: false })
@@ -182,6 +194,13 @@ export function JoinWelcomeStep({
 
   async function submit() {
     if (!allThree || saving) return
+    // Door A (wave E): an anonymous caller has no authenticated route to record this
+    // through, and the deferred model carries the three ticks into its OWN write
+    // instead (`agreements_accepted`) -- never a network call from this step at all.
+    if (deferAcceptance) {
+      onAccept(true)
+      return
+    }
     setSaving(true)
     setFailed(false)
     try {
@@ -217,7 +236,8 @@ export function JoinWelcomeStep({
     <div data-testid="join-welcome">
       <OnboardingWizardChrome
         locale={locale}
-        position={stepPosition('welcome')}
+        position={stepPosition('welcome', steps)}
+        steps={steps}
         title={t(locale, 'health.onboarding.step.welcome')}
       >
         <div className="studio-page-header">

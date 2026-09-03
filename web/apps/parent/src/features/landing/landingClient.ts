@@ -35,7 +35,14 @@ export type BookingRequest = {
     group_id: string
     session_id?: string | null
   }[]
+  //: F21, closed: one entry per child, the REAL declaration collected through the same
+  //: popup every other door uses (`template_id`/`answers`/`signature_image_base64`) --
+  //: never the hardcoded `{ confirmed: true }` this door used to send regardless of what
+  //: the parent ticked.
   trial_health_declarations: Record<string, unknown>[]
+  //: §2 decision 5 -- the welcome screen's three ticks, deferred into this one write
+  //: because an anonymous caller has no authenticated route to record them through.
+  agreements_accepted: boolean
 }
 
 /** What a failed booking means, in terms the page can render. */

@@ -347,54 +347,54 @@ describe('booking — every call to action reaches the flow', () => {
     window.history.replaceState(null, '', '/')
   })
 
-  it('the hero CTA opens the flow as a dialog, asking who is booking, with the first group carried in', async () => {
+  // §3 Door A -- the booking form inside the dialog is now the shared wizard, opening
+  // on `JoinWelcomeStep` (agreements), never a "who is booking" form directly. There is
+  // no separate sign-in step to offer a shortcut from any more (decision 5: the wizard
+  // itself is anonymous-capable end to end), so the `booking-sign-in-link` assertions
+  // these tests used to make no longer apply to step 1 -- see `BookingFlow.test.tsx`
+  // for the wizard's own coverage of decisions 5/8/9 and F21.
+  it('the hero CTA opens the flow as a dialog, on the wizard’s welcome step', async () => {
     const user = userEvent.setup()
     render(<PublicLanding slug="judo-tel-aviv" locale="he" client={clientReturning(TWO_GROUPS)} />)
     await user.click(await screen.findByTestId('landing-hero-cta'))
     const dialog = screen.getByTestId('booking-dialog')
     expect(dialog).toHaveAttribute('role', 'dialog')
-    // Step 1 is a form, not a sign-in wall (2026-08-31). The sign-in link is still there
-    // as a shortcut for a family that already has an account, which is what the href
-    // assertion below is about.
-    expect(screen.getByTestId('booking-you')).toBeInTheDocument()
-    expect(screen.getByTestId('booking-sign-in-link')).toHaveAttribute(
-      'href',
-      expect.stringContaining(encodeURIComponent('book=g1')),
-    )
+    expect(within(dialog).getByTestId('join-welcome')).toBeInTheDocument()
   })
 
-  it('each derived week-grid slot books THAT group', async () => {
+  it('each derived week-grid slot opens the same dialog', async () => {
     const user = userEvent.setup()
     render(<PublicLanding slug="judo-tel-aviv" locale="he" client={clientReturning(TWO_GROUPS)} />)
     await user.click(await screen.findByTestId('landing-slot-1-g2'))
-    expect(screen.getByTestId('booking-dialog')).toBeInTheDocument()
-    expect(screen.getByTestId('booking-sign-in-link')).toHaveAttribute(
-      'href',
-      expect.stringContaining(encodeURIComponent('book=g2')),
-    )
+    const dialog = screen.getByTestId('booking-dialog')
+    expect(within(dialog).getByTestId('join-welcome')).toBeInTheDocument()
   })
 
   // "The user presses the free trial and can't pick the team he wants" (2026-08-31) went
   // through two answers. The first was a select in the DIALOG HEADER, which fixed the dead
   // end and introduced a worse problem: the booking already asks for a group per child in
-  // step 2 — siblings are often not in the same one — so a second control above the steps
-  // could only ever disagree with those. The owner read it as what it was, a question that
-  // does not belong to that screen. The header carries no group at all now, and the page's
-  // picked group survives as a PRE-FILL on the first child, which is the useful half.
-  it('carries the page’s chosen group into the first child rather than showing it twice', async () => {
+  // the students step — siblings are often not in the same one — so a second control above
+  // the steps could only ever disagree with those. The owner read it as what it was, a
+  // question that does not belong to that screen. The header carries no group at all now,
+  // and the page's picked group survives as a PRE-FILL on the first row instead, which is
+  // the useful half -- decision 8's own panel, not a select in the header.
+  it('carries the page’s chosen group into the first row rather than showing it twice', async () => {
     const user = userEvent.setup()
     render(<PublicLanding slug="judo-tel-aviv" locale="he" client={clientReturning(TWO_GROUPS)} />)
     await user.click(await screen.findByTestId('landing-hero-cta'))
     const dialog = screen.getByTestId('booking-dialog')
 
-    // Nothing above the steps asks for a group.
+    // Nothing above the wizard's steps asks for a group.
     expect(within(dialog).queryByTestId('booking-dialog-group')).toBeNull()
 
-    // It is pre-filled on the child instead, where the booking actually reads it.
-    await user.type(within(dialog).getByTestId('booking-you-first-name'), 'רונית')
-    await user.type(within(dialog).getByTestId('booking-you-email'), 'ronit@example.test')
-    await user.click(within(dialog).getByTestId('booking-to-children'))
-    expect(within(dialog).getByTestId('booking-group-0')).toHaveValue('g1')
+    await user.click(within(dialog).getByTestId('join-welcome-terms-check'))
+    await user.click(within(dialog).getByTestId('join-welcome-privacy-check'))
+    await user.click(within(dialog).getByTestId('join-welcome-club-check'))
+    await user.click(within(dialog).getByTestId('join-welcome-continue'))
+
+    // It is pre-filled on the first row instead, where the booking actually reads it.
+    const panel = await within(dialog).findByTestId(/^booking-row-panel-/)
+    expect(within(panel).getByTestId('booking-row-group-0-g1')).toBeChecked()
   })
 
   it('the close button still closes the flow back to the page', async () => {
@@ -435,13 +435,25 @@ describe('booking — every call to action reaches the flow', () => {
 
   it('?book= reopens the flow after the sign-in round trip, group intact', async () => {
     // The return_path carries the choice; landing on it signed-in must resume the booking,
-    // not drop the parent back on the shop window to start again.
+    // not drop the parent back on the shop window to start again. §2 decision 5: EVERY
+    // door shows the welcome screen and all three agreements, signed in or not -- so the
+    // dialog still opens on `JoinWelcomeStep` first, and the carried group shows up on
+    // the first row once the parent reaches the students step.
+    const user = userEvent.setup()
     window.history.replaceState(null, '', '/t/judo-tel-aviv?book=g2')
     render(
       <PublicLanding slug="judo-tel-aviv" locale="he" client={clientReturning(TWO_GROUPS)} signedIn />,
     )
-    expect(await screen.findByTestId('booking-dialog')).toBeInTheDocument()
-    expect(screen.getByTestId('booking-group-0')).toHaveValue('g2')
+    const dialog = await screen.findByTestId('booking-dialog')
+    expect(within(dialog).getByTestId('join-welcome')).toBeInTheDocument()
+
+    await user.click(within(dialog).getByTestId('join-welcome-terms-check'))
+    await user.click(within(dialog).getByTestId('join-welcome-privacy-check'))
+    await user.click(within(dialog).getByTestId('join-welcome-club-check'))
+    await user.click(within(dialog).getByTestId('join-welcome-continue'))
+
+    const panel = await within(dialog).findByTestId(/^booking-row-panel-/)
+    expect(within(panel).getByTestId('booking-row-group-0-g2')).toBeChecked()
   })
 })
 

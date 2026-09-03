@@ -471,8 +471,6 @@ describe('§3 Door D — #/add-child opens the shared wizard, not the old 3-fiel
     vi.stubGlobal(
       'fetch',
       stubAuthed((url, init) => {
-        // eslint-disable-next-line no-console
-        console.log('FETCH', url)
         if (url.includes('/api/v1/me/students/register') && init?.method === 'POST') {
           registerCalled = true
           return new Response(JSON.stringify({ student_ids: ['st-new'] }), { status: 201 })
@@ -510,11 +508,15 @@ describe('§3 Door D — #/add-child opens the shared wizard, not the old 3-fiel
         if (url.includes('/api/v1/public/studios/demo/price-plans')) {
           return new Response(JSON.stringify({ items: [] }), { status: 200 })
         }
+        if (url.includes('/api/v1/health-templates/tmpl1')) {
+          return new Response(
+            JSON.stringify({ id: 'tmpl1', kind: 'full', version: 1, schema: HEALTH_SCHEMA }),
+            { status: 200 },
+          )
+        }
         if (url.includes('/api/v1/health-templates')) {
           return new Response(
-            JSON.stringify({
-              items: [{ id: 'tmpl1', kind: 'full', version: 1, schema: HEALTH_SCHEMA }],
-            }),
+            JSON.stringify({ items: [{ id: 'tmpl1', kind: 'full', version: 1 }] }),
             { status: 200 },
           )
         }
@@ -537,16 +539,6 @@ describe('§3 Door D — #/add-child opens the shared wizard, not the old 3-fiel
     await user.click(within(panel).getByTestId(/^join-family-save-/))
     const before = studentsGetCalls
     await user.click(screen.getByTestId('join-submit'))
-    for (const delay of [50, 200, 400, 800]) {
-      // eslint-disable-next-line no-await-in-loop
-      await new Promise((resolve) => setTimeout(resolve, delay))
-      // eslint-disable-next-line no-console
-      console.log(
-        `DEBUG@${delay}`,
-        document.querySelector('main')?.textContent?.slice(0, 200),
-        document.body.querySelector('[data-testid]')?.getAttribute('data-testid'),
-      )
-    }
 
     // The health step, still local -- nothing written yet.
     await screen.findByTestId('health-opening-question')
@@ -627,5 +619,65 @@ describe('B1 -- the join shell decides sign-in-or-wizard, not step 1 (F1)', () =
     expect(screen.queryByTestId('join-sign-in-wall')).toBeNull()
 
     globalThis.history.pushState({}, '', '/')
+  })
+})
+
+describe('§3 Door C — /?invite=<token> opens the shared wizard, not the old gate stack', () => {
+  afterEach(() => {
+    globalThis.history.pushState({}, '', '/')
+  })
+
+  it('mounts the wizard, never the old ConsentGate/HealthGate screens, for a freshly invited parent', async () => {
+    // `AccessGate` has already redeemed the token and reloaded the session by the time
+    // any of this renders (its own test file covers that half) -- `access.parent` is
+    // true from the first `/auth/refresh`. What is under test here is App.tsx's OWN
+    // fork: with `?invite=` still on the URL and nothing agreed to yet, the OLD
+    // ConsentGate/HealthGate/PaymentSetupGate stack must never render at all.
+    window.history.replaceState(null, '', '/?invite=tok-123')
+    vi.stubGlobal(
+      'fetch',
+      stubAuthed((url) => {
+        if (url.includes('/api/v1/me/onboarding-status')) {
+          return new Response(
+            JSON.stringify({
+              steps: [
+                { key: 'agreements', complete: false },
+                { key: 'students', complete: false },
+                { key: 'health', complete: true },
+                { key: 'payment', complete: true },
+              ],
+              next: 'agreements',
+            }),
+            { status: 200 },
+          )
+        }
+        if (url.includes('/api/v1/me/students')) {
+          // The manager's stub -- "the student, name only".
+          return new Response(
+            JSON.stringify({
+              items: [
+                {
+                  id: 'st-stub',
+                  first_name: 'תום',
+                  last_name: 'ישראלי',
+                  status: 'active',
+                  health_status: 'missing',
+                  agreement_complete: false,
+                },
+              ],
+            }),
+            { status: 200 },
+          )
+        }
+        return null
+      }),
+    )
+
+    render(<App />)
+
+    await screen.findByTestId('join-welcome')
+    // Never the old per-step gates -- this is the wizard's OWN step 1, not a screen
+    // asking about an existing child's consent/health/payment one gate at a time.
+    expect(screen.queryByTestId('gated-children-loading')).toBeNull()
   })
 })

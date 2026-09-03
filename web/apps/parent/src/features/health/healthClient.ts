@@ -201,3 +201,26 @@ export function makeHealthClient(fetcher: Fetcher) {
 }
 
 export type HealthClient = ReturnType<typeof makeHealthClient>
+
+/** Door A (wave E, `/t/<slug>`) — anonymous, or signed in with no membership yet, either
+ *  way with no `TenantSession` `GET /health-templates` can resolve. §2 decision 7: "one
+ *  health form for everybody... asked through the popup, here as everywhere," so this
+ *  door needs the SAME schema every other door signs against, read through the
+ *  unauthenticated `GET /public/studios/{slug}/health-template` instead
+ *  (`app/routers/public.py`) -- one request, no list-then-fetch-highest-version dance,
+ *  because the server already resolves "the current published full template" itself.
+ *
+ *  Only `template()` is populated: `JoinHealthStep`/`SubjectHealthFlow` -- the one
+ *  caller this feeds -- never calls anything else on a `HealthClient` (no
+ *  `client.submit()`; B2's deferred model flushes health through the door's own write,
+ *  `POST /trial-bookings/self`'s `trial_health_declarations`). The cast is deliberate
+ *  rather than a stub for every other method: a stub that silently resolved would be a
+ *  correctness bug waiting for a future caller, and a stub that threw would be
+ *  indistinguishable from a real one crashing.
+ */
+export function makePublicHealthClient(fetcher: Fetcher, slug: string): HealthClient {
+  return {
+    template: (): Promise<HealthFormTemplateOut> =>
+      fetcher(`/api/v1/public/studios/${slug}/health-template`).then(json<HealthFormTemplateOut>),
+  } as unknown as HealthClient
+}

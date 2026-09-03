@@ -25,7 +25,7 @@ import {
   type SubjectHealthDraft,
 } from './healthDraft'
 import { HealthReviewPopup } from './HealthReviewPopup'
-import { OnboardingWizardChrome, stepPosition } from './OnboardingWizardChrome'
+import { OnboardingWizardChrome, stepPosition, type WizardStepKey } from './OnboardingWizardChrome'
 
 const queueStyle: CSSProperties = {
   display: 'flex',
@@ -247,6 +247,10 @@ export type JoinHealthStepProps = {
   onSigned: (draft: SubjectHealthDraft) => void
   signerName?: string
   students: readonly GatedStudent[]
+  /** Wave E's door → step-list mapping. Defaults to the full 4-step list -- every
+   *  existing call site's unchanged rail; Door A (`/t/<slug>`) passes its own 3-step
+   *  list (no payment step). */
+  steps?: readonly WizardStepKey[]
 }
 
 export function JoinHealthStep({
@@ -257,6 +261,7 @@ export function JoinHealthStep({
   onSigned,
   signerName,
   students,
+  steps,
 }: JoinHealthStepProps) {
   // Server truth (`needsFullDeclaration`) alone would loop forever under the deferred
   // model: a signed kid's `health_status` stays 'missing' until the final flush, which
@@ -272,7 +277,8 @@ export function JoinHealthStep({
       <OnboardingWizardChrome
         locale={locale}
         onBack={onBack}
-        position={stepPosition('health')}
+        position={stepPosition('health', steps)}
+        steps={steps}
         title={t(locale, 'health.onboarding.step.health')}
       >
         {queue.length > 1 ? (
