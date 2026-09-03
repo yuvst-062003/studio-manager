@@ -291,8 +291,30 @@ done
 # relative to web/, which is where vitest runs.
 if [ "$V" = "core" ]; then
   web_tests=$(
-    find web/packages -path '*/src/*' \
-      \( -name '*.test.ts' -o -name '*.test.tsx' \) 2>/dev/null | sed 's|^web/||' | sort
+    {
+      find web/packages -path '*/src/*' \
+        \( -name '*.test.ts' -o -name '*.test.tsx' \) 2>/dev/null || true
+      # Each app's App.tsx wires every vertical's screens into one shell -- it belongs to
+      # no feature_dirs glob any vertical could plausibly claim, only to src/ itself, so it
+      # sits here with the rest of M0's cross-cutting layer rather than in any lane's own
+      # branch above. Glob, not find: web/apps/*/src/*.test.tsx expands one level below
+      # src/ and no deeper, so it can never re-match a features/ test some other lane's
+      # gate already runs.
+      #
+      # *.test.tsx only, deliberately not *.test.ts: at the app root, .ts (not .tsx) is
+      # exactly the manifest/service-worker/source-scan tests (manifest.test.ts,
+      # sw-precache.test.ts, App.stylesheets.test.ts, routes.reachable.test.ts) --
+      # sw-precache.test.ts throws outright without `npm run build` first (see its own
+      # comment), which lane-check never runs, so sweeping *.test.ts here would turn this
+      # gate red for a reason that has nothing to do with core.
+      #
+      # This is the gap that let web/apps/parent/src/App.test.tsx go from 19/19 to 16/20
+      # through a full people, health and billing lane-check, all green, because none of
+      # them -- or any other vertical -- reach a file that belongs to no feature.
+      for path in web/apps/*/src/*.test.tsx; do
+        if [ -f "$path" ]; then echo "$path"; fi
+      done
+    } | sed 's|^web/||' | sort
   )
 else
   web_tests=$(
@@ -311,7 +333,22 @@ fi
 
 # eslint targets, also relative to web/.
 if [ "$V" = "core" ]; then
-  eslint_targets="packages"
+  eslint_targets=$(
+    {
+      echo packages
+      # Same app-shell reasoning as the frontend gate above, extended past the tests to
+      # the source they cover: App.tsx and its siblings (NetworkStatus.tsx, StaffAlerts.tsx,
+      # GlobalSearch.tsx, main.tsx, registerSW.ts) are the one place D10's logical-property
+      # rule and every other eslint rule would otherwise never reach -- no feature_dirs glob
+      # points at web/apps/*/src itself, only at its features/ subdirectory. One level below
+      # src/ only, not a bare directory: `eslint apps/dashboard/src` recurses and would pull
+      # every features/ file back in under core's gate too, double-run and mis-owned by the
+      # lane that actually wrote it.
+      for path in web/apps/*/src/*.ts web/apps/*/src/*.tsx; do
+        if [ -f "$path" ]; then echo "${path#web/}"; fi
+      done
+    } | sort
+  )
 else
   eslint_targets=$(
     {
