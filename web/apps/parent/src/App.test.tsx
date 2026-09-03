@@ -341,7 +341,15 @@ describe('L6 — the anonymous landing touches no session', () => {
     // one case where a refresh is known to be worth it — without acting on it the booking
     // flow greets the freshly-signed-in parent with its sign-in step again, forever.
     // Redesign 2026-08-29: the flow no longer opens on load; the return_path carries the
-    // picked group as `?book=`, and THAT reopens the flow at the child form.
+    // picked group as `?book=`, and THAT reopens the flow.
+    //
+    // F21 (2026-09-03) rebuilt Door A onto the shared wizard, so "resumes" no longer means
+    // jumping straight to a step of its own — every door's wizard opens at the SAME step 1
+    // (`JoinWelcomeStep`, `join-welcome`) regardless of how it was reached. What proves this
+    // is actually a resume rather than a fresh, empty booking is the GROUP surviving the
+    // round trip: `initialGroupId` (carried from `?book=g1`) fires `BookingFlow`'s slot
+    // fetch for g1 on mount, before any card is even ticked, and the same group is still the
+    // one selected once the family step renders — never a blank pick the parent has to redo.
     globalThis.history.pushState({}, '', '/t/gladiator?book=g1&signed_in=1')
     const calls: string[] = []
     vi.stubGlobal(
@@ -361,35 +369,78 @@ describe('L6 — the anonymous landing touches no session', () => {
             { status: 200 },
           )
         }
-        return new Response(
-          JSON.stringify({
-            studio_name: 'גלדיאטור',
-            slug: 'gladiator',
-            logo_url: null,
-            default_locale: 'he',
-            headline: null,
-            about: null,
-            address: null,
-            photo_urls: [],
-            groups: [
-              {
-                id: 'g1',
-                name: 'מתחילים',
-                description: null,
-                age_min: null,
-                age_max: null,
-                training_weekdays: [],
-                training_times: [],
-              },
-            ],
-          }),
-          { status: 200 },
-        )
+        if (url.includes('/api/v1/privacy/consents')) {
+          return new Response(
+            JSON.stringify({
+              outstanding: [],
+              policy_version: 1,
+              policy_version_label: 'v1',
+              policy_is_draft: false,
+            }),
+            { status: 200 },
+          )
+        }
+        if (url.includes('/api/v1/public/groups/g1/trial-slots')) {
+          return new Response(JSON.stringify({ items: [] }), { status: 200 })
+        }
+        if (url.includes('/api/v1/public/studios/gladiator/landing')) {
+          return new Response(
+            JSON.stringify({
+              studio_name: 'גלדיאטור',
+              slug: 'gladiator',
+              logo_url: null,
+              default_locale: 'he',
+              headline: null,
+              about: null,
+              address: null,
+              photo_urls: [],
+              groups: [
+                {
+                  id: 'g1',
+                  name: 'מתחילים',
+                  description: null,
+                  age_min: null,
+                  age_max: null,
+                  training_weekdays: [],
+                  training_times: [],
+                },
+              ],
+            }),
+            { status: 200 },
+          )
+        }
+        return new Response(JSON.stringify({ items: [] }), { status: 200 })
       }),
     )
     render(<App />)
     await waitFor(() => expect(calls.some((url) => url.includes('/auth/refresh'))).toBe(true))
-    await waitFor(() => expect(screen.getByTestId('booking-children')).toBeInTheDocument())
+
+    // The wizard opened on its own — no click on "הצטרפות" — proving the session restore
+    // is what reopened it, not a fresh visit.
+    await screen.findByTestId('join-welcome')
+    // The PICKED group's slots are already being fetched, before the parent has ticked a
+    // single card: `initialGroupId` carried g1 through the redirect into `BookingFlow`'s
+    // mount effect, the seam `?book=` actually has to cross.
+    await waitFor(() =>
+      expect(calls.some((url) => url.includes('/api/v1/public/groups/g1/trial-slots'))).toBe(
+        true,
+      ),
+    )
+
+    // Walk the wizard's own step 1 to prove the resumed group survives all the way to
+    // where a parent would actually see it, not only in an unobserved fetch.
+    const user = userEvent.setup()
+    await screen.findByTestId('join-welcome-terms-version')
+    await user.click(screen.getByTestId('join-welcome-terms-check'))
+    await user.click(screen.getByTestId('join-welcome-privacy-check'))
+    await user.click(screen.getByTestId('join-welcome-club-check'))
+    await user.click(screen.getByTestId('join-welcome-continue'))
+
+    await screen.findByTestId('booking-students-step')
+    // Still g1 — the exact group chosen before the OAuth round trip, not merely SOME
+    // group, and not a blank pick the parent is made to repeat.
+    expect(screen.getByTestId('booking-row-group-0-g1')).toBeChecked()
+
     // The marker is one-shot: stripped so a copied URL or a later reload does not refire
     // it — while `book` survives the strip; it is what resumed the flow just now.
     expect(globalThis.location.search).toBe('?book=g1')
