@@ -96,8 +96,13 @@ class GuardianCreate(BaseModel):
     model class is built, so the name has to exist by then.
     """
 
-    first_name: str = Field(min_length=1, max_length=80)
-    last_name: str = Field(min_length=1, max_length=80)
+    #: Optional (2026-09-03 onboarding doors spec, decision 20) — the manager's 3-field
+    #: add-student form sends a guardian EMAIL and nothing else: "Everything the manager
+    #: leaves empty, the parent fills in the wizard." A guardian with no name here is not
+    #: a guardian with no name forever; §5.3's invitation is still what attaches a login,
+    #: and the parent's own name is asked in the wizard they land in.
+    first_name: str | None = Field(default=None, min_length=1, max_length=80)
+    last_name: str | None = Field(default=None, min_length=1, max_length=80)
     relation: str = Field(default="parent", max_length=40)
     phone: str | None = Field(default=None, max_length=40)
     email: str | None = Field(default=None, max_length=255)

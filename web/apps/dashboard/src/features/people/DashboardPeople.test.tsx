@@ -281,131 +281,166 @@ describe('documentLabelKey', () => {
 // -- 3c: adding a student -------------------------------------------------------
 
 describe('AddStudentScreen — 3c', () => {
-  it('attaches to an existing PARENT, and never claims a household exists', () => {
-    // The artboard says "משק בית"; L9 says there is no such entity. The screen attaches to
-    // a parent, and the copy says parent.
+  // Decision 20 (2026-09-03 onboarding doors spec) — student-first, three fields.
+  // Everything below replaces the parent-first, multi-child, group-and-weekday form.
+
+  it('has exactly three fields — full name, 18+, guardian email — and none of the old ones', () => {
     render(<AddStudentScreen locale="he" client={makeClient()} />)
-    expect(screen.getByTestId('add-student-parent-hint')).toHaveTextContent(
-      t('he', 'people.request.matchedHint'),
+    expect(screen.getByLabelText(t('he', 'people.student.fullName'))).toBeInTheDocument()
+    expect(screen.getByLabelText(t('he', 'people.student.isAdult'))).toBeInTheDocument()
+    expect(screen.getByLabelText(t('he', 'people.student.guardianEmail'))).toBeInTheDocument()
+    // The parent's own name/phone, the group picker and the weekday picker all left with
+    // the parent-first form — the manager types almost nothing (§3, Door C).
+    expect(screen.queryByLabelText(t('he', 'people.student.firstName'))).toBeNull()
+    expect(screen.queryByLabelText(t('he', 'people.student.lastName'))).toBeNull()
+    expect(screen.queryByLabelText(t('he', 'people.student.phone'))).toBeNull()
+    expect(screen.queryByTestId('add-student-group-0')).toBeNull()
+    expect(screen.queryByTestId('add-student-add-child')).toBeNull()
+  })
+
+  it('splits a typed full name on the first whitespace, and sends the guardian email with NO guardian names', async () => {
+    // Proving test 1 — assert on the body the client actually sends, not on props.
+    const user = userEvent.setup()
+    const client = makeClient()
+    render(<AddStudentScreen locale="he" client={client} />)
+    await user.type(screen.getByLabelText(t('he', 'people.student.fullName')), 'דנה כהן לוי')
+    await user.type(
+      screen.getByLabelText(t('he', 'people.student.guardianEmail')),
+      'yael@example.invalid',
+    )
+    await user.click(screen.getByTestId('add-student-submit'))
+
+    await waitFor(() => expect(client.createStudent).toHaveBeenCalled())
+    const body = vi.mocked(client.createStudent).mock.calls[0]![0]
+    expect(body.first_name).toBe('דנה')
+    // Split on the FIRST whitespace only — a second surname stays in the last name.
+    expect(body.last_name).toBe('כהן לוי')
+    expect(body.guardian.email).toBe('yael@example.invalid')
+    expect(body.guardian).not.toHaveProperty('first_name')
+    expect(body.guardian).not.toHaveProperty('last_name')
+  })
+
+  it('accepts a single-word full name — not refused, and no invented last name', async () => {
+    // Proving test 2.
+    const user = userEvent.setup()
+    const client = makeClient()
+    render(<AddStudentScreen locale="he" client={client} />)
+    await user.type(screen.getByLabelText(t('he', 'people.student.fullName')), 'מדונה')
+    await user.click(screen.getByTestId('add-student-submit'))
+
+    await waitFor(() => expect(client.createStudent).toHaveBeenCalled())
+    const body = vi.mocked(client.createStudent).mock.calls[0]![0]
+    expect(body.first_name).toBe('מדונה')
+    // Non-empty (the API's last_name has min_length=1) but carries no invented name.
+    expect(body.last_name.length).toBeGreaterThan(0)
+    expect(body.last_name.trim()).toBe('')
+  })
+
+  it('18 ומעלה makes the student their own guardian, with their own email', async () => {
+    // Proving test 3.
+    const user = userEvent.setup()
+    const client = makeClient()
+    render(<AddStudentScreen locale="he" client={client} />)
+    await user.type(screen.getByLabelText(t('he', 'people.student.fullName')), 'רון לוי')
+    await user.click(screen.getByLabelText(t('he', 'people.student.isAdult')))
+    await user.type(
+      screen.getByLabelText(t('he', 'people.student.guardianEmail')),
+      'ron@example.invalid',
+    )
+    await user.click(screen.getByTestId('add-student-submit'))
+
+    await waitFor(() => expect(client.createStudent).toHaveBeenCalled())
+    const body = vi.mocked(client.createStudent).mock.calls[0]![0]
+    expect(body.guardian.first_name).toBe('רון')
+    expect(body.guardian.last_name).toBe('לוי')
+    expect(body.guardian.email).toBe('ron@example.invalid')
+    expect(body.guardian.relation).toBe('self')
+  })
+
+  it('says the email could not be sent when the deployment cannot send it, and still shows the copyable link', async () => {
+    // Proving test 4.
+    const client = makeClient({
+      createStudent: vi.fn(() =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify({
+              invitation_token: 'tok-123',
+              invitation_url: 'https://parent.example/?invite=tok-123',
+              invitation_email_configured: false,
+            }),
+            { status: 201, headers: { 'Content-Type': 'application/json' } },
+          ),
+        ),
+      ),
+    })
+    const user = userEvent.setup()
+    render(<AddStudentScreen locale="he" client={client} />)
+    await user.type(screen.getByLabelText(t('he', 'people.student.fullName')), 'דנה כהן')
+    await user.click(screen.getByTestId('add-student-submit'))
+
+    expect(await screen.findByTestId('add-student-invite-email-unavailable')).toHaveTextContent(
+      t('he', 'people.invite.emailNotConfigured'),
+    )
+    // The copyable link is still there — a silent absence is what decision 21 forbids.
+    expect(screen.getByTestId('add-student-invite-url')).toHaveTextContent('tok-123')
+  })
+
+  it('says the email was sent, when it was', async () => {
+    // Proving test 5.
+    const client = makeClient({
+      createStudent: vi.fn(() =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify({
+              invitation_token: 'tok-123',
+              invitation_url: 'https://parent.example/?invite=tok-123',
+              invitation_email_configured: true,
+              invitation_email_sent: true,
+            }),
+            { status: 201, headers: { 'Content-Type': 'application/json' } },
+          ),
+        ),
+      ),
+    })
+    const user = userEvent.setup()
+    render(<AddStudentScreen locale="he" client={client} />)
+    await user.type(screen.getByLabelText(t('he', 'people.student.fullName')), 'דנה כהן')
+    await user.click(screen.getByTestId('add-student-submit'))
+
+    expect(await screen.findByTestId('add-student-invite-email-sent')).toHaveTextContent(
+      t('he', 'people.invite.emailSent'),
     )
   })
 
-  it('offers a group, and enrols the child into it in the same save', async () => {
-    // §5.4(a) — 'parent details -> child details AND GROUP -> save. Creates everything
-    // immediately.' The API accepted a group_id and silently dropped it, so this form
-    // never sent one and every manager-added student arrived as a lead with no enrollment.
+  it('renders no email notice at all when the response carries neither field yet', async () => {
+    // The two booleans are OPTIONAL — a parallel lane fills them in. A response from a
+    // backend that has not shipped that piece must not be read as a definite failure.
     const user = userEvent.setup()
-    const client = makeClient()
-    render(<AddStudentScreen locale="he" client={client} />)
-    const [parentFirst, parentLast] = screen.getAllByLabelText(t('he', 'people.student.firstName'))
-    await user.type(parentFirst!, 'יעל')
-    await user.type(screen.getAllByLabelText(t('he', 'people.student.lastName'))[0]!, 'כהן')
-    await user.type(parentLast!, 'דנה')
-    await user.type(screen.getAllByLabelText(t('he', 'people.student.lastName'))[1]!, 'כהן')
-    await user.selectOptions(await screen.findByTestId('add-student-group-0'), 'g1')
+    render(<AddStudentScreen locale="he" client={makeClient()} />)
+    await user.type(screen.getByLabelText(t('he', 'people.student.fullName')), 'דנה כהן')
     await user.click(screen.getByTestId('add-student-submit'))
 
-    await waitFor(() => expect(client.createStudent).toHaveBeenCalled())
-    const body = vi.mocked(client.createStudent).mock.calls[0]![0]
-    expect(body.group_id).toBe('g1')
-  })
-
-  it('collects C12’s weekdays over the chosen group’s real training days', async () => {
-    // C12 — 'EVERY enrolment form collects attends_weekdays as checkboxes over the group's
-    // scheduled weekdays, all ticked by default.' All ticked sends NULL, because an array
-    // freezes today's timetable into the row and §5.6 rewrites future sessions.
-    const user = userEvent.setup()
-    const client = makeClient()
-    render(<AddStudentScreen locale="he" client={client} />)
-    const [parentFirst, parentLast] = screen.getAllByLabelText(t('he', 'people.student.firstName'))
-    await user.type(parentFirst!, 'יעל')
-    await user.type(screen.getAllByLabelText(t('he', 'people.student.lastName'))[0]!, 'כהן')
-    await user.type(parentLast!, 'דנה')
-    await user.type(screen.getAllByLabelText(t('he', 'people.student.lastName'))[1]!, 'כהן')
-    await user.selectOptions(await screen.findByTestId('add-student-group-0'), 'g1')
-
-    // The group trains Sunday and Wednesday, both ticked by default.
-    expect(await screen.findByTestId('weekday-0')).toBeChecked()
-    expect(screen.getByTestId('weekday-3')).toBeChecked()
-    await user.click(screen.getByTestId('weekday-3'))
-    await user.click(screen.getByTestId('add-student-submit'))
-
-    await waitFor(() => expect(client.createStudent).toHaveBeenCalled())
-    expect(vi.mocked(client.createStudent).mock.calls[0]![0].attends_weekdays).toEqual([0])
-  })
-
-  it('sends no group when the manager picked none, rather than inventing one', async () => {
-    // §5.4a — a lead is 'a real student who simply has no enrollment'. The phone-enquiry
-    // case must stay reachable from this form.
-    const user = userEvent.setup()
-    const client = makeClient()
-    render(<AddStudentScreen locale="he" client={client} />)
-    const [parentFirst, parentLast] = screen.getAllByLabelText(t('he', 'people.student.firstName'))
-    await user.type(parentFirst!, 'יעל')
-    await user.type(screen.getAllByLabelText(t('he', 'people.student.lastName'))[0]!, 'כהן')
-    await user.type(parentLast!, 'דנה')
-    await user.type(screen.getAllByLabelText(t('he', 'people.student.lastName'))[1]!, 'כהן')
-    await user.click(screen.getByTestId('add-student-submit'))
-
-    await waitFor(() => expect(client.createStudent).toHaveBeenCalled())
-    const body = vi.mocked(client.createStudent).mock.calls[0]![0]
-    expect(body.group_id ?? null).toBeNull()
+    await screen.findByTestId('add-student-invitation')
+    expect(screen.queryByTestId('add-student-invite-email-sent')).toBeNull()
+    expect(screen.queryByTestId('add-student-invite-email-unavailable')).toBeNull()
+    expect(screen.queryByTestId('add-student-invite-email-not-sent')).toBeNull()
   })
 
   it('renders no price on the add form', () => {
-    // L2 — the price is on the STUDENT and `price_plan` is W4's table. A group picker is
-    // the closest this screen gets to money, and it stops there.
+    // L2 — the price is on the STUDENT and `price_plan` is W4's table; this screen never
+    // touches it.
     render(<AddStudentScreen locale="he" client={makeClient()} />)
     expect(document.body.textContent ?? '').not.toMatch(/₪/)
-  })
-
-  it('sends the address and never a person_id it guessed', async () => {
-    // L7 — matching is on a VERIFIED email or phone, and a client cannot verify anything.
-    const user = userEvent.setup()
-    const client = makeClient()
-    render(<AddStudentScreen locale="he" client={client} />)
-    const [parentFirst, parentLast] = screen.getAllByLabelText(
-      t('he', 'people.student.firstName'),
-    )
-    await user.type(parentFirst!, 'יעל')
-    await user.type(screen.getAllByLabelText(t('he', 'people.student.lastName'))[0]!, 'כהן')
-    await user.type(screen.getByLabelText(t('he', 'people.student.email')), 'y@example.invalid')
-    await user.type(parentLast!, 'דנה')
-    await user.type(screen.getAllByLabelText(t('he', 'people.student.lastName'))[1]!, 'כהן')
-    await user.click(screen.getByTestId('add-student-submit'))
-
-    await waitFor(() => expect(client.createStudent).toHaveBeenCalled())
-    const body = vi.mocked(client.createStudent).mock.calls[0]![0]
-    expect(body.guardian.email).toBe('y@example.invalid')
-    expect(JSON.stringify(body)).not.toContain('person_id')
-  })
-
-  it('adds a second child in one action', async () => {
-    // §5.4a's worked example — two children submitted together.
-    const user = userEvent.setup()
-    render(<AddStudentScreen locale="he" client={makeClient()} />)
-    await user.click(screen.getByTestId('add-student-add-child'))
-    expect(screen.getByTestId('add-student-child-1')).toBeInTheDocument()
+    expect(document.body.textContent ?? '').not.toContain(t('he', 'people.convert.pricePlan'))
   })
 
   it('shows the invitation once, for a parent at the desk', async () => {
     const user = userEvent.setup()
     render(<AddStudentScreen locale="he" client={makeClient()} />)
-    await user.type(screen.getAllByLabelText(t('he', 'people.student.firstName'))[0]!, 'יעל')
-    await user.type(screen.getAllByLabelText(t('he', 'people.student.lastName'))[0]!, 'כהן')
-    await user.type(screen.getAllByLabelText(t('he', 'people.student.firstName'))[1]!, 'דנה')
-    await user.type(screen.getAllByLabelText(t('he', 'people.student.lastName'))[1]!, 'כהן')
+    await user.type(screen.getByLabelText(t('he', 'people.student.fullName')), 'דנה כהן')
     await user.click(screen.getByTestId('add-student-submit'))
 
     expect(await screen.findByTestId('add-student-invitation')).toHaveTextContent('tok-123')
-  })
-
-  it('has NO price field', () => {
-    // L2 — `price_plan` is W4's table; the conversion screen stores an id and the prices
-    // screen is M6's.
-    render(<AddStudentScreen locale="he" client={makeClient()} />)
-    expect(document.body.textContent ?? '').not.toContain(t('he', 'people.convert.pricePlan'))
-    expect(document.body.textContent ?? '').not.toContain('₪')
   })
 
   it('labels every input', () => {
@@ -413,6 +448,7 @@ describe('AddStudentScreen — 3c', () => {
     for (const input of screen.getAllByRole('textbox')) {
       expect(input).toHaveAccessibleName()
     }
+    expect(screen.getByLabelText(t('he', 'people.student.isAdult'))).toBeInTheDocument()
   })
 })
 

@@ -101,8 +101,14 @@ class StudentService:
         first_name: str,
         last_name: str,
         birthdate: date | None,
-        guardian_first_name: str,
-        guardian_last_name: str,
+        #: `str | None` — decision 20 (2026-09-03 onboarding doors spec): the manager's
+        #: 3-field add-student form sends a guardian email and no guardian name at all.
+        #: A matched guardian never touches these (the existing Person's own name is
+        #: kept); a brand-new one falls back to "" below rather than crashing on
+        #: `None.strip()` — the parent's real name is asked for in the wizard they land
+        #: in through the invitation, not guessed by the manager.
+        guardian_first_name: str | None,
+        guardian_last_name: str | None,
         guardian_email: str | None,
         guardian_phone: str | None,
         at: datetime,
@@ -176,8 +182,11 @@ class StudentService:
             guardian_person_id = matched.person_id
         else:
             parent = Person(
-                first_name=guardian_first_name.strip(),
-                last_name=guardian_last_name.strip(),
+                #: `person.first_name`/`last_name` are NOT NULL — "" satisfies that without
+                #: inventing a name the manager never typed. Decision 20's nameless-guardian
+                #: form is the only caller that reaches this with `None`.
+                first_name=(guardian_first_name or "").strip(),
+                last_name=(guardian_last_name or "").strip(),
                 email=guardian_email,
                 phone=guardian_phone,
                 created_at=at,
@@ -560,8 +569,11 @@ class StudentService:
         session: Session,
         *,
         student_id: uuid.UUID,
-        first_name: str,
-        last_name: str,
+        #: `str | None` — `GuardianCreate` (decision 20) accepts a nameless guardian, and
+        #: this endpoint takes that same schema. See `create`'s docstring for the ""
+        #: fallback below.
+        first_name: str | None,
+        last_name: str | None,
         email: str | None,
         phone: str | None,
         relation: str,
@@ -581,8 +593,8 @@ class StudentService:
             person_id = matched.person_id
         else:
             person = Person(
-                first_name=first_name.strip(),
-                last_name=last_name.strip(),
+                first_name=(first_name or "").strip(),
+                last_name=(last_name or "").strip(),
                 email=email,
                 phone=phone,
                 created_at=at,

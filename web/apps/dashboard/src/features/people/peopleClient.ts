@@ -95,8 +95,13 @@ export function makeDashboardPeopleClient(fetcher: Fetcher) {
       /** C12 — NULL means every session of that group, which is the default. */
       attends_weekdays?: number[] | null
       guardian: {
-        first_name: string
-        last_name: string
+        //: Optional (decision 20, 2026-09-03 onboarding doors spec) — the dashboard's
+        //: 3-field add-student form sends a guardian email with no name at all;
+        //: `GuardianCreate` (`app/schemas/people.py`) accepts that. Every existing
+        //: caller (`ImportStudentsPanel`) still sends both, so this widening is
+        //: backward compatible.
+        first_name?: string
+        last_name?: string
         email?: string | null
         phone?: string | null
         relation?: string

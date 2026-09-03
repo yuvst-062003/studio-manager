@@ -47,6 +47,13 @@ export const people: Bundle = {
   'student.age': 'גיל',
   'student.phone': 'טלפון',
   'student.email': 'אימייל',
+  // -- dashboard 3c, decision 20 — student-first, three fields ------------------
+  'student.fullName': 'שם מלא',
+  'student.isAdult': '18 ומעלה?',
+  // Decision 12 — this question survives ONLY here, because the form below has no
+  // birthdate to derive an age from. Do not delete it to match the parent wizard.
+  'student.isAdultHint': 'החניך/ה יהיו האחראים על עצמם, והאימייל למטה הוא שלהם',
+  'student.guardianEmail': 'אימייל ההורה',
   'student.joinedOn': 'הצטרף בתאריך',
   'student.leftOn': 'עזב בתאריך',
   'student.group': 'קבוצה',
@@ -110,6 +117,11 @@ export const people: Bundle = {
   'import.row.created': 'נוצר',
   'import.row.failed': 'נכשל',
   'invite.linkHint': 'שלחו להורה את הקישור — הוא נכנס עם חשבון Google ומחובר ישירות לילד:',
+  // -- decision 21's visible half — the email half must never be silent ---------
+  'invite.emailSent': 'ההזמנה נשלחה גם במייל',
+  'invite.emailNotConfigured':
+    'שליחת מייל אינה מוגדרת בסביבה הזו — יש להעביר את הקישור להורה בעצמכם',
+  'invite.emailNotSent': 'ההזמנה לא נשלחה במייל — יש להעביר את הקישור להורה בעצמכם',
   'landing.title': 'שיעור ניסיון חינם',
   'landing.subtitle': 'בחרו קבוצה ומועד, ואנחנו נחזור אליכם',
   'landing.chooseGroup': 'בחירת קבוצה',

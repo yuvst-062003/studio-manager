@@ -1,41 +1,33 @@
-// Dashboard artboard 3c — הוספת חניך: "שיוך למשק בית קיים במקום חשבון חדש".
+// Dashboard artboard 3c — הוספת חניך.
 //
-// The artboard says "משק בית". **There is no household** (L9, §4.3): "'My children' is
-// simply SELECT student_id FROM guardian WHERE person_id = me." So the screen attaches the
-// child to an existing **parent**, and the copy says parent — the artboard's word describes
-// the intent, not an entity anybody should build.
+// **Student-first, three fields** (2026-09-03 onboarding doors spec, decision 20):
+// full name · 18 ומעלה? · guardian email. Nothing else. It used to be parent-first —
+// parent's own first/last name and phone, then a repeatable list of children each with a
+// group and a weekday picker — but "Door C is Door B with one row pre-filled" (spec §3):
+// the manager types almost nothing, and the invited parent fills the rest in the wizard.
+// A group the manager guessed here is a group the parent then has to correct there.
 //
-// **The client never sends a person_id it guessed.** L7 — matching is on a VERIFIED email or
-// phone, and a client cannot verify anything. It submits the address; the server decides
-// whether that is somebody it already has, which is why `guardian_matched` and not a client
-// hint is what ends up in the audit trail.
+// The artboard's "משק בית" is still a PARENT, not a household — L9, §4.3: "'my children'
+// is simply SELECT student_id FROM guardian WHERE person_id = me." No entity for it exists.
 //
-// **No price field** (L2). `price_plan` is W4's table; the conversion screen stores an id,
-// and the prices screen is M6's.
-import { useEffect, useState } from 'react'
+// **The client never sends a person_id it guessed.** L7 — matching is on a VERIFIED email
+// or phone, and a client cannot verify anything. It submits the guardian's email; the
+// server decides whether that is somebody it already has.
+//
+// **No price field** (L2). `price_plan` is W4's table, behind its own screen.
+//
+// **No group and no weekday picker** (decision 20). Those, and the multi-child list, left
+// with the parent-first form. `WeekdayPicker`/`attendsWeekdaysFor` (./WeekdayPicker) are
+// untouched — nothing else in this app imports them, but deleting a module is not this
+// screen's decision to make alone.
+import { useState } from 'react'
 import type { CSSProperties, FormEvent } from 'react'
-import { Alert, Button, TextField } from '@studio/ui'
+import { Alert, Button, Checkbox, TextField } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
-import { WeekdayPicker, attendsWeekdaysFor } from './WeekdayPicker'
 import { CopyButton } from './SharingCards'
 import { ImportStudentsPanel } from './ImportStudentsPanel'
-import type { DashboardPeopleClient, GroupOption } from './peopleClient'
-
-//: §5.4(a) is 'child details AND GROUP -> save'. `group_id` empty is the phone-enquiry
-//: case: §5.4a's lead is 'a real student who simply has no enrollment', so the form must
-//: keep letting a manager say 'not yet' rather than forcing a group nobody chose.
-type Child = {
-  first_name: string
-  last_name: string
-  birthdate: string
-  group_id: string
-  /** C12 — which of the group's training days this child comes to. `null` is 'untouched',
-   *  which RENDERS as every day ticked. Storing the selection as null-until-touched keeps
-   *  'all ticked by default' derived from the days as they load, instead of writing them
-   *  into state from an effect the moment they arrive. */
-  weekdays: number[] | null
-}
+import type { DashboardPeopleClient } from './peopleClient'
 
 const formStyle: CSSProperties = {
   display: 'flex',
@@ -44,13 +36,23 @@ const formStyle: CSSProperties = {
   maxInlineSize: '40rem',
 }
 
-const blank = (): Child => ({
-  first_name: '',
-  last_name: '',
-  birthdate: '',
-  group_id: '',
-  weekdays: null,
-})
+/** Splits a typed full name on the FIRST whitespace — everything after it is the last
+ *  name, so a middle or additional surname stays together ("יעל בת כהן" → "יעל" ·
+ *  "בת כהן"). A single word is legal (a mononym, or simply a name typed without a
+ *  space): `StudentCreate.last_name` requires at least one character, so a lone space is
+ *  used rather than inventing a second name the manager never typed or refusing the
+ *  submission outright. */
+function splitFullName(fullName: string): { first_name: string; last_name: string } {
+  const trimmed = fullName.trim()
+  const boundary = trimmed.search(/\s/)
+  if (boundary === -1) {
+    return { first_name: trimmed, last_name: ' ' }
+  }
+  return {
+    first_name: trimmed.slice(0, boundary),
+    last_name: trimmed.slice(boundary + 1).trim() || ' ',
+  }
+}
 
 export function AddStudentScreen({
   locale,
@@ -61,98 +63,72 @@ export function AddStudentScreen({
   client: DashboardPeopleClient
   onCreated?: () => void
 }) {
-  const [parentFirst, setParentFirst] = useState('')
-  const [parentLast, setParentLast] = useState('')
-  const [email, setEmail] = useState('')
-  const [phone, setPhone] = useState('')
-  const [children, setChildren] = useState<Child[]>([blank()])
-  const [groups, setGroups] = useState<GroupOption[]>([])
-  // Keyed by group, so two children in the same group share one lookup.
-  const [daysByGroup, setDaysByGroup] = useState<Record<string, number[]>>({})
+  const [fullName, setFullName] = useState('')
+  // Decision 12 — the 18+ question is gone from the parent's own wizard, because the
+  // wizard always asks for a birthdate and derives age from it. THIS form has no
+  // birthdate field, so it has nothing to derive age from, and the question survives
+  // here for exactly that reason. Do not "tidy" it away to match the wizard.
+  const [isAdult, setIsAdult] = useState(false)
+  const [guardianEmail, setGuardianEmail] = useState('')
   const [sending, setSending] = useState(false)
   const [failed, setFailed] = useState(false)
   const [invitationToken, setInvitationToken] = useState<string | null>(null)
   const [invitationUrl, setInvitationUrl] = useState<string | null>(null)
+  // Decision 21's visible half. Optional — and left `undefined` rather than defaulted to
+  // `false` — because the response body only carries these two fields once the parallel
+  // "invitation email" piece lands; until then the client must render nothing about email
+  // at all rather than claim a definite failure it does not know happened.
+  const [invitationEmailConfigured, setInvitationEmailConfigured] = useState<
+    boolean | undefined
+  >(undefined)
+  const [invitationEmailSent, setInvitationEmailSent] = useState<boolean | undefined>(undefined)
   const [done, setDone] = useState(false)
-
-  useEffect(() => {
-    let live = true
-    client
-      .groups()
-      .then((body) => live && setGroups(body.items ?? []))
-      // A group list that fails to load is not a reason to block the form: a student with
-      // no group is a legal outcome, so the picker degrades to 'not yet' rather than
-      // trapping the manager on a screen they cannot submit.
-      .catch(() => live && setGroups([]))
-    return () => {
-      live = false
-    }
-  }, [client])
-
-  // C12's checkboxes are 'over the GROUP'S scheduled weekdays', so the days come from the
-  // schedule seam once a group is chosen — never from a hardcoded week.
-  const chosenGroups = [...new Set(children.map((child) => child.group_id).filter(Boolean))]
-  const groupKey = [...chosenGroups].sort().join(',')
-  useEffect(() => {
-    if (!groupKey) return
-    let live = true
-    Promise.all(
-      groupKey.split(',').map((groupId) =>
-        client
-          .weekdayOptions(groupId)
-          .then((body) => [groupId, body.training_weekdays ?? []] as const),
-      ),
-    )
-      .then((pairs) => live && setDaysByGroup(Object.fromEntries(pairs)))
-      .catch(() => live && setDaysByGroup({}))
-    return () => {
-      live = false
-    }
-  }, [client, groupKey])
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()
     setSending(true)
     setFailed(false)
     try {
-      let token: string | null = null
-      let url: string | null = null
-      // §5.4a's worked example: "יעל submits one form with דנה and יוסי. The manager
-      // approves once." Each child is its own request; the SERVER matches them onto the
-      // same parent by the verified address, which is what stops a second Person appearing.
-      for (const child of children) {
-        const trainingDays = daysByGroup[child.group_id] ?? []
-        const response = await client.createStudent({
-          first_name: child.first_name,
-          last_name: child.last_name,
-          birthdate: child.birthdate || null,
-          // §5.4(a) — naming a group enrols the child in the same save. The server
-          // validates the pattern against the group's real schedule.
-          group_id: child.group_id || null,
-          attends_weekdays: child.group_id
-            ? attendsWeekdaysFor(child.weekdays ?? trainingDays, trainingDays)
-            : null,
-          guardian: {
-            first_name: parentFirst,
-            last_name: parentLast,
-            email: email || null,
-            phone: phone || null,
-            relation: 'parent',
-          },
-        })
-        if (!response.ok) {
-          setFailed(true)
-          return
-        }
-        const body = (await response.json()) as {
-          invitation_token?: string | null
-          invitation_url?: string | null
-        }
-        token = token ?? body.invitation_token ?? null
-        url = url ?? body.invitation_url ?? null
+      const { first_name, last_name } = splitFullName(fullName)
+      const response = await client.createStudent({
+        first_name,
+        last_name,
+        birthdate: null,
+        guardian: isAdult
+          ? {
+              // Decision 20 — "18 ומעלה? means self-guarding: the student IS the
+              // guardian and the email is theirs." Reuses the student's own split name
+              // rather than asking the manager to type it twice.
+              first_name,
+              last_name,
+              email: guardianEmail || null,
+              relation: 'self',
+            }
+          : {
+              // §6's API table — `GuardianCreate` accepts an email with no names, for
+              // exactly this form. The manager never types a guardian's name; the parent
+              // gives it when they accept the invitation.
+              email: guardianEmail || null,
+              relation: 'parent',
+            },
+      })
+      if (!response.ok) {
+        setFailed(true)
+        return
       }
-      setInvitationToken(token)
-      setInvitationUrl(url)
+      const body = (await response.json()) as {
+        invitation_token?: string | null
+        invitation_url?: string | null
+        //: Decision 21 — the contract two booleans wide. Both optional: the backend
+        //: piece that fills them in is a parallel lane, so a response with neither is
+        //: an older/undeployed backend, not a failure to report.
+        invitation_email_configured?: boolean
+        invitation_email_sent?: boolean
+      }
+      setInvitationToken(body.invitation_token ?? null)
+      setInvitationUrl(body.invitation_url ?? null)
+      setInvitationEmailConfigured(body.invitation_email_configured)
+      setInvitationEmailSent(body.invitation_email_sent)
       setDone(true)
       onCreated?.()
     } catch {
@@ -179,6 +155,22 @@ export function AddStudentScreen({
               </span>
               <CopyButton locale={locale} value={invitationUrl ?? invitationToken} />
             </p>
+            {/* Decision 21 — the email half must be visible, not silent, either way. */}
+            {invitationEmailSent ? (
+              <p data-testid="add-student-invite-email-sent">
+                {t(locale, 'people.invite.emailSent')}
+              </p>
+            ) : invitationEmailConfigured === false ? (
+              <span data-testid="add-student-invite-email-unavailable">
+                <Alert tone="pending" iconLabel={t(locale, 'people.invite.emailNotConfigured')}>
+                  {t(locale, 'people.invite.emailNotConfigured')}
+                </Alert>
+              </span>
+            ) : invitationEmailConfigured === true ? (
+              <p data-testid="add-student-invite-email-not-sent">
+                {t(locale, 'people.invite.emailNotSent')}
+              </p>
+            ) : null}
           </div>
         ) : (
           // L7 — a matched parent already has a login. §5.4a: 'No second invitation, no
@@ -194,119 +186,31 @@ export function AddStudentScreen({
     <form onSubmit={submit} style={formStyle} aria-labelledby="add-student" data-testid="add-student">
       <h1 id="add-student">{t(locale, 'people.student.add')}</h1>
 
-      <fieldset>
-        <legend>{t(locale, 'people.guardian.one')}</legend>
-        {/* The artboard's "משק בית" is a PARENT. L9 — no household entity exists. */}
-        <p data-testid="add-student-parent-hint">{t(locale, 'people.request.matchedHint')}</p>
-        <TextField
-          label={t(locale, 'people.student.firstName')}
-          value={parentFirst}
-          onChange={(event) => setParentFirst(event.target.value)}
-          required
-        />
-        <TextField
-          label={t(locale, 'people.student.lastName')}
-          value={parentLast}
-          onChange={(event) => setParentLast(event.target.value)}
-          required
-        />
-        <TextField
-          label={t(locale, 'people.student.email')}
-          type="email"
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
-        />
-        <TextField
-          label={t(locale, 'people.student.phone')}
-          type="tel"
-          value={phone}
-          onChange={(event) => setPhone(event.target.value)}
-        />
-      </fieldset>
+      <TextField
+        label={t(locale, 'people.student.fullName')}
+        value={fullName}
+        onChange={(event) => setFullName(event.target.value)}
+        data-testid="add-student-full-name"
+        required
+      />
 
-      {children.map((child, index) => (
-        <fieldset key={index} data-testid={`add-student-child-${index}`}>
-          <legend>{t(locale, 'people.student.one')}</legend>
-          <TextField
-            label={t(locale, 'people.student.firstName')}
-            value={child.first_name}
-            onChange={(event) =>
-              setChildren((current) =>
-                current.map((c, i) =>
-                  i === index ? { ...c, first_name: event.target.value } : c,
-                ),
-              )
-            }
-            required
-          />
-          <TextField
-            label={t(locale, 'people.student.lastName')}
-            value={child.last_name}
-            onChange={(event) =>
-              setChildren((current) =>
-                current.map((c, i) => (i === index ? { ...c, last_name: event.target.value } : c)),
-              )
-            }
-            required
-          />
-          <TextField
-            label={t(locale, 'people.student.birthdate')}
-            type="date"
-            value={child.birthdate}
-            onChange={(event) =>
-              setChildren((current) =>
-                current.map((c, i) => (i === index ? { ...c, birthdate: event.target.value } : c)),
-              )
-            }
-          />
-          {/* §5.4(a) — 'child details AND GROUP'. Optional, because a lead with no
-              enrollment is a real and common outcome (§5.4a). */}
-          <label>
-            {t(locale, 'people.enrollment.group')}
-            <select
-              value={child.group_id}
-              onChange={(event) =>
-                setChildren((current) =>
-                  current.map((c, i) =>
-                    // Changing the group clears the day selection: the ticks belonged to
-                    // the old group's timetable and mean nothing against the new one.
-                    i === index ? { ...c, group_id: event.target.value, weekdays: null } : c,
-                  ),
-                )
-              }
-              data-testid={`add-student-group-${index}`}
-            >
-              <option value="">{t(locale, 'people.enrollment.noGroupYet')}</option>
-              {groups.map((group) => (
-                <option key={group.id} value={group.id}>
-                  {group.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          {child.group_id ? (
-            <WeekdayPicker
-              locale={locale}
-              trainingWeekdays={daysByGroup[child.group_id] ?? []}
-              // C12 — 'all ticked by default'. Derived, not stored.
-              selected={child.weekdays ?? daysByGroup[child.group_id] ?? []}
-              onChange={(next) =>
-                setChildren((current) =>
-                  current.map((c, i) => (i === index ? { ...c, weekdays: next } : c)),
-                )
-              }
-            />
-          ) : null}
-        </fieldset>
-      ))}
+      <Checkbox
+        label={t(locale, 'people.student.isAdult')}
+        checked={isAdult}
+        onChange={(event) => setIsAdult(event.target.checked)}
+        data-testid="add-student-is-adult"
+      />
+      <p data-testid="add-student-is-adult-hint" style={{ margin: 0 }}>
+        {t(locale, 'people.student.isAdultHint')}
+      </p>
 
-      <Button
-        variant="secondary"
-        onClick={() => setChildren((current) => [...current, blank()])}
-        data-testid="add-student-add-child"
-      >
-        {t(locale, 'people.landing.addChild')}
-      </Button>
+      <TextField
+        label={t(locale, 'people.student.guardianEmail')}
+        type="email"
+        value={guardianEmail}
+        onChange={(event) => setGuardianEmail(event.target.value)}
+        data-testid="add-student-guardian-email"
+      />
 
       {failed ? (
         <span data-testid="add-student-error">
