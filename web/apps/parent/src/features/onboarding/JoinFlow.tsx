@@ -34,7 +34,18 @@ import { OnboardingWizardChrome, stepPosition } from './OnboardingWizardChrome'
 import { WizardNavButtons } from './WizardNavButtons'
 
 type JoinGroup = { id: string; name: string; weekdays: number[] }
-type JoinInfo = { studio_name: string; groups: JoinGroup[]; email: string | null }
+//: `logo_url` -- §6's addition to `OnboardingInfoOut` (same API path the sign-in wall
+//: reads) -- threaded through to `JoinWelcomeStep` (C1), which shows it on the welcome
+//: screen and in each document popup's header (decision 11). Optional rather than
+//: required: this type is asserted from an untyped `response.json()` below, and an
+//: older cached response (or a test fixture that predates this field) should read as
+//: "no logo" rather than fail the cast.
+type JoinInfo = {
+  studio_name: string
+  groups: JoinGroup[]
+  email: string | null
+  logo_url?: string | null
+}
 
 type JoinStep = 'welcome' | 'family' | 'health' | 'payment' | 'done'
 
@@ -329,6 +340,7 @@ export function JoinFlow({
     content = (
       <JoinWelcomeStep
         locale={locale}
+        logoUrl={info.logo_url ?? null}
         privacyClient={privacyClient}
         studioName={info.studio_name}
         onAccept={(accepted) => {

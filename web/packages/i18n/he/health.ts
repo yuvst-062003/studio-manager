@@ -171,6 +171,8 @@ export const health: Bundle = {
   // WE wrote. This is the club's own form and its own תקנון, signed under the club's own
   // name, so the caveat would now be false -- see the design doc §11.
   'clubTerms.title': 'תקנון ותנאי תשלום',
+  'clubTerms.summary':
+    'איך משלמים בצ׳קים, מה קורה כשמבטלים מנוי באמצע השנה, וכיצד מחשבים החזר יחסי.',
   'clubTerms.payment.title': 'תנאי תשלום',
   'clubTerms.payment.cheques':
     'תשלום בצ\'קים יתבצע לטובת "בריין בילדינג (ע״ר)". תאריך הצ\'ק לא יאוחר מה-10 לכל חודש.',

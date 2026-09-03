@@ -176,8 +176,9 @@ export const people: Bundle = {
   'sibling.retryGroups': 'Reload',
   'sibling.title': 'Add another child',
   'join.title': 'Join the club — family registration',
-  'join.welcome.appCardTitle': 'Terms of use and privacy policy',
-  'join.welcome.appCardLabel': "I've read and accept the terms of use and privacy policy",
+  'join.welcome.heading': 'Before we start',
+  'join.welcome.subtitle':
+    'Before we can store information about your children, we need your agreement to three documents.',
   'directions.title': 'Getting here',
   'directions.openMaps': 'Open in maps',
   'directions.call': 'Call the club',

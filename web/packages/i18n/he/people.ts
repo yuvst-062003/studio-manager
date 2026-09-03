@@ -214,8 +214,9 @@ export const people: Bundle = {
   'sibling.retryGroups': 'טעינה מחדש',
   'sibling.title': 'הוספת ילד נוסף',
   'join.title': 'הצטרפות למועדון — הרשמת משפחה',
-  'join.welcome.appCardTitle': 'תנאי שימוש ומדיניות פרטיות',
-  'join.welcome.appCardLabel': 'קראתי ואני מאשר/ת את תנאי השימוש ומדיניות הפרטיות',
+  'join.welcome.heading': 'לפני שנתחיל',
+  'join.welcome.subtitle':
+    'כדי שנוכל לשמור מידע על הילדים שלכם, אנחנו צריכים את ההסכמה שלכם לשלושה מסמכים.',
   'directions.title': 'הוראות הגעה',
   'directions.openMaps': 'פתיחה במפות',
   'directions.call': 'התקשרות למועדון',

@@ -125,6 +125,8 @@ export const health: Bundle = {
 
   // -- the club's own agreement -- see the Hebrew file for why the disclaimer went ----
   'clubTerms.title': 'Club terms and payment terms',
+  'clubTerms.summary':
+    'How cheque payments work, what happens when a membership is cancelled mid-year, and how a partial-year refund is calculated.',
   'clubTerms.payment.title': 'Payment terms',
   'clubTerms.payment.cheques':
     'Cheques are made payable to "בריין בילדינג (ע״ר)". The cheque date must be no later than the 10th of each month.',

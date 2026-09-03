@@ -180,9 +180,9 @@ export const people: Bundle = {
   'sibling.retryGroups': 'Загрузить снова',
   'sibling.title': 'Добавить ещё одного ребёнка',
   'join.title': 'Вступление в клуб — регистрация семьи',
-  'join.welcome.appCardTitle': 'Условия использования и политика конфиденциальности',
-  'join.welcome.appCardLabel':
-    'Я прочитал(а) и принимаю условия использования и политику конфиденциальности',
+  'join.welcome.heading': 'Прежде чем начать',
+  'join.welcome.subtitle':
+    'Прежде чем мы сможем хранить данные о ваших детях, нам нужно ваше согласие на три документа.',
   'directions.title': 'Как добраться',
   'directions.openMaps': 'Открыть в картах',
   'directions.call': 'Позвонить в клуб',

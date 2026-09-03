@@ -97,9 +97,12 @@ function makePrivacyClient(): PrivacyClient {
   } as unknown as PrivacyClient
 }
 
+// C1 rebuilt step 1 as three cards (decision 10) -- terms and privacy no longer share
+// one combined "app" card and tick, so this helper now ticks all three.
 async function acceptWelcomeStep(user: ReturnType<typeof userEvent.setup>) {
   await screen.findByTestId('join-welcome')
-  await user.click(screen.getByTestId('join-welcome-app-check'))
+  await user.click(screen.getByTestId('join-welcome-terms-check'))
+  await user.click(screen.getByTestId('join-welcome-privacy-check'))
   await user.click(screen.getByTestId('join-welcome-club-check'))
   await user.click(screen.getByTestId('join-welcome-continue'))
 }
@@ -506,6 +509,48 @@ describe('JoinFlow', () => {
     expect(screen.queryByTestId('onboarding-wizard-back')).toBeNull()
   })
 
+  // C1/F2 -- §6 adds `logo_url` to `OnboardingInfoOut`, and `JoinWelcomeStep` renders it
+  // on the welcome screen (decision 11). Driven through the actual response shape the
+  // public onboarding fetch answers with, not a hand-built `logoUrl` prop -- proving the
+  // seam `fetch -> JoinInfo -> JoinWelcomeStep` actually carries the field, rather than
+  // silently dropping it the way it was dropped before this piece threaded it through.
+  it('threads logo_url from the public onboarding response into the welcome step', async () => {
+    const logoUrl = '/api/v1/public/studios/demo-club/logo'
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input)
+        if (url.includes('/api/v1/public/onboarding/live-token-123456')) {
+          return new Response(
+            JSON.stringify({
+              studio_name: 'מועדון הדגמה',
+              email: null,
+              groups: [{ id: 'g1', name: 'ילדים א', weekdays: [0, 2] }],
+              logo_url: logoUrl,
+            }),
+            { status: 200 },
+          )
+        }
+        return new Response(JSON.stringify({ items: [] }), { status: 200 })
+      }),
+    )
+
+    render(
+      <JoinFlow
+        billingClient={billingClient}
+        displayName={DISPLAY_NAME}
+        healthClient={healthClient}
+        locale="he"
+        privacyClient={makePrivacyClient()}
+        standingOrderLinks={[]}
+        token="live-token-123456"
+      />,
+    )
+
+    const logo = await screen.findByTestId('join-welcome-logo')
+    expect(logo).toHaveAttribute('src', expect.stringContaining(logoUrl))
+  })
+
   // F1 -- `JoinWelcomeStep` used to call its own `useSession()`, so back-navigation
   // remounted it and it restarted at `status: 'loading'`, which its render treated as
   // "not signed in" and showed a sign-in wall for one tick before flipping back. Fixed
@@ -559,7 +604,7 @@ describe('JoinFlow', () => {
     // Step 1, right away -- not a loading gap, not a sign-in wall.
     expect(screen.getByTestId('join-welcome')).toBeInTheDocument()
     expect(screen.queryByTestId('sign-in')).toBeNull()
-    expect(screen.getByTestId('join-welcome-app-check')).toBeInTheDocument()
+    expect(screen.getByTestId('join-welcome-terms-check')).toBeInTheDocument()
   })
 
   // F5 -- `welcome` and `family` used to render bare (no `pageStyle` container), while
