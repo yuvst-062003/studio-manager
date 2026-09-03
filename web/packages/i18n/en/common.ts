@@ -22,6 +22,7 @@ export const common: Bundle = {
   'loadFailed.body': 'We could not load this.',
   'loadFailed.offline': 'You are offline. This will load when the connection returns.',
   'loadFailed.retry': 'Try again',
+  'error.generic': 'Something went wrong. Try again',
   'a11y.button': 'Accessibility menu',
   'a11y.title': 'Accessibility',
   'a11y.textSize': 'Text size',

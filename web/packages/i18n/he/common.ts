@@ -24,6 +24,12 @@ export const common: Bundle = {
   'loadFailed.body': 'לא הצלחנו לטעון את הנתונים.',
   'loadFailed.offline': 'אין חיבור לרשת. הנתונים ייטענו כשהחיבור יחזור.',
   'loadFailed.retry': 'נסו שוב',
+  // The one generic action-failure message, called at 16 sites across the parent, staff
+  // and dashboard apps -- `t(locale, 'common.error.generic')` -- but never defined here
+  // until now, so every one of those sites rendered the literal key string to a user.
+  // `Bundle` is `Record<string, string>`, not a typed union, so `npm run typecheck` had no
+  // way to catch a key that does not exist. Copy model: `people.ts`'s own `error.generic`.
+  'error.generic': 'משהו השתבש. נסו שוב',
   'a11y.button': 'תפריט נגישות',
   'a11y.title': 'נגישות',
   'a11y.textSize': 'גודל טקסט',

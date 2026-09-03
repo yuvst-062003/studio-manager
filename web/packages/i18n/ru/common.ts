@@ -30,6 +30,7 @@ export const common: Bundle = {
   'loadFailed.body': 'Не удалось загрузить данные.',
   'loadFailed.offline': 'Нет подключения к сети. Данные загрузятся, когда связь восстановится.',
   'loadFailed.retry': 'Повторить',
+  'error.generic': 'Что-то пошло не так. Попробуйте ещё раз',
   'a11y.button': 'Меню доступности',
   'a11y.title': 'Доступность',
   'a11y.textSize': 'Размер текста',
