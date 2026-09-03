@@ -14,7 +14,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { Button, DateRangePicker, LoadFailed } from '@studio/ui'
-import { formatDateInStudioZone, studioDayKey, useNetworkMode } from '@studio/core'
+import { formatDateInStudioZone, formatMonthLabel, studioDayKey, useNetworkMode } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import type { SessionRow, StaffScheduleClient } from './client'
@@ -246,11 +246,11 @@ export function DatePickerScreen({
 
       <div style={toolbarStyle}>
         <Button variant="secondary" data-testid="month-previous" onClick={() => step(-1)}>
-          {t(locale, 'schedule.week.previous')}
+          {t(locale, 'schedule.week.view.previousMonth')}
         </Button>
-        <span data-testid="month-label">{`${year}-${pad(month)}`}</span>
+        <span data-testid="month-label">{formatMonthLabel(year, month, locale)}</span>
         <Button variant="secondary" data-testid="month-next" onClick={() => step(1)}>
-          {t(locale, 'schedule.week.next')}
+          {t(locale, 'schedule.week.view.nextMonth')}
         </Button>
         <Button data-testid="jump-to-today" onClick={jumpToToday}>
           {t(locale, 'schedule.datePicker.jumpToToday')}

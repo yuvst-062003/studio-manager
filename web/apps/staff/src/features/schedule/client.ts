@@ -40,6 +40,14 @@ export interface SessionRow {
   headcount: number
 }
 
+/** Mirrors `app/schemas/schedule.py::TrainingYearOut` — only the three fields
+ *  {@link yearCovers} needs. */
+export interface TrainingYearRow {
+  starts_on: string
+  ends_on: string
+  status: string
+}
+
 export interface StaffScheduleClient {
   listSessions(query: {
     from: string
@@ -47,6 +55,14 @@ export interface StaffScheduleClient {
     groupId?: string
     coachPersonId?: string
   }): Promise<SessionRow[]>
+  /**
+   * Register §4.2 — `GET /training-years` is `AnyStaff`, not manager-only
+   * (`app/routers/schedule.py:78`), so a coach's own client can already ask "does any
+   * training year cover this date" without a backend change. Used only when a day/month
+   * query above comes back empty, to tell "an ordinary day off" apart from "no training
+   * year exists here at all" (§4.2's silent-skip failure mode) — see {@link yearCovers}.
+   */
+  listTrainingYears(): Promise<TrainingYearRow[]>
 }
 
 const API = '/api/v1'
@@ -62,7 +78,23 @@ export function makeStaffScheduleClient(fetcher: Fetcher): StaffScheduleClient {
       const body = (await response.json()) as { items: SessionRow[] }
       return body.items
     },
+    async listTrainingYears() {
+      // 200 is far above any real club's declared-years count (one a year, ever) and still
+      // bounded — the same reasoning `bootstrap.py`'s MAX_SESSIONS_IN_WINDOW uses.
+      const response = await fetcher(`${API}/training-years?limit=200`)
+      if (!response.ok) throw new Error(String(response.status))
+      const body = (await response.json()) as { items: TrainingYearRow[] }
+      return body.items
+    },
   }
+}
+
+/** Whether any training year's `[starts_on, ends_on]` covers `dayKey` (`YYYY-MM-DD`).
+ *  Lexicographic comparison is exact on ISO dates — the same trick `DatePickerScreen`'s
+ *  `applyRange` already uses. Every declared year counts, not only `active`: a `draft` year
+ *  not yet activated is still evidence the gap is a rollover step away, not a dead end. */
+export function yearCovers(years: TrainingYearRow[], dayKey: string): boolean {
+  return years.some((year) => year.starts_on <= dayKey && dayKey <= year.ends_on)
 }
 
 /**

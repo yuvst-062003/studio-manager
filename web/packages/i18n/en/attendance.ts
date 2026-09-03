@@ -16,6 +16,7 @@ export const attendance: Bundle = {
   'roster.absentUnexcused': 'Absent — unexcused',
   'roster.unmarked': 'Not marked',
   'roster.unmarkedCount': '{{count}} students not marked',
+  'roster.unmarkedCount.one': '1 student not marked',
   'roster.notExpectedToday': 'Not expected today',
   'roster.notExpectedHint': 'They can still be marked — a child who turns up is a real child',
   'roster.markAllPresent': 'Mark everyone present',
@@ -72,6 +73,7 @@ export const attendance: Bundle = {
 
   'sync.pending': 'Waiting to sync',
   'sync.pendingCount': '{{count}} marks waiting to sync',
+  'sync.pendingCount.one': '1 mark waiting to sync',
   'sync.syncing': 'Syncing…',
   'sync.synced': 'Everything is synced',
   'sync.syncedAt': 'Last synced at',

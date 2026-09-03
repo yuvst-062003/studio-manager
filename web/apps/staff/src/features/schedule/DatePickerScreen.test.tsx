@@ -29,7 +29,12 @@ const SESSION: SessionRow = {
 }
 
 function stub(sessions: SessionRow[] = [SESSION]): StaffScheduleClient {
-  return { listSessions: vi.fn(async () => sessions) }
+  return {
+    listSessions: vi.fn(async () => sessions),
+    listTrainingYears: vi.fn(async () => [
+      { starts_on: '2026-09-01', ends_on: '2027-08-20', status: 'active' },
+    ]),
+  }
 }
 
 function renderPicker(props: Record<string, unknown> = {}) {
@@ -144,9 +149,27 @@ describe('DatePickerScreen (9b)', () => {
   it('jumps to today', async () => {
     renderPicker()
     await userEvent.click(screen.getByTestId('month-next'))
-    await waitFor(() => expect(screen.getByTestId('month-label')).toHaveTextContent('12'))
+    await waitFor(() => expect(screen.getByTestId('month-label')).toHaveTextContent('דצמבר 2026'))
     await userEvent.click(screen.getByTestId('jump-to-today'))
     await waitFor(() => expect(screen.getByTestId('day-2026-11-03')).toBeInTheDocument())
+  })
+
+  it('renders a localized month label, not a raw ISO string (register §9)', () => {
+    renderPicker()
+    expect(screen.getByTestId('month-label')).toHaveTextContent('נובמבר 2026')
+    expect(screen.getByTestId('month-label')).not.toHaveTextContent('2026-11')
+  })
+
+  it('labels the month stepper truthfully — it steps months, not weeks (register §9)', () => {
+    // DatePickerScreen.tsx used to borrow `schedule.week.previous`/`.next` ("שבוע קודם" /
+    // "שבוע הבא") for a handler that steps `month`, not `week` — a coach reading "next
+    // week" here landed a month away. `schedule.week.previous`/`.next` stay reserved for
+    // the dashboard's WeekBoard, which really does step by week (WeekBoard.test.tsx).
+    renderPicker()
+    expect(screen.getByTestId('month-previous')).toHaveTextContent(t('he', 'schedule.week.view.previousMonth'))
+    expect(screen.getByTestId('month-next')).toHaveTextContent(t('he', 'schedule.week.view.nextMonth'))
+    expect(screen.getByTestId('month-previous')).not.toHaveTextContent('שבוע')
+    expect(screen.getByTestId('month-next')).not.toHaveTextContent('שבוע')
   })
 
   it('moves month by month, and refetches the month it lands on', async () => {

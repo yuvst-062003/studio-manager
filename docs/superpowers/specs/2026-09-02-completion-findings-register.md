@@ -208,10 +208,27 @@ than fixed.
   `models/comms.py:84`. It is the one kind deliberately exempted from the preference
   switch: an exemption for a message nobody sends.
 
-**Not this lane's to close.** `attendance.at_risk` is prompt 2's producer (M9); the seam
-is agreed, not built here. `billing.payment_failed` needs prompt 1 (MONEY) to build the
-`failed` order-outcome state transition first — this lane owns the notification, MONEY
-owns the state, and as of 2026-09-02 nothing exists yet for this lane to attach to.
+**`attendance.at_risk` fixed 2026-09-02 (prompt 2, lane `attendance`).**
+`app/workers/at_risk.py` is the producer — three or more consecutive **expected**
+sessions missed (SPEC §5.14, verbatim), where "expected" reads C12's
+`is_expected` and "missed" is `absent_excused`/`absent_unexcused` only —
+`unmarked` breaks the streak rather than extending it, per the roster's own rule
+that an unmarked session is never an inferred absence. Declared in
+`infra/railway/jobs.json` (`attendance-at-risk`, daily at 07:00 Asia/Jerusalem).
+The threshold is a studio setting (`app/services/attendance/settings.py`, default
+3), editable via `GET/PUT /attendance/settings` (manager-only) — deliberately its
+own small endpoint rather than a new field on `PATCH /studio`
+(`app/services/structure/logo.py::SETTINGS_FIELDS`), since that whitelist belongs
+to a different vertical and a shared JSONB blob is exactly the place two lanes
+editing the same list silently drops one lane's key. Idempotent per **streak**
+(via `streak_start_session_id` in the notification payload), not per run — a
+static streak does not re-fire on every job tick. Payload matches
+`AtRiskAlert.tsx`'s existing `AtRiskPayload` type in both apps exactly
+(`student_id`, `group_id`, `contact_person_id`, `contact_phone`,
+`missed_count`); no frontend change was needed. Tests: `tests/attendance/test_at_risk.py`
+(13 cases — the threshold, the unmarked-breaks-the-streak rule, C12's
+not-expected exclusion, and the idempotency/re-streak rules).
+`billing.payment_failed` is unaddressed — out of this lane's scope, still open.
 
 ### 2.4 The setup wizard discards coach invitation tokens
 
@@ -329,6 +346,29 @@ is unusable on both home and calendar.
 Home's "בהמשך השבוע" lists the 6th and 8th; the calendar marks planned sessions on the 3rd
 and 4th as well.
 
+**Fixed 2026-09-02 (prompt 2, lane `attendance`) — two independent causes, both in the
+parent app:**
+
+1. **The calendar's planned-marker loop never checked `session.status`.**
+   `ChildCalendar.tsx`'s `marksByDay` walked every future session and rang it `planned`
+   regardless of whether it was `scheduled` or `cancelled`; Home's own fetch
+   (`Resolve.tsx`) already filtered to `status === 'scheduled'`. A cancelled class on the
+   3rd or 4th rang on the calendar and correctly did not appear in Home's list — two
+   queries with the same data disagreeing because only one of them read a field the data
+   already carried. Fixed by adding the same status check to the calendar's loop.
+   Test: `ChildCalendar.test.tsx` — "does not ring a cancelled future session as planned".
+2. **The next-lesson card's intent buttons (מגיע/ה · לא מגיע/ה) stayed offered for hours
+   after a lesson ended.** `ParentHome.tsx`'s `nextLesson` correctly excludes a started
+   lesson on the render it executes (`lesson.startsAt <= now` is checked live), but nothing
+   in the component ever triggered a **second** render after mount — a family that opened
+   the app once at 16:00 and left the tab open still saw the 16:00 class offered at 20:43.
+   The staff app already has the fix pattern (`useToday.ts`, a periodic re-render), but at
+   **day** granularity, deliberately, to avoid re-rendering every minute — the wrong grain
+   for this bug, which is entirely *within* a day. Fixed with a 60-second re-render tick
+   local to `ParentHome`. Test: `ParentHome.test.tsx` — "withdraws the next-lesson card
+   once its start time has passed, without a remount" (fake timers, no wall-clock
+   dependency).
+
 ### 3.9 Report charts truncate to nonsense
 
 `…20.40.39.png` — month labels render `נובמבר 5…`, `ינואר 26…`: the ellipsis eats the year
@@ -357,6 +397,25 @@ says "Silently skipped rather than raised". Downstream, lazily and with no error
 calendar goes blank, the register cannot be opened (`app/services/attendance/roster.py:12-18`
 deliberately never materializes), the trial picker returns empty
 (`app/services/people/landing.py:174`), and the public landing page shows no classes.
+
+**Not the live cause of an empty register today — §0 confirmed a 2026-27 training year
+exists (`starts_on 2026-09-01`, `ends_on 2027-08-20`, `active`) — but the silent-skip
+behaviour itself is real and will recur at the next rollover a manager forgets to run in
+time.** Defended against 2026-09-02 (prompt 2, lane `attendance`), entirely on the read
+side, without touching `_year_covering` or `materialize_sessions` (schedule vertical's
+files, and the skip is deliberate there — "a rule that runs past the end of the year is
+ordinary, not an error" — this fix is about what the coach's screen says when it happens,
+not about changing when it happens). `GET /training-years` is `AnyStaff`, not
+manager-only (`app/routers/schedule.py:78`), so a coach's own client can already ask
+"does any year cover this date" with no backend change. `TodayScreen.tsx` now makes that
+check exactly when a day comes back with zero sessions, and renders
+`schedule.today.noTrainingYear` / `...Hint` — an actionable sentence — instead of the
+generic "no classes today" empty state. Test: `TodayScreen.test.tsx` — "names the real
+cause when NO training year covers today" and "does not claim a training-year gap when a
+year genuinely covers today" (the regression guard for the common case). The calendar's
+month-grid view (`DatePickerScreen.tsx`) was not extended the same way — time-boxed out of
+this lane's session; the same `client.listTrainingYears()`/`yearCovers()` helpers already
+added to `web/apps/staff/src/features/schedule/client.ts` are what a follow-up would use.
 
 ### 4.3 Schedule edits become silent no-ops
 
@@ -803,10 +862,30 @@ are desktop-width, which is also how the manager looked at it.
 - **The date picker's buttons lie.** Labelled `שבוע קודם`/`שבוע הבא`
   (`DatePickerScreen.tsx:248-253`) while the handler steps **months**. `שבוע הבא` appears
   again below the grid meaning something else.
+  **Fixed 2026-09-02 (prompt 2).** Switched to `schedule.week.view.previousMonth`/
+  `nextMonth` — keys that already existed for the dashboard's `WeekBoard` month view, so no
+  new i18n key was needed; `schedule.week.previous`/`.next` stay reserved for the dashboard
+  `WeekBoard`, which genuinely does step by week (`WeekBoard.test.tsx` pins that usage).
 - **A raw ISO month label** — `2026-09` (`DatePickerScreen.tsx:251`). The parent calendar
   renders `ספטמבר 2026`.
+  **Fixed 2026-09-02 (prompt 2).** Now calls `formatMonthLabel` from
+  `@studio/core` (`web/packages/core/src/datetime.ts`) — the same formatter the parent
+  calendar already uses; it existed and was simply not called here. Both fixes tested in
+  `DatePickerScreen.test.tsx`.
 - **Broken Hebrew plurals** — `1 שיעורים` (`i18n/he/schedule.ts:19` is
   `'{{count}} שיעורים'` with no plural rule), `1 חיובים`, `0 חיובים`.
+  **Rule fixed 2026-09-02 (prompt 2).** `translatePlural`/`plural`
+  (`web/packages/i18n/index.ts`) — Hebrew's own categories via `Intl.PluralRules`, a
+  `.one` sibling key read only at `count === 1`, falling back to the existing template
+  otherwise (so `0`/`2`+ need no new strings). Applied to the three instances this lane
+  owns: `schedule.today.sessionCount` (he/en/ru, `TodayScreen.tsx`),
+  `attendance.roster.unmarkedCount` and `attendance.sync.pendingCount` (he/en/ru,
+  `NetworkStatus.tsx`, `RosterScreen.tsx`). Tested: `web/packages/i18n/src/i18n.test.ts`.
+  **`1 חיובים` / `0 חיובים` (billing.ts) are unaddressed** — money lane's namespace, not
+  this lane's to edit; the same `plural()` helper is there for prompt 1 to call. A `grep`
+  for the same `'{{count}}'` shape also found it, unfixed, in `people.ts`, `health.ts`,
+  `events.ts`, `comms.ts` and `reports.ts` — each is a finding for its owning vertical, not
+  fixed here.
 - **An unstyled native `<select>`** (`TodayScreen.tsx:231`) — a white macOS control with a
   blue stepper, the only white-on-white element on a black screen.
 - **The whole app is built from inline style objects** and has exactly one CSS file. The
@@ -814,6 +893,18 @@ are desktop-width, which is also how the manager looked at it.
 - **Offline is doubled** — `לא מקוון` in a top strip and again in an in-roster banner,
   whose ⚠ renders at **both** ends. The strip is a 0.25rem caption bar, easy to miss in a
   basement.
+  **Fixed 2026-09-02 (prompt 2).** `RosterScreen.tsx`'s own network-mode `Alert` and its
+  duplicate pending-count line are removed; `NetworkStatus.tsx` (mounted once at the app
+  shell, visible on every screen) is now the one signal. It gained what only the roster's
+  copy had — the per-mode reassurance hint (`...Hint` keys) — so nothing was lost in the
+  merge, and it already correctly names `api-down` with its own copy where the roster's
+  version had a recorded gap ("falls back to intermittent... recorded as a finding rather
+  than inlined here (G4)") that no longer exists once there is only one copy. The strip's
+  visual weight (the "easy to miss" half of this finding) is untouched — that is a design
+  question, out of this lane. Tests: `NetworkStatus.test.tsx` (new — all five §10.1 states,
+  the hint copy, the plural pending count); `RosterScreen.test.tsx` updated to assert the
+  screen renders **neither** copy, in every mode, as the regression guard against the
+  duplicate returning.
 - **The drawer is a nav and a settings screen stacked** — eight unstyled text links ~96px
   apart, no icons, no active state, no dividers, then identity, then six toggles each
   redundantly labelled `פעיל`.
@@ -838,12 +929,65 @@ No capture shows a pending-sync count, a queued-row badge or a sync-in-progress 
 queue was empty. **The 90-minute airplane-mode run on a real device has never happened**
 (`state.yaml`, status `open`), and the manager may do it unrehearsed tomorrow.
 
+**Partially addressed 2026-09-02 (prompt 2).** Automated coverage added for the three
+states no screenshot has shown, all previously true gaps rather than merely unphotographed
+features:
+
+- **Pending-sync count that decrements** — `NetworkStatus.test.tsx`'s new
+  "decrements as marks sync" test drives `markSynced` + `queueChanged()` (the same call
+  `sync.ts`'s real flush makes) and asserts the badge counts down 2 → 1 → gone, not just a
+  static number.
+- **A conflict surfaced from `ConflictSection.tsx`** — that component had **zero tests**
+  before this session. `ConflictSection.test.tsx` (new, 7 cases) covers all four of §10.5's
+  conflict kinds, the count interpolation, and that dismiss hides without deleting the
+  underlying op.
+- **A "queued-row badge"** — this one is not merely unphotographed, it does not exist.
+  `web/packages/core/src/offline/useOffline.ts::useQueuedOperations` ("the detail behind
+  the badge — 'tappable to see what's queued' (§5.7)") is exported and has **no consumer
+  anywhere in `web/apps/`** — `grep -rl useQueuedOperations web/apps/` returns nothing. The
+  hook itself has no test either. This is a genuine finding, newly surfaced: the mechanism
+  for a per-row/tappable queued view was built and never wired to any screen. Building that
+  screen is new UI (a disclosure of some kind) and is out of this lane's scope (design is a
+  later pass); recorded here so the next design pass does not have to rediscover it.
+
+**The real-device run itself is still open**, by design (Q3 of this session's brief) — the
+user will run it after this lane's session ends. `docs/qa/2026-09-02-offline-manual-protocol.md`
+is the numbered protocol handed over for it, including an optional step 8 that tries to
+provoke a genuine cross-device conflict on purpose (the one state hardest to hit by
+accident, and the one the automated coverage above cannot reach end to end).
+`HB-e2e-offline-bulk-op`, which the original fix prompt also named as open here, is
+**actually already closed** (`state.yaml`, closed 2026-08-26) — a stale cross-reference,
+corrected in §16.
+
 ### One permission finding
 
 `…20.48.23.png` shows payment amounts and התשלום התקבל / לא התקבל controls **inside the
 staff app**, while the spec cited in `attendance.css:154` says a coach sees no payment
 data. Nothing signals it is manager-only, so a coach who opens it and gets an error reads
 it as broken.
+
+**Investigated 2026-09-02 (prompt 2) — wrong as stated, on the code as it stands.**
+`PaymentPromisesSection.tsx` — the screen the capture shows — is gated **three ways
+independently**, not zero:
+
+1. **Nav visibility**: the `#/cash` drawer item is added to the item list only
+   `if (viewerIsManager)` (`App.tsx:303-310`) — a coach's drawer never shows it at all.
+2. **Route render**: `App.tsx:520-533` — a signed-in staff member who is `!viewerIsManager`
+   and lands on `#/cash` (or `#/join-link`, `#/setup`, `#/privacy`) by any means (typed URL,
+   stale bookmark, a link from before a demotion) renders `EmptyState` with
+   `common.permission.locked` / `common.permission.managerOnly` — an honest "restricted"
+   screen, not an error and not a crash. The component's own header comment
+   ("MANAGER-ONLY BY ROUTE AND BY SHELL") says this is deliberate.
+3. **Backend**: every endpoint the screen's client calls —
+   `GET /payment-promises`, `POST /payment-promises/{id}/confirm`,
+   `POST /payment-promises/{id}/decline` (`app/routers/payment_promises.py:130,148,168`) —
+   is independently `ManagerOrOwner`. A coach reaching the screen by any means still gets
+   403s from the server, matching the screen's own claim.
+
+No path was found — nav, direct hash navigation, or the API itself — that lets a coach see
+this screen or its data. The screenshot most plausibly came from a **manager's own**
+account, correctly showing manager content, not a coach seeing something they should not.
+No code change made; this finding is marked **wrong** rather than fixed.
 
 ---
 
@@ -863,6 +1007,13 @@ is those.
 - **The calendar breaks at desktop** — "סנכרון ליומן" and its three buttons stranded
   bottom-right, ~1,000px from the grid they belong to.
 - The legend declares five attendance states; the grid renders two.
+  **Wrong, investigated 2026-09-02 (prompt 2).** Stale — already fixed before this
+  capture's underlying code was read: commit `411f5d8` ("a mark per child, and five states
+  the legend names") aligned them. `ChildCalendar.tsx:132-138` declares
+  `LEGEND_STATES = ['present', 'absent', 'notified', 'unmarked', 'planned']`, the legend
+  list (`:1049-1055`) renders all five, and the grid's own marks (`STATUS_MARK`, `:106-111`,
+  plus the `planned` ring) draw from the same set — five legend entries, five renderable
+  states, on current code. No change made; the capture predates the fix.
 - Month chevrons in LTR order around "ספטמבר 2026" — "previous" is ambiguous in RTL.
 - The same control is "הכל" on home and "כל הילדים" on the calendar.
 - Amounts in two colours (₪1,150 red, ₪250 amber) with no stated meaning.
@@ -871,6 +1022,9 @@ is those.
   disagrees.
 - The next-lesson card carries no date, and offered מגיע/ה · לא מגיע/ה at 20:43 for a 16:00
   lesson.
+  **The intent-buttons-after-the-lesson half fixed 2026-09-02 (prompt 2) — see §3.8.** The
+  "carries no date" half is unaddressed — a design/layout change (adding a date to the
+  card), out of this lane's behaviour-only scope.
 - Vertical white pill artifacts on the right edge of every debt row.
 
 **Genuinely good:** no raw i18n keys, no untranslated strings, RTL direction correct
@@ -1176,6 +1330,9 @@ Recorded so a later session does not chase them.
 | §0 (original): "production really is on custom subdomains... runbook's Hosts section still says generated Railway domains" | **Confirmed true as stated** — the finding was correct, not a correction. `railway status` matches `infra/railway/domains.json` exactly; the runbook's "Hosts" section was stale and is corrected there. |
 | §13 #7: "the one residual risk is `settings.ENV`" | **Closed.** `/api/v1/health` reports `"env":"production"`, verified 2026-09-02; `/dev/*` cannot mount. |
 | §13 #5: "`POLICY_VERSION` moved 0 → 1... unwarned, the manager reads it as a regression" | **Lower stakes than framed.** Production carries 1 guardian, 2 people for the live club — the re-gate affects at most one account, not "every existing family" in any practical sense yet. User confirmed intended; no warning needed for the 2026-09-03 trial. |
+| §9: "One permission finding" — a coach sees payment data in the staff app, gets an error, reads the app as broken | **Wrong**, investigated 2026-09-02 (prompt 2). `PaymentPromisesSection.tsx` is gated three independent ways — nav visibility (`App.tsx:303-310`), an honest `EmptyState` refusal at the route (`App.tsx:520-533`, not an error), and `ManagerOrOwner` on all three backend endpoints it calls (`payment_promises.py:130,148,168`). No path lets a coach reach it or its data; the capture most plausibly came from a manager's own account showing manager content correctly. |
+| §10: "The legend declares five attendance states; the grid renders two" | **Wrong / stale**, investigated 2026-09-02 (prompt 2). Already fixed by commit `411f5d8` before the register's own captures were read against current code — `ChildCalendar.tsx` declares and renders all five states on both the legend and the grid today. |
+| Prompt 2's own brief: "`HB-e2e-offline-bulk-op` is also open in `state.yaml`" | **Wrong.** Checked 2026-09-02 — that entry is `status: closed`, closed 2026-08-26 ("with permission, since the alternative was leaving a daily coach action broken"). A stale cross-reference in the prompt document itself, not in the register. |
 
 ---
 

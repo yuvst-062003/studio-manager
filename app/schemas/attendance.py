@@ -12,7 +12,8 @@ against these two fields, and M4 owns both the component and the code that fills
 
 **Invariant 3 is why there is no money here.** The roster is the most coach-reachable
 payload in the product; a `balance_agorot` on `RosterEntry` would fail that gate for every
-coach at once.
+coach at once. `plan_name` is the deliberate exception -- a plan's label, never its
+`monthly_amount_agorot` -- see `app/services/attendance/roster.py::RosterRowRaw`.
 """
 
 from __future__ import annotations
@@ -143,6 +144,8 @@ class RosterEntry(BaseModel):
     #: Rendered by `BeltBar`, whose D7 ring is unconditional.
     belt_color_hex: str | None = None
     belt_name: str | None = None
+    #: `PricePlan.name` only -- never an amount. `None` until a manager chooses one.
+    plan_name: str | None = None
     #: -- the seam ------------------------------------------------------------
     health_status: HealthStatus = "missing"
     #: §5.5 — booleans only, never free text. This is what a coach sees.

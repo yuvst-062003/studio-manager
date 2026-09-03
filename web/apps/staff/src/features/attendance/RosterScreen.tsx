@@ -15,14 +15,16 @@
 //     `attendance.sync.pendingCount` interpolates marks, so the badge counts marks.
 import { useEffect, useMemo, useState } from 'react'
 import { Alert, Button } from '@studio/ui'
-import { t } from '@studio/i18n'
+import { plural, t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import {
   formatTimeInStudioZone,
   offlineStorageIsDurable,
+  offlineStore,
   queueMark,
+  readRoster,
+  readSession,
   usePendingCount,
-  useNetworkMode,
   useStaleQueueWarning,
   studioDayKey,
 } from '@studio/core'
@@ -69,7 +71,6 @@ export function RosterScreen({
     startsAt: string
     locationName: string | null
   } | null>(null)
-  const mode = useNetworkMode()
   const pending = usePendingCount()
   const stale = useStaleQueueWarning(clock)
 
@@ -86,9 +87,28 @@ export function RosterScreen({
           locationName: body.session.location_name,
         })
       })
-      .catch(() => {
-        // Offline is not an error state on this screen. The cached roster is what renders,
-        // and `mode` already tells the coach why nothing refreshed.
+      .catch(async () => {
+        // Offline is not an error state on this screen. §6.1 already primes `readRoster`/
+        // `readSession` into IndexedDB on every successful bootstrap — this used to say
+        // "the cached roster is what renders" while nothing ever read them back, so a
+        // coach opening the app with no signal saw an empty screen rather than the roster
+        // they had a moment ago. `mode` (NetworkStatus) already tells them why nothing
+        // refreshed; this is what makes there be something to look at while it doesn't.
+        if (!live) return
+        const cache = offlineStore()
+        const [cachedRoster, cachedSession] = await Promise.all([
+          readRoster(cache, sessionId),
+          readSession(cache, sessionId),
+        ])
+        if (!live) return
+        if (cachedRoster) setRoster(cachedRoster)
+        if (cachedSession) {
+          setHeader({
+            groupName: cachedSession.group_name,
+            startsAt: cachedSession.starts_at,
+            locationName: cachedSession.location_name,
+          })
+        }
       })
     return () => {
       live = false
@@ -158,7 +178,7 @@ export function RosterScreen({
           <span>{t(locale, 'attendance.sync.staleBody')}</span>
         </Alert>
         <p data-testid="roster-stale-count">
-          {t(locale, 'attendance.sync.pendingCount').replace('{{count}}', String(pending))}
+          {plural(locale, 'attendance.sync.pendingCount', pending)}
         </p>
       </section>
     )
@@ -200,24 +220,11 @@ export function RosterScreen({
           </li>
         </ul>
 
-        {/* `1c`'s sync banner, which `9f` lost. Rendered in every degraded mode, not only
-            in `offline`: §10.1 has four states and a coach on a captive portal is told the
-            truth rather than `מחובר`. */}
-        {mode !== 'online' ? (
-          <Alert iconLabel={t(locale, `attendance.network.${networkKey(mode)}`)} tone="pending">
-            {t(locale, `attendance.network.${networkKey(mode)}`)} ·{' '}
-            {t(locale, 'attendance.network.offlineHint')}
-          </Alert>
-        ) : null}
-
-        {/* `1c` finding 4 — the badge counts MARKS, which is what the key interpolates.
-            Three artboards drew it counting sessions against a key that counts marks; the
-            copy is what has to become true, not the other way round. */}
-        {pending > 0 ? (
-          <p data-testid="roster-pending">
-            {t(locale, 'attendance.sync.pendingCount').replace('{{count}}', String(pending))}
-          </p>
-        ) : null}
+        {/* Register §9 — "offline is doubled": this screen used to repeat `NetworkStatus`'s
+            mode text and pending count in a second banner right here. `NetworkStatus` is
+            mounted once at the app shell (App.tsx) and is visible on every staff screen
+            including this one, so a second copy was never new information, only a second
+            place to read the same one. One offline signal, in one place. */}
 
         {/* `9f`'s advance-notice hint row. Its claim — that those students are handled
             automatically — is true precisely because the bulk button below skips them. */}
@@ -372,12 +379,4 @@ function markId(sessionId: string, studentId: string): string {
  *  Jerusalem, which is exactly what `studioDayKey` exists to get right. */
 function sessionWeekday(startsAt: string): number {
   return new Date(`${studioDayKey(startsAt)}T12:00:00Z`).getUTCDay()
-}
-
-/** §10.1's four modes to the four keys `attendance.network.*` carries. `api-down` renders as
- *  `intermittent` for now — §10.1 gives it its own copy (`השרת אינו זמין, ננסה שוב`) and the
- *  namespace has no key for it. Recorded as a finding rather than inlined here (G4). */
-function networkKey(mode: string): string {
-  if (mode === 'api-down') return 'intermittent'
-  return mode
 }

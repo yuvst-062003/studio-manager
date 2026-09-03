@@ -17,10 +17,18 @@ export const schedule: Bundle = {
   // -- the day / week views (staff 9a, 1d; dashboard 3a) ------------------------
   'today.title': 'היום',
   'today.sessionCount': '{{count}} שיעורים',
+  // Register §9 — "1 שיעורים" has no plural rule. `translatePlural` reaches for this
+  // sibling only when `count === 1`; every other count keeps the template above.
+  'today.sessionCount.one': 'שיעור אחד',
   'today.backToToday': 'חזרה להיום',
   'today.openRoster': 'פתיחת נוכחות',
   'today.empty': 'אין שיעורים היום',
   'today.emptyHint': 'ימי פעילות נקבעים בלו״ז השבועי של הקבוצה',
+  // Register §4.2 — a date outside every declared training year used to render exactly
+  // like an ordinary day off, with no way to tell them apart. This is the actionable
+  // sentence: no year covers this date at all, and a manager has to fix that upstream.
+  'today.noTrainingYear': 'אין שנת לימודים שמכסה את התאריך הזה',
+  'today.noTrainingYearHint': 'יש לפנות למנהל להוספת שנת לימודים המכסה תאריך זה',
   'today.allCoaches': 'כל המאמנים',
   'today.filterByCoach': 'סינון לפי מאמן',
   'week.title': 'לוח שבועי',

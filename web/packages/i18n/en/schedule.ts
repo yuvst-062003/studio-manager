@@ -4,10 +4,13 @@ import type { Bundle } from '../types'
 export const schedule: Bundle = {
   'today.title': 'Today',
   'today.sessionCount': '{{count}} sessions',
+  'today.sessionCount.one': '1 session',
   'today.backToToday': 'Back to today',
   'today.openRoster': 'Open the register',
   'today.empty': 'No classes today',
   'today.emptyHint': 'Activity days are set in the group’s weekly schedule',
+  'today.noTrainingYear': 'No training year covers this date',
+  'today.noTrainingYearHint': 'Ask the manager to add a training year that covers this date',
   'today.allCoaches': 'All coaches',
   'today.filterByCoach': 'Filter by coach',
   'week.title': 'Weekly schedule',

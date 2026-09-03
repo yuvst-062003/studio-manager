@@ -8,6 +8,7 @@ import {
   queueChanged,
   setForcedMode,
   setOfflineStore,
+  writeWindow,
 } from '@studio/core'
 import type { OfflineStore, RosterRow as RosterRowData } from '@studio/core'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -173,29 +174,21 @@ describe('artboards 1c and 9f — the roster screen', () => {
     expect(screen.getByTestId('roster-row-student-1')).toHaveAttribute('data-status', 'present')
   })
 
-  it('renders the sync banner in EVERY degraded mode, not only offline', async () => {
-    // `9f` finding 2 — the later artboard lost `1c`'s offline, sync and staleness
-    // indicators, on the one screen a coach uses in a basement. §10.1 has four states, and
-    // a coach on a captive portal told `מחובר` stops trusting the indicator entirely.
-    setForcedMode('intermittent')
-    renderScreen()
-    expect(await screen.findByText(/חיבור לא יציב/)).toBeInTheDocument()
-  })
-
-  it('renders no sync banner when the network is fine', async () => {
-    setForcedMode('online')
-    renderScreen()
-    await screen.findByText('דנה כהן')
-    expect(screen.queryByText(/לא מקוון/)).not.toBeInTheDocument()
-  })
-
-  it('shows the pending badge counting MARKS, which is what the key interpolates', async () => {
-    // `1c` finding 4 — three artboards drew this counting SESSIONS against a key that
-    // counts marks. The copy that ships is what has to become true.
-    renderScreen()
-    await userEvent.click(await screen.findByTestId('roster-row-student-1'))
-    expect(await screen.findByTestId('roster-pending')).toHaveTextContent('1')
-  })
+  // Register §9 — "offline is doubled": this screen used to repeat `NetworkStatus`'s mode
+  // text and pending count in a second banner. §10.1's four-mode coverage and the "counts
+  // MARKS, not sessions" regression guard now live in NetworkStatus.test.tsx, where the
+  // one remaining copy of this UI is. What stays here is the negative: whatever the mode,
+  // this screen itself must render neither, so the duplicate cannot creep back in.
+  it.each(['offline', 'slow', 'intermittent', 'api-down', 'online'] as const)(
+    'never renders its own network banner (mode: %s) — NetworkStatus is the only signal',
+    async (mode) => {
+      setForcedMode(mode)
+      renderScreen()
+      await screen.findByText('דנה כהן')
+      expect(screen.queryByText(/לא מקוון|חיבור איטי|חיבור לא יציב|השרת אינו זמין/)).not.toBeInTheDocument()
+      expect(screen.queryByTestId('roster-pending')).not.toBeInTheDocument()
+    },
+  )
 })
 
 describe('§5.7 — the bulk rule, and the artboard that gets it wrong', () => {
@@ -292,13 +285,42 @@ describe('§5.5 — the roster is never blocked', () => {
 })
 
 describe('offline behaviour', () => {
-  it('renders rather than erroring when the roster fetch fails', async () => {
-    // Offline is not an error state on this screen. The cached roster is what draws, and
-    // `mode` already tells the coach why nothing refreshed.
+  it('renders rather than erroring when the roster fetch fails and nothing is cached', async () => {
     const client = makeClient([])
     client.sessionRoster = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'))
     renderScreen({ client })
     expect(await screen.findByTestId('roster-screen')).toBeInTheDocument()
+  })
+
+  it('falls back to the cached roster when the fetch fails', async () => {
+    // Register follow-up — this test used to only assert the screen didn't crash; it never
+    // proved the "cached roster is what renders" claim its own comment made. §6.1 primes
+    // `readRoster`/`readSession` on every successful bootstrap; this is what proves the
+    // roster screen actually reads them back rather than showing an empty list when a
+    // coach opens the app with no signal.
+    await writeWindow(store, {
+      server_time: NOW,
+      from_time: NOW,
+      to_time: NOW,
+      sessions: [
+        {
+          id: SESSION,
+          group_id: 'group-1',
+          group_name: 'מתקדמים',
+          starts_at: '2026-11-03T15:00:00.000Z',
+          ends_at: '2026-11-03T16:00:00.000Z',
+          location_name: 'אולם ב׳',
+          status: 'scheduled',
+          attendance_taken: false,
+        },
+      ],
+      rosters: { [SESSION]: [row({ display_name: 'שלומית לוי' })] },
+    })
+    const client = makeClient([])
+    client.sessionRoster = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'))
+    renderScreen({ client })
+    expect(await screen.findByText('שלומית לוי')).toBeInTheDocument()
+    expect(await screen.findByTestId('roster-session')).toHaveTextContent('אולם ב׳')
   })
 
   it('tells the coach attendance can be corrected at any time', async () => {
@@ -365,6 +387,8 @@ describe('§6.5 — the blocking stale-queue warning', () => {
     })
     queueChanged()
     renderScreen()
-    expect(await screen.findByTestId('roster-stale-count')).toHaveTextContent('1')
+    // Singular grammar (register §9's plural-rule fix) — one queued mark reads "סימון אחד
+    // ממתין לסנכרון", not "1 סימונים".
+    expect(await screen.findByTestId('roster-stale-count')).toHaveTextContent('סימון אחד ממתין לסנכרון')
   })
 })

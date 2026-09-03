@@ -19,6 +19,7 @@
 // chip, and this row is mark → flag + name + note → belt with no chip. The mismatch is
 // precisely why `roster-row` is a slot rather than a prop. `AttendanceMark` and `BeltBar`
 // are reused; the composite is built here.
+import { useRef } from 'react'
 import { AttendanceMark, Icon, useSlot } from '@studio/ui'
 import type { AttendanceState } from '@studio/ui'
 import { t } from '@studio/i18n'
@@ -79,6 +80,13 @@ const MARK_LABEL: Record<RosterRowData['status'], string> = {
   absent_excused: 'attendance.roster.absentExcused',
 }
 
+/** §5.7's own words: "requires a long-press to override". Register follow-up — this used
+ *  to fire `onOverride` on an ordinary click, so a thumb brushing the list erased the exact
+ *  notice it was meant to protect. Half a second is long enough that a brush or a slow
+ *  double-tap cannot reach it by accident, short enough that a deliberate hold does not
+ *  feel broken. */
+const LONG_PRESS_MS = 550
+
 export function RosterRow({
   row,
   locale,
@@ -97,6 +105,22 @@ export function RosterRow({
   // protected from a stray tap. Both halves are needed: the server rule cannot see a thumb.
   const preReported = row.has_absence_report && row.status === 'absent_excused'
 
+  // §5.7's long-press, tracked by hand: React has no `onLongPress`. `pointerActive` marks
+  // that a pointer (mouse, touch or pen) started this interaction at all — a `click` with
+  // no pointer behind it is keyboard activation, which is already a deliberate act and
+  // does not need a hold. `longPressFired` marks that the hold has already called
+  // `onOverride`, so the trailing `click` a pointer always produces on release does not
+  // call it a second time.
+  const pointerActive = useRef(false)
+  const longPressFired = useRef(false)
+  const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const clearPressTimer = () => {
+    if (pressTimer.current !== null) {
+      clearTimeout(pressTimer.current)
+      pressTimer.current = null
+    }
+  }
+
   // S3 resolved `1c`'s two-jobs comment: the row's TAP is the mark cycle — `1c` line 41,
   // "the whole row cycles them on tap" — and the card opens from a dedicated control at
   // the inline end. A shell div holds the two, because a control inside a control is
@@ -113,11 +137,34 @@ export function RosterRow({
         // product.
         onClick={() => {
           if (preReported) {
-            onOverride?.()
+            if (longPressFired.current) {
+              // Already handled by the hold below — this is just the click a pointer
+              // produces on release, not a second, independent activation.
+            } else if (!pointerActive.current) {
+              // No pointerdown preceded this click: keyboard activation.
+              onOverride?.()
+            }
+            // else: a pointer click that never reached the hold threshold — a stray tap,
+            // ignored on purpose.
+            pointerActive.current = false
+            longPressFired.current = false
             return
           }
           onCycle(nextStatus(row.status))
         }}
+        onPointerCancel={clearPressTimer}
+        onPointerDown={() => {
+          if (!preReported) return
+          pointerActive.current = true
+          longPressFired.current = false
+          clearPressTimer()
+          pressTimer.current = setTimeout(() => {
+            longPressFired.current = true
+            onOverride?.()
+          }, LONG_PRESS_MS)
+        }}
+        onPointerLeave={clearPressTimer}
+        onPointerUp={clearPressTimer}
         type="button"
       >
         <AttendanceMark label={t(locale, MARK_LABEL[row.status])} state={GLYPH[row.status]} />
@@ -131,11 +178,20 @@ export function RosterRow({
           {preReported ? (
             <span className="roster-row__note" data-note="pre-reported">
               {t(locale, 'attendance.source.preReported')}
+              {/* The parent's own words, up to 200 chars (`AbsenceReportIn.reason`). This
+                  used to reach the row's data and stop there — a coach saw only the generic
+                  label and never *why*. */}
+              {row.absence_reason ? <> · {row.absence_reason}</> : null}
             </span>
           ) : null}
           {row.status === 'unmarked' && !preReported ? (
             <span className="roster-row__note" data-note="unmarked">
               {t(locale, 'attendance.roster.unmarked')}
+            </span>
+          ) : null}
+          {row.plan_name ? (
+            <span className="roster-row__note" data-note="plan">
+              {row.plan_name}
             </span>
           ) : null}
         </span>

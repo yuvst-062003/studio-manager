@@ -32,6 +32,7 @@ export const attendance: Bundle = {
   // §5.14 — `unmarked` is a real state. A report must never treat it as absent.
   'roster.unmarked': 'לא סומן',
   'roster.unmarkedCount': 'לא סומנו {{count}} חניכים',
+  'roster.unmarkedCount.one': 'חניך אחד לא סומן',
   // §5.7's collapsed section — students enrolled in the group but not expected at THIS
   // session (C12). `סמן הכל נוכח` never touches it and its rows never count toward `לא סומן`.
   'roster.notExpectedToday': 'לא אמורים להגיע היום',
@@ -104,6 +105,7 @@ export const attendance: Bundle = {
   // -- the sync queue -------------------------------------------------------------
   'sync.pending': 'ממתין לסנכרון',
   'sync.pendingCount': '{{count}} סימונים ממתינים לסנכרון',
+  'sync.pendingCount.one': 'סימון אחד ממתין לסנכרון',
   'sync.syncing': 'מסנכרן…',
   'sync.synced': 'הכול מסונכרן',
   'sync.syncedAt': 'סונכרן לאחרונה בשעה',

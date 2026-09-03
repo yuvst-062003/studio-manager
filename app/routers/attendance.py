@@ -31,6 +31,7 @@ from datetime import date
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from app.core.auth_context import AnyStaff, ManagerOrOwner
@@ -54,6 +55,7 @@ from app.services.attendance.errors import ForbiddenError, NotFoundError, Precon
 from app.services.attendance.report import BadRangeError, build_report
 from app.services.attendance.schemas import BatchResult
 from app.services.attendance.service import AttendanceService
+from app.services.attendance.settings import get_at_risk_threshold, set_at_risk_threshold
 
 router = APIRouter(tags=["coach", "attendance"])
 
@@ -397,6 +399,34 @@ def attendance_report(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail={"code": "bad_range", "message": str(exc)},
         ) from exc
+
+
+class AtRiskSettingsOut(BaseModel):
+    threshold: int
+
+
+class AtRiskSettingsIn(BaseModel):
+    #: 1 would fire on the very first absence, which is not what a manager typing a smaller
+    #: number is asking for — SPEC §5.14's own default is 3. 20 is far above any plausible
+    #: club policy and exists only so a stray extra digit does not read as "never fire".
+    threshold: int = Field(ge=1, le=20)
+
+
+@router.get("/attendance/settings", response_model=AtRiskSettingsOut)
+def get_attendance_settings(_: ManagerOrOwner, session: TenantSessionDep) -> AtRiskSettingsOut:
+    """Register §2.3's at-risk threshold, manager-only for the same reason
+    `attendance_report` above is: a studio-wide policy number, not a coach's own view of
+    the mat. `app/services/attendance/settings.py` is why this and `PUT` below exist as
+    their own small pair rather than another field on `PATCH /studio` — a different
+    vertical's endpoint and whitelist."""
+    return AtRiskSettingsOut(threshold=get_at_risk_threshold(session))
+
+
+@router.put("/attendance/settings", response_model=AtRiskSettingsOut)
+def put_attendance_settings(
+    _: ManagerOrOwner, body: AtRiskSettingsIn, session: TenantSessionDep
+) -> AtRiskSettingsOut:
+    return AtRiskSettingsOut(threshold=set_at_risk_threshold(session, threshold=body.threshold))
 
 
 @router.get("/students/{student_id}/attendance", response_model=AttendancePage)

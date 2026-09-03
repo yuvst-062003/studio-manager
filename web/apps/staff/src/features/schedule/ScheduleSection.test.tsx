@@ -8,7 +8,10 @@ import { ScheduleSection, staffScheduleRoute } from './ScheduleSection'
 import type { StaffScheduleClient } from './client'
 
 function stub(): StaffScheduleClient {
-  return { listSessions: vi.fn(async () => []) } as unknown as StaffScheduleClient
+  return {
+    listSessions: vi.fn(async () => []),
+    listTrainingYears: vi.fn(async () => []),
+  } as unknown as StaffScheduleClient
 }
 
 /**

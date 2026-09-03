@@ -50,8 +50,16 @@ const COACHES = [
   { person_id: 'p2', display_name: 'נועה' },
 ]
 
-function stub(sessions: SessionRow[] = [TODAY_SESSION]): StaffScheduleClient {
-  return { listSessions: vi.fn(async () => sessions) }
+function stub(
+  sessions: SessionRow[] = [TODAY_SESSION],
+  trainingYears: { starts_on: string; ends_on: string; status: string }[] = [
+    { starts_on: '2026-09-01', ends_on: '2027-08-20', status: 'active' },
+  ],
+): StaffScheduleClient {
+  return {
+    listSessions: vi.fn(async () => sessions),
+    listTrainingYears: vi.fn(async () => trainingYears),
+  }
 }
 
 function renderIn(
@@ -174,7 +182,8 @@ describe('TodayScreen (9a / 1d)', () => {
     renderIn(screenFor({ viewerIsCoach: true, viewerPersonId: 'p1' }))
     await screen.findByTestId('session-row')
     const summary = screen.getByTestId('today-summary')
-    expect(summary).toHaveTextContent('1 שיעורים')
+    // Register §9's plural-rule fix: one session reads "שיעור אחד", not "1 שיעורים".
+    expect(summary).toHaveTextContent('שיעור אחד')
     expect(summary).toHaveTextContent('רון מאמן')
   })
 
@@ -192,6 +201,25 @@ describe('TodayScreen (9a / 1d)', () => {
     render(screenFor({ client: stub([]) }))
     expect(await screen.findByText(t('he', 'schedule.today.empty'))).toBeInTheDocument()
     expect(screen.getByText(t('he', 'schedule.today.emptyHint'))).toBeInTheDocument()
+  })
+
+  it('names the real cause when NO training year covers today (register §4.2)', async () => {
+    // `_year_covering` (app/services/schedule/service.py) silently skips a date outside
+    // every declared training year — the calendar, the register and the trial picker all
+    // go quiet with no error anywhere. This is the attendance side saying what happened:
+    // an empty day and a year-less date must not read as the same thing.
+    render(screenFor({ client: stub([], []) }))
+    expect(await screen.findByText(t('he', 'schedule.today.noTrainingYear'))).toBeInTheDocument()
+    expect(screen.getByText(t('he', 'schedule.today.noTrainingYearHint'))).toBeInTheDocument()
+    expect(screen.queryByText(t('he', 'schedule.today.empty'))).not.toBeInTheDocument()
+  })
+
+  it('does not claim a training-year gap when a year genuinely covers today', async () => {
+    // The 2026-27 default fixture (starts_on 2026-09-01, ends_on 2027-08-20) covers
+    // 2026-11-03 — an ordinary day off must still read as an ordinary day off.
+    render(screenFor({ client: stub([]) }))
+    expect(await screen.findByText(t('he', 'schedule.today.empty'))).toBeInTheDocument()
+    expect(screen.queryByText(t('he', 'schedule.today.noTrainingYear'))).not.toBeInTheDocument()
   })
 
   it('shows a cancelled session with its translated reason, never the token', async () => {

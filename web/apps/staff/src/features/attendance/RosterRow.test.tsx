@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { clearSlot, registerSlot } from '@studio/ui'
 import { DIRECTION } from '@studio/i18n'
@@ -120,10 +120,11 @@ describe('§5.7 — the tap cycle', () => {
     expect(onCycle).toHaveBeenCalledWith('absent_unexcused')
   })
 
-  it('does NOT cycle a parent s pre-report on an ordinary tap', async () => {
+  it('does NOT cycle NOR override a parent s pre-report on an ordinary tap', async () => {
     // §5.7 — "an excused absence shows as ✕ with a הודיעו מראש label and requires a
     // long-press to override." A parent told the club this morning; a thumb brushing the
-    // list must not erase that.
+    // list must not erase that. `userEvent.click` is a real pointerdown-then-pointerup
+    // pair well under the hold threshold, so this is the "brush" the rule exists for.
     const onCycle = vi.fn()
     const onOverride = vi.fn()
     renderIn(
@@ -136,6 +137,66 @@ describe('§5.7 — the tap cycle', () => {
     )
     await userEvent.click(screen.getByTestId('roster-row-student-1'))
     expect(onCycle).not.toHaveBeenCalled()
+    expect(onOverride).not.toHaveBeenCalled()
+  })
+
+  it('overrides a parent s pre-report on a genuine long-press', async () => {
+    // The positive case the finding named: a hold past the threshold, not a tap, is what
+    // is supposed to reach `onOverride`.
+    const onOverride = vi.fn()
+    renderIn(
+      <RosterRow
+        locale="he"
+        onCycle={vi.fn()}
+        onOverride={onOverride}
+        row={row({ status: 'absent_excused', has_absence_report: true })}
+      />,
+    )
+    const target = screen.getByTestId('roster-row-student-1')
+    fireEvent.pointerDown(target)
+    expect(onOverride).not.toHaveBeenCalled()
+    await new Promise((resolve) => setTimeout(resolve, 600))
+    expect(onOverride).toHaveBeenCalledOnce()
+    fireEvent.pointerUp(target)
+    // The pointer's own trailing click must not call it a second time.
+    fireEvent.click(target)
+    expect(onOverride).toHaveBeenCalledOnce()
+  })
+
+  it('does not override on a hold released before the threshold', async () => {
+    const onOverride = vi.fn()
+    renderIn(
+      <RosterRow
+        locale="he"
+        onCycle={vi.fn()}
+        onOverride={onOverride}
+        row={row({ status: 'absent_excused', has_absence_report: true })}
+      />,
+    )
+    const target = screen.getByTestId('roster-row-student-1')
+    fireEvent.pointerDown(target)
+    await new Promise((resolve) => setTimeout(resolve, 100))
+    fireEvent.pointerUp(target)
+    fireEvent.click(target)
+    await new Promise((resolve) => setTimeout(resolve, 600))
+    expect(onOverride).not.toHaveBeenCalled()
+  })
+
+  it('lets a keyboard activation override immediately, with no hold', async () => {
+    // A hold is a touchscreen-safety concept. A keyboard Enter/Space on a focused button
+    // is already a single deliberate action with nothing to brush.
+    const onOverride = vi.fn()
+    renderIn(
+      <RosterRow
+        locale="he"
+        onCycle={vi.fn()}
+        onOverride={onOverride}
+        row={row({ status: 'absent_excused', has_absence_report: true })}
+      />,
+    )
+    const target = screen.getByTestId('roster-row-student-1')
+    target.focus()
+    await userEvent.keyboard('{Enter}')
     expect(onOverride).toHaveBeenCalledOnce()
   })
 
@@ -152,6 +213,50 @@ describe('§5.7 — the tap cycle', () => {
     )
     await userEvent.click(screen.getByTestId('roster-row-student-1'))
     expect(onCycle).toHaveBeenCalledWith('present')
+  })
+})
+
+describe('the note line — reason and plan', () => {
+  it("shows the parent's own reason beside the pre-reported label", () => {
+    // Register follow-up — `absence_reason` reached this row's data long before this test
+    // existed; nothing rendered it. A coach saw only "notified in advance" and never why.
+    renderIn(
+      <RosterRow
+        locale="he"
+        onCycle={vi.fn()}
+        row={row({
+          status: 'absent_excused',
+          has_absence_report: true,
+          absence_reason: 'מחלה',
+        })}
+      />,
+    )
+    expect(screen.getByTestId('roster-row-student-1')).toHaveTextContent('מחלה')
+  })
+
+  it('shows nothing extra when the parent gave no reason', () => {
+    renderIn(
+      <RosterRow
+        locale="he"
+        onCycle={vi.fn()}
+        row={row({ status: 'absent_excused', has_absence_report: true, absence_reason: null })}
+      />,
+    )
+    expect(screen.getByTestId('roster-row-student-1')).toHaveTextContent(
+      'הודיעו מראש',
+    )
+  })
+
+  it("shows the student's plan name when one is set", () => {
+    renderIn(
+      <RosterRow locale="he" onCycle={vi.fn()} row={row({ plan_name: 'פעמיים בשבוע' })} />,
+    )
+    expect(screen.getByText('פעמיים בשבוע')).toBeInTheDocument()
+  })
+
+  it('shows no plan badge when none is chosen', () => {
+    renderIn(<RosterRow locale="he" onCycle={vi.fn()} row={row({ plan_name: null })} />)
+    expect(screen.queryByTestId('roster-row-student-1')?.querySelector('[data-note="plan"]')).toBeNull()
   })
 })
 

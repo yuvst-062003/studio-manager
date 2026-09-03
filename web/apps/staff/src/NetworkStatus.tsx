@@ -9,7 +9,7 @@
 // the probe loop for as long as a component is mounted. Mounted once, at the app shell — a
 // second caller would be a second interval." Without a mount the probe loop never ran, and
 // the mode only changed when a real request happened to fail.
-import { t } from '@studio/i18n'
+import { plural, t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { useNetworkMonitor, usePendingCount } from '@studio/core'
 import type { NetworkMode } from '@studio/core'
@@ -21,6 +21,15 @@ const MODE_KEY: Record<Exclude<NetworkMode, 'online'>, string> = {
   slow: 'attendance.network.slow',
   intermittent: 'attendance.network.intermittent',
   'api-down': 'attendance.network.apiDown',
+}
+
+/** The reassurance line ("your marks are saved on the device") — register §9 used to carry
+ *  this only inside the roster screen's now-removed duplicate banner. `slow` has none: §10.1
+ *  gives it no distinct hint copy, and a slow connection does not queue anything to explain. */
+const HINT_KEY: Partial<Record<Exclude<NetworkMode, 'online'>, string>> = {
+  offline: 'attendance.network.offlineHint',
+  intermittent: 'attendance.network.intermittentHint',
+  'api-down': 'attendance.network.apiDownHint',
 }
 
 export function NetworkStatus({ locale }: { locale: Locale }) {
@@ -47,11 +56,14 @@ export function NetworkStatus({ locale }: { locale: Locale }) {
       }}
     >
       {mode !== 'online' ? (
-        <span data-testid="network-status-mode">{t(locale, MODE_KEY[mode])}</span>
+        <span data-testid="network-status-mode">
+          {t(locale, MODE_KEY[mode])}
+          {HINT_KEY[mode] ? <> · {t(locale, HINT_KEY[mode] as string)}</> : null}
+        </span>
       ) : null}
       {pending > 0 ? (
         <span data-testid="network-status-pending">
-          {t(locale, 'attendance.sync.pendingCount').replace('{{count}}', String(pending))}
+          {plural(locale, 'attendance.sync.pendingCount', pending)}
         </span>
       ) : null}
     </div>

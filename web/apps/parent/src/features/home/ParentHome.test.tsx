@@ -4,9 +4,9 @@
 // grouped by day, child filter chips. The tab bar moved to the App shell (1a draws it on
 // every screen), so its tests live beside the shell now. 2a (day strip, past attendance)
 // is still deliberately unbuilt — the last test keeps it from creeping in.
-import { render, screen, within } from '@testing-library/react'
+import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactElement } from 'react'
 import { DIRECTION, t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
@@ -200,5 +200,31 @@ describe('ParentHome', () => {
     const { container } = renderIn(<ParentHome locale="he" />, { theme })
     expect(container.querySelector('[data-testid="parent-home"]')).toBeInTheDocument()
     expect(document.documentElement).toHaveAttribute('data-theme', theme)
+  })
+})
+
+describe('register §3.8 — a lesson that already started stays offered for hours', () => {
+  // The staff app's calendar has `useToday.ts`, a 60s poll that re-stamps the clock this
+  // screen reads. This screen has no such thing: `nextLesson` recomputes from `new Date()`
+  // on every RENDER, but nothing was making it render again after mount — so a family
+  // that opened the app once at 16:00 still saw the 16:00 class as "coming", offering
+  // מגיע/ה · לא מגיע/ה, at 20:43 for a lesson that finished four hours earlier.
+  beforeEach(() => vi.useFakeTimers())
+  afterEach(() => vi.useRealTimers())
+
+  it('withdraws the next-lesson card once its start time has passed, without a remount', () => {
+    const now = Date.now()
+    vi.setSystemTime(now)
+    const soon = { id: 'soon', startsAt: new Date(now + 60_000).toISOString(), groupName: 'מתחילים' }
+    render(
+      <ParentHome locale="he" students={CHILDREN} upcoming={[soon]} intentClient={STUB_CLIENT} />,
+    )
+    expect(screen.getByTestId('parent-home-next-lesson')).toBeInTheDocument()
+
+    // The lesson starts (and, realistically, ends) — no prop changes, only time passing.
+    act(() => vi.setSystemTime(now + 5 * 3600_000))
+    act(() => vi.advanceTimersByTime(70_000))
+
+    expect(screen.queryByTestId('parent-home-next-lesson')).toBeNull()
   })
 })

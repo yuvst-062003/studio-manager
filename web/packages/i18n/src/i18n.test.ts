@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DIRECTION, LOCALES, NAMESPACES, REFERENCE_LOCALE, t, translate, bundles } from '../index'
+import { DIRECTION, LOCALES, NAMESPACES, REFERENCE_LOCALE, translatePlural, t, translate, bundles } from '../index'
 import type { Bundle, Namespace } from '../types'
 
 /** Every namespace empty, so a synthetic fixture only has to fill the ones it uses. */
@@ -64,6 +64,46 @@ describe('fallback (SPEC §9 — Hebrew is the reference locale)', () => {
 
 describe('REFERENCE_LOCALE', () => {
   it('is he', () => expect(REFERENCE_LOCALE).toBe('he'))
+})
+
+describe('plural (register §9 — "1 שיעורים" has no plural rule)', () => {
+  // Hebrew's own plural categories: 1 -> 'one', everything else (including 0) -> 'other'.
+  // A synthetic bundle rather than the shipped one, same reasoning as the fallback suite
+  // above: this pins the RULE, not which keys happen to have a `.one` variant today.
+  const synthetic = {
+    he: { ...EMPTY, schedule: { 'today.sessionCount': '{{count}} שיעורים', 'today.sessionCount.one': 'שיעור אחד' } },
+    en: { ...EMPTY, schedule: { 'today.sessionCount': '{{count}} sessions', 'today.sessionCount.one': '1 session' } },
+    ru: { ...EMPTY, schedule: {} },
+  }
+
+  it('uses the singular variant for count === 1', () => {
+    expect(translatePlural(synthetic, 'he', 'schedule.today.sessionCount', 1)).toBe('שיעור אחד')
+    expect(translatePlural(synthetic, 'en', 'schedule.today.sessionCount', 1)).toBe('1 session')
+  })
+
+  it('falls back to the base (interpolated) key when no singular variant is defined', () => {
+    expect(translatePlural(synthetic, 'he', 'schedule.today.sessionCount', 0)).toBe('0 שיעורים')
+    expect(translatePlural(synthetic, 'he', 'schedule.today.sessionCount', 2)).toBe('2 שיעורים')
+    expect(translatePlural(synthetic, 'he', 'schedule.today.sessionCount', 5)).toBe('5 שיעורים')
+  })
+
+  it('falls back through the locale chain when a locale has no singular variant of its own', () => {
+    // ru's schedule bundle is empty above -- both the base key and the .one variant are
+    // missing, so this must reach he's base key exactly as `translate` already does,
+    // not throw and not return a raw `{{count}}` template.
+    expect(translatePlural(synthetic, 'ru', 'schedule.today.sessionCount', 1)).toBe('שיעור אחד')
+  })
+
+  it('interpolates extra params alongside count', () => {
+    const withName = {
+      he: { ...EMPTY, comms: { 'atRisk.body': '{{name}} נעדר {{count}} שיעורים ברצף' } },
+      en: EMPTY,
+      ru: EMPTY,
+    }
+    expect(translatePlural(withName, 'he', 'comms.atRisk.body', 3, { name: 'דני' })).toBe(
+      'דני נעדר 3 שיעורים ברצף',
+    )
+  })
 })
 
 describe('referenced nav labels resolve (regression 2026-08-29)', () => {

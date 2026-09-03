@@ -9,7 +9,7 @@
 // strip and the day-grouped lesson cards. The strip let a parent read backwards into past
 // attendance — Option B looks forward only, and the day now sits on each row's leading
 // edge instead. The screen fits 844px again; the previous arrangement scrolled to 2,700.
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { formatTimeInStudioZone, studioDayKey } from '@studio/core'
 import { EmptyState, Icon, MoneyDisplay } from '@studio/ui'
@@ -229,6 +229,20 @@ export function ParentHome({
   onIntentChanged?: () => void
 }) {
   const [childFilter, setChildFilter] = useState<string | null>(null)
+
+  // Register §3.8 — `week` and `nextLesson` below both read `new Date()` fresh on every
+  // render, but nothing was making this component RENDER again after mount: a family that
+  // opened the app at 16:00 and left the tab open still saw the 16:00 class offered as
+  // "coming" at 20:43, hours after it ended. `useToday.ts` (the staff app's equivalent
+  // fix) polls at day granularity, deliberately, to avoid re-rendering every minute; this
+  // screen needs the opposite — it is exactly the WITHIN-a-day staleness that matters
+  // here, so the tick is minute-grained instead. `tick` itself is never read: its only
+  // job is to be a new value each time, so React does not bail out of the re-render.
+  const [, setTick] = useState(0)
+  useEffect(() => {
+    const timer = setInterval(() => setTick((n) => n + 1), 60_000)
+    return () => clearInterval(timer)
+  }, [])
 
   /**
    * Option B's list: what is still to come, in time order, already filtered by the

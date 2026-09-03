@@ -90,7 +90,8 @@ export type ConflictCard = {
 
 /** One roster row, as `BootstrapPayload.rosters[sessionId][]` sends it. Mirrors
  *  `app/schemas/attendance.py::RosterEntry`. **Carries no money and must never learn to** —
- *  SPEC §13 invariant 3, and this is the shape a coach's screen is built from. */
+ *  SPEC §13 invariant 3, and this is the shape a coach's screen is built from. `plan_name`
+ *  is the one deliberate exception: a plan's label, never `monthly_amount_agorot`. */
 export type RosterRow = {
   student_id: string
   display_name: string
@@ -104,6 +105,9 @@ export type RosterRow = {
   source: 'coach' | 'parent' | 'bulk' | 'system' | null
   has_absence_report: boolean
   absence_reason: string | null
+  /** Optional so every producer of this shape from before this field existed still type-
+   *  checks unchanged. `undefined` and `null` both render as "no badge". */
+  plan_name?: string | null
 }
 
 /** Mirrors `app/schemas/schedule.py::SessionOut`, narrowed to what the roster draws. */

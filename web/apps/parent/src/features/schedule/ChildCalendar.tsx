@@ -706,7 +706,10 @@ export function ChildCalendar({
     for (const session of [...sessions, ...horizon]) byId.set(session.id, session)
     for (const session of byId.values()) {
       const day = studioDayKey(session.starts_at)
-      if (day <= todayKey || answered.has(session.id)) continue
+      // Register §3.8 — a cancelled session used to ring here exactly like a real one,
+      // which is why the calendar and Home's "בהמשך השבוע" (status === 'scheduled' only,
+      // Resolve.tsx) could disagree about which days a given week actually holds a class.
+      if (day <= todayKey || answered.has(session.id) || session.status !== 'scheduled') continue
       byDay.set(day, [
         ...(byDay.get(day) ?? []),
         { key: `planned:${session.id}`, state: 'planned', label: stateWord('planned') },

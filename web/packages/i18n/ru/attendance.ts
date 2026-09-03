@@ -16,6 +16,7 @@ export const attendance: Bundle = {
   'roster.absentUnexcused': 'Отсутствует без причины',
   'roster.unmarked': 'Не отмечен',
   'roster.unmarkedCount': 'Не отмечено учеников: {{count}}',
+  'roster.unmarkedCount.one': 'Не отмечен 1 ученик',
   'roster.notExpectedToday': 'Сегодня не ожидаются',
   'roster.notExpectedHint': 'Их тоже можно отметить — ребёнок, который пришёл, тоже настоящий',
   'roster.markAllPresent': 'Отметить всех присутствующими',
@@ -73,6 +74,7 @@ export const attendance: Bundle = {
 
   'sync.pending': 'Ожидает синхронизации',
   'sync.pendingCount': 'Отметок ожидает синхронизации: {{count}}',
+  'sync.pendingCount.one': 'Ожидает синхронизации 1 отметка',
   'sync.syncing': 'Синхронизация…',
   'sync.synced': 'Всё синхронизировано',
   'sync.syncedAt': 'Последняя синхронизация в',

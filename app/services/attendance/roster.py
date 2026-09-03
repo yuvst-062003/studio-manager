@@ -34,6 +34,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session as OrmSession
 
 from app.models.attendance import AbsenceReport, Attendance, AttendanceConfirmation
+from app.models.billing import PricePlan
 from app.models.health import HealthDeclaration
 from app.models.people import Enrollment, Student
 from app.models.person import Person
@@ -53,8 +54,11 @@ LIVE_ENROLLMENT_STATUSES = ("active",)
 class RosterRowRaw:
     """One student on a coach's roster, before projection into `RosterEntry`.
 
-    **No financial field, and no room for one** (SPEC §13 invariant 3). The roster is the
-    most coach-reachable payload in the product, so the shape itself is the guard.
+    **No amount, ever** (SPEC §13 invariant 3 -- `tests/invariants/test_03_...` checks the
+    field *names* a coach-tagged route returns, and none here matches its financial
+    pattern). `plan_name` is the one deliberate exception to "no room for one": it is the
+    plan's label (e.g. `"פעמיים בשבוע"`), never `PricePlan.monthly_amount_agorot` or any
+    other figure -- a coach asked to see which plan a student is on, not what it costs.
 
     **No `blocked` field either** (§5.5). Nothing on the mat is ever blocked by a missing
     health declaration; the row carries the ⚠ and the coach can still mark the student
@@ -84,6 +88,9 @@ class RosterRowRaw:
     #: neutral bar rather than as a missing element.
     belt_color_hex: str | None = None
     belt_name: str | None = None
+    #: `PricePlan.name` via `student.price_plan_id`. `None` when no plan is chosen yet,
+    #: same as the belt fields above.
+    plan_name: str | None = None
 
 
 def require_session(session: OrmSession, session_id: uuid.UUID) -> SessionRow:
@@ -179,6 +186,13 @@ def build_roster(
             )
         ).tuples()
     }
+    plan_ids = {student.price_plan_id for _, student, _ in enrollments if student.price_plan_id}
+    plan_names = {
+        plan_id: name
+        for plan_id, name in session.execute(
+            select(PricePlan.id, PricePlan.name).where(PricePlan.id.in_(plan_ids))
+        ).tuples()
+    }
 
     rows = [
         _row(
@@ -190,6 +204,7 @@ def build_roster(
             report=reports.get(student.id),
             confirmed=student.id in confirmations,
             derived_flags=flags.get(student.id) or {},
+            plan_name=plan_names.get(student.price_plan_id) if student.price_plan_id else None,
         )
         for enrollment, student, person in enrollments
     ]
@@ -209,6 +224,7 @@ def _row(
     report: AbsenceReport | None,
     confirmed: bool,
     derived_flags: dict[str, bool],
+    plan_name: str | None,
 ) -> RosterRowRaw:
     return RosterRowRaw(
         student_id=student.id,
@@ -228,4 +244,5 @@ def _row(
         expected=is_expected(enrollment.attends_weekdays, (weekday,), weekday),
         belt_color_hex=None,
         belt_name=None,
+        plan_name=plan_name,
     )

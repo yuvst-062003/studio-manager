@@ -65,6 +65,15 @@
       "why": "§5.5's day 1/3/7 chase for a declaration that has not been signed, plus the renewal pass for the studios that set `health_declaration_validity_months`. Nothing here blocks anything -- §5.5's argument is that blocking a row in an app does not stop a child stepping onto a mat, so chasing the parent is the whole job, and a chase that never runs is §5.5 not implemented. Daily, in waking hours, for the same reason `billing-run` is: this worker enqueues straight through W5's seam and the drain is fifteen minutes behind it, so the cron hour is the send hour and the quiet-hours refusal in `ReminderService` is not in this path. 09:30 rather than 09:00: `people-followups` already occupies 09:00, and a household that is in both ladders -- a lead being converted whose child has no declaration -- should get two messages far enough apart to read as two, not one buzz containing both."
     },
     {
+      "name": "attendance-at-risk",
+      "environment": "production",
+      "schedule": "0 7 * * *",
+      "max_silence_minutes": 1800,
+      "command": "python -m app.workers.at_risk",
+      "spec": "SPEC §5.14",
+      "why": "Register §2.3 -- `attendance.at_risk` was fully specified (kinds.py, both apps' AtRiskAlert) and nothing produced it; this is the producer. Daily rather than on every mark, because §5.14's rule is about a PATTERN across several sessions, not a single tap -- computing it at write time would fire mid-cycle on marks a coach is still correcting, and computing it on every dashboard read would repeat the same streak-walk query for every manager who opens the card. 07:00 Asia/Jerusalem, before `people-followups` and `health-reminders` occupy 09:00 and 09:30: most marking happens the evening before, so the streak for last night's session is already settled by morning, and a manager opening the dashboard at breakfast sees the freshest count the day can offer rather than one still catching up to yesterday evening. Idempotent per streak (not per run) via `streak_start_session_id` in the notification payload -- see the worker's own docstring for why a job that re-fired on every unchanged streak would be the failure §5.11's whole fan-out exists to avoid."
+    },
+    {
       "name": "privacy-requests",
       "environment": "production",
       "schedule": "20 * * * *",

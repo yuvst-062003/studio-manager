@@ -98,5 +98,47 @@ export function t(locale: Locale, key: string): string {
   return translate(bundles, locale, key)
 }
 
+/**
+ * A count-bearing string, with a real plural rule (register §9 — `'{{count}} שיעורים'`
+ * read "1 שיעורים" because nothing ever branched on `count`).
+ *
+ * `key` names the "other" form exactly as it exists today (`schedule.today.sessionCount`);
+ * a `.one` sibling (`schedule.today.sessionCount.one`) is looked up first and used verbatim
+ * — Hebrew's singular has its own word order ("שיעור אחד"), not a template with `1`
+ * substituted in. When no `.one` variant is defined for the locale, `key` falls back
+ * through the same he-is-reference chain `translate` already uses, so a locale that hasn't
+ * added a singular form yet degrades to its ordinary (grammatically fine for 0, 2+) form
+ * rather than a missing-key literal.
+ *
+ * Only `.one` is supported, not `.two`/`.few`/`.many` — the register's complaint is about
+ * `count === 1` specifically, and Hebrew's `.two` is optional flourish ("2 שיעורים" is
+ * correct, "שני שיעורים" only nicer) rather than a defect to fix here.
+ */
+export function translatePlural(
+  source: Record<Locale, Record<Namespace, Bundle>>,
+  locale: Locale,
+  key: string,
+  count: number,
+  params: Record<string, string | number> = {},
+): string {
+  const category = new Intl.PluralRules(locale).select(count)
+  const singularKey = `${key}.one`
+  const singular = translate(source, locale, singularKey)
+  const template = category === 'one' && singular !== singularKey ? singular : translate(source, locale, key)
+  return Object.entries({ count, ...params }).reduce(
+    (text, [name, value]) => text.split(`{{${name}}}`).join(String(value)),
+    template,
+  )
+}
+
+export function plural(
+  locale: Locale,
+  key: string,
+  count: number,
+  params: Record<string, string | number> = {},
+): string {
+  return translatePlural(bundles, locale, key, count, params)
+}
+
 export { DIRECTION, LOCALES, NAMESPACES, REFERENCE_LOCALE }
 export type { Bundle, Locale, Namespace }

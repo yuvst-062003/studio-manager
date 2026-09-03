@@ -147,6 +147,22 @@ describe('ChildCalendar (12b)', () => {
     expect(screen.queryByText('system:closure')).toBeNull()
   })
 
+  it('does not ring a cancelled future session as planned (register §3.8)', async () => {
+    // The planned-marker loop used to mark every future session id 'planned' with no
+    // status check at all — so a cancelled class still drew the same accent ring as a
+    // real one, which is why the calendar and Home's "בהמשך השבוע" (status === 'scheduled'
+    // only) could name different days for the same week.
+    render(calendar({ client: stub([{ ...FUTURE, status: 'cancelled', cancel_reason: 'system:closure' }]) }))
+    const cell = await screen.findByTestId('calendar-day-2026-11-17')
+    expect(cell).not.toHaveAttribute('data-state', 'planned')
+  })
+
+  it('still rings a genuinely scheduled future session as planned', async () => {
+    render(calendar({ client: stub([FUTURE]) }))
+    const cell = await screen.findByTestId('calendar-day-2026-11-17')
+    expect(cell).toHaveAttribute('data-state', 'planned')
+  })
+
   it('names the month in words rather than as an ISO key', async () => {
     // The heading was `${year}-${pad(month)}`, so a Hebrew-speaking parent read "2026-11"
     // sitting above a grid whose every other date is spelled out. It is also the one string

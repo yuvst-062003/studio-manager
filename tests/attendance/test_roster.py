@@ -250,6 +250,40 @@ def test_a_roster_row_carries_no_financial_field(tenant_session, a_session, an_e
     )
 
 
+def test_a_students_plan_name_reaches_the_roster(
+    tenant_session, app_session, studio, a_session, an_enrolled_student
+):
+    """Register follow-up: a coach asked to see which plan a student is on. There is no
+    `trial` concept anywhere on an *enrolled* student -- `PricePlan` carries no such flag,
+    and a prospective student who has not enrolled is a separate `TrialBooking`, never an
+    `Enrollment` row, so it never reaches `build_roster` at all. The plan NAME is real,
+    already-stored data and carries no amount -- see `RosterRowRaw.plan_name`."""
+    from app.models.billing import PricePlan
+
+    plan = PricePlan(
+        studio_id=studio.id,
+        name="פעמיים בשבוע",
+        sessions_per_week=2,
+        weekly_extra_allowance=0,
+        monthly_amount_agorot=30000,
+        active_from=YEAR_STARTS,
+    )
+    app_session.add(plan)
+    app_session.flush()
+    student = app_session.get(Student, an_enrolled_student)
+    student.price_plan_id = plan.id
+    app_session.commit()
+    _, rows = build_roster(tenant_session, a_session)
+    assert rows[0].plan_name == "פעמיים בשבוע"
+
+
+def test_a_student_with_no_plan_chosen_has_no_plan_name(
+    tenant_session, a_session, an_enrolled_student
+):
+    _, rows = build_roster(tenant_session, a_session)
+    assert rows[0].plan_name is None
+
+
 def test_rows_are_ordered_by_display_name_so_a_coach_can_scan_thirty(
     tenant_session, app_session, studio, a_group, a_session, an_enrolled_student
 ):

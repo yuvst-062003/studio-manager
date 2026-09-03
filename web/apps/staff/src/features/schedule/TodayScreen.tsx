@@ -20,9 +20,9 @@ import {
   studioDayKey,
   useNetworkMode,
 } from '@studio/core'
-import { t } from '@studio/i18n'
+import { plural, t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
-import { cancelReasonLabel } from './client'
+import { cancelReasonLabel, yearCovers } from './client'
 import type { SessionRow, StaffScheduleClient } from './client'
 
 const DAY_MS = 86_400_000
@@ -130,6 +130,9 @@ export function TodayScreen({
   const [sessions, setSessions] = useState<SessionRow[]>([])
   const [failed, setFailed] = useState(false)
   const [attempt, setAttempt] = useState(0)
+  // Register §4.2 — defaults to false (an ordinary empty day) until the check below
+  // (fired only when the day's own fetch comes back empty) proves otherwise.
+  const [noTrainingYear, setNoTrainingYear] = useState(false)
   // S11 — a failed read distinguishes offline from broken (S5's network state).
   const networkMode = useNetworkMode()
   const strip = useMemo(() => stripAround(initialDay ?? todayKey), [initialDay, todayKey])
@@ -158,6 +161,29 @@ export function TodayScreen({
     () => sessions.filter((session) => studioDayKey(session.starts_at) === day),
     [day, sessions],
   )
+
+  // Register §4.2 — `_year_covering` (app/services/schedule/service.py) silently skips any
+  // occurrence outside every declared training year, so a year-less date and an ordinary
+  // day off both arrive here as "zero sessions" with nothing to tell them apart. Checked
+  // only when the day is empty: `GET /training-years` is `AnyStaff`, so a coach's own
+  // client can already ask, and asking on every non-empty day would be a query nobody needs
+  // the answer to.
+  useEffect(() => {
+    if (onThisDay.length > 0) {
+      setNoTrainingYear(false)
+      return
+    }
+    let live = true
+    client
+      .listTrainingYears()
+      .then((years) => live && setNoTrainingYear(!yearCovers(years, day)))
+      // A failed check must not invent a claim the day cannot back up — the ordinary
+      // "no classes" empty state is the honest fallback, not a second failure mode.
+      .catch(() => live && setNoTrainingYear(false))
+    return () => {
+      live = false
+    }
+  }, [client, day, onThisDay.length])
 
   const chooseDay = useCallback((key: string) => setDay(key), [])
 
@@ -194,7 +220,7 @@ export function TodayScreen({
       {/* S7 — `5 שיעורים · אלון מזרחי`. The coach half renders only when the filter has
           chosen one, which for a coach opening their own day is the default. */}
       <p data-testid="today-summary" style={noteStyle}>
-        {t(locale, 'schedule.today.sessionCount').replace('{{count}}', String(onThisDay.length))}
+        {plural(locale, 'schedule.today.sessionCount', onThisDay.length)}
         {coachName ? <> · <bdi>{coachName}</bdi></> : null}
       </p>
 
@@ -244,8 +270,11 @@ export function TodayScreen({
 
       {onThisDay.length === 0 ? (
         <EmptyState
-          title={t(locale, 'schedule.today.empty')}
-          description={t(locale, 'schedule.today.emptyHint')}
+          title={t(locale, noTrainingYear ? 'schedule.today.noTrainingYear' : 'schedule.today.empty')}
+          description={t(
+            locale,
+            noTrainingYear ? 'schedule.today.noTrainingYearHint' : 'schedule.today.emptyHint',
+          )}
         />
       ) : (
         <ul
