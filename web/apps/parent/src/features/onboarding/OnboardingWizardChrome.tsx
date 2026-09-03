@@ -43,7 +43,6 @@ const titleStyle: CSSProperties = {
 const countStyle: CSSProperties = {
   color: 'var(--text-muted)',
   flex: 'none',
-  fontFamily: 'var(--font-mono, ui-monospace, monospace)',
   fontSize: 'var(--text-caption)',
 }
 

@@ -42,7 +42,11 @@ class Caller:
 
     @property
     def headers(self) -> dict[str, str]:
-        return {"Authorization": f"Bearer {self.token}"}
+        # X-Dev-Now pins every request this caller makes to T0 (§19) -- without it, a
+        # test asserting an invitation with `expires_at=T0 + timedelta(days=7)` is still
+        # current drifts stale the moment real time passes T0 + 7 days, the same class of
+        # bug tests/attendance/conftest.py's own Caller.headers already guards against.
+        return {"Authorization": f"Bearer {self.token}", "X-Dev-Now": T0.isoformat()}
 
 
 @pytest.fixture
