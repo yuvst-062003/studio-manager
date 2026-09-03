@@ -197,6 +197,7 @@ function promise(
     total_agorot: 50_000,
     prepay_months: 0,
     claimed_plan_id: null,
+    already_paid: false,
     charge_ids: ['c1'],
     created_at: '2026-09-01T09:00:00Z',
     decided_at: null,
