@@ -115,6 +115,12 @@ export { RefusalScreen } from './first-run/RefusalScreen'
 export { InstallWalkthrough, isIosSafari } from './first-run/InstallWalkthrough'
 export type { InstallPromptEvent } from './first-run/InstallWalkthrough'
 export { InstallBanner } from './first-run/InstallBanner'
+export {
+  chromeIntentUrl,
+  detectInAppBrowser,
+  InAppBrowserBanner,
+} from './first-run/InAppBrowserBanner'
+export type { InAppBrowser } from './first-run/InAppBrowserBanner'
 export { UpdateToast } from './sw-update/UpdateToast'
 export {
   SW_LAUNCH_GRACE_MS,

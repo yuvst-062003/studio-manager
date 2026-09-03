@@ -99,6 +99,16 @@ export const common: Bundle = {
   'auth.eyebrow.staff': 'כניסת מאמנים',
   'auth.eyebrow.dashboard': 'כניסת מנהלים',
   'auth.noPasswords': 'בלי סיסמאות. הגישה נקבעת לפי החשבון שאיתו הוזמנתם.',
+  // §5.2 — "OAuth must never run inside a webview. Google returns disallowed_useragent."
+  // §6.1's own trial link is meant to travel through Instagram/Facebook/TikTok, so this is
+  // the expected result of that channel working, not an edge case.
+  'auth.inAppBrowser.title': 'התחברות עם Google לא זמינה כאן',
+  'auth.inAppBrowser.body': 'אי אפשר להתחבר עם Google בתוך {{app}}.',
+  'auth.inAppBrowser.instruction': 'יש ללחוץ על שלוש הנקודות (⋯) למעלה ולבחור "פתיחה בדפדפן".',
+  'auth.inAppBrowser.app.instagram': 'אינסטגרם',
+  'auth.inAppBrowser.app.facebook': 'פייסבוק',
+  'auth.inAppBrowser.app.tiktok': 'טיקטוק',
+  'auth.inAppBrowser.app.linkedin': 'לינקדאין',
   // -- the manager sign-in (docs/design "Gladiator Manager Sign In", 2026-09-01) ------
   // The staff app's own face. `SignIn`'s split screen still serves parent and dashboard,
   // so these keys live beside those rather than replacing them.
@@ -172,6 +182,9 @@ export const common: Bundle = {
   'refusal.dashboard.title': 'אין לחשבון הזה הרשאות במועדון',
   'refusal.dashboard.body': 'בקשו מבעלי המועדון להוסיף לכם תפקיד, או התחברו עם חשבון אחר.',
   'refusal.dashboard.otherApp': 'אפליקציית הצוות',
+  // 2026-09-03 — every refusal screen's own account-chooser line, so "טעיתי בחשבון" is
+  // obviously fixable at a glance rather than something to guess at before hitting sign out.
+  'refusal.signedInAs': 'מחוברים בתור {email}',
   'tour.1': 'כאן השיעורים של היום',
   'tour.2': 'לחיצה לסימון נוכחות',
   'tour.3': 'עובד גם בלי אינטרנט',

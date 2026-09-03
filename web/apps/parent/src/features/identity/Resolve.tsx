@@ -1,10 +1,14 @@
-// §6.1's parent-app first launch, steps 3 and 4:
+// §6.1's parent-app first launch, step 4, and step 3's non-refusal arms:
 //
 //   3  resolve        invitation token → attach identity to the pre-created Person
 //                     verified email/phone hit → attach to the matched Person
-//                     no match → "לא מצאנו אותך"
-//                                [ יש לי קוד הזמנה ] [ הרשמה לסטודיו ]
 //   4  studio picker  only shown if she belongs to more than one studio
+//
+// Step 3's "no match" refusal ("לא מצאנו אותך" / [ יש לי קוד הזמנה ]) moved to
+// `AccessGate` (2026-09-02), which wraps this component's caller rather than living
+// inside it — see that file's header for why. Everything here now runs under the
+// guarantee `AccessGate` provides: `session.access.parent` is `true` and no invite
+// redemption is in flight.
 //
 // Steps 5 and 6 — the BLOCKING consent and health gates — are M4's, and this file
 // deliberately does NOT pre-build a seam for them. §1.3's seam-4 table names five
@@ -12,7 +16,7 @@
 // speculative design in a file (`slots.ts`) the plan says is authored once. M4 decides
 // its own shape; what M1 owes it is a container with an obvious place to land.
 import { useEffect, useMemo, useState } from 'react'
-import { RefusalScreen, StudioSwitcher } from '@studio/ui'
+import { StudioSwitcher } from '@studio/ui'
 import type { Session } from '@studio/core'
 import { apiFetch } from '@studio/core'
 import { t } from '@studio/i18n'
@@ -25,47 +29,7 @@ import type { TrialLesson } from '../people'
 import { TrialHome } from '../people'
 import { makeParentScheduleClient } from '../schedule/client'
 
-/** Where the staff app lives, so §6.1's second refusal is a link rather than a dead end. */
-const STAFF_APP_URL = '/staff'
-
 export function Resolve({ session, locale }: { session: Session; locale: Locale }) {
-  // Pre-filled from an invitation LINK (`/?invite=<token>`, 2026-08-30) — the manager's
-  // add-a-student screen hands the parent this URL; retyping a long token from it is the
-  // exact friction the link exists to remove.
-  const [code, setCode] = useState(
-    () => new URLSearchParams(globalThis.location?.search ?? '').get('invite') ?? '',
-  )
-  const redeem = (token: string) =>
-    apiFetch('/api/v1/auth/accept-invitation', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token }),
-    }).then((response) => {
-      if (response.ok) session.reload()
-    })
-
-  // The link's token is redeemed on arrival, once — a parent who followed the link has
-  // already said yes. A failed redeem leaves the pre-filled field on screen, which is
-  // the manual path with the typing already done.
-  const arrivedWithInvite = code !== '' && !session.access.parent
-  // Whether that redeem is still in flight. The refusal below keys on `!access.parent`,
-  // which stays true for the whole round trip -- so an invited parent's FIRST screen was
-  // "you do not have access here", from the club's own link. They are mid-join, not
-  // refused, and they are the one audience that message must never reach.
-  const [joining, setJoining] = useState(arrivedWithInvite)
-  useEffect(() => {
-    if (!arrivedWithInvite) return
-    // `code` was initialised from this same `?invite=` param and nothing has had a chance
-    // to edit it yet, so re-reading the URL here would be a second source for one value.
-    // `arrivedWithInvite` already guarantees it is non-empty.
-    //
-    // `finally` and not `then`: a failed redeem must also stop claiming to be joining, or
-    // a parent whose token expired waits on a spinner for ever instead of reaching the
-    // pre-filled manual path below.
-    void redeem(code).finally(() => setJoining(false))
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- one shot, on arrival only.
-  }, [])
-
   // A session with memberships but NO active studio has no tenant scope, and every
   // tenant-scoped route answers 401 without one. The picker below is skipped at a single
   // studio (§6.1 step 4 shows it "only if she belongs to more than one"), so such a
@@ -213,17 +177,6 @@ export function Resolve({ session, locale }: { session: Session; locale: Locale 
     }
   }, [scheduleClient, session.access.parent, intentEpoch])
 
-  // §3.1 — the parent app asks 'do you have any guardian rows?', which is what
-  // `access.parent` reports. A role check here would let a manager with no children in.
-  // Mid-join, not refused. See `joining` above.
-  if (joining) {
-    return (
-      <section aria-busy="true" data-testid="parent-joining">
-        <p>{t(locale, 'common.auth.joining')}</p>
-      </section>
-    )
-  }
-
   // Held while the sole studio is being activated, for the reason the health gate holds
   // its own render: a home drawn before the scope exists is a home whose every read 401s,
   // and the parent reads empty boxes rather than a wait.
@@ -232,39 +185,6 @@ export function Resolve({ session, locale }: { session: Session; locale: Locale 
       <section aria-busy="true" data-testid="parent-activating-studio">
         <p>{t(locale, 'common.auth.joining')}</p>
       </section>
-    )
-  }
-
-  if (!session.access.parent) {
-    return (
-      <>
-        <RefusalScreen
-          which="parent"
-          otherAppUrl={STAFF_APP_URL}
-          onSignOut={() => void session.signOut()}
-          locale={locale}
-        />
-        {/* §6.1 step 3's 'no match' branch. Without it, a correctly-invited parent whose
-            email differs from the invitation by one character has no way forward at all
-            — and that person cannot tell their situation from a genuine refusal. */}
-        <section data-testid="parent-no-match">
-          <p>{t(locale, 'common.auth.notFound')}</p>
-          <label htmlFor="invite-code">{t(locale, 'common.auth.inviteCodeLabel')}</label>
-          <input
-            id="invite-code"
-            value={code}
-            onChange={(event) => setCode(event.target.value)}
-          />
-          <button
-            type="button"
-            onClick={() => {
-              void redeem(code)
-            }}
-          >
-            {t(locale, 'common.auth.haveInviteCode')}
-          </button>
-        </section>
-      </>
     )
   }
 

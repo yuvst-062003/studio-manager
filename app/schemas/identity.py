@@ -120,3 +120,9 @@ class MeResponse(BaseModel):
     #: persona). Feature pass 2026-08-27: the sidebar footer and the drawer account
     #: header (2e) both draw a name the session never carried.
     display_name: str | None = None
+    #: The Google/Apple account's own address, from `auth_identity` -- unlike
+    #: `display_name` it needs no `Person` row, so it is populated even for an identity
+    #: with zero studio memberships. §6.1's refusal screen renders "signed in as
+    #: <email>" so a person refused by their OWN account can tell at a glance that the
+    #: fix is switching accounts, not retrying the same one.
+    email: str | None = None

@@ -6815,6 +6815,17 @@
             ],
             "title": "Display Name"
           },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
           "identity_id": {
             "format": "uuid",
             "title": "Identity Id",
@@ -7361,6 +7372,18 @@
             "title": "First Name",
             "type": "string"
           },
+          "grade": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grade"
+          },
           "group_ids": {
             "items": {
               "format": "uuid",
@@ -7376,6 +7399,18 @@
             "minLength": 1,
             "title": "Last Name",
             "type": "string"
+          },
+          "national_id": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "National Id"
           },
           "self_student": {
             "default": false,
@@ -7548,6 +7583,78 @@
         "title": "OnboardingLinkStatusOut",
         "type": "object"
       },
+      "OnboardingOtherParentIn": {
+        "properties": {
+          "first_name": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "First Name",
+            "type": "string"
+          },
+          "last_name": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Name"
+          },
+          "national_id": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "National Id"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          }
+        },
+        "required": [
+          "first_name"
+        ],
+        "title": "OnboardingOtherParentIn",
+        "type": "object"
+      },
+      "OnboardingPickupIn": {
+        "properties": {
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "phone": {
+            "default": "",
+            "maxLength": 32,
+            "title": "Phone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "OnboardingPickupIn",
+        "type": "object"
+      },
       "OnboardingRegisterIn": {
         "properties": {
           "children": {
@@ -7571,6 +7678,16 @@
             "title": "Last Name",
             "type": "string"
           },
+          "other_parent": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OnboardingOtherParentIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "phone": {
             "anyOf": [
               {
@@ -7582,6 +7699,24 @@
               }
             ],
             "title": "Phone"
+          },
+          "pickup_contacts": {
+            "items": {
+              "$ref": "#/components/schemas/OnboardingPickupIn"
+            },
+            "maxItems": 10,
+            "title": "Pickup Contacts",
+            "type": "array"
+          },
+          "signer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OnboardingSignerIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -7623,6 +7758,69 @@
           "already_registered"
         ],
         "title": "OnboardingRegisterOut",
+        "type": "object"
+      },
+      "OnboardingSignerIn": {
+        "properties": {
+          "address": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Address",
+            "type": "string"
+          },
+          "aliyah_year": {
+            "anyOf": [
+              {
+                "maxLength": 8,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Aliyah Year"
+          },
+          "city": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "City",
+            "type": "string"
+          },
+          "national_id": {
+            "maxLength": 20,
+            "minLength": 1,
+            "title": "National Id",
+            "type": "string"
+          },
+          "phone_home": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone Home"
+          },
+          "relation": {
+            "default": "mother",
+            "enum": [
+              "mother",
+              "father",
+              "other"
+            ],
+            "title": "Relation",
+            "type": "string"
+          }
+        },
+        "required": [
+          "national_id",
+          "address",
+          "city"
+        ],
+        "title": "OnboardingSignerIn",
         "type": "object"
       },
       "OpsHealthResponse": {

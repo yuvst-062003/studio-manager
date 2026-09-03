@@ -13,12 +13,47 @@ import App from './App'
 // walkthrough at #/install. §10.6's stake (pending_ops and Safari's 7-day cap) is why
 // the nudge exists at all — and why it is a pitch, not a gate.
 
+/** A signed-in, authorized coach — this file's default session (see `beforeEach`). Since
+ *  `AccessGate` (2026-09-02), a session with no role assignment never reaches `AppShell`
+ *  at all — so the install banner and every other test in this file need an authorized
+ *  session, not just `{items: []}` for everything. `/auth/me` carries the full shape and
+ *  not only `dev_tools`: `useSession` REPLACES the refresh's state with that body and
+ *  defaults a missing `access` to `{staff:false,parent:false}`. */
+const SIGNED_IN_BODY = {
+  access: { staff: true, parent: false },
+  studios: [
+    {
+      studio_id: 'st-1',
+      studio_name: 'מועדון בדיקה',
+      studio_is_demo: false,
+      person_id: 'p-coach',
+      roles: ['lead_coach'],
+      is_guardian: false,
+    },
+  ],
+  active_studio_id: 'st-1',
+}
+
 beforeEach(() => {
   globalThis.localStorage?.clear()
   globalThis.location.hash = ''
   vi.stubGlobal(
     'fetch',
-    vi.fn(async () => new Response(JSON.stringify({ items: [] }), { status: 200 })),
+    vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.includes('/auth/refresh')) {
+        return new Response(
+          JSON.stringify({ access_token: 'tok', expires_in: 900, ...SIGNED_IN_BODY }),
+          { status: 200 },
+        )
+      }
+      if (url.includes('/auth/me')) {
+        return new Response(JSON.stringify({ ...SIGNED_IN_BODY, dev_tools: false }), {
+          status: 200,
+        })
+      }
+      return new Response(JSON.stringify({ items: [] }), { status: 200 })
+    }),
   )
 })
 
@@ -72,6 +107,25 @@ describe('staff app', () => {
     // §19.4 — 'Rendered only when the authenticated identity has is_developer.'
     render(<App />)
     expect(screen.queryByTestId('studio-dev-bar')).toBeNull()
+  })
+})
+
+describe('an identity with no role assignment anywhere (mirrors the dashboard app’s 2026-08-29/30 fix)', () => {
+  // Every hash-routed screen in App.tsx already re-checks `session.access.staff` for
+  // itself, so a refused coach could not reach a screen behind this bug — but `Resolve`
+  // rendered `RefusalScreen` only as the DEFAULT branch, deep inside `AppShell`, so the
+  // title, the drawer and the (deliberately unguarded) install banner rendered around it
+  // regardless. `AccessGate` (2026-09-02) closes that gap the same way the dashboard app's
+  // 2026-08-29/30 fix did: refuse BEFORE the shell mounts, not inside it.
+  it('refuses before the shell — no title, no drawer, no install banner', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(JSON.stringify({ items: [] }), { status: 200 })),
+    )
+    render(<App />)
+    await waitFor(() => expect(screen.getByTestId('staff-refusal')).toBeInTheDocument())
+    expect(screen.queryByTestId('install-banner')).toBeNull()
+    expect(screen.queryByRole('button', { name: t('he', 'common.nav.menu') })).toBeNull()
   })
 })
 

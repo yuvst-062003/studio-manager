@@ -13,13 +13,52 @@ import App from './App'
 // to use the app, and the install story is a nudge (InstallBanner) plus an on-demand
 // walkthrough at #/install. The tests inverted with it.
 
+const STUDIO = {
+  studio_id: 'st-1',
+  studio_name: 'מועדון בדיקה',
+  studio_is_demo: false,
+  person_id: 'p-guardian',
+  roles: [] as string[],
+  is_guardian: true,
+}
+
+/** The shape `useSession` needs to call this a signed-in guardian WITH access — see
+ *  `features/schedule/mounted.test.tsx`'s `signedInAs`, which this mirrors. `/auth/me`
+ *  carries the full shape and not only `dev_tools`: `useSession` REPLACES the refresh's
+ *  state with that body and defaults a missing `access` to `{staff:false,parent:false}`,
+ *  so a thinner stub signs the guardian back out and every route in this file lands on
+ *  `AccessGate`'s refusal instead of the screen under test. */
+const SIGNED_IN_BODY = {
+  access: { staff: false, parent: true },
+  studios: [STUDIO],
+  active_studio_id: STUDIO.studio_id,
+}
+
+/**
+ * A signed-in, authorized guardian for every URL `extra` does not claim — this file's
+ * default session (see `beforeEach`). `extra` returning `null` falls through to a bare
+ * `{items: []}` 200, same as the old file-wide default; most of these tests only care
+ * about one or two endpoints and let this cover the rest.
+ */
+function stubAuthed(extra: (url: string, init?: RequestInit) => Response | null) {
+  return vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input)
+    if (url.includes('/auth/refresh')) {
+      return new Response(JSON.stringify({ access_token: 'tok', expires_in: 900, ...SIGNED_IN_BODY }), {
+        status: 200,
+      })
+    }
+    if (url.includes('/auth/me')) {
+      return new Response(JSON.stringify({ ...SIGNED_IN_BODY, dev_tools: false }), { status: 200 })
+    }
+    return extra(url, init) ?? new Response(JSON.stringify({ items: [] }), { status: 200 })
+  })
+}
+
 beforeEach(() => {
   globalThis.localStorage?.clear()
   globalThis.location.hash = ''
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(async () => new Response(JSON.stringify({ items: [] }), { status: 200 })),
-  )
+  vi.stubGlobal('fetch', stubAuthed(() => null))
 })
 
 afterEach(() => {
@@ -72,6 +111,48 @@ describe('parent app', () => {
   })
 })
 
+describe('an account with no studio at all (mirrors the dashboard app’s 2026-08-29/30 fix)', () => {
+  // §6.1 says signing in is not access: "there is no path from I downloaded the app to I
+  // have a studio", so any Google account can authenticate and belong to nothing. The
+  // dashboard app was fixed for this twice (2026-08-29, then 2026-08-30 for the
+  // zero-studio case specifically) with the SAME comment this describe block borrows —
+  // "refused BEFORE the shell, not inside it: the point is that none of the doors are
+  // offered, and a refusal rendered inside AppShell would still draw the nav." The parent
+  // app never got that fix: `Resolve` renders `RefusalScreen` correctly, but only as the
+  // DEFAULT branch deep inside `AppShell`'s consent/health/payment gates, so the title,
+  // the hamburger drawer, the install banner and (once the gates resolve) the tab bar all
+  // render around it. Reported from production (2026-09-02): a signed-in account with no
+  // guardian rows saw the full working-looking app around "לא נמצאו תלמידים המשויכים
+  // אליך", which reads as a broken deployment rather than an honest refusal.
+  //
+  // A signed-in account with `studios: []` / `access.parent: false` — every OTHER test in
+  // this file overrides `beforeEach`'s default (an authorized guardian) to reach its
+  // screen, and before the fix that override was not even necessary: the routes below
+  // (`#/absence`, `#/payments/history`, `#/student/<id>`, the uPay return leg) were
+  // reachable regardless of access, contradicting App.tsx's own comment that "a person
+  // with no guardian row never reaches this shell".
+  const NO_STUDIO = vi.fn(
+    async () => new Response(JSON.stringify({ items: [] }), { status: 200 }),
+  )
+
+  it('refuses before the shell — no title, no drawer, no install banner, no tab bar', async () => {
+    vi.stubGlobal('fetch', NO_STUDIO)
+    render(<App />)
+    await waitFor(() => expect(screen.getByTestId('parent-refusal')).toBeInTheDocument())
+    expect(screen.queryByTestId('install-banner')).toBeNull()
+    expect(screen.queryByRole('button', { name: t('he', 'common.nav.menu') })).toBeNull()
+    expect(screen.queryByRole('heading', { name: t('he', 'common.home.title') })).toBeNull()
+  })
+
+  it('keeps refusing a hash-typed route — the doors stay shut, not only the front one', async () => {
+    vi.stubGlobal('fetch', NO_STUDIO)
+    globalThis.location.hash = '#/absence'
+    render(<App />)
+    await waitFor(() => expect(screen.getByTestId('parent-refusal')).toBeInTheDocument())
+    expect(screen.queryByTestId('absence-screen')).toBeNull()
+  })
+})
+
 describe('the P1 routes — screens that were built and rendered by nothing', () => {
   it('routes #/absence to the absence pre-report', async () => {
     globalThis.location.hash = '#/absence'
@@ -83,8 +164,8 @@ describe('the P1 routes — screens that were built and rendered by nothing', ()
     globalThis.location.hash = '#/payments/history'
     vi.stubGlobal(
       'fetch',
-      vi.fn(async (input: RequestInfo | URL) =>
-        String(input).includes('/me/balance')
+      stubAuthed((url) =>
+        url.includes('/me/balance')
           ? new Response(
               JSON.stringify({
                 payer_person_id: 'p1',
@@ -96,7 +177,7 @@ describe('the P1 routes — screens that were built and rendered by nothing', ()
               }),
               { status: 200 },
             )
-          : new Response(JSON.stringify({ items: [] }), { status: 200 }),
+          : null,
       ),
     )
     render(<App />)
@@ -109,10 +190,10 @@ describe('the P1 routes — screens that were built and rendered by nothing', ()
     globalThis.location.hash = '#/payment-complete/some-ref'
     vi.stubGlobal(
       'fetch',
-      vi.fn(async (input: RequestInfo | URL) =>
-        String(input).includes('/payment-complete')
+      stubAuthed((url) =>
+        url.includes('/payment-complete')
           ? new Response(JSON.stringify({ status: 'pending', public_ref: null }), { status: 200 })
-          : new Response(JSON.stringify({ items: [] }), { status: 200 }),
+          : null,
       ),
     )
     render(<App />)
@@ -134,11 +215,11 @@ describe('the P1 routes — screens that were built and rendered by nothing', ()
     const calls: string[] = []
     vi.stubGlobal(
       'fetch',
-      vi.fn(async (input: RequestInfo | URL) => {
-        calls.push(String(input))
-        return String(input).includes('/payment-complete')
+      stubAuthed((url) => {
+        calls.push(url)
+        return url.includes('/payment-complete')
           ? new Response(JSON.stringify({ status: 'pending', public_ref: null }), { status: 200 })
-          : new Response(JSON.stringify({ items: [] }), { status: 200 })
+          : null
       }),
     )
     render(<App />)
@@ -293,8 +374,8 @@ describe('P7 — the belt link resolves or refuses, never silently home', () => 
     globalThis.location.hash = '#/belts/st1'
     vi.stubGlobal(
       'fetch',
-      vi.fn(async (input: RequestInfo | URL) =>
-        String(input).includes('/students/st1/belts')
+      stubAuthed((url) =>
+        url.includes('/students/st1/belts')
           ? new Response(
               JSON.stringify({
                 items: [
@@ -315,7 +396,7 @@ describe('P7 — the belt link resolves or refuses, never silently home', () => 
               }),
               { status: 200 },
             )
-          : new Response(JSON.stringify({ items: [] }), { status: 200 }),
+          : null,
       ),
     )
     render(<App />)
@@ -340,8 +421,7 @@ describe('12g — adding a sibling refreshes the family it just grew', () => {
     let studentsGetCalls = 0
     vi.stubGlobal(
       'fetch',
-      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-        const url = String(input)
+      stubAuthed((url, init) => {
         if (url.includes('/api/v1/me/students')) {
           if ((init?.method ?? 'GET') === 'POST') {
             return new Response(JSON.stringify({ id: 'st-new' }), { status: 201 })
@@ -369,7 +449,7 @@ describe('12g — adding a sibling refreshes the family it just grew', () => {
             { status: 200 },
           )
         }
-        return new Response(JSON.stringify({ items: [] }), { status: 200 })
+        return null
       }),
     )
     render(<App />)

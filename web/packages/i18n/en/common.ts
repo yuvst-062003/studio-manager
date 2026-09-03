@@ -96,6 +96,16 @@ export const common: Bundle = {
   'auth.eyebrow.staff': 'Coach sign-in',
   'auth.eyebrow.dashboard': 'Manager sign-in',
   'auth.noPasswords': 'No passwords. Access follows the account you were invited with.',
+  // §5.2 — "OAuth must never run inside a webview. Google returns disallowed_useragent."
+  // §6.1's own trial link is meant to travel through Instagram/Facebook/TikTok, so this is
+  // the expected result of that channel working, not an edge case.
+  'auth.inAppBrowser.title': "Google sign-in isn't available here",
+  'auth.inAppBrowser.body': "You can't sign in with Google inside {{app}}.",
+  'auth.inAppBrowser.instruction': 'Tap the ⋯ menu at the top and choose "Open in browser".',
+  'auth.inAppBrowser.app.instagram': 'Instagram',
+  'auth.inAppBrowser.app.facebook': 'Facebook',
+  'auth.inAppBrowser.app.tiktok': 'TikTok',
+  'auth.inAppBrowser.app.linkedin': 'LinkedIn',
   // -- the manager sign-in (docs/design "Gladiator Manager Sign In", 2026-09-01) ------
   // See he/common.ts for why the badge carries both scripts.
   'auth.manager.badge': 'ממשק ניהול · MANAGER',
@@ -154,6 +164,9 @@ export const common: Bundle = {
   'refusal.dashboard.title': 'This account has no permissions in the club',
   'refusal.dashboard.body': 'Ask the club owner to give you a role, or sign in with a different account.',
   'refusal.dashboard.otherApp': 'The staff app',
+  // 2026-09-03 — every refusal screen's own account-chooser line, so "wrong account" is
+  // obviously fixable at a glance rather than something to guess at before hitting sign out.
+  'refusal.signedInAs': 'signed in as {email}',
   'tour.1': "here are today's sessions",
   'tour.2': 'tap to mark attendance',
   'tour.3': 'works without internet too',

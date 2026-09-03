@@ -34,6 +34,11 @@ export type Session = {
   /** The signed-in person's name for the active studio (feature pass 2026-08-27) —
    *  what the sidebar footer and the drawer header render. */
   displayName: string | null
+  /** The Google/Apple account's own address (2026-09-03). Unlike `displayName` it
+   *  needs no studio membership to resolve, so it is populated for the exact account
+   *  §6.1's refusal is written for — "signed in as <email>" is how a person refused by
+   *  their own account can tell the fix is switching accounts, not retrying this one. */
+  email: string | null
   reload: () => Promise<void>
   signOut: () => Promise<void>
 }
@@ -44,6 +49,7 @@ export function useSession(): Session {
   const [status, setStatus] = useState<SessionStatus>('loading')
   const [state, setState] = useState<SessionState | null>(null)
   const [displayName, setDisplayName] = useState<string | null>(null)
+  const [email, setEmail] = useState<string | null>(null)
   const [dev, setDev] = useState<{
     devTools: boolean
     isPlatformAdmin: boolean
@@ -91,6 +97,7 @@ export function useSession(): Session {
           label: response.headers.get('X-Acting-As'),
         })
         setDisplayName(me.display_name ?? null)
+        setEmail(me.email ?? null)
       }
     } catch {
       // /auth/me failing leaves the refresh's own answer in place. It is the same data,
@@ -145,12 +152,14 @@ export function useSession(): Session {
     actingAsLabel: dev.label,
     activeStudioName: active?.studio_name ?? null,
     displayName,
+    email,
     reload: load,
     signOut: async () => {
       await signOut()
       setState(null)
       setDev({ devTools: false, isPlatformAdmin: false, actingAs: null, label: null })
       setDisplayName(null)
+      setEmail(null)
       setStatus('anonymous')
     },
   }

@@ -8376,6 +8376,8 @@ export interface components {
             dev_tools: boolean;
             /** Display Name */
             display_name?: string | null;
+            /** Email */
+            email?: string | null;
             /**
              * Identity Id
              * Format: uuid
@@ -8661,10 +8663,14 @@ export interface components {
             birthdate?: string | null;
             /** First Name */
             first_name: string;
+            /** Grade */
+            grade?: string | null;
             /** Group Ids */
             group_ids: string[];
             /** Last Name */
             last_name: string;
+            /** National Id */
+            national_id?: string | null;
             /**
              * Self Student
              * @default false
@@ -8720,6 +8726,27 @@ export interface components {
             /** Url */
             url?: string | null;
         };
+        /** OnboardingOtherParentIn */
+        OnboardingOtherParentIn: {
+            /** First Name */
+            first_name: string;
+            /** Last Name */
+            last_name?: string | null;
+            /** National Id */
+            national_id?: string | null;
+            /** Phone */
+            phone?: string | null;
+        };
+        /** OnboardingPickupIn */
+        OnboardingPickupIn: {
+            /** Name */
+            name: string;
+            /**
+             * Phone
+             * @default
+             */
+            phone: string;
+        };
         /** OnboardingRegisterIn */
         OnboardingRegisterIn: {
             /** Children */
@@ -8728,8 +8755,12 @@ export interface components {
             first_name: string;
             /** Last Name */
             last_name: string;
+            other_parent?: components["schemas"]["OnboardingOtherParentIn"] | null;
             /** Phone */
             phone?: string | null;
+            /** Pickup Contacts */
+            pickup_contacts?: components["schemas"]["OnboardingPickupIn"][];
+            signer?: components["schemas"]["OnboardingSignerIn"] | null;
         };
         /** OnboardingRegisterOut */
         OnboardingRegisterOut: {
@@ -8744,6 +8775,25 @@ export interface components {
             person_id: string;
             /** Student Ids */
             student_ids: string[];
+        };
+        /** OnboardingSignerIn */
+        OnboardingSignerIn: {
+            /** Address */
+            address: string;
+            /** Aliyah Year */
+            aliyah_year?: string | null;
+            /** City */
+            city: string;
+            /** National Id */
+            national_id: string;
+            /** Phone Home */
+            phone_home?: string | null;
+            /**
+             * Relation
+             * @default mother
+             * @enum {string}
+             */
+            relation: "mother" | "father" | "other";
         };
         /** OpsHealthResponse */
         OpsHealthResponse: {

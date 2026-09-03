@@ -104,6 +104,16 @@ export const common: Bundle = {
   'auth.eyebrow.staff': 'Вход для тренеров',
   'auth.eyebrow.dashboard': 'Вход для менеджеров',
   'auth.noPasswords': 'Без паролей. Доступ определяется аккаунтом, на который вас пригласили.',
+  // §5.2 — "OAuth must never run inside a webview. Google returns disallowed_useragent."
+  // §6.1's own trial link is meant to travel through Instagram/Facebook/TikTok, so this is
+  // the expected result of that channel working, not an edge case.
+  'auth.inAppBrowser.title': 'Вход через Google здесь недоступен',
+  'auth.inAppBrowser.body': 'Невозможно войти через Google внутри {{app}}.',
+  'auth.inAppBrowser.instruction': 'Нажмите ⋯ вверху экрана и выберите «Открыть в браузере».',
+  'auth.inAppBrowser.app.instagram': 'Instagram',
+  'auth.inAppBrowser.app.facebook': 'Facebook',
+  'auth.inAppBrowser.app.tiktok': 'TikTok',
+  'auth.inAppBrowser.app.linkedin': 'LinkedIn',
   // -- the manager sign-in (docs/design "Gladiator Manager Sign In", 2026-09-01) ------
   // See he/common.ts for why the badge carries both scripts.
   'auth.manager.badge': 'ממשק ניהול · MANAGER',
@@ -162,6 +172,9 @@ export const common: Bundle = {
   'refusal.dashboard.title': 'У этого аккаунта нет прав в клубе',
   'refusal.dashboard.body': 'Попросите владельца клуба назначить вам роль или войдите под другим аккаунтом.',
   'refusal.dashboard.otherApp': 'Приложение для тренеров',
+  // 2026-09-03 — строка выбора аккаунта на каждом экране отказа, чтобы "не тот аккаунт"
+  // было видно сразу, а не приходилось угадывать перед выходом из системы.
+  'refusal.signedInAs': 'вы вошли как {email}',
   'tour.1': 'здесь занятия на сегодня',
   'tour.2': 'нажмите, чтобы отметить посещаемость',
   'tour.3': 'работает и без интернета',

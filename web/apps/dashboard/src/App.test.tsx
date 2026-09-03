@@ -302,6 +302,29 @@ describe('an account with no role in the active studio (2026-08-29)', () => {
     expect(screen.queryByRole('link', { name: t('he', 'common.dash.nav.weekly') })).toBeNull()
   })
 
+  it('tells a refused visitor which account they are signed in as (2026-09-03)', async () => {
+    // The seam, not the component: `RefusalScreen`'s own tests prove it renders an
+    // `email` prop it is handed. This proves the dashboard actually hands it one, from
+    // the real session — a field dropped between fetch and prop passes every test that
+    // only constructs `RefusalScreen`'s props by hand.
+    const NO_STUDIO = {
+      ...SESSION,
+      studios: [],
+      active_studio_id: null,
+      email: 'wrong.account@example.invalid',
+    }
+    stubApi({
+      '/auth/refresh': { access_token: 'tok', expires_in: 900, ...NO_STUDIO },
+      '/auth/me': NO_STUDIO,
+      '/api/v1/sessions': { items: [] },
+    })
+    render(<App />)
+    expect(await screen.findByTestId('dashboard-refusal')).toBeInTheDocument()
+    expect(screen.getByTestId('refusal-account')).toHaveTextContent(
+      'wrong.account@example.invalid',
+    )
+  })
+
   it('still renders the shell for a role that HAS access', async () => {
     // The refusal must key on "no role at all", not on "not an owner" — a lead coach has
     // a genuine, narrower dashboard and must keep it.

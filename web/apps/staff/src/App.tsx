@@ -41,6 +41,7 @@ import type { InstallPromptEvent } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { LegalScreen } from './features/legal/LegalScreen'
+import { AccessGate } from './features/identity/AccessGate'
 import { Resolve } from './features/identity/Resolve'
 import { PaymentPromisesSection } from './features/billing/PaymentPromisesSection'
 import { JoinLinkSection } from './features/people/JoinLinkSection'
@@ -297,6 +298,11 @@ export default function App() {
       ) : null}
 
       {session.status === 'signed-in' ? (
+        // §6.1 step 3's refusal renders OUTSIDE `AppShell` — see `AccessGate`'s header.
+        // Every hash-routed branch below already re-checks `session.access.staff` for
+        // itself, so this closes the one gap that was left: the shell's own chrome
+        // (title, drawer, the unguarded install banner) rendering around the refusal.
+        <AccessGate session={session} locale={locale}>
         <AppShell
           title={session.activeStudioName ?? ''}
           items={
@@ -581,6 +587,7 @@ export default function App() {
             </>
           )}
         </AppShell>
+        </AccessGate>
       ) : null}
     </ThemeProvider>
   )

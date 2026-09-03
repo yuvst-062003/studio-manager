@@ -478,6 +478,14 @@ def me(request: Request, session: SessionDep) -> MeResponse:
         if person is not None:
             display_name = f"{person.first_name} {person.last_name}"
 
+    # Unlike `display_name` above, this needs no `Person` row -- `auth_identity` is
+    # global (§3.3), so it resolves for the exact account §6.1's refusal is written for:
+    # one with zero studio memberships anywhere.
+    from app.models.identity import AuthIdentity
+
+    auth_identity = session.get(AuthIdentity, identity_id)
+    email = auth_identity.email if auth_identity is not None else None
+
     return MeResponse(
         identity_id=identity_id,
         access=AppAccessOut(staff=access.staff, parent=access.parent),
@@ -493,6 +501,7 @@ def me(request: Request, session: SessionDep) -> MeResponse:
         is_platform_admin=is_platform_admin(session, identity_id),
         acting_as_person_id=getattr(request.state, "acting_as_person_id", None),
         display_name=display_name,
+        email=email,
     )
 
 

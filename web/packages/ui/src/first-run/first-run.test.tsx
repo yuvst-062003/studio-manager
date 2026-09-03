@@ -7,6 +7,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { t } from '@studio/i18n'
+import { chromeIntentUrl, detectInAppBrowser, InAppBrowserBanner } from './InAppBrowserBanner'
 import { InstallBanner } from './InstallBanner'
 import { InstallWalkthrough, isIosSafari } from './InstallWalkthrough'
 import { LanguagePicker } from './LanguagePicker'
@@ -15,6 +16,11 @@ import { SignIn } from './SignIn'
 
 const IOS = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Version/17.0 Mobile/15E148 Safari/604.1'
 const ANDROID = 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/120 Mobile Safari/537.36'
+const INSTAGRAM_IOS = `${IOS} Instagram 314.0.0.28.111`
+const INSTAGRAM_ANDROID = `${ANDROID} Instagram 314.0.0.28.111`
+const FACEBOOK_IOS = `${IOS} [FBAN/FBIOS;FBAV/450.0.0.38.108;]`
+const TIKTOK_IOS = `${IOS} musical_ly_2023801020`
+const LINKEDIN_IOS = `${IOS} LinkedInApp/9.28.1`
 
 afterEach(() => vi.unstubAllGlobals())
 
@@ -136,6 +142,111 @@ describe('SignIn', () => {
     const { container } = render(<SignIn locale="he" app="staff" />)
     await waitFor(() => expect(container.querySelectorAll('a')).toHaveLength(0))
   })
+
+  it('warns before the Google button when opened inside an in-app browser', async () => {
+    // SPEC §5.2 / the constraints table: "OAuth in embedded webviews — blocked by Google
+    // (disallowed_useragent); must use system browser." The button is still there (a
+    // false positive must not remove the only way in), but the warning comes first.
+    render(<SignIn locale="he" app="parent" userAgent={INSTAGRAM_IOS} />)
+    await waitFor(() => expect(screen.getByTestId('in-app-browser-banner')).toBeInTheDocument())
+    expect(
+      screen.getByRole('link', { name: t('he', 'common.auth.signInWithGoogle') }),
+    ).toBeInTheDocument()
+  })
+
+  it('says nothing extra in an ordinary browser', async () => {
+    render(<SignIn locale="he" app="parent" userAgent={ANDROID} />)
+    await waitFor(() =>
+      expect(screen.getByRole('link', { name: t('he', 'common.auth.signInWithGoogle') })).toBeInTheDocument(),
+    )
+    expect(screen.queryByTestId('in-app-browser-banner')).toBeNull()
+  })
+})
+
+describe('detectInAppBrowser', () => {
+  it('recognises Instagram, Facebook, TikTok and LinkedIn regardless of platform', () => {
+    expect(detectInAppBrowser(INSTAGRAM_IOS)).toBe('instagram')
+    expect(detectInAppBrowser(INSTAGRAM_ANDROID)).toBe('instagram')
+    expect(detectInAppBrowser(FACEBOOK_IOS)).toBe('facebook')
+    expect(detectInAppBrowser(TIKTOK_IOS)).toBe('tiktok')
+    expect(detectInAppBrowser(LINKEDIN_IOS)).toBe('linkedin')
+  })
+
+  it('reports nothing for an ordinary browser', () => {
+    expect(detectInAppBrowser(IOS)).toBeNull()
+    expect(detectInAppBrowser(ANDROID)).toBeNull()
+  })
+})
+
+describe('chromeIntentUrl', () => {
+  it('builds an Android intent link that falls back to the original URL if Chrome is absent', () => {
+    // Android honours `intent://` even from inside another app's WebView, which is the one
+    // platform where an automatic escape genuinely works — see InAppBrowserBanner below for
+    // why iOS gets no equivalent. `S.browser_fallback_url` is what keeps a device with no
+    // Chrome installed from landing on an error instead of the same page.
+    const url = chromeIntentUrl('https://app.example.test/join/abc?x=1')
+    expect(url).toBe(
+      'intent://app.example.test/join/abc?x=1#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=https%3A%2F%2Fapp.example.test%2Fjoin%2Fabc%3Fx%3D1;end',
+    )
+  })
+})
+
+describe('InAppBrowserBanner', () => {
+  it('says nothing in an ordinary browser', () => {
+    render(<InAppBrowserBanner locale="he" userAgent={IOS} />)
+    expect(screen.queryByTestId('in-app-browser-banner')).toBeNull()
+  })
+
+  it('tells the parent how to reach the real browser when Instagram is detected', () => {
+    render(<InAppBrowserBanner locale="he" userAgent={INSTAGRAM_IOS} />)
+    const banner = screen.getByTestId('in-app-browser-banner')
+    expect(banner).toBeInTheDocument()
+    expect(banner.textContent).toContain(t('he', 'common.auth.inAppBrowser.instruction'))
+    // Names WHICH app, not a generic "here" — a guardian juggling three apps that day
+    // needs to know this warning is about the one she is actually in.
+    expect(banner.textContent).toContain(t('he', 'common.auth.inAppBrowser.app.instagram'))
+  })
+
+  it('sends Android to Chrome via an intent link, automatically', () => {
+    // The one platform where §5.2's "must use system browser" can actually be enforced
+    // rather than only requested.
+    const navigate = vi.fn()
+    render(
+      <InAppBrowserBanner
+        locale="he"
+        userAgent={INSTAGRAM_ANDROID}
+        currentUrl="https://app.example.test/join/abc"
+        navigate={navigate}
+      />,
+    )
+    expect(navigate).toHaveBeenCalledWith(chromeIntentUrl('https://app.example.test/join/abc'))
+  })
+
+  it('never attempts a redirect on iOS — Apple allows no equivalent', () => {
+    const navigate = vi.fn()
+    render(
+      <InAppBrowserBanner
+        locale="he"
+        userAgent={INSTAGRAM_IOS}
+        currentUrl="https://app.example.test/join/abc"
+        navigate={navigate}
+      />,
+    )
+    expect(navigate).not.toHaveBeenCalled()
+  })
+
+  it('does not redirect in an ordinary Android browser', () => {
+    const navigate = vi.fn()
+    render(
+      <InAppBrowserBanner
+        locale="he"
+        userAgent={ANDROID}
+        currentUrl="https://app.example.test/join/abc"
+        navigate={navigate}
+      />,
+    )
+    expect(navigate).not.toHaveBeenCalled()
+  })
 })
 
 describe('InstallBanner', () => {
@@ -211,6 +322,34 @@ describe('RefusalScreen', () => {
       <RefusalScreen which={which} otherAppUrl="https://x.invalid" onSignOut={vi.fn()} locale="he" />,
     )
     expect(container.textContent).not.toMatch(/\d/)
+  })
+
+  // 2026-09-03 — the account-chooser line, so a visitor signed into the wrong Google
+  // account can tell that is the problem at a glance rather than guessing before hitting
+  // sign out. Self-identification (the caller's OWN address), not the enumeration the
+  // leak tests above guard against.
+  it('tells a refused visitor which account they are signed in as', () => {
+    render(
+      <RefusalScreen
+        which="parent"
+        otherAppUrl="https://staff.invalid"
+        onSignOut={vi.fn()}
+        locale="he"
+        email="wrong.account@example.invalid"
+      />,
+    )
+    expect(screen.getByTestId('refusal-account')).toHaveTextContent(
+      'wrong.account@example.invalid',
+    )
+  })
+
+  it('renders nothing extra when the email has not resolved yet', () => {
+    // A caller mid-refresh (or one that never learns the address) must not render
+    // "signed in as null" — the whole point is a trustworthy account chooser, not a bug.
+    render(
+      <RefusalScreen which="parent" otherAppUrl="https://staff.invalid" onSignOut={vi.fn()} locale="he" />,
+    )
+    expect(screen.queryByTestId('refusal-account')).toBeNull()
   })
 })
 

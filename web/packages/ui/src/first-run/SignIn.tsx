@@ -18,6 +18,7 @@
 import type { ReactNode } from 'react'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
+import { InAppBrowserBanner } from './InAppBrowserBanner'
 import { startUrl, useAuthProviders } from './useAuthProviders'
 import './gladiator-signin.css'
 import logoUrl from './assets/gladiator-logo.png'
@@ -39,12 +40,14 @@ export function SignIn({
   app,
   returnPath = '/',
   languagePicker,
+  userAgent = globalThis.navigator?.userAgent ?? '',
 }: {
   locale: Locale
   app: 'staff' | 'parent' | 'dashboard'
   returnPath?: string
   /** §6.1 puts language before login; the screen floats it over the artwork. */
   languagePicker?: ReactNode
+  userAgent?: string
 }) {
   const providers = useAuthProviders()
 
@@ -83,6 +86,7 @@ export function SignIn({
           />
 
           <div className="gsignin-parent__stack">
+            <InAppBrowserBanner locale={locale} userAgent={userAgent} />
             {providerLinks.map((provider) => (
               <a key={provider.key} className="gsignin-parent__cta" href={provider.href}>
                 <svg
@@ -158,6 +162,7 @@ export function SignIn({
         <div className="gsignin__rule" aria-hidden="true" />
         <div className="gsignin__stack">
           <span className="gsignin__eyebrow">{t(locale, `common.auth.eyebrow.${app}`)}</span>
+          <InAppBrowserBanner locale={locale} userAgent={userAgent} />
           {(providers ?? []).map((provider) => (
             <a
               key={provider.name}

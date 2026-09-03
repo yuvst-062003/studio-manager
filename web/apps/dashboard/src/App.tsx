@@ -684,6 +684,7 @@ export default function App() {
         // and a second one made the query ambiguous.
         <>
           <RefusalScreen
+            email={session.email}
             locale={locale}
             onSignOut={() => void session.signOut()}
             otherAppUrl={STAFF_APP_URL}

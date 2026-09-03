@@ -189,6 +189,13 @@ def test_me_carries_no_field_that_leaks_the_other_app(client, fake_provider):
         # 2026-08-27). Nothing cross-app about it: it is null until a membership
         # resolves, and it never counts or names anything in the other app.
         "display_name",
+        # The account's OWN address, from the global `auth_identity` row (§3.3) --
+        # unlike `display_name` it needs no membership, so it is the one field that
+        # resolves even at zero studios. Self-identification, not enumeration: it says
+        # nothing about whether THIS account exists in the other app, only which
+        # account this caller is signed in as. §6.1's refusal renders it as "signed in
+        # as <email>" so a wrong-account visitor can tell at a glance.
+        "email",
         # §18.1 -- whether to offer the platform console. Nothing cross-app about it
         # either, and for a stronger reason than `display_name`: it is a fact about the
         # global `auth_identity`, which §3.3 puts outside every studio, so it cannot leak
@@ -196,6 +203,19 @@ def test_me_carries_no_field_that_leaks_the_other_app(client, fake_provider):
         # accepted -- `PlatformAdmin` has no creation route on purpose.
         "is_platform_admin",
     }
+
+
+def test_me_reports_the_accounts_own_email_even_with_no_studio(client, fake_provider):
+    """Unlike `display_name`, this needs no `Person` row -- `auth_identity` is global
+    (§3.3) -- so it resolves for the exact account §6.1's refusal is written for: one
+    with zero studio memberships anywhere."""
+    fake_provider.register(
+        code="c-email", subject=f"s-{uuid.uuid4()}", email="whoami@example.invalid"
+    )
+    token = sign_in(client, code="c-email").json()["access_token"]
+    body = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"}).json()
+    assert body["studios"] == []
+    assert body["email"] == "whoami@example.invalid"
 
 
 def test_me_without_a_token_is_401(client):
