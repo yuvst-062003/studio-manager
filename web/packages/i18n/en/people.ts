@@ -170,13 +170,6 @@ export const people: Bundle = {
     'Matched on a verified phone or email. Confirm before linking',
   'request.newFamily': 'New family',
 
-  'sibling.steps.title': 'What happens now',
-  'sibling.steps.approve': 'The child joins the groups you picked',
-  'sibling.steps.declaration': 'You sign the health declaration',
-  'sibling.steps.billing': 'The price follows how many times a week they train, and appears on the payments screen',
-  'sibling.ages': 'Ages {min}–{max}',
-  'sibling.noGroups': 'We could not load the group list. At least one group is needed — please try again.',
-  'sibling.retryGroups': 'Reload',
   'sibling.title': 'Add another child',
   'join.title': 'Join the club — family registration',
   'join.welcome.heading': 'Before we start',
@@ -274,8 +267,6 @@ export const people: Bundle = {
     'This link is active but was created before the update, so it cannot be shown. Create a new one to get a permanent link you can copy any time.',
   'landing.card.title': "The club's landing page",
   'landing.card.hint': 'Share with new families — trial-lesson signup.',
-  'sibling.subtitle': 'The child is added to this same account',
-  'sibling.submit': 'Add the child',
   'sibling.pendingHint': 'The child is added. Next: sign the health declaration and choose how to pay.',
 
   'freeze.title': 'Freeze membership',
@@ -435,8 +426,6 @@ export const people: Bundle = {
   'joinClub.error': 'We could not complete the join. Please try again.',
   'joinClub.forWhom': 'Joining for',
   'sibling.duplicate': 'This child looks like they are already registered. Please contact the club.',
-  'sibling.duplicateNamed': '{name} is already registered — no need to add them again.',
-  'sibling.duplicateOpen': 'Open their card',
 
   // -- screen 8: the guardian's own settings -------------------------------------
   //

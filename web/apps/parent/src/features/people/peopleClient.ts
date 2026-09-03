@@ -94,30 +94,6 @@ export function makePeopleClient(fetcher: Fetcher) {
       fetcher(`/api/v1/enrollments?student_id=${studentId}`).then(json<EnrollmentOut[]>),
 
     /**
-     * Parent `12g`, `+ הוסף ילד` — and it ENROLS (owner decision, 2026-08-30), so the
-     * response is a `StudentSummaryOut` and not a receipt for a request.
-     *
-     * **422 `duplicate_student` is a real outcome and the caller must render it.** The
-     * server refuses a child who matches an existing student by name and birthdate rather
-     * than creating a second record; `student_id` and `display_name` come back only when
-     * this caller is already that child's guardian, because naming a child they have no
-     * relationship with would disclose that they train here (§11.1).
-     */
-    requestSibling: (body: {
-      first_name: string
-      last_name: string
-      birthdate?: string | null
-      /** Plural and required: the price is derived from weekly volume across every group
-       *  the child trains in, so one id could not price a child who trains twice a week. */
-      group_ids: string[]
-    }): Promise<Response> =>
-      fetcher('/api/v1/me/students', {
-        method: 'POST',
-        headers: JSON_HEADERS,
-        body: JSON.stringify(body),
-      }),
-
-    /**
      * Entrance A — a trial family joining the club from their own app.
      *
      * `POST /me/students/{id}/join` and **not** `POST /me/students`: this converts the child

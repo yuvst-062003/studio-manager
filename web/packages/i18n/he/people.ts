@@ -210,14 +210,9 @@ export const people: Bundle = {
     'נמצאה התאמה לפי טלפון או אימייל מאומת. אשרו לפני השיוך',
   'request.newFamily': 'משפחה חדשה',
 
-  // -- add a sibling (parent 12g) ------------------------------------------------
-  'sibling.steps.title': 'מה קורה עכשיו',
-  'sibling.steps.approve': 'הילד מצטרף לקבוצות שבחרתם',
-  'sibling.steps.declaration': 'חותמים על הצהרת בריאות',
-  'sibling.steps.billing': 'החיוב נקבע לפי מספר האימונים בשבוע, ומופיע במסך התשלומים',
-  'sibling.ages': 'גילאי {min}–{max}',
-  'sibling.noGroups': 'לא הצלחנו לטעון את רשימת הקבוצות. צריך לבחור לפחות קבוצה אחת — אפשר לנסות שוב.',
-  'sibling.retryGroups': 'טעינה מחדש',
+  // `sibling.title` is the nav label for "+ הוסף ילד" (#/add-child); `sibling.pendingHint`
+  // and `sibling.duplicate` (below) are read by the doors that replaced the old
+  // add-a-sibling screen (12g). The rest of that screen's copy went with it.
   'sibling.title': 'הוספת ילד נוסף',
   'join.title': 'הצטרפות למועדון — הרשמת משפחה',
   'join.welcome.heading': 'לפני שנתחיל',
@@ -316,8 +311,6 @@ export const people: Bundle = {
   'join.card.legacyNote': 'הקישור פעיל אך נוצר לפני העדכון ולכן אינו ניתן להצגה. צרו קישור חדש כדי לקבל קישור קבוע שאפשר להעתיק בכל עת.',
   'landing.card.title': 'דף הנחיתה של המועדון',
   'landing.card.hint': 'לשיתוף עם משפחות חדשות — הרשמה לשיעור ניסיון.',
-  'sibling.subtitle': 'הילד יתווסף לאותו חשבון',
-  'sibling.submit': 'הוספת הילד',
   // §5.4 — enrollment is always a manager decision, so this promises review, not a place.
   'sibling.pendingHint': 'הילד נוסף. נותר לחתום על הצהרת בריאות ולבחור אמצעי תשלום.',
 
@@ -497,12 +490,9 @@ export const people: Bundle = {
   'joinClub.retryGroups': 'טעינה מחדש',
   'joinClub.error': 'לא הצלחנו להשלים את ההצטרפות. נסו שוב.',
   'joinClub.forWhom': 'מצטרפים בשביל',
-  // The refusal a duplicate produces, and the two versions of it. Naming a child this
-  // caller is not a guardian of would disclose that they train here (§11.1), so the
-  // server sends the name only when it may — and the copy has to work without it.
+  // `SelfServeJoinFlow`'s duplicate-child refusal, kept name-agnostic per §11.1: naming a
+  // child this caller is not a guardian of would disclose that they train here.
   'sibling.duplicate': 'נראה שהילד/ה כבר רשומים במועדון. פנו למועדון כדי לוודא.',
-  'sibling.duplicateNamed': '{name} כבר רשומים במועדון — אין צורך להוסיף שוב.',
-  'sibling.duplicateOpen': 'לכרטיס החניך',
 
   // -- screen 8: the guardian's own settings -------------------------------------
   //

@@ -1,13 +1,12 @@
-// Parent artboards 12g, 12i and §6.3's trial home.
+// Parent artboards 12i and §6.3's trial home.
 //
-// The three tests that carry weight are all negatives: §6.3's reduced home must NOT show
-// payments, attendance or a belt; `12g` must NOT promise a place; and `12i` must NOT let
-// somebody leave before reading who still owes the month.
+// The tests that carry weight are negatives: §6.3's reduced home must NOT show payments,
+// attendance or a belt; and `12i` must NOT let somebody leave before reading who still
+// owes the month.
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { t } from '@studio/i18n'
-import { AddSibling } from './AddSibling'
 import { FirstRegistration } from './FirstRegistration'
 import { ProfileAndLeave, chipToneFor } from './ProfileAndLeave'
 import { TrialHome, daysUntil } from './TrialHome'
@@ -52,12 +51,11 @@ const GUARDIANS: GuardianOut[] = [
   },
 ]
 
-function makeClient(response = new Response(null, { status: 201 })): PeopleClient {
+function makeClient(): PeopleClient {
   return {
     myStudents: vi.fn(),
     student: vi.fn(),
     enrollments: vi.fn(),
-    requestSibling: vi.fn(() => Promise.resolve(response)),
     leave: vi.fn(() => Promise.resolve(new Response(null, { status: 200 }))),
   } as unknown as PeopleClient
 }
@@ -176,164 +174,6 @@ describe('daysUntil', () => {
 
   it('goes negative once the lesson has passed', () => {
     expect(daysUntil('2026-09-06T14:00:00Z', new Date('2026-09-08T14:00:00Z'))).toBeLessThan(0)
-  })
-})
-
-// -- 12g: add a sibling ---------------------------------------------------------
-
-const GROUPS = [
-  { id: 'g1', name: 'מתחילים' },
-  { id: 'g2', name: 'מתקדמים' },
-]
-
-describe('AddSibling — 12g', () => {
-  it('refuses a duplicate child by name, and offers the one they already have', async () => {
-    // The defect the self-enrolment change created: `possible_duplicate_students` ran only
-    // on the registration-request detail view, whose sole producer was removed — so this
-    // door made a SECOND student for a child already on the roster, one `trial` and one
-    // `active`, both on the register and neither visibly wrong.
-    const user = userEvent.setup()
-    const client = makeClient(
-      new Response(
-        JSON.stringify({
-          detail: {
-            code: 'duplicate_student',
-            student_id: 'st9',
-            display_name: 'נועה כהן',
-          },
-        }),
-        { status: 422, headers: { 'Content-Type': 'application/json' } },
-      ),
-    )
-    render(<AddSibling locale="he" client={client} groups={GROUPS} />)
-    await user.type(screen.getByLabelText(t('he', 'people.student.firstName')), 'נועה')
-    await user.type(screen.getByLabelText(t('he', 'people.student.lastName')), 'כהן')
-    await user.click(screen.getByTestId('sibling-group-g1'))
-    await user.click(screen.getByTestId('sibling-submit'))
-
-    expect(await screen.findByTestId('sibling-duplicate')).toHaveTextContent('נועה כהן')
-    // The useful answer is the child they already have, not the same form again.
-    expect(screen.getByTestId('sibling-duplicate-open')).toHaveAttribute(
-      'href',
-      '#/student/st9',
-    )
-    // NOT the generic failure: a parent who did nothing wrong must not be told to retry.
-    expect(screen.queryByTestId('sibling-error')).toBeNull()
-    expect(screen.queryByTestId('sibling-submitted')).toBeNull()
-  })
-
-  it('names no child the caller has no relationship with', async () => {
-    // §11.1. The refusal is the same code either way, but naming a student this caller is
-    // not a guardian of would tell them a child of that name trains here — which is the
-    // whole of what a stranger would use this endpoint for. The server omits the name; the
-    // screen has to work without it.
-    const user = userEvent.setup()
-    const client = makeClient(
-      new Response(JSON.stringify({ detail: { code: 'duplicate_student' } }), {
-        status: 422,
-        headers: { 'Content-Type': 'application/json' },
-      }),
-    )
-    render(<AddSibling locale="he" client={client} groups={GROUPS} />)
-    await user.type(screen.getByLabelText(t('he', 'people.student.firstName')), 'יעל')
-    await user.type(screen.getByLabelText(t('he', 'people.student.lastName')), 'כהן')
-    await user.click(screen.getByTestId('sibling-group-g1'))
-    await user.click(screen.getByTestId('sibling-submit'))
-
-    expect(await screen.findByTestId('sibling-duplicate')).toHaveTextContent(
-      t('he', 'people.sibling.duplicate'),
-    )
-    expect(screen.queryByTestId('sibling-duplicate-open')).toBeNull()
-  })
-
-  it('says the child joins the SAME account', () => {
-    // L9 — there is no household entity, and the subtitle is how the screen says so.
-    render(<AddSibling locale="he" client={makeClient()} />)
-    expect(screen.getByTestId('sibling-subtitle')).toHaveTextContent(
-      t('he', 'people.sibling.subtitle'),
-    )
-  })
-
-  it('adds the child, and says a place rather than a review', async () => {
-    // Owner decision, 2026-08-30: this door enrols now. It used to file a request a
-    // manager approved, while the club's join link — one WhatsApp message — already
-    // created active priced children with no manager at all.
-    const user = userEvent.setup()
-    const client = makeClient()
-    render(<AddSibling locale="he" client={client} groups={GROUPS} />)
-    await user.type(screen.getByLabelText(t('he', 'people.student.firstName')), 'נועה')
-    await user.type(screen.getByLabelText(t('he', 'people.student.lastName')), 'כהן')
-    await user.click(screen.getByTestId('sibling-group-g1'))
-    await user.click(screen.getByTestId('sibling-submit'))
-
-    await waitFor(() => expect(client.requestSibling).toHaveBeenCalled())
-    expect(client.requestSibling).toHaveBeenCalledWith(
-      expect.objectContaining({ group_ids: ['g1'] }),
-    )
-    expect(await screen.findByTestId('sibling-pending-hint')).toHaveTextContent(
-      t('he', 'people.sibling.pendingHint'),
-    )
-  })
-
-  it('takes more than one group, because the price follows weekly volume', async () => {
-    // A child training twice a week is priced at the two-a-week plan. One group id could
-    // not express that, which is why the picker is checkboxes and the field is plural.
-    const user = userEvent.setup()
-    const client = makeClient()
-    render(<AddSibling locale="he" client={client} groups={GROUPS} />)
-    await user.type(screen.getByLabelText(t('he', 'people.student.firstName')), 'נועה')
-    await user.type(screen.getByLabelText(t('he', 'people.student.lastName')), 'כהן')
-    await user.click(screen.getByTestId('sibling-group-g1'))
-    await user.click(screen.getByTestId('sibling-group-g2'))
-    await user.click(screen.getByTestId('sibling-submit'))
-
-    await waitFor(() =>
-      expect(client.requestSibling).toHaveBeenCalledWith(
-        expect.objectContaining({ group_ids: ['g1', 'g2'] }),
-      ),
-    )
-  })
-
-  it('will not submit a child with no group', async () => {
-    // No group means no weekly volume, so no price and no charge — the server refuses it,
-    // and offering a button that returns a refusal is worse than one that waits.
-    const user = userEvent.setup()
-    const client = makeClient()
-    render(<AddSibling locale="he" client={client} groups={GROUPS} />)
-    await user.type(screen.getByLabelText(t('he', 'people.student.firstName')), 'נועה')
-    await user.type(screen.getByLabelText(t('he', 'people.student.lastName')), 'כהן')
-    expect(screen.getByTestId('sibling-submit')).toBeDisabled()
-    expect(client.requestSibling).not.toHaveBeenCalled()
-  })
-
-  it('keeps what was typed when the request fails', async () => {
-    const user = userEvent.setup()
-    render(
-      <AddSibling
-        locale="he"
-        client={makeClient(new Response(null, { status: 500 }))}
-        groups={GROUPS}
-      />,
-    )
-    await user.type(screen.getByLabelText(t('he', 'people.student.firstName')), 'נועה')
-    await user.type(screen.getByLabelText(t('he', 'people.student.lastName')), 'כהן')
-    await user.click(screen.getByTestId('sibling-group-g1'))
-    await user.click(screen.getByTestId('sibling-submit'))
-
-    expect(await screen.findByTestId('sibling-error')).toBeInTheDocument()
-    expect(screen.getByLabelText(t('he', 'people.student.firstName'))).toHaveValue('נועה')
-  })
-
-  it('labels every input', () => {
-    render(<AddSibling locale="he" client={makeClient()} />)
-    for (const input of screen.getAllByRole('textbox')) {
-      expect(input).toHaveAccessibleName()
-    }
-  })
-
-  it('renders no physical CSS', () => {
-    const { container } = render(<AddSibling locale="en" client={makeClient()} />)
-    noPhysicalCss(container)
   })
 })
 
@@ -555,22 +395,5 @@ describe('FirstRegistration — 12j', () => {
       )
       unmount()
     }
-  })
-})
-
-describe('the empty group picker says so (2026-08-30)', () => {
-  it('shows the no-groups message with a retry instead of a silent blank fieldset', async () => {
-    // "Parents can't pick a program" — the picker rendered its legend over NOTHING when
-    // the read failed or the club published no groups.
-    const fetchMock = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>(
-      async () => new Response('{}', { status: 500 }),
-    )
-    vi.stubGlobal('fetch', fetchMock)
-    render(<AddSibling locale="he" client={makeClient()} />)
-    expect(await screen.findByTestId('sibling-no-groups')).toHaveTextContent(
-      t('he', 'people.sibling.noGroups'),
-    )
-    expect(screen.getByTestId('sibling-retry-groups')).toBeInTheDocument()
-    vi.unstubAllGlobals()
   })
 })
