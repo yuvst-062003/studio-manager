@@ -243,6 +243,12 @@ describe('SelfServeJoinFlow -- Doors C and D', () => {
     expect(screen.queryByTestId('join-email')).toBeNull()
   })
 
+  // The next two tests drive the whole wizard through real `userEvent` interactions --
+  // filling a student panel, submitting, and (for the trial fork) signing a health
+  // declaration too -- which legitimately takes seconds. Under a loaded, full parallel
+  // test run that pushes past vitest's default 5s `testTimeout` and the test times out
+  // even though nothing is actually hung. Give them real headroom instead of a global
+  // bump that would mask an unrelated test hanging. Do not "tidy" this away.
   it('the duplicate check refuses in the panel, before any health declaration is filled', async () => {
     stubFetch({
       duplicateResult: true,
@@ -286,7 +292,7 @@ describe('SelfServeJoinFlow -- Doors C and D', () => {
     // Refused in the panel -- never reached the health step at all.
     expect(screen.queryByTestId('health-opening-question')).toBeNull()
     expect(healthClient.template).not.toHaveBeenCalled()
-  })
+  }, 15000)
 
   it("Door D's trial fork writes the student as trial with no charge; the member fork prices and charges", async () => {
     const calls = stubFetch({
@@ -336,5 +342,5 @@ describe('SelfServeJoinFlow -- Doors C and D', () => {
     )
     // Member endpoint never called -- no member row in this run.
     expect(calls.some((url) => url.includes('/api/v1/me/students/register'))).toBe(false)
-  })
+  }, 15000)
 })

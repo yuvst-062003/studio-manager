@@ -166,6 +166,14 @@ beforeEach(() => {
 })
 
 describe('JoinFlow', () => {
+  // Several tests below drive the whole multi-step wizard through real `userEvent`
+  // interactions -- typing a full family/student panel, signing a health declaration,
+  // reaching the confirm gate, sometimes twice over for two students -- and legitimately
+  // take a couple of seconds each. Under a loaded, full parallel test run that pushes
+  // past vitest's default 5s `testTimeout` and a perfectly fine test times out even
+  // though nothing is hung. Each such test carries an explicit, generous per-test
+  // timeout for that reason; do not "tidy" those away, and do not raise the global
+  // default instead -- that would hide a real hang in some unrelated fast test.
   it('writes nothing through steps 1-3, then fires exactly one write from step 4 carrying the family, health and club terms together', async () => {
     const user = userEvent.setup()
     const onComplete = vi.fn()
@@ -291,7 +299,7 @@ describe('JoinFlow', () => {
 
     await user.click(await screen.findByTestId('join-done-enter'))
     await waitFor(() => expect(onComplete).toHaveBeenCalledTimes(1))
-  })
+  }, 15000)
 
   // F9 -- "a brand-new family is registered but never signs or pays." Their session had
   // no active studio (nobody belonged to a club at sign-in); before this fix `/register`
@@ -417,7 +425,7 @@ describe('JoinFlow', () => {
     // `register` with no reload in between, so this would contain 'me/students:401'.
     expect(calls).not.toContain('me/students:401')
     expect(calls.indexOf('refresh')).toBeLessThan(calls.indexOf('me/students:ok'))
-  })
+  }, 15000)
 
   it('shows the national-id-specific message when the server rejects the id, on the confirm gate', async () => {
     const user = userEvent.setup()
@@ -472,7 +480,7 @@ describe('JoinFlow', () => {
     expect(screen.queryByText(t('he', 'common.error.generic'))).toBeNull()
     // Never advanced past the confirm gate on a failed write.
     expect(screen.getByTestId('join-confirm-step')).toBeInTheDocument()
-  })
+  }, 15000)
 
   it('the first step has no back button', async () => {
     vi.stubGlobal(
@@ -800,7 +808,7 @@ describe('JoinFlow', () => {
 
     await user.click(screen.getByTestId('join-done-enter'))
     await waitFor(() => expect(onComplete).toHaveBeenCalledTimes(1))
-  })
+  }, 15000)
 
   // -- wave E / F19 / decision 6 ---------------------------------------------------
   it('scopes health and payment to the students THIS run created, never the whole family', async () => {
@@ -915,7 +923,7 @@ describe('JoinFlow', () => {
 
     await screen.findByTestId('setup-row-st-new')
     expect(screen.queryByTestId('setup-row-st-existing')).toBeNull()
-  })
+  }, 15000)
 
   it('a failed write keeps the family on the confirm gate, with an error, and never reaches done', async () => {
     const user = userEvent.setup()
@@ -968,7 +976,7 @@ describe('JoinFlow', () => {
     expect(screen.getByTestId('join-confirm-step')).toBeInTheDocument()
     expect(screen.queryByTestId('join-done-step')).toBeNull()
     expect(onComplete).not.toHaveBeenCalled()
-  })
+  }, 15000)
 
   it('persists the family draft to localStorage as it is typed, and restores it on a same-tab return', async () => {
     const user = userEvent.setup()
@@ -1047,7 +1055,8 @@ describe('JoinFlow', () => {
 
   // F7 -- "Assert the seam": driven through the real submit function
   // (`submitRegistration`, fired by the confirm gate's button), not a hand-built props
-  // object, all the way from step 2's panels to the actual request body.
+  // object, all the way from step 2's panels to the actual request body. Two full
+  // student panels plus two signed health declarations -- see the note above.
   it('F7 -- two students in one submission reach the real register body with DIFFERENT other_parent data', async () => {
     const user = userEvent.setup()
     let submittedBody: { children: { other_parent: { first_name: string } | null }[] } | null =
@@ -1141,5 +1150,5 @@ describe('JoinFlow', () => {
     expect(body.children[0]?.other_parent?.first_name).not.toBe(
       body.children[1]?.other_parent?.first_name,
     )
-  })
+  }, 15000)
 })
