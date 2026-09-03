@@ -41,6 +41,7 @@ from app.services.health.agreement import (
     RegistrationIncompleteError,
 )
 from app.services.health.clauses import ClauseMismatchError
+from app.services.health.club_terms import CLUB_TERMS_VERSION
 from app.services.health.declarations import (
     AnswersIncompleteError,
     DeclarationNotFoundError,
@@ -108,6 +109,12 @@ class OnboardingInfoOut(BaseModel):
     #: anyone has signed in -- reusing the existing unauthenticated
     #: `GET /public/studios/{slug}/logo` rather than inventing a second logo route.
     logo_url: str | None
+    #: `app/services/health/club_terms.py::CLUB_TERMS_VERSION`, live -- what the welcome
+    #: screen's club-terms card shows next to "קריאת המסמך המלא", replacing a frontend
+    #: constant that had to be bumped by hand in step with this one and had no test
+    #: keeping the two in sync. Non-optional: this endpoint always has the number, the
+    #: same way it always has `slug`.
+    club_terms_version: int
 
 
 class OnboardingPickupIn(BaseModel):
@@ -327,6 +334,7 @@ def onboarding_info(token: str, request: Request, session: SessionDep) -> Onboar
         email=email,
         slug=studio.slug,
         logo_url=(f"/api/v1/public/studios/{studio.slug}/logo" if studio.logo_object_key else None),
+        club_terms_version=CLUB_TERMS_VERSION,
     )
 
 

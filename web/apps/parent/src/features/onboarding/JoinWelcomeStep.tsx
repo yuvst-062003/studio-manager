@@ -33,15 +33,6 @@ import type { ConsentState, PrivacyClient } from '../privacy/privacyClient'
 import { OnboardingWizardChrome, stepPosition, type WizardStepKey } from './OnboardingWizardChrome'
 import { WizardNavButtons } from './WizardNavButtons'
 
-/** Mirrors `app/services/health/club_terms.py`'s `CLUB_TERMS_VERSION`. There is no
- *  parent-readable field carrying this number yet: §6's API-changes table adds
- *  `slug`/`logo_url` to `OnboardingInfoOut` but not `club_terms_version`, unlike
- *  `policy_version` (read live off `GET /privacy/consents`, which this screen already
- *  calls). Until that gap is closed server-side, this constant is the honest stopgap --
- *  it must be bumped by hand alongside the backend one, and is exported so a test (or a
- *  future caller) reads the same number rather than a second copy of it. */
-export const CLUB_TERMS_DISPLAY_VERSION = 2
-
 type WelcomeDoc = PolicyDoc | 'club'
 
 const cardHeadStyle: CSSProperties = {
@@ -121,6 +112,13 @@ export type JoinWelcomeStepProps = {
    *  (`App.tsx`'s `JoinShell`) and this screen read, an unauthenticated
    *  `GET /public/studios/{slug}/logo`. Null when the studio has no uploaded logo. */
   logoUrl: string | null
+  /** `OnboardingInfoOut.club_terms_version`, live off the server's own
+   *  `app/services/health/club_terms.py::CLUB_TERMS_VERSION` -- not a frontend constant
+   *  hand-mirrored from it, which is what this field replaced (nothing kept the two in
+   *  step). Null the same way `logoUrl` is: an older cached response, or a caller (a
+   *  test, Door A/D's stripped-down welcome) that never had the number, renders no
+   *  version line rather than a stale or fabricated one. */
+  clubTermsVersion: number | null
   privacyClient: PrivacyClient
   /** Always called with `true` -- reached only once all three cards are checked. The
    *  boolean keeps the call site symmetrical with `JoinFlow`'s existing
@@ -148,6 +146,7 @@ export function JoinWelcomeStep({
   locale,
   studioName,
   logoUrl,
+  clubTermsVersion,
   privacyClient,
   onAccept,
   deferAcceptance = false,
@@ -190,7 +189,10 @@ export function JoinWelcomeStep({
   const policyVersionLine = state
     ? `${t(locale, 'reports.privacy.doc.version')} ${state.policy_version_label}`
     : null
-  const clubVersionLine = `${t(locale, 'reports.privacy.doc.version')} ${CLUB_TERMS_DISPLAY_VERSION}`
+  const clubVersionLine =
+    clubTermsVersion !== null
+      ? `${t(locale, 'reports.privacy.doc.version')} ${clubTermsVersion}`
+      : null
 
   async function submit() {
     if (!allThree || saving) return
@@ -315,9 +317,11 @@ export function JoinWelcomeStep({
         <Card>
           <div style={cardHeadStyle}>
             <h3 style={{ margin: 0 }}>{t(locale, 'health.clubTerms.title')}</h3>
-            <span data-testid="join-welcome-club-version" style={versionStyle}>
-              {clubVersionLine}
-            </span>
+            {clubVersionLine ? (
+              <span data-testid="join-welcome-club-version" style={versionStyle}>
+                {clubVersionLine}
+              </span>
+            ) : null}
           </div>
           <span style={chipStyle}>{t(locale, 'health.clubTerms.onceForFamily')}</span>
           <p style={summaryStyle}>{t(locale, 'health.clubTerms.summary')}</p>

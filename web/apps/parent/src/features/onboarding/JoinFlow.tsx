@@ -40,11 +40,17 @@ type JoinGroup = { id: string; name: string; weekdays: number[] }
 //: required: this type is asserted from an untyped `response.json()` below, and an
 //: older cached response (or a test fixture that predates this field) should read as
 //: "no logo" rather than fail the cast.
+//:
+//: `club_terms_version` -- `OnboardingInfoOut`'s replacement for the frontend's old
+//: `CLUB_TERMS_DISPLAY_VERSION` constant, which duplicated the backend's
+//: `CLUB_TERMS_VERSION` by hand. Optional for the same reason `logo_url` is: an older
+//: cached response predating this field must render "no version line", not crash.
 type JoinInfo = {
   studio_name: string
   groups: JoinGroup[]
   email: string | null
   logo_url?: string | null
+  club_terms_version?: number
 }
 
 type JoinStep = 'welcome' | 'family' | 'health' | 'payment' | 'done'
@@ -373,6 +379,7 @@ export function JoinFlow({
     content = (
       <JoinWelcomeStep
         locale={locale}
+        clubTermsVersion={info.club_terms_version ?? null}
         logoUrl={info.logo_url ?? null}
         privacyClient={privacyClient}
         studioName={info.studio_name}

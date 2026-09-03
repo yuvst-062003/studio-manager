@@ -849,6 +849,21 @@ def test_the_public_read_carries_slug_and_logo_url(client, as_manager):
     assert body["logo_url"] is None
 
 
+def test_the_public_read_carries_club_terms_version(client, as_manager):
+    """The welcome screen's club-terms card used to show a hand-mirrored frontend
+    constant, `CLUB_TERMS_DISPLAY_VERSION`, kept in step with this module's
+    `CLUB_TERMS_VERSION` only by whoever remembered to edit both. `OnboardingInfoOut` now
+    carries the live number, the same way `logo_url` already does (previous test)."""
+    from app.services.health.club_terms import CLUB_TERMS_VERSION
+
+    created = client.post("/api/v1/onboarding-link", headers=as_manager.headers)
+    token = created.json()["url"].rsplit("/join/", 1)[1]
+
+    info = client.get(f"/api/v1/public/onboarding/{token}")
+    assert info.status_code == 200, info.text
+    assert info.json()["club_terms_version"] == CLUB_TERMS_VERSION
+
+
 # -- /me/onboarding-status -- §3's one answer to "what is left" (B1 item 5) ----
 def test_onboarding_status_is_incomplete_for_consents_at_the_pre_bump_version(
     client, as_guardian, tenant_session

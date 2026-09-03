@@ -664,6 +664,90 @@ describe('JoinFlow', () => {
     expect(logo).toHaveAttribute('src', expect.stringContaining(logoUrl))
   })
 
+  // F-finding: `CLUB_TERMS_DISPLAY_VERSION` used to be a frontend constant hand-mirrored
+  // from the backend's `CLUB_TERMS_VERSION`, with nothing keeping the two in step. §6-style
+  // fix: `OnboardingInfoOut` now carries `club_terms_version` live, and `JoinWelcomeStep`
+  // renders it the same way it already renders `logo_url` (previous test). Driven through
+  // the actual response shape, not a hand-built `clubTermsVersion` prop -- proving the seam
+  // `fetch -> JoinInfo -> JoinWelcomeStep` actually carries the field, rather than the
+  // screen silently keeping its own stale copy the way it did before this piece threaded
+  // it through.
+  it('threads club_terms_version from the public onboarding response into the welcome step', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input)
+        if (url.includes('/api/v1/public/onboarding/live-token-123456')) {
+          return new Response(
+            JSON.stringify({
+              studio_name: 'מועדון הדגמה',
+              email: null,
+              groups: [{ id: 'g1', name: 'ילדים א', weekdays: [0, 2] }],
+              // Deliberately not the real CLUB_TERMS_VERSION (2) -- proves this came off
+              // the fetch response and not a leftover frontend constant.
+              club_terms_version: 7,
+            }),
+            { status: 200 },
+          )
+        }
+        return new Response(JSON.stringify({ items: [] }), { status: 200 })
+      }),
+    )
+
+    render(
+      <JoinFlow
+        billingClient={billingClient}
+        displayName={DISPLAY_NAME}
+        healthClient={healthClient}
+        locale="he"
+        privacyClient={makePrivacyClient()}
+        standingOrderLinks={[]}
+        token="live-token-123456"
+      />,
+    )
+
+    const clubVersion = await screen.findByTestId('join-welcome-club-version')
+    expect(clubVersion).toHaveTextContent('7')
+  })
+
+  // The other half of the same seam: an older cached response with no
+  // `club_terms_version` at all must not crash the screen -- it renders no version line,
+  // the same tolerant-absence shape `logo_url` already has.
+  it('renders no club-terms version line when the response predates the field', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input)
+        if (url.includes('/api/v1/public/onboarding/live-token-123456')) {
+          return new Response(
+            JSON.stringify({
+              studio_name: 'מועדון הדגמה',
+              email: null,
+              groups: [{ id: 'g1', name: 'ילדים א', weekdays: [0, 2] }],
+            }),
+            { status: 200 },
+          )
+        }
+        return new Response(JSON.stringify({ items: [] }), { status: 200 })
+      }),
+    )
+
+    render(
+      <JoinFlow
+        billingClient={billingClient}
+        displayName={DISPLAY_NAME}
+        healthClient={healthClient}
+        locale="he"
+        privacyClient={makePrivacyClient()}
+        standingOrderLinks={[]}
+        token="live-token-123456"
+      />,
+    )
+
+    await screen.findByTestId('join-welcome')
+    expect(screen.queryByTestId('join-welcome-club-version')).toBeNull()
+  })
+
   // F1 -- `JoinWelcomeStep` used to call its own `useSession()`, so back-navigation
   // remounted it and it restarted at `status: 'loading'`, which its render treated as
   // "not signed in" and showed a sign-in wall for one tick before flipping back. Fixed

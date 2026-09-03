@@ -436,6 +436,7 @@ export function SelfServeJoinFlow({
     content = (
       <JoinWelcomeStep
         locale={locale}
+        clubTermsVersion={null}
         logoUrl={null}
         privacyClient={privacyClient}
         studioName=""

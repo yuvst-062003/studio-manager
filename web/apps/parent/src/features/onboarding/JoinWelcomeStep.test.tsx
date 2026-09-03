@@ -3,9 +3,13 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { t } from '@studio/i18n'
 import type { PrivacyClient } from '../privacy/privacyClient'
-import { CLUB_TERMS_DISPLAY_VERSION, JoinWelcomeStep } from './JoinWelcomeStep'
+import { JoinWelcomeStep } from './JoinWelcomeStep'
 
 const LOGO_URL = '/api/v1/public/studios/demo-club/logo'
+// An arbitrary, deliberately-not-the-real-CLUB_TERMS_VERSION number: these tests supply
+// it as a PROP now, not read off a frontend constant mirroring the backend's, so a value
+// distinct from the real one proves the card renders whatever it is handed.
+const CLUB_TERMS_TEST_VERSION = 9
 
 function makeClient(): PrivacyClient {
   return {
@@ -36,6 +40,7 @@ describe('JoinWelcomeStep', () => {
     render(
       <JoinWelcomeStep
         locale="he"
+        clubTermsVersion={CLUB_TERMS_TEST_VERSION}
         logoUrl={null}
         studioName="מועדון הדגמה"
         privacyClient={client}
@@ -73,6 +78,7 @@ describe('JoinWelcomeStep', () => {
     render(
       <JoinWelcomeStep
         locale="he"
+        clubTermsVersion={CLUB_TERMS_TEST_VERSION}
         logoUrl={null}
         studioName="מועדון הדגמה"
         privacyClient={client}
@@ -102,6 +108,7 @@ describe('JoinWelcomeStep', () => {
     render(
       <JoinWelcomeStep
         locale="he"
+        clubTermsVersion={CLUB_TERMS_TEST_VERSION}
         logoUrl={null}
         studioName="מועדון הדגמה"
         privacyClient={client}
@@ -142,6 +149,7 @@ describe('JoinWelcomeStep', () => {
     render(
       <JoinWelcomeStep
         locale="he"
+        clubTermsVersion={CLUB_TERMS_TEST_VERSION}
         logoUrl={LOGO_URL}
         studioName="מועדון הדגמה"
         privacyClient={client}
@@ -164,6 +172,7 @@ describe('JoinWelcomeStep', () => {
     render(
       <JoinWelcomeStep
         locale="he"
+        clubTermsVersion={CLUB_TERMS_TEST_VERSION}
         logoUrl={null}
         studioName="מועדון הדגמה"
         privacyClient={client}
@@ -175,13 +184,14 @@ describe('JoinWelcomeStep', () => {
   })
 
   // Each card carries its OWN version -- terms and privacy come off the same
-  // consent-status read (both move with POLICY_VERSION), club terms off the constant
-  // this file mirrors from CLUB_TERMS_VERSION.
+  // consent-status read (both move with POLICY_VERSION), club terms off the
+  // `clubTermsVersion` prop (`OnboardingInfoOut.club_terms_version`, server-side).
   it("shows each card's own document version", async () => {
     const client = makeClient()
     render(
       <JoinWelcomeStep
         locale="he"
+        clubTermsVersion={CLUB_TERMS_TEST_VERSION}
         logoUrl={null}
         studioName="מועדון הדגמה"
         privacyClient={client}
@@ -196,7 +206,27 @@ describe('JoinWelcomeStep', () => {
 
     expect(termsVersion).toHaveTextContent('v3')
     expect(privacyVersion).toHaveTextContent('v3')
-    expect(clubVersion).toHaveTextContent(String(CLUB_TERMS_DISPLAY_VERSION))
+    expect(clubVersion).toHaveTextContent(String(CLUB_TERMS_TEST_VERSION))
+  })
+
+  // F-finding: `clubTermsVersion` is optional and nullable the same way `logoUrl` is --
+  // an older cached `OnboardingInfoOut` (or Door A/D's stripped-down welcome, which
+  // passes `null` on purpose) must render no version line, not a stale or fabricated
+  // number.
+  it('renders no club-terms version line when clubTermsVersion is null', async () => {
+    const client = makeClient()
+    render(
+      <JoinWelcomeStep
+        locale="he"
+        clubTermsVersion={null}
+        logoUrl={null}
+        studioName="מועדון הדגמה"
+        privacyClient={client}
+        onAccept={vi.fn()}
+      />,
+    )
+    await screen.findByText('מועדון הדגמה')
+    expect(screen.queryByTestId('join-welcome-club-version')).toBeNull()
   })
 
   it("renders no back button -- this is the wizard's first step", async () => {
@@ -204,6 +234,7 @@ describe('JoinWelcomeStep', () => {
     render(
       <JoinWelcomeStep
         locale="he"
+        clubTermsVersion={CLUB_TERMS_TEST_VERSION}
         logoUrl={null}
         studioName="מועדון הדגמה"
         privacyClient={client}
@@ -225,6 +256,7 @@ describe('JoinWelcomeStep', () => {
     render(
       <JoinWelcomeStep
         locale="he"
+        clubTermsVersion={CLUB_TERMS_TEST_VERSION}
         logoUrl={null}
         studioName="מועדון הדגמה"
         privacyClient={client}
