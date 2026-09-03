@@ -232,6 +232,11 @@ export const health: Bundle = {
   'onboarding.openingQuestion': 'יש משהו שכדאי שנדע?',
   'onboarding.openingHealthy': 'אין מגבלות ידועות',
   'onboarding.openingReporting': 'יש משהו שצריך לדעת',
-  'onboarding.allMarkedHealthy': '13 שאלות סומנו "לא"',
+  // F12: derived from the template's own boolean-question count via `plural()`, not a
+  // literal -- the literal happened to read '13' only because that was the count on the
+  // day it was written, and the next question added to the template would have left it
+  // wrong with nothing to catch it.
+  'onboarding.allMarkedHealthy': '{{count}} שאלות סומנו "לא"',
+  'onboarding.allMarkedHealthy.one': 'שאלה אחת סומנה "לא"',
   'onboarding.signAndContinue': 'חתימה והמשך',
 }

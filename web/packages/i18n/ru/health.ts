@@ -184,6 +184,7 @@ export const health: Bundle = {
   'onboarding.openingQuestion': 'Есть что-то, что нам стоит знать?',
   'onboarding.openingHealthy': 'Известных ограничений нет',
   'onboarding.openingReporting': 'Есть что сообщить',
-  'onboarding.allMarkedHealthy': '13 вопросов отмечены "нет"',
+  'onboarding.allMarkedHealthy': '{{count}} вопросов отмечены "нет"',
+  'onboarding.allMarkedHealthy.one': '1 вопрос отмечен "нет"',
   'onboarding.signAndContinue': 'Подписать и продолжить',
 }

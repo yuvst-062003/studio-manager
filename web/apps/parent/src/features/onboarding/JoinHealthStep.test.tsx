@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { t } from '@studio/i18n'
+import { plural, t } from '@studio/i18n'
 import { makeHealthClient } from '../health/healthClient'
 import type { Fetcher, HealthClient } from '../health/healthClient'
 import type { GatedStudent } from '../health/HealthGate'
@@ -312,6 +312,73 @@ describe('JoinHealthStep (2-inner-step, deferred)', () => {
     await user.click(screen.getByTestId('health-sign-continue'))
 
     await waitFor(() => expect(onSigned).toHaveBeenCalledTimes(1))
+  })
+
+  it('F12: the collapsed-card count follows the template, not a hardcoded literal', async () => {
+    // F12: the collapsed card used to say a hardcoded '13 שאלות סומנו "לא"' regardless of
+    // what the template actually asked. Neither fixture below has 13 boolean questions (1
+    // and 2, respectively) -- an assertion against the literal '13' would pass by accident
+    // either way, which is exactly why it proves nothing. This asserts the OLD literal is
+    // gone and the two different templates render two different counts.
+    const OLD_HARDCODED_LITERAL = '13 שאלות סומנו'
+    const user = userEvent.setup()
+
+    const { unmount } = render(
+      <JoinHealthStep
+        client={makeClient()}
+        drafts={{}}
+        locale="he"
+        onBack={vi.fn()}
+        onSigned={vi.fn()}
+        students={students}
+      />,
+    )
+    await user.click(await screen.findByTestId('health-opening-healthy'))
+    const oneQuestionText = (await screen.findByTestId('health-collapsed-card')).textContent
+    unmount()
+
+    // Add a second boolean question and render again -- a literal count could never move;
+    // the derived one must.
+    const twoBooleanQuestions: HealthClient = {
+      template: vi.fn(async () => ({
+        id: 'tmpl1',
+        version: 1,
+        schema: {
+          ...schema,
+          sections: schema.sections.map((section) =>
+            section.id === 'medical_history'
+              ? {
+                  ...section,
+                  questions: [
+                    ...section.questions,
+                    { id: 'allergy', type: 'boolean' as const, label: 'אלרגיה', flag: true },
+                  ],
+                }
+              : section,
+          ),
+        },
+      })),
+      submit: vi.fn(async () => ({}) as never),
+    } as unknown as HealthClient
+    render(
+      <JoinHealthStep
+        client={twoBooleanQuestions}
+        drafts={{}}
+        locale="he"
+        onBack={vi.fn()}
+        onSigned={vi.fn()}
+        students={students}
+      />,
+    )
+    await user.click(await screen.findByTestId('health-opening-healthy'))
+    const twoQuestionText = (await screen.findByTestId('health-collapsed-card')).textContent
+
+    expect(oneQuestionText).not.toContain(OLD_HARDCODED_LITERAL)
+    expect(twoQuestionText).not.toContain(OLD_HARDCODED_LITERAL)
+    expect(twoQuestionText).not.toBe(oneQuestionText)
+    // The exact copy this lane ships, derived with the same helper the component uses.
+    expect(oneQuestionText).toContain(plural('he', 'health.onboarding.allMarkedHealthy', 1))
+    expect(twoQuestionText).toContain(plural('he', 'health.onboarding.allMarkedHealthy', 2))
   })
 })
 

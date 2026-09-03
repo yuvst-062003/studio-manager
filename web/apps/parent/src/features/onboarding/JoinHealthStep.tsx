@@ -12,9 +12,10 @@
 import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { Alert, Button, Card, Checkbox, TextField } from '@studio/ui'
-import { t } from '@studio/i18n'
+import { plural, t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { applicableClause, clauseTextKey, CLAUSE_QUESTION_ID } from '../health/clauses'
+import { isVisible } from '../health/healthClient'
 import type { AnswerValue, HealthClient, TemplateSchema } from '../health/healthClient'
 import { needsFullDeclaration, type GatedStudent } from '../health/HealthGate'
 import { SignaturePad } from '../health/SignaturePad'
@@ -106,6 +107,12 @@ function SubjectHealthFlow({
   const healthFundQuestion = flatQuestions(schema).find((q) => q.id === 'health_fund')
   const emergencyQuestion = flatQuestions(schema).find((q) => q.id === 'emergency_contact')
   const expanded = draft.openingAnswer === 'reporting' || popupOpen
+  // F12: the collapsed card's count, from the template itself rather than a literal that
+  // only happened to match it on the day it was written. Visible booleans only, matching
+  // `markAllHealthyDraft` above -- the same set this path actually marks "no".
+  const markedHealthyCount = flatQuestions(schema).filter(
+    (question) => question.type === 'boolean' && isVisible(question, draft.answers),
+  ).length
 
   function updateAnswers(next: Record<string, AnswerValue>) {
     setDraft((previous) => ({ ...previous, answers: next }))
@@ -148,7 +155,9 @@ function SubjectHealthFlow({
       {!expanded ? (
         <Card>
           <div data-testid="health-collapsed-card" style={choiceStyle}>
-            <p style={{ margin: 0 }}>{t(locale, 'health.onboarding.allMarkedHealthy')}</p>
+            <p style={{ margin: 0 }}>
+              {plural(locale, 'health.onboarding.allMarkedHealthy', markedHealthyCount)}
+            </p>
             <Button
               data-testid="health-review-open"
               onClick={() => setPopupOpen(true)}
