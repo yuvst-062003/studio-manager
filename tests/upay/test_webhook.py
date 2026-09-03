@@ -224,17 +224,49 @@ def test_a_recurring_callback_with_no_reference_lands_unmatched(client, an_order
 
 def test_an_unobserved_outcome_code_settles_nothing(client, an_order, tenant_session):
     """IPNs for failed or declined payments are [NOT COVERED] -- three live tests never
-    produced one. Both ways of guessing are worse than refusing: calling it `success`
-    settles charges for money that did not arrive, and inventing a failure shape would
-    silently swallow the first real one."""
+    produced one. Both ways of guessing the SHAPE of a failure are still refused: calling
+    it `success` settles charges for money that did not arrive, and inventing a payment
+    record for it would silently swallow the first real one -- neither happens here.
+
+    §7.4 of the completion findings register -- what WAS missing is the one fact this
+    order needed regardless of shape: an outcome that is not success arrived for it, so the
+    parent must stop being told 'verifying'. `_settle_order` overwrites `status`
+    unconditionally on any later success (`reconciliation.py`), so marking it here is not a
+    dead end -- a genuine retry still settles the order correctly.
+    """
     response = _deliver(
         client, an_order.order, IpnShape.SUCCESS, providererrorcode="7", errordescription="DECLINED"
     )
     assert response.status_code == 200
     tenant_session.expire_all()
-    assert tenant_session.get(PaymentOrder, an_order.order.id).status == "pending"
+    assert tenant_session.get(PaymentOrder, an_order.order.id).status == "failed"
     assert tenant_session.execute(select(Payment)).scalars().all() == []
     assert tenant_session.execute(select(UpayIpnRecord)).scalars().one().match_status == "unmatched"
+
+
+def test_an_unobserved_outcome_code_for_an_already_settled_order_does_not_downgrade_it(
+    client, an_order, tenant_session
+):
+    """The guard that keeps the fix above from being a NEW risk. An order that already
+    settled must never be knocked back to `failed` by a later, unrelated delivery carrying
+    a code nobody has seen -- that would make a genuinely paid family look unpaid again,
+    which is exactly the 'costs them a second payment' failure `amount_mismatch` exists to
+    avoid."""
+    _deliver(client, an_order.order, IpnShape.SUCCESS, suffix="1")
+    tenant_session.expire_all()
+    assert tenant_session.get(PaymentOrder, an_order.order.id).status == "paid"
+
+    response = _deliver(
+        client,
+        an_order.order,
+        IpnShape.SUCCESS,
+        suffix="2",
+        providererrorcode="7",
+        errordescription="DECLINED",
+    )
+    assert response.status_code == 200
+    tenant_session.expire_all()
+    assert tenant_session.get(PaymentOrder, an_order.order.id).status == "paid"
 
 
 def test_the_endpoint_needs_no_authentication(client, an_order):

@@ -18,7 +18,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { apiFetch, downloadFile, formatDateInStudioZone } from '@studio/core'
-import { Button, Card, Checkbox, EmptyState, MoneyDisplay, StatusChip } from '@studio/ui'
+import { Button, Card, Checkbox, EmptyState, MoneyDisplay, PercentDisplay, StatusChip } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import type {
@@ -239,10 +239,10 @@ export function CollectionsScreen({
           label={t(locale, 'billing.debt.collectedThisMonth')}
           agorot={collectedThisMonthAgorot}
           tone="paid"
-          note={t(locale, 'billing.debt.collectedShare').replace(
-            '{{percent}}',
-            String(collectedSharePercent),
-          )}
+          percentNote={{
+            value: collectedSharePercent,
+            suffix: t(locale, 'billing.debt.collectedShare'),
+          }}
         />
         <Card caption={t(locale, 'billing.subscription.title')}>
           {/* Informational, and deliberately uncoloured — `3e`'s token table gives this one
@@ -450,17 +450,25 @@ function Stat({
   label,
   agorot,
   tone,
-  note,
+  percentNote,
 }: {
   label: string
   agorot: number
   tone: 'debt' | 'paid'
-  note?: string
+  /** §3.3 -- a number and its own trailing words, never a pre-built string: the value
+   *  goes through `PercentDisplay`'s own isolation, and a plain string here is exactly
+   *  what let this fuse with the amount above it in the first place. */
+  percentNote?: { value: number; suffix: string }
 }) {
   return (
     <Card caption={label}>
       <MoneyDisplay agorot={agorot} tone={tone} label={label} />
-      {note ? <span>{note}</span> : null}
+      {percentNote ? (
+        <span data-testid="kpi-collected-share">
+          {' '}
+          <PercentDisplay value={percentNote.value} /> {percentNote.suffix}
+        </span>
+      ) : null}
     </Card>
   )
 }

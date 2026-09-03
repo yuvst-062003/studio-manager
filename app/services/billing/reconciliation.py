@@ -165,9 +165,20 @@ class IpnIntake:
             # alert on every one of them.
             return None
         except UnobservedIpnOutcomeError:
-            # IPNs for failed payments are [NOT COVERED]. Guessing either way is worse than
-            # refusing: `success` settles charges for money that did not arrive, and
-            # inventing a failure shape would swallow the first real one.
+            # IPNs for failed payments are [NOT COVERED]. Guessing the SHAPE of a failure is
+            # still refused here, exactly as before: no `Payment` is recorded, no amount
+            # field is trusted, `record.match_status` stays `unmatched` -- `success` would
+            # settle charges for money that did not arrive, and inventing a failure shape
+            # would swallow the first real one.
+            #
+            # §7.4 -- what WAS missing is narrower than a shape: the one fact this order
+            # needs regardless of what the code turns out to mean is that something other
+            # than success arrived for it, so the parent stops being told 'verifying' for
+            # 24 hours. Only from `pending`, never overwriting an order that already
+            # resolved -- an unrelated later delivery carrying an unseen code must not make
+            # a genuinely paid family look unpaid again. `_settle_order` above overwrites
+            # `status` unconditionally on any later success, so this is not a dead end: a
+            # genuine retry still settles the order correctly.
             logger.warning(
                 "upay ipn carries an unobserved outcome code",
                 extra={
@@ -175,6 +186,9 @@ class IpnIntake:
                     "provider_error_code": payload.provider_error_code,
                 },
             )
+            if order is not None and order.status == "pending":
+                order.status = "failed"
+                self._session.flush()
             return None
         except UnparsableIpnAmountError:
             logger.warning(

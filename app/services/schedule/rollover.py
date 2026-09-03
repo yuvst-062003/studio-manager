@@ -55,7 +55,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.billing import PricePlan
-from app.models.people import Enrollment
+from app.models.people import Enrollment, Student
 from app.models.schedule import Session as TrainingSession
 from app.models.schedule import StudioClosure, TrainingYear
 from app.models.structure import Group
@@ -527,6 +527,25 @@ class RolloverService:
             except (BillingConflictError, BillingNotFoundError, BillingRefusedError) as exc:
                 outcome.refuse(plan_id, str(exc))
                 continue
+            # §3.5 of the completion findings register: closing the plan alone leaves every
+            # student who was on it still pointing at the now-closed row, and the billing run
+            # fetches by that stored id with no `active_to` check -- so without this, the next
+            # run charges the old amount and nothing anywhere says so. Only `active` students,
+            # matching who the run ever bills; a student who already left has nothing new to
+            # be repriced for.
+            affected = (
+                self._session.execute(
+                    select(Student).where(
+                        Student.studio_id == studio_id,
+                        Student.price_plan_id == plan_id,
+                        Student.status == "active",
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            for student in affected:
+                student.price_plan_id = successor.id
             AuditService.record(
                 self._session,
                 action="price_plan.rolled_over",
@@ -538,6 +557,7 @@ class RolloverService:
                     "closed_plan_id": str(plan_id),
                     "monthly_amount_agorot": [plan.monthly_amount_agorot, amount],
                     "training_year_id": str(training_year_id),
+                    "students_repointed": len(affected),
                 },
             )
             outcome.applied += 1

@@ -96,6 +96,10 @@ class _Tally:
     #: freeze and was billed anyway is a phone call; a family who was frozen and does not
     #: appear in the run's own record is a number nobody can explain next month.
     frozen: list[str] = field(default_factory=list)
+    #: §3.6 -- an active student with no active enrollment at all (most often rollover's
+    #: `apply_students` ending one as "not returning"). Not billing them is correct; saying
+    #: nothing about why is what this fixes.
+    no_active_enrollment: list[str] = field(default_factory=list)
     #: Step 7 -- agorot of existing credit spent on this period's charges. Reported for the
     #: same reason `frozen` is: a run that settled 40 families out of money already in the
     #: drawer looks, from `charges_created` alone, exactly like a run that collected
@@ -153,6 +157,7 @@ class BillingRunService:
             "prorated": tally.prorated,
             "unpriced": tally.unpriced,
             "frozen": tally.frozen,
+            "no_active_enrollment": tally.no_active_enrollment,
             "credit_applied": tally.credit_applied,
         }
         self._session.flush()
@@ -320,6 +325,20 @@ class BillingRunService:
             .distinct()
             .order_by(Student.id)
         ).all()
+        # §3.6 -- an active student who reaches this point with no active enrollment at all
+        # (most often §5.15 rollover's `apply_students` ending one as "not returning") is
+        # excluded by the JOIN above before anything else runs. That is the right outcome --
+        # nobody is billed for a group they no longer attend -- but until now it happened
+        # with no tally entry and no `unpriced`/`frozen` line to explain it either, so a
+        # student simply stopped appearing in the run with nothing recording why.
+        active_ids = set(
+            self._session.execute(
+                select(Student.id).where(Student.studio_id == studio_id, Student.status == "active")
+            ).scalars()
+        )
+        enrolled_ids = {student_id for student_id, _ in rows}
+        for student_id in sorted(active_ids - enrolled_ids, key=str):
+            tally.no_active_enrollment.append(str(student_id))
         billable: list[tuple[uuid.UUID, uuid.UUID | None]] = []
         for student_id, price_plan_id in rows:
             if student_id in frozen:
@@ -346,6 +365,15 @@ class BillingRunService:
             # §5.4 sets the price at conversion and nothing forces it; a child can also be
             # enrolled before a guardian is attached. Charging zero would look like a
             # working run and losing them silently would be worse, so both are reported.
+            tally.unpriced.append(str(student_id))
+            return
+        if plan.active_to is not None and due > plan.active_to:
+            # §3.5 -- belt and braces alongside rollover's repointing. `Student.price_plan_id`
+            # is trusted everywhere else in this file; the one place it must not be trusted
+            # blindly is here, because a closed plan is last year's price and nothing forces
+            # every path that changes a plan to also repoint the student. Charging it anyway
+            # would silently restate an amount the plan itself says stopped applying before
+            # this charge's due date -- reported as unpriced rather than raised wrong.
             tally.unpriced.append(str(student_id))
             return
 

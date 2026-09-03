@@ -131,6 +131,61 @@ describe('1b — the pay screen', () => {
     expect(screen.queryByTestId('pay-button')).not.toBeInTheDocument()
   })
 
+  it('names a manual charge by its own label rather than rendering a bare row', () => {
+    // §3.1 — a shop item or a manual adjustment has no period and no student, and the row
+    // rendered neither before this: a family read `100₪` with no way to tell what it was
+    // for, even though the charge carries its own label in `proration_note`.
+    const item: ChargeOut = {
+      ...charge('c3', 1, 10_000),
+      kind: 'manual',
+      student_id: null,
+      period_year: null,
+      period_month: null,
+      proration_note: 'כפפות · S',
+    }
+    renderPay({
+      debts: [{ charge: item, studentName: '', beltColorHex: null, coveredElsewhere: false }],
+    })
+    expect(screen.getByTestId('debt-row')).toHaveTextContent('כפפות · S')
+  })
+
+  it('falls back to the charge kind when a manual charge carries no label at all', () => {
+    // Belt and braces beside the fix above: every manual-charge creation path in the
+    // backend sets `proration_note`, but a row must never render fully bare if one someday
+    // does not.
+    const item: ChargeOut = {
+      ...charge('c3', 1, 10_000),
+      kind: 'manual',
+      student_id: null,
+      period_year: null,
+      period_month: null,
+      proration_note: null,
+    }
+    renderPay({
+      debts: [{ charge: item, studentName: '', beltColorHex: null, coveredElsewhere: false }],
+    })
+    expect(screen.getByTestId('debt-row')).toHaveTextContent(t(LOCALE, 'billing.charge.kind.manual'))
+  })
+
+  it('breaks the total down when part of it is already covered by an open payment', () => {
+    // §3.2 — three rows read "already covered by an open payment" while still summed,
+    // unexplained, into "total debt". The total is not wrong (nothing is settled yet), but
+    // showing no relationship between the two numbers reads as a contradiction.
+    renderPay({
+      debts: [
+        debt('c1', 9, { coveredElsewhere: true }),
+        debt('c2', 10, { coveredElsewhere: true }),
+        debt('c3', 11),
+      ],
+    })
+    expect(screen.getByTestId('covered-elsewhere-total')).toHaveTextContent('500')
+  })
+
+  it('shows no covered-elsewhere breakdown when nothing is covered', () => {
+    renderPay({ debts: [debt('c1', 9), debt('c2', 10)] })
+    expect(screen.queryByTestId('covered-elsewhere-total')).not.toBeInTheDocument()
+  })
+
   it('renders the empty state when nothing is owed', () => {
     // 1b's finding 3: not drawn, and it is the GOAL state.
     renderPay({ debts: [] })
@@ -147,6 +202,33 @@ describe('1b — the pay screen', () => {
     await userEvent.click(screen.getByTestId('pay-button'))
     expect(screen.getByTestId('pay-button')).toBeDisabled()
     release({ public_ref: 'ref-1' })
+  })
+
+  it('retries the form fetch rather than creating a second order', async () => {
+    // §7.6 — the order is created, then fetching its form fails. The order still exists on
+    // the server; a retry that calls `createOrder` again 409s on it (orders.py:238-239),
+    // and the parent could neither pay nor cancel for 24h. The fix: remember the order this
+    // press already created and retry only the form on the next press.
+    const createOrder = vi.fn().mockResolvedValue({ public_ref: 'ref-1' })
+    const orderForm = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('network'))
+      .mockResolvedValueOnce({ action: 'https://upay', fields: {} })
+    const onOrderOpened = vi.fn()
+    renderPay({ client: stubClient({ createOrder, orderForm }), onOrderOpened })
+
+    await userEvent.click(screen.getByTestId('pay-button'))
+    await waitFor(() => expect(screen.getByText(t(LOCALE, 'common.error.generic'))).toBeInTheDocument())
+    expect(screen.getByTestId('pay-button')).toBeEnabled()
+
+    await userEvent.click(screen.getByTestId('pay-button'))
+    await waitFor(() => expect(onOrderOpened).toHaveBeenCalledWith({
+      action: 'https://upay',
+      fields: {},
+    }))
+    expect(createOrder).toHaveBeenCalledTimes(1)
+    expect(orderForm).toHaveBeenCalledTimes(2)
+    expect(orderForm).toHaveBeenCalledWith('ref-1')
   })
 
   it('renders every amount through MoneyDisplay and never a hand-built string', () => {
@@ -233,6 +315,15 @@ describe('1b — the standing-order links', () => {
     expect(links).toHaveLength(2)
     expect(links[0]).toHaveAttribute('href', 'https://app.upay.co.il/recurring/300')
     expect(links[1]).toHaveAttribute('href', 'https://app.upay.co.il/recurring/550')
+  })
+
+  it('opens the mandate link in a new tab rather than navigating the app away', () => {
+    // §7.2 — with no target, following this link replaced the payments screen with a
+    // third party's checkout page, and there was no way back to it.
+    renderPay({ standingOrderLinks: TWO })
+    const [link] = screen.getAllByTestId('standing-order-link')
+    expect(link).toHaveAttribute('target', '_blank')
+    expect(link).toHaveAttribute('rel', expect.stringContaining('noopener'))
   })
 
   it('names the child in each link, because the link text alone repeats', () => {
@@ -710,6 +801,25 @@ describe('the return from uPay', () => {
     )
     expect(screen.getByText(t(LOCALE, 'billing.order.mismatchAlert'))).toBeInTheDocument()
     expect(screen.getByText(t(LOCALE, 'billing.order.mismatchHint'))).toBeInTheDocument()
+  })
+
+  it('reports a failed payment honestly, rather than as still verifying', () => {
+    // §7.4 — `failed`, `expired` and `pending` all fell into the same catch-all branch, so
+    // a parent whose card was declined kept reading "מאמת תשלום…" forever. The label
+    // already existed (`billing.order.status.failed`) with no call site anywhere.
+    render(<PaymentCompleteScreen locale={LOCALE} status="failed" onOpenPayments={vi.fn()} />)
+    expect(screen.getByTestId('order-failed')).toHaveTextContent(
+      t(LOCALE, 'billing.order.status.failed'),
+    )
+    expect(screen.queryByText(t(LOCALE, 'billing.order.verifying'))).not.toBeInTheDocument()
+  })
+
+  it('reports an expired payment honestly, rather than as still verifying', () => {
+    render(<PaymentCompleteScreen locale={LOCALE} status="expired" onOpenPayments={vi.fn()} />)
+    expect(screen.getByTestId('order-expired')).toHaveTextContent(
+      t(LOCALE, 'billing.order.status.expired'),
+    )
+    expect(screen.queryByText(t(LOCALE, 'billing.order.verifying'))).not.toBeInTheDocument()
   })
 })
 

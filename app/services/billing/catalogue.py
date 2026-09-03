@@ -152,8 +152,8 @@ class UnpricedStudent:
     payer_display_name: str | None
 
 
-def unpriced_students(session: Session) -> list[UnpricedStudent]:
-    """Active students with no `price_plan_id`, for the collections screen.
+def unpriced_students(session: Session, *, today: date) -> list[UnpricedStudent]:
+    """Active students nobody can bill, for the collections screen.
 
     **The billing run has recorded these since M6 and nothing has ever read the record.**
     `_charge_one` appends to `tally.unpriced` when no plan matches, the tally lands in
@@ -165,6 +165,11 @@ def unpriced_students(session: Session) -> list[UnpricedStudent]:
     timetable; this makes the exception visible. Both are needed: a club with no live plans
     at all still produces unpriced children, and the run keeps writing `tally.unpriced` --
     this adds a read that a human reaches.
+
+    **`price_plan_id IS NULL` is not the only way to be unpriced.** §3.5 -- a plan closed by
+    rollover leaves the student who did not get repointed still holding a now-stale id, which
+    this table alone cannot tell apart from a live one. `today` names the date that decides
+    "closed"; the caller reads the clock so this stays a pure query.
 
     **Active only.** A student who left owes the club nothing new, and a checklist padded
     with them is a checklist nobody works through. Ordered by name so the list is stable
@@ -180,12 +185,17 @@ def unpriced_students(session: Session) -> list[UnpricedStudent]:
         .subquery()
     )
     payer = aliased(Person)
+    plan = aliased(PricePlan)
     rows = session.execute(
         select(Student, Person, payer)
         .join(Person, Student.person_id == Person.id)
         .outerjoin(primary, primary.c.student_id == Student.id)
         .outerjoin(payer, payer.id == primary.c.person_id)
-        .where(Student.status == "active", Student.price_plan_id.is_(None))
+        .outerjoin(plan, plan.id == Student.price_plan_id)
+        .where(
+            Student.status == "active",
+            or_(Student.price_plan_id.is_(None), plan.active_to < today),
+        )
         .order_by(Person.first_name, Person.last_name, Student.id)
     ).all()
     return [

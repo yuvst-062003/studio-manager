@@ -47,6 +47,16 @@ export function PaymentCompleteScreen({
             </Alert>
             <p>{t(locale, 'billing.order.mismatchHint')}</p>
           </>
+        ) : status === 'failed' ? (
+          // §7.4 -- the backend now assigns `failed` on a declined IPN (reconciliation.py);
+          // this is that outcome's one call site. The label already existed with none.
+          <Alert tone="danger" iconLabel={t(locale, 'billing.order.status.failed')}>
+            <span data-testid="order-failed">{t(locale, 'billing.order.status.failed')}</span>
+          </Alert>
+        ) : status === 'expired' ? (
+          <Alert tone="danger" iconLabel={t(locale, 'billing.order.status.expired')}>
+            <span data-testid="order-expired">{t(locale, 'billing.order.status.expired')}</span>
+          </Alert>
         ) : (
           <>
             <p>{t(locale, 'billing.order.verifying')}</p>

@@ -157,6 +157,19 @@ export function PaymentsScreen({
   const [inFlight, setInFlight] = useState(false)
   const [promiseInFlight, setPromiseInFlight] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // §7.6 -- `pay()` used to create the order and fetch its form in one uninterruptible
+  // step. If the form fetch failed, the order still existed on the server (orders.py
+  // never rolls it back), so a retry called `createOrder` again and 409'd on it
+  // (`orders.py:238-239`) -- the parent could then neither pay nor cancel for 24h. This
+  // remembers the order THIS attempt already created, so a retry only re-fetches the form.
+  // The selection it was created for travels with it: months/instalments changing after a
+  // failed attempt means the family wants a different order, not the stuck one -- checked
+  // lazily in `pay()` itself rather than through an effect that would reset it eagerly.
+  const [pendingOrder, setPendingOrder] = useState<{
+    publicRef: string
+    months: number
+    instalments: number
+  } | null>(null)
 
   // One live promise at a time across BOTH routes: the service refuses a second over the
   // same charges, so a card that still offered its button would be offering a 409. A plan
@@ -213,18 +226,41 @@ export function PaymentsScreen({
   // a second rounding of the same money.
   const total = selectionTotal(chosen) + prepayMonths * prepayTerms.monthlyTotalAgorot
   const split = instalmentSplit(total, instalments)
+  // §3.2 -- the hero total below counts every open charge, covered-elsewhere ones
+  // included, because none of it has actually settled yet. But a row reading "already
+  // covered by an open payment" beside a total that treats it exactly like every other
+  // debt is a contradiction with nothing on screen explaining it. This names the part of
+  // the total that is already in motion elsewhere.
+  const coveredElsewhereAgorot = useMemo(
+    () => selectionTotal(debts.filter((row) => row.coveredElsewhere).map((row) => row.charge)),
+    [debts],
+  )
 
   async function pay() {
     if (inFlight || total <= 0) return
     setInFlight(true)
     setError(null)
     try {
-      const order = await client.createOrder(
-        chosen.map((charge) => charge.id),
-        instalments,
-        prepayMonths,
-      )
-      onOrderOpened(await client.orderForm(order.public_ref))
+      // Only reusable for the SAME selection it was created for -- months or instalments
+      // changing since the failed attempt means the family wants a different order, not
+      // the stuck one, and reusing it here would open a payment page for the wrong amount.
+      const reusableRef =
+        pendingOrder && pendingOrder.months === months && pendingOrder.instalments === instalments
+          ? pendingOrder.publicRef
+          : null
+      const publicRef =
+        reusableRef ??
+        (
+          await client.createOrder(
+            chosen.map((charge) => charge.id),
+            instalments,
+            prepayMonths,
+          )
+        ).public_ref
+      setPendingOrder({ publicRef, months, instalments })
+      const form = await client.orderForm(publicRef)
+      setPendingOrder(null)
+      onOrderOpened(form)
     } catch {
       setError(t(locale, 'common.error.generic'))
     } finally {
@@ -280,6 +316,16 @@ export function PaymentsScreen({
               label={t(locale, 'billing.openDebts.total')}
             />
           </div>
+          {coveredElsewhereAgorot > 0 ? (
+            <p data-testid="covered-elsewhere-total">
+              {t(locale, 'billing.openDebts.coveredElsewhereTotal')}{' '}
+              <MoneyDisplay
+                agorot={coveredElsewhereAgorot}
+                tone="pending"
+                label={t(locale, 'billing.openDebts.coveredElsewhereTotal')}
+              />
+            </p>
+          ) : null}
           {debts.map((row) => (
             <div key={row.charge.id} style={rowStyle} data-testid="debt-row">
               {/* D7 — a belt fill always carries its ring. `BeltBar` has no prop that
@@ -293,6 +339,17 @@ export function PaymentsScreen({
               />
               <span>{periodLabel(row.charge)}</span>
               <span>{row.studentName}</span>
+              {/* §3.1 -- a charge with neither a period nor a student (a shop item, a
+                  manual adjustment) rendered nothing here at all: an amount with no
+                  explanation. `proration_note` already carries one on every manual-charge
+                  creation path; the kind name is the floor for the one that someday
+                  doesn't. */}
+              <span data-testid="debt-row-note">
+                {row.charge.proration_note ??
+                  (periodLabel(row.charge) || row.studentName
+                    ? null
+                    : t(locale, `billing.charge.kind.${row.charge.kind}`))}
+              </span>
               <MoneyDisplay agorot={row.charge.amount_agorot} tone="debt" />
               {row.coveredElsewhere ? (
                 <span data-testid="covered-elsewhere">
@@ -434,6 +491,11 @@ export function PaymentsScreen({
                   '{{name}}',
                   link.studentName,
                 )}
+                // §7.2 -- the same fix as the onboarding step's own copy of this link:
+                // without a target, following it navigates the payments screen away to a
+                // third party's checkout page.
+                rel="noopener noreferrer"
+                target="_blank"
               >
                 {t(locale, 'billing.standingOrder.link')}
               </a>

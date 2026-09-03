@@ -60,6 +60,7 @@ export { EmptyState } from './primitives/EmptyState'
 export { LoadFailed } from './primitives/LoadFailed'
 export { MoneyDisplay } from './primitives/MoneyDisplay'
 export type { MoneyTone } from './primitives/MoneyDisplay'
+export { PercentDisplay } from './primitives/PercentDisplay'
 export { ProgressBar } from './primitives/ProgressBar'
 // A range is one ltr island. Three separate bidi bugs came from not having this.
 export { RangeText } from './primitives/RangeText'

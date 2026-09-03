@@ -975,7 +975,7 @@ def list_unpriced_students(_: ManagerOrOwner, session: TenantSessionDep) -> Unpr
                 payer_person_id=row.payer_person_id,
                 payer_display_name=row.payer_display_name,
             )
-            for row in unpriced_students(session)
+            for row in unpriced_students(session, today=now().date())
         ]
     )
 

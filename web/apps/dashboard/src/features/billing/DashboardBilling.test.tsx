@@ -261,7 +261,20 @@ describe('3e — collections', () => {
     // M9's namespace, on M6's screen. Seam 3 exists so two LANES never touch one file.
     renderCollections()
     expect(screen.getByText(t(LOCALE, 'billing.debt.collectedThisMonth'))).toBeInTheDocument()
-    expect(screen.getByText('79% מהצפוי')).toBeInTheDocument()
+    // §3.3 -- the percentage is its own isolated left-to-right run (`PercentDisplay`), so
+    // it is no longer one bare string with the amount above it: asserted by combined
+    // content, the way a split run is asserted everywhere else in this codebase.
+    expect(screen.getByTestId('kpi-collected-share')).toHaveTextContent('79% מהצפוי')
+  })
+
+  it('isolates the collected-share percentage from the amount beside it', () => {
+    // §3.3 of the completion findings register: `MoneyDisplay`'s own amount sat directly
+    // beside an un-isolated percent note with no separator, and the bidi algorithm
+    // reordered the two digit runs into `0%₪0` instead of `₪0` then `0% מהצפוי`.
+    renderCollections()
+    const card = screen.getByTestId('kpi-collected-share')
+    expect(card.querySelector('bdi')).not.toBeNull()
+    expect(card.querySelector('bdi')).toHaveTextContent('79%')
   })
 })
 
@@ -597,6 +610,20 @@ describe('the payment-promise queue', () => {
     const rows = await screen.findAllByTestId('payment-promise-row')
     expect(within(rows[0]!).getByTestId('promise-method')).toHaveTextContent('מזומן')
     expect(within(rows[1]!).getByTestId('promise-method')).toHaveTextContent('צ׳קים')
+  })
+
+  it('names a single charge in the singular, not "1 חיובים"', async () => {
+    // §3.4 of the completion findings register.
+    renderPanel({
+      client: stub({
+        paymentPromises: vi
+          .fn()
+          .mockResolvedValue([managerPromise('r1', 'cash', { charge_count: 1 })]),
+      }),
+    })
+    const row = await screen.findByTestId('promise-charges')
+    expect(row).toHaveTextContent(t(LOCALE, 'billing.promise.manager.chargesOne'))
+    expect(row).not.toHaveTextContent('1 חיובים')
   })
 
   it('says whether the money is already in the drawer or still coming', async () => {
