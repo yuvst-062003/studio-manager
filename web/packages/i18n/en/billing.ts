@@ -58,6 +58,14 @@ export const billing: Bundle = {
   'cheque.pendingTitle': 'Waiting for the manager',
   'cheque.declined': 'The cheque request was declined — pay another way or talk to the manager.',
 
+  // -- decision 17 (2026-09-03) — "already paid" as a fifth, up-front answer, on par
+  // with the other four. Never offered for card, which already has its own record.
+  // The two chip strings are decision 19: a claim must never read as settled, and a
+  // not-yet-cleared standing order must not read as though nothing is left to do.
+  'alreadyPaid.methodQuestion': 'How did you pay?',
+  'chip.alreadyPaid': 'Already paid · {{method}} · pending club confirmation',
+  'chip.standingPending': 'Standing order · the club confirms once the mandate is set up',
+
   'prepay.termMonths': 'months forward',
   'prepay.openCharges': 'Open charges',
   'prepay.forward': 'Paid forward',

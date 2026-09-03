@@ -30,7 +30,8 @@
 //                     every month and nobody would notice until reconciliation.
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
-import { Alert, Button, Card, Checkbox, EmptyState, LoadFailed, MoneyDisplay, StatusChip } from '@studio/ui'
+import { Alert, Button, Card, EmptyState, LoadFailed, MoneyDisplay, StatusChip } from '@studio/ui'
+import type { ChipStatus } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { PaymentOverlay } from './PaymentOverlay'
@@ -49,6 +50,18 @@ import { selectionTotal } from './billingClient'
 const METHODS = ['card', 'cash', 'cheque', 'standing_order'] as const
 export type SetupMethod = (typeof METHODS)[number]
 
+/**
+ * Decision 17's follow-up to "כבר שילמתי" — מזומן / צ׳ק / הוראת קבע, never כרטיס אשראי:
+ * a card payment made in the app already has its own record, so there is nothing to
+ * claim there. `PromiseMethod` (billingClient.ts) already names exactly this set, so
+ * reusing it rather than a fourth hand-typed tuple keeps the two in one place.
+ */
+const ALREADY_PAID_METHODS = [
+  'cash',
+  'cheque',
+  'standing_order',
+] as const satisfies readonly PromiseMethod[]
+
 /** Every route except the card raises a promise a manager settles by hand. */
 export function isHandCarried(method: SetupMethod): method is PromiseMethod {
   return method !== 'card'
@@ -66,10 +79,14 @@ export type ChildRow = {
   charges: ChargeOut[]
   amountAgorot: number
   method: SetupMethod | null
-  /** Standing-order only: the parent's own claim that they already settled this
-   *  mandate outside the app (paid the manager directly, before it cleared). Purely
-   *  informational -- it changes no arithmetic and settles nothing; the manager still
-   *  confirms from their own reconciliation queue. */
+  /** Decision 17 -- "כבר שילמתי" is a TENSE, not a method: the parent's own claim that
+   *  this row's money already moved outside the app (handed to the manager directly,
+   *  or a mandate that was already set up), for whichever of `method`'s three
+   *  hand-carried routes they say it was. Purely informational -- it changes no
+   *  arithmetic and settles nothing; the manager still confirms from their own
+   *  reconciliation queue (decision 19). Never true when `method === 'card'`: the
+   *  already-paid follow-up never offers card, because a card payment made in the app
+   *  already has its own record. */
   alreadyPaid: boolean
 }
 
@@ -90,13 +107,117 @@ const rowStyle: CSSProperties = {
 
 const mutedStyle: CSSProperties = { color: 'var(--text-muted)' }
 
+const choicesStyle: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 'var(--space-2)',
+}
+
+/**
+ * Decision 19's chip table, read literally: a plain method chip for a row paying now,
+ * a claim chip (never reading as settled) for one marked "כבר שילמתי", and — because a
+ * הוראת קבע mandate is never instantly settled either — its own not-yet-cleared chip
+ * even when nobody has claimed anything. `{{method}}` is filled with the SAME label the
+ * plain chip would show, so the claim reuses one source of method names rather than a
+ * second copy that can drift from `schedule.plan.gate.method.*`.
+ */
+function chipFor(locale: Locale, row: ChildRow): { status: ChipStatus; label: string } {
+  const method = row.method ?? 'card'
+  if (row.alreadyPaid) {
+    return {
+      status: 'pending',
+      label: t(locale, 'billing.chip.alreadyPaid').replace(
+        '{{method}}',
+        t(locale, `schedule.plan.gate.method.${method}`),
+      ),
+    }
+  }
+  if (method === 'standing_order') {
+    return { status: 'pending', label: t(locale, 'billing.chip.standingPending') }
+  }
+  return { status: 'planned', label: t(locale, `schedule.plan.gate.method.${method}`) }
+}
+
+/**
+ * Decision 17's five-answer question -- כרטיס אשראי · הוראת קבע · מזומן · צ׳קים · כבר
+ * שילמתי -- shared between the family-wide ask and the per-child "שינוי" override
+ * (§4 step 4 point 4: "the same five options and the same follow-up"), so the two
+ * screens cannot silently drift into offering a different set.
+ */
+function PayHowChoices({
+  locale,
+  onAlreadyPaid,
+  onChoose,
+}: {
+  locale: Locale
+  onAlreadyPaid: () => void
+  onChoose: (method: SetupMethod) => void
+}) {
+  return (
+    <div style={choicesStyle}>
+      {METHODS.map((method) => (
+        <Button
+          data-testid={`setup-method-${method}`}
+          key={method}
+          onClick={() => onChoose(method)}
+          variant="secondary"
+        >
+          {t(locale, `schedule.plan.gate.method.${method}`)}
+        </Button>
+      ))}
+      <Button data-testid="setup-method-already_paid" onClick={onAlreadyPaid} variant="secondary">
+        {t(locale, 'schedule.plan.gate.paidAlready')}
+      </Button>
+    </div>
+  )
+}
+
+/**
+ * Decision 17's one follow-up -- "איך שילמתם?" -- מזומן / צ׳ק / הוראת קבע, never כרטיס
+ * אשראי (a card payment made in the app already has its own record). Shared for the
+ * same reason `PayHowChoices` is.
+ */
+function AlreadyPaidFollowUp({
+  locale,
+  onCancel,
+  onChoose,
+}: {
+  locale: Locale
+  onCancel: () => void
+  onChoose: (method: PromiseMethod) => void
+}) {
+  return (
+    <>
+      <p>{t(locale, 'billing.alreadyPaid.methodQuestion')}</p>
+      <div style={choicesStyle}>
+        {ALREADY_PAID_METHODS.map((method) => (
+          <Button
+            data-testid={`setup-claim-method-${method}`}
+            key={method}
+            onClick={() => onChoose(method)}
+            variant="secondary"
+          >
+            {t(locale, `schedule.plan.gate.method.${method}`)}
+          </Button>
+        ))}
+      </div>
+      <Button data-testid="setup-claim-cancel" onClick={onCancel} variant="ghost">
+        {t(locale, 'billing.dialog.cancel')}
+      </Button>
+    </>
+  )
+}
+
 /**
  * Group the payer's open charges by the child they are for.
  *
  * Exported and pure so the arithmetic is testable without a server: a two-child family's
  * summary is the one place a mistake here is invisible and expensive.
  */
-export function rowsFor(students: readonly SetupChild[], charges: readonly ChargeOut[]): ChildRow[] {
+export function rowsFor(
+  students: readonly SetupChild[],
+  charges: readonly ChargeOut[],
+): ChildRow[] {
   return students.map((child) => {
     const own = charges.filter((charge) => charge.student_id === child.id)
     return {
@@ -159,7 +280,12 @@ export function PaymentSetup({
   // Before this is true the screen asks once for the family. Child positions are used only
   // for overrides opened from the summary.
   const [familyAnswered, setFamilyAnswered] = useState(false)
+  // Decision 17 -- the family chose "כבר שילמתי" and is now on the one follow-up
+  // ("איך שילמתם?"), not yet counted as `familyAnswered`.
+  const [familyClaimPending, setFamilyClaimPending] = useState(false)
   const [index, setIndex] = useState<number | null>(null)
+  // Same follow-up, for the per-child "שינוי" override at `index`.
+  const [overrideClaimPending, setOverrideClaimPending] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   // F15, cause 1 — not an error. Set when `payByCard` meets the demo sentinel below:
@@ -195,27 +321,33 @@ export function PaymentSetup({
   }, [rows, payable.length, onNothingToPay])
   const current = familyAnswered && index !== null ? (payable[index] ?? null) : null
 
-  const choose = useCallback((childId: string, method: SetupMethod) => {
-    setRows((previous) =>
-      (previous ?? []).map((row) => (row.child.id === childId ? { ...row, method } : row)),
-    )
-    setIndex(null)
-  }, [])
-
-  const chooseForFamily = useCallback((method: SetupMethod) => {
+  // Decision 17 -- one child's answer, `alreadyPaid` set explicitly rather than left to
+  // default so a plain choice (card/cash/cheque/standing_order picked directly) and a
+  // claim (picked through the follow-up) can never be confused by an implicit default.
+  const choose = useCallback((childId: string, method: SetupMethod, alreadyPaid: boolean) => {
     setRows((previous) =>
       (previous ?? []).map((row) =>
-        row.amountAgorot > 0 ? { ...row, method } : row,
+        row.child.id === childId ? { ...row, method, alreadyPaid } : row,
       ),
     )
+    setIndex(null)
+    setOverrideClaimPending(false)
+  }, [])
+
+  const chooseForFamily = useCallback((method: SetupMethod, alreadyPaid: boolean) => {
+    setRows((previous) =>
+      (previous ?? []).map((row) => (row.amountAgorot > 0 ? { ...row, method, alreadyPaid } : row)),
+    )
     setFamilyAnswered(true)
+    setFamilyClaimPending(false)
     setIndex(null)
   }, [])
 
-  const toggleAlreadyPaid = useCallback((childId: string, alreadyPaid: boolean) => {
-    setRows((previous) =>
-      (previous ?? []).map((row) => (row.child.id === childId ? { ...row, alreadyPaid } : row)),
-    )
+  // "שינוי" on a summary row -- always starts a fresh five-option ask, never mid-way
+  // through a stale follow-up left over from a previous override.
+  const openOverride = useCallback((idx: number) => {
+    setOverrideClaimPending(false)
+    setIndex(idx)
   }, [])
 
   function run(action: () => Promise<void>) {
@@ -278,8 +410,8 @@ export function PaymentSetup({
     )
   }
 
-  // -- one method for the family -------------------------------------------
-  if (!familyAnswered) {
+  // -- one answer for the family, decision 17's five options -----------------
+  if (!familyAnswered && !familyClaimPending) {
     const multiple = payable.length > 1
     return (
       <div style={pageStyle} data-testid="payment-setup">
@@ -290,17 +422,33 @@ export function PaymentSetup({
         <Card>
           <h2>{t(locale, 'schedule.plan.gate.payHow')}</h2>
           {multiple ? <p style={mutedStyle}>{t(locale, 'schedule.setup.familyApplies')}</p> : null}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-            {METHODS.map((method) => (
-              <Button
-                data-testid={`setup-method-${method}`}
-                key={method}
-                onClick={() => chooseForFamily(method)}
-                variant="secondary"
-              >
-                {t(locale, `schedule.plan.gate.method.${method}`)}
-              </Button>
-            ))}
+          <PayHowChoices
+            locale={locale}
+            onAlreadyPaid={() => setFamilyClaimPending(true)}
+            onChoose={(method) => chooseForFamily(method, false)}
+          />
+        </Card>
+        <Button data-testid="setup-later" onClick={onFinish} variant="ghost">
+          {t(locale, 'schedule.plan.gate.later')}
+        </Button>
+      </div>
+    )
+  }
+
+  // -- the family chose כבר שילמתי; one follow-up, for the whole family ------
+  if (!familyAnswered && familyClaimPending) {
+    return (
+      <div style={pageStyle} data-testid="payment-setup">
+        <Card>
+          <h1>{t(locale, 'schedule.setup.title')}</h1>
+        </Card>
+        <Card>
+          <div data-testid="setup-claim-family">
+            <AlreadyPaidFollowUp
+              locale={locale}
+              onCancel={() => setFamilyClaimPending(false)}
+              onChoose={(method) => chooseForFamily(method, true)}
+            />
           </div>
         </Card>
         <Button data-testid="setup-later" onClick={onFinish} variant="ghost">
@@ -310,8 +458,8 @@ export function PaymentSetup({
     )
   }
 
-  // -- one child override ---------------------------------------------------
-  if (current) {
+  // -- one child override ("שינוי"), the same five options --------------------
+  if (current && !overrideClaimPending) {
     return (
       <div style={pageStyle} data-testid="payment-setup">
         <Card>
@@ -327,22 +475,44 @@ export function PaymentSetup({
         <Card>
           <div data-testid={`setup-ask-${current.child.id}`}>
             <h2>{t(locale, 'schedule.plan.gate.payHow')}</h2>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-              {METHODS.map((method) => (
-                <Button
-                  data-testid={`setup-method-${method}`}
-                  key={method}
-                  onClick={() => choose(current.child.id, method)}
-                  variant="secondary"
-                >
-                  {t(locale, `schedule.plan.gate.method.${method}`)}
-                </Button>
-              ))}
-            </div>
+            <PayHowChoices
+              locale={locale}
+              onAlreadyPaid={() => setOverrideClaimPending(true)}
+              onChoose={(method) => choose(current.child.id, method, false)}
+            />
           </div>
         </Card>
         {/* Never a dead end. An outstanding month must not cost a family the app they use
             to find out when their child trains. */}
+        <Button data-testid="setup-later" onClick={onFinish} variant="ghost">
+          {t(locale, 'schedule.plan.gate.later')}
+        </Button>
+      </div>
+    )
+  }
+
+  // -- one child override, כבר שילמתי chosen; the same one follow-up ---------
+  if (current && overrideClaimPending) {
+    return (
+      <div style={pageStyle} data-testid="payment-setup">
+        <Card>
+          <h1>{t(locale, 'schedule.setup.title')}</h1>
+          <p style={rowStyle}>
+            <strong>
+              <bdi>{current.child.first_name}</bdi>
+            </strong>
+            <MoneyDisplay agorot={current.amountAgorot} label={current.child.first_name} />
+          </p>
+        </Card>
+        <Card>
+          <div data-testid={`setup-claim-${current.child.id}`}>
+            <AlreadyPaidFollowUp
+              locale={locale}
+              onCancel={() => setOverrideClaimPending(false)}
+              onChoose={(method) => choose(current.child.id, method, true)}
+            />
+          </div>
+        </Card>
         <Button data-testid="setup-later" onClick={onFinish} variant="ghost">
           {t(locale, 'schedule.plan.gate.later')}
         </Button>
@@ -355,6 +525,13 @@ export function PaymentSetup({
   const cardCharges = cardRows.flatMap((row) => row.charges)
   const cardTotal = selectionTotal(cardCharges)
   const standingRows = payable.filter((row) => row.method === 'standing_order')
+  // Decision 15/16 -- a child who has claimed "כבר שילמתי · הוראת קבע" is never in the
+  // mandate-link queue below: they have said the mandate already exists, and handing
+  // them a link to create a second one is how a family ends up paying twice a month.
+  // `standingRows` itself stays unfiltered -- `recordStandingOrder()` below still needs
+  // every standing-order row, claimed or not, to write the (method, already_paid) split
+  // decision 18 requires.
+  const standingLinkQueueRows = standingRows.filter((row) => !row.alreadyPaid)
   const handRows = payable.filter((row) => row.method === 'cash' || row.method === 'cheque')
 
   async function payByCard() {
@@ -391,13 +568,23 @@ export function PaymentSetup({
   }
 
   async function tellTheManager() {
-    // One promise per METHOD, not per child: the manager settles "the Cohen family's cash"
-    // in one action, and two rows for one handover is two things to tick off.
+    // Decision 18 / F20's second half -- grouped by (method, already_paid), never by
+    // method alone: a claimed cash payment and an expected one are two promises, the
+    // same way `recordStandingOrder()` below already splits standing-order rows. Lumping
+    // them into one `createPromise` call would file the claim as `already_paid: false`
+    // and lose it -- the manager would chase money that already arrived.
     for (const method of ['cash', 'cheque'] as const) {
-      const ids = handRows
-        .filter((row) => row.method === method)
-        .flatMap((row) => row.charges.map((charge) => charge.id))
-      if (ids.length > 0) await client.createPromise(ids, method, 0)
+      const forMethod = handRows.filter((row) => row.method === method)
+      const claimed = forMethod.filter((row) => row.alreadyPaid)
+      const pending = forMethod.filter((row) => !row.alreadyPaid)
+      if (claimed.length > 0) {
+        const ids = claimed.flatMap((row) => row.charges.map((charge) => charge.id))
+        await client.createPromise(ids, method, 0, true)
+      }
+      if (pending.length > 0) {
+        const ids = pending.flatMap((row) => row.charges.map((charge) => charge.id))
+        await client.createPromise(ids, method, 0, false)
+      }
     }
     setHandSent(true)
   }
@@ -459,13 +646,12 @@ export function PaymentSetup({
             {row.amountAgorot > 0 ? (
               <>
                 <MoneyDisplay agorot={row.amountAgorot} label={row.child.first_name} />
-                <StatusChip
-                  status="planned"
-                  label={t(locale, `schedule.plan.gate.method.${row.method ?? 'card'}`)}
-                />
+                <StatusChip {...chipFor(locale, row)} />
                 <Button
                   data-testid={`setup-change-${row.child.id}`}
-                  onClick={() => setIndex(payable.findIndex((p) => p.child.id === row.child.id))}
+                  onClick={() =>
+                    openOverride(payable.findIndex((p) => p.child.id === row.child.id))
+                  }
                   variant="ghost"
                 >
                   {t(locale, 'schedule.setup.change')}
@@ -515,61 +701,51 @@ export function PaymentSetup({
         </Card>
       ) : null}
 
-      {standingRows.length > 0 ? (
+      {standingLinkQueueRows.length > 0 ? (
         <Card>
           <div data-testid="setup-standing">
             <h2>{t(locale, 'schedule.setup.standingTitle')}</h2>
             {/* Why there is a link each, said on the screen: a mandate is signed for a
                 fixed amount, so one link for two children underpays for one of them every
-                month until reconciliation notices. */}
+                month until reconciliation notices. A child who claimed "כבר שילמתי ·
+                הוראת קבע" (decision 15/16) never reaches this list -- they said the
+                mandate already exists, and a link here would offer to create a second
+                one. */}
             <p style={mutedStyle}>{t(locale, 'schedule.setup.standingHint')}</p>
-            {standingRows.map((row) => {
+            {standingLinkQueueRows.map((row) => {
               const link = standingOrderLinks.find(
                 (candidate) => candidate.studentId === row.child.id,
               )
               return (
-                <div key={row.child.id} style={{ display: 'flex', flexDirection: 'column' }}>
-                  <div style={rowStyle}>
-                    <span style={{ flex: 1, minInlineSize: 0 }}>
-                      <bdi>{row.child.first_name}</bdi>
+                <div key={row.child.id} style={rowStyle}>
+                  <span style={{ flex: 1, minInlineSize: 0 }}>
+                    <bdi>{row.child.first_name}</bdi>
+                  </span>
+                  <MoneyDisplay agorot={row.amountAgorot} label={row.child.first_name} />
+                  {link ? (
+                    <Button
+                      // Two controls reading the same words are two links a screen reader
+                      // cannot tell apart, and telling them apart is the whole point here.
+                      aria-label={t(locale, 'schedule.setup.linkFor').replace(
+                        '{name}',
+                        row.child.first_name,
+                      )}
+                      data-testid={`setup-standing-link-${row.child.id}`}
+                      // 2026-09-03 addendum -- opens in the in-app overlay instead of a
+                      // new tab. §7.2's old failure mode (following the link navigated
+                      // the ONE tab the join wizard runs in away, restarting it on
+                      // return) is exactly what the overlay exists to prevent.
+                      onClick={() => setOverlay({ kind: 'link', url: link.url })}
+                      type="button"
+                      variant="ghost"
+                    >
+                      {t(locale, 'billing.standingOrder.link')}
+                    </Button>
+                  ) : (
+                    <span style={mutedStyle}>
+                      {t(locale, 'billing.standingOrder.notConfirmable')}
                     </span>
-                    <MoneyDisplay agorot={row.amountAgorot} label={row.child.first_name} />
-                    {link ? (
-                      <Button
-                        // Two controls reading the same words are two links a screen reader
-                        // cannot tell apart, and telling them apart is the whole point here.
-                        aria-label={t(locale, 'schedule.setup.linkFor').replace(
-                          '{name}',
-                          row.child.first_name,
-                        )}
-                        data-testid={`setup-standing-link-${row.child.id}`}
-                        // 2026-09-03 addendum -- opens in the in-app overlay instead of a
-                        // new tab. §7.2's old failure mode (following the link navigated
-                        // the ONE tab the join wizard runs in away, restarting it on
-                        // return) is exactly what the overlay exists to prevent.
-                        onClick={() => setOverlay({ kind: 'link', url: link.url })}
-                        type="button"
-                        variant="ghost"
-                      >
-                        {t(locale, 'billing.standingOrder.link')}
-                      </Button>
-                    ) : (
-                      <span style={mutedStyle}>
-                        {t(locale, 'billing.standingOrder.notConfirmable')}
-                      </span>
-                    )}
-                  </div>
-                  {/* The parent's own claim that this mandate was already settled
-                      outside the app -- e.g. handed to the manager in person before it
-                      cleared. Purely informational: it changes no arithmetic here, and
-                      it is the manager's own confirm/decline action, not this checkbox,
-                      that ever marks money as actually received. */}
-                  <Checkbox
-                    checked={row.alreadyPaid}
-                    data-testid={`setup-standing-already-paid-${row.child.id}`}
-                    label={t(locale, 'schedule.plan.alreadyPaid')}
-                    onChange={(event) => toggleAlreadyPaid(row.child.id, event.target.checked)}
-                  />
+                  )}
                 </div>
               )
             })}

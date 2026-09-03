@@ -2,6 +2,11 @@
 //
 // Owner design, 2026-08-30: a payment method per kid, then one summary — card in one
 // checkout, a הוראת קבע link per kid, cash and cheques told to the manager.
+//
+// Decision 17 (2026-09-03) made "כבר שילמתי" a fifth, up-front answer -- offered
+// alongside the other four rather than a checkbox buried under standing-order rows --
+// and decision 18/19 generalised the (method, already_paid) split and the "never reads
+// as settled" chip wording to every hand-carried route, not just standing order.
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
@@ -38,7 +43,9 @@ function charge(id: string, studentId: string, amount: number): ChargeOut {
 
 function stub(overrides: Partial<BillingClient> = {}): BillingClient {
   return {
-    openCharges: vi.fn().mockResolvedValue([charge('c1', 's1', 30_000), charge('c2', 's2', 40_000)]),
+    openCharges: vi
+      .fn()
+      .mockResolvedValue([charge('c1', 's1', 30_000), charge('c2', 's2', 40_000)]),
     promises: vi.fn().mockResolvedValue([]),
     createPromise: vi.fn().mockResolvedValue(undefined),
     balance: vi.fn(),
@@ -69,9 +76,22 @@ function setup(props: Partial<Parameters<typeof PaymentSetup>[0]> = {}) {
   )
 }
 
-/** Answer for the current setup question. */
+/** Answer for the current setup question (family or per-child override) with one of the
+ *  four plain methods -- never "already paid", which has its own follow-up. */
 async function answer(method: string) {
   await userEvent.click(await screen.findByTestId(`setup-method-${method}`))
+}
+
+/** Decision 17's fifth choice, from whichever screen (family or override) is open:
+ *  "כבר שילמתי" then the one follow-up, מזומן / צ׳ק / הוראת קבע. */
+async function claimAlreadyPaid(method: 'cash' | 'cheque' | 'standing_order') {
+  await userEvent.click(await screen.findByTestId('setup-method-already_paid'))
+  await userEvent.click(await screen.findByTestId(`setup-claim-method-${method}`))
+}
+
+/** Opens the per-row "שינוי" override for one child from the summary. */
+async function change(childId: string) {
+  await userEvent.click(await screen.findByTestId(`setup-change-${childId}`))
 }
 
 describe('the onboarding payment step', () => {
@@ -173,9 +193,7 @@ describe('the onboarding payment step', () => {
     const second = screen.getByTestId('setup-standing-link-s2')
     // Told apart by name, because two controls with the same words are two links a screen
     // reader cannot distinguish.
-    expect(first).toHaveAccessibleName(
-      t('he', 'schedule.setup.linkFor').replace('{name}', 'דנה'),
-    )
+    expect(first).toHaveAccessibleName(t('he', 'schedule.setup.linkFor').replace('{name}', 'דנה'))
     // Nothing is charged by this route, so no card total appears.
     expect(screen.queryByTestId('setup-card')).toBeNull()
 
@@ -189,9 +207,10 @@ describe('the onboarding payment step', () => {
     expect(iframe2.src).toBe('https://app.upay.co.il/r/400')
   })
 
-  it('tells the manager about cash and cheques, one promise per method', async () => {
+  it('tells the manager about cash and cheques, one promise per method, when nobody has claimed already-paid', async () => {
     // The manager settles "the family's cash" in one action; a row per child would be two
-    // things to tick off for one handover.
+    // things to tick off for one handover. Decision 18 always splits by (method,
+    // already_paid), so the ordinary case is a single `already_paid: false` promise.
     const createPromise = vi.fn().mockResolvedValue(undefined)
     setup({ client: stub({ createPromise }) })
 
@@ -199,8 +218,28 @@ describe('the onboarding payment step', () => {
     await userEvent.click(await screen.findByTestId('setup-tell-manager'))
 
     await waitFor(() => expect(createPromise).toHaveBeenCalledTimes(1))
-    expect(createPromise).toHaveBeenCalledWith(['c1', 'c2'], 'cash', 0)
+    expect(createPromise).toHaveBeenCalledWith(['c1', 'c2'], 'cash', 0, false)
     expect(screen.getByTestId('setup-hand-sent')).toBeInTheDocument()
+  })
+
+  it('F20 / decision 18 — splits cash into two promises when one child claimed already-paid and the other has not', async () => {
+    // Today `tellTheManager()` grouped by method alone, so a claimed payment and an
+    // expected one, both cash, would merge into one promise reporting `already_paid:
+    // false` — losing the claim entirely. This drives the real client call, not a
+    // hand-built grouping check, the same way `recordStandingOrder()` was already
+    // proven for standing order below.
+    const createPromise = vi.fn().mockResolvedValue(undefined)
+    setup({ client: stub({ createPromise }) })
+
+    await answer('cash') // family: both children pay cash, nobody has claimed yet
+    await change('s1')
+    await claimAlreadyPaid('cash') // s1 alone claims "already paid, cash"
+
+    await userEvent.click(await screen.findByTestId('setup-tell-manager'))
+
+    await waitFor(() => expect(createPromise).toHaveBeenCalledTimes(2))
+    expect(createPromise).toHaveBeenCalledWith(['c1'], 'cash', 0, true)
+    expect(createPromise).toHaveBeenCalledWith(['c2'], 'cash', 0, false)
   })
 
   it('carries a different method per child through to the summary', async () => {
@@ -209,7 +248,7 @@ describe('the onboarding payment step', () => {
     setup({ client: stub({ createOrder }) })
 
     await answer('card')
-    await userEvent.click(await screen.findByTestId('setup-change-s2'))
+    await change('s2')
     await answer('standing_order')
 
     // Only the card child is in the checkout, at their own price.
@@ -224,7 +263,7 @@ describe('the onboarding payment step', () => {
   it('lets a family change an answer from the summary', async () => {
     setup()
     await answer('card')
-    await userEvent.click(await screen.findByTestId('setup-change-s1'))
+    await change('s1')
     // Back on that child's question, not the other's.
     expect(await screen.findByTestId('setup-ask-s1')).toBeInTheDocument()
   })
@@ -233,7 +272,9 @@ describe('the onboarding payment step', () => {
     // `register` prices a child only when exactly one live plan matches their weekly
     // volume. Zero or two leaves them unpriced, on the manager's checklist — and a row
     // silently missing from this summary is the one nobody chases.
-    setup({ client: stub({ openCharges: vi.fn().mockResolvedValue([charge('c1', 's1', 30_000)]) }) })
+    setup({
+      client: stub({ openCharges: vi.fn().mockResolvedValue([charge('c1', 's1', 30_000)]) }),
+    })
     await answer('card')
     expect(await screen.findByTestId('setup-unpriced-s2')).toHaveTextContent(
       t('he', 'schedule.setup.unpriced'),
@@ -252,7 +293,7 @@ describe('the onboarding payment step', () => {
     const onSummary = vi.fn()
     setup({ onSummary })
     await answer('card')
-    await userEvent.click(await screen.findByTestId('setup-change-s2'))
+    await change('s2')
     await answer('cash')
     await userEvent.click(screen.getByTestId('setup-finish'))
 
@@ -283,14 +324,14 @@ describe('the onboarding payment step', () => {
   it('lets a parent mark a standing-order child as already paid outside the app, separately from the rest', async () => {
     // A family who paid the manager directly (cash in hand, before the mandate cleared)
     // still needs the manager to see and verify that claim -- distinctly from a child
-    // whose mandate is still just expected.
+    // whose mandate is still just expected. Decision 17 moved this from a checkbox under
+    // the mandate-link card to the same up-front "כבר שילמתי" flow every method gets.
     const createPromise = vi.fn().mockResolvedValue(undefined)
     setup({ client: stub({ createPromise }) })
 
     await answer('standing_order')
-    await userEvent.click(
-      await screen.findByTestId('setup-standing-already-paid-s1'),
-    )
+    await change('s1')
+    await claimAlreadyPaid('standing_order')
     await userEvent.click(screen.getByTestId('setup-finish'))
 
     await waitFor(() => expect(createPromise).toHaveBeenCalledTimes(2))
@@ -305,13 +346,13 @@ describe('the onboarding payment step', () => {
     setup({ client: stub({ createPromise }) })
 
     await answer('card')
-    await userEvent.click(await screen.findByTestId('setup-change-s2'))
+    await change('s2')
     await answer('standing_order')
-    await userEvent.click(screen.getByTestId('setup-change-s1'))
+    await change('s1')
     await answer('cash')
 
     await userEvent.click(await screen.findByTestId('setup-tell-manager'))
-    await waitFor(() => expect(createPromise).toHaveBeenCalledWith(['c1'], 'cash', 0))
+    await waitFor(() => expect(createPromise).toHaveBeenCalledWith(['c1'], 'cash', 0, false))
 
     await userEvent.click(screen.getByTestId('setup-finish'))
     await waitFor(() =>
@@ -377,5 +418,146 @@ describe('the onboarding payment step', () => {
     for (const control of screen.getAllByRole('button')) {
       expect(control).toHaveAccessibleName()
     }
+  })
+
+  // -- decision 17 — "כבר שילמתי" as a real, up-front fifth choice ------------------------
+
+  describe('decision 17 — "כבר שילמתי" as a fifth, up-front family choice', () => {
+    it('is offered alongside the other four, before any price is read, and asks one follow-up that never offers כרטיס אשראי', async () => {
+      setup()
+
+      // The fifth choice sits next to the other four on the very first screen.
+      expect(await screen.findByTestId('setup-method-card')).toBeInTheDocument()
+      expect(screen.getByTestId('setup-method-cash')).toBeInTheDocument()
+      expect(screen.getByTestId('setup-method-cheque')).toBeInTheDocument()
+      expect(screen.getByTestId('setup-method-standing_order')).toBeInTheDocument()
+      const alreadyPaidButton = screen.getByTestId('setup-method-already_paid')
+      expect(alreadyPaidButton).toHaveTextContent(t('he', 'schedule.plan.gate.paidAlready'))
+
+      await userEvent.click(alreadyPaidButton)
+
+      // The one follow-up — איך שילמתם — offers exactly the three hand-carried routes.
+      expect(
+        await screen.findByText(t('he', 'billing.alreadyPaid.methodQuestion')),
+      ).toBeInTheDocument()
+      expect(screen.getByTestId('setup-claim-method-cash')).toBeInTheDocument()
+      expect(screen.getByTestId('setup-claim-method-cheque')).toBeInTheDocument()
+      expect(screen.getByTestId('setup-claim-method-standing_order')).toBeInTheDocument()
+      expect(screen.queryByTestId('setup-claim-method-card')).toBeNull()
+      expect(screen.queryByTestId(/^setup-method-(?!already_paid)/)).toBeNull()
+    })
+
+    it('stores method + already_paid: true for every payable child once the follow-up is answered', async () => {
+      setup()
+      await claimAlreadyPaid('cheque')
+
+      const expectedChip = t('he', 'billing.chip.alreadyPaid').replace(
+        '{{method}}',
+        t('he', 'schedule.plan.gate.method.cheque'),
+      )
+      expect(await screen.findByTestId('setup-row-s1')).toHaveTextContent(expectedChip)
+      expect(screen.getByTestId('setup-row-s2')).toHaveTextContent(expectedChip)
+    })
+
+    it('can be cancelled back to the five-choice screen without answering', async () => {
+      setup()
+      await userEvent.click(await screen.findByTestId('setup-method-already_paid'))
+      await userEvent.click(await screen.findByTestId('setup-claim-cancel'))
+      expect(await screen.findByTestId('setup-method-already_paid')).toBeInTheDocument()
+      expect(screen.queryByTestId('setup-claim-method-cash')).toBeNull()
+    })
+
+    it('lets a per-row "שינוי" override diverge into an already-paid claim independently of the family choice', async () => {
+      const createPromise = vi.fn().mockResolvedValue(undefined)
+      setup({ client: stub({ createPromise }) })
+
+      await answer('card') // family: everyone pays by card
+      await change('s2')
+      await claimAlreadyPaid('cheque') // s2 alone claims "already paid, cheque"
+
+      // s1 is still the only card child.
+      expect(await screen.findByTestId('setup-card')).toHaveTextContent('300')
+      const expectedChip = t('he', 'billing.chip.alreadyPaid').replace(
+        '{{method}}',
+        t('he', 'schedule.plan.gate.method.cheque'),
+      )
+      expect(screen.getByTestId('setup-row-s2')).toHaveTextContent(expectedChip)
+
+      await userEvent.click(await screen.findByTestId('setup-tell-manager'))
+      await waitFor(() => expect(createPromise).toHaveBeenCalledWith(['c2'], 'cheque', 0, true))
+    })
+  })
+
+  // -- decision 19 — the exact chip wording per §4's table ------------------------------
+
+  describe('decision 19 — a claimed payment never reads as settled', () => {
+    it('renders the plain method chip for a row paying now', async () => {
+      setup()
+      await answer('cash')
+      expect(await screen.findByTestId('setup-row-s1')).toHaveTextContent(
+        t('he', 'schedule.plan.gate.method.cash'),
+      )
+    })
+
+    it('renders "כבר שולם · מזומן · ממתין לאישור המועדון" for an already-paid cash row', async () => {
+      setup()
+      await claimAlreadyPaid('cash')
+      const expected = t('he', 'billing.chip.alreadyPaid').replace(
+        '{{method}}',
+        t('he', 'schedule.plan.gate.method.cash'),
+      )
+      expect(expected).toBe('כבר שולם · מזומן · ממתין לאישור המועדון')
+      expect(await screen.findByTestId('setup-row-s1')).toHaveTextContent(expected)
+      expect(screen.getByTestId('setup-row-s2')).toHaveTextContent(expected)
+    })
+
+    it('renders "הוראת קבע · המועדון יאשר לאחר קליטת ההוראה" for a not-yet-cleared standing-order row', async () => {
+      setup()
+      await answer('standing_order')
+      expect(t('he', 'billing.chip.standingPending')).toBe(
+        'הוראת קבע · המועדון יאשר לאחר קליטת ההוראה',
+      )
+      expect(await screen.findByTestId('setup-row-s1')).toHaveTextContent(
+        t('he', 'billing.chip.standingPending'),
+      )
+      expect(screen.getByTestId('setup-row-s2')).toHaveTextContent(
+        t('he', 'billing.chip.standingPending'),
+      )
+    })
+  })
+
+  // -- decision 15/16 regression — a claim never re-enters the mandate-link queue -------
+
+  describe('decision 15/16 — a claimed standing-order child is never in the mandate-link queue', () => {
+    it('excludes only the claimed child, while an unclaimed sibling still gets their link', async () => {
+      setup()
+      await answer('standing_order')
+      await change('s1')
+      await claimAlreadyPaid('standing_order')
+
+      // s1 claimed the mandate already exists; s2 has not.
+      expect(screen.queryByTestId('setup-standing-link-s1')).toBeNull()
+      expect(await screen.findByTestId('setup-standing-link-s2')).toBeInTheDocument()
+    })
+
+    it('hides the mandate-link card entirely once every standing-order child has claimed', async () => {
+      setup()
+      await claimAlreadyPaid('standing_order')
+      // Both children are already-paid standing order — no links to offer at all.
+      await screen.findByTestId('setup-row-s1')
+      expect(screen.queryByTestId('setup-standing')).toBeNull()
+    })
+
+    it('still writes a promise for the claimed child even though they are off the link queue', async () => {
+      const createPromise = vi.fn().mockResolvedValue(undefined)
+      setup({ client: stub({ createPromise }) })
+
+      await claimAlreadyPaid('standing_order')
+      await userEvent.click(screen.getByTestId('setup-finish'))
+
+      await waitFor(() =>
+        expect(createPromise).toHaveBeenCalledWith(['c1', 'c2'], 'standing_order', 0, true),
+      )
+    })
   })
 })

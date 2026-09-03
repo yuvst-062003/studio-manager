@@ -94,6 +94,16 @@ export const billing: Bundle = {
   'cheque.pendingTitle': 'ממתין לאישור המנהל',
   'cheque.declined': 'בקשת התשלום בצ׳קים נדחתה — אפשר לשלם בדרך אחרת או לדבר עם המנהל.',
 
+  // -- decision 17 (2026-09-03) — "כבר שילמתי" as a fifth, up-front answer to "איך
+  // תשלמו", on par with the other four. Choosing it asks this one follow-up -- never
+  // כרטיס אשראי, because a card payment made in the app already has its own record --
+  // and the two chip strings below are decision 19: a claimed row must never read as
+  // settled, and a not-yet-cleared הוראת קבע row must not read as though nothing is
+  // left to do.
+  'alreadyPaid.methodQuestion': 'איך שילמתם?',
+  'chip.alreadyPaid': 'כבר שולם · {{method}} · ממתין לאישור המועדון',
+  'chip.standingPending': 'הוראת קבע · המועדון יאשר לאחר קליטת ההוראה',
+
   // One live promise at a time, across both routes — the service refuses a second, so the
   // other card says why rather than offering a button that answers 409.
   // Prepayment -- the club collects three months of cash or twelve cheques at a time.
