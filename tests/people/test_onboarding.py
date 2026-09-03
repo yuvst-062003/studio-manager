@@ -987,6 +987,7 @@ _HEALTH_ANSWERS = {
     "diabetes": False,
     "injury": False,
     "other": False,
+    "health_fund": "מכבי",
     "emergency_contact": "050-0000000",
     "clause_confirmed": "none",
 }
@@ -1081,6 +1082,84 @@ def test_the_register_endpoint_carries_health_and_club_terms_in_one_call(
     ).scalar_one()
     assert club_terms.version == CLUB_TERMS_VERSION
     assert club_terms.granted is True
+
+
+# -- F14: קופת חולים is now required, not merely offered -----------------------
+def test_the_register_endpoint_refuses_a_declaration_missing_health_fund(
+    client, fake_provider, app_session, studio, a_group, twice_weekly, a_live_plan, as_manager
+):
+    """§4 step 3: 'קופת חולים (now required) + טלפון חירום'. This is the layer that
+    actually governs the flag -- `app/services/structure/health_templates.py`'s
+    `required: True` only matters because `required_question_ids`
+    (`app/services/health/declarations.py`) reads it off the template row `register`
+    validates against, at the same seam as the round-trip test above. Fresh studio, so
+    `ensure_full_template` seeds it from the live constant rather than a migration-frozen
+    row -- see the C3 report for why that distinction matters for a studio that already
+    existed before this change.
+    """
+    from app.services.structure.health_templates import ensure_full_template
+
+    template = ensure_full_template(app_session, studio.id, at=T0)
+    app_session.commit()
+
+    created = client.post("/api/v1/onboarding-link", headers=as_manager.headers)
+    token = created.json()["url"].rsplit("/join/", 1)[1]
+
+    from app.routers import onboarding as onboarding_router
+
+    monkeypatch_target = onboarding_router.ScheduleService
+    try:
+        onboarding_router.ScheduleService = lambda session: twice_weekly  # type: ignore[assignment]
+
+        client.cookies.clear()
+        subject = f"health-fund-required-{uuid.uuid4()}"
+        fake_provider.register(
+            code="c-health-fund-1", subject=subject, email=f"{subject}@example.invalid"
+        )
+        signed = sign_in(client, code="c-health-fund-1").json()
+        headers = {"Authorization": f"Bearer {signed['access_token']}"}
+
+        answers_without_health_fund = {
+            k: v for k, v in _HEALTH_ANSWERS.items() if k != "health_fund"
+        }
+        response = client.post(
+            f"/api/v1/onboarding/{token}/register",
+            headers=headers,
+            json={
+                "first_name": "שירה",
+                "last_name": "לוי",
+                "phone": "050-1234567",
+                "club_terms_accepted": True,
+                "signer": {
+                    "national_id": "100000017",
+                    "address": "הרצל 12",
+                    "city": "רעננה",
+                    "relation": "mother",
+                },
+                "children": [
+                    {
+                        "first_name": "נועה",
+                        "last_name": "לוי",
+                        "birthdate": "2016-04-01",
+                        "group_ids": [str(a_group)],
+                        "national_id": "100000009",
+                        "grade": "ד",
+                        "health": {
+                            "template_id": str(template.id),
+                            "answers": answers_without_health_fund,
+                            "signature_image_base64": _ONE_PIXEL_PNG_B64,
+                        },
+                    }
+                ],
+            },
+        )
+    finally:
+        onboarding_router.ScheduleService = monkeypatch_target
+
+    assert response.status_code == 422, response.text
+    detail = response.json()["detail"]
+    assert detail["code"] == "answers_incomplete"
+    assert "health_fund" in detail["message"]
 
 
 # -- B2: an edited group/plan on resubmission (§8 open item 3) -----------------

@@ -211,6 +211,30 @@ def test_the_schema_is_versioned_so_a_signature_records_what_was_signed():
     assert FULL_TEMPLATE_SCHEMA["kind"] == "full"
 
 
+def test_health_fund_is_required():
+    """F14 / spec §4 step 3: 'קופת חולים (now required) + טלפון חירום'. Was `required:
+    False`.
+
+    **This constant is necessary but not sufficient for every studio.** `ensure_full_template`
+    is idempotent by `(studio_id, kind, version)` (the tests above), and revision 0018 already
+    froze a `required: False` copy of this exact section into `health_form_template` for every
+    studio that existed when it ran. Flipping the flag here reaches a studio provisioned from
+    now on (`ensure_full_template` at `provision_studio` time) and the demo studio (wiped and
+    reseeded from this live constant on every reset, `app/services/demo/fixtures.py`
+    `_seed_health_templates`) -- it does NOT retroactively change the JSONB `schema` column
+    already on disk for a studio provisioned before this change, because the version number
+    (2) did not move and the idempotency check finds that row and returns it unchanged. Making
+    it retroactive for an already-provisioned studio needs either a migration (out of scope
+    here -- SPEC §6 "no migration anywhere" for this build) or that studio's own manager
+    re-publishing the template through the D11 editor. See
+    `tests/people/test_onboarding.py::test_the_register_endpoint_refuses_a_declaration_missing_health_fund`
+    for the layer that actually enforces this at submit time, for a freshly-provisioned
+    studio.
+    """
+    health_fund = next(q for q in _questions() if q["id"] == "health_fund")
+    assert health_fund["required"] is True
+
+
 def test_the_schema_carries_no_place_for_an_answer():
     """The template holds questions. Anything resembling storage for a response belongs on
     health_declaration, encrypted (11.1)."""

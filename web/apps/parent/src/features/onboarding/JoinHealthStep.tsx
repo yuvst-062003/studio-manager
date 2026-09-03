@@ -172,6 +172,14 @@ function SubjectHealthFlow({
       <Card>
         {healthFundQuestion ? (
           <TextField
+            error={
+              // Driven by the schema's own flag (F14 flipped it to `true`), not hardcoded --
+              // a studio's manager can still edit this question back to optional through the
+              // D11 template editor, and this field must follow that, not fight it.
+              showErrors && healthFundQuestion.required && !draft.answers.health_fund
+                ? t(locale, 'people.join.required')
+                : undefined
+            }
             label={healthFundQuestion.label}
             onChange={(event) => updateAnswers({ ...draft.answers, health_fund: event.target.value })}
             value={typeof draft.answers.health_fund === 'string' ? draft.answers.health_fund : ''}

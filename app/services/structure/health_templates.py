@@ -278,7 +278,7 @@ FULL_TEMPLATE_SCHEMA: dict[str, Any] = {
                     "required": False,
                     "visible_if": {"other": True},
                 },
-                {"id": "health_fund", "type": "text", "label": "קופת חולים", "required": False},
+                {"id": "health_fund", "type": "text", "label": "קופת חולים", "required": True},
                 {
                     "id": "emergency_contact",
                     "type": "phone",

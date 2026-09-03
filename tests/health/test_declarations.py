@@ -32,6 +32,12 @@ ANSWERS = {
     "diabetes": False,
     "injury": False,
     "other": False,
+    # F14 / decision "step 3": health_fund flipped to required in
+    # app/services/structure/health_templates.py. This fixture is imported by every other
+    # file in this directory that submits a full-template declaration, so one addition here
+    # keeps all of them answering a now-required question rather than each guessing its own
+    # placeholder.
+    "health_fund": "מכבי",
     "emergency_contact": "050-0000000",
     # Template v2. `fit_to_train` and `notify_changes` were v1's paraphrase of the club's own
     # two sentences; the club's `טופס הרשמה` supplies the sentences themselves, and which of

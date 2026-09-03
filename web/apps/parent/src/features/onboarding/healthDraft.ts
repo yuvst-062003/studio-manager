@@ -11,6 +11,7 @@
 // `type: 'text'` questions with a `visible_if` in template v2 -- every other text
 // question (`health_fund`, `restrictions`, `special_notes`) is always-visible with no
 // `visible_if` -- so that structural shape identifies them without hardcoding ids.
+import { applicableClause } from '../health/clauses'
 import { isAnswered, isVisible, unansweredRequired } from '../health/healthClient'
 import type { AnswerValue, TemplateSchema } from '../health/healthClient'
 
@@ -46,9 +47,27 @@ export function conditionalDetailQuestionIds(schema: TemplateSchema): string[] {
     .map((question) => question.id)
 }
 
+/**
+ * The clause found by SHAPE (`type === 'clause'`), never by a hardcoded id -- same rule
+ * `conditionalDetailQuestionIds` above already follows, and for the same reason: a schema
+ * this module is handed is data, not a fixture written against `clauses.ts`'s own constant.
+ */
+function clauseQuestion(schema: TemplateSchema) {
+  return questions(schema).find((question) => question.type === 'clause')
+}
+
 export function healthAnswersComplete(schema: TemplateSchema, draft: SubjectHealthDraft): boolean {
   if (draft.signatureBase64 === null) return false
   if (unansweredRequired(schema, draft.answers).length > 0) return false
+  // A confirmed clause that no longer matches what the CURRENT answers imply is not a
+  // completed declaration -- it is a stale tick left over from before the parent flagged (or
+  // cleared) a concern. `JoinHealthStep`'s checkbox already re-renders unchecked in this
+  // state; without this check `sign()` would still accept the draft underneath it, and the
+  // server's `verify_clause` would be the first thing to say no (`clause_mismatch`).
+  const clauseQ = clauseQuestion(schema)
+  if (clauseQ && draft.answers[clauseQ.id] !== applicableClause(schema, draft.answers)) {
+    return false
+  }
   const detailIds = conditionalDetailQuestionIds(schema)
   const questionById = new Map(questions(schema).map((question) => [question.id, question]))
   return detailIds.every((id) => {

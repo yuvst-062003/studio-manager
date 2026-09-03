@@ -7,6 +7,11 @@ import {
   markAllHealthyDraft,
 } from './healthDraft'
 
+// The clause question's id is 'clause_confirmed' on purpose, matching the real template
+// (app/services/structure/health_templates.py) rather than a made-up id like the other
+// fixture ids in this file. `../health/clauses.ts`'s NEUTRAL_QUESTIONS/CLAUSE_QUESTION_ID
+// exclude the clause question from `declaresALimitation` BY THIS EXACT ID -- a differently
+// named clause question would have its own confirmation value misread as a medical answer.
 const schema: TemplateSchema = {
   sections: [
     {
@@ -27,7 +32,7 @@ const schema: TemplateSchema = {
           label: 'טלפון חירום',
           required: true,
         },
-        { id: 'clause1', type: 'clause', label: 'אני מאשר/ת' },
+        { id: 'clause_confirmed', type: 'clause', label: 'אני מאשר/ת', required: true },
       ],
     },
   ],
@@ -46,7 +51,7 @@ describe('healthAnswersComplete', () => {
       answers: {
         asthma: false,
         emergency_contact: '0501234567',
-        clause1: 'clause-text',
+        clause_confirmed: 'none',
       },
       signatureBase64: null,
     }
@@ -56,7 +61,7 @@ describe('healthAnswersComplete', () => {
   it('is false when a visible conditional detail field is blank, even though the schema marks it optional', () => {
     const draft = {
       ...emptyHealthDraft('st1'),
-      answers: { asthma: true, emergency_contact: '0501234567', clause1: 'clause-text' },
+      answers: { asthma: true, emergency_contact: '0501234567', clause_confirmed: 'limited' },
       signatureBase64: 'data:image/png;base64,x',
     }
     expect(healthAnswersComplete(schema, draft)).toBe(false)
@@ -69,7 +74,7 @@ describe('healthAnswersComplete', () => {
         asthma: true,
         chronic_illness_details: 'טיפול קבוע',
         emergency_contact: '0501234567',
-        clause1: 'clause-text',
+        clause_confirmed: 'limited',
       },
       signatureBase64: 'data:image/png;base64,x',
     }
@@ -79,7 +84,7 @@ describe('healthAnswersComplete', () => {
   it('does not require the hidden detail field when the trigger is no', () => {
     const draft = {
       ...emptyHealthDraft('st1'),
-      answers: { asthma: false, emergency_contact: '0501234567', clause1: 'clause-text' },
+      answers: { asthma: false, emergency_contact: '0501234567', clause_confirmed: 'none' },
       signatureBase64: 'data:image/png;base64,x',
     }
     expect(healthAnswersComplete(schema, draft)).toBe(true)
@@ -88,10 +93,48 @@ describe('healthAnswersComplete', () => {
   it('leaves health_fund and other always-optional fields out of the requirement', () => {
     const draft = {
       ...emptyHealthDraft('st1'),
-      answers: { asthma: false, emergency_contact: '0501234567', clause1: 'clause-text' },
+      answers: { asthma: false, emergency_contact: '0501234567', clause_confirmed: 'none' },
       signatureBase64: 'data:image/png;base64,x',
     }
     expect(draft.answers).not.toHaveProperty('health_fund')
+    expect(healthAnswersComplete(schema, draft)).toBe(true)
+  })
+
+  // F-clause-mismatch: a parent who confirms "no limitations" (clause.none) and THEN goes
+  // back and flags a concern must not be able to sign against the now-stale confirmation.
+  // The checkbox in JoinHealthStep re-renders unchecked when this happens (`clauseConfirmed`
+  // is recomputed live), but until this test, nothing stopped `sign()` from firing anyway --
+  // `unansweredRequired` only checks that SOME value is present, never that it still matches
+  // what the current answers imply. This is `clause_mismatch` on the server
+  // (app/services/health/clauses.py `verify_clause`), reachable purely by editing an answer
+  // after ticking the box once.
+  it('is false when the confirmed clause no longer matches what the answers imply', () => {
+    const draft = {
+      ...emptyHealthDraft('st1'),
+      answers: {
+        // Confirmed against an all-clear answer set ...
+        clause_confirmed: 'none',
+        emergency_contact: '0501234567',
+        // ... then a concern was flagged without re-confirming.
+        asthma: true,
+        chronic_illness_details: 'טיפול קבוע',
+      },
+      signatureBase64: 'data:image/png;base64,x',
+    }
+    expect(healthAnswersComplete(schema, draft)).toBe(false)
+  })
+
+  it('is true again once the confirmation is retaken against the new answers', () => {
+    const draft = {
+      ...emptyHealthDraft('st1'),
+      answers: {
+        clause_confirmed: 'limited',
+        emergency_contact: '0501234567',
+        asthma: true,
+        chronic_illness_details: 'טיפול קבוע',
+      },
+      signatureBase64: 'data:image/png;base64,x',
+    }
     expect(healthAnswersComplete(schema, draft)).toBe(true)
   })
 })
