@@ -242,6 +242,12 @@ describe('JoinFamilyStep (per-student panels)', () => {
     expect(within(panel).queryByText(t('he', 'people.join.pickupTitle'))).toBeNull()
   })
 
+  // This test drives a full student panel through real `userEvent` interactions --
+  // signer fields, birthdate, name, id, grade, a group checkbox, save, submit -- and
+  // legitimately takes a couple of seconds. Under a loaded, full parallel test run that
+  // pushes past vitest's default 5s `testTimeout` and the test times out even though
+  // nothing is hung. Give it real headroom instead of a global bump that would mask an
+  // unrelated test hanging. Do not "tidy" this away.
   it('decision 12 -- the derived flag, not a toggle, is what the payload reflects', async () => {
     stubPricePlans()
     const user = userEvent.setup()
@@ -282,7 +288,7 @@ describe('JoinFamilyStep (per-student panels)', () => {
       }),
       [],
     )
-  })
+  }, 15000)
 
   // F7 -- second parent/pickup are per student now, with a "same as previous" default.
   it('F7 -- "same as previous" is offered and defaults on for a second minor, off for the first', async () => {
@@ -319,6 +325,12 @@ describe('JoinFamilyStep (per-student panels)', () => {
     expect(within(panel).getByText(/דוד כהן/)).toBeInTheDocument()
   })
 
+  // This test fills two full student panels through real `userEvent` interactions --
+  // signer fields, then each student's name/birthdate/id/grade/other-parent/group,
+  // save, submit -- and legitimately takes a few seconds. Under a loaded, full
+  // parallel test run that pushes past vitest's default 5s `testTimeout` and the test
+  // times out even though nothing is hung. Give it real headroom instead of a global
+  // bump that would mask an unrelated test hanging. Do not "tidy" this away.
   it('F7 -- unticking "same as previous" lets a second student diverge, and two students can carry DIFFERENT other_parent data', async () => {
     stubPricePlans()
     const user = userEvent.setup()
@@ -375,7 +387,7 @@ describe('JoinFamilyStep (per-student panels)', () => {
     expect(payload.children[0].other_parent.first_name).not.toBe(
       payload.children[1].other_parent.first_name,
     )
-  })
+  }, 15000)
 
   // Decision 14 -- each student's own plan, offered only when it covers the groups
   // just chosen for THAT student.
