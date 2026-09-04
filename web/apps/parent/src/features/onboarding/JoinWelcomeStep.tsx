@@ -16,15 +16,24 @@
 //
 // **Three cards, not two (decision 10, closing F3).** Terms of use, privacy policy and
 // the club's own terms-and-payment terms are each their own card, own version, own
-// "קריאת המסמך המלא" popup and own tick -- identical shape across all three. Continuing
-// needs all three, not two. Submitting records the app-level consent grant (the same
-// call `ConsentGate` makes, for the SAME two documents this screen shows two of the
-// three cards for) -- the club-level acceptance is what `JoinFlow`'s `onAccept` carries
-// forward as local state, finished once a student exists at step 4's single write (B2).
+// "קריאת המסמך המלא" popup -- identical shape across all three. Submitting records the
+// app-level consent grant (the same call `ConsentGate` makes, for the SAME two documents
+// this screen shows two of the three cards for) -- the club-level acceptance is what
+// `JoinFlow`'s `onAccept` carries forward as local state, finished once a student exists
+// at step 4's single write (B2).
+//
+// **One tick, not three (owner request, 2026-09-03).** The three cards above kept their
+// own version and their own popup, but only ONE control gates continuing now -- a real
+// `Checkbox` whose label names all three documents, so agreeing once is still informed
+// consent rather than a blind bundle. This is a UI change only: `submit` below still
+// calls `privacyClient.grant` with BOTH `terms` and `privacy` (two ledger rows, per
+// `grant`'s own "append one decision per entry" contract) and still calls `onAccept(true)`
+// for the caller's own separately-versioned club-terms write. The owner accepted a
+// simpler screen, not a coarser consent record.
 import { useEffect, useState } from 'react'
-import type { CSSProperties } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import { apiUrl } from '@studio/core'
-import { Alert, Button, Card, Checkbox, PolicyDocument, useModalDialog } from '@studio/ui'
+import { Alert, Button, Card, Checkbox, Icon, PolicyDocument, useModalDialog } from '@studio/ui'
 import type { PolicyDoc } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
@@ -35,32 +44,105 @@ import { WizardNavButtons } from './WizardNavButtons'
 
 type WelcomeDoc = PolicyDoc | 'club'
 
+// The redesigned card (owner: "too heavy" -- the old shape put the tick on its own row
+// and read the full-document link as a bordered `<Button>`, making each card roughly
+// twice the height it needed). `<Card>` itself (`web/packages/ui/src/primitives/Card.tsx`
+// + its CSS) is not this component's to change -- its 18px/20px padding and 14px radius
+// are shared by every other screen that uses it, and the owner asked for THIS screen
+// alone. So these three cards are plain, locally-styled elements instead, built from the
+// same tokens `<Card>` itself reads.
+const compactCardStyle: CSSProperties = {
+  background: 'var(--surface)',
+  border: 'var(--border-width-hairline) solid var(--border)',
+  borderRadius: 'var(--radius-lg)',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 'var(--space-2)',
+  padding: 'var(--space-3)',
+}
+
 const cardHeadStyle: CSSProperties = {
-  alignItems: 'baseline',
+  alignItems: 'center',
   display: 'flex',
   gap: 'var(--space-2)',
-  justifyContent: 'space-between',
+}
+
+const cardTitleStyle: CSSProperties = {
+  flex: '1 1 auto',
+  fontSize: 'var(--text-label)',
+  fontWeight: 'var(--weight-medium)',
+  margin: 0,
+}
+
+// The decorative mirror of the ONE real tick (below, decision: "a single control that
+// agrees to all three documents at once"). It is `aria-hidden` and never in the tab
+// order on purpose -- the accessible, focusable, labelled control is the single
+// `Checkbox` under the three cards, and duplicating it visually here as three MORE
+// checkbox-shaped things a screen reader could land on would be the exact "<span> that
+// only looks like one" the redesign was told not to build. This is purely the artboard's
+// "filled accent square with a ✓ when on" look, kept per-card because the cards
+// themselves stayed three.
+const tickMarkStyle: CSSProperties = {
+  blockSize: '1.0625rem',
+  border: 'var(--border-width-strong) solid var(--border-strong)',
+  borderRadius: 'var(--radius-xs)',
+  color: 'var(--surface)',
+  display: 'grid',
+  flex: 'none',
+  inlineSize: '1.0625rem',
+  placeItems: 'center',
+}
+
+const tickMarkOnStyle: CSSProperties = {
+  ...tickMarkStyle,
+  background: 'var(--accent)',
+  borderColor: 'var(--accent)',
+}
+
+const versionPillStyle: CSSProperties = {
+  border: 'var(--border-width-hairline) solid var(--border-strong)',
+  borderRadius: 'var(--radius-pill)',
+  color: 'var(--text-muted)',
+  flex: 'none',
+  fontSize: 'var(--text-micro)',
+  padding: '1px var(--space-2)',
 }
 
 const summaryStyle: CSSProperties = {
-  color: 'var(--text-secondary)',
-}
-
-const versionStyle: CSSProperties = {
   color: 'var(--text-muted)',
-  flex: 'none',
   fontSize: 'var(--text-caption)',
+  lineHeight: 'var(--leading-relaxed)',
+  margin: 0,
 }
 
 const chipStyle: CSSProperties = {
   alignSelf: 'flex-start',
   background: 'color-mix(in srgb, var(--accent) 12%, var(--surface))',
-  borderRadius: '999px',
+  borderRadius: 'var(--radius-pill)',
   color: 'var(--accent)',
   display: 'inline-block',
   fontSize: 'var(--text-caption)',
   fontWeight: 500,
   padding: 'var(--space-1) var(--space-3)',
+}
+
+// The artboard's "קריאת המסמך המלא ›" -- accent-coloured text, not a bordered button.
+// `Button`'s `ghost` variant IS a bordered button (`.studio-btn[data-variant="ghost"]`
+// in `web/packages/ui/src/primitives/primitives.css`), which is exactly the shape the
+// owner rejected -- a plain, unstyled `<button>` with an inline style is what stays a
+// real, keyboard-operable control without inheriting that border.
+const readLinkStyle: CSSProperties = {
+  alignItems: 'center',
+  alignSelf: 'flex-start',
+  background: 'none',
+  border: 'none',
+  color: 'var(--accent)',
+  cursor: 'pointer',
+  display: 'inline-flex',
+  fontSize: 'var(--text-label)',
+  fontWeight: 'var(--weight-medium)',
+  gap: 'var(--space-1)',
+  padding: 0,
 }
 
 const clauseStyle: CSSProperties = {
@@ -120,16 +202,16 @@ export type JoinWelcomeStepProps = {
    *  version line rather than a stale or fabricated one. */
   clubTermsVersion: number | null
   privacyClient: PrivacyClient
-  /** Always called with `true` -- reached only once all three cards are checked. The
+  /** Always called with `true` -- reached only once the single tick is checked. The
    *  boolean keeps the call site symmetrical with `JoinFlow`'s existing
    *  `clubTermsAccepted` state rather than hardcoding `true` two files apart. */
   onAccept: (clubTermsAccepted: boolean) => void
   /** Door A (wave E, `/t/<slug>`): an anonymous caller can never reach the
    *  authenticated `POST /privacy/consents` this step normally writes through on
-   *  submit -- `true` skips that write entirely and calls `onAccept` the moment all
-   *  three cards are ticked, leaving the caller to carry the three ticks into its OWN
-   *  write (`agreements_accepted` on the trial booking). `false` (the default) is
-   *  every other door's existing behaviour, unchanged. */
+   *  submit -- `true` skips that write entirely and calls `onAccept` the moment the
+   *  tick is checked, leaving the caller to carry it into its OWN write
+   *  (`agreements_accepted` on the trial booking). `false` (the default) is every other
+   *  door's existing behaviour, unchanged. */
   deferAcceptance?: boolean
   /** Wave E's door → step-list mapping. Defaults to the full 4-step list -- Doors
    *  B/C/D's existing rail, unchanged; Door A passes its own 3-step list. */
@@ -140,6 +222,65 @@ function popupTitle(locale: Locale, doc: WelcomeDoc): string {
   if (doc === 'terms') return t(locale, 'reports.privacy.terms.title')
   if (doc === 'policy') return t(locale, 'reports.privacy.policy.title')
   return t(locale, 'health.clubTerms.title')
+}
+
+/** "Onward" is leftward in Hebrew and rightward in English (see
+ *  `web/packages/ui/src/primitives/DetailRow.tsx`'s own chevron) -- CSS has no logical
+ *  transform for this, and that file's rotation lives in
+ *  `web/packages/ui/src/primitives/primitives.css`, which is not this component's file
+ *  to add a rule to. Same two rotations, computed locally instead. */
+function chevronRotation(locale: Locale): CSSProperties {
+  return { transform: locale === 'he' ? 'rotate(90deg)' : 'rotate(-90deg)' }
+}
+
+type DocumentCardProps = {
+  agreed: boolean
+  chip?: ReactNode
+  locale: Locale
+  onRead: () => void
+  readTestId: string
+  summary: string
+  testIdPrefix: string
+  title: string
+  versionLine: string | null
+}
+
+/** One card, one document, one popup -- the shape decision 10 fixed and this redesign
+ *  keeps. What changed is the tick: it used to be each card's OWN `Checkbox`, and is now
+ *  a purely decorative mark (see `tickMarkStyle`'s own note) that mirrors the single real
+ *  control below all three cards. */
+function DocumentCard({
+  agreed,
+  chip,
+  locale,
+  onRead,
+  readTestId,
+  summary,
+  testIdPrefix,
+  title,
+  versionLine,
+}: DocumentCardProps) {
+  return (
+    <div style={compactCardStyle}>
+      <div style={cardHeadStyle}>
+        <span aria-hidden="true" style={agreed ? tickMarkOnStyle : tickMarkStyle}>
+          {agreed ? <Icon name="check" size={11} /> : null}
+        </span>
+        <h3 style={cardTitleStyle}>{title}</h3>
+        {versionLine ? (
+          <span data-testid={`${testIdPrefix}-version`} style={versionPillStyle}>
+            {versionLine}
+          </span>
+        ) : null}
+      </div>
+      {chip}
+      <p style={summaryStyle}>{summary}</p>
+      <button data-testid={readTestId} onClick={onRead} style={readLinkStyle} type="button">
+        {t(locale, 'reports.privacy.gate.readFull')}
+        <Icon name="chevronDown" size={12} style={chevronRotation(locale)} />
+      </button>
+    </div>
+  )
 }
 
 export function JoinWelcomeStep({
@@ -153,7 +294,10 @@ export function JoinWelcomeStep({
   steps,
 }: JoinWelcomeStepProps) {
   const [state, setState] = useState<ConsentState | null | undefined>(undefined)
-  const [accepted, setAccepted] = useState({ terms: false, privacy: false, club: false })
+  // One tick, not three (owner request) -- see this file's header comment. `submit`
+  // below still writes three separately-versioned records; this boolean only decides
+  // whether the button that triggers that write is enabled.
+  const [agreed, setAgreed] = useState(false)
   const [openDoc, setOpenDoc] = useState<WelcomeDoc | null>(null)
   const [saving, setSaving] = useState(false)
   const [failed, setFailed] = useState(false)
@@ -185,7 +329,6 @@ export function JoinWelcomeStep({
 
   const dialogRef = useModalDialog(openDoc !== null, () => setOpenDoc(null))
 
-  const allThree = accepted.terms && accepted.privacy && accepted.club
   const policyVersionLine = state
     ? `${t(locale, 'reports.privacy.doc.version')} ${state.policy_version_label}`
     : null
@@ -195,10 +338,10 @@ export function JoinWelcomeStep({
       : null
 
   async function submit() {
-    if (!allThree || saving) return
+    if (!agreed || saving) return
     // Door A (wave E): an anonymous caller has no authenticated route to record this
-    // through, and the deferred model carries the three ticks into its OWN write
-    // instead (`agreements_accepted`) -- never a network call from this step at all.
+    // through, and the deferred model carries the tick into its OWN write instead
+    // (`agreements_accepted`) -- never a network call from this step at all.
     if (deferAcceptance) {
       onAccept(true)
       return
@@ -252,97 +395,55 @@ export function JoinWelcomeStep({
         {/* No sign-in fork here (F1) -- the shell renders this component only once
             `session.status === 'signed-in'`, so there is nothing to branch on. */}
 
-        <Card>
-          <div style={cardHeadStyle}>
-            <h3 style={{ margin: 0 }}>{t(locale, 'reports.privacy.terms.title')}</h3>
-            {policyVersionLine ? (
-              <span data-testid="join-welcome-terms-version" style={versionStyle}>
-                {policyVersionLine}
-              </span>
-            ) : null}
-          </div>
-          <p style={summaryStyle}>{t(locale, 'reports.privacy.gate.termsSummary')}</p>
-          <Button
-            data-testid="join-welcome-terms-read"
-            onClick={() => setOpenDoc('terms')}
-            type="button"
-            variant="ghost"
-          >
-            {t(locale, 'reports.privacy.gate.readFull')}
-          </Button>
-          <Checkbox
-            block
-            checked={accepted.terms}
-            data-testid="join-welcome-terms-check"
-            label={t(locale, 'reports.privacy.gate.acceptTerms')}
-            onChange={(event) =>
-              setAccepted((prev) => ({ ...prev, terms: event.target.checked }))
-            }
-          />
-        </Card>
+        <DocumentCard
+          agreed={agreed}
+          locale={locale}
+          onRead={() => setOpenDoc('terms')}
+          readTestId="join-welcome-terms-read"
+          summary={t(locale, 'reports.privacy.gate.termsSummary')}
+          testIdPrefix="join-welcome-terms"
+          title={t(locale, 'reports.privacy.terms.title')}
+          versionLine={policyVersionLine}
+        />
 
-        <Card>
-          <div style={cardHeadStyle}>
-            <h3 style={{ margin: 0 }}>{t(locale, 'reports.privacy.policy.title')}</h3>
-            {policyVersionLine ? (
-              <span data-testid="join-welcome-privacy-version" style={versionStyle}>
-                {policyVersionLine}
-              </span>
-            ) : null}
-          </div>
-          <p style={summaryStyle}>{t(locale, 'reports.privacy.gate.privacySummary')}</p>
-          <Button
-            data-testid="join-welcome-privacy-read"
-            onClick={() => setOpenDoc('policy')}
-            type="button"
-            variant="ghost"
-          >
-            {t(locale, 'reports.privacy.gate.readFull')}
-          </Button>
-          <Checkbox
-            block
-            checked={accepted.privacy}
-            data-testid="join-welcome-privacy-check"
-            label={t(locale, 'reports.privacy.gate.acceptPrivacy')}
-            onChange={(event) =>
-              setAccepted((prev) => ({ ...prev, privacy: event.target.checked }))
-            }
-          />
-        </Card>
+        <DocumentCard
+          agreed={agreed}
+          locale={locale}
+          onRead={() => setOpenDoc('policy')}
+          readTestId="join-welcome-privacy-read"
+          summary={t(locale, 'reports.privacy.gate.privacySummary')}
+          testIdPrefix="join-welcome-privacy"
+          title={t(locale, 'reports.privacy.policy.title')}
+          versionLine={policyVersionLine}
+        />
 
         {/* The club card -- same shape as the two above it (decision 10). The three
             payment clauses live ONLY inside its popup now; "the three payment clauses
             ARE that document" (spec §2 decision 10), so nothing is duplicated between
             the card body and the popup. */}
-        <Card>
-          <div style={cardHeadStyle}>
-            <h3 style={{ margin: 0 }}>{t(locale, 'health.clubTerms.title')}</h3>
-            {clubVersionLine ? (
-              <span data-testid="join-welcome-club-version" style={versionStyle}>
-                {clubVersionLine}
-              </span>
-            ) : null}
-          </div>
-          <span style={chipStyle}>{t(locale, 'health.clubTerms.onceForFamily')}</span>
-          <p style={summaryStyle}>{t(locale, 'health.clubTerms.summary')}</p>
-          <Button
-            data-testid="join-welcome-club-read"
-            onClick={() => setOpenDoc('club')}
-            type="button"
-            variant="ghost"
-          >
-            {t(locale, 'reports.privacy.gate.readFull')}
-          </Button>
-          <Checkbox
-            block
-            checked={accepted.club}
-            data-testid="join-welcome-club-check"
-            label={t(locale, 'health.clubTerms.accept')}
-            onChange={(event) =>
-              setAccepted((prev) => ({ ...prev, club: event.target.checked }))
-            }
-          />
-        </Card>
+        <DocumentCard
+          agreed={agreed}
+          chip={<span style={chipStyle}>{t(locale, 'health.clubTerms.onceForFamily')}</span>}
+          locale={locale}
+          onRead={() => setOpenDoc('club')}
+          readTestId="join-welcome-club-read"
+          summary={t(locale, 'health.clubTerms.summary')}
+          testIdPrefix="join-welcome-club"
+          title={t(locale, 'health.clubTerms.title')}
+          versionLine={clubVersionLine}
+        />
+
+        {/* The ONE real control (owner request) -- a native `Checkbox`, not the three
+            cards' own decorative marks, so it stays a focusable, labelled, keyboard-
+            operable control per §a11y rather than three lookalike spans. Its label
+            names all three documents so agreeing once is still informed. */}
+        <Checkbox
+          block
+          checked={agreed}
+          data-testid="join-welcome-agree-check"
+          label={t(locale, 'people.join.welcome.agreeAll')}
+          onChange={(event) => setAgreed(event.target.checked)}
+        />
 
         {failed ? (
           <Alert iconLabel={t(locale, 'people.join.title')} live tone="danger">
@@ -351,7 +452,7 @@ export function JoinWelcomeStep({
         ) : null}
 
         <WizardNavButtons
-          forwardDisabled={!allThree || saving || state === undefined}
+          forwardDisabled={!agreed || saving || state === undefined}
           forwardLabel={saving ? t(locale, 'reports.privacy.gate.working') : undefined}
           forwardTestId="join-welcome-continue"
           locale={locale}

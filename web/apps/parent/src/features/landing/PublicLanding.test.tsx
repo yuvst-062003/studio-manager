@@ -387,9 +387,9 @@ describe('booking — every call to action reaches the flow', () => {
     // Nothing above the wizard's steps asks for a group.
     expect(within(dialog).queryByTestId('booking-dialog-group')).toBeNull()
 
-    await user.click(within(dialog).getByTestId('join-welcome-terms-check'))
-    await user.click(within(dialog).getByTestId('join-welcome-privacy-check'))
-    await user.click(within(dialog).getByTestId('join-welcome-club-check'))
+    // One tick now gates continue, not three (owner request, 2026-09-03) -- the three
+    // document cards stayed, but only one control agrees to all of them.
+    await user.click(within(dialog).getByTestId('join-welcome-agree-check'))
     await user.click(within(dialog).getByTestId('join-welcome-continue'))
 
     // It is pre-filled on the first row instead, where the booking actually reads it.
@@ -447,9 +447,9 @@ describe('booking — every call to action reaches the flow', () => {
     const dialog = await screen.findByTestId('booking-dialog')
     expect(within(dialog).getByTestId('join-welcome')).toBeInTheDocument()
 
-    await user.click(within(dialog).getByTestId('join-welcome-terms-check'))
-    await user.click(within(dialog).getByTestId('join-welcome-privacy-check'))
-    await user.click(within(dialog).getByTestId('join-welcome-club-check'))
+    // One tick now gates continue, not three (owner request, 2026-09-03) -- the three
+    // document cards stayed, but only one control agrees to all of them.
+    await user.click(within(dialog).getByTestId('join-welcome-agree-check'))
     await user.click(within(dialog).getByTestId('join-welcome-continue'))
 
     const panel = await within(dialog).findByTestId(/^booking-row-panel-/)

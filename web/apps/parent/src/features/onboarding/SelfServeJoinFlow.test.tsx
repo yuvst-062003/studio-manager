@@ -85,6 +85,12 @@ type Handlers = {
   registerStudentIds?: string[]
   onboardingStatus?: { steps: { key: string; complete: boolean }[]; next: string | null }
   existingStudents?: { id: string; first_name: string; last_name: string }[]
+  // Decision 11: the same `/api/v1/me/studio` read this component already makes for
+  // `slug` also carries `logo_url` (and `name`) -- `StudioOut`'s own fields
+  // (`app/schemas/studio.py`). `null`/`''` by default so the existing tests, which never
+  // cared about the logo, keep passing unchanged.
+  studioLogoUrl?: string | null
+  studioName?: string
 }
 
 function stubFetch(handlers: Handlers = {}) {
@@ -101,6 +107,8 @@ function stubFetch(handlers: Handlers = {}) {
       next: 'agreements',
     },
     existingStudents = [],
+    studioLogoUrl = null,
+    studioName = '',
   } = handlers
   const calls: string[] = []
   vi.stubGlobal(
@@ -109,7 +117,10 @@ function stubFetch(handlers: Handlers = {}) {
       const url = String(input)
       calls.push(url)
       if (url.includes('/api/v1/me/studio')) {
-        return new Response(JSON.stringify({ slug: 'demo-club' }), { status: 200 })
+        return new Response(
+          JSON.stringify({ slug: 'demo-club', logo_url: studioLogoUrl, name: studioName }),
+          { status: 200 },
+        )
       }
       if (url.includes('/api/v1/public/studios/demo-club/groups')) {
         return new Response(
@@ -221,6 +232,59 @@ describe('SelfServeJoinFlow -- Doors C and D', () => {
       />,
     )
     await screen.findByTestId('join-welcome')
+  })
+
+  // Decision 11 -- "the club logo appears on the welcome screen and in each popup
+  // header." Doors C and D used to hardcode `logoUrl={null}` into `JoinWelcomeStep`, so
+  // a parent arriving from a manager's invitation (Door C) or adding a sibling (Door D)
+  // saw no logo even when the studio has one. Driven through the REAL data path: the
+  // `/api/v1/me/studio` read this component already makes for `slug` (no new backend
+  // route needed -- `StudioOut.logo_url` was already in that response), never a
+  // hand-built prop.
+  //
+  // The stub deliberately answers with the AUTHENTICATED shape `StudioOut.logo_url`
+  // actually has (`/api/v1/studio/logo?v=...`, `app/services/structure/logo.py`) --
+  // a real browser check (Playwright, against the live dev backend) caught that pointing
+  // a plain `<img>` at that path 401s, since an image tag never carries the bearer
+  // token that route needs. This asserts the component does NOT forward that URL
+  // verbatim: it rebuilds the loadable, unauthenticated `/public/studios/{slug}/logo`
+  // path from `slug`, reading `logo_url` only as "this studio has one."
+  it('Door D shows the club logo, rebuilt as the public path -- never the authenticated one the raw field carries', async () => {
+    stubFetch({ studioLogoUrl: '/api/v1/studio/logo?v=1234', studioName: 'מועדון הדגמה' })
+    render(
+      <SelfServeJoinFlow
+        billingClient={billingClient}
+        displayName={DISPLAY_NAME}
+        door="addChild"
+        healthClient={healthClient}
+        locale="he"
+        privacyClient={makePrivacyClient()}
+        standingOrderLinks={[]}
+      />,
+    )
+    const logo = await screen.findByTestId('join-welcome-logo')
+    expect(logo).toHaveAttribute(
+      'src',
+      expect.stringContaining('/api/v1/public/studios/demo-club/logo'),
+    )
+    expect(logo.getAttribute('src')).not.toContain('/api/v1/studio/logo')
+  })
+
+  it('Door D shows no logo when the studio has none', async () => {
+    stubFetch({ studioLogoUrl: null })
+    render(
+      <SelfServeJoinFlow
+        billingClient={billingClient}
+        displayName={DISPLAY_NAME}
+        door="addChild"
+        healthClient={healthClient}
+        locale="he"
+        privacyClient={makePrivacyClient()}
+        standingOrderLinks={[]}
+      />,
+    )
+    await screen.findByTestId('join-welcome')
+    expect(screen.queryByTestId('join-welcome-logo')).toBeNull()
   })
 
   it('Door D skips straight to the students step, with one empty panel already open, when agreements are current', async () => {

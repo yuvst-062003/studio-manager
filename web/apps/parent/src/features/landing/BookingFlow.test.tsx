@@ -125,9 +125,8 @@ afterEach(() => {
 
 async function acceptAgreements(user: ReturnType<typeof userEvent.setup>) {
   await screen.findByTestId('join-welcome')
-  await user.click(screen.getByTestId('join-welcome-terms-check'))
-  await user.click(screen.getByTestId('join-welcome-privacy-check'))
-  await user.click(screen.getByTestId('join-welcome-club-check'))
+  // One tick now gates continue, not three (owner request, 2026-09-03).
+  await user.click(screen.getByTestId('join-welcome-agree-check'))
   await user.click(screen.getByTestId('join-welcome-continue'))
 }
 
@@ -174,9 +173,11 @@ describe('Door A -- decision 5: the welcome step and its three agreements', () =
     const user = userEvent.setup()
     render(<BookingFlow client={makeClient()} groups={GROUPS} locale="he" slug="demo-club" />)
     await screen.findByTestId('join-welcome')
-    expect(screen.getByTestId('join-welcome-terms-check')).toBeInTheDocument()
-    expect(screen.getByTestId('join-welcome-privacy-check')).toBeInTheDocument()
-    expect(screen.getByTestId('join-welcome-club-check')).toBeInTheDocument()
+    // Three cards, still individually openable, but ONE tick gates continuing.
+    expect(screen.getByTestId('join-welcome-terms-read')).toBeInTheDocument()
+    expect(screen.getByTestId('join-welcome-privacy-read')).toBeInTheDocument()
+    expect(screen.getByTestId('join-welcome-club-read')).toBeInTheDocument()
+    expect(screen.getByTestId('join-welcome-agree-check')).toBeInTheDocument()
     await acceptAgreements(user)
     await screen.findByTestId('booking-students-step')
   })

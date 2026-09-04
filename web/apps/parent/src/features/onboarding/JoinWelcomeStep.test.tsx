@@ -29,10 +29,12 @@ function makeClient(): PrivacyClient {
 }
 
 describe('JoinWelcomeStep', () => {
-  // Decision 10 -- three cards of identical shape (one document · one link · one popup ·
-  // one tick), replacing the old shape where terms+privacy shared a single card and a
-  // single tick.
-  it('renders three cards, each with its own checkbox -- continuing requires all three, not two', async () => {
+  // The owner's redesign: three document cards remain (decision 10 -- each still opens
+  // its own document, on its own version), but a SINGLE tick now gates continuing, not
+  // three. Ticking it once must still be enough, and every document must still be
+  // individually openable -- the compact card lost its own per-document checkbox, not
+  // its own popup.
+  it('gates continue on ONE tick, and every document stays individually openable', async () => {
     const user = userEvent.setup()
     const client = makeClient()
     const onAccept = vi.fn()
@@ -54,19 +56,104 @@ describe('JoinWelcomeStep', () => {
     })
     expect(continueButton).toBeDisabled()
 
-    await user.click(screen.getByTestId('join-welcome-terms-check'))
+    // Each document is still its own popup, reachable independent of the tick.
+    await user.click(screen.getByTestId('join-welcome-terms-read'))
+    await screen.findByTestId('join-welcome-document-popup')
+    await user.click(screen.getByTestId('join-welcome-document-close'))
+    await waitFor(() =>
+      expect(screen.queryByTestId('join-welcome-document-popup')).toBeNull(),
+    )
     expect(continueButton).toBeDisabled()
-    await user.click(screen.getByTestId('join-welcome-privacy-check'))
-    expect(continueButton).toBeDisabled()
-    await user.click(screen.getByTestId('join-welcome-club-check'))
+
+    // One tick, and continuing unlocks -- there is no second or third box left to find.
+    expect(screen.queryByTestId('join-welcome-terms-check')).toBeNull()
+    expect(screen.queryByTestId('join-welcome-privacy-check')).toBeNull()
+    expect(screen.queryByTestId('join-welcome-club-check')).toBeNull()
+    await user.click(screen.getByTestId('join-welcome-agree-check'))
     expect(continueButton).not.toBeDisabled()
+  })
 
-    await user.click(continueButton)
+  // The owner accepted the one-tick screen but explicitly did NOT accept losing
+  // per-document version tracking: "a parent who agreed to an older wording of only the
+  // privacy policy is re-asked for the privacy policy alone" only holds if terms and
+  // privacy are still recorded as separate ledger rows. `grant`'s own contract ("append
+  // one decision per entry") is what makes a single network call still write two rows --
+  // asserting the exact call, not the UI, is what proves the single tick did not collapse
+  // that into one bundled yes. The club card's own version is the THIRD -- carried
+  // forward through `onAccept(true)` into the caller's own separately-versioned write
+  // (`club_terms_accepted`, stamped with `CLUB_TERMS_VERSION` at submit time), which is
+  // this component's documented contract and is exercised end-to-end in
+  // `SelfServeJoinFlow.test.tsx`.
+  it('one tick still produces three separately-versioned consent grants, not one bundled yes', async () => {
+    const user = userEvent.setup()
+    const client = makeClient()
+    const onAccept = vi.fn()
 
+    render(
+      <JoinWelcomeStep
+        locale="he"
+        clubTermsVersion={CLUB_TERMS_TEST_VERSION}
+        logoUrl={null}
+        studioName="מועדון הדגמה"
+        privacyClient={client}
+        onAccept={onAccept}
+      />,
+    )
+
+    await screen.findByText('מועדון הדגמה')
+    await user.click(screen.getByTestId('join-welcome-agree-check'))
+    await user.click(
+      await screen.findByRole('button', { name: t('he', 'health.agreement.next') }),
+    )
+
+    // Terms and privacy: two rows, both stamped with the version this client actually
+    // rendered (3) -- never merged into a single flag.
     await waitFor(() =>
       expect(client.grant).toHaveBeenCalledWith(3, { terms: true, privacy: true }),
     )
+    expect(client.grant).toHaveBeenCalledTimes(1)
+    // Club terms: the third, carried onward rather than folded into the call above --
+    // `onAccept`'s boolean is what the caller turns into its OWN versioned write.
     expect(onAccept).toHaveBeenCalledWith(true)
+  })
+
+  // Accessibility is not negotiable: the tick must be a real, focusable, labelled
+  // control -- not a styled <span> -- and reachable by keyboard alone, space included.
+  it('the single tick is a real checkbox, labelled with all three documents, operable by keyboard', async () => {
+    const client = makeClient()
+    render(
+      <JoinWelcomeStep
+        locale="he"
+        clubTermsVersion={CLUB_TERMS_TEST_VERSION}
+        logoUrl={null}
+        studioName="מועדון הדגמה"
+        privacyClient={client}
+        onAccept={vi.fn()}
+      />,
+    )
+    await screen.findByText('מועדון הדגמה')
+
+    const checkbox = screen.getByRole('checkbox', {
+      name: t('he', 'people.join.welcome.agreeAll'),
+    })
+    // The accessible name names all three documents, not a generic "I agree" -- each
+    // title is a substring of the one combined name, so a `RegExp` proves "contains"
+    // without requiring `toHaveAccessibleName` to match the whole string three ways.
+    expect(checkbox).toHaveAccessibleName(new RegExp(t('he', 'reports.privacy.terms.title')))
+    expect(checkbox).toHaveAccessibleName(new RegExp(t('he', 'reports.privacy.policy.title')))
+    expect(checkbox).toHaveAccessibleName(new RegExp(t('he', 'health.clubTerms.title')))
+
+    const continueButton = await screen.findByRole('button', {
+      name: t('he', 'health.agreement.next'),
+    })
+    expect(continueButton).toBeDisabled()
+
+    checkbox.focus()
+    expect(checkbox).toHaveFocus()
+    const user = userEvent.setup()
+    await user.keyboard(' ')
+    expect(checkbox).toBeChecked()
+    expect(continueButton).not.toBeDisabled()
   })
 
   // F3 -- the club card used to print its clauses inline, with no link and no popup, a
@@ -117,12 +204,8 @@ describe('JoinWelcomeStep', () => {
     )
     await screen.findByText('מועדון הדגמה')
 
-    const termsCheck = screen.getByTestId('join-welcome-terms-check')
-    const privacyCheck = screen.getByTestId('join-welcome-privacy-check')
-    const clubCheck = screen.getByTestId('join-welcome-club-check')
-    await user.click(termsCheck)
-    await user.click(privacyCheck)
-    await user.click(clubCheck)
+    const agreeCheck = screen.getByTestId('join-welcome-agree-check')
+    await user.click(agreeCheck)
 
     expect(document.body.style.overflow).not.toBe('hidden')
 
@@ -136,10 +219,8 @@ describe('JoinWelcomeStep', () => {
     )
     expect(document.body.style.overflow).not.toBe('hidden')
 
-    // The three ticks survived the round trip.
-    expect(termsCheck).toBeChecked()
-    expect(privacyCheck).toBeChecked()
-    expect(clubCheck).toBeChecked()
+    // The one tick survived the round trip.
+    expect(agreeCheck).toBeChecked()
   })
 
   // Decision 11 -- the club logo appears on the welcome screen AND in each popup header.
@@ -267,6 +348,6 @@ describe('JoinWelcomeStep', () => {
     expect(screen.queryByTestId('sign-in')).toBeNull()
     // The agreements content is there immediately -- no async "which screen am I"
     // resolution stands between mount and the real content.
-    expect(screen.getByTestId('join-welcome-terms-check')).toBeInTheDocument()
+    expect(screen.getByTestId('join-welcome-agree-check')).toBeInTheDocument()
   })
 })

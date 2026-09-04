@@ -177,6 +177,8 @@ export const people: Bundle = {
   'join.welcome.heading': 'Before we start',
   'join.welcome.subtitle':
     'Before we can store information about your children, we need your agreement to three documents.',
+  'join.welcome.agreeAll':
+    'I have read and accept the terms of service, the privacy policy, and the club terms and payment terms',
   'directions.title': 'Getting here',
   'directions.openMaps': 'Open in maps',
   'directions.call': 'Call the club',

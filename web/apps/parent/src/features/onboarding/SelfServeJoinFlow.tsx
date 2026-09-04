@@ -156,6 +156,27 @@ export function SelfServeJoinFlow({
 }: SelfServeJoinFlowProps) {
   const token = draftKey(door)
   const [slug, setSlug] = useState<string | null>(null)
+  // Decision 11 ("the club logo appears on the welcome screen and in each popup
+  // header") -- these two doors used to hardcode `logoUrl={null}` and `studioName=""`
+  // into `JoinWelcomeStep` below, so a parent arriving via Door C's invitation or Door
+  // D's "add a sibling" saw no logo at all, even for a studio that has one. `StudioOut`
+  // (`app/schemas/studio.py`) already carries `logo_url` and `name` on the exact
+  // `/api/v1/me/studio` response this component fetches for `slug` -- no new backend
+  // route, just reading the rest of a response already in hand.
+  //
+  // **`StudioOut.logo_url` itself is NOT what gets stored below.** It resolves to
+  // `/api/v1/studio/logo` (`app/services/structure/logo.py::logo_url`) -- the
+  // TENANT-SCOPED read `GET /studio/logo` requires (`app/routers/studio.py`), gated on
+  // the caller's bearer token. A plain `<img src>` (what `JoinWelcomeStep` renders) never
+  // attaches that token, so pointing it at that path 401s and shows a broken image --
+  // caught by actually loading the page, not by a mocked-fetch test asserting the `src`
+  // attribute alone. `JoinWelcomeStep.logoUrl`'s own contract (see its prop doc) is the
+  // UNAUTHENTICATED `GET /public/studios/{slug}/logo` Door B already uses, so a non-null
+  // `logo_url` here is read only as "this studio has a logo" and the actual `src` is
+  // rebuilt from `slug` against that public route -- the same string
+  // `app/routers/public.py`/`app/routers/onboarding.py` build server-side.
+  const [logoUrl, setLogoUrl] = useState<string | null>(null)
+  const [studioName, setStudioName] = useState('')
   const [groups, setGroups] = useState<Group[]>([])
   const [step, setStep] = useState<FlowStep>('loading')
   const [students, setStudents] = useState<readonly GatedStudent[]>([])
@@ -177,15 +198,32 @@ export function SelfServeJoinFlow({
   const wizardSteps: readonly WizardStepKey[] = DOOR_STEPS[door]
 
   // Studio slug -> groups + price plans, the public reads AddSibling.tsx already uses
-  // for the same "no manager session, just an active studio" shape.
+  // for the same "no manager session, just an active studio" shape. `logo_url`/`name`
+  // ride along on the same response (decision 11, see the state above) rather than a
+  // second fetch for fields already being returned.
   useEffect(() => {
     let alive = true
     void apiFetch('/api/v1/me/studio')
-      .then(async (response) => (response.ok ? ((await response.json()) as { slug: string }).slug : null))
+      .then(async (response) =>
+        response.ok
+          ? ((await response.json()) as { slug: string; logo_url: string | null; name: string })
+          : null,
+      )
       .then((resolved) => {
-        if (alive) setSlug(resolved)
+        if (!alive) return
+        setSlug(resolved?.slug ?? null)
+        setLogoUrl(
+          resolved?.slug && resolved.logo_url
+            ? `/api/v1/public/studios/${resolved.slug}/logo`
+            : null,
+        )
+        setStudioName(resolved?.name ?? '')
       })
-      .catch(() => alive && setSlug(null))
+      .catch(() => {
+        if (!alive) return
+        setSlug(null)
+        setLogoUrl(null)
+      })
     return () => {
       alive = false
     }
@@ -437,9 +475,9 @@ export function SelfServeJoinFlow({
       <JoinWelcomeStep
         locale={locale}
         clubTermsVersion={null}
-        logoUrl={null}
+        logoUrl={logoUrl}
         privacyClient={privacyClient}
-        studioName=""
+        studioName={studioName}
         onAccept={(accepted) => {
           setClubTermsAccepted(accepted)
           setStep('family')

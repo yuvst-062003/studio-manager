@@ -224,6 +224,11 @@ export const people: Bundle = {
   'join.welcome.heading': 'לפני שנתחיל',
   'join.welcome.subtitle':
     'כדי שנוכל לשמור מידע על הילדים שלכם, אנחנו צריכים את ההסכמה שלכם לשלושה מסמכים.',
+  // The single tick that replaced the three cards' own separate ticks (owner request,
+  // 2026-09-03): names all three documents by their real titles, so agreeing once is
+  // still informed consent, not a blind bundle. The grant this tick triggers stays
+  // three separately-versioned records regardless -- see `JoinWelcomeStep.tsx`.
+  'join.welcome.agreeAll': 'קראתי ואני מאשר/ת: תנאי שימוש, מדיניות פרטיות ותקנון ותנאי תשלום',
   'directions.title': 'הוראות הגעה',
   'directions.openMaps': 'פתיחה במפות',
   'directions.call': 'התקשרות למועדון',
