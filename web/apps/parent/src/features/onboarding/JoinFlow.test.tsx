@@ -861,6 +861,52 @@ describe('JoinFlow', () => {
     ).toContain('padding: var(--space-4)')
   })
 
+  // F5, closed for real. B1's padding (asserted above) was a genuine improvement -- the
+  // button was no longer flush in the viewport corner -- but a live measurement on
+  // 2026-09-03 still found the "המשך" button and the accessibility FAB's bounding boxes
+  // overlapping: padding added AFTER the last element can only reserve space below it, it
+  // cannot move that element, so a step short enough to render fully without scrolling
+  // was unaffected by any amount of it. The real fix measures how far this wrapper sits
+  // below the page's own top (chrome outside this file, `LanguagePicker`, renders above
+  // it) and caps the wrapper's own `block-size` at exactly what is left of the viewport
+  // after that offset and the FAB's clearance, scrolling its own content internally
+  // rather than letting it render past that line.
+  //
+  // jsdom does not do real layout -- every element's `getBoundingClientRect()` reads back
+  // all zeroes, so a geometry assertion here would not be measuring anything. This test
+  // proves only that the mechanism is wired up: the wrapper carries a `block-size` capped
+  // by the SAME tokens `.studio-a11y__fab` itself uses (`primitives.css`) plus its
+  // hardcoded 44px size, and `overflow-y: auto` so content is actually clipped/scrolled
+  // rather than merely reserved-around. The real, pixel-level proof that the two boxes
+  // never intersect was done with a standalone Playwright script against a real Chromium
+  // page (see the commit message) -- jsdom cannot make that claim, and this test does not
+  // pretend to.
+  it('caps the step wrapper to the viewport minus the FAB clearance, so content is clipped rather than merely padded (F5)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(JSON.stringify({ items: [] }), { status: 200 })),
+    )
+    render(
+      <JoinFlow
+        billingClient={billingClient}
+        displayName={DISPLAY_NAME}
+        healthClient={healthClient}
+        locale="he"
+        privacyClient={makePrivacyClient()}
+        standingOrderLinks={[]}
+        token="live-token-123456"
+      />,
+    )
+    await screen.findByTestId('join-welcome')
+    const style = screen.getByTestId('join-welcome').parentElement?.getAttribute('style')
+    expect(style).toContain('overflow-y: auto')
+    // The clearance formula: the FAB's own `inset-block-end` token, its hardcoded 44px
+    // size, and the same token again as the trailing gap -- see `.studio-a11y__fab` in
+    // primitives.css and the long comment above `A11Y_FAB_CLEARANCE` in this file.
+    expect(style).toContain('var(--space-3) + 44px + var(--space-3)')
+    expect(style).toContain('block-size: calc(100dvh -')
+  })
+
   it('advances the health queue from local drafts for both kids, then writes both declarations in the same single request', async () => {
     const user = userEvent.setup()
     const onComplete = vi.fn()
