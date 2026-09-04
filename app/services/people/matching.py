@@ -29,6 +29,7 @@ from sqlalchemy.orm import Session
 from app.models.identity import AuthIdentity
 from app.models.people import Student
 from app.models.person import Person
+from app.services.people.naming import format_person_name
 
 #: E.164 without the plus. Israel is the club's country, so a leading 0 means +972.
 _IL_COUNTRY_CODE = "972"
@@ -105,7 +106,7 @@ def match_person(
             return PersonMatch(
                 person_id=row.id,
                 matched_on="email",
-                display_name=f"{row.first_name} {row.last_name}",
+                display_name=format_person_name(row.first_name, row.last_name),
             )
 
     normalized = normalize_phone(phone)
@@ -128,7 +129,7 @@ def match_person(
                 return PersonMatch(
                     person_id=row.id,
                     matched_on="phone",
-                    display_name=f"{row.first_name} {row.last_name}",
+                    display_name=format_person_name(row.first_name, row.last_name),
                 )
     return None
 
@@ -163,7 +164,7 @@ def match_children(
     return [
         ChildMatch(
             student_id=student.id,
-            display_name=f"{person.first_name} {person.last_name}",
+            display_name=format_person_name(person.first_name, person.last_name),
             birthdate=person.birthdate,
         )
         for student, person in rows

@@ -81,6 +81,8 @@ export const people: Bundle = {
   'guardian.contact': 'Связаться',
   'guardian.call': 'Позвонить',
   'guardian.message': 'Отправить сообщение',
+  'guardian.notRegisteredYet': 'Ещё не зарегистрирован(а)',
+  'guardian.noContactInfo': 'Нет контактных данных',
 
   'import.title': 'Импорт учеников из файла',
   'import.hint': 'CSV — по строке на ребёнка. Братья и сёстры — отдельные строки с одинаковым email родителя; сервер объединит их в один аккаунт.',

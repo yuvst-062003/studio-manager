@@ -49,6 +49,7 @@ from app.schemas.schedule import (
 )
 from app.services.audit import AuditService
 from app.services.comms import NotificationService
+from app.services.people.naming import format_person_name
 from app.services.schedule.impact import (
     SYSTEM_CANCEL_CLOSURE,
     SYSTEM_CANCEL_SCHEDULE_CHANGE,
@@ -783,7 +784,7 @@ class ScheduleService:
             staff_by_session.setdefault(assignment.session_id, []).append(
                 SessionStaffOut(
                     person_id=assignment.person_id,
-                    display_name=f"{first_name} {last_name}",
+                    display_name=format_person_name(first_name, last_name),
                     role=assignment.role,
                     is_substitute=assignment.is_substitute,
                 )

@@ -35,6 +35,7 @@ from app.models.billing import PricePlan, Product
 from app.models.people import Student
 from app.models.person import Guardian, Person
 from app.services.billing.errors import ConflictError, NotFoundError, RefusedError
+from app.services.people.naming import format_person_name
 
 #: A picker, not a catalogue of a supplier's whole range. A גי runs 100..190 in tens (ten
 #: labels) and gloves run S/M/L; twenty is generous and still a list a parent can read on a
@@ -201,11 +202,11 @@ def unpriced_students(session: Session, *, today: date) -> list[UnpricedStudent]
     return [
         UnpricedStudent(
             student_id=student.id,
-            display_name=f"{person.first_name} {person.last_name}",
+            display_name=format_person_name(person.first_name, person.last_name),
             joined_on=student.joined_on,
             payer_person_id=payer_person.id if payer_person is not None else None,
             payer_display_name=(
-                f"{payer_person.first_name} {payer_person.last_name}"
+                format_person_name(payer_person.first_name, payer_person.last_name)
                 if payer_person is not None
                 else None
             ),

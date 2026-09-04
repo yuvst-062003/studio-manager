@@ -44,6 +44,7 @@ from app.schemas.people import (
 from app.services.people.errors import ConflictError, NotFoundError
 from app.services.people.group_days import ScheduleReader
 from app.services.people.landing import LandingService
+from app.services.people.naming import format_person_name
 from app.services.people.rate_limit import (
     public_booking_identity_limiter,
     public_booking_ip_limiter,
@@ -100,7 +101,7 @@ def _self_result(session: TenantSession, booked: BookedTrial) -> TrialBookingSel
         bookings=[
             TrialBookingConfirmationOut(
                 student_id=row.student.id,
-                student_display_name=f"{summary.first_name} {summary.last_name}",
+                student_display_name=format_person_name(summary.first_name, summary.last_name),
                 group_name=row.group.name,
                 session_starts_at=row.session_row.starts_at if row.session_row else None,
             )
@@ -243,7 +244,7 @@ def list_trial_bookings(
             TrialBookingRow(
                 id=booking.id,
                 student_id=student.id,
-                student_display_name=f"{person.first_name} {person.last_name}",
+                student_display_name=format_person_name(person.first_name, person.last_name),
                 group_id=group.id,
                 group_name=group.name,
                 session_id=booking.session_id,

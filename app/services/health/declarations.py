@@ -48,6 +48,7 @@ from app.services.health import HealthService, club_terms
 from app.services.health.clauses import CLAUSE_QUESTION_ID, verify_clause
 from app.services.health.flags import derive_flags
 from app.services.health.pdf import RenderedSection, render_declaration_pdf
+from app.services.people.naming import format_person_name
 
 logger = logging.getLogger(__name__)
 
@@ -471,7 +472,7 @@ class HealthDeclarationService:
         return [
             HealthStatusSummaryOut(
                 student_id=student_id,
-                student_display_name=f"{first_name} {last_name}".strip(),
+                student_display_name=format_person_name(first_name, last_name),
                 health_status=health_status,
                 last_reminder_sent_at=reminders.get(student_id),
             )

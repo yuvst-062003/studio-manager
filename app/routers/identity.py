@@ -70,6 +70,7 @@ from app.services.identity.resolution import (
     upsert_identity,
 )
 from app.services.identity.tokens import AccessClaims, mint_access_token
+from app.services.people.naming import format_person_name
 
 logger = logging.getLogger(__name__)
 
@@ -476,7 +477,7 @@ def me(request: Request, session: SessionDep) -> MeResponse:
 
         person = session.get(Person, named_person_id)
         if person is not None:
-            display_name = f"{person.first_name} {person.last_name}"
+            display_name = format_person_name(person.first_name, person.last_name)
 
     # Unlike `display_name` above, this needs no `Person` row -- `auth_identity` is
     # global (§3.3), so it resolves for the exact account §6.1's refusal is written for:

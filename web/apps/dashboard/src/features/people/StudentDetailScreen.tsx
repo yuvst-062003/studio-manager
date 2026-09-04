@@ -235,7 +235,22 @@ export function StudentDetailScreen({
         <ul>
           {(student.guardians ?? []).map((guardian) => (
             <li key={guardian.person_id} data-testid="detail-guardian">
-              <bdi>{guardian.display_name}</bdi>
+              {/* Decision 20 — the 3-field add-student form sends a guardian email and no
+                  name, so `display_name` is `""` until the parent finishes the wizard. A
+                  blank row told the manager nothing; the email plus a hint at least says
+                  who this is and that they are not done yet. */}
+              {guardian.display_name ? (
+                <bdi>{guardian.display_name}</bdi>
+              ) : guardian.email ? (
+                <>
+                  <bdi>{guardian.email}</bdi>{' '}
+                  <span data-testid="detail-guardian-pending">
+                    {t(locale, 'people.guardian.notRegisteredYet')}
+                  </span>
+                </>
+              ) : (
+                <bdi>{t(locale, 'people.guardian.noContactInfo')}</bdi>
+              )}
               {guardian.is_primary ? (
                 <span data-testid="detail-primary">{t(locale, 'people.guardian.primary')}</span>
               ) : null}

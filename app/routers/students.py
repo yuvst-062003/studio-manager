@@ -81,6 +81,7 @@ from app.services.people.errors import RefusedError as OnboardingRefused
 from app.services.people.group_days import ScheduleReader
 from app.services.people.invitations import email_configured, send_invitation_email
 from app.services.people.matching import duplicate_student
+from app.services.people.naming import format_person_name
 from app.services.people.onboarding import OnboardingService
 from app.services.people.profile import ProfileService
 from app.services.people.students import StudentRow, StudentService
@@ -204,7 +205,7 @@ def _detail(session: TenantSession, student: Student, person: Person) -> Student
             GuardianOut(
                 person_id=g.person_id,
                 student_id=g.student_id,
-                display_name=f"{p.first_name} {p.last_name}",
+                display_name=format_person_name(p.first_name, p.last_name),
                 relation=g.relation,
                 is_primary=g.is_primary,
                 phone=p.phone,
@@ -659,7 +660,7 @@ def _guardian_list(session: TenantSession, student_id: uuid.UUID) -> GuardianLis
             GuardianOut(
                 person_id=guardian.person_id,
                 student_id=guardian.student_id,
-                display_name=f"{person.first_name} {person.last_name}",
+                display_name=format_person_name(person.first_name, person.last_name),
                 relation=guardian.relation,
                 is_primary=guardian.is_primary,
                 phone=person.phone,
@@ -934,7 +935,7 @@ def _my_profile_out(person: Person) -> MyProfileOut:
         person_id=person.id,
         first_name=person.first_name,
         last_name=person.last_name,
-        display_name=f"{person.first_name} {person.last_name}".strip(),
+        display_name=format_person_name(person.first_name, person.last_name),
         email=person.email,
         phone=person.phone,
     )

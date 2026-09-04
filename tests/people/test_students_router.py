@@ -263,6 +263,42 @@ def test_a_student_in_another_studio_is_404_and_never_403(client, as_manager):
     assert response.status_code == 404
 
 
+def test_a_nameless_guardian_shows_an_empty_display_name_not_a_bare_space(client, as_manager):
+    """Decision 20's 3-field add-student form sends a guardian email and no guardian name
+    at all (`test_guardian_create_nameless.py`). `f"{first} {last}"` on two empty strings
+    is `" "` -- a single space, not an empty string -- which renders as a blank row on the
+    manager's screens rather than an obviously-still-pending name."""
+    tag = uuid.uuid4().hex[:8]
+    payload = {
+        "first_name": f"דנה{tag}",
+        "last_name": f"כהן{tag}",
+        "birthdate": "2018-05-01",
+        "guardian": {
+            "email": f"nameless-{tag}@example.invalid",
+            "relation": "parent",
+        },
+    }
+    student = _create(client, as_manager, payload)["student"]
+
+    card = client.get(f"/api/v1/students/{student['id']}", headers=as_manager.headers)
+
+    assert card.status_code == 200
+    guardian = card.json()["guardians"][0]
+    assert guardian["display_name"] == ""
+    assert guardian["email"] == payload["guardian"]["email"]
+
+
+def test_a_named_guardian_still_shows_their_full_name(client, as_manager):
+    payload = _payload()
+    student = _create(client, as_manager, payload)["student"]
+
+    card = client.get(f"/api/v1/students/{student['id']}", headers=as_manager.headers)
+
+    guardian = card.json()["guardians"][0]
+    expected = f"{payload['guardian']['first_name']} {payload['guardian']['last_name']}"
+    assert guardian["display_name"] == expected
+
+
 def test_a_coach_may_read_one_students_card(
     client, as_manager, as_lead_coach, assign_coach, app_session, studio, a_group
 ):

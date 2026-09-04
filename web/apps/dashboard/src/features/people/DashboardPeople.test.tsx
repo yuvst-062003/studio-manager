@@ -732,6 +732,51 @@ describe('StudentDetailScreen — 4a', () => {
     expect(await screen.findByTestId('student-detail')).toHaveStyle({ display: 'grid' })
   })
 
+  // -- Decision 20's nameless guardian --------------------------------------------
+  //
+  // The 3-field add-student form sends a guardian email and no guardian name at all, so
+  // `GuardianOut.display_name` comes back `""` until the parent finishes the onboarding
+  // wizard. A blank row told the manager nothing; the card falls back to the email plus
+  // a hint instead.
+
+  it('shows the email and a not-yet-registered hint when a guardian has no name', async () => {
+    const client = makeClient({
+      student: vi.fn(() =>
+        Promise.resolve({
+          ...summary(),
+          current_belt_color_hex: '#ffffff',
+          current_belt_name: 'לבנה',
+          guardians: [
+            {
+              person_id: 'p9',
+              student_id: 'st1',
+              display_name: '',
+              relation: 'parent',
+              is_primary: true,
+              phone: null,
+              email: 'nameless@example.invalid',
+            },
+          ],
+        }),
+      ),
+    })
+    render(<StudentDetailScreen studentId="st1" locale="he" client={client} />)
+
+    const row = await screen.findByTestId('detail-guardian')
+    expect(within(row).getByText('nameless@example.invalid')).toBeInTheDocument()
+    expect(
+      within(row).getByText(t('he', 'people.guardian.notRegisteredYet')),
+    ).toBeInTheDocument()
+  })
+
+  it('shows a named guardian’s name, and never their email', async () => {
+    render(<StudentDetailScreen studentId="st1" locale="he" client={makeClient()} />)
+
+    const row = await screen.findByTestId('detail-guardian')
+    expect(within(row).getByText('יעל כהן')).toBeInTheDocument()
+    expect(within(row).queryByText('y@example.invalid')).not.toBeInTheDocument()
+  })
+
   // -- 4a's attendance section --------------------------------------------------
   //
   // `GET /students/{id}/attendance` has been manager-scoped and built since M5 and was

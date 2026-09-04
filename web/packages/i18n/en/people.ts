@@ -78,6 +78,8 @@ export const people: Bundle = {
   'guardian.contact': 'Contact',
   'guardian.call': 'Call',
   'guardian.message': 'Send a message',
+  'guardian.notRegisteredYet': 'Not registered yet',
+  'guardian.noContactInfo': 'No contact info',
 
   'import.title': 'Import students from a file',
   'import.hint': 'A CSV — one row per child. Siblings share a row each with the same parent email, and the server joins them onto one account.',

@@ -42,6 +42,7 @@ from app.models.schedule import Session as SessionRow
 from app.services.attendance.errors import NotFoundError
 from app.services.people.attendance_pattern import is_expected
 from app.services.people.group_days import studio_weekday
+from app.services.people.naming import format_person_name
 
 #: §5.4 -- a `pending` enrollment is a registration request nobody has approved yet, and a
 #: coach marking a child the club has not accepted is a record of a decision that was never
@@ -228,7 +229,7 @@ def _row(
 ) -> RosterRowRaw:
     return RosterRowRaw(
         student_id=student.id,
-        display_name=f"{person.first_name} {person.last_name}",
+        display_name=format_person_name(person.first_name, person.last_name),
         health_status=student.health_status,
         derived_flags=derived_flags,
         # §5.14 -- no stored row means `unmarked`, which is a real answer ("nobody has

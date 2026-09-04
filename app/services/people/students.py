@@ -46,6 +46,7 @@ from app.services.people.enrollments import EnrollmentService
 from app.services.people.errors import ConflictError, NotFoundError, RefusedError
 from app.services.people.group_days import ScheduleReader
 from app.services.people.matching import match_person
+from app.services.people.naming import format_person_name
 from app.services.people.status import StudentStatusService
 
 #: §5.3's invitation. Thirty days matches the refresh-token window and is long enough that
@@ -427,7 +428,7 @@ class StudentService:
             current_belt_id=student.current_belt_id,
             group_names=group_names,
             frozen_until=frozen_until,
-            guardian_display_names=[f"{first} {last}" for first, last in guardians],
+            guardian_display_names=[format_person_name(first, last) for first, last in guardians],
             # Excluding unmarked from BOTH halves, like the student-card strip: an
             # unmarked register says nothing about the child (§5.14).
             attendance_percent=(

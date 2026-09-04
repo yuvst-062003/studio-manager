@@ -108,6 +108,12 @@ export const people: Bundle = {
   'guardian.contact': 'יצירת קשר',
   'guardian.call': 'חיוג',
   'guardian.message': 'שליחת הודעה',
+  // Decision 20 — the 3-field add-student form takes a guardian email and no name, so
+  // the parent's own name is missing until they finish the wizard. The card shows the
+  // email instead of a blank row, with this hint beside it.
+  'guardian.notRegisteredYet': 'טרם נרשם/ה',
+  // Neither a name nor an email — a fallback that is still true, never a blank row.
+  'guardian.noContactInfo': 'אין פרטי קשר',
 
   // -- the public landing page (parent 13a–13c) ---------------------------------
   'import.title': 'ייבוא תלמידים מקובץ',
