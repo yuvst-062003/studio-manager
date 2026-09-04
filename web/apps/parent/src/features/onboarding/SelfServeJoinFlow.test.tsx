@@ -234,6 +234,32 @@ describe('SelfServeJoinFlow -- Doors C and D', () => {
     await screen.findByTestId('join-welcome')
   })
 
+  // F5 -- Doors C/D share `JoinFlow.tsx`'s `pageStyle` byte-for-byte but, unlike Door B,
+  // never reserved the accessibility FAB's corner at all (`.studio-a11y__fab`,
+  // primitives.css, is `position: fixed` above every route including these two). The
+  // fix reserves it the same way Door B does: `paddingBlockEnd: var(--a11y-fab-clearance)`,
+  // the token defined once in `primitives.css` beside `.studio-a11y__fab` itself. jsdom
+  // does not do real layout, so this only proves the mechanism is wired up -- see the
+  // equivalent test and comment in `JoinFlow.test.tsx` for why a geometry assertion
+  // would not measure anything here.
+  it('reserves the FAB clearance as padding-block-end, so the corner is never covered (F5)', async () => {
+    stubFetch()
+    render(
+      <SelfServeJoinFlow
+        billingClient={billingClient}
+        displayName={DISPLAY_NAME}
+        door="addChild"
+        healthClient={healthClient}
+        locale="he"
+        privacyClient={makePrivacyClient()}
+        standingOrderLinks={[]}
+      />,
+    )
+    await screen.findByTestId('join-welcome')
+    const style = screen.getByTestId('join-welcome').parentElement?.getAttribute('style')
+    expect(style).toContain('padding-block-end: var(--a11y-fab-clearance)')
+  })
+
   // Decision 11 -- "the club logo appears on the welcome screen and in each popup
   // header." Doors C and D used to hardcode `logoUrl={null}` into `JoinWelcomeStep`, so
   // a parent arriving from a manager's invitation (Door C) or adding a sibling (Door D)

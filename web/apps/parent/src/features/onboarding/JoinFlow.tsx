@@ -55,64 +55,6 @@ type JoinInfo = {
 
 type JoinStep = 'welcome' | 'family' | 'health' | 'payment' | 'done'
 
-// F5, still open after B1. B1's `pageStyle` wrapper (below) gave every step a uniform
-// `var(--space-4)` (16px) padding, which reads as "no longer flush in the corner" but is
-// not the fix: `AccessibilityMenu`'s FAB (`.studio-a11y__fab`, primitives/primitives.css)
-// is `position: fixed`, so it floats above this container regardless of the container's
-// own padding, at `inset-block-end: var(--space-3)` (12px from the viewport's bottom
-// edge) with a 44px `block-size`. A step whose content ends near the viewport's bottom on
-// FIRST PAINT -- step 1 here, before any scrolling -- lands its own last control inside
-// that same 12-56px band, and Playwright (and a real thumb) cannot tell the two apart.
-// Measured 2026-09-03 at 420x900: the "המשך" button and the FAB overlapped by a real
-// bounding-box intersection, not just visual proximity.
-//
-// **This is not RTL-only.** `inset-inline-start` flips the FAB's inline (horizontal)
-// side with direction, and a lone forward button in `WizardNavButtons`'s unstyled flex
-// row packs to that same inline-start edge in EITHER direction -- so the two share a
-// corner in Hebrew and in English alike (confirmed by measuring both directions with a
-// real Chromium page). What varies by direction is only which physical corner; the
-// collision itself is a BLOCK-axis (vertical) problem, not an inline-axis one.
-//
-// **Why this needs measuring, not just a CSS value.** Two CSS-only attempts were tried
-// and both failed, empirically, before this one:
-//   1. More `padding-block-end` on this wrapper. Padding added AFTER the last element
-//      can only push space below it -- it cannot move the element itself. On a step
-//      short enough to render fully without scrolling (step 1's real-world repro), that
-//      makes it a no-op: verified by forcing the same reproducible layout at a shorter
-//      viewport and diffing `padding-block-end: 16px` against a much larger value -- the
-//      button's on-screen position was byte-for-byte identical either way.
-//   2. `position: sticky; inset-block-end: <clearance>` on a wrapper around `content`.
-//      This looks like the standard tool for "never let this get closer than X to the
-//      viewport edge", but Chromium's `bottom`-anchored sticky only holds an element back
-//      while the user scrolls TOWARD that edge from beyond it -- it does not pre-emptively
-//      clamp an element whose STATIC position already violates the offset at rest,
-//      confirmed with an isolated, app-free test page at several scroll positions
-//      (including a real scrollable ancestor and a trailing sibling spacer, not just
-//      padding): the button tracked scroll 1:1 with zero clamping in every configuration,
-//      while an identical `top`-anchored sticky element in the same environment clamped
-//      exactly as expected. Real, reproducible Chromium behavior, not a setup mistake.
-//
-// What actually works, and what this does: measure how far this wrapper's own top sits
-// below the page's top -- unavoidable because the shell renders its own chrome
-// (`LanguagePicker`) above this component, outside this file, at a height this file
-// cannot see in CSS alone -- and cap this wrapper's own `block-size` at exactly what is
-// left of the viewport after that offset and the FAB's clearance, scrolling its own
-// content internally (`overflow-y: auto`) rather than letting it render past that line.
-// Short content just leaves blank space at the bottom of this box, unremarkable; content
-// too tall to fit scrolls within it, and the FAB's band is never reachable. Confirmed
-// empirically at the real repro's forced-collision size (see the standalone Playwright
-// check run for this fix, noted in the commit) and at 420x900 in both directions.
-//
-// The reserved amount is the FAB's own footprint plus a real gap, not a number picked to
-// look right today: `var(--space-3)` (the FAB's `inset-block-end` offset) + 44px (the
-// FAB's own `block-size`/`inline-size`, hardcoded in its rule the same way this hardcodes
-// it back -- primitives.css has no shared size token to draw on, matching the same
-// FAB-clearance problem's existing fix in `first-run/dashboard-signin.css`) + another
-// `var(--space-3)` so content ends short of the FAB's top edge rather than flush against
-// it. If the FAB is ever resized, both numbers live in `.studio-a11y__fab` and this
-// comment names them, rather than a magic number silently drifting out of sync.
-const A11Y_FAB_CLEARANCE = 'var(--space-3) + 44px + var(--space-3)'
-
 const pageStyle: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
@@ -121,42 +63,6 @@ const pageStyle: CSSProperties = {
   marginInline: 'auto',
   inlineSize: '100%',
   padding: 'var(--space-4)',
-}
-
-/** How far the measured node sits below the very top of the document, independent of the
- *  page's current scroll position -- `getBoundingClientRect().top` alone is relative to
- *  whatever is currently scrolled into view, so it is added back to `scrollY` here to
- *  recover the stable, scroll-independent offset the clearance calc below needs.
- *
- *  A CALLBACK ref, not a plain one: this component returns `null` on its very first
- *  render (`info` still loading, see below) before any DOM exists, and a `useLayoutEffect`
- *  keyed on a plain `useRef` object only fires once, against THAT render -- it measures
- *  `null`, and because the ref object itself never changes, never fires again once the
- *  real wrapper mounts a render later (confirmed the hard way: logging inside such an
- *  effect showed it running exactly twice, both against a null node, for every load). A
- *  callback ref sidesteps this by construction -- React calls it exactly when it attaches
- *  (or detaches) a real node, whichever render that happens on. Re-measures on resize too
- *  (locale switches change `LanguagePicker`'s own rendered height -- see the long comment
- *  above `A11Y_FAB_CLEARANCE`). */
-function useDocumentTopOffset(): { ref: (node: HTMLElement | null) => void; offset: number } {
-  const [offset, setOffset] = useState(0)
-  const nodeRef = useRef<HTMLElement | null>(null)
-  const measure = useCallback(() => {
-    const node = nodeRef.current
-    if (node) setOffset(node.getBoundingClientRect().top + globalThis.scrollY)
-  }, [])
-  const ref = useCallback(
-    (node: HTMLElement | null) => {
-      nodeRef.current = node
-      measure()
-    },
-    [measure],
-  )
-  useEffect(() => {
-    globalThis.addEventListener('resize', measure)
-    return () => globalThis.removeEventListener('resize', measure)
-  }, [measure])
-  return { ref, offset }
 }
 
 const confirmStyle: CSSProperties = {
@@ -234,10 +140,6 @@ export function JoinFlow({
   standingOrderLinks: readonly StandingOrderLink[]
   token: string
 }) {
-  // F5's clearance -- see the long comment above `A11Y_FAB_CLEARANCE`. Measured on
-  // THIS render's own wrapper, not assumed, because the shell's chrome above it
-  // (`LanguagePicker`) is outside this file.
-  const { ref: pageRef, offset: pageTopOffset } = useDocumentTopOffset()
   const [info, setInfo] = useState<JoinInfo | null | 'invalid'>(null)
   const [step, setStep] = useState<JoinStep>('welcome')
   // Local placeholders (`local-0`, `local-1`, ...) until `submitRegistration` succeeds,
@@ -457,8 +359,9 @@ export function JoinFlow({
   }
 
   // F5 -- every step's content is computed here and wrapped exactly ONCE, below, in
-  // `pageStyle`'s padded, FAB-clearance-capped container (see the comment above
-  // `A11Y_FAB_CLEARANCE`). Before B1, `welcome` and `family` returned their step
+  // `pageStyle`'s padded container, whose `paddingBlockEnd` reserves the FAB's own
+  // corner (`--a11y-fab-clearance`, primitives.css). Before B1, `welcome` and `family`
+  // returned their step
   // component bare (no padding at all), so their primary button landed flush in the
   // corner, underneath the accessibility FAB, and Playwright could not click it.
   // B1's padding fixed that corner case but not the FAB collision itself. Wrapping
@@ -585,15 +488,7 @@ export function JoinFlow({
   }
 
   return (
-    <div
-      ref={pageRef}
-      style={{
-        ...pageStyle,
-        blockSize: `calc(100dvh - ${pageTopOffset}px - (${A11Y_FAB_CLEARANCE}))`,
-        overflowY: 'auto',
-      }}
-      data-testid={testId}
-    >
+    <div style={{ ...pageStyle, paddingBlockEnd: 'var(--a11y-fab-clearance)' }} data-testid={testId}>
       {content}
     </div>
   )

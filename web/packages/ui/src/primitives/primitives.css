@@ -1642,6 +1642,17 @@ a.studio-stat-tile:focus-visible {
 }
 
 /* -- נגישות (IS 5568, 2026-08-30) — the adjustments menu and what its flags do -------- */
+
+/* F5: how far ANY content elsewhere in the app must stay clear of the FAB below, so a
+ * primary action never comes to rest underneath it. Built from that rule's own three
+ * numbers -- its `inset-block-end` offset, its hardcoded 44px size, and that offset
+ * again as a trailing gap so content ends short of the FAB rather than flush against
+ * it -- and kept here, beside `.studio-a11y__fab`, because both numbers are that rule's
+ * and the two must be edited together. */
+:root {
+  --a11y-fab-clearance: calc(var(--space-3) + 44px + var(--space-3));
+}
+
 .studio-a11y__fab {
   position: fixed;
   inset-inline-start: var(--space-3);

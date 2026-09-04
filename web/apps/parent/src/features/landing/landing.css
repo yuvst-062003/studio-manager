@@ -912,6 +912,12 @@
   max-block-size: 85dvh;
   overflow-y: auto;
   padding: var(--space-5);
+
+  /* F5 -- this sheet's bottom edge sits flush with the viewport bottom, and the
+   * accessibility FAB (z-index 60) floats above it, so a primary button at the end of a
+   * scrolled sheet lands underneath the FAB. Reserves its corner the same way the doors
+   * do (`--a11y-fab-clearance`, beside `.studio-a11y__fab` in primitives.css). */
+  padding-block-end: calc(var(--space-5) + var(--a11y-fab-clearance));
   position: fixed;
   z-index: 41;
 }
@@ -1033,5 +1039,9 @@
     inset-inline: 0;
     margin: auto;
     max-inline-size: 30rem;
+
+    /* F5 -- at this width the sheet is a centered card, nowhere near the FAB's
+     * viewport corner, so the base rule's reserved clearance is reset. */
+    padding-block-end: var(--space-5);
   }
 }

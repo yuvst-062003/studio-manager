@@ -590,7 +590,10 @@ export function SelfServeJoinFlow({
   }
 
   return (
-    <div style={pageStyle} data-testid={testId}>
+    // F5 -- reserves the accessibility FAB's corner (`--a11y-fab-clearance`,
+    // primitives.css, beside `.studio-a11y__fab`) so a primary action never comes to
+    // rest underneath it, the same fix as Door B (`JoinFlow.tsx`).
+    <div style={{ ...pageStyle, paddingBlockEnd: 'var(--a11y-fab-clearance)' }} data-testid={testId}>
       {content}
     </div>
   )

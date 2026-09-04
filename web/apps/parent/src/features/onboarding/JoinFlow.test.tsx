@@ -864,24 +864,27 @@ describe('JoinFlow', () => {
   // F5, closed for real. B1's padding (asserted above) was a genuine improvement -- the
   // button was no longer flush in the viewport corner -- but a live measurement on
   // 2026-09-03 still found the "המשך" button and the accessibility FAB's bounding boxes
-  // overlapping: padding added AFTER the last element can only reserve space below it, it
-  // cannot move that element, so a step short enough to render fully without scrolling
-  // was unaffected by any amount of it. The real fix measures how far this wrapper sits
-  // below the page's own top (chrome outside this file, `LanguagePicker`, renders above
-  // it) and caps the wrapper's own `block-size` at exactly what is left of the viewport
-  // after that offset and the FAB's clearance, scrolling its own content internally
-  // rather than letting it render past that line.
+  // overlapping: a uniform padding on every side reads as "no longer flush" without
+  // actually reserving the FAB's own corner. The fix reserves exactly that corner --
+  // `paddingBlockEnd: var(--a11y-fab-clearance)`, the token defined once in
+  // `primitives.css` beside `.studio-a11y__fab` itself, built from that rule's own
+  // `inset-block-end` offset, its hardcoded 44px size, and that offset again as a
+  // trailing gap -- so content ends short of the FAB rather than flush against it. This
+  // replaced an earlier attempt that capped the wrapper's `block-size` to the viewport
+  // and scrolled it internally (`overflow-y: auto`); that also worked but added a nested
+  // scroll container that broke the mobile browser's address-bar collapse-on-scroll, and
+  // needed a ~40-line hook to measure the wrapper's offset from the page's own top.
+  // Padding needs neither: it reserves space at the end of natural, unclipped page flow.
   //
   // jsdom does not do real layout -- every element's `getBoundingClientRect()` reads back
   // all zeroes, so a geometry assertion here would not be measuring anything. This test
-  // proves only that the mechanism is wired up: the wrapper carries a `block-size` capped
-  // by the SAME tokens `.studio-a11y__fab` itself uses (`primitives.css`) plus its
-  // hardcoded 44px size, and `overflow-y: auto` so content is actually clipped/scrolled
-  // rather than merely reserved-around. The real, pixel-level proof that the two boxes
-  // never intersect was done with a standalone Playwright script against a real Chromium
-  // page (see the commit message) -- jsdom cannot make that claim, and this test does not
-  // pretend to.
-  it('caps the step wrapper to the viewport minus the FAB clearance, so content is clipped rather than merely padded (F5)', async () => {
+  // proves only that the mechanism is wired up: the wrapper carries the same
+  // `--a11y-fab-clearance` token `.studio-a11y__fab` itself is built from
+  // (`primitives.css`), as `padding-block-end`. The real, pixel-level proof that the two
+  // boxes never intersect was done with a standalone Playwright script against a real
+  // Chromium page (see the commit message) -- jsdom cannot make that claim, and this test
+  // does not pretend to.
+  it('reserves the FAB clearance as padding-block-end, so the corner is never covered (F5)', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => new Response(JSON.stringify({ items: [] }), { status: 200 })),
@@ -899,12 +902,7 @@ describe('JoinFlow', () => {
     )
     await screen.findByTestId('join-welcome')
     const style = screen.getByTestId('join-welcome').parentElement?.getAttribute('style')
-    expect(style).toContain('overflow-y: auto')
-    // The clearance formula: the FAB's own `inset-block-end` token, its hardcoded 44px
-    // size, and the same token again as the trailing gap -- see `.studio-a11y__fab` in
-    // primitives.css and the long comment above `A11Y_FAB_CLEARANCE` in this file.
-    expect(style).toContain('var(--space-3) + 44px + var(--space-3)')
-    expect(style).toContain('block-size: calc(100dvh -')
+    expect(style).toContain('padding-block-end: var(--a11y-fab-clearance)')
   })
 
   it('advances the health queue from local drafts for both kids, then writes both declarations in the same single request', async () => {
