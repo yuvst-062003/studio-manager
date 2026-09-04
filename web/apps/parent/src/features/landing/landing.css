@@ -930,6 +930,13 @@
   inset-block-end: 0;
   inset-inline: 0;
   padding: var(--space-3) var(--space-4) var(--space-5);
+
+  /* F5 -- the accessibility FAB (z-index 60) floats over this bar's inline-start end;
+   * reserves its corner so the full-width button underneath is never partly covered. The
+   * `@media (width >= 64rem)` reset below (padding: 0, a floating inline-end button) is
+   * nowhere near that corner, so it already neutralises this without needing its own
+   * override. */
+  padding-inline-start: var(--a11y-fab-clearance);
   position: fixed;
   z-index: 30;
 }
