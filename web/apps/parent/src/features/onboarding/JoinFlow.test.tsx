@@ -101,9 +101,11 @@ function makePrivacyClient(): PrivacyClient {
 // one combined "app" card and tick, so this helper now ticks all three.
 async function acceptWelcomeStep(user: ReturnType<typeof userEvent.setup>) {
   await screen.findByTestId('join-welcome')
-  await user.click(screen.getByTestId('join-welcome-terms-check'))
-  await user.click(screen.getByTestId('join-welcome-privacy-check'))
-  await user.click(screen.getByTestId('join-welcome-club-check'))
+  // One tick for all three documents (owner's 2026-09-04 decision): step 1 shows the
+  // three cards, each still openable on its own, but a single checkbox gates continue.
+  // The three per-card marks are decorative and aria-hidden, so there is nothing else
+  // here to click. `JoinWelcomeStep` still records the three grants separately.
+  await user.click(screen.getByTestId('join-welcome-agree-check'))
   await user.click(screen.getByTestId('join-welcome-continue'))
 }
 
@@ -801,7 +803,7 @@ describe('JoinFlow', () => {
     // Step 1, right away -- not a loading gap, not a sign-in wall.
     expect(screen.getByTestId('join-welcome')).toBeInTheDocument()
     expect(screen.queryByTestId('sign-in')).toBeNull()
-    expect(screen.getByTestId('join-welcome-terms-check')).toBeInTheDocument()
+    expect(screen.getByTestId('join-welcome-agree-check')).toBeInTheDocument()
   })
 
   // F5 -- `welcome` and `family` used to render bare (no `pageStyle` container), while
