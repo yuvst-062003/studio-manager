@@ -14,6 +14,10 @@ import type { BillingClient, ChargeOut } from '../../billing/billingClient'
 import type { StandingOrderLink } from '../../billing/PaymentSetup'
 import type { HealthClient } from '../../health/healthClient'
 import { STEP1_COPY, STEP2_COPY, STEP3_COPY, STEP4_COPY, STUDENT_FORM_COPY } from './content'
+import { Step3Payment } from './Step3Payment'
+import type { SubmitJoinResult } from './submitJoin'
+import { emptyStudent } from './types'
+import type { WizardPlan } from './types'
 import { WizardJoinFlow } from './WizardJoinFlow'
 
 vi.mock('@studio/core', async (importOriginal) => {
@@ -342,4 +346,91 @@ describe('WizardJoinFlow -- wiring submitJoin into the screens', () => {
     expect(screen.getByText(STEP4_COPY.paymentReasonWriteFailed)).toBeInTheDocument()
     expect(screen.queryByText(STEP4_COPY.paymentRecorded)).toBeNull()
   }, 20000)
+
+  it('F5: "already arranged" removes the card option entirely, and submitting reaches createPromise, never createOrder', async () => {
+    const user = userEvent.setup()
+    const { apiFetch } = await import('@studio/core')
+    vi.mocked(apiFetch).mockImplementation(fetchHandler())
+    const billingClient = billingClientStub({ openCharges: vi.fn(async () => [charge('ch1', 's1')]) })
+    renderWizard({ billingClient })
+
+    await addOneChildAndReachStep3(user)
+    // "כן, התשלום כבר הוסדר מראש" -- the arranged-with-the-coach choice.
+    await user.click(
+      screen.getByRole('radio', { name: new RegExp(STEP3_COPY.decisionArrangedTitle) }),
+    )
+    await user.click(screen.getByRole('button', { name: STEP3_COPY.reportArranged }))
+
+    // No אשראי option anywhere on the methods screen -- not disabled, absent.
+    expect(screen.queryByRole('radio', { name: STEP3_COPY.methodCredit })).toBeNull()
+    // The footer follows: with no chargeable child left on credit, the button never
+    // offers a card charge.
+    expect(screen.queryByText(new RegExp(STEP3_COPY.submitWithCredit))).toBeNull()
+    const submit = screen.getByRole('button', { name: STEP3_COPY.submitNoCredit })
+
+    await user.click(submit)
+
+    await waitFor(() => expect(billingClient.createPromise).toHaveBeenCalled())
+    expect(billingClient.createOrder).not.toHaveBeenCalled()
+  }, 20000)
+})
+
+// F2 (fix round 1) — an unsigned mandate row used to expose "open the form" only as an
+// accessible name, with nothing on screen telling a SIGHTED family the row is tappable.
+// `Step3Payment` is presentational and the mandates checklist is entirely internal state
+// (reached only by what `onSubmit` resolves with), so this renders it directly rather
+// than driving the whole wizard through a real registration just to reach the checklist.
+describe('Step3Payment -- the mandates checklist (F2 fix round 1)', () => {
+  const PLAN: WizardPlan = {
+    id: 'plan-1',
+    title: 'חודשי',
+    subtitle: '',
+    pricePerMonthAgorot: 30_000,
+    features: [],
+  }
+
+  it('an unsigned mandate row shows its open-the-form text visibly, not only as an accessible name', async () => {
+    const user = userEvent.setup()
+    const student = emptyStudent('c1', { firstName: 'איתי', lastName: 'לוי', planId: PLAN.id })
+    const result: SubmitJoinResult = {
+      personId: 'person-1',
+      outcomes: [
+        {
+          draftId: 'c1',
+          name: 'איתי לוי',
+          method: 'standing_order',
+          amountAgorot: 30_000,
+          state: 'mandate_pending',
+        },
+      ],
+      checkout: null,
+      checkoutUnavailable: false,
+      mandates: [
+        { draftId: 'c1', studentId: 's1', name: 'איתי לוי', amountAgorot: 30_000, url: 'https://upay.example/link' },
+      ],
+    }
+
+    render(
+      <Step3Payment
+        students={[student]}
+        plans={[PLAN]}
+        methods={{ c1: 'standing_order' }}
+        onMethodChange={() => {}}
+        onBack={() => {}}
+        onSubmit={async () => result}
+        onDone={() => {}}
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: STEP3_COPY.continueToPay }))
+    await user.click(screen.getByRole('button', { name: STEP3_COPY.submitNoCredit }))
+
+    const row = await screen.findByRole('button', {
+      name: `${STEP3_COPY.mandateOpen} — איתי לוי`,
+    })
+    // The accessible name (asserted above) is not enough on its own -- F2's finding was
+    // that nothing on screen told a SIGHTED parent the row was tappable. The visible
+    // text has to be there too, and in the link-blue the rest of the screen uses for it.
+    expect(within(row).getByText(STEP3_COPY.mandateOpen)).toBeVisible()
+  })
 })

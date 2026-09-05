@@ -96,6 +96,20 @@ export function Step3Payment({
   const setIntent = (next: Intent) => {
     setIntentState(next)
     onIntentChange?.(next === 'arranged')
+    // F5 (fix round 1) — "already arranged" must never leave a child on credit: a card
+    // pays through this app's own uPay order, which is a SECOND charge for money the
+    // family has just told the club they already handed over. Writing an explicit value
+    // for every such child, once, here, is what keeps this component's own `?? 'credit'`
+    // fallback, the picker's `active` check and `submitJoin`'s method bucketing from
+    // disagreeing about what was chosen -- the three only ever read the same value.
+    // Switching back to 'now' changes nothing: a family that picked cash and changed
+    // their mind still has cash selected, and can choose card again themselves.
+    if (next === 'arranged') {
+      for (const student of chargeable) {
+        const current = methods[student.id]
+        if (current === undefined || current === 'credit') onMethodChange(student.id, 'cash')
+      }
+    }
   }
 
   const priceOf = (student: StudentDraft) =>
@@ -121,6 +135,12 @@ export function Step3Payment({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [students, plans, methods])
+
+  // F5 (fix round 1) — no אשראי button at all on the "already arranged" path, not a
+  // disabled one. A disabled control still invites "why can't I?"; this route simply has
+  // no card in it.
+  const availableMethodButtons =
+    intent === 'arranged' ? METHOD_BUTTONS.filter((button) => button.key !== 'credit') : METHOD_BUTTONS
 
   const allMandatesSigned =
     result !== null && result.mandates.every((mandate) => signed.includes(mandate.draftId))
@@ -260,43 +280,43 @@ export function Step3Payment({
 
             {result.mandates.map((mandate) => {
               const isSigned = signed.includes(mandate.draftId)
-              const row = (
-                <>
-                  <span className="flex items-center gap-2.5 min-w-0">
-                    {isSigned ? (
-                      <Check className="w-4 h-4 text-emerald-700 shrink-0" aria-hidden />
-                    ) : (
-                      <span
-                        aria-hidden
-                        className="w-4 h-4 rounded-full border-2 border-[#757681] shrink-0"
-                      />
-                    )}
-                    <span className="flex flex-col min-w-0 text-right">
-                      <span className="text-[13px] font-bold text-[#161b28] truncate">
-                        {mandate.name}
-                      </span>
-                      <span className="text-[11px] text-[#444650]">
-                        ₪{formatShekels(mandate.amountAgorot)}
-                      </span>
+              const marker = (
+                <span className="flex items-center gap-2.5 min-w-0">
+                  {isSigned ? (
+                    <Check className="w-4 h-4 text-emerald-700 shrink-0" aria-hidden />
+                  ) : (
+                    <span
+                      aria-hidden
+                      className="w-4 h-4 rounded-full border-2 border-[#757681] shrink-0"
+                    />
+                  )}
+                  <span className="flex flex-col min-w-0 text-right">
+                    <span className="text-[13px] font-bold text-[#161b28] truncate">
+                      {mandate.name}
+                    </span>
+                    <span className="text-[11px] text-[#444650]">
+                      ₪{formatShekels(mandate.amountAgorot)}
                     </span>
                   </span>
-                  <span
-                    className={`text-[12px] font-semibold shrink-0 ${
-                      isSigned ? 'text-emerald-700' : 'text-[#444650]'
-                    }`}
-                  >
-                    {isSigned ? copy.mandateDone : copy.mandateTodo}
-                  </span>
-                </>
+                </span>
               )
               return isSigned ? (
                 <div
                   key={mandate.draftId}
                   className="flex items-center justify-between gap-2 py-2.5 border-b border-[#f2f3ff] last:border-0"
                 >
-                  {row}
+                  {marker}
+                  <span className="text-[12px] font-semibold text-emerald-700 shrink-0">
+                    {copy.mandateDone}
+                  </span>
                 </div>
               ) : (
+                // F2 (fix round 1) — this row IS the only route to signing a mandate, and
+                // an empty circle beside a status word ("להסדרה") reads as information,
+                // not as something to tap. `copy.mandateOpen` now stands in that same
+                // spot as a visible, blue, underline-on-hover call to action, so a
+                // sighted parent gets the same "tap me" signal a screen reader already
+                // had from the accessible name below (left untouched).
                 <button
                   key={mandate.draftId}
                   type="button"
@@ -305,9 +325,12 @@ export function Step3Payment({
                     setOpenMandateDraftId(mandate.draftId)
                     setFrame({ kind: 'link', url: mandate.url })
                   }}
-                  className="flex items-center justify-between gap-2 py-2.5 -mx-1 px-1 border-b border-[#f2f3ff] last:border-0 w-full text-right cursor-pointer hover:bg-[#f2f3ff] rounded-lg transition-colors focus-visible:ring-2 focus-visible:ring-[#0056c5]"
+                  className="group flex items-center justify-between gap-2 py-2.5 -mx-1 px-1 border-b border-[#f2f3ff] last:border-0 w-full text-right cursor-pointer hover:bg-[#f2f3ff] rounded-lg transition-colors focus-visible:ring-2 focus-visible:ring-[#0056c5]"
                 >
-                  {row}
+                  {marker}
+                  <span className="text-[13px] font-bold text-[#0056c5] shrink-0 group-hover:underline group-active:text-[#00429b]">
+                    {copy.mandateOpen}
+                  </span>
                 </button>
               )
             })}
@@ -473,8 +496,17 @@ export function Step3Payment({
                   <legend className="text-[11px] text-[#444650] font-medium mb-1">
                     {copy.methodFor} {name}
                   </legend>
-                  <div className="grid grid-cols-4 gap-1.5">
-                    {METHOD_BUTTONS.map(({ key, label, Icon }) => {
+                  {/* F5 (fix round 1) — arranged with the coach already means one of the
+                      three PROMISE methods. No אשראי button here at all: a family that
+                      just reported the payment settled must never be one tap from a real
+                      card charge on a live merchant account, and a disabled button still
+                      invites "why can't I?" where an absent one does not. */}
+                  <div
+                    className={`grid gap-1.5 ${
+                      intent === 'arranged' ? 'grid-cols-3' : 'grid-cols-4'
+                    }`}
+                  >
+                    {availableMethodButtons.map(({ key, label, Icon }) => {
                       const active = method === key
                       return (
                         <label
@@ -501,7 +533,10 @@ export function Step3Payment({
             )
           })}
 
-          {students.length >= 2 &&
+          {/* F3 (fix round 1) — counts CHARGEABLE children, not every registered child: a
+              family of two where one is awaiting manager review has exactly one payer,
+              and "one form either way" is not a multi-child note. */}
+          {chargeable.length >= 2 &&
           chargeable.some((student) => (methods[student.id] ?? 'credit') === 'standing_order') ? (
             <div className="bg-[#0056c5]/10 border border-[#0056c5]/20 rounded-xl p-3 flex items-start gap-2 text-[#001849]">
               <Repeat className="w-4 h-4 text-[#0056c5] shrink-0 mt-0.5" />

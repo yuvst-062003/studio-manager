@@ -418,7 +418,9 @@ export const STEP3_COPY = {
   mandatesTitle: 'הוראת קבע',
   mandatesCount: 'הרשאות להסדרה',
   mandateDone: 'הוסדר',
-  mandateTodo: 'להסדרה',
+  // F2 (fix round 1) — `mandateOpen` is now what an unsigned row shows visibly (a link-
+  // blue call to action), not just its accessible name, so the separate `mandateTodo`
+  // status word it used to show instead is dead. Removed rather than left unused.
   mandateOpen: 'פתיחת הטופס',
   mandatesFinish: 'סיום הרשמה',
   mandatesFinishWithOpen: 'סיום — נותרו הרשאות להסדרה',
@@ -454,7 +456,6 @@ export const STEP4_COPY = {
 
   traineesTitle: 'מתאמנים רשומים',
   season: 'תשפ״ה',
-  paidBadge: 'תשלום אושר',
   awaitingBadge: 'ממתין למענה מנהל',
   openCard: 'פתיחת כרטיס חניך',
 
@@ -474,14 +475,15 @@ export const STEP4_COPY = {
   paymentReasonNoChargeForCard: 'אין חיוב פתוח לתשלום באשראי — המועדון ייצור קשר',
   paymentReasonWriteFailed: 'ההרשמה נקלטה, אך הדיווח על אופן התשלום לא נשלח. המועדון ייצור קשר',
   paymentReasonNoStudent: 'ההרשמה נקלטה. המועדון ייצור קשר להשלמת פרטי התשלום',
-} as const
 
-/** Hardcoded by decision (spec §16 item 4) — these are Gladiator's own, and move to studio
- *  settings before a second studio onboards. */
-export const UPCOMING_EVENTS = [
-  { id: 'ev-1', day: '15', month: 'ספט׳', title: 'אימון פתיחת עונה חגיגי 🥋', detail: 'יום א׳, 17:30 • דוג׳ו מרכזי', audience: 'לכל המשפחה' },
-  { id: 'ev-2', day: '20', month: 'ספט׳', title: 'סדנת קרבות וטקטיקה 🏆', detail: 'יום ו׳, 13:30 • אולם הספורט', audience: 'נבחרת' },
-] as const
+  // F1 (fix round 1) — the trainee-list chip, driven by that child's `PaymentOutcome`
+  // rather than drawn unconditionally. `awaitingBadge` above is reused for
+  // `awaiting_review`; these four cover the remaining states.
+  chipRecorded: 'אופן התשלום נרשם',
+  chipMandatePending: 'נותר לחתום על הו״ק',
+  chipCardPending: 'ממתין לתשלום באשראי',
+  chipNotRecorded: 'אופן התשלום לא נרשם',
+} as const
 
 export const ATHLETE_CARD_COPY = {
   title: 'כרטיס חניך דיגיטלי',

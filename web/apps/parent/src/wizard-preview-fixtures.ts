@@ -50,6 +50,17 @@ export const PLANS: readonly WizardPlan[] = [
   },
 ]
 
+// F4 (fix round 1) — these two rows used to live in the wizard's own `content.ts` and
+// `Step4Done` rendered them unconditionally: a family who had just registered would put a
+// club event that does not exist in their calendar. `Step4Done.events` is now an optional
+// prop that renders nothing when absent (same shape as `registrationRef`), and the wizard
+// itself passes none. These stay here only so the preview harness can still show the
+// card's design.
+export const UPCOMING_EVENTS = [
+  { id: 'ev-1', day: '15', month: 'ספט׳', title: 'אימון פתיחת עונה חגיגי 🥋', detail: 'יום א׳, 17:30 • דוג׳ו מרכזי', audience: 'לכל המשפחה' },
+  { id: 'ev-2', day: '20', month: 'ספט׳', title: 'סדנת קרבות וטקטיקה 🏆', detail: 'יום ו׳, 13:30 • אולם הספורט', audience: 'נבחרת' },
+] as const
+
 export const HEALTH_SCHEMA: TemplateSchema = {
   title: 'הצהרת בריאות',
   version: 1,

@@ -15,7 +15,7 @@
 import { useEffect, useState } from 'react'
 import { AlertCircle, Check, Clock, Copy, MessageCircle } from 'lucide-react'
 import { AthleteCardModal } from './AthleteCardModal'
-import { STEP4_COPY, UPCOMING_EVENTS } from './content'
+import { STEP4_COPY } from './content'
 import type { OutcomeReason, PaymentOutcome } from './submitJoin'
 import { needsManagerReview } from './types'
 import type { StudentDraft, WizardGroup } from './types'
@@ -32,6 +32,68 @@ const REASON_COPY: Record<OutcomeReason, keyof typeof STEP4_COPY> = {
   no_charge_for_card: 'paymentReasonNoChargeForCard',
   write_failed: 'paymentReasonWriteFailed',
   no_student: 'paymentReasonNoStudent',
+}
+
+/** F1 (fix round 1) — the trainee-list chip used to draw a green "תשלום אושר" tick for
+ *  every non-flagged child, unconditionally: on the same screen as an outcome card
+ *  correctly saying a promise failed for that same child, the reassuring chip was the
+ *  false claim, and it was false in the ordinary case too (a cash promise or an opened
+ *  uPay order is not an approved payment). Driven from the outcome instead -- and drawn
+ *  as nothing at all when no outcome names this child, because an absent fact is not a
+ *  reassuring one. */
+function PaymentChip({ outcome }: { outcome: PaymentOutcome | undefined }) {
+  const copy = STEP4_COPY
+  if (!outcome) return null
+
+  const AMBER =
+    'px-2.5 py-1 rounded-full bg-amber-500/25 text-amber-300 text-[11px] font-bold flex items-center gap-1 border border-amber-400/40 shrink-0'
+  const BLUE =
+    'px-2.5 py-1 rounded-full bg-[#0056c5]/20 text-[#8ea8f7] text-[11px] font-bold flex items-center gap-1 border border-[#0056c5]/30 shrink-0'
+
+  switch (outcome.state) {
+    case 'awaiting_review':
+      return (
+        <span className={AMBER}>
+          <Clock className="w-3.5 h-3.5" />
+          {copy.awaitingBadge}
+        </span>
+      )
+    case 'mandate_pending':
+      return (
+        <span className={AMBER}>
+          <Clock className="w-3.5 h-3.5" />
+          {copy.chipMandatePending}
+        </span>
+      )
+    case 'not_recorded':
+      return (
+        <span className={AMBER}>
+          <AlertCircle className="w-3.5 h-3.5" />
+          {copy.chipNotRecorded}
+        </span>
+      )
+    case 'recorded':
+      // Neutral, not the green-with-a-tick treatment: green and a check are this
+      // product's visual language for money actually received, and no money has been
+      // received here -- a cash or cheque promise is a plan, not a receipt.
+      return <span className={BLUE}>{copy.chipRecorded}</span>
+    case 'card_pending':
+      // An order was opened; the card page settles it. Neutral for the same reason.
+      return <span className={BLUE}>{copy.chipCardPending}</span>
+    default:
+      return null
+  }
+}
+
+/** One club event, as the "upcoming events" card needs it. Optional and rendered only
+ *  when non-empty -- see `Step4DoneProps.events`. */
+export type UpcomingEvent = {
+  id: string
+  day: string
+  month: string
+  title: string
+  detail: string
+  audience: string
 }
 
 function Confetti() {
@@ -75,6 +137,11 @@ export type Step4DoneProps = {
   outcomes: readonly PaymentOutcome[]
   /** The reference the submit returned. Absent means the card is not drawn. */
   registrationRef?: string
+  /** F4 (fix round 1) — same rule as `registrationRef`: absent (or empty) means the whole
+   *  card does not render, rather than a fabricated event a family puts in their own
+   *  calendar. The join wizard has no events read and passes none; the preview harness
+   *  still supplies its two fixture rows so the card's design stays reviewable. */
+  events?: readonly UpcomingEvent[]
   clubLogoUrl?: string | null
   whatsappUrl?: string | null
   onEnterApp: () => void
@@ -85,6 +152,7 @@ export function Step4Done({
   groups,
   outcomes,
   registrationRef,
+  events,
   clubLogoUrl,
   whatsappUrl,
   onEnterApp,
@@ -241,10 +309,10 @@ export function Step4Done({
                 .filter(Boolean)
                 .map((part) => part[0])
                 .join('')
-              const awaiting = needsManagerReview(student)
               //: The group's real name. The prototype guesses from `groupKey === 'group4'`,
               //: which labels groups 1, 2, 3 and 5 all as "צעירי גלדיאטור".
               const group = groups.find((entry) => entry.id === student.groupId)
+              const outcome = outcomes.find((entry) => entry.draftId === student.id)
               return (
                 <li key={student.id}>
                   <button
@@ -264,17 +332,7 @@ export function Step4Done({
                         </span>
                       </span>
                     </span>
-                    {awaiting ? (
-                      <span className="px-2.5 py-1 rounded-full bg-amber-500/25 text-amber-300 text-[11px] font-bold flex items-center gap-1 border border-amber-400/40 shrink-0">
-                        <Clock className="w-3.5 h-3.5" />
-                        {copy.awaitingBadge}
-                      </span>
-                    ) : (
-                      <span className="px-2.5 py-1 rounded-full bg-[#10b981]/20 text-[#34d399] text-[11px] font-bold flex items-center gap-1 border border-[#10b981]/30 shrink-0">
-                        <Check className="w-3 h-3" />
-                        {copy.paidBadge}
-                      </span>
-                    )}
+                    <PaymentChip outcome={outcome} />
                   </button>
                 </li>
               )
@@ -282,36 +340,38 @@ export function Step4Done({
           </ul>
         </div>
 
-        <div className="w-full bg-[#091b48]/90 rounded-2xl p-4 border border-[#1b3a8a] shadow-md mb-5 flex flex-col gap-3">
-          <div className="flex items-center justify-between text-xs pb-1 border-b border-white/10">
-            <span className="text-[14px] font-bold text-white flex items-center gap-1.5">
-              <span aria-hidden>📅</span>
-              <span>{copy.eventsTitle}</span>
-            </span>
+        {events && events.length > 0 ? (
+          <div className="w-full bg-[#091b48]/90 rounded-2xl p-4 border border-[#1b3a8a] shadow-md mb-5 flex flex-col gap-3">
+            <div className="flex items-center justify-between text-xs pb-1 border-b border-white/10">
+              <span className="text-[14px] font-bold text-white flex items-center gap-1.5">
+                <span aria-hidden>📅</span>
+                <span>{copy.eventsTitle}</span>
+              </span>
+            </div>
+            <ul className="flex flex-col gap-2.5 list-none p-0 m-0">
+              {events.map((event) => (
+                <li
+                  key={event.id}
+                  className="flex items-center justify-between gap-2 p-3 rounded-xl bg-[#0e2766] border border-white/10"
+                >
+                  <span className="flex items-center gap-3 min-w-0">
+                    <span className="w-11 h-11 rounded-xl bg-[#0056c5] flex flex-col items-center justify-center text-white shrink-0">
+                      <span className="text-[15px] font-bold leading-none">{event.day}</span>
+                      <span className="text-[10px] opacity-80 leading-none mt-0.5">{event.month}</span>
+                    </span>
+                    <span className="flex flex-col min-w-0">
+                      <span className="text-[13px] font-bold text-white truncate">{event.title}</span>
+                      <span className="text-[11px] text-[#b3c5ff] truncate">{event.detail}</span>
+                    </span>
+                  </span>
+                  <span className="px-2 py-0.5 rounded-md bg-white/10 text-white text-[11px] font-medium shrink-0">
+                    {event.audience}
+                  </span>
+                </li>
+              ))}
+            </ul>
           </div>
-          <ul className="flex flex-col gap-2.5 list-none p-0 m-0">
-            {UPCOMING_EVENTS.map((event) => (
-              <li
-                key={event.id}
-                className="flex items-center justify-between gap-2 p-3 rounded-xl bg-[#0e2766] border border-white/10"
-              >
-                <span className="flex items-center gap-3 min-w-0">
-                  <span className="w-11 h-11 rounded-xl bg-[#0056c5] flex flex-col items-center justify-center text-white shrink-0">
-                    <span className="text-[15px] font-bold leading-none">{event.day}</span>
-                    <span className="text-[10px] opacity-80 leading-none mt-0.5">{event.month}</span>
-                  </span>
-                  <span className="flex flex-col min-w-0">
-                    <span className="text-[13px] font-bold text-white truncate">{event.title}</span>
-                    <span className="text-[11px] text-[#b3c5ff] truncate">{event.detail}</span>
-                  </span>
-                </span>
-                <span className="px-2 py-0.5 rounded-md bg-white/10 text-white text-[11px] font-medium shrink-0">
-                  {event.audience}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
+        ) : null}
 
         {whatsappUrl ? (
           <a

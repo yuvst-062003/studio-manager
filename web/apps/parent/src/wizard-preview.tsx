@@ -11,11 +11,12 @@ import { Step1Agreements } from './features/onboarding/wizard/Step1Agreements'
 import { Step2Trainees } from './features/onboarding/wizard/Step2Trainees'
 import { Step3Payment } from './features/onboarding/wizard/Step3Payment'
 import { Step4Done } from './features/onboarding/wizard/Step4Done'
-import type { SubmitJoinResult } from './features/onboarding/wizard/submitJoin'
+import type { PaymentOutcome, SubmitJoinResult } from './features/onboarding/wizard/submitJoin'
 import { WizardHeader } from './features/onboarding/wizard/WizardHeader'
 import type { WizardStep } from './features/onboarding/wizard/WizardHeader'
+import { needsManagerReview } from './features/onboarding/wizard/types'
 import type { PaymentMethod, StudentDraft } from './features/onboarding/wizard/types'
-import { GROUPS, PLANS, HEALTH_SCHEMA } from './wizard-preview-fixtures'
+import { GROUPS, PLANS, HEALTH_SCHEMA, UPCOMING_EVENTS } from './wizard-preview-fixtures'
 import './tailwind.css'
 
 const EMBLEM =
@@ -82,11 +83,47 @@ const SEED: StudentDraft[] = [
   },
 ]
 
+//: One outcome per seeded child, covering every state step 4 can draw: a flagged child is
+//: `awaiting_review`, the LAST child is forced to `not_recorded` so the unfinished row is
+//: on screen at every checkpoint, and the rest follow their chosen method. Preview only.
+function previewOutcomes(
+  students: readonly StudentDraft[],
+  methods: Readonly<Record<string, PaymentMethod>>,
+): PaymentOutcome[] {
+  return students.map((student, index) => {
+    const method = methods[student.id] ?? 'credit'
+    const amountAgorot = PLANS.find((plan) => plan.id === student.planId)?.pricePerMonthAgorot ?? 0
+    const name = `${student.firstName} ${student.lastName}`.trim()
+    const base = { draftId: student.id, name, method, amountAgorot }
+    if (needsManagerReview(student)) return { ...base, state: 'awaiting_review' as const }
+    if (index === students.length - 1 && students.length > 1) {
+      return { ...base, state: 'not_recorded' as const, reason: 'write_failed' as const }
+    }
+    if (method === 'credit') return { ...base, state: 'card_pending' as const }
+    if (method === 'standing_order') return { ...base, state: 'mandate_pending' as const }
+    return { ...base, state: 'recorded' as const }
+  })
+}
+
 function Preview() {
   const params = new URLSearchParams(window.location.search)
   const [step, setStep] = useState<WizardStep>(Number(params.get('step') ?? 1) as WizardStep)
   const [agreed, setAgreed] = useState(params.has('agreed'))
-  const [students, setStudents] = useState<StudentDraft[]>(params.has('empty') ? [] : SEED)
+  //: `?healthy` clears the seeded flag on the second child, so both are chargeable --
+  //: what the two-mandate standing-order screen needs.
+  const [students, setStudents] = useState<StudentDraft[]>(
+    params.has('empty')
+      ? []
+      : params.has('healthy')
+        ? SEED.map((student) => ({
+            ...student,
+            healthyPreset: true,
+            healthAnswers: Object.fromEntries(
+              Object.keys(student.healthAnswers).map((key) => [key, false]),
+            ),
+          }))
+        : SEED,
+  )
   const [methods, setMethods] = useState<Record<string, PaymentMethod>>({})
 
   //: The exact nine fields `app/integrations/upay/form.py::upay_form_fields` builds, with
@@ -116,8 +153,9 @@ function Preview() {
         <Step4Done
           students={students}
           groups={GROUPS}
-          outcomes={[]}
+          outcomes={previewOutcomes(students, methods)}
           registrationRef="GLD-2026-8841"
+          events={UPCOMING_EVENTS}
           clubLogoUrl={EMBLEM}
           whatsappUrl="https://chat.whatsapp.com"
           onEnterApp={() => setStep(1)}
@@ -156,6 +194,24 @@ function Preview() {
                 const response = await fetch('http://localhost:5400/form.json')
                 const form = (await response.json()) as { action: string; fields: Record<string, string> }
                 return { personId: 'preview', outcomes: [], checkout: form, checkoutUnavailable: false, mandates: [] }
+              }
+              if (params.has('mandates')) {
+                //: Straight to the checklist: no checkout to dismiss first, which is the
+                //: state a two-child standing-order family actually lands in.
+                return {
+                  personId: 'preview',
+                  outcomes: previewOutcomes(students, methods),
+                  checkout: null,
+                  checkoutUnavailable: false,
+                  mandates: students.map((student) => ({
+                    draftId: student.id,
+                    studentId: student.id,
+                    name: `${student.firstName} ${student.lastName}`.trim(),
+                    amountAgorot:
+                      PLANS.find((plan) => plan.id === student.planId)?.pricePerMonthAgorot ?? 0,
+                    url: 'http://localhost:5400/mandate',
+                  })),
+                }
               }
               if (params.get('frame') === 'link') {
                 // The standing-order mandate: uPay hosts it and it loads by `src`, not by
