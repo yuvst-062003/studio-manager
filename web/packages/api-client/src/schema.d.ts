@@ -10958,6 +10958,10 @@ export interface components {
             active_studio_id: string | null;
             /** Expires In */
             expires_in: number;
+            /** Invited Student Id */
+            invited_student_id?: string | null;
+            /** Invited Student Name */
+            invited_student_name?: string | null;
             /** Studios */
             studios: components["schemas"]["StudioMembershipOut"][];
         };

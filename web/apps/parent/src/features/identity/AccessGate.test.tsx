@@ -205,4 +205,38 @@ describe('the invitation LINK (2026-08-30)', () => {
     vi.unstubAllGlobals()
     window.history.replaceState(null, '', '/')
   })
+
+  // task 9b -- the trial follow-up reuses this exact link for a family who may already
+  // be a guardian of some OTHER child (or of this one already). Before this fix,
+  // `arrivedWithInvite` was ALSO gated on `!session.access.parent`, which is true the
+  // moment a family has ever booked a trial while signed in -- so the redeem call this
+  // whole feature depends on never fired for them at all. It must fire regardless.
+  it('redeems ?invite= even when the family already has full parent access', async () => {
+    window.history.replaceState(null, '', '/?invite=tok-returning')
+    const fetchMock = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>(
+      async () =>
+        new Response(
+          JSON.stringify({ invited_student_id: 'st-1', invited_student_name: 'נועה כהן' }),
+          { status: 200 },
+        ),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    const s = session({ access: { staff: false, parent: true } })
+    const onInvitedStudent = vi.fn()
+    render(
+      <AccessGate session={s} locale="he" onInvitedStudent={onInvitedStudent}>
+        {protectedContent}
+      </AccessGate>,
+    )
+    await waitFor(() => expect(s.reload).toHaveBeenCalled())
+    const [url, init] = fetchMock.mock.calls[0]!
+    expect(String(url)).toContain('/auth/accept-invitation')
+    expect(String(init?.body)).toContain('tok-returning')
+    expect(onInvitedStudent).toHaveBeenCalledWith({ id: 'st-1', name: 'נועה כהן' })
+    // Never refused: `access.parent` was already true, so the refusal branch is never
+    // reachable regardless -- this is the mid-join screen briefly, then the children.
+    expect(screen.queryByTestId('parent-refusal')).toBeNull()
+    vi.unstubAllGlobals()
+    window.history.replaceState(null, '', '/')
+  })
 })

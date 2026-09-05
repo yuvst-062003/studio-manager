@@ -28,6 +28,7 @@ import type { InstallPromptEvent } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { AccessGate } from './features/identity/AccessGate'
+import type { InvitedStudent } from './features/identity/AccessGate'
 import { Resolve } from './features/identity/Resolve'
 import { ScheduleSection, isCalendarRoute } from './features/schedule/ScheduleSection'
 // `12a` — the absence pre-report (P1). Every layer of this feature existed except a line
@@ -372,24 +373,34 @@ function AuthedApp() {
   const healthClient = useMemo(() => makeHealthClient(apiFetch), [])
   const absenceClient = useMemo(() => makeAbsenceClient(apiFetch), [])
   const privacyClient = useMemo(() => makePrivacyClient(apiFetch), [])
-  // §3 Door C -- the manager's invitation (`/?invite=<token>`). `AccessGate` redeems the
-  // token and reloads the session on arrival (see its own header); by the time this
-  // component ever renders, `session.access.parent` is already true and the query
-  // string is the only thing left that still says "this visit came from that link" --
-  // `AccessGate`'s own `arrivedWithInvite` flips false the instant redemption succeeds,
-  // so it cannot be reused here as a standing "is this door C" signal. Computed once:
-  // the param is not expected to change over this component's lifetime.
+  // §3 Door C -- the manager's invitation (`/?invite=<token>`), and now also the trial
+  // follow-up's reuse of that same link for a family who may already have full access
+  // (task 9b). `AccessGate` redeems the token and reports which student it named (see
+  // its own header); by the time this component ever renders, `session.access.parent`
+  // may already have been true BEFORE this visit, so it is not a usable signal either --
+  // the query string is the only thing that still says "this visit came from that
+  // link". `AccessGate`'s own local `arrivedWithInvite` flips false the instant
+  // redemption succeeds, so it cannot be reused here as a standing "is this door C"
+  // signal. Computed once: the param is not expected to change over this component's
+  // lifetime.
   const arrivedWithInvite = useMemo(
     () => new URLSearchParams(globalThis.location?.search ?? '').has('invite'),
     [],
   )
+  // task 9b §2/§3 -- which child the invitation THIS visit redeemed was about, reported
+  // by `AccessGate` from the same `POST /accept-invitation` response that binds it
+  // server-side. `null` until redemption resolves (or fails, or names no student) --
+  // the gate below asks THIS, never the family-WIDE onboarding status, because a family
+  // who has already finished onboarding for every other child still needs to register
+  // the ONE this link named (§3's whole point).
+  const [invitedStudent, setInvitedStudent] = useState<InvitedStudent | null>(null)
   // Task 3b -- read ONCE, for both doors C and D (`doorSteps.ts::startingStep` needs the
   // whole body, not only whether a next step exists), rather than door C's old private
-  // fetch of the same endpoint. `statusLoaded` and not merely a non-null `onboardingStatus`
-  // -- a failed read legitimately resolves to `null` and still has to count as "read", or
-  // `inviteNeedsWizard` below would stay stuck at its in-flight value forever.
+  // fetch of the same endpoint. A failed read resolves to `null`, which `startingStep`
+  // itself treats as "open at the agreements step" (see that function's own docstring) --
+  // there is no separate tri-state to track here any more (task 9b removed the last
+  // reader that needed one).
   const [onboardingStatus, setOnboardingStatus] = useState<OnboardingStatus | null>(null)
-  const [statusLoaded, setStatusLoaded] = useState(false)
   useEffect(() => {
     if (session.status !== 'signed-in' || !session.access.parent) return
     let alive = true
@@ -398,58 +409,19 @@ function AuthedApp() {
       .then((result) => {
         if (!alive) return
         setOnboardingStatus(result)
-        setStatusLoaded(true)
       })
       .catch(() => {
         if (!alive) return
         setOnboardingStatus(null)
-        setStatusLoaded(true)
       })
     return () => {
       alive = false
     }
   }, [session.status, session.access.parent])
-  // `null` while the read above is in flight, so the fork below can show the wizard's own
-  // loading state instead of flashing the old gate stack first (see the render). A plain
-  // derived value -- computed straight from `onboardingStatus`/`statusLoaded` during
-  // render, not copied into its own state via an effect -- EXCEPT that `onEnterApp` below
-  // has to be able to force it to `false` the instant the family finishes, without waiting
-  // for a fresh read to say so; `wizardFinished` is that one-way override.
-  const [wizardFinished, setWizardFinished] = useState(false)
-  const inviteNeedsWizard = wizardFinished
-    ? false
-    : !statusLoaded
-      ? null
-      : onboardingStatus
-        ? onboardingStatus.next !== null
-        : false
   // `JoinWizard`'s effects key on `source`'s IDENTITY (task 3a) -- memoised so doors C and
   // D hand it the SAME object across a re-render, not a fresh one that restarts both of
   // `studioSource`'s reads.
   const memberSource = useMemo(() => studioSource(healthClient), [healthClient])
-  // §3 Door C: "one row pre-filled" -- the manager's stub, name only. Read once,
-  // independent of `gatedChildren`'s own fetch below (that one is gated on more state
-  // and would otherwise race this door's own wizard mount).
-  const [inviteStubName, setInviteStubName] = useState<string | null>(null)
-  useEffect(() => {
-    if (!arrivedWithInvite || inviteNeedsWizard !== true) return
-    let alive = true
-    void apiFetch('/api/v1/me/students')
-      .then(async (response) =>
-        response.ok
-          ? ((await response.json()) as { items: { first_name: string; last_name: string }[] })
-          : { items: [] },
-      )
-      .then((body) => {
-        if (!alive || body.items.length !== 1) return
-        const [only] = body.items
-        if (only) setInviteStubName(`${only.first_name} ${only.last_name}`.trim())
-      })
-      .catch(() => undefined)
-    return () => {
-      alive = false
-    }
-  }, [arrivedWithInvite, inviteNeedsWizard])
   // §6.1 step 5's gate reports its own state up, because the TAB BAR has to hide with it
   // and the bar is a prop of `AppShell`, rendered outside the gate's children. `loading`
   // until the answer arrives: a bar drawn during the fetch is a bar a fast finger uses
@@ -686,7 +658,7 @@ function AuthedApp() {
         // `AppShell` — see `AccessGate`'s header. `AppShell` mounts only once it has
         // confirmed `session.access.parent`, so a hash typed by a refused visitor
         // (`#/absence`, `#/student/<id>`, …) can no longer reach a screen behind it either.
-        <AccessGate session={session} locale={locale}>
+        <AccessGate session={session} locale={locale} onInvitedStudent={setInvitedStudent}>
         <AppShell
           title={session.activeStudioName ?? ''}
           items={NAV}
@@ -811,25 +783,31 @@ function AuthedApp() {
               — see the fetch above. §7.9: `AppShell`'s own chrome (title, drawer, tab
               bar) already renders around this, but the content area itself read as an
               empty page with nothing on it for as long as the fetch took. */}
-          {arrivedWithInvite && inviteNeedsWizard !== false ? (
+          {arrivedWithInvite && invitedStudent !== null ? (
             // §3 Door C -- "Door C is Door B with one row pre-filled, not a separate
             // 'gaps only' step list." The invited parent has agreed to nothing and
             // signed nothing yet, so the OLD ConsentGate/HealthGate/PaymentSetupGate
             // stack below must never run first -- that IS the redundant "gaps only"
             // list the spec rules out, and it would ask through a different screen
-            // than the one this door's own wizard already opens on. `inviteNeedsWizard
-            // !== false` (not `!== null`) is deliberate: while the `/me/onboarding-
-            // status` read is still in flight this renders the wizard's OWN loading
-            // state rather than flashing the old gates first and correcting a moment
-            // later -- see `JoinWizard`'s own `studio.status === 'loading'` branch.
+            // than the one this door's own wizard already opens on.
+            //
+            // task 9b -- gated on `invitedStudent`, not on the family-WIDE onboarding
+            // status any more. "Does this family still need onboarding" answers `no` for
+            // a returning family with other children already registered, and the wizard
+            // never opened for them at all -- they landed on their ordinary home screen
+            // with the one child this link named never touched. The right question is
+            // "does the student THIS invitation named still need registering", which is
+            // exactly what a non-null `invitedStudent` says: `AccessGate` only reports
+            // one once `POST /accept-invitation` has actually named a student, so there
+            // is no separate in-flight state to track here (see that component's header).
             <JoinWizard
               locale={locale}
               billingClient={billingClient}
               onEnterApp={() => {
-                setWizardFinished(true)
+                setInvitedStudent(null)
                 setFamilyJoined((n) => n + 1)
               }}
-              prefillFirstRowName={inviteStubName ?? undefined}
+              prefillFirstRowName={invitedStudent.name ?? undefined}
               source={memberSource}
               standingOrderLinks={loadStandingOrderLinks}
               startAtStep={wizardStepFor(startingStep('invite', onboardingStatus))}

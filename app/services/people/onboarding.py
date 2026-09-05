@@ -393,6 +393,8 @@ class OnboardingService:
         group_ids: list[uuid.UUID],
         at: datetime,
         schedule: ScheduleReader,
+        billing_run: BillingRunService | None = None,
+        tally: _Tally | None = None,
     ) -> None:
         """§8's open item 3: a resubmission's edited group list must be applied, not
         dropped. `add_child` never runs a second time for a child `duplicate_student`
@@ -403,12 +405,25 @@ class OnboardingService:
 
         Adds any group in THIS submission the student is not already actively enrolled
         in, and recomputes the plan from the resulting volume -- the same rule
-        `add_child` uses for a fresh child. Never REMOVES an enrollment: dropping a
-        group the family already has is a manager's decision, not a side effect of
-        resubmitting the join link with an ADDED one. Raises no new charge -- the first
-        month for this student was already billed (or correctly left unpriced) by
-        whichever submission created it; correcting that amount for a plan that changed
-        mid-onboarding is a billing-lane concern, not this one.
+        `add_child` uses for a fresh child.
+
+        Never REMOVES an enrollment: dropping a group the family already has is a
+        manager's decision, not a side effect of resubmitting the join link with an
+        ADDED one.
+
+        **Calls `charge_first_month`, exactly as `add_child` does.** The comment this
+        replaced said the rule was to raise no new charge, and that was right for a
+        RESUBMISSION -- a plan that changed mid-onboarding is not corrected here, and
+        `charge_first_month`'s own idempotency key (one tuition charge per student per
+        period) is what makes a repeat call for an already-billed student a no-op rather
+        than a second bill. But the same call is also reached by a converting TRIAL
+        child: the trial booking created this student and a trial is never billed, so
+        `add_child` raising `DuplicateStudentError` for them used to mean nobody ever
+        called `charge_first_month` at all -- every family converting through the club's
+        own funnel ended up enrolled, priced, and owing nothing, with a payment choice
+        that promised money the till never asked for. The rule was never "withhold the
+        first charge"; it was "do not re-price one that already went out". Calling here
+        on the same terms `add_child` does is what makes both true at once.
         """
         today = at.date()
         existing_group_ids = set(
@@ -456,6 +471,11 @@ class OnboardingService:
             if student is not None:
                 student.price_plan_id = plan.id
                 session.flush()
+                # See this method's own docstring: idempotent per period, so a genuine
+                # resubmission (already billed this period) gets 0 here and a converting
+                # trial child (never billed) gets their first month.
+                run = billing_run if billing_run is not None else BillingRunService(session)
+                run.charge_first_month(studio_id, student_id, plan.id, on=today, tally=tally)
 
     @staticmethod
     def _managers_of_studio(
@@ -748,6 +768,8 @@ class OnboardingService:
                     group_ids=list(child.get("group_ids") or []),
                     at=at,
                     schedule=schedule,
+                    billing_run=billing_run,
+                    tally=tally,
                 )
             else:
                 student_ids.append(student_id)

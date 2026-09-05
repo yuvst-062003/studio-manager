@@ -61,6 +61,21 @@ class StudioMembership:
     is_guardian: bool
 
 
+@dataclass(frozen=True)
+class AcceptedInvitation:
+    """What redeeming one buys the caller.
+
+    `student_id` is the invitation's own `student_id`, carried through rather than
+    re-read -- both callers in `app/routers/identity.py` need it to tell the client which
+    child to pre-fill (task 9b §2), and a second query for a value already in hand would
+    just be a second place for it to disagree with what was actually matched. `None` for
+    an invitation with no student attached (a staff or manager invite).
+    """
+
+    person: Person
+    student_id: uuid.UUID | None
+
+
 def effective_identity_id(identity: AuthIdentity) -> uuid.UUID:
     """§5.2's linking, resolved.
 
@@ -270,7 +285,7 @@ def studios_for_identity(session: Session, identity_id: uuid.UUID) -> list[Studi
 
 def accept_invitation(
     session: Session, *, token: str, identity_id: uuid.UUID, at: datetime
-) -> Person:
+) -> AcceptedInvitation:
     """§5.3 -- 'the invitation carries a token binding the accepting auth identity to the
     pre-created Person.'
 
@@ -278,6 +293,34 @@ def accept_invitation(
     a login to a profile that exists rather than creating a second one -- §3.3 point 2:
     "Attaching an auth identity to an existing student Person later gives them a login
     with zero migration."
+
+    **A second way to succeed, added for the trial follow-up's `/?invite=<token>` link,
+    which one email sends to every family regardless of whether they already have an
+    account.** For a stranger the binding above is exactly right. For a family who
+    already has a login, `person.auth_identity_id IS NULL` never matches anybody --
+    their Person has a login attached already -- so the invitation used to be refused
+    outright, to the club's likeliest sale (a happy family adding a second child).
+
+    What that family needs is not a NEW binding at all: if the caller already owns a
+    Person in this studio who is a guardian of the invitation's own `student_id`, the
+    identity being "accepted" already holds the record. Nothing is bound that was not
+    already bound -- this is not a loosening of the rule above, it is a second route to
+    the same non-event. The invitation is still marked accepted (so a stale copy of the
+    same link cannot be replayed) and that Person is returned, unchanged.
+
+    **Matched on the STUDENT, never on the email or phone.** An existing family's own
+    `Person.email` may be null, stale, or simply a different address than the one the
+    trial's booking form collected -- the whole reason this function has a fragile-match
+    problem for a stranger too. Keying the loosened branch on the address would let a
+    guess at that address stand in for the login this function exists to guard; keying
+    it on `student_id` cannot be guessed into, because it only ever succeeds for an
+    identity that is ALREADY a guardian of that exact child.
+
+    **Every other identity keeps today's exact refusal.** An unknown token, an expired
+    one, an already-accepted one, and an identity that owns some OTHER person in this
+    studio (or none at all) all fall through to the ordinary match below and are refused
+    exactly as before. An invitation with no `student_id` skips this branch entirely and
+    behaves exactly as it always has.
     """
     token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
     with with_all_tenants(reason=_LOGIN_SCOPE):
@@ -288,6 +331,28 @@ def accept_invitation(
             raise InvitationRejectedError("unknown or already accepted")
         if at >= invitation.expires_at:
             raise InvitationRejectedError("expired")
+
+        if invitation.student_id is not None:
+            already_owned = (
+                session.execute(
+                    select(Person)
+                    .join(Guardian, Guardian.person_id == Person.id)
+                    .where(
+                        Person.studio_id == invitation.studio_id,
+                        Person.auth_identity_id == identity_id,
+                        Person.anonymized_at.is_(None),
+                        Guardian.studio_id == invitation.studio_id,
+                        Guardian.student_id == invitation.student_id,
+                    )
+                )
+                .scalars()
+                .first()
+            )
+            if already_owned is not None:
+                invitation.accepted_at = at
+                invitation.accepted_by_person_id = already_owned.id
+                session.flush()
+                return AcceptedInvitation(person=already_owned, student_id=invitation.student_id)
 
         match = (
             (Person.email == invitation.email)
@@ -313,4 +378,4 @@ def accept_invitation(
         invitation.accepted_at = at
         invitation.accepted_by_person_id = person.id
         session.flush()
-        return person
+        return AcceptedInvitation(person=person, student_id=invitation.student_id)

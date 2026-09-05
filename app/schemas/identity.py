@@ -93,6 +93,14 @@ class SessionResponse(BaseModel):
     access: AppAccessOut
     studios: list[StudioMembershipOut]
     active_studio_id: uuid.UUID | None
+    #: Task 9b §2 -- which child the invitation this session redeemed was about, so the
+    #: parent app's join wizard can pre-fill THAT student instead of guessing from
+    #: `/me/students` (the old heuristic: pre-fill only when the family has exactly one
+    #: child, which silently failed for anybody adding a second). `None` on every session
+    #: that redeemed no invitation, or one with no `student_id` (a staff/manager invite).
+    #: Never the invitation's token -- that stays server-side.
+    invited_student_id: uuid.UUID | None = None
+    invited_student_name: str | None = None
 
 
 class MeResponse(BaseModel):

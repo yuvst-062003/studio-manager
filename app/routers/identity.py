@@ -60,6 +60,7 @@ from app.services.identity.refresh import (
     set_refresh_cookie,
 )
 from app.services.identity.resolution import (
+    AcceptedInvitation,
     InvitationRejectedError,
     StudioMembership,
     accept_invitation,
@@ -101,6 +102,26 @@ def _membership_out(membership: StudioMembership) -> StudioMembershipOut:
     )
 
 
+def _invited_student_name(session: SessionDep, student_id: uuid.UUID) -> str | None:
+    """Task 9b §2 -- the name behind the id `SessionResponse.invited_student_id` carries.
+
+    A plain, unscoped read on the same `SessionDep` the resolver used: both call sites
+    run before a studio is in context (this router's own header), so there is no tenant
+    session to route this through, and the id came from an `Invitation` row this same
+    request just matched -- not from anything a caller supplied.
+    """
+    from app.models.people import Student
+    from app.models.person import Person as PersonModel
+
+    student = session.get(Student, student_id)
+    if student is None:
+        return None
+    child = session.get(PersonModel, student.person_id)
+    if child is None:
+        return None
+    return format_person_name(child.first_name, child.last_name)
+
+
 def _signing_key() -> str:
     key = settings.JWT_SIGNING_KEY
     if key is None:
@@ -124,11 +145,19 @@ def _build_session(
     active_studio_id: uuid.UUID | None,
     acting_as_person_id: uuid.UUID | None = None,
     refresh_secret: str | None = None,
+    invited_student_id: uuid.UUID | None = None,
+    invited_student_name: str | None = None,
 ) -> SessionResponse:
     """Everything a fresh session needs, assembled once.
 
     Both the callback and switch-studio produce a session, and a second copy of this
     would be a second place for the claim set to drift.
+
+    `invited_student_id`/`invited_student_name` are `None` on every call except the two
+    that just redeemed an invitation naming a student (task 9b §2) -- `refresh` and
+    `switch-studio` mint a session for an identity that redeemed nothing THIS request, and
+    carrying a stale invited-student pair forward on every later session would tell the
+    wizard to keep pre-filling a child from a link that is long since accepted.
     """
     at = now()
     memberships = studios_for_identity(session, identity_id)
@@ -174,6 +203,8 @@ def _build_session(
         access=AppAccessOut(staff=access.staff, parent=access.parent),
         studios=[_membership_out(m) for m in memberships],
         active_studio_id=claims.active_studio_id,
+        invited_student_id=invited_student_id,
+        invited_student_name=invited_student_name,
     )
 
 
@@ -312,14 +343,18 @@ def _complete_callback(
     identity = upsert_identity(session, provider_identity, at=at)
     resolved_id = effective_identity_id(identity)
 
+    invited_student_id: uuid.UUID | None = None
     if body.invitation_token is not None:
         try:
-            accept_invitation(session, token=body.invitation_token, identity_id=resolved_id, at=at)
+            accepted: AcceptedInvitation = accept_invitation(
+                session, token=body.invitation_token, identity_id=resolved_id, at=at
+            )
         except InvitationRejectedError as exc:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail={"code": "invitation_rejected", "message": "this invitation is not valid"},
             ) from exc
+        invited_student_id = accepted.student_id
 
     memberships = studios_for_identity(session, resolved_id)
     # §5.2 -- the switcher exists only when there is a choice, so a single membership is
@@ -341,6 +376,12 @@ def _complete_callback(
         is_platform_admin=is_platform_admin(session, resolved_id),
         active_studio_id=active_studio_id,
         refresh_secret=issued.secret,
+        invited_student_id=invited_student_id,
+        invited_student_name=(
+            _invited_student_name(session, invited_student_id)
+            if invited_student_id is not None
+            else None
+        ),
     )
     session.commit()
     return result, transaction
@@ -593,12 +634,13 @@ def accept_invitation_code(
             detail={"code": "unauthenticated", "message": "sign in first"},
         )
     try:
-        person = accept_invitation(session, token=body.token, identity_id=identity_id, at=now())
+        accepted = accept_invitation(session, token=body.token, identity_id=identity_id, at=now())
     except InvitationRejectedError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={"code": "invitation_rejected", "message": "this invitation is not valid"},
         ) from exc
+    person = accepted.person
 
     # The choice goes onto the refresh row, exactly as `switch-studio` puts it there and
     # for the same stated reason: the studio lives on the row, so it survives a rotation.
@@ -633,6 +675,12 @@ def accept_invitation_code(
         # parent who has just proved which club they belong to should not then be asked.
         active_studio_id=person.studio_id,
         refresh_secret=refresh_secret,
+        invited_student_id=accepted.student_id,
+        invited_student_name=(
+            _invited_student_name(session, accepted.student_id)
+            if accepted.student_id is not None
+            else None
+        ),
     )
     session.commit()
     return result

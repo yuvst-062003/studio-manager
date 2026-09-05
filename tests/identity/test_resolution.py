@@ -8,16 +8,21 @@ mock cannot be wrong in the way a query can.
 
 from __future__ import annotations
 
+import hashlib
+import secrets
 import uuid
 from collections.abc import Iterator
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from app.core.tenancy import with_all_tenants
-from app.models.person import Guardian, Person, RoleAssignment
+from app.models.people import Student
+from app.models.person import Guardian, Invitation, Person, RoleAssignment
 from app.models.studio import Studio
 from app.services.identity.providers import ProviderIdentity
 from app.services.identity.resolution import (
+    InvitationRejectedError,
+    accept_invitation,
     app_access,
     effective_identity_id,
     persons_for_identity,
@@ -350,3 +355,182 @@ def test_a_suspended_studio_is_not_offered(app_session, studio):
     studio.status = "suspended"
     app_session.commit()
     assert studios_for_identity(app_session, identity.id) == []
+
+
+# -- task 9b -- accept_invitation ---------------------------------------------
+def _invitation(
+    session: Session,
+    studio: Studio,
+    *,
+    email: str | None = None,
+    phone: str | None = None,
+    student_id: uuid.UUID | None = None,
+    expires_at: datetime = T0 + timedelta(days=7),
+    accepted_at: datetime | None = None,
+) -> tuple[Invitation, str]:
+    token = secrets.token_urlsafe(16)
+    row = Invitation(
+        studio_id=studio.id,
+        email=email,
+        phone=phone,
+        intended_role="guardian",
+        student_id=student_id,
+        token_hash=hashlib.sha256(token.encode()).hexdigest(),
+        expires_at=expires_at,
+        accepted_at=accepted_at,
+    )
+    session.add(row)
+    session.flush()
+    return row, token
+
+
+def _student(session: Session, studio: Studio) -> Student:
+    child = Person(studio_id=studio.id, first_name="נועה", last_name="לוי")
+    session.add(child)
+    session.flush()
+    student = Student(
+        studio_id=studio.id, person_id=child.id, status="trial", health_status="missing"
+    )
+    session.add(student)
+    session.flush()
+    return student
+
+
+def test_a_strangers_redemption_binds_the_pre_created_person(app_session, studio):
+    """The baseline case, asserted directly against the service rather than only through
+    the router (`tests/identity/test_auth_router.py`): a Person with no login yet, matched
+    by email, gets this identity bound and the invitation marked accepted."""
+    person = Person(
+        studio_id=studio.id, first_name="שירה", last_name="הורה", email="a@example.invalid"
+    )
+    app_session.add(person)
+    app_session.flush()
+    invitation, token = _invitation(app_session, studio, email="a@example.invalid")
+    identity = _identity(app_session)
+    app_session.commit()
+
+    accepted = accept_invitation(app_session, token=token, identity_id=identity.id, at=T0)
+    assert accepted.person.id == person.id
+    assert accepted.student_id is None
+    assert person.auth_identity_id == identity.id
+    assert invitation.accepted_at == T0
+    assert invitation.accepted_by_person_id == person.id
+
+
+def test_an_identity_already_guarding_the_invited_student_accepts_without_binding(
+    app_session, studio
+):
+    """§2's decision: a family who already has an account and already guards the trial
+    child the invitation names is not a stranger to be bound -- the identity already
+    holds the record. Accepting must not rebind `auth_identity_id` (there is nothing to
+    bind) and must still mark the invitation accepted, so a stale copy of the same link
+    cannot be replayed."""
+    student = _student(app_session, studio)
+    identity = _identity(app_session)
+    existing_family = Person(
+        studio_id=studio.id,
+        auth_identity_id=identity.id,
+        first_name="שירה",
+        last_name="הורה",
+        # Deliberately NOT the invitation's address -- match-by-student must not need it.
+        email=None,
+    )
+    app_session.add(existing_family)
+    app_session.flush()
+    app_session.add(
+        Guardian(
+            studio_id=studio.id,
+            student_id=student.id,
+            person_id=existing_family.id,
+            is_primary=True,
+        )
+    )
+    # The invitation itself carries a DIFFERENT, stale address -- the trial booking's own
+    # form, which this family's Person may never have matched even before they had a login.
+    invitation, token = _invitation(
+        app_session, studio, email="stale-trial-form@example.invalid", student_id=student.id
+    )
+    app_session.commit()
+
+    accepted = accept_invitation(app_session, token=token, identity_id=identity.id, at=T0)
+    assert accepted.person.id == existing_family.id
+    assert accepted.student_id == student.id
+    assert existing_family.auth_identity_id == identity.id, "unchanged -- nothing new was bound"
+    assert invitation.accepted_at == T0
+    assert invitation.accepted_by_person_id == existing_family.id
+
+
+def test_a_different_identity_owning_another_person_is_still_refused(app_session, studio):
+    """The identity is not a guardian of the invited student -- owning some OTHER person
+    in this studio buys nothing. Matching on the student, not the address, must not turn
+    into matching on "any person this identity happens to have"."""
+    student = _student(app_session, studio)
+    other_identity = _identity(app_session)
+    unrelated_person = Person(
+        studio_id=studio.id,
+        auth_identity_id=other_identity.id,
+        first_name="דנה",
+        last_name="אחרת",
+    )
+    app_session.add(unrelated_person)
+    app_session.flush()
+    # `unrelated_person` guards no one -- and even a Guardian row of THEIRS for a
+    # different student must not satisfy the match.
+    other_student = _student(app_session, studio)
+    app_session.add(
+        Guardian(
+            studio_id=studio.id,
+            student_id=other_student.id,
+            person_id=unrelated_person.id,
+            is_primary=True,
+        )
+    )
+    invitation, token = _invitation(
+        app_session, studio, email="trial-form@example.invalid", student_id=student.id
+    )
+    app_session.commit()
+
+    with pytest.raises(InvitationRejectedError):
+        accept_invitation(app_session, token=token, identity_id=other_identity.id, at=T0)
+
+
+def test_an_unknown_token_is_refused(app_session):
+    with pytest.raises(InvitationRejectedError):
+        accept_invitation(app_session, token="never-issued", identity_id=uuid.uuid4(), at=T0)
+
+
+def test_an_expired_token_is_refused(app_session, studio):
+    invitation, token = _invitation(
+        app_session, studio, email="late@example.invalid", expires_at=T0 - timedelta(minutes=1)
+    )
+    app_session.commit()
+    with pytest.raises(InvitationRejectedError):
+        accept_invitation(app_session, token=token, identity_id=uuid.uuid4(), at=T0)
+
+
+def test_an_already_accepted_token_is_refused(app_session, studio):
+    invitation, token = _invitation(
+        app_session, studio, email="taken@example.invalid", accepted_at=T0 - timedelta(days=1)
+    )
+    app_session.commit()
+    with pytest.raises(InvitationRejectedError):
+        accept_invitation(app_session, token=token, identity_id=uuid.uuid4(), at=T0)
+
+
+def test_an_invitation_with_no_student_id_behaves_exactly_as_before(app_session, studio):
+    """The loosened branch is entered only when `student_id` is set. `None` skips it
+    entirely and the ordinary email/phone match is the only path, unchanged."""
+    person = Person(
+        studio_id=studio.id, first_name="עידן", last_name="כהן", email="staff@example.invalid"
+    )
+    app_session.add(person)
+    app_session.flush()
+    invitation, token = _invitation(
+        app_session, studio, email="staff@example.invalid", student_id=None
+    )
+    identity = _identity(app_session)
+    app_session.commit()
+
+    accepted = accept_invitation(app_session, token=token, identity_id=identity.id, at=T0)
+    assert accepted.person.id == person.id
+    assert accepted.student_id is None

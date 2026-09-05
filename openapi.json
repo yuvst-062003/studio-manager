@@ -11846,6 +11846,29 @@
             "title": "Expires In",
             "type": "integer"
           },
+          "invited_student_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invited Student Id"
+          },
+          "invited_student_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invited Student Name"
+          },
           "studios": {
             "items": {
               "$ref": "#/components/schemas/StudioMembershipOut"

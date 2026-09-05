@@ -25,13 +25,24 @@ import { clearAllJoinDrafts } from '../onboarding/joinDraftStorage'
 /** Where the staff app lives, so §6.1's second refusal is a link rather than a dead end. */
 const STAFF_APP_URL = '/staff'
 
+/** Task 9b §2 -- what `POST /accept-invitation` names, the moment it names it. `id` is
+ *  the invited `Student`; `name` is `null` only for the (staff/manager) invitations that
+ *  carry no student at all, which the parent app never redeems through this gate. */
+export type InvitedStudent = { id: string; name: string | null }
+
 export function AccessGate({
   session,
   locale,
+  onInvitedStudent,
   children,
 }: {
   session: Session
   locale: Locale
+  /** Task 9b §2/§3 -- fired once, the moment redemption resolves with a named student,
+   *  so `App.tsx` can open the join wizard on THAT child regardless of the family's
+   *  wider onboarding status. Omitted by nothing today, but optional so a future caller
+   *  that has no wizard to feed is not forced to wire a no-op. */
+  onInvitedStudent?: (student: InvitedStudent | null) => void
   children: React.ReactNode
 }) {
   // Pre-filled from an invitation LINK (`/?invite=<token>`, 2026-08-30) — the manager's
@@ -45,14 +56,39 @@ export function AccessGate({
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token }),
-    }).then((response) => {
-      if (response.ok) session.reload()
+    }).then(async (response) => {
+      if (!response.ok) return
+      // Read BEFORE `session.reload()`: task 9b §2 puts the invited student on this same
+      // response rather than a second read, and the caller needs it reported before the
+      // reload's own re-render goes looking for it.
+      const body = (await response.json().catch(() => ({}))) as {
+        invited_student_id?: string | null
+        invited_student_name?: string | null
+      }
+      onInvitedStudent?.(
+        body.invited_student_id
+          ? { id: body.invited_student_id, name: body.invited_student_name ?? null }
+          : null,
+      )
+      session.reload()
     })
 
   // The link's token is redeemed on arrival, once — a parent who followed the link has
-  // already said yes. A failed redeem leaves the pre-filled field on screen, which is
-  // the manual path with the typing already done.
-  const arrivedWithInvite = code !== '' && !session.access.parent
+  // already said yes.
+  //
+  // **Not gated on `!session.access.parent` any more (task 9b).** That condition was
+  // right for the ONLY audience this door originally served — a manager-invited
+  // stranger, who by definition starts with no parent access anywhere — but the trial
+  // follow-up email reuses this exact link for a family who may already be a guardian
+  // of some OTHER child (or of this one already, via the OAuth callback's own
+  // `invitation_token`), and for them `access.parent` is already `true` before this
+  // visit even begins. Gating on it meant the redeem call this whole feature depends on
+  // never fired for that family at all -- not refused, simply never attempted, which is
+  // a silent bounce dressed up as nothing having gone wrong. A failed redeem still
+  // leaves the pre-filled field on screen, which is the manual path with the typing
+  // already done; a token already accepted on a prior visit fails harmlessly the same
+  // way.
+  const arrivedWithInvite = code !== ''
   // Whether that redeem is still in flight. The refusal below keys on `!access.parent`,
   // which stays true for the whole round trip -- so an invited parent's FIRST screen was
   // "you do not have access here", from the club's own link. They are mid-join, not

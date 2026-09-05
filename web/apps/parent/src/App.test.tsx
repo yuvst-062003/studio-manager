@@ -689,6 +689,95 @@ function stubDoorD(
   return state
 }
 
+/** Stubs Door C's own reads: `/auth/accept-invitation` (task 9b's redemption response,
+ *  naming the invited student), `/me/onboarding-status`, `/me/studio` + its public
+ *  groups/price-plans, the health template, and `/me/students` -- the family's OTHER
+ *  children, read only by `AuthedApp`'s own `gatedChildren` effect in the background.
+ *  The wizard's own step 2 (`Step2Trainees`) never reads that endpoint at all; a test
+ *  that stuffs it with siblings and then asserts they never reach step 2 is pinning
+ *  that construction, not working around a fetch the wizard depends on. */
+function stubDoorC(
+  options: {
+    onboardingStatus?: OnboardingStatus
+    invitedStudentId?: string
+    invitedStudentName?: string
+    existingStudents?: readonly { id: string; first_name: string; last_name: string }[]
+  } = {},
+) {
+  const {
+    onboardingStatus = AGREEMENTS_CURRENT_STATUS,
+    invitedStudentId = 'st-invited',
+    invitedStudentName = 'נועה כהן',
+    existingStudents = [],
+  } = options
+  vi.stubGlobal(
+    'fetch',
+    stubAuthed((url) => {
+      if (url.includes('/api/v1/auth/accept-invitation')) {
+        return new Response(
+          JSON.stringify({
+            access_token: 'tok',
+            expires_in: 900,
+            ...SIGNED_IN_BODY,
+            invited_student_id: invitedStudentId,
+            invited_student_name: invitedStudentName,
+          }),
+          { status: 200 },
+        )
+      }
+      if (url.includes('/api/v1/me/onboarding-status')) {
+        return new Response(JSON.stringify(onboardingStatus), { status: 200 })
+      }
+      if (url.includes('/api/v1/me/students')) {
+        return new Response(
+          JSON.stringify({
+            items: existingStudents.map((s) => ({
+              ...s,
+              status: 'active',
+              health_status: 'missing',
+              agreement_complete: true,
+            })),
+          }),
+          { status: 200 },
+        )
+      }
+      if (url.includes('/api/v1/me/studio')) {
+        return new Response(
+          JSON.stringify({ slug: 'demo-club', name: 'מועדון הדגמה', logo_url: null }),
+          { status: 200 },
+        )
+      }
+      if (url.includes('/api/v1/public/studios/demo-club/groups')) {
+        return new Response(
+          JSON.stringify({ items: [{ id: 'g1', name: 'מתחילים', training_weekdays: [0, 2] }] }),
+          { status: 200 },
+        )
+      }
+      if (url.includes('/api/v1/public/studios/demo-club/price-plans')) {
+        return new Response(
+          JSON.stringify({
+            items: [{ id: 'plan-1', name: 'חודשי', monthly_amount_agorot: 30_000, sessions_per_week: 2 }],
+          }),
+          { status: 200 },
+        )
+      }
+      if (url.includes('/api/v1/health-templates/tmpl1')) {
+        return new Response(
+          JSON.stringify({ id: 'tmpl1', kind: 'full', version: 1, schema: HEALTH_SCHEMA }),
+          { status: 200 },
+        )
+      }
+      if (url.includes('/api/v1/health-templates')) {
+        return new Response(
+          JSON.stringify({ items: [{ id: 'tmpl1', kind: 'full', version: 1 }] }),
+          { status: 200 },
+        )
+      }
+      return null
+    }),
+  )
+}
+
 /** Opens the "+" add-student dialog and fills the real step-2 form (`StudentFormSheet`,
  *  all five parts) for ONE minor child -- the same seam `JoinWizard.test.tsx`'s own
  *  `fillOneChildAndContinue` drives -- ending on the save click, back on step 2's list.
@@ -961,6 +1050,21 @@ describe('§3 Door C — /?invite=<token> opens the shared wizard, not the old g
     vi.stubGlobal(
       'fetch',
       stubAuthed((url) => {
+        // task 9b -- `AccessGate` redeems the token itself (it is no longer gated on
+        // `!access.parent`, so it fires here too) and the invited student now comes
+        // from THIS response, not from `/me/students`.
+        if (url.includes('/api/v1/auth/accept-invitation')) {
+          return new Response(
+            JSON.stringify({
+              access_token: 'tok',
+              expires_in: 900,
+              ...SIGNED_IN_BODY,
+              invited_student_id: 'st-stub',
+              invited_student_name: 'תום ישראלי',
+            }),
+            { status: 200 },
+          )
+        }
         if (url.includes('/api/v1/me/onboarding-status')) {
           return new Response(
             JSON.stringify({
@@ -971,24 +1075,6 @@ describe('§3 Door C — /?invite=<token> opens the shared wizard, not the old g
                 { key: 'payment', complete: true },
               ],
               next: 'agreements',
-            }),
-            { status: 200 },
-          )
-        }
-        if (url.includes('/api/v1/me/students')) {
-          // The manager's stub -- "the student, name only".
-          return new Response(
-            JSON.stringify({
-              items: [
-                {
-                  id: 'st-stub',
-                  first_name: 'תום',
-                  last_name: 'ישראלי',
-                  status: 'active',
-                  health_status: 'missing',
-                  agreement_complete: false,
-                },
-              ],
             }),
             { status: 200 },
           )
@@ -1015,6 +1101,21 @@ describe('§3 Door C — /?invite=<token> opens the shared wizard, not the old g
     vi.stubGlobal(
       'fetch',
       stubAuthed((url) => {
+        // task 9b -- the prefilled name now comes from the redemption response, not
+        // from `/me/students`'s "exactly one row" heuristic (deleted with the bug it
+        // only ever half-covered).
+        if (url.includes('/api/v1/auth/accept-invitation')) {
+          return new Response(
+            JSON.stringify({
+              access_token: 'tok',
+              expires_in: 900,
+              ...SIGNED_IN_BODY,
+              invited_student_id: 'st-stub',
+              invited_student_name: 'נועה כהן',
+            }),
+            { status: 200 },
+          )
+        }
         if (url.includes('/api/v1/me/onboarding-status')) {
           return new Response(
             JSON.stringify({
@@ -1146,4 +1247,109 @@ describe('§3 Door C — /?invite=<token> opens the shared wizard, not the old g
       within(secondDialog).getByLabelText(new RegExp(`^${STUDENT_FORM_COPY.firstName}\\s*\\*?$`)),
     ).toHaveValue('')
   }, 15000)
+
+  // task 9b -- the exact case that was broken: a returning family whose OTHER children
+  // are already fully onboarded (`next: null`) used to have the wizard never open at
+  // all for the child this link named, because the old gate asked "does this FAMILY
+  // still need onboarding" instead of "does the student this invitation named still
+  // need registering". `AGREEMENTS_CURRENT_STATUS` is exactly that family-wide "nothing
+  // outstanding" answer, and it doubles as the "opens on step 2" half of §3's own rule.
+  it('opens the wizard on step 2 even when /me/onboarding-status reports nothing outstanding', async () => {
+    window.history.replaceState(null, '', '/?invite=tok-123')
+    stubDoorC({ onboardingStatus: AGREEMENTS_CURRENT_STATUS })
+
+    render(<App />)
+
+    await screen.findByTestId('join-family-step')
+    expect(screen.queryByTestId('join-welcome')).toBeNull()
+  })
+
+  it('opens on step 1 when the invited family\'s consents are NOT current', async () => {
+    window.history.replaceState(null, '', '/?invite=tok-123')
+    stubDoorC({ onboardingStatus: AGREEMENTS_NOT_CURRENT_STATUS })
+
+    render(<App />)
+
+    await screen.findByTestId('join-welcome')
+    expect(screen.queryByTestId('join-family-step')).toBeNull()
+  })
+
+  // §4's own rule -- "not their other children" -- and §2's mechanism: the pre-filled
+  // name is whatever `POST /accept-invitation` named, chosen BY ID, never a guess from
+  // `/me/students` (deleted with the "exactly one row" heuristic this replaces). Three
+  // existing siblings are seeded on the account specifically to prove the choice does
+  // not come from that list at all -- Step2Trainees never reads it (see `stubDoorC`).
+  it('a family with three existing children sees only the invited child, pre-filled by id, on step 2', async () => {
+    window.history.replaceState(null, '', '/?invite=tok-123')
+    stubCanvasAndPointerCapture()
+    stubDoorC({
+      invitedStudentId: 'st-invited-sibling',
+      invitedStudentName: 'נועה כהן',
+      existingStudents: [
+        { id: 'st-1', first_name: 'אורי', last_name: 'לוי' },
+        { id: 'st-2', first_name: 'מאיה', last_name: 'לוי' },
+        { id: 'st-3', first_name: 'יובל', last_name: 'לוי' },
+      ],
+    })
+    const user = userEvent.setup()
+
+    render(<App />)
+
+    await screen.findByTestId('join-family-step')
+    await user.click(screen.getByRole('button', { name: STEP2_COPY.addStudent }))
+    const dialog = screen.getByRole('dialog')
+    const field = (text: string) =>
+      within(dialog).getByLabelText(
+        new RegExp(`^${text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\*?$`),
+      )
+
+    // Chosen by id, not by position in `/me/students` -- which the wizard's own step 2
+    // never reads (Step2Trainees builds THIS run's own list from nothing).
+    expect(field(STUDENT_FORM_COPY.firstName)).toHaveValue('נועה')
+    expect(field(STUDENT_FORM_COPY.lastName)).toHaveValue('כהן')
+
+    const fill = (text: string, value: string) => user.type(field(text), value)
+    await fill(STUDENT_FORM_COPY.nationalId, '100000009')
+    await fill(STUDENT_FORM_COPY.birthDate, '2016-04-01')
+    await fill(STUDENT_FORM_COPY.address, 'הרצל 1')
+    await fill(STUDENT_FORM_COPY.city, 'תל אביב')
+    await user.selectOptions(field(STUDENT_FORM_COPY.grade), 'grade_3')
+    await fill(STUDENT_FORM_COPY.guardianFirstName, 'דנה')
+    await fill(STUDENT_FORM_COPY.guardianLastName, 'כהן')
+    await fill(STUDENT_FORM_COPY.guardianNationalId, '100000017')
+    await fill(STUDENT_FORM_COPY.guardianPhone, '0501234567')
+    await fill(STUDENT_FORM_COPY.guardianEmail, 'noa@example.com')
+    await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.next1 }))
+
+    await user.click(within(dialog).getByRole('radio'))
+    await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.next2 }))
+
+    await user.click(within(dialog).getByRole('radio'))
+    await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.next3 }))
+
+    await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.healthYes }))
+    await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.next4 }))
+
+    await fill(STUDENT_FORM_COPY.emergencyPhone, '0507654321')
+    await user.selectOptions(field(STUDENT_FORM_COPY.healthFund), 'clalit')
+    await user.click(
+      within(dialog).getByRole('checkbox', { name: new RegExp(STUDENT_FORM_COPY.attestCheckbox) }),
+    )
+    const canvas = dialog.querySelector('canvas')
+    if (!canvas) throw new Error('signature canvas not found')
+    fireEvent.pointerDown(canvas, { clientX: 100, clientY: 100, pointerId: 1 })
+    fireEvent.pointerMove(canvas, { clientX: 200, clientY: 100, pointerId: 1 })
+    fireEvent.pointerUp(canvas, { clientX: 200, clientY: 100, pointerId: 1 })
+    await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.save }))
+
+    // Step 2's own list, once this run's one child is saved into it: exactly one card,
+    // and the three existing siblings never reach this screen at all.
+    const familyStep = screen.getByTestId('join-family-step')
+    const cards = within(familyStep).getAllByRole('heading', { level: 3 })
+    expect(cards).toHaveLength(1)
+    expect(cards[0]).toHaveTextContent('נועה כהן')
+    for (const siblingName of ['אורי', 'מאיה', 'יובל']) {
+      expect(document.body.textContent).not.toContain(siblingName)
+    }
+  }, 20000)
 })

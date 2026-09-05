@@ -1353,6 +1353,242 @@ def test_a_resubmission_applies_a_changed_group_rather_than_dropping_it(
     )
 
 
+# -- task 9b §5: a converting trial child is actually billed ------------------
+def test_a_converting_trial_child_is_billed_their_first_month(
+    tenant_session, app_session, studio, a_group, twice_weekly, a_live_plan
+):
+    """The trial booking already created this student -- a trial is never billed, so
+    `add_child` (the only caller of `charge_first_month` until now) never runs for them:
+    it raises `DuplicateStudentError` before creating anything, and `register` catches
+    that and routes the submission through `_sync_enrollments` instead. Before this fix
+    that function applied the groups and the plan and raised no charge at all, so every
+    family converting through the club's own funnel ended up enrolled, priced, and owing
+    nothing -- the payment step had a plan to show and no charge behind it.
+    """
+    from app.models.identity import AuthIdentity
+
+    identity_row = AuthIdentity(
+        provider="google",
+        provider_subject=f"trial-convert-{uuid.uuid4().hex[:8]}",
+        email="trialfamily@example.invalid",
+        email_verified=True,
+        is_private_relay=False,
+        is_developer=False,
+    )
+    app_session.add(identity_row)
+    app_session.commit()
+
+    # The family's own Person, already signed in -- exactly what task 9b §1's
+    # `accept_invitation` branch hands back for a returning family, and what
+    # `existing_registration` adopts here rather than duplicating.
+    parent = Person(
+        studio_id=studio.id, auth_identity_id=identity_row.id, first_name="שירה", last_name="לוי"
+    )
+    tenant_session.add(parent)
+    tenant_session.flush()
+
+    # The trial child: a Person + a `trial` Student + the guardian link the booking
+    # itself would have written (`app/services/people/trials.py`), built directly here
+    # rather than through `TrialService` so this test pins ONLY the onboarding half.
+    trial_child = Person(studio_id=studio.id, first_name="נועה", last_name="כהן")
+    tenant_session.add(trial_child)
+    tenant_session.flush()
+    trial_student = Student(
+        studio_id=studio.id,
+        person_id=trial_child.id,
+        status="trial",
+        source="public_link",
+        health_status="trial_signed",
+    )
+    tenant_session.add(trial_student)
+    tenant_session.flush()
+    tenant_session.add(
+        Guardian(
+            studio_id=studio.id,
+            student_id=trial_student.id,
+            person_id=parent.id,
+            is_primary=True,
+            relation="parent",
+        )
+    )
+    tenant_session.commit()
+
+    _, student_ids, charged, child_ids = OnboardingService.register(
+        tenant_session,
+        studio_id=studio.id,
+        identity_id=identity_row.id,
+        first_name="שירה",
+        last_name="לוי",
+        phone=None,
+        email="trialfamily@example.invalid",
+        children=[
+            {
+                "first_name": "נועה",
+                "last_name": "כהן",
+                "birthdate": None,
+                "group_ids": [a_group],
+                "self": False,
+            }
+        ],
+        at=T0,
+        schedule=twice_weekly,
+    )
+    tenant_session.commit()
+
+    assert student_ids == [], "the trial child already existed -- not a second student"
+    assert child_ids == [trial_student.id]
+    assert charged == 1, "register()'s own charges_created must count the converting child"
+
+    charge = tenant_session.execute(
+        select(Charge).where(Charge.student_id == trial_student.id, Charge.kind == "tuition")
+    ).scalar_one()
+    assert charge.payer_person_id == parent.id
+    assert charge.status == "open", "a real charge, not merely a plan assignment"
+    assert tenant_session.get(Student, trial_student.id).price_plan_id == a_live_plan.id
+
+
+def test_a_genuine_resubmission_still_charges_nothing_extra(
+    tenant_session, app_session, studio, a_group, a_second_group, twice_weekly, a_live_plan
+):
+    """The regression the old comment protected against, protected the same way now:
+    `charge_first_month`'s own per-period idempotency key -- not `_sync_enrollments`
+    skipping the call outright -- is what keeps a resubmission that ADDS a group from
+    raising a second bill for a student already charged this period."""
+    from app.models.identity import AuthIdentity
+
+    twice_weekly.sessions[a_second_group] = [
+        make_session(
+            studio_id=studio.id,
+            group_id=a_second_group,
+            training_year_id=uuid.uuid4(),
+            starts_at=moment,
+        )
+        for moment in (SUNDAY, SUNDAY + timedelta(days=3))
+    ]
+
+    identity_row = AuthIdentity(
+        provider="google",
+        provider_subject=f"resubmit-bill-{uuid.uuid4().hex[:8]}",
+        email="resubmit-bill@example.invalid",
+        email_verified=True,
+        is_private_relay=False,
+        is_developer=False,
+    )
+    app_session.add(identity_row)
+    app_session.commit()
+
+    common = dict(
+        studio_id=studio.id,
+        identity_id=identity_row.id,
+        first_name="שירה",
+        last_name="לוי",
+        phone=None,
+        email="resubmit-bill@example.invalid",
+        at=T0,
+        schedule=twice_weekly,
+    )
+    child = {
+        "first_name": "נועה",
+        "last_name": "לוי",
+        "birthdate": date(2016, 4, 1),
+        "group_ids": [a_group],
+        "self": False,
+    }
+    _, first_ids, first_charged, _ = OnboardingService.register(
+        tenant_session, children=[child], **common
+    )
+    tenant_session.commit()
+    assert first_charged == 1
+    student_id = first_ids[0]
+
+    # The parent went back and added a second group -- §8 open item 3's own scenario --
+    # for the SAME child, in the SAME billing period.
+    edited_child = {**child, "group_ids": [a_group, a_second_group]}
+    _, second_ids, second_charged, _ = OnboardingService.register(
+        tenant_session, children=[edited_child], **common
+    )
+    tenant_session.commit()
+
+    assert second_ids == [], "still the same child -- no second student"
+    assert second_charged == 0, "a resubmission must not raise a second charge"
+    tuition_charges = tenant_session.execute(
+        select(func.count(Charge.id)).where(
+            Charge.student_id == student_id, Charge.kind == "tuition"
+        )
+    ).scalar_one()
+    assert tuition_charges == 1, "exactly the one charge the first submission raised"
+
+
+def test_an_unpriced_resubmission_still_charges_nothing_and_still_shows_up(
+    tenant_session, app_session, studio, a_group, a_second_group, twice_weekly
+):
+    """No `PricePlan` exists at all in this studio -- `plan_for_volume` returns `None` on
+    both submissions, so `_sync_enrollments` must skip the charge exactly as `add_child`
+    already skips it, and the student stays on the manager's own unpriced list
+    (`GET /billing/unpriced-students`) rather than silently dropping off it because a
+    resubmission happened to touch the row."""
+    from app.models.identity import AuthIdentity
+    from app.services.billing.catalogue import unpriced_students
+
+    twice_weekly.sessions[a_second_group] = [
+        make_session(
+            studio_id=studio.id,
+            group_id=a_second_group,
+            training_year_id=uuid.uuid4(),
+            starts_at=moment,
+        )
+        for moment in (SUNDAY, SUNDAY + timedelta(days=3))
+    ]
+
+    identity_row = AuthIdentity(
+        provider="google",
+        provider_subject=f"unpriced-resubmit-{uuid.uuid4().hex[:8]}",
+        email="unpriced-resubmit@example.invalid",
+        email_verified=True,
+        is_private_relay=False,
+        is_developer=False,
+    )
+    app_session.add(identity_row)
+    app_session.commit()
+
+    common = dict(
+        studio_id=studio.id,
+        identity_id=identity_row.id,
+        first_name="שירה",
+        last_name="לוי",
+        phone=None,
+        email="unpriced-resubmit@example.invalid",
+        at=T0,
+        schedule=twice_weekly,
+    )
+    child = {
+        "first_name": "נועה",
+        "last_name": "לוי",
+        "birthdate": date(2016, 4, 1),
+        "group_ids": [a_group],
+        "self": False,
+    }
+    _, first_ids, first_charged, _ = OnboardingService.register(
+        tenant_session, children=[child], **common
+    )
+    tenant_session.commit()
+    assert first_charged == 0
+    student_id = first_ids[0]
+    assert tenant_session.get(Student, student_id).price_plan_id is None
+
+    edited_child = {**child, "group_ids": [a_group, a_second_group]}
+    _, second_ids, second_charged, _ = OnboardingService.register(
+        tenant_session, children=[edited_child], **common
+    )
+    tenant_session.commit()
+
+    assert second_ids == []
+    assert second_charged == 0, "no plan exists anywhere in the studio -- nothing to charge"
+    assert tenant_session.get(Student, student_id).price_plan_id is None
+    unpriced_ids = {row.student_id for row in unpriced_students(tenant_session, today=T0.date())}
+    assert student_id in unpriced_ids, "still visible on the manager's own checklist"
+
+
 # -- C2: per-child other_parent/pickup, and each student's own plan (F7, decision 14) --
 def test_two_minors_in_one_submission_carry_different_second_parent_and_pickup_details(
     tenant_session, app_session, studio, a_group, twice_weekly
