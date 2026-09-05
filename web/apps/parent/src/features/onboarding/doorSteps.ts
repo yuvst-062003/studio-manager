@@ -75,3 +75,21 @@ export function startingStep(door: Door, status: OnboardingStatus | null): Wizar
   if (!agreementsDone) return first
   return steps[1] ?? first
 }
+
+/** The redesigned wizard's four screens against the old flow's step keys. `welcome` is
+ *  step 1's agreements; everything else this function can return lands on step 2, because
+ *  the redesign folded the old separate `health` screen INTO step 2's student form.
+ *  `startingStep` only ever returns the first or second entry of a door's list, so in
+ *  practice this answers 1 or 2 -- the rest is here so the mapping is total rather than
+ *  a partial one somebody later has to guess at. */
+export function wizardStepFor(key: WizardStepKey): 1 | 2 | 3 | 4 {
+  switch (key) {
+    case 'welcome':
+      return 1
+    case 'family':
+    case 'health':
+      return 2
+    case 'payment':
+      return 3
+  }
+}

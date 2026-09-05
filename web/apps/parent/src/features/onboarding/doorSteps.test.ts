@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DOOR_STEPS, startingStep, type OnboardingStatus } from './doorSteps'
+import { DOOR_STEPS, startingStep, wizardStepFor, type OnboardingStatus } from './doorSteps'
 
 function status(overrides: Partial<Record<'agreements' | 'students' | 'health' | 'payment', boolean>>): OnboardingStatus {
   const keys = ['agreements', 'students', 'health', 'payment'] as const
@@ -42,5 +42,27 @@ describe('startingStep', () => {
     expect(
       startingStep('addChild', status({ agreements: true, students: true, health: true, payment: true })),
     ).toBe('family')
+  })
+})
+
+describe('wizardStepFor', () => {
+  it('welcome opens the wizard on step 1', () => {
+    expect(wizardStepFor('welcome')).toBe(1)
+  })
+
+  it('family and health both land on step 2 -- the redesign folded health into the student form', () => {
+    expect(wizardStepFor('family')).toBe(2)
+    expect(wizardStepFor('health')).toBe(2)
+  })
+
+  it('payment lands on step 3', () => {
+    expect(wizardStepFor('payment')).toBe(3)
+  })
+
+  it('agrees with startingStep on what a door actually opens on -- 1 or 2, never 3 or 4', () => {
+    expect(wizardStepFor(startingStep('addChild', null))).toBe(1)
+    expect(
+      wizardStepFor(startingStep('addChild', status({ agreements: true }))),
+    ).toBe(2)
   })
 })

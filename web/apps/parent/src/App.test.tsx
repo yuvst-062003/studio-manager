@@ -3,6 +3,17 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { t } from '@studio/i18n'
 import App from './App'
+import type { OnboardingStatus } from './features/onboarding/doorSteps'
+// Task 3b -- doors C and D now drive the redesigned wizard's real step-2 form
+// (`StudentFormSheet`), the same way `JoinWizard.test.tsx` does, rather than the retired
+// `SelfServeJoinFlow`'s `JoinFamilyStep` panel.
+import {
+  STEP1_COPY,
+  STEP2_COPY,
+  STEP3_COPY,
+  STEP4_COPY,
+  STUDENT_FORM_COPY,
+} from './features/onboarding/wizard/content'
 
 // M0's version of this file asserted HelloProof's app name and its display-mode chip.
 // M1 replaced that screen with §6.1's real first run, so the assertions moved with it
@@ -509,139 +520,357 @@ describe('P7 — the belt link resolves or refuses, never silently home', () => 
   }, 15000)
 })
 
+// Task 3b -- doors C and D now share `JoinWizard` with door B, so their own tests drive the
+// same real step-2 form (`StudentFormSheet`, all five parts) `JoinWizard.test.tsx` drives,
+// through `#/add-child` / `?invite=` rather than a directly-rendered `JoinWizard`.
+const AGREEMENTS_CURRENT_STATUS: OnboardingStatus = {
+  steps: [
+    { key: 'agreements', complete: true },
+    { key: 'students', complete: true },
+    { key: 'health', complete: true },
+    { key: 'payment', complete: true },
+  ],
+  next: null,
+}
+
+const AGREEMENTS_NOT_CURRENT_STATUS: OnboardingStatus = {
+  steps: [
+    { key: 'agreements', complete: false },
+    { key: 'students', complete: true },
+    { key: 'health', complete: true },
+    { key: 'payment', complete: true },
+  ],
+  next: 'agreements',
+}
+
+function chargeFixture(id: string, studentId: string, amountAgorot = 30_000) {
+  return {
+    id,
+    payer_person_id: 'payer-1',
+    student_id: studentId,
+    kind: 'tuition',
+    period_year: 2026,
+    period_month: 9,
+    amount_agorot: amountAgorot,
+    original_amount_agorot: null,
+    proration_note: null,
+    due_date: '2026-09-28',
+    status: 'open',
+    created_by: 'billing_run',
+    allocated_agorot: 0,
+    is_covered_elsewhere: false,
+  }
+}
+
+function stubCanvasAndPointerCapture() {
+  Element.prototype.scrollTo = vi.fn()
+  globalThis.HTMLCanvasElement.prototype.getContext = vi.fn(() => ({
+    lineWidth: 0,
+    lineCap: '',
+    lineJoin: '',
+    strokeStyle: '',
+    beginPath: vi.fn(),
+    moveTo: vi.fn(),
+    lineTo: vi.fn(),
+    stroke: vi.fn(),
+    clearRect: vi.fn(),
+    save: vi.fn(),
+    restore: vi.fn(),
+    fillText: vi.fn(),
+    fillStyle: '',
+    font: '',
+    textAlign: '',
+    textBaseline: '',
+    scale: vi.fn(),
+  })) as unknown as typeof HTMLCanvasElement.prototype.getContext
+  globalThis.HTMLCanvasElement.prototype.toDataURL = vi.fn(() => 'data:image/png;base64,AAAA')
+  globalThis.HTMLElement.prototype.setPointerCapture = vi.fn()
+  globalThis.HTMLElement.prototype.releasePointerCapture = vi.fn()
+}
+
+/** Stubs every read door D's `JoinWizard` mount touches (`/me/onboarding-status`,
+ *  `/me/studio` + its public groups/price-plans, the health template) plus the writes a
+ *  registration can reach (`/me/students/register`, `/me/charges`, `/me/payment-promises`,
+ *  `/payment-orders`, `/me/standing-order-links`), and returns a mutable record of what
+ *  was called with what -- the seam these tests assert against, not component state. */
+function stubDoorD(
+  options: {
+    onboardingStatus?: OnboardingStatus
+    existingCharges?: readonly ReturnType<typeof chargeFixture>[]
+  } = {},
+) {
+  const { onboardingStatus = AGREEMENTS_CURRENT_STATUS, existingCharges = [] } = options
+  const state = {
+    registerCalled: false,
+    studentsGetCalls: 0,
+    promiseBodies: [] as Record<string, unknown>[],
+    orderBodies: [] as Record<string, unknown>[],
+  }
+  vi.stubGlobal(
+    'fetch',
+    stubAuthed((url, init) => {
+      if (url.includes('/api/v1/me/students/register') && init?.method === 'POST') {
+        state.registerCalled = true
+        return new Response(
+          JSON.stringify({
+            person_id: 'p1',
+            student_ids: ['st-new'],
+            child_student_ids: ['st-new'],
+            charges_created: 1,
+          }),
+          { status: 201 },
+        )
+      }
+      if (url.includes('/api/v1/me/onboarding-status')) {
+        return new Response(JSON.stringify(onboardingStatus), { status: 200 })
+      }
+      if (url.includes('/api/v1/me/charges')) {
+        return new Response(JSON.stringify({ items: existingCharges }), { status: 200 })
+      }
+      if (url.includes('/api/v1/me/payment-promises') && init?.method === 'POST') {
+        state.promiseBodies.push(JSON.parse(String(init.body)) as Record<string, unknown>)
+        return new Response(JSON.stringify({}), { status: 201 })
+      }
+      if (url.includes('/api/v1/payment-orders') && init?.method === 'POST') {
+        state.orderBodies.push(JSON.parse(String(init.body)) as Record<string, unknown>)
+        return new Response(JSON.stringify({ public_ref: 'order-1' }), { status: 201 })
+      }
+      if (url.includes('/api/v1/me/standing-order-links')) {
+        return new Response(JSON.stringify({ items: [] }), { status: 200 })
+      }
+      if (url.includes('/api/v1/me/students')) {
+        state.studentsGetCalls += 1
+        return new Response(JSON.stringify({ items: [] }), { status: 200 })
+      }
+      if (url.includes('/api/v1/me/studio')) {
+        return new Response(
+          JSON.stringify({ slug: 'demo', name: 'מועדון בדיקה', logo_url: null }),
+          { status: 200 },
+        )
+      }
+      if (url.includes('/api/v1/public/studios/demo/groups')) {
+        return new Response(
+          JSON.stringify({ items: [{ id: 'g1', name: 'מתחילים', training_weekdays: [0, 2] }] }),
+          { status: 200 },
+        )
+      }
+      if (url.includes('/api/v1/public/studios/demo/price-plans')) {
+        return new Response(
+          JSON.stringify({
+            items: [{ id: 'plan-1', name: 'חודשי', monthly_amount_agorot: 30_000, sessions_per_week: 2 }],
+          }),
+          { status: 200 },
+        )
+      }
+      if (url.includes('/api/v1/health-templates/tmpl1')) {
+        return new Response(
+          JSON.stringify({ id: 'tmpl1', kind: 'full', version: 1, schema: HEALTH_SCHEMA }),
+          { status: 200 },
+        )
+      }
+      if (url.includes('/api/v1/health-templates')) {
+        return new Response(
+          JSON.stringify({ items: [{ id: 'tmpl1', kind: 'full', version: 1 }] }),
+          { status: 200 },
+        )
+      }
+      return null
+    }),
+  )
+  return state
+}
+
+/** Opens the "+" add-student dialog and fills the real step-2 form (`StudentFormSheet`,
+ *  all five parts) for ONE minor child -- the same seam `JoinWizard.test.tsx`'s own
+ *  `fillOneChildAndContinue` drives -- ending on the save click, back on step 2's list.
+ *  Assumes step 2's family list (`join-family-step`) is already on screen. */
+async function fillAndSaveOneChild(
+  user: ReturnType<typeof userEvent.setup>,
+  name: { firstName: string; lastName: string } = { firstName: 'דניאל', lastName: 'לוי' },
+) {
+  await screen.findByTestId('join-family-step')
+  await user.click(screen.getByRole('button', { name: STEP2_COPY.addStudent }))
+
+  const dialog = screen.getByRole('dialog')
+  const field = (text: string) =>
+    within(dialog).getByLabelText(
+      new RegExp(`^${text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\*?$`),
+    )
+  const fill = (text: string, value: string) => user.type(field(text), value)
+
+  await fill(STUDENT_FORM_COPY.firstName, name.firstName)
+  await fill(STUDENT_FORM_COPY.lastName, name.lastName)
+  await fill(STUDENT_FORM_COPY.nationalId, '100000009')
+  await fill(STUDENT_FORM_COPY.birthDate, '2016-04-01')
+  await fill(STUDENT_FORM_COPY.address, 'הרצל 1')
+  await fill(STUDENT_FORM_COPY.city, 'תל אביב')
+  await user.selectOptions(field(STUDENT_FORM_COPY.grade), 'grade_3')
+  await fill(STUDENT_FORM_COPY.guardianFirstName, 'דנה')
+  await fill(STUDENT_FORM_COPY.guardianLastName, 'לוי')
+  await fill(STUDENT_FORM_COPY.guardianNationalId, '100000017')
+  await fill(STUDENT_FORM_COPY.guardianPhone, '0501234567')
+  await fill(STUDENT_FORM_COPY.guardianEmail, 'dana@example.com')
+  await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.next1 }))
+
+  await user.click(within(dialog).getByRole('radio'))
+  await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.next2 }))
+
+  await user.click(within(dialog).getByRole('radio'))
+  await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.next3 }))
+
+  await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.healthYes }))
+  await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.next4 }))
+
+  await fill(STUDENT_FORM_COPY.emergencyPhone, '0507654321')
+  await user.selectOptions(field(STUDENT_FORM_COPY.healthFund), 'clalit')
+  await user.click(
+    within(dialog).getByRole('checkbox', { name: new RegExp(STUDENT_FORM_COPY.attestCheckbox) }),
+  )
+  const canvas = dialog.querySelector('canvas')
+  if (!canvas) throw new Error('signature canvas not found')
+  fireEvent.pointerDown(canvas, { clientX: 100, clientY: 100, pointerId: 1 })
+  fireEvent.pointerMove(canvas, { clientX: 200, clientY: 100, pointerId: 1 })
+  fireEvent.pointerUp(canvas, { clientX: 200, clientY: 100, pointerId: 1 })
+
+  await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.save }))
+}
+
+/** `fillAndSaveOneChild`, then presses on to step 3's decision sub-view. */
+async function fillOneChildAndReachStep3(
+  user: ReturnType<typeof userEvent.setup>,
+  name: { firstName: string; lastName: string } = { firstName: 'דניאל', lastName: 'לוי' },
+) {
+  await fillAndSaveOneChild(user, name)
+  await user.click(screen.getByRole('button', { name: STEP2_COPY.continueToStep3 }))
+}
+
 describe('§3 Door D — #/add-child opens the shared wizard, not the old 3-field form', () => {
-  // This test drives the whole multi-step wizard through real `userEvent` interactions --
-  // filling a full student panel, submitting, signing a health declaration, then
-  // confirming -- and legitimately takes over a second (measured up to 1.7s). Under a
-  // loaded, full parallel test run that pushes past vitest's default 5s `testTimeout`
-  // and the test times out even though nothing is hung. Give it real headroom instead of
-  // a global bump that would mask an unrelated test hanging. Do not "tidy" this away.
+  // These tests drive the whole multi-step wizard through real `userEvent` interactions --
+  // filling a full student panel, choosing a payment method, then confirming -- and
+  // legitimately take a couple of seconds. Under a loaded, full parallel test run that
+  // pushes past vitest's default 5s `testTimeout` and the test times out even though
+  // nothing is hung. Give them real headroom instead of a global bump that would mask an
+  // unrelated test hanging. Do not "tidy" this away.
   it('F18 replaced: the wizard writes the new child through /me/students/register and refreshes the family without a reload', async () => {
     // The old `AddSibling` (F18) wrote first/last/group_ids straight to `POST
     // /me/students` with no ת.ז., no plan, no health step and no payment step. Door D
-    // replaces it wholesale: `#/add-child` now mounts `SelfServeJoinFlow`, the same
-    // wizard every other self-service door shares.
+    // replaces it wholesale: `#/add-child` now mounts `JoinWizard`, the same wizard every
+    // other self-service door shares.
     const user = userEvent.setup()
     globalThis.location.hash = '#/add-child'
-    globalThis.HTMLCanvasElement.prototype.getContext = vi.fn(() => ({
-      lineWidth: 0,
-      lineCap: '',
-      lineJoin: '',
-      strokeStyle: '',
-      beginPath: vi.fn(),
-      moveTo: vi.fn(),
-      lineTo: vi.fn(),
-      stroke: vi.fn(),
-      clearRect: vi.fn(),
-      save: vi.fn(),
-      restore: vi.fn(),
-      fillText: vi.fn(),
-      fillStyle: '',
-      font: '',
-      textAlign: '',
-      textBaseline: '',
-    })) as unknown as typeof HTMLCanvasElement.prototype.getContext
-    globalThis.HTMLCanvasElement.prototype.toDataURL = vi.fn(() => 'data:image/png;base64,AAAA')
+    stubCanvasAndPointerCapture()
+    const state = stubDoorD()
 
-    let studentsGetCalls = 0
-    let registerCalled = false
+    render(<App />)
+
+    // Straight to the students step, agreements already current -- never the old form's
+    // bare 3 fields, and never step 1's agreements screen either.
+    await fillOneChildAndReachStep3(user)
+    expect(state.registerCalled).toBe(false)
+
+    await user.click(screen.getByRole('button', { name: STEP3_COPY.continueToPay }))
+    const before = state.studentsGetCalls
+    await user.click(screen.getByRole('radio', { name: STEP3_COPY.methodCash }))
+    await user.click(screen.getByRole('button', { name: STEP3_COPY.submitNoCredit }))
+
+    await waitFor(() => expect(state.registerCalled).toBe(true))
+    // Step 4's own "enter app" is what fires `onEnterApp` -- `familyJoined` bumps and
+    // `AuthedApp`'s `/me/students` effect re-reads, the same seam the old test proved for
+    // `AddSibling`, without a reload.
+    await user.click(await screen.findByRole('button', { name: STEP4_COPY.enterApp }))
+    await waitFor(() => expect(state.studentsGetCalls).toBeGreaterThan(before))
+  }, 20000)
+
+  // §5 -- "already true and breaks quietly": a family adding a fourth child must see only
+  // the child THIS run added, and that child's own plan price -- never a sibling's older
+  // open balance swept in beside it. `submitJoin.ts` already scopes charges to the
+  // students THIS registration created (F19/decision 6); this pins that guarantee at the
+  // door D seam, through the real rendered wizard, rather than only at `submitJoin`'s own
+  // unit level.
+  it('shows only the child being added -- a sibling’s open balance never joins the total or the write', async () => {
+    const user = userEvent.setup()
+    globalThis.location.hash = '#/add-child'
+    stubCanvasAndPointerCapture()
+    const state = stubDoorD({
+      existingCharges: [
+        chargeFixture('ch-new', 'st-new', 30_000),
+        // An unrelated sibling's OWN older unpaid charge -- same payer, different child,
+        // never created by this run.
+        chargeFixture('ch-sibling', 'st-sibling', 55_000),
+      ],
+    })
+
+    render(<App />)
+    await fillOneChildAndReachStep3(user)
+
+    // Step 3 lists exactly the one child being added, and the total is that child's own
+    // plan price (₪300) -- never the sum with the sibling's ₪550.
+    expect(document.body.textContent).toContain(`1 ${STEP3_COPY.familyCount}`)
+    expect(document.body.textContent).toContain('₪300')
+    expect(document.body.textContent).not.toContain('₪850')
+
+    await user.click(screen.getByRole('button', { name: STEP3_COPY.continueToPay }))
+    await user.click(screen.getByRole('radio', { name: STEP3_COPY.methodCash }))
+    await user.click(screen.getByRole('button', { name: STEP3_COPY.submitNoCredit }))
+
+    await waitFor(() => expect(state.promiseBodies.length).toBeGreaterThan(0))
+    const chargeIdsUsed = [
+      ...state.promiseBodies.flatMap((body) => (body.charge_ids as string[] | undefined) ?? []),
+      ...state.orderBodies.flatMap((body) => (body.charge_ids as string[] | undefined) ?? []),
+    ]
+    expect(chargeIdsUsed).toContain('ch-new')
+    expect(chargeIdsUsed).not.toContain('ch-sibling')
+  }, 20000)
+
+  // §3's "the agreements step is skipped, not absent" -- the three ways `doorSteps.ts`'s
+  // `startingStep` can answer, each pinned through the real rendered wizard rather than
+  // only at that module's own unit level.
+  it('opens on step 2 when the status says agreements are already current', async () => {
+    globalThis.location.hash = '#/add-child'
+    stubCanvasAndPointerCapture()
+    stubDoorD({ onboardingStatus: AGREEMENTS_CURRENT_STATUS })
+
+    render(<App />)
+
+    await screen.findByTestId('join-family-step')
+    expect(screen.queryByTestId('join-welcome')).toBeNull()
+  })
+
+  it('opens on step 1 when the status says agreements are NOT yet current', async () => {
+    globalThis.location.hash = '#/add-child'
+    stubCanvasAndPointerCapture()
+    stubDoorD({ onboardingStatus: AGREEMENTS_NOT_CURRENT_STATUS })
+
+    render(<App />)
+
+    await screen.findByTestId('join-welcome')
+    expect(screen.queryByTestId('join-family-step')).toBeNull()
+  })
+
+  it('opens on step 1 when the status read is still in flight (or failed) -- asking once more is the safe answer', async () => {
+    globalThis.location.hash = '#/add-child'
+    stubCanvasAndPointerCapture()
+    // No `/me/onboarding-status` handler at all -- `stubAuthed`'s fallback 200s every
+    // other URL with `{items: []}`, so this specifically answers `null` for the status
+    // read the same way a network failure would.
     vi.stubGlobal(
       'fetch',
-      stubAuthed((url, init) => {
-        if (url.includes('/api/v1/me/students/register') && init?.method === 'POST') {
-          registerCalled = true
-          return new Response(JSON.stringify({ student_ids: ['st-new'] }), { status: 201 })
-        }
-        if (url.includes('/api/v1/me/students/duplicate-check')) {
-          return new Response(JSON.stringify({ duplicate: false }), { status: 200 })
-        }
-        if (url.includes('/api/v1/me/onboarding-status')) {
-          return new Response(
-            JSON.stringify({
-              steps: [
-                { key: 'agreements', complete: true },
-                { key: 'students', complete: true },
-                { key: 'health', complete: true },
-                { key: 'payment', complete: true },
-              ],
-              next: null,
-            }),
-            { status: 200 },
-          )
-        }
-        if (url.includes('/api/v1/me/students')) {
-          studentsGetCalls += 1
-          return new Response(JSON.stringify({ items: [] }), { status: 200 })
-        }
+      stubAuthed((url) => {
+        if (url.includes('/api/v1/me/onboarding-status')) return new Response('', { status: 500 })
         if (url.includes('/api/v1/me/studio')) {
-          return new Response(JSON.stringify({ slug: 'demo' }), { status: 200 })
-        }
-        if (url.includes('/api/v1/public/studios/demo/groups')) {
           return new Response(
-            JSON.stringify({ items: [{ id: 'g1', name: 'מתחילים', weekdays: [0, 2] }] }),
+            JSON.stringify({ slug: 'demo', name: 'מועדון בדיקה', logo_url: null }),
             { status: 200 },
           )
-        }
-        if (url.includes('/api/v1/public/studios/demo/price-plans')) {
-          return new Response(JSON.stringify({ items: [] }), { status: 200 })
-        }
-        if (url.includes('/api/v1/health-templates/tmpl1')) {
-          return new Response(
-            JSON.stringify({ id: 'tmpl1', kind: 'full', version: 1, schema: HEALTH_SCHEMA }),
-            { status: 200 },
-          )
-        }
-        if (url.includes('/api/v1/health-templates')) {
-          return new Response(
-            JSON.stringify({ items: [{ id: 'tmpl1', kind: 'full', version: 1 }] }),
-            { status: 200 },
-          )
-        }
-        if (url.includes('/api/v1/students/') && url.endsWith('/health-declaration')) {
-          return new Response(JSON.stringify({}), { status: 201 })
         }
         return null
       }),
     )
+
     render(<App />)
 
-    // Straight to the students step, one panel already open (agreements already
-    // current) -- never the old form's bare 3 fields.
-    const panel = await screen.findByTestId(/^join-family-panel-/)
-    await user.type(within(panel).getByLabelText(t('he', 'people.join.birthdate')), '1990-01-01')
-    await user.type(within(panel).getByLabelText(t('he', 'people.join.fullName')), 'דניאל לוי')
-    await user.type(within(panel).getByLabelText(t('he', 'people.join.nationalId')), '100000009')
-    await user.type(within(panel).getByLabelText(t('he', 'people.join.grade')), 'ד')
-    await user.click(within(panel).getByRole('checkbox', { name: 'מתחילים · ראשון·שלישי' }))
-    await user.click(within(panel).getByTestId(/^join-family-save-/))
-    const before = studentsGetCalls
-    await user.click(screen.getByTestId('join-submit'))
-
-    // The health step, still local -- nothing written yet.
-    await screen.findByTestId('health-opening-question')
-    expect(registerCalled).toBe(false)
-    await user.click(screen.getByTestId('health-opening-healthy'))
-    // Decision 13: the typed-name fallback is gone -- drawing is the only way to sign. A real
-    // pointer path on the canvas, not a field that no longer exists. `fireEvent`, not a raw
-    // `dispatchEvent`: each call is wrapped in `act()`, so `hasInk` has actually flushed by
-    // the time `pointerup` fires and reads it to decide whether to emit.
-    {
-      const canvas = screen.getByTestId('signature-canvas')
-      fireEvent.pointerDown(canvas, { clientX: 100, clientY: 100, pointerId: 1 })
-      fireEvent.pointerMove(canvas, { clientX: 200, clientY: 100, pointerId: 1 })
-      fireEvent.pointerUp(canvas, { clientX: 200, clientY: 100, pointerId: 1 })
-    }
-    await user.type(screen.getByLabelText('טלפון חירום'), '0501111111')
-    await user.click(screen.getByRole('checkbox', { name: /אני מאשר/ }))
-    await user.click(screen.getByTestId('health-sign-continue'))
-
-    await screen.findByTestId('self-serve-confirm-step')
-    await user.click(screen.getByTestId('self-serve-confirm-submit'))
-
-    await waitFor(() => expect(registerCalled).toBe(true))
-    // Refreshed without a reload -- the same seam the old test proved for `AddSibling`.
-    await waitFor(() => expect(studentsGetCalls).toBeGreaterThan(before))
-  }, 15000)
+    await screen.findByTestId('join-welcome')
+  })
 })
 
 describe('B1 -- the join shell decides sign-in-or-wizard, not step 1 (F1)', () => {
@@ -766,4 +995,146 @@ describe('§3 Door C — /?invite=<token> opens the shared wizard, not the old g
     // asking about an existing child's consent/health/payment one gate at a time.
     expect(screen.queryByTestId('gated-children-loading')).toBeNull()
   })
+
+  // §3's "one row pre-filled": the manager's stub name, seeded into the FIRST child this
+  // run adds and nowhere else -- `JoinWizard`'s own `firstStudentDefaults` (task 3a) is
+  // applied only while the family list is empty, so a SECOND child added in the same run
+  // starts from a blank panel same as door B/D.
+  it('prefills the manager\'s stub name into the first child added, and only the first', async () => {
+    window.history.replaceState(null, '', '/?invite=tok-123')
+    stubCanvasAndPointerCapture()
+    vi.stubGlobal(
+      'fetch',
+      stubAuthed((url) => {
+        if (url.includes('/api/v1/me/onboarding-status')) {
+          return new Response(
+            JSON.stringify({
+              steps: [
+                { key: 'agreements', complete: false },
+                { key: 'students', complete: false },
+                { key: 'health', complete: true },
+                { key: 'payment', complete: true },
+              ],
+              next: 'agreements',
+            }),
+            { status: 200 },
+          )
+        }
+        if (url.includes('/api/v1/me/students')) {
+          return new Response(
+            JSON.stringify({
+              items: [
+                {
+                  id: 'st-stub',
+                  first_name: 'נועה',
+                  last_name: 'כהן',
+                  status: 'active',
+                  health_status: 'missing',
+                  agreement_complete: false,
+                },
+              ],
+            }),
+            { status: 200 },
+          )
+        }
+        if (url.includes('/api/v1/me/studio')) {
+          return new Response(
+            JSON.stringify({ slug: 'demo-club', name: 'מועדון הדגמה', logo_url: null }),
+            { status: 200 },
+          )
+        }
+        if (url.includes('/api/v1/public/studios/demo-club/groups')) {
+          return new Response(
+            JSON.stringify({ items: [{ id: 'g1', name: 'מתחילים', training_weekdays: [0, 2] }] }),
+            { status: 200 },
+          )
+        }
+        if (url.includes('/api/v1/public/studios/demo-club/price-plans')) {
+          return new Response(
+            JSON.stringify({
+              items: [{ id: 'plan-1', name: 'חודשי', monthly_amount_agorot: 30_000, sessions_per_week: 2 }],
+            }),
+            { status: 200 },
+          )
+        }
+        if (url.includes('/api/v1/health-templates/tmpl1')) {
+          return new Response(
+            JSON.stringify({ id: 'tmpl1', kind: 'full', version: 1, schema: HEALTH_SCHEMA }),
+            { status: 200 },
+          )
+        }
+        if (url.includes('/api/v1/health-templates')) {
+          return new Response(
+            JSON.stringify({ items: [{ id: 'tmpl1', kind: 'full', version: 1 }] }),
+            { status: 200 },
+          )
+        }
+        return null
+      }),
+    )
+    const user = userEvent.setup()
+
+    render(<App />)
+
+    await screen.findByTestId('join-welcome')
+    await user.click(screen.getByLabelText(STEP1_COPY.agree))
+    await user.click(screen.getByRole('button', { name: STEP1_COPY.continue }))
+
+    await screen.findByTestId('join-family-step')
+    await user.click(screen.getByRole('button', { name: STEP2_COPY.addStudent }))
+    const dialog = screen.getByRole('dialog')
+    const field = (text: string) =>
+      within(dialog).getByLabelText(
+        new RegExp(`^${text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\*?$`),
+      )
+
+    // The prefilled row: first and last name already filled, before anything is typed.
+    expect(field(STUDENT_FORM_COPY.firstName)).toHaveValue('נועה')
+    expect(field(STUDENT_FORM_COPY.lastName)).toHaveValue('כהן')
+
+    // Complete the rest of the panel (not first/last name -- already correct) so this
+    // child actually joins the list, which is what makes the SECOND dialog's defaults
+    // come from `students[0]` rather than the door's own prefill (Step2Trainees.tsx).
+    const fill = (text: string, value: string) => user.type(field(text), value)
+    await fill(STUDENT_FORM_COPY.nationalId, '100000009')
+    await fill(STUDENT_FORM_COPY.birthDate, '2016-04-01')
+    await fill(STUDENT_FORM_COPY.address, 'הרצל 1')
+    await fill(STUDENT_FORM_COPY.city, 'תל אביב')
+    await user.selectOptions(field(STUDENT_FORM_COPY.grade), 'grade_3')
+    await fill(STUDENT_FORM_COPY.guardianFirstName, 'דנה')
+    await fill(STUDENT_FORM_COPY.guardianLastName, 'כהן')
+    await fill(STUDENT_FORM_COPY.guardianNationalId, '100000017')
+    await fill(STUDENT_FORM_COPY.guardianPhone, '0501234567')
+    await fill(STUDENT_FORM_COPY.guardianEmail, 'noa@example.com')
+    await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.next1 }))
+
+    await user.click(within(dialog).getByRole('radio'))
+    await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.next2 }))
+
+    await user.click(within(dialog).getByRole('radio'))
+    await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.next3 }))
+
+    await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.healthYes }))
+    await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.next4 }))
+
+    await fill(STUDENT_FORM_COPY.emergencyPhone, '0507654321')
+    await user.selectOptions(field(STUDENT_FORM_COPY.healthFund), 'clalit')
+    await user.click(
+      within(dialog).getByRole('checkbox', { name: new RegExp(STUDENT_FORM_COPY.attestCheckbox) }),
+    )
+    const canvas = dialog.querySelector('canvas')
+    if (!canvas) throw new Error('signature canvas not found')
+    fireEvent.pointerDown(canvas, { clientX: 100, clientY: 100, pointerId: 1 })
+    fireEvent.pointerMove(canvas, { clientX: 200, clientY: 100, pointerId: 1 })
+    fireEvent.pointerUp(canvas, { clientX: 200, clientY: 100, pointerId: 1 })
+    await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.save }))
+
+    // The second child added in the SAME run starts from a blank panel -- the prefill is
+    // a starting point for the first row only, never a value that reappears.
+    await user.click(screen.getByRole('button', { name: STEP2_COPY.addStudent }))
+    const secondDialog = screen.getByRole('dialog')
+    expect(
+      within(secondDialog).getByLabelText(new RegExp(`^${STUDENT_FORM_COPY.firstName}\\s*\\*?$`)),
+    ).toHaveValue('')
+  }, 15000)
 })

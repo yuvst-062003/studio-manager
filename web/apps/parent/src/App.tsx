@@ -7,7 +7,7 @@
 // home-screen web app, "so an iPhone parent who never installs receives no push at all —
 // and §5.11 permits no email or SMS fallback, so that parent is reachable only by
 // telephone."
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { apiFetch, apiUrl, getAccessToken, refresh, useDisplayMode, useSession, switchStudio } from '@studio/core'
 import {
   AccessibilityMenu,
@@ -46,8 +46,11 @@ import { matchJoinPath } from './features/onboarding/JoinFlow'
 // button, and the same four endpoints. `JoinFlow` itself is left in place until the
 // doors below (A, C, D) move across too.
 import { JoinWizard } from './features/onboarding/wizard/JoinWizard'
-import { tokenSource } from './features/onboarding/wizard/wizardSources'
-import { SelfServeJoinFlow } from './features/onboarding/SelfServeJoinFlow'
+import { studioSource, tokenSource } from './features/onboarding/wizard/wizardSources'
+// Task 3b -- doors C and D read the same `/me/onboarding-status` this decides between,
+// and translate its answer into the wizard's own step numbering.
+import { startingStep, wizardStepFor } from './features/onboarding/doorSteps'
+import type { OnboardingStatus } from './features/onboarding/doorSteps'
 // §2 decision 3 -- "cleared ... on sign-out": a stale draft (children's national ids,
 // health answers) must not survive into whoever signs in on this device next.
 import { clearAllJoinDrafts } from './features/onboarding/joinDraftStorage'
@@ -213,6 +216,28 @@ function LandingShell({ slug }: { slug: string }) {
   )
 }
 
+/** §5.10's mandate links, read by `submitJoin` AFTER the write -- the children it names
+ *  do not exist before it. A missing or failing read must not fail a registration that has
+ *  already landed, so this returns `[]` rather than throwing. A plain top-level function
+ *  and not a hook: every door `JoinWizard` serves shares this ONE read (`JoinShell` for
+ *  door B, `AuthedApp` below for doors C and D) rather than each holding its own copy. */
+async function loadStandingOrderLinks(): Promise<readonly StandingOrderLink[]> {
+  try {
+    const response = await apiFetch('/api/v1/me/standing-order-links')
+    if (!response.ok) return []
+    const body = (await response.json()) as {
+      items: { student_id: string; amount_agorot: number; url: string }[]
+    }
+    return body.items.map((row) => ({
+      studentId: row.student_id,
+      amountAgorot: row.amount_agorot,
+      url: row.url,
+    }))
+  } catch {
+    return []
+  }
+}
+
 /** What the sign-in wall needs to show the club's own branding before anyone has signed
  *  in -- §6's `slug`/`logo_url` additions to `OnboardingInfoOut`, read from the same
  *  public, unauthenticated `GET /public/onboarding/{token}` the wizard itself reads once
@@ -241,26 +266,6 @@ function JoinShell({ token }: { token: string }) {
   // a fresh one that would restart both loads.
   const source = useMemo(() => tokenSource(token, healthClient), [token, healthClient])
   useDocumentLocale(locale)
-
-  // §5.10's mandate links, read by `submitJoin` AFTER the write -- the children it names
-  // do not exist before it. A missing or failing read must not fail a registration that
-  // has already landed, so this returns `[]` rather than throwing.
-  const standingOrderLinks = useCallback(async (): Promise<readonly StandingOrderLink[]> => {
-    try {
-      const response = await apiFetch('/api/v1/me/standing-order-links')
-      if (!response.ok) return []
-      const body = (await response.json()) as {
-        items: { student_id: string; amount_agorot: number; url: string }[]
-      }
-      return body.items.map((row) => ({
-        studentId: row.student_id,
-        amountAgorot: row.amount_agorot,
-        url: row.url,
-      }))
-    } catch {
-      return []
-    }
-  }, [])
 
   // Fetched once on mount, unconditionally -- not gated on `session.status`, so it is
   // already resolved by the time `status` settles to `anonymous` and the wall below
@@ -326,7 +331,7 @@ function JoinShell({ token }: { token: string }) {
         onEnterApp={() => {
           globalThis.location.assign('/')
         }}
-        standingOrderLinks={standingOrderLinks}
+        standingOrderLinks={loadStandingOrderLinks}
       />
     </ThemeProvider>
   )
@@ -378,22 +383,50 @@ function AuthedApp() {
     () => new URLSearchParams(globalThis.location?.search ?? '').has('invite'),
     [],
   )
-  // `null` while the read is in flight, so the fork below can show the wizard's own
-  // loading state instead of flashing the old gate stack first (see the render).
-  const [inviteNeedsWizard, setInviteNeedsWizard] = useState<boolean | null>(null)
+  // Task 3b -- read ONCE, for both doors C and D (`doorSteps.ts::startingStep` needs the
+  // whole body, not only whether a next step exists), rather than door C's old private
+  // fetch of the same endpoint. `statusLoaded` and not merely a non-null `onboardingStatus`
+  // -- a failed read legitimately resolves to `null` and still has to count as "read", or
+  // `inviteNeedsWizard` below would stay stuck at its in-flight value forever.
+  const [onboardingStatus, setOnboardingStatus] = useState<OnboardingStatus | null>(null)
+  const [statusLoaded, setStatusLoaded] = useState(false)
   useEffect(() => {
-    if (!arrivedWithInvite || session.status !== 'signed-in' || !session.access.parent) return
+    if (session.status !== 'signed-in' || !session.access.parent) return
     let alive = true
     void apiFetch('/api/v1/me/onboarding-status')
-      .then(async (response) =>
-        response.ok ? ((await response.json()) as { next: string | null }) : null,
-      )
-      .then((body) => alive && setInviteNeedsWizard(body ? body.next !== null : false))
-      .catch(() => alive && setInviteNeedsWizard(false))
+      .then(async (response) => (response.ok ? ((await response.json()) as OnboardingStatus) : null))
+      .then((result) => {
+        if (!alive) return
+        setOnboardingStatus(result)
+        setStatusLoaded(true)
+      })
+      .catch(() => {
+        if (!alive) return
+        setOnboardingStatus(null)
+        setStatusLoaded(true)
+      })
     return () => {
       alive = false
     }
-  }, [arrivedWithInvite, session.status, session.access.parent])
+  }, [session.status, session.access.parent])
+  // `null` while the read above is in flight, so the fork below can show the wizard's own
+  // loading state instead of flashing the old gate stack first (see the render). A plain
+  // derived value -- computed straight from `onboardingStatus`/`statusLoaded` during
+  // render, not copied into its own state via an effect -- EXCEPT that `onEnterApp` below
+  // has to be able to force it to `false` the instant the family finishes, without waiting
+  // for a fresh read to say so; `wizardFinished` is that one-way override.
+  const [wizardFinished, setWizardFinished] = useState(false)
+  const inviteNeedsWizard = wizardFinished
+    ? false
+    : !statusLoaded
+      ? null
+      : onboardingStatus
+        ? onboardingStatus.next !== null
+        : false
+  // `JoinWizard`'s effects key on `source`'s IDENTITY (task 3a) -- memoised so doors C and
+  // D hand it the SAME object across a re-render, not a fresh one that restarts both of
+  // `studioSource`'s reads.
+  const memberSource = useMemo(() => studioSource(healthClient), [healthClient])
   // §3 Door C: "one row pre-filled" -- the manager's stub, name only. Read once,
   // independent of `gatedChildren`'s own fetch below (that one is gated on more state
   // and would otherwise race this door's own wizard mount).
@@ -431,38 +464,29 @@ function AuthedApp() {
   // parent §6.5 worked hardest to keep.
   const [gatedChildren, setGatedChildren] = useState<readonly GatedStudent[] | null>(null)
   const [setupChildren, setSetupChildren] = useState<readonly SetupChild[]>([])
-  /** §5.10's mandate links, one per child. Read live and never cached: a stale link signs
-   *  a family up at the wrong amount and nobody finds out for months. */
+  /** §5.10's mandate links, one per child, for `PaymentSetupGate` below. Read live and
+   *  never cached: a stale link signs a family up at the wrong amount and nobody finds
+   *  out for months. Read once, on mount, through the same shared `loadStandingOrderLinks`
+   *  doors B/C/D's `JoinWizard` mounts use for their own (function-shaped) read -- not a
+   *  third copy of the fetch.
+   *
+   *  Fetched once and never again: task 3a/3b moved doors C and D onto `JoinWizard`, whose
+   *  own `submitJoin` reads this same endpoint itself right after its write and shows the
+   *  result on its OWN done screen -- the bump this effect used to need
+   *  (`SelfServeJoinFlow`'s `onRegistered`) has no caller left. A family who adds a child
+   *  through door D and picks a standing order sees that child's link on the wizard's own
+   *  step 4; this array (and the gate it feeds) simply has not re-read since mount, same
+   *  as before doors C/D existed. */
   const [mandateLinks, setMandateLinks] = useState<readonly StandingOrderLink[]>([])
-  // F16 -- bumped by `SelfServeJoinFlow`'s `onRegistered` once Door D's write returns.
-  // The fetch below runs on mount and never again, so a child added through Door D had
-  // its mandate link created strictly AFTER the only read that would have found it.
-  const [mandateReloads, setMandateReloads] = useState(0)
   useEffect(() => {
     let live = true
-    void apiFetch('/api/v1/me/standing-order-links')
-      .then(async (r) =>
-        r.ok
-          ? ((await r.json()) as {
-              items: { student_id: string; amount_agorot: number; url: string }[]
-            })
-          : { items: [] },
-      )
-      .then((body) => {
-        if (!live) return
-        setMandateLinks(
-          body.items.map((row) => ({
-            studentId: row.student_id,
-            amountAgorot: row.amount_agorot,
-            url: row.url,
-          })),
-        )
-      })
-      .catch(() => undefined)
+    void loadStandingOrderLinks().then((links) => {
+      if (live) setMandateLinks(links)
+    })
     return () => {
       live = false
     }
-  }, [mandateReloads])
+  }, [])
   const [declarationsSigned, setDeclarationsSigned] = useState(0)
   // Bumped when a trial family joins the club. The child goes `trial` -> `active` while
   // still holding the short health form, so §5.5's gate must fire on the very next
@@ -778,9 +802,9 @@ function AuthedApp() {
 
               `access.parent` guards lane SCHEDULE's branch because a hash is typed by
               whoever is holding the phone, so the check cannot live in the link. Lane
-              PEOPLE's branch needs no such guard — Door D's `SelfServeJoinFlow` is
-              behind §6.1's refusal already, since a person with no guardian row never
-              reaches this shell. */}
+              PEOPLE's branch needs no such guard — Door D's `JoinWizard` is behind
+              §6.1's refusal already, since a person with no guardian row never reaches
+              this shell. */}
           {/* §6.1 step 6 wraps EVERY routed branch, not the default one: "no other
               screen is reachable", and every drawer link and typed hash routes through
               this expression. Loading, not `null`, while the children are still loading
@@ -797,21 +821,17 @@ function AuthedApp() {
             // !== false` (not `!== null`) is deliberate: while the `/me/onboarding-
             // status` read is still in flight this renders the wizard's OWN loading
             // state rather than flashing the old gates first and correcting a moment
-            // later -- see `SelfServeJoinFlow`'s own `step === 'loading'` branch.
-            <SelfServeJoinFlow
+            // later -- see `JoinWizard`'s own `studio.status === 'loading'` branch.
+            <JoinWizard
               billingClient={billingClient}
-              displayName={session.displayName}
-              door="invite"
-              healthClient={healthClient}
-              locale={locale}
-              onComplete={() => {
-                setInviteNeedsWizard(false)
+              onEnterApp={() => {
+                setWizardFinished(true)
                 setFamilyJoined((n) => n + 1)
               }}
-              onRegistered={() => setMandateReloads((n) => n + 1)}
               prefillFirstRowName={inviteStubName ?? undefined}
-              privacyClient={privacyClient}
-              standingOrderLinks={mandateLinks}
+              source={memberSource}
+              standingOrderLinks={loadStandingOrderLinks}
+              startAtStep={wizardStepFor(startingStep('invite', onboardingStatus))}
             />
           ) : gatedChildren === null ? (
             <p data-testid="gated-children-loading">{t(locale, 'common.setup.loading')}</p>
@@ -933,16 +953,17 @@ function AuthedApp() {
             // their EXISTING children, and an unrelated unpaid balance is still this
             // family's own gate to clear before adding a fourth child, not a wizard
             // Door D exists to route around.
-            <SelfServeJoinFlow
+            <JoinWizard
               billingClient={billingClient}
-              displayName={session.displayName}
-              door="addChild"
-              healthClient={healthClient}
-              locale={locale}
-              onComplete={() => setFamilyJoined((n) => n + 1)}
-              onRegistered={() => setMandateReloads((n) => n + 1)}
-              privacyClient={privacyClient}
-              standingOrderLinks={mandateLinks}
+              onEnterApp={() => {
+                setFamilyJoined((n) => n + 1)
+                // Leave the hash, or `addingChild` stays true and the family lands back
+                // on the wizard they have just finished. "Enter the app" means the app.
+                globalThis.location.hash = ''
+              }}
+              source={memberSource}
+              standingOrderLinks={loadStandingOrderLinks}
+              startAtStep={wizardStepFor(startingStep('addChild', onboardingStatus))}
             />
           ) : belts.length === 2 ? (
             <BeltProgressScreen
