@@ -38,6 +38,41 @@ not shipped code. Delete all three once the wizard is mounted for real.
 6. **Strings into `web/packages/i18n`** (§7), mirrored into `en/` and `ru/`. Last, so nothing is
    translated twice. This is the one item safe to hand to a subagent, file to file.
 
+## Who does what
+
+**Opus plans, reviews and owns every checkpoint. Sonnet writes the code.**
+
+Dispatch Sonnet with a named source file and a named target file, and a task small enough to
+state in a sentence — "port this component's markup into that file, replace these constants with
+these props, keep every class". Never hand Sonnet a screen to build from prose: the previous
+wizard was rejected after exactly that, because each handoff re-interprets the words and nobody
+looked at a rendered screen until the end.
+
+Opus reads every diff before it lands, runs the verification itself, and is the one who looks at
+the screenshots. A green subagent report is not evidence.
+
+## Finish what you start
+
+Keep a todo list for the six items and work them in order. Before you claim any item is done,
+invoke **`superpowers:verification-before-completion`** and follow it: run the check, show the
+output, then make the claim. "Typecheck clean" is true only of the tree you ran it on — if you
+edit after running it, you have not checked that edit.
+
+Do not move to the next item with the previous one partly done. If you have to leave something,
+say so explicitly and list it; silence is what turns an unfinished item into a bug nobody knows
+about.
+
+## When something conflicts
+
+If the two specs disagree with each other, or a spec disagrees with the code, or an instruction
+here disagrees with what you find — **stop and use the AskUserQuestion tool.** Give the real
+options with their trade-offs and let the owner choose.
+
+Do not resolve a conflict by picking whichever reading is easier to build, and do not quietly do
+something halfway between the two. Several of the decisions in these specs look arbitrary and are
+not: they were made against live probes of a payment provider with no sandbox, and against rules
+about a minor's medical data.
+
 ## How to work
 
 **Show a rendered screen at every checkpoint and wait for a yes.** The unit is a whole wizard
@@ -75,4 +110,9 @@ is recorded. Strings are in `@studio/i18n` with Hebrew, English and Russian. The
 and the three old flows are deleted. Typecheck, lint and the parent suite are green, and each
 door has been looked at as a rendered screen.
 
-Then say the wizard is finished, list anything deliberately left undone, and stop.
+Before saying any of that, invoke `superpowers:verification-before-completion` and run the
+checks with the output on screen. Then say the wizard is finished, list anything deliberately
+left undone and why, and stop.
+
+If anything on the list above is NOT done, do not say the wizard is finished. Say which items
+remain and what blocks each one.
