@@ -16,6 +16,8 @@ import type { Locale } from '@studio/i18n'
 import { GuardianSettings } from './GuardianSettings'
 import { makePeopleClient, useMyStudents } from './peopleClient'
 import type { MyProfile } from './peopleClient'
+import { AccountControls } from '../shell/AccountControls'
+import type { AccountControlsProps } from '../shell/AccountControls'
 import { makeParentCommsClient } from '../comms/commsClient'
 import { usePushRegistration } from '../comms/usePushRegistration'
 
@@ -26,9 +28,13 @@ type PromiseRow = { method?: string | null }
 export function ProfileSection({
   locale,
   onLocaleChange,
+  account,
 }: {
   locale: Locale
   onLocaleChange: (next: Locale) => void
+  /** Sign-out and the studio switcher, which the deleted nav drawer used to hold. See
+   *  `AccountControls` — they are passed in because the session is read once, in App.tsx. */
+  account: AccountControlsProps
 }) {
   const client = useMemo(() => makePeopleClient(apiFetch), [])
   const commsClient = useMemo(() => makeParentCommsClient(apiFetch), [])
@@ -106,6 +112,8 @@ export function ProfileSection({
       profile={profile}
       studio={studio}
       students={mine.status === 'ready' ? mine.students : []}
-    />
+    >
+      <AccountControls locale={locale} {...account} />
+    </GuardianSettings>
   )
 }

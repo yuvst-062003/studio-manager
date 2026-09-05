@@ -331,6 +331,11 @@ export type GuardianSettingsProps = {
   notifications?: { enabled: boolean; busy?: boolean; onChange: (next: boolean) => void } | null
   /** How the family pays today, already resolved to a label by the caller. */
   paymentMethod?: string | null
+  /** Appended after the last group. The redesign's deleted nav drawer left two controls
+   *  with nowhere to live -- sign-out and the studio switcher -- and this screen is where
+   *  §4 puts them. A slot rather than two more props: checkpoint 5 replaces this whole
+   *  screen, and what it has to carry across is then one child, not a prop list. */
+  children?: ReactNode
 }
 
 export function GuardianSettings({
@@ -342,6 +347,7 @@ export function GuardianSettings({
   studio,
   notifications,
   paymentMethod,
+  children,
 }: GuardianSettingsProps) {
   const [editing, setEditing] = useState(false)
   const [current, setCurrent] = useState(profile)
@@ -519,6 +525,8 @@ export function GuardianSettings({
       {profileSections.map(({ key, render: Section }) => (
         <Section key={key} locale={locale} students={students} />
       ))}
+
+      {children}
     </section>
   )
 }

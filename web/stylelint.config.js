@@ -69,6 +69,12 @@ export default {
             : `D10: ${property}: ${value} is banned — use the flow-relative value, start or end.`,
       },
     ],
+    // Tailwind v4's own at-rules, which stylelint-config-standard does not know. Only
+    // `@custom-variant` is listed, and deliberately not the whole Tailwind vocabulary:
+    // the parent app redesign needs exactly this one — to point `dark:` at the app's
+    // `[data-theme]` instead of the operating system (see apps/parent/src/tailwind.css) —
+    // and a blanket exemption would also silence a genuine typo in an at-rule name.
+    'at-rule-no-unknown': [true, { ignoreAtRules: ['custom-variant'] }],
     'custom-property-pattern': null,
     'import-notation': null,
     'selector-class-pattern': null,
