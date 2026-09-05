@@ -40,11 +40,11 @@ import { CalendarSync } from './features/comms'
 import { makeParentScheduleClient } from './features/schedule/client'
 import { useToday } from './features/schedule/useToday'
 import { PublicLanding, makeLandingClient, matchLandingPath } from './features/landing'
-import { matchJoinPath } from './features/onboarding/JoinFlow'
-// The redesigned wizard (spec 2026-09-05). It replaces `JoinFlow`'s four screens and
-// keeps its contract: the sign-in wall above it, nothing written until step 3's final
-// button, and the same four endpoints. `JoinFlow` itself is left in place until the
-// doors below (A, C, D) move across too.
+import { matchJoinPath } from './features/onboarding/joinPath'
+// The redesigned wizard (spec 2026-09-05). It replaced `JoinFlow`'s four screens for all
+// three doors that route through here (B, C, D) -- door A's own trial booking
+// (`BookingFlow.tsx`) is unrelated and still runs its own flow. `JoinFlow.tsx` itself is
+// gone (task 7); only `matchJoinPath` above survived it, moved to `joinPath.ts`.
 import { JoinWizard } from './features/onboarding/wizard/JoinWizard'
 import { studioSource, tokenSource } from './features/onboarding/wizard/wizardSources'
 // Task 3b -- doors C and D read the same `/me/onboarding-status` this decides between,
@@ -242,16 +242,16 @@ async function loadStandingOrderLinks(): Promise<readonly StandingOrderLink[]> {
  *  in -- §6's `slug`/`logo_url` additions to `OnboardingInfoOut`, read from the same
  *  public, unauthenticated `GET /public/onboarding/{token}` the wizard itself reads once
  *  signed in (kept as a separate fetch here rather than threaded through as a prop, so
- *  neither this shell nor `JoinFlow` has to wait on the other's request). */
+ *  neither this shell nor `JoinWizard`'s own load has to wait on the other's request). */
 type JoinWallInfo = { studio_name: string; logo_url: string | null }
 
 function JoinShell({ token }: { token: string }) {
   const [locale, setLocale] = useState<Locale>('he')
-  // The privacy client belonged to `JoinFlow`'s payment step and nothing in the
+  // The privacy client belonged to the old `JoinFlow`'s payment step and nothing in the
   // redesigned wizard consumes it, so it is not rebuilt here (task 1c's own note) -- an
   // unused fetch held open for a screen that never reads it is worse than not fetching.
-  // F1/F10 -- the ONE `useSession()` call for this whole route. `JoinFlow` and
-  // `JoinWelcomeStep` used to each mount their own, and every mount's `refresh()` call
+  // F1/F10 -- the ONE `useSession()` call for this whole route. `JoinFlow` (now deleted)
+  // and `JoinWelcomeStep` used to each mount their own, and every mount's `refresh()` call
   // rotates the refresh token -- three (with this one, four) rotations for one page load,
   // and a REMOUNT of any of them (e.g. `JoinWelcomeStep` on back-navigation) restarted
   // that instance at `status: 'loading'`, which its own render treated as "not signed
@@ -292,9 +292,8 @@ function JoinShell({ token }: { token: string }) {
 
   if (session.status !== 'signed-in') {
     // §3's Redirect rule: "Not signed in → the SHELL shows the sign-in wall above the
-    // wizard, with the club's logo and name. Never inside step 1" (F1). The wizard
-    // (`JoinFlow`, starting at `JoinWelcomeStep`) is not rendered at all until this
-    // branch is no longer taken.
+    // wizard, with the club's logo and name. Never inside step 1" (F1). `JoinWizard`
+    // is not rendered at all until this branch is no longer taken.
     return (
       <ThemeProvider>
         <AccessibilityMenu locale={locale} />
@@ -318,7 +317,7 @@ function JoinShell({ token }: { token: string }) {
     )
   }
 
-  // `JoinFlow` owns consent internally now (its own Step 1) -- no external `ConsentGate`
+  // `JoinWizard` owns consent internally (its own Step 1) -- no external `ConsentGate`
   // wrapper. `ConsentGate.tsx` itself is unchanged and still gates the regular app
   // below; this shell just no longer uses it for this route.
   return (
