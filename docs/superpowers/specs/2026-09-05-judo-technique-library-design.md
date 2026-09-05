@@ -178,8 +178,16 @@ for category, sub-family, Gokyo group and the name's literal meaning. Then the I
 
 ### 4.3 The IJF sheet
 
-A **full-screen sheet, not an inline frame.** Their site is a 2007-era PHP page and
-squeezing it into a phone column mid-scroll looks broken.
+A **full-screen sheet, not an inline frame** — because it is someone else's page and
+should be framed as somewhere else, with their name on it. (An earlier draft justified
+this by claiming their page would look broken at phone width. Driving it proved otherwise:
+it is responsive and lays out cleanly at 390px. The decision stands on the honest reason.)
+
+Verified end to end rather than assumed: the frame loads `judo.ijf.org` at 200 with their
+CSS, fonts and scripts, and their 3D animation streams inside it as blob-backed partial
+content. **Their page keeps its own header and menu**, so a child can navigate from the
+technique deeper into the IJF's site without leaving the sheet — acceptable, and noted
+here because the button that opened it does not say so.
 
 Framing is available: they send no `X-Frame-Options` and no `Content-Security-Policy`.
 Their CORS header is empty, so a browser `fetch` is blocked — server-side reads work, which
