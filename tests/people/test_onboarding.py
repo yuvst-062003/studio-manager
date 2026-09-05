@@ -1447,6 +1447,306 @@ def test_a_converting_trial_child_is_billed_their_first_month(
     assert tenant_session.get(Student, trial_student.id).price_plan_id == a_live_plan.id
 
 
+def test_a_converting_trial_child_is_active_and_reaches_the_next_monthly_run(
+    tenant_session, app_session, studio, a_group, twice_weekly, a_live_plan
+):
+    """A finding beyond the brief that first shipped this fix (commit 34bc278): a
+    converting trial child was billed their first month while STAYING at
+    `status='trial'`. `BillingRunService`'s monthly run
+    (`app/services/billing/run.py::_billable_students`) selects `Student.status ==
+    'active' AND Enrollment.status == 'active'`; `charge_first_month` has no such
+    filter, which is exactly why the first charge worked at all. Left at `trial`, this
+    student would take that one charge and then silently drop out of every run after
+    it -- a visible gap (nobody ever billed) turned into an invisible one (billed once,
+    looks fine, quietly skipped forever after). Asserted through the RUN itself, not by
+    reading the column: the column is a means, the second month's charge is the end.
+    """
+    from app.models.identity import AuthIdentity
+    from app.services.billing.run import BillingRunService
+
+    identity_row = AuthIdentity(
+        provider="google",
+        provider_subject=f"trial-convert-run-{uuid.uuid4().hex[:8]}",
+        email="trialrun@example.invalid",
+        email_verified=True,
+        is_private_relay=False,
+        is_developer=False,
+    )
+    app_session.add(identity_row)
+    app_session.commit()
+
+    parent = Person(
+        studio_id=studio.id, auth_identity_id=identity_row.id, first_name="שירה", last_name="לוי"
+    )
+    tenant_session.add(parent)
+    tenant_session.flush()
+
+    trial_child = Person(studio_id=studio.id, first_name="נועה", last_name="כהן")
+    tenant_session.add(trial_child)
+    tenant_session.flush()
+    trial_student = Student(
+        studio_id=studio.id,
+        person_id=trial_child.id,
+        status="trial",
+        source="public_link",
+        health_status="trial_signed",
+    )
+    tenant_session.add(trial_student)
+    tenant_session.flush()
+    tenant_session.add(
+        Guardian(
+            studio_id=studio.id,
+            student_id=trial_student.id,
+            person_id=parent.id,
+            is_primary=True,
+            relation="parent",
+        )
+    )
+    tenant_session.commit()
+
+    OnboardingService.register(
+        tenant_session,
+        studio_id=studio.id,
+        identity_id=identity_row.id,
+        first_name="שירה",
+        last_name="לוי",
+        phone=None,
+        email="trialrun@example.invalid",
+        children=[
+            {
+                "first_name": "נועה",
+                "last_name": "כהן",
+                "birthdate": None,
+                "group_ids": [a_group],
+                "self": False,
+            }
+        ],
+        at=T0,
+        schedule=twice_weekly,
+    )
+    tenant_session.commit()
+
+    assert tenant_session.get(Student, trial_student.id).status == "active"
+
+    # The following period's own run -- the one thing `charge_first_month` alone cannot
+    # prove. If the promotion above had not happened, `_billable_students`'s status
+    # filter would silently exclude this student and the run would raise nothing.
+    run = BillingRunService(tenant_session).run(
+        studio.id, period_year=2026, period_month=10, at=datetime(2026, 10, 12, 9, 0, tzinfo=UTC)
+    )
+    assert run.status == "completed"
+    second_charge = tenant_session.execute(
+        select(Charge).where(
+            Charge.student_id == trial_student.id,
+            Charge.kind == "tuition",
+            Charge.period_year == 2026,
+            Charge.period_month == 10,
+        )
+    ).scalar_one()
+    assert second_charge.status == "open"
+
+
+def test_a_converting_trial_childs_health_status_is_not_promoted(
+    tenant_session, app_session, studio, a_group, twice_weekly, a_live_plan
+):
+    """`StudentService.convert`'s own precedent (`app/services/people/students.py`):
+    'the trial declaration is not sufficient for enrollment... converting requires the
+    full form.' Promoting `health_status` here would switch off the health gate for a
+    student who has signed nothing."""
+    from app.models.identity import AuthIdentity
+
+    identity_row = AuthIdentity(
+        provider="google",
+        provider_subject=f"trial-health-{uuid.uuid4().hex[:8]}",
+        email="trialhealth@example.invalid",
+        email_verified=True,
+        is_private_relay=False,
+        is_developer=False,
+    )
+    app_session.add(identity_row)
+    app_session.commit()
+
+    parent = Person(
+        studio_id=studio.id, auth_identity_id=identity_row.id, first_name="שירה", last_name="לוי"
+    )
+    tenant_session.add(parent)
+    tenant_session.flush()
+
+    trial_child = Person(studio_id=studio.id, first_name="נועה", last_name="כהן")
+    tenant_session.add(trial_child)
+    tenant_session.flush()
+    trial_student = Student(
+        studio_id=studio.id,
+        person_id=trial_child.id,
+        status="trial",
+        source="public_link",
+        health_status="trial_signed",
+    )
+    tenant_session.add(trial_student)
+    tenant_session.flush()
+    tenant_session.add(
+        Guardian(
+            studio_id=studio.id,
+            student_id=trial_student.id,
+            person_id=parent.id,
+            is_primary=True,
+            relation="parent",
+        )
+    )
+    tenant_session.commit()
+
+    OnboardingService.register(
+        tenant_session,
+        studio_id=studio.id,
+        identity_id=identity_row.id,
+        first_name="שירה",
+        last_name="לוי",
+        phone=None,
+        email="trialhealth@example.invalid",
+        children=[
+            {
+                "first_name": "נועה",
+                "last_name": "כהן",
+                "birthdate": None,
+                "group_ids": [a_group],
+                "self": False,
+            }
+        ],
+        at=T0,
+        schedule=twice_weekly,
+    )
+    tenant_session.commit()
+
+    assert tenant_session.get(Student, trial_student.id).status == "active"
+    assert tenant_session.get(Student, trial_student.id).health_status == "trial_signed", (
+        "converting must not silently satisfy the health gate"
+    )
+
+
+def test_a_frozen_student_is_not_reactivated_by_a_resubmitted_link(
+    tenant_session, app_session, studio, a_group, twice_weekly, a_live_plan
+):
+    """A resubmission matches an existing student by name and birthdate alone --
+    `frozen -> active` is a LEGAL move in `StudentStatusService`'s own graph, but
+    reactivating a frozen student is a manager's decision, never a side effect of a
+    link that happens to share a name."""
+    from app.models.identity import AuthIdentity
+
+    identity_row = AuthIdentity(
+        provider="google",
+        provider_subject=f"frozen-resubmit-{uuid.uuid4().hex[:8]}",
+        email="frozenresubmit@example.invalid",
+        email_verified=True,
+        is_private_relay=False,
+        is_developer=False,
+    )
+    app_session.add(identity_row)
+    app_session.commit()
+
+    parent = Person(
+        studio_id=studio.id, auth_identity_id=identity_row.id, first_name="שירה", last_name="לוי"
+    )
+    tenant_session.add(parent)
+    tenant_session.flush()
+
+    frozen_child = Person(studio_id=studio.id, first_name="נועה", last_name="כהן")
+    tenant_session.add(frozen_child)
+    tenant_session.flush()
+    frozen_student = Student(
+        studio_id=studio.id,
+        person_id=frozen_child.id,
+        status="frozen",
+        source="public_link",
+        health_status="missing",
+    )
+    tenant_session.add(frozen_student)
+    tenant_session.flush()
+    tenant_session.add(
+        Guardian(
+            studio_id=studio.id,
+            student_id=frozen_student.id,
+            person_id=parent.id,
+            is_primary=True,
+            relation="parent",
+        )
+    )
+    tenant_session.commit()
+
+    OnboardingService.register(
+        tenant_session,
+        studio_id=studio.id,
+        identity_id=identity_row.id,
+        first_name="שירה",
+        last_name="לוי",
+        phone=None,
+        email="frozenresubmit@example.invalid",
+        children=[
+            {
+                "first_name": "נועה",
+                "last_name": "כהן",
+                "birthdate": None,
+                "group_ids": [a_group],
+                "self": False,
+            }
+        ],
+        at=T0,
+        schedule=twice_weekly,
+    )
+    tenant_session.commit()
+
+    assert tenant_session.get(Student, frozen_student.id).status == "frozen"
+
+
+def test_an_already_active_student_is_left_alone_by_the_promotion(
+    tenant_session, app_session, studio, a_group, twice_weekly, a_live_plan
+):
+    """The promotion is for a genuinely CONVERTING child. A student already `active`
+    (this door's own ordinary resubmission case) is left exactly as they are --
+    `active -> active` is not even a legal move in `StudentStatusService`'s own graph,
+    so the guard here is what keeps a plain resubmission from ever reaching a refused
+    transition call."""
+    from app.models.identity import AuthIdentity
+
+    identity_row = AuthIdentity(
+        provider="google",
+        provider_subject=f"already-active-{uuid.uuid4().hex[:8]}",
+        email="alreadyactive@example.invalid",
+        email_verified=True,
+        is_private_relay=False,
+        is_developer=False,
+    )
+    app_session.add(identity_row)
+    app_session.commit()
+
+    common = dict(
+        studio_id=studio.id,
+        identity_id=identity_row.id,
+        first_name="שירה",
+        last_name="לוי",
+        phone=None,
+        email="alreadyactive@example.invalid",
+        at=T0,
+        schedule=twice_weekly,
+    )
+    child = {
+        "first_name": "נועה",
+        "last_name": "לוי",
+        "birthdate": date(2016, 4, 1),
+        "group_ids": [a_group],
+        "self": False,
+    }
+    _, first_ids, _, _ = OnboardingService.register(tenant_session, children=[child], **common)
+    tenant_session.commit()
+    student_id = first_ids[0]
+    assert tenant_session.get(Student, student_id).status == "active"
+
+    # The same submission again, verbatim -- an ordinary resubmission, not a conversion.
+    OnboardingService.register(tenant_session, children=[child], **common)
+    tenant_session.commit()
+
+    assert tenant_session.get(Student, student_id).status == "active"
+
+
 def test_a_genuine_resubmission_still_charges_nothing_extra(
     tenant_session, app_session, studio, a_group, a_second_group, twice_weekly, a_live_plan
 ):

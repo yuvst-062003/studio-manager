@@ -45,6 +45,7 @@ from app.services.people.enrollments import PENDING_REVIEW_ACTION, EnrollmentSer
 from app.services.people.errors import DuplicateStudentError, NotFoundError, RefusedError
 from app.services.people.group_days import ScheduleReader
 from app.services.people.matching import duplicate_student
+from app.services.people.status import StudentStatusService
 
 logger = logging.getLogger(__name__)
 
@@ -395,6 +396,7 @@ class OnboardingService:
         schedule: ScheduleReader,
         billing_run: BillingRunService | None = None,
         tally: _Tally | None = None,
+        actor_person_id: uuid.UUID | None = None,
     ) -> None:
         """§8's open item 3: a resubmission's edited group list must be applied, not
         dropped. `add_child` never runs a second time for a child `duplicate_student`
@@ -411,6 +413,27 @@ class OnboardingService:
         manager's decision, not a side effect of resubmitting the join link with an
         ADDED one.
 
+        **Promotes a genuinely converting child to `active`, on `StudentService.convert`'s
+        own precedent (`app/services/people/students.py`) -- the manager's own
+        trial-to-member action.** A trial or lead student matched here by
+        `duplicate_student` is not merely getting new groups; they are converting, and
+        `StudentStatusService.transition` is the ONLY writer of `student.status`
+        (`app/services/people/status.py`'s own header) -- assigning the column directly
+        would put a conversion in the roster with no row in `student_status_history`,
+        which is what §5.4a's whole funnel report is computed from.
+        Deliberately narrower than the legal-transition graph: `frozen -> active` and
+        `lead -> active` are both legal moves in that graph, but a `frozen` or `left`
+        (or `lost`) student reached here by nothing more than a resubmitted link sharing
+        a name and birthdate must NOT be silently reactivated -- that is a manager's own
+        decision, the same one `frozen`'s existence protects everywhere else. Only
+        `lead`, `trial` and `pending_approval` -- the pre-membership states -- are
+        promoted; an already-`active` student is left exactly as they are, since there
+        is nothing here for a repeat visit to redo.
+        **`health_status` is deliberately NOT touched**, on `convert`'s own docstring:
+        "the trial declaration is not sufficient for enrollment... converting requires
+        the full form." Promoting it here would switch off the health gate for a
+        student who has signed nothing.
+
         **Calls `charge_first_month`, exactly as `add_child` does.** The comment this
         replaced said the rule was to raise no new charge, and that was right for a
         RESUBMISSION -- a plan that changed mid-onboarding is not corrected here, and
@@ -424,8 +447,25 @@ class OnboardingService:
         that promised money the till never asked for. The rule was never "withhold the
         first charge"; it was "do not re-price one that already went out". Calling here
         on the same terms `add_child` does is what makes both true at once.
+
+        **And the promotion above is what keeps that charge from being the student's
+        ONLY one.** `BillingRunService`'s monthly run selects `Student.status ==
+        'active' AND Enrollment.status == 'active'` (`_billable_students`) -- a student
+        left at `trial` would take this one first charge and then silently drop out of
+        every run after it, which is a worse defect than never billing them at all: the
+        gap becomes invisible instead of visible.
         """
         today = at.date()
+        student = session.get(Student, student_id)
+        if student is not None and student.status in {"lead", "trial", "pending_approval"}:
+            StudentStatusService.transition(
+                session,
+                student=student,
+                to_status="active",
+                at=at,
+                actor_person_id=actor_person_id,
+                reason="converted through the onboarding link",
+            )
         existing_group_ids = set(
             session.execute(
                 select(Enrollment.group_id).where(
@@ -466,16 +506,14 @@ class OnboardingService:
             for group_id in existing_group_ids
         ]
         plan = plan_for_volume(session, studio_id=studio_id, volume=weekly_volume(volume_pairs))
-        if plan is not None:
-            student = session.get(Student, student_id)
-            if student is not None:
-                student.price_plan_id = plan.id
-                session.flush()
-                # See this method's own docstring: idempotent per period, so a genuine
-                # resubmission (already billed this period) gets 0 here and a converting
-                # trial child (never billed) gets their first month.
-                run = billing_run if billing_run is not None else BillingRunService(session)
-                run.charge_first_month(studio_id, student_id, plan.id, on=today, tally=tally)
+        if plan is not None and student is not None:
+            student.price_plan_id = plan.id
+            session.flush()
+            # See this method's own docstring: idempotent per period, so a genuine
+            # resubmission (already billed this period) gets 0 here and a converting
+            # trial child (never billed) gets their first month.
+            run = billing_run if billing_run is not None else BillingRunService(session)
+            run.charge_first_month(studio_id, student_id, plan.id, on=today, tally=tally)
 
     @staticmethod
     def _managers_of_studio(
@@ -770,6 +808,7 @@ class OnboardingService:
                     schedule=schedule,
                     billing_run=billing_run,
                     tally=tally,
+                    actor_person_id=parent.id,
                 )
             else:
                 student_ids.append(student_id)
