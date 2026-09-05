@@ -37,12 +37,12 @@ The drawer held seven entries plus a footer. Nothing was dropped.
 
 | Drawer entry | Where it goes | Landed by |
 |---|---|---|
-| `myChildren` `/` | Home's per-child chips, and Profile's trainee cards | checkpoints 2 and 5 |
-| `calendar` `#/calendar` | a **modal inside Home** (§4) | checkpoint 2 |
+| `myChildren` `/` | Home's per-child chips, and Profile's trainee cards | chips ✅ (2), cards → 5 |
+| `calendar` `#/calendar` | a **modal inside Home** (§4) | ✅ checkpoint 3 |
 | `payments` `#/payments` | **Profile** — balance, method, history | checkpoint 5 |
-| `announcements` | **tab 3** | ✅ now |
-| `events` `#/events` | **no dedicated surface** (§4) — events appear in Home beside every other session | checkpoint 2 |
-| `shop` `#/shop` | **tab 2** | ✅ now |
+| `announcements` | **tab 3** | ✅ checkpoint 1 |
+| `events` `#/events` | **no dedicated surface** (§4) — events appear in Home beside every other session | outstanding, see below |
+| `shop` `#/shop` | **tab 2** | ✅ checkpoint 4 |
 | `addChild` `#/add-child` | **Profile**, under the trainee cards | checkpoint 5 |
 
 | Drawer footer | Where it goes | Landed by |
@@ -101,3 +101,46 @@ the inbox's RSVP action.
 | 2 | badge at `-right-1.5` | `-end-1.5` | logical properties are required (`.claude/rules/ui-rtl-a11y.md`); **this moves the badge to the bell's top-left in Hebrew** — see the checkpoint note |
 | 3 | badge is a bare numeral | count also in `aria-label`, mark `aria-hidden` | a numeral beside a word says nothing about what it counts |
 | 4 | badge takes any integer | `99+` above 99 | a parent back from a month away would widen one of four fixed slots |
+
+
+## Where the work has actually got to
+
+| Checkpoint | Surface | State |
+|---|---|---|
+| 1 | the shell — four tabs, no drawer | ✅ mounted |
+| 2 | **בית** | ✅ mounted, incl. the absence sheet and per-session reminders |
+| 3 | **עדכונים**, and בית's monthly calendar with its day/lesson absence reports | ✅ mounted |
+| 4 | **חנות המועדון** | ✅ mounted |
+| 5 | **פרופיל** — and with it the money, the trainee cards and add-a-child | outstanding |
+| 6 | strings into `@studio/i18n`, mirrored into `en/` and `ru/` | outstanding |
+| — | the dark sweep | outstanding, and see below |
+
+### Still outstanding, and deliberately so
+
+- **The date-range absence flow** (the prototype's FLOW B: pick children, pick from/to).
+  Home's header button and the floating button both go to `#/absence`, which is a working
+  screen that already does multi-child, multi-session picking. Nothing is broken; the
+  prototype's version is simply not built.
+- **Events folded into Home.** §4 says events appear beside every other session. `GET
+  /sessions` returns lessons, not events, so this needs the events read joined into the same
+  list. `#/events` is still linked from the inbox's RSVP action, so nothing is stranded.
+- **`#/calendar`.** The month modal is now Home's calendar, so the ROUTE survives only for
+  §5.12's `CalendarSync` — the feed subscription — which has no home in the new design yet.
+  `AccountControls` still links it, and checkpoint 5 should move the subscription into
+  Profile and retire the route.
+- **`ParentHome`, `InboxScreen`, `ShopSection`, `OrderItemsScreen`** are all still on disk
+  and no longer rendered. They are kept until the redesign is accepted end to end. **Note
+  the hazard:** `routes.reachable.test.ts` scans source, not the render tree, so a link
+  living only inside an unmounted component now counts as reachable. Deleting these files is
+  part of finishing, not an afterthought.
+
+### The dark-mode correction
+
+Checkpoint 1 recorded that the prototype styles dark mode with `dark:` variants throughout.
+That is true of `BottomNavigation` (24) and `ProfileScreen` (318) and FALSE of `HomeScreen`,
+`UpdatesScreen` and `GearScreen`, which carry **none** — they get dark mode from 18 global
+`html.dark .bg-white{…}` overrides in the prototype's `index.css`.
+
+So the ported Home, Updates and Shop have no `dark:` classes, correctly. The sweep at the end
+ports those 18 overrides scoped to `.tw-scope` and matched against `[data-theme="dark"]`,
+which is the mechanism `tailwind.css`'s custom variant already points at.

@@ -78,7 +78,7 @@ import { TrainingPlanSection } from './features/billing/TrainingPlanSection'
 import { PaymentSetupGate } from './features/billing/PaymentSetup'
 import type { SetupChild, StandingOrderLink } from './features/billing/PaymentSetup'
 import { makeParentBillingClient } from './features/billing/PaymentsSection'
-import { ShopSection } from './features/billing'
+import { ClubShop } from './features/billing/redesign/ClubShop'
 // §6.1 step 6 — the BLOCKING declaration. Mounted here because nothing imported it
 // (HB-w6-health-gate-unmounted): the gate, the form and the pad were built and tested in
 // W3 and a guardian with an unsigned declaration still reached home.
@@ -804,7 +804,10 @@ function AuthedApp() {
             // 404 and the section renders nothing rather than another family's plan.
             <TrainingPlanSection locale={locale} studentId={planStudentId} />
           ) : onShop ? (
-            <ShopSection locale={locale} />
+            // Checkpoint 4 of the parent-app redesign. `ShopSection` + `OrderItemsScreen`
+            // are replaced by the port of the prototype's `GearScreen`; both stay on disk
+            // until the redesign is accepted end to end.
+            <ClubShop locale={locale} />
           ) : onDirections ? (
             <DirectionsScreen locale={locale} />
           ) : onInstall ? (
