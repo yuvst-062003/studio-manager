@@ -153,30 +153,21 @@ async function addOneChildAndReachStep3(user: ReturnType<typeof userEvent.setup>
     within(dialog).getByLabelText(
       new RegExp(`^${text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\*?$`),
     )
-  // `fireEvent.change` sets the whole value in one dispatch, rather than `user.type`'s
-  // per-character sequence. That matters here: `StudentFormSheet`'s dirty flag flips on
-  // the FIRST keystroke of a fresh (adding, not editing) form, which changes
-  // `requestClose`'s identity and re-runs `useDialog`'s focus effect --
-  // `dialogRef.current?.focus()` steals focus back from whatever field the family is
-  // mid-word in. A real typist re-clicks the field without noticing (worth flagging
-  // separately -- see the report); a scripted `user.type` has no such recovery and loses
-  // every character after the first. Setting the value in one shot sidesteps it entirely
-  // without touching the component under test.
-  const fill = (text: string, value: string) => fireEvent.change(field(text), { target: { value } })
+  const fill = (text: string, value: string) => user.type(field(text), value)
 
   // Part 1 — student + guardian.
-  fill(STUDENT_FORM_COPY.firstName, 'נועה')
-  fill(STUDENT_FORM_COPY.lastName, 'כהן')
-  fill(STUDENT_FORM_COPY.nationalId, '100000017')
-  fill(STUDENT_FORM_COPY.birthDate, '2016-04-01')
-  fill(STUDENT_FORM_COPY.address, 'הרצל 1')
-  fill(STUDENT_FORM_COPY.city, 'תל אביב')
+  await fill(STUDENT_FORM_COPY.firstName, 'נועה')
+  await fill(STUDENT_FORM_COPY.lastName, 'כהן')
+  await fill(STUDENT_FORM_COPY.nationalId, '100000017')
+  await fill(STUDENT_FORM_COPY.birthDate, '2016-04-01')
+  await fill(STUDENT_FORM_COPY.address, 'הרצל 1')
+  await fill(STUDENT_FORM_COPY.city, 'תל אביב')
   await user.selectOptions(field(STUDENT_FORM_COPY.grade), 'grade_3')
-  fill(STUDENT_FORM_COPY.guardianFirstName, 'דנה')
-  fill(STUDENT_FORM_COPY.guardianLastName, 'כהן')
-  fill(STUDENT_FORM_COPY.guardianNationalId, '100000017')
-  fill(STUDENT_FORM_COPY.guardianPhone, '0501234567')
-  fill(STUDENT_FORM_COPY.guardianEmail, 'dana@example.com')
+  await fill(STUDENT_FORM_COPY.guardianFirstName, 'דנה')
+  await fill(STUDENT_FORM_COPY.guardianLastName, 'כהן')
+  await fill(STUDENT_FORM_COPY.guardianNationalId, '100000017')
+  await fill(STUDENT_FORM_COPY.guardianPhone, '0501234567')
+  await fill(STUDENT_FORM_COPY.guardianEmail, 'dana@example.com')
   await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.next1 }))
 
   // Part 2 — the one group in the fixture.
@@ -192,7 +183,7 @@ async function addOneChildAndReachStep3(user: ReturnType<typeof userEvent.setup>
   await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.next4 }))
 
   // Part 5 — emergency contact, health fund, attestation and signature.
-  fill(STUDENT_FORM_COPY.emergencyPhone, '0507654321')
+  await fill(STUDENT_FORM_COPY.emergencyPhone, '0507654321')
   await user.selectOptions(field(STUDENT_FORM_COPY.healthFund), 'clalit')
   await user.click(
     within(dialog).getByRole('checkbox', { name: new RegExp(STUDENT_FORM_COPY.attestCheckbox) }),

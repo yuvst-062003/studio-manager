@@ -15,6 +15,23 @@ export function useDialog(isOpen: boolean, onClose: () => void) {
   //: closes and drops focus to <body> strands a keyboard user at the top of the page.
   const restoreTo = useRef<HTMLElement | null>(null)
 
+  //: `onClose` is not always stable -- `StudentFormSheet.requestClose` is a `useCallback`
+  //: keyed on `dirty`, which flips on the first keystroke into a fresh add form. If the
+  //: effect below depended on `onClose` directly, that flip re-ran it: the cleanup fired
+  //: (restoring focus to whatever was active a moment ago) and the new run re-focused the
+  //: panel, stealing focus from the field the parent was mid-word in and re-capturing
+  //: `restoreTo` to the input instead of whatever opened the dialog. Reading through a ref
+  //: at event time means the effect only cares about `isOpen`, so a caller re-rendering
+  //: with a new handler identity every keystroke can no longer tear the dialog down.
+  //:
+  //: The ref is synced from an effect rather than during render -- render can run more
+  //: than once for a commit that never happens, and a ref mutated there would leak into
+  //: the wrong one.
+  const closeRef = useRef(onClose)
+  useEffect(() => {
+    closeRef.current = onClose
+  })
+
   useEffect(() => {
     if (!isOpen) return
 
@@ -31,7 +48,7 @@ export function useDialog(isOpen: boolean, onClose: () => void) {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault()
-        onClose()
+        closeRef.current()
         return
       }
       if (event.key !== 'Tab') return
@@ -65,7 +82,7 @@ export function useDialog(isOpen: boolean, onClose: () => void) {
       document.body.style.overflow = previousOverflow
       restoreTo.current?.focus?.()
     }
-  }, [isOpen, onClose])
+  }, [isOpen])
 
   return dialogRef
 }
