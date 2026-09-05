@@ -86,6 +86,22 @@ first.
 example of the house style for ported screens: a `content.ts` for strings, a `useDialog` hook
 giving every modal a focus trap and an Escape key, real radio inputs instead of clickable divs.
 
+## 5.1 · Who does what
+
+**Opus plans, reviews and owns every checkpoint. Sonnet writes the code.**
+
+Dispatch Sonnet file-to-file: a named source in the prototype, a named target in this repo, and
+a task statable in one sentence — "port this component's markup into that file, replace these
+constants with these props, keep every class". That handoff is safe because the source is code
+Sonnet can read, not prose it has to interpret.
+
+**Never hand Sonnet a screen to build from a description.** That is the handoff that failed: the
+earlier wizard attempt dispatched five agents from a written spec and every screen came back
+wrong while every gate stayed green.
+
+Opus reads every diff before it lands, runs the verification itself, composes the comparison
+images and looks at them. A green subagent report is not evidence — only a rendered screen is.
+
 ## 6 · Order
 
 One tab per checkpoint. Suggested order, but ask if you disagree:
