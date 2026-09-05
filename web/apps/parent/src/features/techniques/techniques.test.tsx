@@ -6,8 +6,9 @@
 // anywhere along that path is invisible to every other test in this file.
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { TECHNIQUES, familiesOf, ijfUrl, searchTechniques, techniqueBySlug, videoUrl } from './data'
+import { formatSeconds, loadShelf, saveShelf, setStartAt, toggleFavourite } from './shelf'
 import { matchTechniquesPath } from './index'
 import { TechniqueDetail } from './TechniqueDetail'
 import { TechniquesScreen } from './TechniquesScreen'
@@ -168,10 +169,11 @@ describe('the detail screen', () => {
 
     render(<TechniqueDetail locale="he" slug="o-soto-gari" />)
 
-    expect(screen.getByTestId('technique-video')).toHaveAttribute(
-      'src',
-      `https://www.youtube-nocookie.com/embed/${technique.youtubeId}`,
-    )
+    const src = screen.getByTestId('technique-video').getAttribute('src') ?? ''
+    expect(src).toContain(`youtube-nocookie.com/embed/${technique.youtubeId}`)
+    // `enablejsapi` is what makes the speed and start controls able to talk to the
+    // player at all — without it both are inert and nothing else would say so.
+    expect(src).toContain('enablejsapi=1')
     expect(screen.getByTestId('technique-description')).toHaveTextContent(technique.descriptionHe)
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(technique.nameRomaji)
   })
@@ -197,5 +199,87 @@ describe('the detail screen', () => {
   it('refuses an unknown slug instead of rendering an empty shell', () => {
     render(<TechniqueDetail locale="he" slug="not-a-technique" />)
     expect(screen.getByText('לא מצאנו טכניקה בשם הזה')).toBeInTheDocument()
+  })
+})
+
+describe('my techniques', () => {
+  beforeEach(() => globalThis.localStorage.clear())
+
+  it('adds and removes a technique, and remembers it', async () => {
+    const user = userEvent.setup()
+    render(<TechniqueDetail locale="he" slug="uchi-mata" />)
+    const save = screen.getByTestId('save-technique')
+    expect(save).toHaveAttribute('aria-pressed', 'false')
+
+    await user.click(save)
+    expect(save).toHaveAttribute('aria-pressed', 'true')
+    expect(loadShelf().favourites).toEqual(['uchi-mata'])
+
+    await user.click(save)
+    expect(save).toHaveAttribute('aria-pressed', 'false')
+    expect(loadShelf().favourites).toEqual([])
+  })
+
+  it('shows the saved ones first on the library screen', () => {
+    saveShelf({ favourites: ['kesa-gatame', 'uchi-mata'], startAt: {} })
+    render(<TechniquesScreen locale="he" />)
+    const shelf = screen.getByTestId('my-techniques')
+    // A hold and a throw together: the shelf is the child's list and the category switch
+    // does not filter it, or half of it would vanish for a reason nobody chose.
+    expect(within(shelf).getByTestId('technique-row-kesa-gatame')).toBeInTheDocument()
+    expect(within(shelf).getByTestId('technique-row-uchi-mata')).toBeInTheDocument()
+  })
+
+  it('stays out of the way when nothing is saved', () => {
+    render(<TechniquesScreen locale="he" />)
+    expect(screen.queryByTestId('my-techniques')).not.toBeInTheDocument()
+  })
+
+  it('survives a corrupt or unreadable store rather than taking the screen down', () => {
+    globalThis.localStorage.setItem('techniques-shelf:v1', '{ not json')
+    expect(loadShelf()).toEqual({ favourites: [], startAt: {} })
+    render(<TechniquesScreen locale="he" />)
+    expect(screen.getByTestId('technique-families')).toBeInTheDocument()
+  })
+})
+
+describe('the video controls', () => {
+  beforeEach(() => globalThis.localStorage.clear())
+
+  it('carries a saved start point into the player src', () => {
+    saveShelf({ favourites: [], startAt: { 'uchi-mata': 12 } })
+    render(<TechniqueDetail locale="he" slug="uchi-mata" />)
+    expect(screen.getByTestId('technique-video').getAttribute('src')).toContain('start=12')
+    expect(screen.getByText(/0:12/)).toBeInTheDocument()
+  })
+
+  it('offers slow motion', () => {
+    render(<TechniqueDetail locale="he" slug="uchi-mata" />)
+    expect(screen.getByRole('radio', { name: '0.5×' })).toBeInTheDocument()
+  })
+
+  it('will not save a start point before the player has said where it is', () => {
+    // Disabled rather than saving a zero, which would look like the control did nothing.
+    render(<TechniqueDetail locale="he" slug="uchi-mata" />)
+    expect(screen.getByTestId('set-start')).toBeDisabled()
+  })
+
+  it('offers a reset only once a start point exists', () => {
+    render(<TechniqueDetail locale="he" slug="uchi-mata" />)
+    expect(screen.queryByTestId('clear-start')).not.toBeInTheDocument()
+  })
+
+  it('keeps a time readable and does not store a meaningless zero', () => {
+    expect(formatSeconds(7)).toBe('0:07')
+    expect(formatSeconds(67)).toBe('1:07')
+    expect(setStartAt({ favourites: [], startAt: { a: 5 } }, 'a', 0).startAt).toEqual({})
+    expect(setStartAt({ favourites: [], startAt: {} }, 'a', 9.7).startAt).toEqual({ a: 9 })
+  })
+
+  it('keeps the order a child added things in', () => {
+    let shelf = { favourites: [] as string[], startAt: {} }
+    shelf = toggleFavourite(shelf, 'uchi-mata')
+    shelf = toggleFavourite(shelf, 'o-soto-gari')
+    expect(shelf.favourites).toEqual(['uchi-mata', 'o-soto-gari'])
   })
 })

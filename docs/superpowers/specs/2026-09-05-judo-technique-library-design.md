@@ -15,6 +15,10 @@ deciding what goes on it.
 **In:** the library — browse and search all 100 techniques, and a detail screen per
 technique carrying the official Kodokan video and a link into the IJF's own page.
 
+**Added after the first review:** "my techniques" — a child's own saved list, judo's
+*tokui-waza* — and two video controls, slow motion and a remembered start point. §10 says
+how and why they are stored the way they are.
+
 **Out, deliberately:**
 
 - The **tab wiring**. A parallel session owns `web/apps/parent/src/App.tsx`; two sessions
@@ -253,3 +257,38 @@ Looking at step 1 caught two defects no test would have: the search field printe
 `חיפוש טכניקה` twice, once as its label and once as its own placeholder, and the two
 segment labels crowded each other at 390px. Both are fixed; the placeholder now shows the
 three scripts the box accepts.
+
+
+## 10 · My techniques, slow motion, and where the video starts
+
+Three additions from the first review, and one decision joins them: **all of it is
+`localStorage`, per device, and none of it is a server table.**
+
+A favourite is a preference, not a record the club needs. A table would mean a migration,
+an endpoint, a tenant column and a regenerated client for something whose entire value is
+that it is instant and private to the child. `shelf.ts` is the only module that touches
+the key, so moving it behind an API later changes one file. Every read and write is
+guarded — `localStorage` does not merely come back empty in a private window or with site
+data blocked, the accessor itself throws, and an uncaught throw would take the whole
+library down over a saved star.
+
+**My techniques** (`shelf.title`) sits at the top of the library and is **not filtered by
+the category switch**. The list is the child's; hiding the holds in it because they were
+looking at throws would make the shelf appear to have lost something.
+
+**The star lives on the detail screen only.** `DetailRow` establishes that a row which
+goes somewhere carries no separate control, and a button nested inside a link is a defect
+for a keyboard and a screen reader both.
+
+**Slow motion and the start point** go through YouTube's `postMessage` interface with
+`enablejsapi=1`, not through their IFrame API script — loading `youtube.com/iframe_api`
+would put a third-party script on a page children use, and the two commands needed here
+are three lines. The speed does not survive the reload that changing the start point
+causes, so it is re-applied on every frame load rather than only when the control is used.
+
+**The start point is the child's, not ours.** These films open with a title card and a bow
+and the technique begins later, but nobody has annotated where — so rather than invent
+timestamps, the person watching sets their own. That is better than a curated one anyway:
+the moment worth re-watching differs between the child learning the entry and the child
+fixing their finish. `Start here` stays **disabled until the player has reported a
+position**, rather than saving a zero that would look like the control did nothing.

@@ -7,7 +7,8 @@
 import { useMemo, useState } from 'react'
 import type { Locale } from '@studio/i18n'
 import { EmptyState, PageHeader, SectionHeader, SegmentedControl, TextField } from '@studio/ui'
-import { familiesOf, searchTechniques } from './data'
+import { familiesOf, searchTechniques, techniqueBySlug } from './data'
+import { loadShelf } from './shelf'
 import type { Category, Technique } from './types'
 import { fillGroup, s } from './strings'
 import './techniques.css'
@@ -61,6 +62,16 @@ function TechniqueRow({ locale, technique }: { locale: Locale; technique: Techni
 export function TechniquesScreen({ locale }: { locale: Locale }) {
   const [category, setCategory] = useState<Category>('nage-waza')
   const [query, setQuery] = useState('')
+  // Read once. The shelf changes on the detail screen, and coming back remounts this one.
+  const [shelf] = useState(loadShelf)
+
+  // A child's own techniques come FIRST and are not filtered by the category switch —
+  // the list is theirs, and hiding half of it behind a segment they did not touch would
+  // make the shelf look like it had lost something.
+  const mine = useMemo(
+    () => shelf.favourites.map(techniqueBySlug).filter((t) => t !== undefined),
+    [shelf],
+  )
 
   // Search runs across BOTH categories, then the segmented control narrows the result.
   // Searching only inside the selected one means a child who types a hold while throws
@@ -89,6 +100,18 @@ export function TechniquesScreen({ locale }: { locale: Locale }) {
         ]}
         value={category}
       />
+
+      {mine.length > 0 && query === '' ? (
+        <section className="studio-techniques__family" data-testid="my-techniques">
+          <SectionHeader level={3} title={s(locale, 'shelf.title')} />
+          <p className="studio-techniques__shelf-hint">{s(locale, 'shelf.hint')}</p>
+          <div className="studio-techniques__rows">
+            {mine.map((technique) => (
+              <TechniqueRow key={technique.slug} locale={locale} technique={technique} />
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       {nothingAnywhere ? (
         <EmptyState

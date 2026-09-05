@@ -285,3 +285,93 @@
   background: color-mix(in srgb, var(--accent) 9%, transparent);
   border-color: color-mix(in srgb, var(--accent) 40%, transparent);
 }
+
+/* ── My techniques, and the video controls ───────────────────────────────────── */
+
+.studio-technique__video {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.studio-technique__controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.studio-technique__start {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.studio-technique__start-label {
+  font-size: var(--text-caption);
+  color: var(--text-muted);
+
+  /* A time is digits in a row; they should not jitter as the seconds change. */
+  font-variant-numeric: tabular-nums;
+}
+
+.studio-technique__start-actions {
+  display: flex;
+  gap: var(--space-3);
+}
+
+/* A text control, not a button — these sit under the player as asides to it, and three
+ * filled buttons stacked under a video would outrank the video. */
+.studio-technique__link {
+  font: inherit;
+  font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
+  color: var(--accent);
+  background: none;
+  border: none;
+  padding: var(--space-1) 0;
+  cursor: pointer;
+  text-decoration: underline;
+
+  /* 44px of touch without 44px of ink: the row keeps its own height. */
+  min-block-size: 32px;
+}
+
+.studio-technique__link:disabled {
+  color: var(--text-muted);
+  text-decoration: none;
+  cursor: default;
+}
+
+/* The star. On the detail screen only: `DetailRow` establishes that a row which goes
+ * somewhere carries no separate control, and a button nested inside a link is a defect
+ * for a keyboard and a screen reader both. */
+.studio-technique__save {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-block-size: 44px;
+  padding: var(--space-2) var(--space-4);
+  font: inherit;
+  font-size: var(--text-label);
+  font-weight: var(--weight-semibold);
+  color: var(--text-secondary);
+  background: var(--surface);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.studio-technique__save[aria-pressed='true'] {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 9%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+.studio-techniques__shelf-hint {
+  margin: 0;
+  font-size: var(--text-caption);
+  color: var(--text-muted);
+}

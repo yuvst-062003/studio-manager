@@ -7,13 +7,18 @@
 import { useState } from 'react'
 import type { Locale } from '@studio/i18n'
 import { Button, DetailRow, EmptyState } from '@studio/ui'
-import { ijfUrl, techniqueBySlug, videoUrl } from './data'
+import { ijfUrl, techniqueBySlug } from './data'
 import { IjfSheet } from './IjfSheet'
+import { TechniquePlayer } from './TechniquePlayer'
+import { loadShelf, saveShelf, setStartAt, toggleFavourite } from './shelf'
 import { fillGroup, s } from './strings'
 import './techniques.css'
 
 export function TechniqueDetail({ locale, slug }: { locale: Locale; slug: string }) {
   const [sheetOpen, setSheetOpen] = useState(false)
+  // Read once on mount, not on every render: `localStorage` is synchronous and this
+  // screen re-renders on every playback message the player receives.
+  const [shelf, setShelf] = useState(loadShelf)
   const technique = techniqueBySlug(slug)
 
   // A hand-typed or stale hash. Refuse plainly rather than render an empty shell.
@@ -30,9 +35,14 @@ export function TechniqueDetail({ locale, slug }: { locale: Locale; slug: string
     )
   }
 
-  const video = videoUrl(technique)
   const ijf = ijfUrl(technique)
   const offline = !(globalThis.navigator?.onLine ?? true)
+  const saved = shelf.favourites.includes(technique.slug)
+
+  const update = (next: typeof shelf) => {
+    setShelf(next)
+    saveShelf(next)
+  }
 
   return (
     <article className="studio-technique" data-testid={`technique-${technique.slug}`}>
@@ -58,7 +68,7 @@ export function TechniqueDetail({ locale, slug }: { locale: Locale; slug: string
       {/* Three states, and the two failures say which one they are. The Kodokan has
           published no video for Sasae-tsurikomi-ashi, which is NOT the same thing as the
           phone having no signal, and a child deserves to be told which. */}
-      {video === null ? (
+      {technique.youtubeId === null ? (
         <p className="studio-technique__player-missing" data-testid="video-missing">
           {s(locale, 'video.missing')}
         </p>
@@ -67,15 +77,30 @@ export function TechniqueDetail({ locale, slug }: { locale: Locale; slug: string
           {s(locale, 'video.offline')}
         </p>
       ) : (
-        <iframe
-          allow="accelerometer; encrypted-media; gyroscope; picture-in-picture"
-          allowFullScreen
-          className="studio-technique__player"
-          data-testid="technique-video"
-          src={video}
+        <TechniquePlayer
+          locale={locale}
+          onStartAtChange={(seconds) => update(setStartAt(shelf, technique.slug, seconds))}
+          startAt={shelf.startAt[technique.slug] ?? 0}
           title={s(locale, 'video.title')}
+          videoId={technique.youtubeId}
         />
       )}
+
+      {/* Tokui-waza — judo's own word for the technique you make your own. `aria-pressed`
+          rather than two labels: it is one control in two states, and a screen reader
+          should say so. */}
+      <button
+        aria-pressed={saved}
+        className="studio-technique__save"
+        data-testid="save-technique"
+        onClick={() => update(toggleFavourite(shelf, technique.slug))}
+        type="button"
+      >
+        <svg aria-hidden="true" fill={saved ? 'currentColor' : 'none'} height="17" stroke="currentColor" strokeLinejoin="round" strokeWidth="1.7" viewBox="0 0 24 24" width="17">
+          <path d="m12 3.6 2.6 5.3 5.8.8-4.2 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.2-4.1 5.8-.8z" />
+        </svg>
+        {saved ? s(locale, 'shelf.saved') : s(locale, 'shelf.add')}
+      </button>
 
       {/* Ours, written from the Kodokan's definition of the MOVEMENT. Their sentences are
           theirs, and a translation of a sentence is still that sentence. */}
