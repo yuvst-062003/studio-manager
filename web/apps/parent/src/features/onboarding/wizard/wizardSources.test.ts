@@ -172,18 +172,20 @@ describe('studioSource -- doors C and D, no token anywhere', () => {
     plansItems?: unknown[]
     registerStatus?: number
     registerBody?: unknown
+    meStudioLogoUrl?: string | null
   } = {}) {
     const {
       groupsItems = [],
       plansItems = [],
       registerStatus = 201,
       registerBody = REGISTER_RESPONSE,
+      meStudioLogoUrl = null,
     } = options
     return vi.fn(async (input: string | URL, init?: RequestInit) => {
       const url = String(input)
       if (url.includes('/api/v1/me/studio')) {
         return new Response(
-          JSON.stringify({ slug: 'demo-club', name: 'מועדון בדיקה', logo_url: null }),
+          JSON.stringify({ slug: 'demo-club', name: 'מועדון בדיקה', logo_url: meStudioLogoUrl }),
           { status: 200 },
         )
       }
@@ -235,6 +237,32 @@ describe('studioSource -- doors C and D, no token anywhere', () => {
     // `OnboardingGroupOut.weekdays` maps to for door B -- proving the rename was bridged,
     // not silently dropped.
     expect(studio.groups[0]?.scheduleLabel).toContain('ראשון')
+  })
+
+  it("loadStudio builds logoUrl from the PUBLIC /public/studios/{slug}/logo route, never from /me/studio's own logo_url value", async () => {
+    const { apiFetch } = await import('@studio/core')
+    // `/me/studio`'s `logo_url` resolves server-side to the TENANT-SCOPED
+    // `/api/v1/studio/logo` -- feeding exactly that value back here proves the result is
+    // not that string passed through, but the public path rebuilt from the slug.
+    const fetchMock = fetchMockFor({ meStudioLogoUrl: '/api/v1/studio/logo' })
+    vi.mocked(apiFetch).mockImplementation(fetchMock)
+
+    const source = studioSource(healthClientStub())
+    const studio = await source.loadStudio()
+
+    expect(studio.logoUrl).toBe('/api/v1/public/studios/demo-club/logo')
+    expect(studio.logoUrl).not.toBe('/api/v1/studio/logo')
+  })
+
+  it('loadStudio returns a null logoUrl when /me/studio has no logo -- a studio with none must not get a URL that 404s', async () => {
+    const { apiFetch } = await import('@studio/core')
+    const fetchMock = fetchMockFor({ meStudioLogoUrl: null })
+    vi.mocked(apiFetch).mockImplementation(fetchMock)
+
+    const source = studioSource(healthClientStub())
+    const studio = await source.loadStudio()
+
+    expect(studio.logoUrl).toBeNull()
   })
 
   it('register posts to /api/v1/me/students/register with a body carrying club_terms_accepted and children and NO signer', async () => {

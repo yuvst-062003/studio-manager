@@ -180,9 +180,18 @@ export function studioSource(healthClient: HealthClient): JoinWizardSource {
       }))
       return {
         studioName: name,
-        // A path on the API, same convention door B's `logo_url` is -- passed through
-        // unchanged; the shell already renders a null one as "no logo".
-        logoUrl,
+        // `StudioOut.logo_url` (what `/me/studio` -- read above, in `loadStudioInfo` --
+        // actually returns) resolves to `/api/v1/studio/logo`, the TENANT-SCOPED read
+        // `GET /studio/logo` requires (`app/routers/studio.py`), gated on the caller's
+        // bearer token. Step 1 and the shell header render this through a plain
+        // `<img src>`, which never attaches that token, so pointing it at that path
+        // 401s and shows a broken image -- caught by actually loading the page, not by
+        // a mocked-fetch test asserting the `src` attribute alone. So `logo_url` here is
+        // read only as the boolean fact "this studio has a logo"; the real URL is
+        // rebuilt from `slug` against the UNAUTHENTICATED `GET /public/studios/{slug}/logo`
+        // door B already uses, and which the server itself builds the same way in
+        // `app/routers/public.py`/`app/routers/onboarding.py`. Null stays null.
+        logoUrl: logoUrl ? `/api/v1/public/studios/${slug}/logo` : null,
         groups: groups.map(toWizardGroup),
       }
     },
