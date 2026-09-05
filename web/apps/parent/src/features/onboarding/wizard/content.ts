@@ -471,3 +471,11 @@ export const ATHLETE_CARD_COPY = {
   active: 'פעיל',
   awaiting: 'ממתין למנהל',
 } as const
+
+export const WIZARD_FLOW_COPY = {
+  loading: 'טוען את פרטי המועדון…',
+  loadFailed: 'לא הצלחנו לטעון את פרטי המועדון. נסו לרענן את הדף.',
+  loadingCatalogue: 'טוען קבוצות ומסלולים…',
+  catalogueFailed: 'לא הצלחנו לטעון את הקבוצות והמסלולים. נסו לרענן את הדף.',
+  submitFailed: 'ההרשמה לא נשלחה. בדקו את החיבור ונסו שוב — הפרטים שמילאתם נשמרו.',
+} as const

@@ -77,7 +77,7 @@ export function Step2Trainees({
   }
 
   return (
-    <div className="tw-scope flex flex-col w-full pb-28">
+    <div className="tw-scope flex flex-col w-full pb-28" data-testid="join-family-step">
       <div className="flex flex-col gap-1.5 mt-2 mb-4">
         <div className="flex items-center justify-between flex-wrap gap-1">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#e3e7fa] text-[#0d2c6c] text-[12px] font-semibold">

@@ -49,7 +49,7 @@ export function Step1Agreements({
   const [faqOpen, setFaqOpen] = useState(false)
 
   return (
-    <div className="tw-scope flex flex-col w-full pb-16">
+    <div className="tw-scope flex flex-col w-full pb-16" data-testid="join-welcome">
       {/* §3.1 — club emblem */}
       <div className="relative flex flex-col items-center text-center pt-2 pb-4">
         {emblemUrl ? (

@@ -40,7 +40,12 @@ import { CalendarSync } from './features/comms'
 import { makeParentScheduleClient } from './features/schedule/client'
 import { useToday } from './features/schedule/useToday'
 import { PublicLanding, makeLandingClient, matchLandingPath } from './features/landing'
-import { JoinFlow, matchJoinPath } from './features/onboarding/JoinFlow'
+import { matchJoinPath } from './features/onboarding/JoinFlow'
+// The redesigned wizard (spec 2026-09-05). It replaces `JoinFlow`'s four screens and
+// keeps its contract: the sign-in wall above it, nothing written until step 3's final
+// button, and the same four endpoints. `JoinFlow` itself is left in place until the
+// doors below (A, C, D) move across too.
+import { WizardJoinFlow } from './features/onboarding/wizard/WizardJoinFlow'
 import { SelfServeJoinFlow } from './features/onboarding/SelfServeJoinFlow'
 // §2 decision 3 -- "cleared ... on sign-out": a stale draft (children's national ids,
 // health answers) must not survive into whoever signs in on this device next.
@@ -216,14 +221,11 @@ type JoinWallInfo = { studio_name: string; logo_url: string | null }
 
 function JoinShell({ token }: { token: string }) {
   const [locale, setLocale] = useState<Locale>('he')
-  const [mandateLinks, setMandateLinks] = useState<readonly StandingOrderLink[]>([])
-  // F16 -- bumped by `JoinFlow`'s `onRegistered` once the single write has returned.
-  // The links below are one per child at that child's own amount, so they cannot
-  // exist until that write has created the children; the fetch's own `session.status`
-  // dependency never changes across it (signed-in before, signed-in after), so
-  // without this counter the effect never re-runs and every הוראת קבע child reads
-  // "לא ניתן לאשר" on the done screen -- which is exactly F16.
-  const [mandateReloads, setMandateReloads] = useState(0)
+  // The standing-order mandate links, the privacy client and the billing client all
+  // belonged to `JoinFlow`'s payment step. `WizardJoinFlow` collects the payment METHOD
+  // per child but does not yet act on it -- see its own note -- so nothing here consumes
+  // them, and holding a fetch open for a screen that never reads it is worse than not
+  // fetching. They come back with the promise and order writes.
   // F1/F10 -- the ONE `useSession()` call for this whole route. `JoinFlow` and
   // `JoinWelcomeStep` used to each mount their own, and every mount's `refresh()` call
   // rotates the refresh token -- three (with this one, four) rotations for one page load,
@@ -233,37 +235,11 @@ function JoinShell({ token }: { token: string }) {
   // children need -- neither child calls `useSession()` any more.
   const session = useSession()
   const [wallInfo, setWallInfo] = useState<JoinWallInfo | null>(null)
-  const privacyClient = useMemo(() => makePrivacyClient(apiFetch), [])
   const healthClient = useMemo(() => makeHealthClient(apiFetch), [])
-  const billingClient = useMemo(() => makeParentBillingClient(apiFetch), [])
   useDocumentLocale(locale)
 
-  useEffect(() => {
-    if (session.status !== 'signed-in') return
-    let live = true
-    void apiFetch('/api/v1/me/standing-order-links')
-      .then(async (response) =>
-        response.ok
-          ? ((await response.json()) as {
-              items: { student_id: string; amount_agorot: number; url: string }[]
-            })
-          : { items: [] },
-      )
-      .then((body) => {
-        if (!live) return
-        setMandateLinks(
-          body.items.map((row) => ({
-            studentId: row.student_id,
-            amountAgorot: row.amount_agorot,
-            url: row.url,
-          })),
-        )
-      })
-      .catch(() => undefined)
-    return () => {
-      live = false
-    }
-  }, [session.status, mandateReloads])
+  // (the standing-order mandate fetch lived here; it comes back with the promise and
+  // order writes that consume it)
 
   // Fetched once on mount, unconditionally -- not gated on `session.status`, so it is
   // already resolved by the time `status` settles to `anonymous` and the wall below
@@ -323,17 +299,11 @@ function JoinShell({ token }: { token: string }) {
     <ThemeProvider>
       <AccessibilityMenu locale={locale} />
       <LanguagePicker locale={locale} onChoose={setLocale} />
-      <JoinFlow
-        billingClient={billingClient}
-        displayName={session.displayName}
+      <WizardJoinFlow
         healthClient={healthClient}
-        locale={locale}
-        onComplete={() => {
+        onEnterApp={() => {
           globalThis.location.assign('/')
         }}
-        onRegistered={() => setMandateReloads((n) => n + 1)}
-        privacyClient={privacyClient}
-        standingOrderLinks={mandateLinks}
         token={token}
       />
     </ThemeProvider>
