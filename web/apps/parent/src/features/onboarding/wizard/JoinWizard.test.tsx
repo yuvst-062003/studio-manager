@@ -362,6 +362,28 @@ describe('JoinWizard -- wiring submitJoin into the screens', () => {
     expect(billingClient.createOrder).not.toHaveBeenCalled()
   }, 20000)
 
+  // A price is the most load-bearing number on this screen and nothing above renders one
+  // built from a source's raw `loadCatalogue()` output rather than a hand-built `WizardPlan`
+  // -- `wizardSources.test.ts` proved a source that skips the wire's snake_case ->
+  // `PlanOption` mapping hands `toWizardPlan` `undefined`, which `formatShekels` turns into
+  // the literal string "NaN" on screen. This drives the real wizard with `fakeSource()`'s
+  // already-correctly-mapped catalogue (`PLAN`, built through `toWizardPlan` above) and
+  // asserts the rendered total actually names ₪300 and never "NaN" -- the render-level half
+  // of that guarantee, closing the hole a unit test on the adapter alone cannot close.
+  it('reaching step 3 renders the real shekel price for the collected child, never "NaN"', async () => {
+    const user = userEvent.setup()
+    renderWizard()
+
+    await addOneChildAndReachStep3(user)
+
+    // 30_000 agorot (the fixture `PLAN`'s price) -> ₪300/month once `formatShekels` rounds
+    // it. Checked against the whole rendered page rather than one queried element: the
+    // total badge and the per-child breakdown both show this figure, and either one
+    // showing "NaN" instead is the defect this test exists to catch.
+    expect(document.body.textContent).not.toContain('NaN')
+    expect(document.body.textContent).toContain('₪300')
+  }, 20000)
+
   // Task 3a: doors C and D open past the agreements screen when the family's consents are
   // already current (`doorSteps.ts::startingStep`), and the register payload must say so
   // (`AgreementService.accept_club_terms` treats a redundant `club_terms_accepted: true`

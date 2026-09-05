@@ -64,6 +64,19 @@ const REGISTER_RESPONSE: RegisterResult = {
   charges_created: 1,
 }
 
+/** The real wire shape both price-plan endpoints return -- snake_case, confirmed against
+ *  `OnboardingPricePlanOut` (`app/routers/onboarding.py`) and the identical shape
+ *  `/public/studios/{slug}/price-plans` returns. `PlanOption` (what `toWizardPlan` reads)
+ *  is camelCase -- a source that skips this mapping hands `toWizardPlan` `undefined` for
+ *  `monthlyAmountAgorot`/`sessionsPerWeek`, which is what rendered every price on door B
+ *  as "NaN" until this fix. */
+const WIRE_PLAN = {
+  id: 'p400',
+  name: 'מסלול לוחם',
+  monthly_amount_agorot: 40_000,
+  sessions_per_week: 3,
+}
+
 describe('tokenSource -- door B, lifted unchanged from WizardJoinFlow', () => {
   it('loadStudio calls /api/v1/public/onboarding/{token} and maps the groups', async () => {
     const { apiFetch } = await import('@studio/core')
@@ -111,6 +124,45 @@ describe('tokenSource -- door B, lifted unchanged from WizardJoinFlow', () => {
         body: JSON.stringify(REGISTER_PAYLOAD),
       }),
     )
+  })
+
+  it('loadCatalogue maps the snake_case wire price-plan shape to WizardPlan -- pricePerMonthAgorot is the real number, not NaN', async () => {
+    const { apiFetch } = await import('@studio/core')
+    const fetchMock = vi.fn(async (input: string | URL) => {
+      const url = String(input)
+      if (url.includes(`/api/v1/public/onboarding/${TOKEN}/price-plans`)) {
+        return new Response(JSON.stringify({ items: [WIRE_PLAN] }), { status: 200 })
+      }
+      return new Response(JSON.stringify({ items: [] }), { status: 200 })
+    })
+    vi.mocked(apiFetch).mockImplementation(fetchMock)
+
+    const source = tokenSource(TOKEN, healthClientStub())
+    const catalogue = await source.loadCatalogue()
+
+    expect(catalogue.plans).toHaveLength(1)
+    // Asserting the NUMBER, not just that it is defined -- `0` would pass a truthiness
+    // check and is also wrong.
+    expect(catalogue.plans[0]?.pricePerMonthAgorot).toBe(40_000)
+    expect(catalogue.plans[0]?.subtitle).toBe('3 אימונים בשבוע')
+  })
+
+  it('loadCatalogue also maps a bare-array price-plans body (no `items` wrapper) the same way', async () => {
+    const { apiFetch } = await import('@studio/core')
+    const fetchMock = vi.fn(async (input: string | URL) => {
+      const url = String(input)
+      if (url.includes(`/api/v1/public/onboarding/${TOKEN}/price-plans`)) {
+        return new Response(JSON.stringify([WIRE_PLAN]), { status: 200 })
+      }
+      return new Response(JSON.stringify({ items: [] }), { status: 200 })
+    })
+    vi.mocked(apiFetch).mockImplementation(fetchMock)
+
+    const source = tokenSource(TOKEN, healthClientStub())
+    const catalogue = await source.loadCatalogue()
+
+    expect(catalogue.plans[0]?.pricePerMonthAgorot).toBe(40_000)
+    expect(catalogue.plans[0]?.subtitle).toBe('3 אימונים בשבוע')
   })
 })
 
@@ -217,5 +269,18 @@ describe('studioSource -- doors C and D, no token anywhere', () => {
     await expect(source.register(REGISTER_PAYLOAD)).rejects.toMatchObject({
       code: 'national_id_invalid',
     })
+  })
+
+  it('loadCatalogue maps the snake_case wire price-plan shape to WizardPlan -- the same contract tokenSource is held to', async () => {
+    const { apiFetch } = await import('@studio/core')
+    const fetchMock = fetchMockFor({ plansItems: [WIRE_PLAN] })
+    vi.mocked(apiFetch).mockImplementation(fetchMock)
+
+    const source = studioSource(healthClientStub())
+    const catalogue = await source.loadCatalogue()
+
+    expect(catalogue.plans).toHaveLength(1)
+    expect(catalogue.plans[0]?.pricePerMonthAgorot).toBe(40_000)
+    expect(catalogue.plans[0]?.subtitle).toBe('3 אימונים בשבוע')
   })
 })

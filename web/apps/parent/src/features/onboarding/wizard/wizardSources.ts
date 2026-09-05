@@ -21,6 +21,30 @@ export type WizardCatalogue = {
   templateId: string
 }
 
+/** `OnboardingPricePlanOut` -- what BOTH price-plan endpoints actually return
+ *  (`/public/onboarding/{token}/price-plans` for door B, `/public/studios/{slug}/price-plans`
+ *  for doors C/D): snake_case on the wire. `PlanOption` (what `toWizardPlan` reads) is
+ *  camelCase, so every `loadCatalogue` below maps through this one function rather than
+ *  each repeating the field list -- reading the wire straight through as `PlanOption`, as
+ *  `tokenSource.loadCatalogue` used to, hands `toWizardPlan` `undefined` for
+ *  `monthlyAmountAgorot`/`sessionsPerWeek`, which is what rendered every price on door B's
+ *  wizard as "NaN". */
+type WirePricePlan = {
+  id: string
+  name: string
+  monthly_amount_agorot: number
+  sessions_per_week: number | null
+}
+
+function toPlanOption(item: WirePricePlan): PlanOption {
+  return {
+    id: item.id,
+    name: item.name,
+    monthlyAmountAgorot: item.monthly_amount_agorot,
+    sessionsPerWeek: item.sessions_per_week,
+  }
+}
+
 /** The three things a door differs by, and nothing else. Everything the wizard draws,
  *  validates, persists and submits is the same on all four doors -- §11's "one shell for
  *  all four doors" -- so what varies is injected here rather than branched on inside. */
@@ -62,16 +86,15 @@ export function tokenSource(token: string, healthClient: HealthClient): JoinWiza
         healthClient.template(),
       ])
       if (!plansResponse.ok) throw new Error(String(plansResponse.status))
-      // Accepts both `{items: [...]}` and a bare array, as today -- unchanged from
-      // `WizardJoinFlow`. Note this reads the body straight through as `PlanOption`
-      // (camelCase) with no snake->camel mapping, even though the wire is actually
-      // snake_case (see `studioSource.loadCatalogue` below, which does map it). That is a
-      // pre-existing door-B behaviour, not something task 3a introduces or fixes -- see
-      // the task report.
-      const body = (await plansResponse.json()) as { items?: PlanOption[] } | PlanOption[]
+      // Accepts both `{items: [...]}` and a bare array, as today. Mapped through
+      // `toPlanOption` because the wire is snake_case and `PlanOption` is camel -- see
+      // that function's own doc for why (a fix, not part of the original lift: this used
+      // to read the body straight through as `PlanOption`, which rendered every price on
+      // this screen as "NaN").
+      const body = (await plansResponse.json()) as { items?: WirePricePlan[] } | WirePricePlan[]
       const planList = Array.isArray(body) ? body : (body.items ?? [])
       return {
-        plans: planList.map(toWizardPlan),
+        plans: planList.map(toPlanOption).map(toWizardPlan),
         schema: template.schema as unknown as TemplateSchema,
         templateId: template.id,
       }
@@ -171,27 +194,11 @@ export function studioSource(healthClient: HealthClient): JoinWizardSource {
         healthClient.template(),
       ])
       if (!plansResponse.ok) throw new Error(String(plansResponse.status))
-      const body = (await plansResponse.json()) as {
-        items: {
-          id: string
-          name: string
-          monthly_amount_agorot: number
-          sessions_per_week: number | null
-        }[]
-      }
-      // The wire is snake_case (`OnboardingPricePlanOut`, the same shape door B's own
-      // price-plans route returns) and `PlanOption` -- what `toWizardPlan` reads -- is
-      // camelCase. Mapped explicitly here, at this one seam, rather than changing
-      // `toWizardPlan`. (`tokenSource.loadCatalogue` above casts the same kind of response
-      // straight to `PlanOption` with no such mapping; see the task report.)
-      const plans: PlanOption[] = body.items.map((item) => ({
-        id: item.id,
-        name: item.name,
-        monthlyAmountAgorot: item.monthly_amount_agorot,
-        sessionsPerWeek: item.sessions_per_week,
-      }))
+      const body = (await plansResponse.json()) as { items: WirePricePlan[] }
+      // Same wire shape and same `toPlanOption` mapping as `tokenSource.loadCatalogue`
+      // above -- one function, so the two sources cannot drift apart on this seam again.
       return {
-        plans: plans.map(toWizardPlan),
+        plans: body.items.map(toPlanOption).map(toWizardPlan),
         schema: template.schema as unknown as TemplateSchema,
         templateId: template.id,
       }
