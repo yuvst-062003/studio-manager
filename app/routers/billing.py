@@ -139,6 +139,7 @@ def _charge_out(
         amount_agorot=charge.amount_agorot,
         original_amount_agorot=charge.original_amount_agorot,
         proration_note=charge.proration_note,
+        product_id=charge.product_id,
         due_date=charge.due_date,
         status=charge.status,
         created_by=charge.created_by,

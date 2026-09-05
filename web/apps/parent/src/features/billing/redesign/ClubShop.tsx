@@ -92,15 +92,16 @@ export function ClubShop({ locale }: { locale: Locale }) {
             label?: string | null
             amount_agorot: number
             due_date: string
-            created_by: string
+            product_id: string | null
           }[]
         }
-        // `manual` is what the order endpoint writes — "one manual charge per line". Tuition
-        // comes from a billing run and an event charge from an event, and neither is
-        // something a family bought from the shop.
+        // `product_id`, not `created_by`. A shop order and a manager's ad-hoc charge are
+        // BOTH `manual` — and so is §5.10's negative credit, which under the old filter
+        // appeared here as a purchase of minus fifty shekels. The column added in revision
+        // 0022 is the only thing that separates them, and it exists because this list does.
         setOrders(
           body.items
-            .filter((charge) => charge.created_by === 'manual')
+            .filter((charge) => charge.product_id !== null)
             .map((charge) => ({
               id: charge.id,
               label: charge.label ?? '',

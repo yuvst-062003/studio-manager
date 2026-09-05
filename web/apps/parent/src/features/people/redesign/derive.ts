@@ -1,6 +1,6 @@
 // The arithmetic פרופיל does before it draws anything. Pure, and tested, because a
 // percentage is the one thing on this screen a parent will quote back at the club.
-import type { AttendanceSummary, ProfileChild, PurchaseRow } from './types'
+import type { AttendanceSummary, ProfileChild } from './types'
 
 /** One row of `GET /me/attendance`. */
 export type AttendanceRow = {
@@ -42,36 +42,6 @@ export function summariseAttendance(
       percent: marked === 0 ? 0 : Math.round((attended / marked) * 100),
     }
   })
-}
-
-/**
- * A shop order's charges, newest first.
- *
- * `created_by === 'manual'` is what the shop's order endpoint writes — "one manual charge
- * per line", per §4.3. Tuition comes from a billing run and an event charge from an event,
- * so neither belongs in a purchase history; a family scanning what they BOUGHT should not
- * have to read past twelve months of fees to find a גי.
- */
-export function purchasesFrom(
-  charges: readonly {
-    id: string
-    label?: string | null
-    amount_agorot: number
-    due_date: string
-    status: string
-    created_by: string
-  }[],
-): PurchaseRow[] {
-  return charges
-    .filter((charge) => charge.created_by === 'manual')
-    .map((charge) => ({
-      id: charge.id,
-      label: charge.label ?? '',
-      amountAgorot: charge.amount_agorot,
-      dueDate: charge.due_date,
-      status: charge.status,
-    }))
-    .sort((a, b) => b.dueDate.localeCompare(a.dueDate))
 }
 
 /**

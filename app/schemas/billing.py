@@ -150,6 +150,10 @@ class ChargeOut(BaseModel):
     amount_agorot: int
     original_amount_agorot: int | None
     proration_note: str | None
+    #: The catalogue item this charge paid for, or `None` for every other charge. It is
+    #: what lets a client separate a shop order from a manager's manual charge — including
+    #: §5.10's negative credit, which would otherwise read as a purchase.
+    product_id: uuid.UUID | None = None
     due_date: date
     #: Read-only. Derived by `BillingService.recompute_charge_status`, never sent in.
     status: ChargeStatus

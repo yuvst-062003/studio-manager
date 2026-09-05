@@ -1,7 +1,7 @@
 // A percentage is the one number on this screen a parent will quote back at the club, so
 // the way it is counted is the thing worth pinning down.
 import { describe, expect, it } from 'vitest'
-import { coverageFrom, familyNameOf, purchasesFrom, summariseAttendance } from './derive'
+import { coverageFrom, familyNameOf, summariseAttendance } from './derive'
 import { whatsappNumber } from './ContactSheet'
 import type { AttendanceRow } from './derive'
 import type { ProfileChild } from './types'
@@ -64,41 +64,6 @@ describe('summariseAttendance — an unmarked register is not an absence', () =>
     const rows = [row('c1', 'present'), row('c1', 'present'), row('c1', 'absent_excused')]
     const [summary] = summariseAttendance(rows, [child('c1', 'דנה')])
     expect(summary!.percent).toBe(67)
-  })
-})
-
-describe('purchasesFrom', () => {
-  const charge = (over: Partial<Parameters<typeof purchasesFrom>[0][number]> = {}) => ({
-    id: 'ch1',
-    label: 'גי',
-    amount_agorot: 18_000,
-    due_date: '2026-08-20',
-    status: 'open',
-    created_by: 'manual',
-    ...over,
-  })
-
-  it('keeps only what the shop wrote — tuition is not a purchase', () => {
-    // A family scanning what they BOUGHT should not read past twelve months of fees to
-    // find a גי. §4.3: an item order is one `manual` charge per line.
-    const rows = purchasesFrom([
-      charge({ id: 'gi' }),
-      charge({ id: 'tuition', created_by: 'billing_run', label: 'שכר לימוד' }),
-      charge({ id: 'event', created_by: 'event', label: 'תחרות' }),
-    ])
-    expect(rows.map((r) => r.id)).toEqual(['gi'])
-  })
-
-  it('is newest first', () => {
-    const rows = purchasesFrom([
-      charge({ id: 'old', due_date: '2026-07-01' }),
-      charge({ id: 'new', due_date: '2026-08-01' }),
-    ])
-    expect(rows.map((r) => r.id)).toEqual(['new', 'old'])
-  })
-
-  it('survives a charge with no label', () => {
-    expect(purchasesFrom([charge({ label: null })])[0]!.label).toBe('')
   })
 })
 

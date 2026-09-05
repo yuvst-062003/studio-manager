@@ -195,6 +195,9 @@ def order_items(body: ItemOrderIn, request: Request, session: TenantSessionDep) 
             amount,
             at.date(),
             student_id=None,
+            # What separates this from a manager's manual charge. Without it the parent
+            # app's purchase history cannot tell an order from a discount.
+            product_id=product.id,
         )
         label = _line_label(product.name, line.quantity, size)
         if line.note:

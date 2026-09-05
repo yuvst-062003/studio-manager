@@ -6420,6 +6420,8 @@ export interface components {
             period_month?: number | null;
             /** Period Year */
             period_year: number | null;
+            /** Product Id */
+            product_id?: string | null;
             /** Proration Note */
             proration_note: string | null;
             /**

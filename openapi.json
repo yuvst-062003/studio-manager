@@ -1854,6 +1854,18 @@
             ],
             "title": "Period Year"
           },
+          "product_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Product Id"
+          },
           "proration_note": {
             "anyOf": [
               {

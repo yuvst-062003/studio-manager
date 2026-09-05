@@ -63,16 +63,6 @@ export type AttendanceSummary = {
   percent: number
 }
 
-/** A shop order, as `/me/charges` returns it. */
-export type PurchaseRow = {
-  id: string
-  label: string
-  amountAgorot: number
-  /** `YYYY-MM-DD`. */
-  dueDate: string
-  status: string
-}
-
 /** The club's own details — one read, two sections. */
 export type ClubDetails = {
   name: string
