@@ -1,0 +1,255 @@
+# The judo technique library
+
+A reference library of judo's 100 techniques inside the parent app, so a student can look
+up a throw they were taught and study it between sessions.
+
+Everything in the app until now answers a question the **parent** has — when is the lesson,
+what do I owe, what did the club say, is the paperwork done. This is the first screen that
+belongs to the **child**. That is the reason it exists and the thing to protect when
+deciding what goes on it.
+
+---
+
+## 1 · Scope
+
+**In:** the library — browse and search all 100 techniques, and a detail screen per
+technique carrying the official Kodokan video and a link into the IJF's own page.
+
+**Out, deliberately:**
+
+- The **tab wiring**. A parallel session owns `web/apps/parent/src/App.tsx`; two sessions
+  editing the shell is how a branch spends its afternoon on a merge. The feature exports
+  everything the wiring needs (§6) and touches no shared file.
+- **Belt-test classification** — which techniques a studio requires for each grade. Wanted
+  next, and it is the part that is genuinely per-studio. §7 says what this design leaves
+  ready for it.
+- The **staff app**, coaches marking a technique as shown, and Hebrew prose descriptions.
+
+## 2 · What the sources permit
+
+This was researched rather than assumed, because the obvious approach — scrape
+judo.ijf.org — is the one that is not available.
+
+`judo.ijf.org/robots.txt` carries an explicit machine-readable policy:
+
+```
+User-agent: *
+Content-Signal: search=yes, ai-train=no, use=reference
+Allow: /
+```
+
+Crawling is permitted. Indexing with **hyperlinks and short excerpts** is permitted. AI
+training is refused. Consumption is permitted as **reference** — cite and link, do not
+reproduce. It is backed by an express EU DSM Article 4 reservation and an "all rights
+reserved" footer. There is no API and `/sitemap.xml` is a 404.
+
+**Conclusion: link to the IJF, never copy them.** Their written descriptions are the good
+ones and they are precisely what `use=reference` reserves.
+
+Two sources carry us instead:
+
+- **[Kodokan Global](https://kdkjd.org/技/柔道-技名称一覧/)** — the sport's governing body and
+  the authority on technique naming, above the IJF. 100 techniques: 68 nage-waza (te 16,
+  koshi 10, ashi 21, ma-sutemi 5, yoko-sutemi 16) and 32 katame-waza (osaekomi, shime,
+  kansetsu), with both Gokyo classifications — 1895's 42 and 1920's 40. **Every technique
+  links to a demonstration on the official Kodokan YouTube channel**, verified by pulling
+  the links out of the page's HTML.
+- **[Wikipedia's list of judo techniques](https://en.wikipedia.org/wiki/List_of_judo_techniques)**
+  — CC BY-SA 4.0, used to cross-check names and catch anything the Kodokan omits.
+
+**We store facts only** — names, kanji, classification, Gokyo group, a YouTube id. Facts
+carry no copyright, so no share-alike attaches and nothing is republished. Video is
+**embedded**, which is YouTube's intended use: we host nothing and the Kodokan keeps its
+views.
+
+### The description text, and where it comes from
+
+Hebrew Wikipedia has **no** technique articles — its entire judo category is 12 entries
+about the sport, the IJF and Jigoro Kano. English Wikipedia is half-present and shallow: of
+eight techniques sampled, four had no article and the rest ran 300–500 characters restating
+the classification badge we already display.
+
+The Kodokan's page, however, carries an **official English definition for every one of the
+100**, from their *Kodokan Definitions of Judo Techniques* (2022).
+
+Those definitions are the Kodokan's copyrighted prose and are **not shipped**. A Hebrew
+translation of one would still be that one. What ships is a Hebrew sentence describing the
+**movement** each definition defines — the movement is a fact, the wording is ours. The
+seeder writes the English out to `.source-definitions.json`, which is git-ignored working
+material for whoever writes the Hebrew, and never reaches the bundle.
+
+The Hebrew itself lives in `data/hebrew.json`, hand-authored and merged rather than
+generated, so re-running the seeder cannot destroy work no scraper can redo.
+
+## 3 · Data
+
+**A checked-in dataset, not a database table.** 100 rows of global reference data that
+changes once a decade does not earn a migration, a router, a service, a schema and a
+regenerated client. It also has to work offline: this is an installed PWA and a child opens
+it in a dojo with bad signal.
+
+**It lives in the feature, not in `web/packages/`.** A new workspace package would need a
+`paths` entry in `web/tsconfig.json` and an `npm install` that rewrites
+`package-lock.json` — two shared files, while another session is working in this repo.
+`workspaceAliases()` derives itself from each package's manifest, so promoting this to
+`@studio/judo` later is a file move plus a manifest, and belongs in the same commit that
+wires the tab. The data sits at
+`web/apps/parent/src/features/techniques/data/techniques.json` (~15KB in the bundle).
+
+```ts
+type Technique = {
+  slug: string            // 'seoi-nage' — stable key, used in the route
+  nameRomaji: string      // 'Seoi-nage'
+  nameHebrew: string      // 'סאוי נגה' — see below
+  nameKanji: string       // '背負投'
+  meaning: string         // 'זריקה מעל הכתף' — the literal name, a fact, short
+  category: 'nage-waza' | 'katame-waza'
+  subcategory: 'te' | 'koshi' | 'ashi' | 'ma-sutemi' | 'yoko-sutemi'
+              | 'osaekomi' | 'shime' | 'kansetsu'
+  gokyoGroup: 1 | 2 | 3 | 4 | 5 | null
+  youtubeId: string | null
+  ijfSlug: string | null  // null unless the URL was verified at seed time
+  orderIndex: number      // the Kodokan's own order within the subcategory
+  descriptionHe: string   // empty for now
+}
+```
+
+`nameHebrew` is load-bearing, not decoration. **A ten-year-old in a Hebrew club will not
+type `Seoi-nage` in Latin script.** Without a Hebrew transliteration the search field is
+ornamental. It is a name, not prose, so it raises no licensing question.
+
+### The seed script
+
+`scripts/fetch-judo-techniques.py` — run by a person, never by the app. It reads the
+Kodokan list, extracts name, kanji, category and YouTube id per technique, cross-checks
+against the Wikipedia list, and writes the JSON. Output is committed, so there is no
+runtime dependency on anyone's uptime.
+
+**It requests every IJF URL and stores `ijfSlug` only on a 200.** The slug is derivable
+from the romaji, and deriving it without checking is how a child taps "3D animation" and
+gets a blank frame with nothing to read — the failure CLAUDE.md's *refuse rather than
+accept* rule already names.
+
+## 4 · Screens
+
+The design language is settled and is followed, not reinvented: **hairline-separated rows
+on a plain ground**, the dense-ledger idiom `StudentCard` establishes and which explicitly
+rejects stacked cards. Tokens only, no new colours.
+
+**No belt-colour coding.** Belt colour is per-studio data, not brand (decision D3). Tinting
+techniques by belt would collide with the belt system and pre-empt §7.
+
+### 4.1 The library
+
+`PageHeader` → search field → `SegmentedControl` (**נגה-וואזה** | **קטאמה-וואזה**, the same
+primitive the calendar uses) → a `SectionHeader` per sub-family with its techniques beneath.
+
+Search matches romaji, Hebrew and kanji at once. No result gets the `EmptyState` primitive.
+
+Each technique is a full-width row and **the row is the control** — no trailing button,
+per `DetailRow`'s established rule. Minimum 44px tall.
+
+```
+┌──────────────────────────────────────────────┐
+│ ‹   Seoi-nage                            ①   │
+│     סאוי נגה · 背負投                          │
+├──────────────────────────────────────────────┤
+│ ‹   O-soto-gari                          ①   │
+│     או סוטו גארי · 大外刈                      │
+└──────────────────────────────────────────────┘
+```
+
+The romaji leads because it **is** the name — what the coach calls out, what is written on
+the video, what is on the dojo poster. Hebrew and kanji sit muted beneath. Both are wrapped
+in `<bdi>`, the way `StudentCard` wraps names, so Latin and kanji do not scramble the RTL
+line.
+
+The Gokyo badge carries its **numeral**, never a bare tint — Part 4's *never colour alone*.
+
+### 4.2 The detail screen
+
+Name and kanji, classification chips, and then **the video immediately, at full content
+width.** Not metadata first: a child opened this to watch something. Below it, `DetailRow`s
+for category, sub-family, Gokyo group and the name's literal meaning. Then the IJF button.
+
+### 4.3 The IJF sheet
+
+A **full-screen sheet, not an inline frame.** Their site is a 2007-era PHP page and
+squeezing it into a phone column mid-scroll looks broken.
+
+Framing is available: they send no `X-Frame-Options` and no `Content-Security-Policy`.
+Their CORS header is empty, so a browser `fetch` is blocked — server-side reads work, which
+is what the seed script does.
+
+The sheet carries its own bar: the technique name, a close control, a visible
+**"התוכן מאתר judo.ijf.org"** attribution, and an open-in-browser escape. When it cannot
+load — offline, or their site down — the `LoadFailed` primitive with a real way out, never
+a blank frame.
+
+## 5 · Strings
+
+All three locales live in `features/techniques/strings.ts`, in `Bundle` shape.
+
+`web/packages/i18n/index.ts` is **not edited**, and neither is `types.ts` — a namespace has
+to be listed in both, and CLAUDE.md says a lane never edits either. They are the shared
+registries that serialise parallel work, and another session is in this repo. Promoting the
+bundles is three file moves and six lines in those two registries, in the same commit that
+wires the tab.
+
+No string is inlined in a component, which is the rule that actually matters.
+
+## 6 · What is left wired for the fifth tab
+
+The bottom bar has four slots today and the owner has decided the library gets a fifth —
+בית · תשלומים · הודעות · **טכניקות** · פרופיל, displacing nothing.
+
+That is cheap: `.studio-tabbar__list` is `display: flex` with `flex: 1` per slot, nothing
+hardcodes four, and no test asserts four. The tab array is inline at `App.tsx:677`.
+
+`features/techniques/index.ts` therefore exports, ready to use:
+
+- `TechniquesScreen` and `TechniqueDetailScreen`
+- `matchTechniquesPath(hash)` — the route matcher for `#/techniques` and `#/techniques/<slug>`
+- `techniquesTabItem(locale, active)` — a ready-made `TabBarItem`
+
+The wiring commit is one import, one array entry and one route branch. **Two things it must
+also do:** add a `techniques` icon to `Icon.tsx` (23 names exist, none fits — `belts` is
+closest and already means something else), and check the label at a 360px viewport, where
+five tabs give each ~72px against תשלומים's current ~90px. If **טכניקות** truncates,
+shorten the label rather than shrink the type.
+
+`routes.reachable.test.ts` reads its route table out of `App.tsx`, so it stays green and
+untouched while this feature is unmounted, and begins guarding the route the moment the
+wiring lands.
+
+## 7 · What this leaves ready for belt classification
+
+The next feature maps a studio's `BeltRank` rows to required techniques. This design leaves
+it three things: a stable `slug` per technique to key against, a dataset both the frontend
+and a Python service can read from one file, and an untinted library so belt colour still
+means only what `BeltBar` says it means.
+
+That mapping is per-studio, so it is a real tenant-scoped table with `TenantMixin` — unlike
+this dataset, which is global and correctly has no `studio_id`.
+
+## 8 · Testing
+
+- The dataset: every record complete, categories and subcategories in range, `youtubeId`
+  well-formed, slugs unique, and the count matching the Kodokan's 100.
+- The screens: search filters across all three name forms, sub-family grouping, the empty
+  state, and `<bdi>` around Latin and kanji inside the RTL line.
+- **The seam**, per CLAUDE.md: one test running dataset → library → detail that asserts a
+  real technique's `youtubeId` reaches the iframe `src`. Not hand-built props — that is the
+  test that catches a field silently dropped in between.
+- `LoadFailed` renders, with its escape, when the IJF frame fails.
+
+## 9 · Review loop
+
+Rendered in a standalone harness — `techniques-preview.html` / `techniques-preview.tsx`,
+following the `wizard-preview` precedent: a design-review harness, not a shipped entry.
+Screenshots land in `docs/screenshots/technique-library/step-N/`.
+
+Looking at step 1 caught two defects no test would have: the search field printed
+`חיפוש טכניקה` twice, once as its label and once as its own placeholder, and the two
+segment labels crowded each other at 390px. Both are fixed; the placeholder now shows the
+three scripts the box accepts.

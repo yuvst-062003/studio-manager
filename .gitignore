@@ -36,3 +36,8 @@ blob-report/
 
 # Playwright MCP scratch output (screenshots, snapshots, console logs).
 .playwright-mcp/
+
+# Working material for the judo technique library: the Kodokan's English definitions, read
+# to write the Hebrew from. Never shipped and never committed — see
+# scripts/fetch_judo_techniques.py.
+**/.source-definitions.json
