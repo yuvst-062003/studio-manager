@@ -37,13 +37,13 @@ The drawer held seven entries plus a footer. Nothing was dropped.
 
 | Drawer entry | Where it goes | Landed by |
 |---|---|---|
-| `myChildren` `/` | Home's per-child chips, and Profile's trainee cards | chips ✅ (2), cards → 5 |
-| `calendar` `#/calendar` | a **modal inside Home** (§4) | ✅ checkpoint 3 |
-| `payments` `#/payments` | **Profile** — balance, method, history | checkpoint 5 |
+| `myChildren` `/` | Home's per-child chips, and Profile's trainee cards | ✅ checkpoints 2 and 5 |
+| `calendar` `#/calendar` | a **modal inside Home** (§4); the route survives as Profile's calendar-feed link | ✅ checkpoints 3 and 5 |
+| `payments` `#/payments` | **Profile** — balance, method, history | ✅ checkpoint 5 |
 | `announcements` | **tab 3** | ✅ checkpoint 1 |
 | `events` `#/events` | **no dedicated surface** (§4) — events appear in Home beside every other session | outstanding, see below |
 | `shop` `#/shop` | **tab 2** | ✅ checkpoint 4 |
-| `addChild` `#/add-child` | **Profile**, under the trainee cards | checkpoint 5 |
+| `addChild` `#/add-child` | **Profile**, under the trainee cards | ✅ checkpoint 5 |
 
 | Drawer footer | Where it goes | Landed by |
 |---|---|---|
@@ -111,7 +111,7 @@ the inbox's RSVP action.
 | 2 | **בית** | ✅ mounted, incl. the absence sheet and per-session reminders |
 | 3 | **עדכונים**, and בית's monthly calendar with its day/lesson absence reports | ✅ mounted |
 | 4 | **חנות המועדון** | ✅ mounted |
-| 5 | **פרופיל** — and with it the money, the trainee cards and add-a-child | outstanding |
+| 5 | **פרופיל** — and with it the money, the trainee cards and add-a-child | ✅ mounted |
 | 6 | strings into `@studio/i18n`, mirrored into `en/` and `ru/` | outstanding |
 | — | the dark sweep | outstanding, and see below |
 
@@ -124,10 +124,10 @@ the inbox's RSVP action.
 - **Events folded into Home.** §4 says events appear beside every other session. `GET
   /sessions` returns lessons, not events, so this needs the events read joined into the same
   list. `#/events` is still linked from the inbox's RSVP action, so nothing is stranded.
-- **`#/calendar`.** The month modal is now Home's calendar, so the ROUTE survives only for
-  §5.12's `CalendarSync` — the feed subscription — which has no home in the new design yet.
-  `AccountControls` still links it, and checkpoint 5 should move the subscription into
-  Profile and retire the route.
+- **`#/calendar`** is now linked from Profile's quick links as the CALENDAR FEED — §5.12's
+  subscription, which is what the route still exists for now that בית draws the month itself
+  in a modal. `AccountControls`'s two transitional links are gone: Profile carries
+  `#/add-child` under its trainee cards and `#/calendar` here.
 - **`ParentHome`, `InboxScreen`, `ShopSection`, `OrderItemsScreen`** are all still on disk
   and no longer rendered. They are kept until the redesign is accepted end to end. **Note
   the hazard:** `routes.reachable.test.ts` scans source, not the render tree, so a link

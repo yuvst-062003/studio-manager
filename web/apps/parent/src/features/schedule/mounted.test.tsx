@@ -77,9 +77,10 @@ describe('the parent app mounts lane SCHEDULE', () => {
 
   it('offers the calendar from a screen, so the hash is not the only way in', async () => {
     // A screen reachable only by typing a URL is not reachable on a phone. This used to
-    // open the nav drawer; the redesign deleted it (§4, four tabs and no side menu), so
-    // the link now lives on Profile — see `AccountControls`, which holds it until
-    // checkpoint 2 ports Home and the calendar becomes a modal inside it.
+    // open the nav drawer; the redesign deleted it (§4, four tabs and no side menu). The
+    // link's final home is Profile's quick links, where it is the CALENDAR FEED — §5.12's
+    // subscription, which is what `#/calendar` still exists for now that בית draws the
+    // month itself in a modal.
     //
     // The assertion is deliberately on the LINK and not on where it happens to sit: what
     // this test has always been about is that something in the running app leads here.

@@ -57,7 +57,8 @@ import { BeltProgressScreen, makeParentBeltsClient, registerBeltSections } from 
 import { BeltRouteResolver } from './features/belts/BeltRouteResolver'
 import { makeParentCommsClient } from './features/comms'
 import { UpdatesScreen } from './features/comms/redesign/UpdatesScreen'
-import { JoinClubSection, ProfileSection, makePeopleClient, registerPeopleSections } from './features/people'
+import { JoinClubSection, makePeopleClient, registerPeopleSections } from './features/people'
+import { ProfileScreen } from './features/people/redesign/ProfileScreen'
 // `2c` behind `#/student/<id>` — the composite card the slot system was built for (P2).
 import { StudentCardSection } from './features/people/StudentCardSection'
 import { registerBillingSections } from './features/billing/StudentCardBillingSection'
@@ -840,7 +841,11 @@ function AuthedApp() {
             // props rather than being read again inside the screen: `useSession()` is
             // called ONCE for this whole route (see F1/F10 above), and a second call in a
             // tab would put a second `/auth/refresh` on every visit to it.
-            <ProfileSection
+            // Checkpoint 5 of the parent-app redesign — the last of the four tabs.
+            // `ProfileSection` + `GuardianSettings` are replaced by the port of the
+            // prototype's `ProfileScreen`; both stay on disk until the redesign is
+            // accepted end to end.
+            <ProfileScreen
               locale={locale}
               onLocaleChange={setLocale}
               account={{
