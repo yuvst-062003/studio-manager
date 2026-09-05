@@ -69,6 +69,16 @@ export const HOME = {
   emptyBody: 'ניתן לצפות בימים אחרים או בלוח החודשי המלא',
   emptyCta: 'פתיחת לוח חודשי',
 
+  /** The monthly calendar modal — §4's home for the deleted drawer's calendar entry. */
+  monthTitle: 'לוח אימונים ואירועים',
+  monthSubtitle: 'לוח פעילות חודשי מלא',
+  monthClose: 'סגירה',
+  monthPrev: 'חודש קודם',
+  monthNext: 'חודש הבא',
+  monthToday: 'היום',
+  monthGridLabel: 'בחירת תאריך',
+  monthAgendaEmpty: 'אין אימונים ביום זה',
+
   /** Loading and failure, neither of which the prototype has — it has no network. */
   loading: 'טוען את לוח האימונים…',
   loadFailed: 'לא הצלחנו לטעון את לוח האימונים',

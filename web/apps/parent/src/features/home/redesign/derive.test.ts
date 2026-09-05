@@ -11,7 +11,10 @@ import {
   expandSessions,
   familyNameOf,
   headlineFor,
+  monthGrid,
+  monthOf,
   shiftDay,
+  shiftMonth,
   weekdayOf,
 } from './derive'
 import type { Lesson } from './derive'
@@ -192,5 +195,35 @@ describe('childrenNeedingDeclaration', () => {
   it('returns first names, in roster order, for the banner to name', () => {
     const kids = [child('c1', 'דנה', []), child('c2', 'נועה', []), child('c3', 'יוסי', [])]
     expect(childrenNeedingDeclaration(kids, (c) => c.id !== 'c1')).toEqual(['נועה', 'יוסי'])
+  })
+})
+
+describe('monthGrid — the calendar modal cannot hardcode one month', () => {
+  it('leads with the right number of blanks: August 2026 starts on a Saturday', () => {
+    // The prototype writes six empty cells into the JSX for exactly this month. Saturday
+    // is index 6, so six blanks — and the very next month has a different answer.
+    const { leadingBlanks, cells } = monthGrid(2026, 8, [], '2026-08-23')
+    expect(leadingBlanks).toBe(6)
+    expect(cells).toHaveLength(31)
+    expect(cells[0]!.dayKey).toBe('2026-08-01')
+    expect(cells[30]!.dayKey).toBe('2026-08-31')
+  })
+
+  it('gets February right in a leap year and in a common one', () => {
+    expect(monthGrid(2028, 2, [], '2028-01-01').cells).toHaveLength(29)
+    expect(monthGrid(2026, 2, [], '2026-01-01').cells).toHaveLength(28)
+  })
+
+  it('marks the days the family trains, and today', () => {
+    const rows = expandSessions([lesson()], [child('c1', 'דנה', ['קבוצה 2'])], {}, noReason)
+    const { cells } = monthGrid(2026, 8, rows, '2026-08-23')
+    expect(cells.filter((c) => c.hasSessions).map((c) => c.dayOfMonth)).toEqual([25])
+    expect(cells.filter((c) => c.isToday).map((c) => c.dayOfMonth)).toEqual([23])
+  })
+
+  it('shifts months across a year boundary in both directions', () => {
+    expect(shiftMonth({ year: 2026, month: 12 }, 1)).toEqual({ year: 2027, month: 1 })
+    expect(shiftMonth({ year: 2026, month: 1 }, -1)).toEqual({ year: 2025, month: 12 })
+    expect(monthOf('2026-08-25')).toEqual({ year: 2026, month: 8 })
   })
 })

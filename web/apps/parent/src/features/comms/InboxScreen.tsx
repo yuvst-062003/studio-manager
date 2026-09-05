@@ -46,7 +46,11 @@ import { usePushRegistration } from './usePushRegistration'
  * need a deploy to fix a typo. A kind this map does not know renders as a plain row rather
  * than as a button that goes nowhere — the safe direction for a kind added by a later lane.
  */
-const ACTIONS: Record<string, { labelKey: string; route: string }> = {
+// Exported for עדכונים's redesign, which builds the same catalogue from the same entries.
+// One map: a kind that gains a screen gains it in both places, and a kind that has none
+// renders as a plain row in both. Two copies is how one screen ends up offering a button
+// the other knows leads nowhere.
+export const ACTIONS: Record<string, { labelKey: string; route: string }> = {
   // Both health actions route home, where §6.1's gate holds the form. There is no
   // `#/health` to send anyone to, and inventing one would be a route with no screen.
   health_declaration: { labelKey: 'comms.inbox.fillDeclaration', route: '#/' },

@@ -11,12 +11,13 @@
 // here would be a second `/auth/refresh` on every visit and two answers about what the
 // family owes.
 import { useCallback, useMemo, useState } from 'react'
-import { formatTimeInStudioZone, studioDayKey } from '@studio/core'
+import { formatMonthLabel, formatTimeInStudioZone, studioDayKey } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { HomeTop } from './HomeTop'
 import { HomeSchedule } from './HomeSchedule'
 import { AbsenceModal } from './AbsenceModal'
+import { MonthCalendarModal } from './MonthCalendarModal'
 import type { AbsenceFailure } from './AbsenceModal'
 import { ReminderSheet, readReminders, writeReminder } from './ReminderSheet'
 import type { LeadTime } from './ReminderSheet'
@@ -27,6 +28,8 @@ import {
   durationMinutesOf,
   expandSessions,
   headlineFor,
+  monthOf,
+  shiftMonth,
   weekdayOf,
 } from './derive'
 import type { Intents, Lesson } from './derive'
@@ -80,6 +83,9 @@ export function HomeScreen({
   const [absenceBusy, setAbsenceBusy] = useState(false)
   const [absenceFailure, setAbsenceFailure] = useState<AbsenceFailure>(null)
   const [reminderTarget, setReminderTarget] = useState<HomeSession | null>(null)
+  // §4: "calendar is a modal inside Home". `null` is closed; otherwise the month on screen,
+  // which is NOT the same as the selected day's month once the arrows have been used.
+  const [monthOpen, setMonthOpen] = useState<{ year: number; month: number } | null>(null)
   const [reminders, setReminders] = useState<Record<string, LeadTime>>(() => readReminders())
 
   const allSessions = useMemo(
@@ -178,11 +184,7 @@ export function HomeScreen({
         days={strip}
         selectedDayKey={selectedDayKey}
         onSelectDay={setSelectedDayKey}
-        onOpenMonth={() => {
-          // §4 puts the calendar in a modal inside Home. Until that modal is ported it goes
-          // to the screen that already draws a month — the same destination the drawer had.
-          globalThis.location.hash = '#/calendar'
-        }}
+        onOpenMonth={() => setMonthOpen(monthOf(selectedDayKey))}
         headline={headlineFor(selectedDayKey)}
         sessions={visible}
         state={state}
@@ -209,6 +211,33 @@ export function HomeScreen({
           failure={absenceFailure}
           onSubmit={submitAbsence}
           onClose={() => setAbsenceTarget(null)}
+        />
+      ) : null}
+
+      {monthOpen ? (
+        <MonthCalendarModal
+          at={monthOpen}
+          monthLabel={formatMonthLabel(monthOpen.year, monthOpen.month, locale)}
+          // EVERY loaded session, not the day's: the grid's whole job is marking the month.
+          sessions={allSessions}
+          todayKey={todayKey}
+          selectedDayKey={selectedDayKey}
+          childList={childList ?? []}
+          selectedChildId={selectedChildId}
+          onSelectChild={setSelectedChildId}
+          onSelectDay={(dayKey) => {
+            setSelectedDayKey(dayKey)
+            // The month follows the day, so picking the 1st from a trailing row does not
+            // leave the grid on the month you just left.
+            setMonthOpen(monthOf(dayKey))
+          }}
+          onShiftMonth={(months) => setMonthOpen((at) => (at ? shiftMonth(at, months) : at))}
+          onToday={() => {
+            setSelectedDayKey(todayKey)
+            setMonthOpen(monthOf(todayKey))
+          }}
+          onClose={() => setMonthOpen(null)}
+          timeLabel={(session) => formatTimeInStudioZone(session.startsAt, locale)}
         />
       ) : null}
 

@@ -154,3 +154,62 @@ export function childrenNeedingDeclaration<T extends { firstName: string }>(
 ): string[] {
   return children.filter(needsOne).map((child) => child.firstName)
 }
+
+/** One cell of the month grid. `null` days are the blanks before the 1st. */
+export type MonthCell = {
+  dayKey: string
+  dayOfMonth: number
+  hasSessions: boolean
+  isToday: boolean
+}
+
+/**
+ * The month grid the calendar modal draws: the blanks before the 1st, then every day.
+ *
+ * The prototype hardcodes August 2026 and its six leading blanks in the JSX. Computing it
+ * is not a liberty — the modal has a month navigator, so the very first thing a parent does
+ * is move to a month whose shape is different.
+ *
+ * `month` is 1-BASED, like `charge.period_month` and `formatMonthLabel` and every other
+ * month value in this codebase except JS `Date`'s — which is the one this signature keeps
+ * callers away from.
+ */
+export function monthGrid(
+  year: number,
+  month: number,
+  sessions: readonly HomeSession[],
+  todayKey: string,
+): { leadingBlanks: number; cells: MonthCell[] } {
+  const withSessions = new Set(sessions.map((session) => studioDayKey(session.startsAt)))
+  const mm = String(month).padStart(2, '0')
+  const firstKey = `${year}-${mm}-01`
+  // Days in the month, without a leap-year table: day 0 of the NEXT month is the last day
+  // of this one. Midday UTC, for the reason `weekdayOf` gives.
+  const lastDay = new Date(Date.UTC(year, month, 0, 12)).getUTCDate()
+
+  const cells: MonthCell[] = []
+  for (let day = 1; day <= lastDay; day += 1) {
+    const dayKey = `${year}-${mm}-${String(day).padStart(2, '0')}`
+    cells.push({
+      dayKey,
+      dayOfMonth: day,
+      hasSessions: withSessions.has(dayKey),
+      isToday: dayKey === todayKey,
+    })
+  }
+  return { leadingBlanks: weekdayOf(firstKey), cells }
+}
+
+/** `2026-08-25` → `{ year: 2026, month: 8 }`, month 1-based. */
+export function monthOf(dayKey: string): { year: number; month: number } {
+  return { year: Number(dayKey.slice(0, 4)), month: Number(dayKey.slice(5, 7)) }
+}
+
+/** Move a `{year, month}` by n months, keeping month 1-based and wrapping the year. */
+export function shiftMonth(
+  at: { year: number; month: number },
+  months: number,
+): { year: number; month: number } {
+  const zeroBased = at.year * 12 + (at.month - 1) + months
+  return { year: Math.floor(zeroBased / 12), month: (zeroBased % 12) + 1 }
+}

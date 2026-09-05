@@ -55,7 +55,8 @@ import {
 } from './features/events'
 import { BeltProgressScreen, makeParentBeltsClient, registerBeltSections } from './features/belts'
 import { BeltRouteResolver } from './features/belts/BeltRouteResolver'
-import { InboxScreen, makeParentCommsClient } from './features/comms'
+import { makeParentCommsClient } from './features/comms'
+import { UpdatesScreen } from './features/comms/redesign/UpdatesScreen'
 import { JoinClubSection, ProfileSection, makePeopleClient, registerPeopleSections } from './features/people'
 // `2c` behind `#/student/<id>` — the composite card the slot system was built for (P2).
 import { StudentCardSection } from './features/people/StudentCardSection'
@@ -900,9 +901,19 @@ function AuthedApp() {
               studentId={invite[1]!}
             />
           ) : onAnnouncements ? (
-            <InboxScreen
+            // Checkpoint 3 of the parent-app redesign. `InboxScreen` (screen 7 of the
+            // superseded Stitch pass) is replaced by the port of the prototype's
+            // `UpdatesScreen` — three labelled sections and a filter strip in place of the
+            // one-card queue. It stays on disk until the redesign is accepted end to end,
+            // and this file still imports its `ACTIONS` map, which is the one place a
+            // notification kind is mapped to a screen.
+            <UpdatesScreen
               client={commsClient}
               locale={locale}
+              childrenById={Object.fromEntries(
+                setupChildren.map((child) => [child.id, child.first_name]),
+              )}
+              childNames={setupChildren.map((child) => child.first_name)}
               onReadChange={() => setNotificationsRead((n) => n + 1)}
             />
           ) : onEvents ? (
