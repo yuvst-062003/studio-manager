@@ -521,8 +521,6 @@ export const common: Bundle = {
   'home.restOfWeek': 'בהמשך השבוע',
   'home.upcoming': 'השיעורים הקרובים',
   'home.alerts': 'התראות',
-  'home.noChildren': 'עדיין אין ילדים משויכים לחשבון הזה.',
-  'home.childrenComeLater': 'מנהל הסטודיו משייך ילד לחשבון בעת ההרשמה.',
   'home.noUpcoming': 'אין עדיין שיעורים מתוזמנים.',
   'home.noUpcomingWeek': 'אין שיעורים מתוזמנים בשבוע הקרוב.',
   'home.noAlerts': 'אין התראות פתוחות.',

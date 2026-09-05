@@ -1,17 +1,18 @@
-// Parent artboards 12i and §6.3's trial home.
+// §6.3's trial home, and the belt chip's tone.
 //
-// The tests that carry weight are negatives: §6.3's reduced home must NOT show payments,
-// attendance or a belt; and `12i` must NOT let somebody leave before reading who still
-// owes the month.
-import { render, screen, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+// The test that carries weight is a negative: §6.3's reduced home must NOT show payments,
+// attendance or a belt.
+//
+// 12i (ProfileAndLeave) and 12j (FirstRegistration) were deleted with the redesign of
+// 2026-09-06 — פרופיל is now `redesign/ProfileScreen`, covered by `redesign/derive.test.ts`
+// and the sheet tests, and the first registration is the onboarding wizard's.
+import { render, screen } from '@testing-library/react'
+import { describe, expect, it } from 'vitest'
 import { t } from '@studio/i18n'
-import { FirstRegistration } from './FirstRegistration'
-import { ProfileAndLeave, chipToneFor } from './ProfileAndLeave'
+import { chipToneFor } from './chipTone'
 import { TrialHome, daysUntil } from './TrialHome'
 import { everyChildIsOnATrial } from './peopleClient'
-import type { GuardianOut, PeopleClient, StudentSummary } from './peopleClient'
+import type { StudentSummary } from './peopleClient'
 
 const student = (over: Partial<StudentSummary> = {}): StudentSummary =>
   ({
@@ -30,35 +31,7 @@ const student = (over: Partial<StudentSummary> = {}): StudentSummary =>
     ...over,
   }) as StudentSummary
 
-const GUARDIANS: GuardianOut[] = [
-  {
-    person_id: 'p9',
-    student_id: 'st1',
-    display_name: 'יעל לוי',
-    relation: 'parent',
-    is_primary: true,
-    phone: '0521234567',
-    email: 'yael@example.invalid',
-  },
-  {
-    person_id: 'p8',
-    student_id: 'st1',
-    display_name: 'דוד לוי',
-    relation: 'parent',
-    is_primary: false,
-    phone: '0527654321',
-    email: 'david@example.invalid',
-  },
-]
 
-function makeClient(): PeopleClient {
-  return {
-    myStudents: vi.fn(),
-    student: vi.fn(),
-    enrollments: vi.fn(),
-    leave: vi.fn(() => Promise.resolve(new Response(null, { status: 200 }))),
-  } as unknown as PeopleClient
-}
 
 const noPhysicalCss = (container: HTMLElement) => {
   for (const node of container.querySelectorAll<HTMLElement>('[style]')) {
@@ -179,145 +152,6 @@ describe('daysUntil', () => {
 
 // -- 12i: profile and leaving ---------------------------------------------------
 
-describe('ProfileAndLeave — 12i', () => {
-  const active = student({ status: 'active' })
-
-  it('renders every guardian with identical affordances', () => {
-    // L8 and §5.3 — 'One guardian view, no permission branching.'
-    render(
-      <ProfileAndLeave
-        students={[active]}
-        guardians={GUARDIANS}
-        locale="he"
-        client={makeClient()}
-      />,
-    )
-    const rows = screen.getAllByTestId('guardian-row')
-    expect(rows).toHaveLength(2)
-    expect(screen.getAllByTestId('guardian-call')).toHaveLength(2)
-  })
-
-  it('offers no call link to a guardian with no phone number', () => {
-    // `href={`tel:${phone ?? ''}`}` rendered a live "חיוג" link to the bare string `tel:`
-    // for every guardian the club holds no number for — a control that looks identical to
-    // the working one and dials nothing. §19.3's personas carry no phone, so every guardian
-    // row in the demo studio had one.
-    render(
-      <ProfileAndLeave
-        students={[active]}
-        guardians={[{ ...GUARDIANS[0]!, phone: null }]}
-        locale="he"
-        client={makeClient()}
-      />,
-    )
-    expect(screen.queryByTestId('guardian-call')).toBeNull()
-  })
-
-  it('keeps the name and the primary badge from running together', () => {
-    // `<bdi>{name}</bdi><span>{primary}</span>` with nothing between them rendered
-    // "שירה הורההורה ראשי" — one word, two facts. A chip is the separation, and it is the
-    // primitive the rest of the app already uses for exactly this.
-    render(
-      <ProfileAndLeave
-        students={[active]}
-        guardians={GUARDIANS}
-        locale="he"
-        client={makeClient()}
-      />,
-    )
-    // Asserted on the LAYOUT, not on `textContent` — `textContent` concatenates whatever
-    // the CSS does, so it reads "יעל לויהורה ראשי" either way and can never tell the bug
-    // from the fix. What went wrong was two adjacent inline elements with no separator
-    // between them; what fixes it is a flex row with a gap, and a chip with its own border.
-    const badge = screen.getByTestId('guardian-primary')
-    expect(badge.firstElementChild).toHaveClass('studio-chip')
-    expect(getComputedStyle(badge.parentElement!).display).toBe('flex')
-  })
-
-  it('explains what is_primary decides, and nothing more', () => {
-    render(
-      <ProfileAndLeave
-        students={[active]}
-        guardians={GUARDIANS}
-        locale="he"
-        client={makeClient()}
-      />,
-    )
-    expect(screen.getByTestId('guardian-primary-hint')).toHaveTextContent(
-      t('he', 'people.guardian.primaryHint'),
-    )
-    // Exactly one primary marker — §5.3.
-    expect(screen.getAllByTestId('guardian-primary')).toHaveLength(1)
-  })
-
-  it('shows the debt notice BEFORE the decision, and disables confirm until a date', async () => {
-    // 12i's own subtitle. §5.4: leaving is not a refund. A notice after the tap is a notice
-    // nobody read.
-    const user = userEvent.setup()
-    render(
-      <ProfileAndLeave
-        students={[active]}
-        guardians={GUARDIANS}
-        locale="he"
-        client={makeClient()}
-      />,
-    )
-    await user.click(screen.getByTestId(`leave-start-${active.id}`))
-    expect(screen.getByTestId('leave-debt-notice')).toHaveTextContent(
-      t('he', 'people.leave.debtNotice'),
-    )
-    expect(screen.getByTestId('leave-submit')).toBeDisabled()
-  })
-
-  it('sends no money field when leaving', async () => {
-    const user = userEvent.setup()
-    const client = makeClient()
-    render(
-      <ProfileAndLeave
-        students={[active]}
-        guardians={GUARDIANS}
-        locale="he"
-        client={client}
-      />,
-    )
-    await user.click(screen.getByTestId(`leave-start-${active.id}`))
-    await user.type(screen.getByTestId('leave-date'), '2026-12-15')
-    await user.click(screen.getByTestId('leave-submit'))
-
-    await waitFor(() => expect(client.leave).toHaveBeenCalled())
-    const body = vi.mocked(client.leave).mock.calls[0]![1]
-    expect(Object.keys(body)).toEqual(expect.arrayContaining(['left_on']))
-    expect(JSON.stringify(body)).not.toMatch(/refund|amount|agorot|balance|write_off/)
-  })
-
-  it('shows a frozen child’s return date', () => {
-    const frozen = student({ status: 'frozen', frozen_until: '2026-11-01' })
-    render(
-      <ProfileAndLeave
-        students={[frozen]}
-        guardians={GUARDIANS}
-        locale="he"
-        client={makeClient()}
-      />,
-    )
-    expect(screen.getByTestId(`frozen-${frozen.id}`)).toHaveTextContent(
-      t('he', 'people.freeze.active'),
-    )
-  })
-
-  it('renders no physical CSS', () => {
-    const { container } = render(
-      <ProfileAndLeave
-        students={[active]}
-        guardians={GUARDIANS}
-        locale="en"
-        client={makeClient()}
-      />,
-    )
-    noPhysicalCss(container)
-  })
-})
-
 describe('chipToneFor', () => {
   it('never relies on colour alone — every status maps to a tone AND carries a label', () => {
     // SC 1.4.1. `ChipStatus` has no `trial` member and @studio/ui is not this lane's to
@@ -331,69 +165,9 @@ describe('chipToneFor', () => {
 
 // -- 12j: the first registration ------------------------------------------------
 
-describe('FirstRegistration — 12j', () => {
-  const onFile = [student({ status: 'pending_approval' })]
-
-  it('renders the children the club already holds', () => {
-    // Both entry paths land on a student that already exists — a manager created it
-    // (§5.4a) or a trial booking did. This screen never creates one.
-    render(<FirstRegistration source="invitation" students={onFile} locale="he" />)
-    expect(screen.getByTestId('first-reg-student')).toHaveTextContent('נועה לוי')
-  })
-
-  it('says something different for an invitation than for a finished trial', () => {
-    // 12j's own title: "קישור מהמועדון או המשך משיעור ניסיון" — two ways in, and a parent
-    // arriving from a trial has already met the club.
-    const { rerender } = render(
-      <FirstRegistration source="invitation" students={onFile} locale="he" />,
-    )
-    const invited = screen.getByTestId('first-reg-source').textContent
-    rerender(<FirstRegistration source="trial" students={onFile} locale="he" />)
-    expect(screen.getByTestId('first-reg-source').textContent).not.toBe(invited)
-  })
-
-  it('offers NO group picker and NO price on either path', () => {
-    // L6 — 'enrolment is always a manager decision'. A group picker here would be the one
-    // place in the product where somebody enrols themselves.
-    for (const source of ['invitation', 'trial'] as const) {
-      const { unmount } = render(
-        <FirstRegistration source={source} students={onFile} locale="he" />,
-      )
-      expect(screen.queryByRole('combobox')).toBeNull()
-      expect(document.body.textContent ?? '').not.toContain('₪')
-      expect(document.body.textContent ?? '').not.toContain(t('he', 'people.convert.pricePlan'))
-      unmount()
-    }
-  })
-
-  it('renders the status as text, never as a control the parent can change', () => {
-    render(<FirstRegistration source="trial" students={onFile} locale="he" />)
-    const status = screen.getByTestId('first-reg-status')
-    expect(status).toHaveTextContent(t('he', 'people.status.pending_approval'))
-    expect(status.tagName).toBe('SPAN')
-  })
-
-  it('renders no physical CSS', () => {
-    const { container } = render(
-      <FirstRegistration source="trial" students={onFile} locale="en" />,
-    )
-    noPhysicalCss(container)
-  })
-
-  it('says what happens next in words, in every locale', () => {
-    // `t()` falls back to the KEY when nothing translates it, and this one translated
-    // nowhere — so a parent who had just registered read the literal string
-    // `people.card.sectionsComeLater` on the screen that told them they were done
-    // (2026-08-31). A missing key is invisible to i18n parity, which compares the
-    // locales to each other and not to what the code asks for.
-    for (const locale of ['he', 'en', 'ru'] as const) {
-      const { unmount } = render(
-        <FirstRegistration source="invitation" students={onFile} locale={locale} />,
-      )
-      expect(screen.getByTestId('first-reg-next')).not.toHaveTextContent(
-        'people.card.sectionsComeLater',
-      )
-      unmount()
-    }
-  })
-})
+// `ProfileAndLeave — 12i` and `FirstRegistration — 12j` used to be tested here. Both
+// components were deleted with the parent-app redesign: 12i's screen is replaced by
+// `features/people/redesign/`, and 12j was already an orphan before the redesign began —
+// exported from the barrel and rendered by nothing, which `unreachable-screens` had been
+// reporting. `chipToneFor` outlived both (the student card still uses it) and moved to
+// `features/people/chipTone.ts`, where its test above now points.

@@ -362,8 +362,6 @@ export const people: Bundle = {
   // the card lines up against them, so a label that wraps moves every row beside it.
   'card.membership': 'Членство',
   'card.plan': 'Программа',
-  'card.sectionsComeLater':
-    'Остальные разделы — расписание, посещаемость и платежи — откроются после подписания декларации о здоровье.',
   'alerts.title': 'Центр уведомлений',
   'alerts.empty': 'Ничего не требует внимания',
   'alerts.pendingRequests': 'Заявки на вступление',

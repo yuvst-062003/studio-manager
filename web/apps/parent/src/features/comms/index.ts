@@ -7,7 +7,6 @@
 // `EventCalendarButtons` is exported and NOT mounted: its home is `7d`/`12h` in
 // `features/events/`, which belongs to lane EVENTS and has no slot to register into. See its
 // own header.
-export { InboxScreen } from './InboxScreen'
 export { PushDisabledBanner } from './PushDisabledBanner'
 export { CalendarSync } from './CalendarSync'
 export { EventCalendarButtons, eventIcsUrl } from './EventCalendarButtons'

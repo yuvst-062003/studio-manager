@@ -18,12 +18,13 @@
 //    such thing and cannot — it has no push. Dropping it would be losing a decision, not
 //    following a design.
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Bell } from 'lucide-react'
 import { formatDateInStudioZone } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { PushDisabledBanner } from '../PushDisabledBanner'
 import { usePushRegistration } from '../usePushRegistration'
-import { ACTIONS } from '../InboxScreen'
+import { ACTIONS } from '../actionCatalogue'
 import type { ParentCommsClient } from '../commsClient'
 import { UpdatesFeed } from './UpdatesFeed'
 import { applyFilter, classify, pendingCountOf, waitingCountOf } from './classify'
@@ -36,6 +37,7 @@ export function UpdatesScreen({
   childrenById,
   childNames,
   onReadChange,
+  userAgent,
 }: {
   locale: Locale
   client: ParentCommsClient
@@ -45,13 +47,17 @@ export function UpdatesScreen({
   /** First names, for the per-child filter chips. */
   childNames: readonly string[]
   onReadChange?: () => void
+  /** A test seam, inherited from `InboxScreen`: §6.5's push rules differ on iOS in a
+   *  browser tab from iOS installed, and the only way to exercise both is to say which. In
+   *  the app it is absent and the hook reads `navigator.userAgent`. */
+  userAgent?: string
 }) {
   const [rows, setRows] = useState<readonly Notification[] | null>(null)
   const [failed, setFailed] = useState(false)
   const [cursor, setCursor] = useState<string | null>(null)
   const [hasMore, setHasMore] = useState(false)
   const [filter, setFilter] = useState<UpdateFilter>({ kind: 'all' })
-  const push = usePushRegistration(client)
+  const push = usePushRegistration(client, userAgent === undefined ? {} : { userAgent })
 
   // The words come from @studio/i18n, the routes from the ONE map `InboxScreen` also reads.
   const catalogue: ActionCatalogue = useMemo(
@@ -123,8 +129,58 @@ export function UpdatesScreen({
   return (
     <section aria-label={t(locale, 'comms.inbox.title')} data-testid="parent-updates">
       {/* Above the feed, as §5.11 asks. It renders nothing when push is on or impossible. */}
-      <div className="tw-scope px-4 pt-4">
+      <div className="tw-scope px-4 pt-4 empty:hidden">
         <PushDisabledBanner locale={locale} state={push.state} />
+
+        {/* §5.11/§6.5's value pre-prompt, carried over from `InboxScreen` unchanged in
+            behaviour and restyled to the prototype's cards. It is rendered only where there
+            is something to ask for — on iOS in a tab the banner above teaches the install
+            instead, because the Push API is absent and this button would do nothing.
+
+            The OS dialog opens from the accept button and from nowhere else: on iOS a
+            denial is permanent and cannot be re-requested in-app, so the one chance is
+            spent only after the parent has been told what it buys them. */}
+        {push.state === 'unasked' ? (
+          <button
+            type="button"
+            onClick={push.offer}
+            data-testid="push-enable"
+            className="w-full flex items-center justify-center gap-2 p-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm font-bold text-[#0056c5] dark:text-blue-300 shadow-xs hover:bg-slate-50 dark:hover:bg-slate-800 active:scale-[0.99] transition-all cursor-pointer"
+          >
+            <Bell className="w-4 h-4" aria-hidden="true" />
+            <span>{t(locale, 'comms.push.enable')}</span>
+          </button>
+        ) : null}
+
+        {push.state === 'pre-prompt' ? (
+          <div
+            data-testid="push-pre-prompt"
+            className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-xs p-4 space-y-2 text-start"
+          >
+            <p className="text-sm font-bold text-slate-900 dark:text-slate-50">
+              {t(locale, 'comms.push.prePrompt.title')}
+            </p>
+            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+              {t(locale, 'comms.push.prePrompt.body')}
+            </p>
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => void push.ask()}
+                className="flex-1 bg-[#0056c5] text-white text-xs font-bold py-2.5 rounded-xl shadow-xs hover:bg-blue-800 active:scale-95 transition-transform cursor-pointer"
+              >
+                {t(locale, 'comms.push.prePrompt.accept')}
+              </button>
+              <button
+                type="button"
+                onClick={push.decline}
+                className="flex-1 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold py-2.5 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-95 transition-transform cursor-pointer"
+              >
+                {t(locale, 'comms.push.prePrompt.decline')}
+              </button>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       <UpdatesFeed

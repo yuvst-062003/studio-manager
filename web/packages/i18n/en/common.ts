@@ -461,8 +461,6 @@ export const common: Bundle = {
   'home.restOfWeek': 'Later this week',
   'home.upcoming': 'Upcoming lessons',
   'home.alerts': 'Alerts',
-  'home.noChildren': 'No children are linked to this account yet.',
-  'home.childrenComeLater': 'The club links a child to your account when they enrol.',
   'home.noUpcoming': 'No lessons are scheduled yet.',
   'home.noUpcomingWeek': 'No lessons are scheduled in the coming week.',
   'home.noAlerts': 'Nothing needs your attention.',

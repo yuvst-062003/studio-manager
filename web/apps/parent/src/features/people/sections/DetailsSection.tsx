@@ -7,7 +7,7 @@
 import { DetailRow, StatusChip } from '@studio/ui'
 import { formatDateInStudioZone } from '@studio/core'
 import { t } from '@studio/i18n'
-import { chipToneFor } from '../ProfileAndLeave'
+import { chipToneFor } from '../chipTone'
 import type { StudentCardSectionProps } from '../StudentCard'
 
 /**

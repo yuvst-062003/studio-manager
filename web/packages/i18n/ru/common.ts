@@ -470,8 +470,6 @@ export const common: Bundle = {
   'home.restOfWeek': 'Далее на неделе',
   'home.upcoming': 'Ближайшие занятия',
   'home.alerts': 'Уведомления',
-  'home.noChildren': 'К этому аккаунту пока не привязан ни один ребёнок.',
-  'home.childrenComeLater': 'Клуб привязывает ребёнка к аккаунту при записи.',
   'home.noUpcoming': 'Занятия пока не запланированы.',
   'home.noUpcomingWeek': 'На ближайшую неделю занятия не запланированы.',
   'home.noAlerts': 'Ничего не требует вашего внимания.',
