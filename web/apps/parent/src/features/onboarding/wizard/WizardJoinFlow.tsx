@@ -11,8 +11,10 @@
 //   * The same endpoints: `/public/onboarding/{token}` for the studio and its groups,
 //     `/public/onboarding/{token}/price-plans` for the plans, `healthClient.template()`
 //     for the declaration, and `/onboarding/{token}/register` for the write.
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { apiFetch } from '@studio/core'
+import { useCallback, useEffect, useState } from 'react'
+import { apiFetch, refresh } from '@studio/core'
+import type { BillingClient } from '../../billing/billingClient'
+import type { StandingOrderLink } from '../../billing/PaymentSetup'
 import type { HealthClient, TemplateSchema } from '../../health/healthClient'
 import type { PlanOption } from '../familyDraft'
 import { Step1Agreements } from './Step1Agreements'
@@ -25,6 +27,8 @@ import { toRegisterPayload, toWizardGroup, toWizardPlan } from './adapters'
 import type { ApiGroup } from './adapters'
 import { clearStudentDraft } from './draft'
 import { WIZARD_FLOW_COPY } from './content'
+import { submitJoin } from './submitJoin'
+import type { RegisterResult, SubmitJoinResult } from './submitJoin'
 import type { PaymentMethod, StudentDraft, WizardGroup, WizardPlan } from './types'
 
 // **The studio gates the wizard; the catalogue gates step 2.**
@@ -48,11 +52,21 @@ export type WizardJoinFlowProps = {
   /** The join token from `/join/{token}`. */
   token: string
   healthClient: HealthClient
+  billingClient: BillingClient
+  /** `GET /me/standing-order-links`. Read after the write -- the children it names do
+   *  not exist before it. */
+  standingOrderLinks: () => Promise<readonly StandingOrderLink[]>
   /** Where "enter the app" goes once the family is registered. */
   onEnterApp: () => void
 }
 
-export function WizardJoinFlow({ token, healthClient, onEnterApp }: WizardJoinFlowProps) {
+export function WizardJoinFlow({
+  token,
+  healthClient,
+  billingClient,
+  standingOrderLinks,
+  onEnterApp,
+}: WizardJoinFlowProps) {
   const copy = WIZARD_FLOW_COPY
   const [studio, setStudio] = useState<StudioState>({ status: 'loading' })
   const [catalogue, setCatalogue] = useState<CatalogueState>({ status: 'loading' })
@@ -60,8 +74,10 @@ export function WizardJoinFlow({ token, healthClient, onEnterApp }: WizardJoinFl
   const [agreed, setAgreed] = useState(false)
   const [students, setStudents] = useState<StudentDraft[]>([])
   const [methods, setMethods] = useState<Record<string, PaymentMethod>>({})
-  const [submitting, setSubmitting] = useState(false)
-  const [submitError, setSubmitError] = useState<string | null>(null)
+  //: Step 3's own "כן, התשלום כבר הוסדר מראש" choice, lifted here because `submitJoin`
+  //: needs it and step 3 does not call `submitJoin` itself.
+  const [alreadyArranged, setAlreadyArranged] = useState(false)
+  const [submitResult, setSubmitResult] = useState<SubmitJoinResult | null>(null)
 
   useEffect(() => {
     let live = true
@@ -132,33 +148,46 @@ export function WizardJoinFlow({ token, healthClient, onEnterApp }: WizardJoinFl
     [step, agreed, students.length],
   )
 
-  const registrationRef = useMemo(() => null as string | null, [])
+  //: The whole write, handed to step 3 as `onSubmit`. Register, then let `submitJoin`
+  //: read back the charges and act on every child's payment choice -- see that module's
+  //: own header for why it cannot be one phase. Rejects ONLY when `register` itself
+  //: rejects, which is the one failure step 3 keeps the family able to retry from.
+  async function submit(): Promise<SubmitJoinResult> {
+    if (catalogue.status !== 'ready') throw new Error('catalogue not ready')
+    const templateId = catalogue.templateId
+    const plans = catalogue.plans
 
-  async function submit() {
-    if (catalogue.status !== 'ready' || submitting) return
-    setSubmitting(true)
-    setSubmitError(null)
-    try {
+    const register = async (): Promise<RegisterResult> => {
       const response = await apiFetch(`/api/v1/onboarding/${token}/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(
-          toRegisterPayload(students, {
-            templateId: catalogue.templateId,
-            clubTermsAccepted: agreed,
-          }),
+          toRegisterPayload(students, { templateId, clubTermsAccepted: agreed }),
         ),
       })
       if (!response.ok) throw new Error(String(response.status))
-      //: The draft has served its purpose; leaving it would offer a family the child they
-      //: have just registered (§5.7 rule 4).
-      clearStudentDraft()
-      setStep(4)
-    } catch {
-      setSubmitError(copy.submitFailed)
-    } finally {
-      setSubmitting(false)
+      return (await response.json()) as RegisterResult
     }
+
+    const result = await submitJoin({
+      students,
+      plans,
+      methods,
+      alreadyArranged,
+      deps: {
+        register,
+        refreshSession: async () => {
+          await refresh()
+        },
+        billing: billingClient,
+        standingOrderLinks,
+      },
+    })
+
+    //: The draft has served its purpose; leaving it would offer a family the child they
+    //: have just registered (§5.7 rule 4).
+    clearStudentDraft()
+    return result
   }
 
   if (studio.status === 'loading') {
@@ -185,7 +214,7 @@ export function WizardJoinFlow({ token, healthClient, onEnterApp }: WizardJoinFl
       <Step4Done
         students={students}
         groups={studio.groups}
-        registrationRef={registrationRef ?? undefined}
+        outcomes={submitResult?.outcomes ?? []}
         clubLogoUrl={studio.logoUrl}
         onEnterApp={onEnterApp}
       />
@@ -232,26 +261,21 @@ export function WizardJoinFlow({ token, healthClient, onEnterApp }: WizardJoinFl
         ) : null}
 
         {step === 3 ? (
-          <>
-            {submitError ? (
-              <p
-                className="mb-3 p-3 rounded-xl bg-red-50 border border-red-300 text-[13px] text-red-800 font-medium"
-                role="alert"
-              >
-                {submitError}
-              </p>
-            ) : null}
-            <Step3Payment
-              students={students}
-              plans={catalogue.status === 'ready' ? catalogue.plans : []}
-              methods={methods}
-              onMethodChange={(id, method) =>
-                setMethods((previous) => ({ ...previous, [id]: method }))
-              }
-              onBack={() => setStep(2)}
-              onSubmit={() => void submit()}
-            />
-          </>
+          <Step3Payment
+            students={students}
+            plans={catalogue.status === 'ready' ? catalogue.plans : []}
+            methods={methods}
+            onMethodChange={(id, method) =>
+              setMethods((previous) => ({ ...previous, [id]: method }))
+            }
+            onIntentChange={setAlreadyArranged}
+            onBack={() => setStep(2)}
+            onSubmit={submit}
+            onDone={(result) => {
+              setSubmitResult(result)
+              setStep(4)
+            }}
+          />
         ) : null}
       </main>
     </div>

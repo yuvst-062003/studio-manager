@@ -408,6 +408,20 @@ export const STEP3_COPY = {
   submitWithCredit: 'מעבר לתשלום באשראי',
   submitNoCredit: 'אישור וסיום הרשמה ✓',
   secureNote: 'עסקה מאובטחת ע״פ תקן PCI-DSS',
+
+  submitting: 'רושמים את המשפחה…',
+  submitFailed: 'ההרשמה לא נשלחה. בדקו את החיבור ונסו שוב.',
+  standingOrderMultiNote:
+    'הוראת קבע נחתמת בנפרד עבור כל חניך. בתשלום באשראי תמלאו טופס אחד לכל המשפחה.',
+  demoNoForm: 'לא ניתן לפתוח דף תשלום בסביבה זו. ההזמנה נרשמה ותוסדר מול המועדון.',
+
+  mandatesTitle: 'הוראת קבע',
+  mandatesCount: 'הרשאות להסדרה',
+  mandateDone: 'הוסדר',
+  mandateTodo: 'להסדרה',
+  mandateOpen: 'פתיחת הטופס',
+  mandatesFinish: 'סיום הרשמה',
+  mandatesFinishWithOpen: 'סיום — נותרו הרשאות להסדרה',
 } as const
 
 export const PAYMENT_FRAME_COPY = {
@@ -450,6 +464,16 @@ export const STEP4_COPY = {
   whatsappJoin: '+ הצטרפות',
 
   enterApp: 'מעבר לאזור האישי באפליקציה',
+
+  paymentTitle: 'מה נקלט בהרשמה',
+  paymentAwaitingReview: 'ממתין למענה מנהל — ללא חיוב',
+  paymentRecorded: 'אופן התשלום נרשם ודווח למועדון',
+  paymentMandatePending: 'נרשם — נותר לחתום על הוראת הקבע',
+  paymentCardPending: 'נפתחה הזמנת תשלום באשראי',
+  paymentNotRecorded: 'לא הצלחנו לרשום את אופן התשלום',
+  paymentReasonNoChargeForCard: 'אין חיוב פתוח לתשלום באשראי — המועדון ייצור קשר',
+  paymentReasonWriteFailed: 'ההרשמה נקלטה, אך הדיווח על אופן התשלום לא נשלח. המועדון ייצור קשר',
+  paymentReasonNoStudent: 'ההרשמה נקלטה. המועדון ייצור קשר להשלמת פרטי התשלום',
 } as const
 
 /** Hardcoded by decision (spec §16 item 4) — these are Gladiator's own, and move to studio

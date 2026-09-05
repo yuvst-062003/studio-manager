@@ -13,11 +13,26 @@
 //     dependency, which `.claude/rules/ui-rtl-a11y.md` says not to add without asking, so
 //     the celebration is CSS -- and it respects `prefers-reduced-motion`.
 import { useEffect, useState } from 'react'
-import { Check, Clock, Copy, MessageCircle } from 'lucide-react'
+import { AlertCircle, Check, Clock, Copy, MessageCircle } from 'lucide-react'
 import { AthleteCardModal } from './AthleteCardModal'
 import { STEP4_COPY, UPCOMING_EVENTS } from './content'
+import type { OutcomeReason, PaymentOutcome } from './submitJoin'
 import { needsManagerReview } from './types'
 import type { StudentDraft, WizardGroup } from './types'
+
+const STATE_COPY: Record<PaymentOutcome['state'], keyof typeof STEP4_COPY> = {
+  awaiting_review: 'paymentAwaitingReview',
+  recorded: 'paymentRecorded',
+  mandate_pending: 'paymentMandatePending',
+  card_pending: 'paymentCardPending',
+  not_recorded: 'paymentNotRecorded',
+}
+
+const REASON_COPY: Record<OutcomeReason, keyof typeof STEP4_COPY> = {
+  no_charge_for_card: 'paymentReasonNoChargeForCard',
+  write_failed: 'paymentReasonWriteFailed',
+  no_student: 'paymentReasonNoStudent',
+}
 
 function Confetti() {
   //: No dependency, and silent for anyone who has asked for less motion. The preference is
@@ -54,6 +69,10 @@ function Confetti() {
 export type Step4DoneProps = {
   students: readonly StudentDraft[]
   groups: readonly WizardGroup[]
+  /** What became of each child's payment choice. Required so a caller cannot quietly
+   *  drop it: a done screen that does not say a promise failed is the screen that tells
+   *  a family their payment was arranged when it was not. */
+  outcomes: readonly PaymentOutcome[]
   /** The reference the submit returned. Absent means the card is not drawn. */
   registrationRef?: string
   clubLogoUrl?: string | null
@@ -64,6 +83,7 @@ export type Step4DoneProps = {
 export function Step4Done({
   students,
   groups,
+  outcomes,
   registrationRef,
   clubLogoUrl,
   whatsappUrl,
@@ -159,6 +179,47 @@ export function Step4Done({
                 )}
               </button>
             </div>
+          </div>
+        ) : null}
+
+        {outcomes.length > 0 ? (
+          <div className="w-full bg-[#091b48]/90 rounded-2xl p-4 border border-[#1b3a8a] shadow-md mb-5 flex flex-col gap-3">
+            <div className="flex items-center justify-between text-xs pb-1 border-b border-white/10">
+              <span className="text-[14px] font-bold text-white flex items-center gap-1.5">
+                <span aria-hidden>💳</span>
+                <span>{copy.paymentTitle}</span>
+              </span>
+            </div>
+            <ul className="flex flex-col gap-2.5 list-none p-0 m-0">
+              {outcomes.map((outcome) => {
+                const notRecorded = outcome.state === 'not_recorded'
+                return (
+                  <li
+                    key={outcome.draftId}
+                    className={`p-3 rounded-xl bg-[#0e2766] border border-white/10 ${
+                      notRecorded ? 'border-s-4 border-s-amber-400' : ''
+                    }`}
+                  >
+                    <span className="text-[13px] font-bold text-white block truncate">
+                      {outcome.name}
+                    </span>
+                    <span
+                      className={`text-[12px] flex items-center gap-1.5 mt-0.5 ${
+                        notRecorded ? 'text-amber-300 font-semibold' : 'text-[#b3c5ff]'
+                      }`}
+                    >
+                      {notRecorded ? <AlertCircle className="w-3.5 h-3.5 shrink-0" /> : null}
+                      <span>{copy[STATE_COPY[outcome.state]]}</span>
+                    </span>
+                    {notRecorded && outcome.reason ? (
+                      <span className="text-[11px] text-amber-300/90 block mt-0.5">
+                        {copy[REASON_COPY[outcome.reason]]}
+                      </span>
+                    ) : null}
+                  </li>
+                )
+              })}
+            </ul>
           </div>
         ) : null}
 

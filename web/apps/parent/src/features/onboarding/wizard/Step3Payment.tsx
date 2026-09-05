@@ -6,14 +6,23 @@
 // (§6.3, §14). It also skips the method picker entirely, so the club never learns HOW the
 // payment was arranged. Here the choice routes into the same sub-view B with a note saying
 // the report goes to the coach ON COMPLETION, which is both honest and better data.
+//
+// **Task 1c** wires the button to `submitJoin` (via the `onSubmit` prop, which now does the
+// whole write and resolves with what landed). Two phases live behind it, because they
+// cannot be one screen: `onSubmit` may come back naming a uPay checkout to post, or one or
+// more standing-order mandates still to sign -- both need a second interaction before the
+// family can be told "done", so `phase` tracks 'form' -> 'working' -> (optionally)
+// 'mandates', and only once every promise is accounted for does this screen call `onDone`.
 import { useMemo, useState } from 'react'
 import {
   AlertCircle,
   Banknote,
+  Check,
   Clock,
   CreditCard,
   Handshake,
   HelpCircle,
+  Info,
   Lock,
   Receipt,
   Repeat,
@@ -21,11 +30,15 @@ import {
   Users,
 } from 'lucide-react'
 import { STEP3_COPY } from './content'
+import { PaymentFrame } from './PaymentFrame'
+import type { PaymentFrameRequest } from './PaymentFrame'
+import type { SubmitJoinResult } from './submitJoin'
 import { formatShekels, needsManagerReview } from './types'
 import type { PaymentMethod, StudentDraft, WizardPlan } from './types'
 
 type SubView = 'decision' | 'methods'
 type Intent = 'now' | 'arranged'
+type Phase = 'form' | 'working' | 'mandates'
 
 const METHOD_BUTTONS: readonly { key: PaymentMethod; label: keyof typeof STEP3_COPY; Icon: typeof CreditCard }[] = [
   { key: 'credit', label: 'methodCredit', Icon: CreditCard },
@@ -46,8 +59,16 @@ export type Step3PaymentProps = {
   plans: readonly WizardPlan[]
   methods: Readonly<Record<string, PaymentMethod>>
   onMethodChange: (studentId: string, method: PaymentMethod) => void
+  /** Step 3's own "כן, התשלום כבר הוסדר מראש" choice, lifted so `WizardJoinFlow` can pass
+   *  it into `submitJoin` as `alreadyArranged`. Fired only when the family changes it. */
+  onIntentChange?: (arranged: boolean) => void
   onBack: () => void
-  onSubmit: () => void
+  /** Runs the whole write. Resolves with what landed; rejects ONLY when the registration
+   *  itself failed, which is the one case that leaves the family able to press the
+   *  button again. Once it resolves the family exists, and nothing may send them back. */
+  onSubmit: () => Promise<SubmitJoinResult>
+  /** Every child accounted for -- advance to step 4 with what landed. */
+  onDone: (result: SubmitJoinResult) => void
 }
 
 export function Step3Payment({
@@ -55,12 +76,27 @@ export function Step3Payment({
   plans,
   methods,
   onMethodChange,
+  onIntentChange,
   onBack,
   onSubmit,
+  onDone,
 }: Step3PaymentProps) {
   const copy = STEP3_COPY
   const [subView, setSubView] = useState<SubView>('decision')
-  const [intent, setIntent] = useState<Intent>('now')
+  const [intent, setIntentState] = useState<Intent>('now')
+  const [phase, setPhase] = useState<Phase>('form')
+  const [result, setResult] = useState<SubmitJoinResult | null>(null)
+  const [frame, setFrame] = useState<PaymentFrameRequest | null>(null)
+  //: Which mandate row a `link` frame belongs to -- kept beside `frame` rather than folded
+  //: into it, so closing the frame marks THAT row done and never another one.
+  const [openMandateDraftId, setOpenMandateDraftId] = useState<string | null>(null)
+  const [signed, setSigned] = useState<readonly string[]>([])
+  const [submitError, setSubmitError] = useState<string | null>(null)
+
+  const setIntent = (next: Intent) => {
+    setIntentState(next)
+    onIntentChange?.(next === 'arranged')
+  }
 
   const priceOf = (student: StudentDraft) =>
     plans.find((plan) => plan.id === student.planId)?.pricePerMonthAgorot ?? 0
@@ -86,17 +122,85 @@ export function Step3Payment({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [students, plans, methods])
 
+  const allMandatesSigned =
+    result !== null && result.mandates.every((mandate) => signed.includes(mandate.draftId))
+
   const footerLabel = () => {
+    if (phase === 'working') return copy.submitting
+    if (phase === 'mandates') return allMandatesSigned ? copy.mandatesFinish : copy.mandatesFinishWithOpen
     if (subView === 'decision') return intent === 'now' ? copy.continueToPay : copy.reportArranged
     if (chargeable.length === 0) return copy.submitReviewOnly
     if (creditSum > 0) return `${copy.submitWithCredit} (₪${formatShekels(creditSum)})`
     return copy.submitNoCredit
   }
 
-  const onFooter = () => (subView === 'decision' ? setSubView('methods') : onSubmit())
+  const runSubmit = async () => {
+    setPhase('working')
+    setSubmitError(null)
+    try {
+      const landed = await onSubmit()
+      setResult(landed)
+      if (landed.checkout) {
+        setOpenMandateDraftId(null)
+        setFrame({ kind: 'checkout', form: landed.checkout })
+        return
+      }
+      if (landed.mandates.length > 0) {
+        setPhase('mandates')
+        return
+      }
+      onDone(landed)
+    } catch {
+      setSubmitError(copy.submitFailed)
+      setPhase('form')
+    }
+  }
+
+  const onFooter = () => {
+    if (phase === 'mandates') {
+      if (result) onDone(result)
+      return
+    }
+    if (subView === 'decision') {
+      setSubView('methods')
+      return
+    }
+    void runSubmit()
+  }
+
+  //: `PaymentFrame`'s `onComplete` and `onClose` both do the same thing here: close the
+  //: frame, mark a mandate row done when the frame WAS that mandate's, then move on --
+  //: to the mandates checklist if any remain, or to step 4 otherwise.
+  const closeFrame = () => {
+    setFrame(null)
+    const finishedMandateId = openMandateDraftId
+    setOpenMandateDraftId(null)
+    if (finishedMandateId) {
+      setSigned((previous) => (previous.includes(finishedMandateId) ? previous : [...previous, finishedMandateId]))
+    }
+    if (!result) return
+    if (result.mandates.length > 0) setPhase('mandates')
+    else onDone(result)
+  }
 
   return (
     <div className="tw-scope flex flex-col w-full pb-36">
+      {submitError ? (
+        <p
+          className="mb-3 p-3 rounded-xl bg-red-50 border border-red-300 text-[13px] text-red-800 font-medium"
+          role="alert"
+        >
+          {submitError}
+        </p>
+      ) : null}
+
+      {result?.checkoutUnavailable ? (
+        <div className="bg-[#0056c5]/10 border border-[#0056c5]/20 rounded-xl p-3 mb-3 flex items-start gap-2 text-[#001849]">
+          <Info className="w-4 h-4 text-[#0056c5] shrink-0 mt-0.5" />
+          <p className="text-[12px] leading-relaxed">{copy.demoNoForm}</p>
+        </div>
+      ) : null}
+
       {/* §6.1 — the family summary strip */}
       <div className="bg-[#f2f3ff] border border-[#dee2f4] rounded-xl p-3 shadow-2xs mb-3 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2.5 min-w-0">
@@ -144,7 +248,72 @@ export function Step3Payment({
         </div>
       ) : null}
 
-      {subView === 'decision' ? (
+      {phase === 'mandates' && result ? (
+        <section className="flex flex-col gap-4">
+          <div className="bg-white rounded-2xl p-4 shadow-xs border border-[#dee2f4] flex flex-col gap-1">
+            <div className="flex items-center justify-between border-b border-[#dee2f4] pb-2 mb-1">
+              <span className="text-[15px] font-bold text-[#001849]">{copy.mandatesTitle}</span>
+              <span className="text-[11px] text-[#444650]">
+                {result.mandates.length} {copy.mandatesCount}
+              </span>
+            </div>
+
+            {result.mandates.map((mandate) => {
+              const isSigned = signed.includes(mandate.draftId)
+              const row = (
+                <>
+                  <span className="flex items-center gap-2.5 min-w-0">
+                    {isSigned ? (
+                      <Check className="w-4 h-4 text-emerald-700 shrink-0" aria-hidden />
+                    ) : (
+                      <span
+                        aria-hidden
+                        className="w-4 h-4 rounded-full border-2 border-[#757681] shrink-0"
+                      />
+                    )}
+                    <span className="flex flex-col min-w-0 text-right">
+                      <span className="text-[13px] font-bold text-[#161b28] truncate">
+                        {mandate.name}
+                      </span>
+                      <span className="text-[11px] text-[#444650]">
+                        ₪{formatShekels(mandate.amountAgorot)}
+                      </span>
+                    </span>
+                  </span>
+                  <span
+                    className={`text-[12px] font-semibold shrink-0 ${
+                      isSigned ? 'text-emerald-700' : 'text-[#444650]'
+                    }`}
+                  >
+                    {isSigned ? copy.mandateDone : copy.mandateTodo}
+                  </span>
+                </>
+              )
+              return isSigned ? (
+                <div
+                  key={mandate.draftId}
+                  className="flex items-center justify-between gap-2 py-2.5 border-b border-[#f2f3ff] last:border-0"
+                >
+                  {row}
+                </div>
+              ) : (
+                <button
+                  key={mandate.draftId}
+                  type="button"
+                  aria-label={`${copy.mandateOpen} — ${mandate.name}`}
+                  onClick={() => {
+                    setOpenMandateDraftId(mandate.draftId)
+                    setFrame({ kind: 'link', url: mandate.url })
+                  }}
+                  className="flex items-center justify-between gap-2 py-2.5 -mx-1 px-1 border-b border-[#f2f3ff] last:border-0 w-full text-right cursor-pointer hover:bg-[#f2f3ff] rounded-lg transition-colors focus-visible:ring-2 focus-visible:ring-[#0056c5]"
+                >
+                  {row}
+                </button>
+              )
+            })}
+          </div>
+        </section>
+      ) : subView === 'decision' ? (
         <fieldset className="flex flex-col gap-4 border-0 p-0 m-0">
           <div className="bg-white rounded-2xl p-4 shadow-xs flex flex-col gap-2 text-center items-center border border-[#dee2f4]/60">
             <div className="w-12 h-12 rounded-full bg-[#e9edff] flex items-center justify-center text-[#001849] mb-1">
@@ -332,6 +501,14 @@ export function Step3Payment({
             )
           })}
 
+          {students.length >= 2 &&
+          chargeable.some((student) => (methods[student.id] ?? 'credit') === 'standing_order') ? (
+            <div className="bg-[#0056c5]/10 border border-[#0056c5]/20 rounded-xl p-3 flex items-start gap-2 text-[#001849]">
+              <Repeat className="w-4 h-4 text-[#0056c5] shrink-0 mt-0.5" />
+              <p className="text-[12px] leading-relaxed">{copy.standingOrderMultiNote}</p>
+            </div>
+          ) : null}
+
           {/* §6.5 — the breakdown */}
           <div className="bg-white rounded-2xl p-4 shadow-xs border border-[#dee2f4] flex flex-col gap-2.5">
             <div className="flex items-center justify-between border-b border-[#dee2f4] pb-2">
@@ -407,17 +584,24 @@ export function Step3Payment({
       <footer className="fixed bottom-0 inset-x-0 z-30 bg-[#faf8ff]/95 backdrop-blur-md shadow-[0_-4px_20px_rgba(15,23,42,0.08)] py-3 px-4 border-t border-[#dee2f4]">
         <div className="max-w-[480px] mx-auto flex flex-col gap-2">
           <div className="flex items-center gap-2">
+            {phase === 'form' ? (
+              <button
+                type="button"
+                onClick={subView === 'methods' ? () => setSubView('decision') : onBack}
+                className="h-12 px-4 rounded-xl bg-[#e9edff] hover:bg-[#dee2f4] text-[#001849] text-[14px] font-semibold flex items-center justify-center gap-1 transition-colors cursor-pointer shrink-0"
+              >
+                {copy.back}
+              </button>
+            ) : null}
             <button
               type="button"
-              onClick={subView === 'methods' ? () => setSubView('decision') : onBack}
-              className="h-12 px-4 rounded-xl bg-[#e9edff] hover:bg-[#dee2f4] text-[#001849] text-[14px] font-semibold flex items-center justify-center gap-1 transition-colors cursor-pointer shrink-0"
-            >
-              {copy.back}
-            </button>
-            <button
-              type="button"
+              disabled={phase === 'working'}
               onClick={onFooter}
-              className="flex-1 h-12 rounded-xl bg-[#001849] hover:bg-[#0056c5] active:scale-[0.99] text-white text-[15px] font-bold shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+              className={`flex-1 h-12 rounded-xl text-white text-[15px] font-bold shadow-md transition-all flex items-center justify-center gap-2 ${
+                phase === 'working'
+                  ? 'bg-[#757681] cursor-not-allowed'
+                  : 'bg-[#001849] hover:bg-[#0056c5] active:scale-[0.99] cursor-pointer'
+              }`}
             >
               <span className="truncate">{footerLabel()}</span>
             </button>
@@ -428,6 +612,8 @@ export function Step3Payment({
           </div>
         </div>
       </footer>
+
+      {frame ? <PaymentFrame request={frame} onComplete={closeFrame} onClose={closeFrame} /> : null}
     </div>
   )
 }

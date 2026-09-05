@@ -10,9 +10,8 @@ import { ThemeProvider } from '@studio/ui'
 import { Step1Agreements } from './features/onboarding/wizard/Step1Agreements'
 import { Step2Trainees } from './features/onboarding/wizard/Step2Trainees'
 import { Step3Payment } from './features/onboarding/wizard/Step3Payment'
-import { PaymentFrame } from './features/onboarding/wizard/PaymentFrame'
 import { Step4Done } from './features/onboarding/wizard/Step4Done'
-import type { PaymentFrameRequest } from './features/onboarding/wizard/PaymentFrame'
+import type { SubmitJoinResult } from './features/onboarding/wizard/submitJoin'
 import { WizardHeader } from './features/onboarding/wizard/WizardHeader'
 import type { WizardStep } from './features/onboarding/wizard/WizardHeader'
 import type { PaymentMethod, StudentDraft } from './features/onboarding/wizard/types'
@@ -89,16 +88,6 @@ function Preview() {
   const [agreed, setAgreed] = useState(params.has('agreed'))
   const [students, setStudents] = useState<StudentDraft[]>(params.has('empty') ? [] : SEED)
   const [methods, setMethods] = useState<Record<string, PaymentMethod>>({})
-  const [frame, setFrame] = useState<PaymentFrameRequest | null>(null)
-
-  //: `?real=1` loads the form the staging API actually builds -- the live uPay endpoint
-  //: with real merchant fields. Served from a local helper OUTSIDE the repository, so the
-  //: merchant credential never lands in the tree. Everything else posts to the stand-in.
-  const openReal = async () => {
-    const response = await fetch('http://localhost:5400/form.json')
-    const form = (await response.json()) as { action: string; fields: Record<string, string> }
-    setFrame({ kind: 'checkout', form })
-  }
 
   //: The exact nine fields `app/integrations/upay/form.py::upay_form_fields` builds, with
   //: the ACTION pointed at a local stand-in. There is no uPay sandbox: `livesystem` is the
@@ -127,6 +116,7 @@ function Preview() {
         <Step4Done
           students={students}
           groups={GROUPS}
+          outcomes={[]}
           registrationRef="GLD-2026-8841"
           clubLogoUrl={EMBLEM}
           whatsappUrl="https://chat.whatsapp.com"
@@ -157,17 +147,38 @@ function Preview() {
             methods={methods}
             onMethodChange={(id, method) => setMethods((prev) => ({ ...prev, [id]: method }))}
             onBack={() => setStep(2)}
-            onSubmit={() =>
-              params.has('real')
-                ? void openReal()
-                : setFrame(
-                params.get('frame') === 'link'
-                  ? // The standing-order mandate: uPay hosts it and it loads by `src`,
-                    // not by a POST. Same frame, different entry.
-                    { kind: 'link', url: 'http://localhost:5400/mandate' }
-                  : { kind: 'checkout', form: stubForm },
-                  )
-            }
+            //: `submitJoin` itself is not run here -- this is a screenshot harness, not a
+            //: live write -- so `onSubmit` fabricates the same shape `submitJoin` would
+            //: have returned, and `Step3Payment` opens the checkout/mandate frame from it
+            //: exactly as it would for the real thing.
+            onSubmit={async (): Promise<SubmitJoinResult> => {
+              if (params.has('real')) {
+                const response = await fetch('http://localhost:5400/form.json')
+                const form = (await response.json()) as { action: string; fields: Record<string, string> }
+                return { personId: 'preview', outcomes: [], checkout: form, checkoutUnavailable: false, mandates: [] }
+              }
+              if (params.get('frame') === 'link') {
+                // The standing-order mandate: uPay hosts it and it loads by `src`, not by
+                // a POST -- same frame, different entry.
+                return {
+                  personId: 'preview',
+                  outcomes: [],
+                  checkout: null,
+                  checkoutUnavailable: false,
+                  mandates: [
+                    {
+                      draftId: students[0]?.id ?? 'seed-1',
+                      studentId: students[0]?.id ?? 'seed-1',
+                      name: `${students[0]?.firstName ?? ''} ${students[0]?.lastName ?? ''}`.trim(),
+                      amountAgorot: 40_000,
+                      url: 'http://localhost:5400/mandate',
+                    },
+                  ],
+                }
+              }
+              return { personId: 'preview', outcomes: [], checkout: stubForm, checkoutUnavailable: false, mandates: [] }
+            }}
+            onDone={() => setStep(4)}
           />
         ) : null}
         {step === 2 ? (
@@ -184,16 +195,6 @@ function Preview() {
       </main>
         </>
       )}
-      {frame ? (
-        <PaymentFrame
-          request={frame}
-          onComplete={() => {
-            setFrame(null)
-            setStep(4)
-          }}
-          onClose={() => setFrame(null)}
-        />
-      ) : null}
     </div>
   )
 }

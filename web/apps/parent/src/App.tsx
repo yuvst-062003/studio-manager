@@ -7,7 +7,7 @@
 // home-screen web app, "so an iPhone parent who never installs receives no push at all —
 // and §5.11 permits no email or SMS fallback, so that parent is reachable only by
 // telephone."
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { apiFetch, apiUrl, getAccessToken, refresh, useDisplayMode, useSession, switchStudio } from '@studio/core'
 import {
   AccessibilityMenu,
@@ -221,11 +221,9 @@ type JoinWallInfo = { studio_name: string; logo_url: string | null }
 
 function JoinShell({ token }: { token: string }) {
   const [locale, setLocale] = useState<Locale>('he')
-  // The standing-order mandate links, the privacy client and the billing client all
-  // belonged to `JoinFlow`'s payment step. `WizardJoinFlow` collects the payment METHOD
-  // per child but does not yet act on it -- see its own note -- so nothing here consumes
-  // them, and holding a fetch open for a screen that never reads it is worse than not
-  // fetching. They come back with the promise and order writes.
+  // The privacy client belonged to `JoinFlow`'s payment step and nothing in the
+  // redesigned wizard consumes it, so it is not rebuilt here (task 1c's own note) -- an
+  // unused fetch held open for a screen that never reads it is worse than not fetching.
   // F1/F10 -- the ONE `useSession()` call for this whole route. `JoinFlow` and
   // `JoinWelcomeStep` used to each mount their own, and every mount's `refresh()` call
   // rotates the refresh token -- three (with this one, four) rotations for one page load,
@@ -236,10 +234,28 @@ function JoinShell({ token }: { token: string }) {
   const session = useSession()
   const [wallInfo, setWallInfo] = useState<JoinWallInfo | null>(null)
   const healthClient = useMemo(() => makeHealthClient(apiFetch), [])
+  const billingClient = useMemo(() => makeParentBillingClient(apiFetch), [])
   useDocumentLocale(locale)
 
-  // (the standing-order mandate fetch lived here; it comes back with the promise and
-  // order writes that consume it)
+  // §5.10's mandate links, read by `submitJoin` AFTER the write -- the children it names
+  // do not exist before it. A missing or failing read must not fail a registration that
+  // has already landed, so this returns `[]` rather than throwing.
+  const standingOrderLinks = useCallback(async (): Promise<readonly StandingOrderLink[]> => {
+    try {
+      const response = await apiFetch('/api/v1/me/standing-order-links')
+      if (!response.ok) return []
+      const body = (await response.json()) as {
+        items: { student_id: string; amount_agorot: number; url: string }[]
+      }
+      return body.items.map((row) => ({
+        studentId: row.student_id,
+        amountAgorot: row.amount_agorot,
+        url: row.url,
+      }))
+    } catch {
+      return []
+    }
+  }, [])
 
   // Fetched once on mount, unconditionally -- not gated on `session.status`, so it is
   // already resolved by the time `status` settles to `anonymous` and the wall below
@@ -300,10 +316,12 @@ function JoinShell({ token }: { token: string }) {
       <AccessibilityMenu locale={locale} />
       <LanguagePicker locale={locale} onChoose={setLocale} />
       <WizardJoinFlow
+        billingClient={billingClient}
         healthClient={healthClient}
         onEnterApp={() => {
           globalThis.location.assign('/')
         }}
+        standingOrderLinks={standingOrderLinks}
         token={token}
       />
     </ThemeProvider>
