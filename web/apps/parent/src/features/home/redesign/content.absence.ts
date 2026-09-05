@@ -35,6 +35,35 @@ export const ABSENCE = {
   },
 } as const
 
+/** FLOW A2 — one report for every lesson the family has on a chosen day. */
+export const DAY_ABSENCE = {
+  title: 'דיווח היעדרות לכל הילדים',
+  subtitle: 'עדכון מרוכז לכל צוות המאמנים',
+  /** `{names}` is the children's list, already joined by the caller. */
+  targetOne: 'ילד אחד: {names}',
+  targetMany: 'כל {count} הילדים: {names}',
+  targetNote: 'היעדרות מכלל האימונים המתוכננים',
+  /** The button on the calendar's day card. */
+  openCta: 'דיווח היעדרות לכל הילדים ביום זה',
+  openDone: 'היעדרות כל הילדים נרשמה ✓',
+  submit: 'שליחת דיווח לכל האימונים',
+  submitting: 'שולח…',
+
+  /** The RESULT list, which the prototype has no need for: this is N separate writes and
+   *  they do not all have to succeed. A sheet that closed on "done" would tell a parent
+   *  they had reported three absences when the club heard about two. */
+  resultsTitle: 'תוצאות הדיווח',
+  resultRecorded: 'נשלח',
+  resultTooLate: 'השיעור כבר התחיל',
+  resultAlready: 'כבר דווח',
+  resultFailed: 'לא נשלח',
+  resultsAllOk: 'כל הדיווחים נשלחו',
+  resultsSomeFailed: 'חלק מהדיווחים לא נשלחו. אפשר לנסות שוב מכרטיס האימון.',
+  done: 'סגירה',
+  /** The day has nothing to report. */
+  nothingToReport: 'אין אימונים מתוכננים ביום זה',
+} as const
+
 /** The six reasons the prototype offers, with its own icons and tints. `label` is what is
  *  actually stored and what a coach reads on the mat, so it has to be a sentence and not a
  *  key — `POST /absence-reports` has one free-text `reason` column and no enum. */

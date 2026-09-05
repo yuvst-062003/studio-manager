@@ -18,6 +18,8 @@ import { HomeTop } from './HomeTop'
 import { HomeSchedule } from './HomeSchedule'
 import { AbsenceModal } from './AbsenceModal'
 import { MonthCalendarModal } from './MonthCalendarModal'
+import { AllDayAbsenceSheet } from './AllDayAbsenceSheet'
+import type { DayAbsenceOutcome } from './AllDayAbsenceSheet'
 import type { AbsenceFailure } from './AbsenceModal'
 import { ReminderSheet, readReminders, writeReminder } from './ReminderSheet'
 import type { LeadTime } from './ReminderSheet'
@@ -86,6 +88,11 @@ export function HomeScreen({
   // §4: "calendar is a modal inside Home". `null` is closed; otherwise the month on screen,
   // which is NOT the same as the selected day's month once the arrows have been used.
   const [monthOpen, setMonthOpen] = useState<{ year: number; month: number } | null>(null)
+  // The whole-day report: which day it is for, and what each of its writes came back with.
+  const [dayAbsenceFor, setDayAbsenceFor] = useState<string | null>(null)
+  const [dayTargets, setDayTargets] = useState<readonly DayAbsenceOutcome[]>([])
+  const [dayOutcomes, setDayOutcomes] = useState<readonly DayAbsenceOutcome[] | null>(null)
+  const [dayBusy, setDayBusy] = useState(false)
   const [reminders, setReminders] = useState<Record<string, LeadTime>>(() => readReminders())
 
   const allSessions = useMemo(
@@ -107,6 +114,40 @@ export function HomeScreen({
           (selectedChildId === null || session.studentId === selectedChildId),
       ),
     [allSessions, selectedDayKey, selectedChildId],
+  )
+
+  /**
+   * What the whole-day report is about — CAPTURED WHEN THE SHEET OPENS, not derived.
+   *
+   * It used to be a `useMemo` over the current sessions, which is correct right up until the
+   * writes land: each reported lesson then drops out of its own filter, the list empties,
+   * and the sheet's header announced "כל 0 הילדים" above two successful reports. The set a
+   * batch was about does not change because the batch succeeded.
+   */
+  const openDayAbsence = useCallback(
+    (dayKey: string) => {
+      setDayOutcomes(null)
+      setDayAbsenceFor(dayKey)
+      setDayTargets(
+        allSessions
+          .filter(
+            (session) =>
+              studioDayKey(session.startsAt) === dayKey &&
+              (selectedChildId === null || session.studentId === selectedChildId) &&
+              !session.reportedAbsent &&
+              session.cancelledReason === null,
+          )
+          .map((session) => ({
+            sessionId: session.id,
+            studentId: session.studentId,
+            studentName: session.studentName,
+            groupName: session.groupName,
+            timeLabel: formatTimeInStudioZone(session.startsAt, locale),
+            state: 'pending' as const,
+          })),
+      )
+    },
+    [allSessions, selectedChildId, locale],
   )
 
   const state: 'ready' | 'loading' | 'failed' = lessonsFailed
@@ -147,6 +188,51 @@ export function HomeScreen({
         })
     },
     [absenceTarget, writer, onAbsenceReported],
+  )
+
+  /**
+   * One tap, one write per (lesson, child) — and a result for each.
+   *
+   * SEQUENTIAL, not `Promise.all`. Each report is a POST that the server can refuse on its
+   * own terms, and firing six at once at a rate-limited endpoint turns one late lesson into
+   * six ambiguous failures. In order also means the list fills top to bottom, which is what
+   * makes the progress legible while it runs.
+   */
+  const submitDayAbsence = useCallback(
+    (reason: string) => {
+      const targets = dayTargets
+      if (targets.length === 0) return
+      setDayBusy(true)
+      if (globalThis.navigator?.onLine === false) {
+        setDayBusy(false)
+        setDayOutcomes(targets.map((row) => ({ ...row, state: 'failed' as const })))
+        return
+      }
+      setDayOutcomes(targets)
+      void (async () => {
+        const done: DayAbsenceOutcome[] = []
+        for (const target of targets) {
+          try {
+            await writer.reportAbsence(target.sessionId, target.studentId, reason)
+            done.push({ ...target, state: 'recorded' })
+          } catch (error: unknown) {
+            const code = (error as { code?: string } | null)?.code
+            done.push({
+              ...target,
+              state:
+                code === 'too_late' || code === 'already_marked'
+                  ? code
+                  : ('failed' as const),
+            })
+          }
+          // Published after every write, so the sheet shows the run rather than a spinner.
+          setDayOutcomes([...done, ...targets.slice(done.length)])
+        }
+        setDayBusy(false)
+        onAbsenceReported()
+      })()
+    },
+    [dayTargets, writer, onAbsenceReported],
   )
 
   return (
@@ -238,6 +324,29 @@ export function HomeScreen({
           }}
           onClose={() => setMonthOpen(null)}
           timeLabel={(session) => formatTimeInStudioZone(session.startsAt, locale)}
+          dayHeadline={headlineFor(selectedDayKey)}
+          onReportWholeDay={() => openDayAbsence(selectedDayKey)}
+          onShowOnHome={() => setMonthOpen(null)}
+          onReportSession={(session) => {
+            setAbsenceFailure(null)
+            setAbsenceTarget(session)
+          }}
+        />
+      ) : null}
+
+      {dayAbsenceFor ? (
+        <AllDayAbsenceSheet
+          targets={dayTargets}
+          childNames={[...new Set(dayTargets.map((row) => row.studentName))]}
+          dayLabel={dayLabelFor(dayAbsenceFor)}
+          busy={dayBusy}
+          outcomes={dayOutcomes}
+          onSubmit={submitDayAbsence}
+          onClose={() => {
+            setDayAbsenceFor(null)
+            setDayOutcomes(null)
+            setDayTargets([])
+          }}
         />
       ) : null}
 

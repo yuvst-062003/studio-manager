@@ -11,9 +11,11 @@
 // The prototype's month arrows are `ChevronRight` for NEXT and `ChevronLeft` for previous.
 // That is correct in a right-to-left document — forward is leftward, so the arrow pointing
 // away from the text's flow direction is the one that advances — and it is kept as drawn.
-import { CalendarDays, ChevronLeft, ChevronRight, X } from 'lucide-react'
+import { Calendar, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Eye, X } from 'lucide-react'
 import { useDialog } from '../../onboarding/wizard/useDialog'
-import { HOME, WEEKDAY_LETTER } from './content'
+import { DAY_ABSENCE } from './content.absence'
+import { HOME, WEEKDAY_LETTER, fill } from './content'
+import { studioDayKey } from '@studio/core'
 import { monthGrid } from './derive'
 import type { HomeChild, HomeSession } from './types'
 
@@ -31,6 +33,10 @@ export function MonthCalendarModal({
   onToday,
   onClose,
   timeLabel,
+  dayHeadline,
+  onReportWholeDay,
+  onShowOnHome,
+  onReportSession,
 }: {
   /** The month on screen. `month` is 1-based, like every other month value here. */
   at: { year: number; month: number }
@@ -49,6 +55,14 @@ export function MonthCalendarModal({
   onToday: () => void
   onClose: () => void
   timeLabel: (session: HomeSession) => string
+  /** The selected day, already formatted — "יום ד׳ • 26 באוגוסט 2026". */
+  dayHeadline: string
+  /** The prototype's day action bar — one report for every lesson on the day. */
+  onReportWholeDay: () => void
+  /** The prototype's "הצג במסך הבית": take this day back to the screen behind and close. */
+  onShowOnHome: () => void
+  /** Per-lesson, the same sheet the home card opens. */
+  onReportSession: (session: HomeSession) => void
 }) {
   const dialogRef = useDialog(true, onClose)
 
@@ -57,7 +71,10 @@ export function MonthCalendarModal({
       ? sessions
       : sessions.filter((session) => session.studentId === selectedChildId)
   const { leadingBlanks, cells } = monthGrid(at.year, at.month, forChild, todayKey)
-  const agenda = forChild.filter((session) => session.startsAt.slice(0, 10) === selectedDayKey)
+  const agenda = forChild.filter((session) => studioDayKey(session.startsAt) === selectedDayKey)
+  // Every lesson on the day already answered — the state the prototype tracks with a single
+  // `allKidsReportedForDay26` boolean, derived here from the reports that actually exist.
+  const allReported = agenda.length > 0 && agenda.every((session) => session.reportedAbsent)
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/60 flex items-end sm:items-center justify-center p-0 sm:p-4 modal-backdrop-blur transition-all duration-300">
@@ -230,13 +247,62 @@ export function MonthCalendarModal({
           </div>
         </div>
 
-        {/* The selected day's agenda. */}
-        <div className="space-y-2" data-testid="month-agenda">
-          {agenda.length === 0 ? (
-            <p className="text-xs text-slate-500 dark:text-slate-400 text-center py-4">
-              {HOME.monthAgendaEmpty}
-            </p>
-          ) : (
+        {/* The selected day's card: what is on, and the two things you can do about it.
+            Both are the prototype's; the first version of this port had neither, and a
+            calendar you can only read is a calendar you open once. */}
+        <div className="space-y-2.5 bg-slate-50/80 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700 rounded-3xl p-3.5" data-testid="month-agenda">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-400/15 text-[#0056c5] dark:text-blue-300 flex items-center justify-center shrink-0">
+                <Calendar className="w-4 h-4" />
+              </div>
+              <div className="min-w-0">
+                <h4 className="text-xs font-bold text-slate-900 dark:text-slate-50 leading-tight truncate">
+                  {dayHeadline}
+                </h4>
+                <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+                  {agenda.length === 0
+                    ? HOME.monthAgendaEmpty
+                    : agenda.length === 1
+                      ? HOME.monthDayOneSession
+                      : fill(HOME.monthDaySessions, { count: agenda.length })}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={onShowOnHome}
+              data-testid="month-show-on-home"
+              className="px-2.5 py-1.5 bg-[#0056c5] hover:bg-blue-700 active:scale-95 text-white rounded-xl text-xs font-semibold shadow-xs flex items-center gap-1 transition-all shrink-0 cursor-pointer"
+            >
+              <Eye className="w-3.5 h-3.5" />
+              <span>{HOME.monthShowOnHome}</span>
+            </button>
+          </div>
+
+          {/* The day action bar. Hidden when there is nothing to report, and when every
+              lesson on the day has already been reported — a button that can only tell you
+              "already reported" six times is not a button. */}
+          {agenda.length > 0 ? (
+            allReported ? (
+              <p className="w-full py-2.5 px-3 rounded-2xl text-xs font-bold bg-emerald-600 text-white flex items-center justify-center gap-2">
+                <CheckCircle2 className="w-4 h-4" />
+                <span>{DAY_ABSENCE.openDone}</span>
+              </p>
+            ) : (
+              <button
+                type="button"
+                onClick={onReportWholeDay}
+                data-testid="month-report-day"
+                className="w-full py-2.5 px-3 rounded-2xl text-xs font-bold shadow-xs active:scale-98 transition-all flex items-center justify-center gap-2 cursor-pointer bg-red-50 dark:bg-red-500/10 hover:bg-red-100/80 border border-red-200 dark:border-red-500/25 text-red-700 dark:text-red-300"
+              >
+                <Calendar className="w-4 h-4" />
+                <span>{DAY_ABSENCE.openCta}</span>
+              </button>
+            )
+          ) : null}
+
+          {agenda.length === 0 ? null : (
             agenda.map((session) => (
               <div
                 key={`${session.id}:${session.studentId}`}
@@ -258,9 +324,36 @@ export function MonthCalendarModal({
                     </p>
                   </div>
                 </div>
-                <span className="text-sm font-bold text-slate-900 dark:text-slate-50 shrink-0">
-                  {timeLabel(session)}
-                </span>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-sm font-bold text-slate-900 dark:text-slate-50">
+                    {timeLabel(session)}
+                  </span>
+                  {/* The per-lesson report, opening the SAME sheet the home card opens —
+                      the prototype has one here too, and a calendar that can only report a
+                      whole day cannot answer "one of my three is ill". */}
+                  {session.cancelledReason === null ? (
+                    session.reportedAbsent ? (
+                      <span
+                        className="px-2 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/25 text-[10px] font-bold flex items-center gap-1"
+                        data-testid={`month-reported-${session.id}-${session.studentId}`}
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>{HOME.absentReported}</span>
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => onReportSession(session)}
+                        aria-label={`${HOME.absentQuestion} ${session.studentName}`}
+                        data-testid={`month-absence-${session.id}-${session.studentId}`}
+                        className="px-2.5 py-2 rounded-xl bg-red-50 dark:bg-red-500/10 text-red-700 dark:text-red-300 hover:bg-red-100 border border-red-200 dark:border-red-500/25 text-[10px] font-bold flex items-center gap-1 active:scale-95 transition-all cursor-pointer"
+                      >
+                        <Calendar className="w-3.5 h-3.5" />
+                        <span>{HOME.absentQuestion}</span>
+                      </button>
+                    )
+                  ) : null}
+                </div>
               </div>
             ))
           )}

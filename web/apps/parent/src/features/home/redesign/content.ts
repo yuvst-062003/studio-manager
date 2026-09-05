@@ -78,6 +78,10 @@ export const HOME = {
   monthToday: 'היום',
   monthGridLabel: 'בחירת תאריך',
   monthAgendaEmpty: 'אין אימונים ביום זה',
+  /** The calendar day card's own controls, ported from the prototype's day action bar. */
+  monthShowOnHome: 'הצג במסך הבית',
+  monthDaySessions: '{count} אימונים מתוכננים למשפחה',
+  monthDayOneSession: 'אימון אחד מתוכנן למשפחה',
 
   /** Loading and failure, neither of which the prototype has — it has no network. */
   loading: 'טוען את לוח האימונים…',

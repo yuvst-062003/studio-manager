@@ -29,7 +29,14 @@ const LESSONS: Lesson[] = [
 
 function Preview() {
   const params = new URLSearchParams(window.location.search)
-  const [epoch, setEpoch] = useState(0)
+  //: Stands in for the server's own record of what has been reported. `Resolve` re-reads
+  //: `/me/attendance-intents` after a write and passes the result down WITHOUT remounting
+  //: the screen; the harness has to do the same, or the sheet showing the run's results is
+  //: torn down before anyone can read it. Keying `HomeScreen` on `epoch` did exactly that
+  //: and made the whole-day report look like it silently closed.
+  const [reported, setReported] = useState<Record<string, 'not_coming'>>(
+    params.has('reported') ? { 's2:dana': 'not_coming' } : {},
+  )
   //: `?state=` walks the three the prototype cannot show: an empty day, a still-loading
   //: read, and a failed one.
   const state = params.get('state')
@@ -39,22 +46,33 @@ function Preview() {
   return (
     <ParentShell activeTab="home" updatesBadgeCount={2}>
       <HomeScreen
-        key={epoch}
         locale="he"
         clubName="מועדון ג׳ודו גלדיאטור"
         familyName="כהן"
         childList={state === 'loading' ? null : CHILDREN}
         lessons={state === 'loading' ? null : state === 'empty' ? [] : LESSONS}
         lessonsFailed={state === 'failed'}
-        intents={params.has('reported') ? { 's2:dana': 'not_coming' } : {}}
+        intents={reported}
         urgent={clean ? { debtAgorot: null, childrenNeedingDeclaration: [] } : { debtAgorot: 32000, childrenNeedingDeclaration: ['נועה'] }}
         debtLabel={clean ? null : '₪320'}
         unreadCount={2}
         todayKey="2026-08-23"
-        writer={{ reportAbsence: async () => { await new Promise((r) => setTimeout(r, 400)) } }}
+        writer={{
+          reportAbsence: async (sessionId, studentId) => {
+            await new Promise((r) => setTimeout(r, 250))
+            //: `?fail` makes the LAST child's write refuse, so the partial-failure state the
+            //: prototype cannot have is reachable in a screenshot.
+            if (params.has('fail') && studentId === 'yossi') {
+              throw Object.assign(new Error('too_late'), { code: 'too_late' })
+            }
+            setReported((current) => ({ ...current, [`${sessionId}:${studentId}`]: 'not_coming' }))
+          },
+        }}
         cancelReasonLabel={() => 'האימון בוטל על ידי המועדון'}
-        onAbsenceReported={() => setEpoch((n) => n + 1)}
-        onRetry={() => setEpoch((n) => n + 1)}
+        //: `Resolve` re-reads the intents here. The harness has already updated its own
+        //: `reported` map inside the writer, so there is nothing further to do.
+        onAbsenceReported={() => {}}
+        onRetry={() => {}}
       />
     </ParentShell>
   )
