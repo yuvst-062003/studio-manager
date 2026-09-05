@@ -923,7 +923,9 @@ function AuthedApp() {
                   globalThis.location.hash = '#/install'
                 }}
               />
-              <Resolve session={session} locale={locale} />
+              {/* The unread count the tab badge already has — passed down so בית's bell
+                  shows the same number rather than fetching it a second time. */}
+              <Resolve session={session} locale={locale} notificationCount={pendingCount} />
             </>
           )}
           </PaymentSetupGate>
