@@ -1903,6 +1903,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/onboarding-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Onboarding Status
+         * @description The signed-in caller's own onboarding status in their ACTIVE studio.
+         *
+         *     No `TenantSessionDep`, deliberately -- that dependency 401s before this function's
+         *     body ever runs when there is no active studio, and F9's exact caller (signed in,
+         *     seconds after OAuth, not yet a member of any studio -- the moment before a fresh
+         *     `/join/<token>` visitor submits step 2) is precisely that. Rather than surface that
+         *     as an error, this resolves the studio itself and, when there is none, answers with
+         *     `OnboardingStatusService.empty()` -- an honest "nothing done yet," not a failure.
+         */
+        get: operations["onboarding_status_api_v1_me_onboarding_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/orders/items": {
         parameters: {
             query?: never;
@@ -2149,6 +2176,66 @@ export interface paths {
          *     not a role'.
          */
         post: operations["add_a_child_api_v1_me_students_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/students/duplicate-check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Duplicate Check
+         * @description §3 Door D -- 'The duplicate check must run in the students panel, not at the final
+         *     write... So the name-and-birthdate check fires as soon as the panel is saved.'
+         *     CLAUDE.md's own rule: refuse rather than accept, when accepting creates a dead end. A
+         *     refusal that arrived only from `add_child` at the very end of the wizard would land
+         *     after the parent had already filled a health declaration and picked a payment method.
+         *
+         *     **Answers `duplicate: bool` and nothing else** (§3: 'never leaking other families'
+         *     data'). `duplicate_student` matches at the STUDIO level, same as `add_child`'s own
+         *     check, but this read narrows the answer to whether the match is a child THIS caller
+         *     already guards -- a coincidence with a stranger's same-named kid must read exactly
+         *     like no match at all, never confirm that a child of that name trains here (§11.1).
+         */
+        get: operations["duplicate_check_api_v1_me_students_duplicate_check_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/students/register": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Register Additional Child
+         * @description §3 Doors C and D -- the wizard's one write, reached by a parent who ALREADY belongs
+         *     to this studio. `TenantSessionDep` is what makes that safe to assume: it fails closed
+         *     (401) the moment there is no active studio, the same guarantee the token-based
+         *     `register()` above re-derives by hand for a caller who has none yet.
+         *
+         *     Reuses `OnboardingService.register` end to end -- the same pricing, enrollment,
+         *     health-declaration and club-terms-acceptance code the join link runs -- so a
+         *     manager-created stub (Door C: "the student, name only") is completed rather than
+         *     duplicated by the very same duplicate-adopt path `register` already has, and decision
+         *     6/F19 (health and payment scoped to only the student THIS call creates) falls out of
+         *     `student_ids` being exactly what this submission created, same as every other door.
+         */
+        post: operations["register_additional_child_api_v1_me_students_register_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3202,6 +3289,35 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/public/onboarding/{token}/price-plans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Onboarding Price Plans
+         * @description Decision 14's plan picker, its data source. `GET /price-plans` is
+         *     `ManagerOrOwner`-only and its response shape leaks cost fields a parent should never
+         *     see -- this reuses `CatalogueService`'s own query (the one place plan selection is
+         *     read from) rather than a second implementation, and narrows only the auth (the join
+         *     token, not a manager session) and the response shape.
+         *
+         *     The picker filters client-side to plans that cover the groups chosen for one
+         *     student; `OnboardingService.register` is the actual authority and refuses (422) a
+         *     submitted plan that does not, so a stale list here costs a round trip, not a
+         *     mis-priced family.
+         */
+        get: operations["onboarding_price_plans_api_v1_public_onboarding__token__price_plans_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/public/studios/{slug}": {
         parameters: {
             query?: never;
@@ -3233,6 +3349,36 @@ export interface paths {
         };
         /** Public Groups */
         get: operations["public_groups_api_v1_public_studios__slug__groups_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/studios/{slug}/health-template": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Public Health Template
+         * @description §2 decision 7 -- 'one health form for everybody... asked through the popup, here as
+         *     everywhere.' Door A (`/t/<slug>`) is anonymous and, even signed in, has no membership
+         *     yet -- `GET /health-templates` (`TemplateReader`: manager, owner or guardian) can never
+         *     answer for that caller. The questions, never the answers: `HealthFormTemplateOut`'s own
+         *     docstring already states 'nothing in this shape is personal data', the same posture
+         *     `PublicGroupOut` takes for the schedule.
+         *
+         *     Highest PUBLISHED version of the `full` kind, same ordering rule
+         *     `list_health_templates` uses (published first, then version desc) -- a draft in
+         *     progress in the manager's D11 editor must never reach a stranger filling in a trial
+         *     form.
+         */
+        get: operations["public_health_template_api_v1_public_studios__slug__health_template_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3298,6 +3444,32 @@ export interface paths {
          *     and the reason there is no generic `GET /files/{key}`.
          */
         get: operations["public_photo_api_v1_public_studios__slug__photos__photo_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/studios/{slug}/price-plans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Public Price Plans
+         * @description §6's parent-readable plan list, resolved from the studio's own slug rather than a
+         *     join token -- Door A's trial-to-member fork and Door D both reach this door with no
+         *     token to resolve a studio from. Same narrowing and the same non-authority as
+         *     `app/routers/onboarding.py::onboarding_price_plans`: the picker filters client-side to
+         *     covering plans, and the actual write (`OnboardingService.register` /
+         *     `OnboardingService.add_child`) is what refuses (422) a plan that does not cover the
+         *     groups chosen.
+         */
+        get: operations["public_price_plans_api_v1_public_studios__slug__price_plans_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3713,10 +3885,21 @@ export interface paths {
         put?: never;
         /**
          * Send Monthly Report
-         * @description Queue a monthly billing report for email delivery.
+         * @description Queue a monthly billing report for delivery through §5.11's fan-out.
          *
-         *     Enqueues a notification through the COMMS lane's notification system.
-         *     The report PDF is generated and attached by the notification worker.
+         *     **§2.7 of the 2026-09-02 findings register.** Two things were wrong, not the one this
+         *     endpoint's own comment named: `NotificationService.enqueue` has never raised
+         *     `NotImplementedError` (COMMS shipped in W5), so the `except` below was dead and
+         *     `status: "failed"` could never actually be returned. The real hole was that this
+         *     function never called `session.commit()` -- `TenantSessionDep` closes its session on
+         *     the way out of the request, which discards an uncommitted flush, so the response
+         *     claimed `status: "queued"` for a notification that was rolled back the moment the
+         *     request ended and never reached anyone.
+         *
+         *     There is no inbox action for `report.monthly` yet (`app/services/comms/actions.py`)
+         *     and nothing attaches the report itself to the message -- the payload carries only
+         *     `year`/`month`. Tapping the notification today opens nothing. Named here rather than
+         *     fixed: building that is a new capability, not the dead-code question this walk was for.
          */
         post: operations["send_monthly_report_api_v1_reports__studio_id__send_monthly_post"];
         delete?: never;
@@ -6840,6 +7023,11 @@ export interface components {
             /** Sent Count */
             sent_count: number;
         };
+        /** DuplicateCheckOut */
+        DuplicateCheckOut: {
+            /** Duplicate */
+            duplicate: boolean;
+        };
         /** EnrollmentCreate */
         EnrollmentCreate: {
             /** Attends Weekdays */
@@ -7526,14 +7714,14 @@ export interface components {
             /** Email */
             email?: string | null;
             /** First Name */
-            first_name: string;
+            first_name?: string | null;
             /**
              * Is Primary
              * @default false
              */
             is_primary: boolean;
             /** Last Name */
-            last_name: string;
+            last_name?: string | null;
             /** Phone */
             phone?: string | null;
             /**
@@ -8667,10 +8855,16 @@ export interface components {
             grade?: string | null;
             /** Group Ids */
             group_ids: string[];
+            health?: components["schemas"]["OnboardingHealthDeclarationIn"] | null;
             /** Last Name */
             last_name: string;
             /** National Id */
             national_id?: string | null;
+            other_parent?: components["schemas"]["OnboardingOtherParentIn"] | null;
+            /** Pickup Contacts */
+            pickup_contacts?: components["schemas"]["OnboardingPickupIn"][];
+            /** Price Plan Id */
+            price_plan_id?: string | null;
             /**
              * Self Student
              * @default false
@@ -8691,12 +8885,42 @@ export interface components {
             /** Weekdays */
             weekdays: number[];
         };
+        /**
+         * OnboardingHealthDeclarationIn
+         * @description B2, decision 2: the single write carries 'every health declaration' -- one of
+         *     these per child who needs one, in the same request that creates them. Same shape
+         *     `HealthDeclarationIn` already uses for the standalone
+         *     `POST /students/{id}/health-declaration`; not reused directly because that schema is
+         *     keyed to an existing student and this one arrives before the student does.
+         */
+        OnboardingHealthDeclarationIn: {
+            /** Answers */
+            answers?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Signature Image Base64
+             * @default
+             */
+            signature_image_base64: string;
+            /**
+             * Template Id
+             * Format: uuid
+             */
+            template_id: string;
+        };
         /** OnboardingInfoOut */
         OnboardingInfoOut: {
+            /** Club Terms Version */
+            club_terms_version: number;
             /** Email */
             email: string | null;
             /** Groups */
             groups: components["schemas"]["OnboardingGroupOut"][];
+            /** Logo Url */
+            logo_url: string | null;
+            /** Slug */
+            slug: string;
             /** Studio Name */
             studio_name: string;
         };
@@ -8751,6 +8975,11 @@ export interface components {
         OnboardingRegisterIn: {
             /** Children */
             children: components["schemas"]["OnboardingChildIn"][];
+            /**
+             * Club Terms Accepted
+             * @default false
+             */
+            club_terms_accepted: boolean;
             /** First Name */
             first_name: string;
             /** Last Name */
@@ -8768,6 +8997,8 @@ export interface components {
             already_registered: boolean;
             /** Charges Created */
             charges_created: number;
+            /** Child Student Ids */
+            child_student_ids: string[];
             /**
              * Person Id
              * Format: uuid
@@ -8775,6 +9006,27 @@ export interface components {
             person_id: string;
             /** Student Ids */
             student_ids: string[];
+        };
+        /**
+         * OnboardingSelfRegisterIn
+         * @description §3 Doors C and D's final write. Door B/C's shape (`OnboardingRegisterIn`) resolves
+         *     its studio from a TOKEN because the caller belongs to nowhere yet; this caller already
+         *     belongs HERE (`TenantSessionDep` below fails closed otherwise), so there is no token to
+         *     carry and no parent identity to introduce -- both are read off the session.
+         *
+         *     `children` reuses `OnboardingChildIn` exactly -- decision 6/F19's member fork of a
+         *     Door D row (ת.ז., plan, health) is that shape end to end, and Door C's manager stub
+         *     is completed through the exact same `add_child` duplicate-adopt path Door B already
+         *     exercises, not a second mechanism.
+         */
+        OnboardingSelfRegisterIn: {
+            /** Children */
+            children: components["schemas"]["OnboardingChildIn"][];
+            /**
+             * Club Terms Accepted
+             * @default false
+             */
+            club_terms_accepted: boolean;
         };
         /** OnboardingSignerIn */
         OnboardingSignerIn: {
@@ -8794,6 +9046,39 @@ export interface components {
              * @enum {string}
              */
             relation: "mother" | "father" | "other";
+        };
+        /**
+         * OnboardingStatusOut
+         * @description §3's one read that replaces four screens each guessing from a different pile of
+         *     facts (`student.status`, `health_status`, `agreement_complete`, `price_plan_id` being
+         *     null, consent records, `trial_booking.attended`, `session.access.parent`) -- their
+         *     disagreement is the cause of the dead end where a parent signs the same health form
+         *     forever.
+         *
+         *     **These flags describe the family's EXISTING state, and nothing else.** They have no
+         *     idea a wizard run in progress is about to create a NEW student -- decision 6 scopes
+         *     `health` and `payment` to "the students THIS run is creating," and that scoping is
+         *     the job of whichever screen calls this route (wave D/E), layered on top rather than
+         *     answered here. A parent with existing children who all hold current declarations
+         *     reads `health: complete` here even while a brand-new child mid-wizard still needs
+         *     one -- do not skip a step on the strength of this flag alone once a new student is in
+         *     play.
+         */
+        OnboardingStatusOut: {
+            /** Next */
+            next: ("agreements" | "students" | "health" | "payment") | null;
+            /** Steps */
+            steps: components["schemas"]["OnboardingStepOut"][];
+        };
+        /** OnboardingStepOut */
+        OnboardingStepOut: {
+            /** Complete */
+            complete: boolean;
+            /**
+             * Key
+             * @enum {string}
+             */
+            key: "agreements" | "students" | "health" | "payment";
         };
         /** OpsHealthResponse */
         OpsHealthResponse: {
@@ -9866,6 +10151,11 @@ export interface components {
         /**
          * ReportDeliveryResponse
          * @description Response confirming report delivery request.
+         *
+         *     `notification_id` is nullable and `status` stays a plain string rather than a Literal
+         *     with one member -- both are the honest shape for a seam that, as of §2.7's fix, only
+         *     ever succeeds or raises. A future real failure mode (the recipient's push preferences,
+         *     a transport error) has somewhere to report itself without a schema change.
          */
         ReportDeliveryResponse: {
             /** Notification Id */
@@ -10978,6 +11268,16 @@ export interface components {
          *     Manager-scoped, so `StudentOut` (with `price_plan_id`) is safe here.
          */
         StudentCreateResult: {
+            /**
+             * Invitation Email Configured
+             * @default false
+             */
+            invitation_email_configured: boolean;
+            /**
+             * Invitation Email Sent
+             * @default false
+             */
+            invitation_email_sent: boolean;
             /** Invitation Token */
             invitation_token?: string | null;
             /** Invitation Url */
@@ -11599,6 +11899,11 @@ export interface components {
          *     a table (§11.1).
          */
         TrialBookingSelfIn: {
+            /**
+             * Agreements Accepted
+             * @default false
+             */
+            agreements_accepted: boolean;
             /** Children */
             children: components["schemas"]["TrialChildIn"][];
             /** Group Id */
@@ -11893,6 +12198,58 @@ export interface components {
         VapidPublicKeyOut: {
             /** Public Key */
             public_key: string | null;
+        };
+        /** OnboardingPricePlanListOut */
+        app__routers__onboarding__OnboardingPricePlanListOut: {
+            /** Items */
+            items: components["schemas"]["app__routers__onboarding__OnboardingPricePlanOut"][];
+        };
+        /**
+         * OnboardingPricePlanOut
+         * @description §6's narrower read: name, price, sessions-per-week -- nothing else. `PricePlanOut`
+         *     (`app/routers/billing.py`) also carries the registration fee and the standing-order
+         *     link URL, both fine for a manager and neither for a stranger with a join link.
+         */
+        app__routers__onboarding__OnboardingPricePlanOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Monthly Amount Agorot */
+            monthly_amount_agorot: number;
+            /** Name */
+            name: string;
+            /** Sessions Per Week */
+            sessions_per_week: number | null;
+        };
+        /** OnboardingPricePlanListOut */
+        app__routers__public__OnboardingPricePlanListOut: {
+            /** Items */
+            items: components["schemas"]["app__routers__public__OnboardingPricePlanOut"][];
+        };
+        /**
+         * OnboardingPricePlanOut
+         * @description §6's narrower read for a stranger with no manager session: name, price,
+         *     sessions-per-week and nothing else -- `PricePlanOut` (`app/routers/billing.py`) also
+         *     carries the registration fee and the standing-order link, both fine for a manager and
+         *     neither for a stranger on the open internet. Mirrors
+         *     `app/routers/onboarding.py::OnboardingPricePlanOut` exactly (same shape, same reason);
+         *     this door has no join token to resolve a studio from, so it needs its own route
+         *     rather than reusing that one's path.
+         */
+        app__routers__public__OnboardingPricePlanOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Monthly Amount Agorot */
+            monthly_amount_agorot: number;
+            /** Name */
+            name: string;
+            /** Sessions Per Week */
+            sessions_per_week: number | null;
         };
         /** EnrollmentMoveIn */
         app__routers__students__EnrollmentMoveIn: {
@@ -15153,6 +15510,26 @@ export interface operations {
             };
         };
     };
+    onboarding_status_api_v1_me_onboarding_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OnboardingStatusOut"];
+                };
+            };
+        };
+    };
     order_items_api_v1_me_orders_items_post: {
         parameters: {
             query?: never;
@@ -15450,6 +15827,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StudentSummaryOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    duplicate_check_api_v1_me_students_duplicate_check_get: {
+        parameters: {
+            query: {
+                first_name: string;
+                last_name: string;
+                birthdate?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DuplicateCheckOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    register_additional_child_api_v1_me_students_register_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OnboardingSelfRegisterIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OnboardingRegisterOut"];
                 };
             };
             /** @description Validation Error */
@@ -16964,6 +17407,37 @@ export interface operations {
             };
         };
     };
+    onboarding_price_plans_api_v1_public_onboarding__token__price_plans_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["app__routers__onboarding__OnboardingPricePlanListOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     public_studio_api_v1_public_studios__slug__get: {
         parameters: {
             query?: never;
@@ -17013,6 +17487,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PublicGroupListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    public_health_template_api_v1_public_studios__slug__health_template_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HealthFormTemplateOut"];
                 };
             };
             /** @description Validation Error */
@@ -17107,6 +17612,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    public_price_plans_api_v1_public_studios__slug__price_plans_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["app__routers__public__OnboardingPricePlanListOut"];
                 };
             };
             /** @description Validation Error */

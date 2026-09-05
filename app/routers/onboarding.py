@@ -202,6 +202,10 @@ class OnboardingRegisterOut(BaseModel):
     #: What THIS submission created. A child already on the account is skipped rather than
     #: duplicated, so a resubmission can return fewer ids than it was given children.
     student_ids: list[uuid.UUID]
+    #: One id per child in the submitted order, created here or already on the roster.
+    #: `student_ids` says what was created; this says what each submitted child IS, which
+    #: is what a caller needs to attach a payment choice to a child it did not create.
+    child_student_ids: list[uuid.UUID]
     charges_created: int
     #: The parent already had a Person in this studio and was adopted rather than created --
     #: a trial family, almost always. It no longer means "and so nothing was done": the
@@ -443,7 +447,7 @@ def register(
             scoped, studio_id=link.studio_id, identity_id=identity_id
         )
         try:
-            parent, student_ids, charged = OnboardingService.register(
+            result = OnboardingService.register(
                 scoped,
                 studio_id=link.studio_id,
                 identity_id=identity_id,
@@ -582,9 +586,10 @@ def register(
             ) from exc
         scoped.commit()
         return OnboardingRegisterOut(
-            person_id=parent.id,
-            student_ids=student_ids,
-            charges_created=charged,
+            person_id=result.parent.id,
+            student_ids=result.student_ids,
+            child_student_ids=result.child_student_ids,
+            charges_created=result.charges_created,
             already_registered=existing is not None,
         )
 
@@ -678,7 +683,7 @@ def register_additional_child(
     studio_id = require_current_studio_id()
 
     try:
-        parent, student_ids, charged = OnboardingService.register(
+        result = OnboardingService.register(
             session,
             studio_id=studio_id,
             identity_id=identity_id,
@@ -789,9 +794,10 @@ def register_additional_child(
         ) from exc
     session.commit()
     return OnboardingRegisterOut(
-        person_id=parent.id,
-        student_ids=student_ids,
-        charges_created=charged,
+        person_id=result.parent.id,
+        student_ids=result.student_ids,
+        child_student_ids=result.child_student_ids,
+        charges_created=result.charges_created,
         already_registered=True,
     )
 

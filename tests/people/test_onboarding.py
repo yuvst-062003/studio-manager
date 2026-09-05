@@ -130,7 +130,7 @@ def test_one_submission_creates_the_whole_family_priced_and_charged(
     app_session.add(identity_row)
     app_session.commit()
     identity = identity_row.id
-    parent, student_ids, charged = OnboardingService.register(
+    parent, student_ids, charged, _ = OnboardingService.register(
         tenant_session,
         studio_id=studio.id,
         identity_id=identity,
@@ -184,7 +184,7 @@ def test_no_matching_plan_means_no_charge_and_no_guess(
 ):
     """Spec: 'an invented price is worse than a visible gap.' The student lands unpriced
     on the manager's checklist."""
-    _, student_ids, charged = OnboardingService.register(
+    _, student_ids, charged, _ = OnboardingService.register(
         tenant_session,
         studio_id=studio.id,
         identity_id=None,
@@ -210,7 +210,7 @@ def test_no_matching_plan_means_no_charge_and_no_guess(
 
 def test_an_adult_member_is_one_person_in_both_roles(tenant_session, studio, a_group, twice_weekly):
     """§5.3's 'אני התלמיד' -- the parent Person doubles as the student's person."""
-    parent, student_ids, _ = OnboardingService.register(
+    parent, student_ids, _, _ = OnboardingService.register(
         tenant_session,
         studio_id=studio.id,
         identity_id=None,
@@ -351,7 +351,7 @@ def test_a_trial_parent_using_the_join_link_gets_their_children_created(
     tenant_session.add(existing)
     tenant_session.flush()
 
-    parent, student_ids, charged = OnboardingService.register(
+    parent, student_ids, charged, _ = OnboardingService.register(
         tenant_session,
         studio_id=studio.id,
         identity_id=identity_row.id,
@@ -491,15 +491,85 @@ def test_resubmitting_the_link_adds_the_missing_child_and_skips_the_existing_one
         "group_ids": [a_group],
         "self": False,
     }
-    parent, first_ids, _ = OnboardingService.register(tenant_session, children=[noa], **common)
+    parent, first_ids, _, _ = OnboardingService.register(tenant_session, children=[noa], **common)
     tenant_session.flush()
 
-    again_parent, second_ids, _ = OnboardingService.register(
+    again_parent, second_ids, _, _ = OnboardingService.register(
         tenant_session, children=[noa, itay], **common
     )
     assert again_parent.id == parent.id
     assert len(second_ids) == 1, "the child already on the account was created a second time"
     assert second_ids[0] not in first_ids
+
+
+def test_child_student_ids_names_every_submitted_child_including_duplicates(
+    tenant_session, app_session, studio, a_group, twice_weekly, a_live_plan
+):
+    """`student_ids` alone cannot answer "which student did submitted child #2 become"
+    once any child in the batch is a duplicate -- it only carries what THIS submission
+    created. `child_student_ids` carries one id per submitted child, in submission order,
+    whether created here or already on the roster, which is what a caller needs to attach
+    a payment choice to a child it did not create.
+    """
+    from app.models.identity import AuthIdentity
+
+    identity_row = AuthIdentity(
+        provider="google",
+        provider_subject=f"child-ids-{uuid.uuid4().hex[:8]}",
+        email="child-ids@example.invalid",
+        email_verified=True,
+        is_private_relay=False,
+        is_developer=False,
+    )
+    app_session.add(identity_row)
+    app_session.commit()
+
+    common = dict(
+        studio_id=studio.id,
+        identity_id=identity_row.id,
+        first_name="שירה",
+        last_name="לוי",
+        phone=None,
+        email="child-ids@example.invalid",
+        at=T0,
+        schedule=twice_weekly,
+    )
+    noa = {
+        "first_name": "נועה",
+        "last_name": "לוי",
+        "birthdate": date(2016, 4, 1),
+        "group_ids": [a_group],
+        "self": False,
+    }
+    itay = {
+        "first_name": "איתי",
+        "last_name": "לוי",
+        "birthdate": date(2019, 2, 2),
+        "group_ids": [a_group],
+        "self": False,
+    }
+    dor = {
+        "first_name": "דור",
+        "last_name": "לוי",
+        "birthdate": date(2020, 6, 6),
+        "group_ids": [a_group],
+        "self": False,
+    }
+    _, first_ids, _, first_child_ids = OnboardingService.register(
+        tenant_session, children=[noa, itay], **common
+    )
+    tenant_session.flush()
+
+    _, second_ids, _, second_child_ids = OnboardingService.register(
+        tenant_session, children=[noa, itay, dor], **common
+    )
+
+    assert len(second_ids) == 1, "only the third child (Dor) is new"
+    assert len(second_child_ids) == 3
+    assert second_child_ids[:2] == first_child_ids, (
+        "the two duplicate children must still be named, and in submission order"
+    )
+    assert second_child_ids[2] == second_ids[0], "the new child's id is the same in both lists"
 
 
 def test_a_resubmitted_same_name_child_never_overwrites_a_different_familys_student(
@@ -532,7 +602,7 @@ def test_a_resubmitted_same_name_child_never_overwrites_a_different_familys_stud
         "grade": "ג",
         "national_id": "100000009",
     }
-    parent_b, ids_b, _ = OnboardingService.register(
+    parent_b, ids_b, _, _ = OnboardingService.register(
         tenant_session,
         studio_id=studio.id,
         identity_id=identity_b.id,
@@ -574,7 +644,7 @@ def test_a_resubmitted_same_name_child_never_overwrites_a_different_familys_stud
         "grade": "א",
         "national_id": "100000017",
     }
-    parent_a, ids_a, _ = OnboardingService.register(
+    parent_a, ids_a, _, _ = OnboardingService.register(
         tenant_session,
         studio_id=studio.id,
         identity_id=identity_a.id,
@@ -657,11 +727,11 @@ def test_a_same_family_resubmission_still_writes_its_own_childs_details(
         "grade": "ג",
         "national_id": "100000009",
     }
-    parent, first_ids, _ = OnboardingService.register(tenant_session, children=[dana], **common)
+    parent, first_ids, _, _ = OnboardingService.register(tenant_session, children=[dana], **common)
     tenant_session.commit()
 
     again_dana = {**dana, "grade": "ד"}
-    again_parent, second_ids, _ = OnboardingService.register(
+    again_parent, second_ids, _, _ = OnboardingService.register(
         tenant_session, children=[again_dana], **common
     )
     tenant_session.commit()
@@ -1228,7 +1298,7 @@ def test_a_resubmission_applies_a_changed_group_rather_than_dropping_it(
         "group_ids": [a_group],
         "self": False,
     }
-    _, first_ids, _ = OnboardingService.register(tenant_session, children=[child], **common)
+    _, first_ids, _, _ = OnboardingService.register(tenant_session, children=[child], **common)
     tenant_session.commit()
     student_id = first_ids[0]
 
@@ -1244,7 +1314,7 @@ def test_a_resubmission_applies_a_changed_group_rather_than_dropping_it(
     # The same child, name and birthdate unchanged (so it matches as a duplicate), but
     # this time enrolled in BOTH groups -- the parent went back and added a group.
     edited_child = {**child, "group_ids": [a_group, a_second_group]}
-    again_parent, second_ids, _ = OnboardingService.register(
+    again_parent, second_ids, _, _ = OnboardingService.register(
         tenant_session, children=[edited_child], **common
     )
     tenant_session.commit()
@@ -1309,7 +1379,7 @@ def test_two_minors_in_one_submission_carry_different_second_parent_and_pickup_d
         },
         "pickup_contacts": [{"name": "דוד אבי", "phone": "0507778888"}],
     }
-    parent, student_ids, _ = OnboardingService.register(
+    parent, student_ids, _, _ = OnboardingService.register(
         tenant_session,
         studio_id=studio.id,
         identity_id=None,
@@ -1388,7 +1458,7 @@ def test_a_students_own_chosen_plan_is_applied_even_when_a_cheaper_one_also_cove
     app_session.add_all([cheap, premium])
     app_session.commit()
 
-    _, student_ids, charged = OnboardingService.register(
+    _, student_ids, charged, _ = OnboardingService.register(
         tenant_session,
         studio_id=studio.id,
         identity_id=None,

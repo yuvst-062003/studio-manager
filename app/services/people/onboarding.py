@@ -25,7 +25,7 @@ import hashlib
 import secrets
 import uuid
 from datetime import datetime
-from typing import Any
+from typing import Any, NamedTuple
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
@@ -46,6 +46,22 @@ from app.services.people.matching import duplicate_student
 
 def _hash(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
+
+
+class RegistrationResult(NamedTuple):
+    """What one `register` call did.
+
+    `student_ids` is what this submission CREATED and is unchanged. `child_student_ids`
+    is one id per submitted child, in the order they were given, whether the child was
+    created here or already on the roster -- what lets a caller say "this child of mine
+    is that student" for every child, which `student_ids` alone cannot do for a family
+    that already has some of its children on file.
+    """
+
+    parent: Person
+    student_ids: list[uuid.UUID]
+    charges_created: int
+    child_student_ids: list[uuid.UUID]
 
 
 class OnboardingService:
@@ -451,10 +467,11 @@ class OnboardingService:
         club_terms_accepted: bool = False,
         signed_ip: str | None = None,
         signed_user_agent: str | None = None,
-    ) -> tuple[Person, list[uuid.UUID], int]:
+    ) -> RegistrationResult:
         """One transaction: the parent, the children, the enrollments, the price, the
-        first charge, every health declaration and the club-terms acceptance. Returns
-        (parent person, student ids, charges created).
+        first charge, every health declaration and the club-terms acceptance. Returns a
+        `RegistrationResult` (parent person, student ids, charges created, child student
+        ids).
 
         `children` rows: {first_name, last_name, birthdate?, group_ids: [uuid], self: bool,
         health?: {template_id, answers, signature_image_base64}, other_parent?, pickup_contacts?,
@@ -473,6 +490,9 @@ class OnboardingService:
         than it was given children -- or none at all. Its GROUPS are still applied though
         (`_sync_enrollments`, §8 open item 3): a parent who went back and added a group must
         not have that edit silently dropped just because the child already existed.
+        `child_student_ids` carries one id per submitted child regardless -- created here or
+        already on the roster -- so a caller can still say which submitted child is which
+        student even when `student_ids` alone cannot.
         """
         if not children:
             raise RefusedError("a registration needs at least one child")
@@ -622,7 +642,12 @@ class OnboardingService:
             diff={"children": len(student_ids), "charged": tally.charged},
         )
         session.flush()
-        return parent, student_ids, tally.charged
+        return RegistrationResult(
+            parent=parent,
+            student_ids=student_ids,
+            charges_created=tally.charged,
+            child_student_ids=[student_id for _child, student_id in applied_pairs],
+        )
 
     @staticmethod
     def _apply_family_details(
