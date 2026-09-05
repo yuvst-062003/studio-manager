@@ -13,7 +13,7 @@ from datetime import UTC, date, datetime, timedelta
 
 import pytest
 from app.models.billing import Charge, PricePlan
-from app.models.people import Enrollment, Student
+from app.models.people import Enrollment, Student, TrialBooking
 from app.models.person import Guardian, Person
 from app.services.people.errors import DuplicateStudentError, NotFoundError, RefusedError
 from app.services.people.onboarding import OnboardingService
@@ -1623,6 +1623,228 @@ def test_a_converting_trial_childs_health_status_is_not_promoted(
     )
 
 
+def _trial_student_with_booking(
+    tenant_session, app_session, studio, a_group, *, email: str
+) -> tuple[Student, TrialBooking]:
+    """A `trial` student plus the open (`outcome='pending'`) booking the trial itself
+    would have left -- shared setup for the follow-up-worker tests below, which all
+    need the SAME two rows and differ only in what happens to them afterward."""
+    from app.models.identity import AuthIdentity
+
+    identity_row = AuthIdentity(
+        provider="google",
+        provider_subject=f"trial-followup-{uuid.uuid4().hex[:8]}",
+        email=email,
+        email_verified=True,
+        is_private_relay=False,
+        is_developer=False,
+    )
+    app_session.add(identity_row)
+    app_session.commit()
+
+    parent = Person(
+        studio_id=studio.id, auth_identity_id=identity_row.id, first_name="שירה", last_name="לוי"
+    )
+    tenant_session.add(parent)
+    tenant_session.flush()
+
+    trial_child = Person(studio_id=studio.id, first_name="נועה", last_name="כהן")
+    tenant_session.add(trial_child)
+    tenant_session.flush()
+    trial_student = Student(
+        studio_id=studio.id,
+        person_id=trial_child.id,
+        status="trial",
+        source="public_link",
+        health_status="trial_signed",
+    )
+    tenant_session.add(trial_student)
+    tenant_session.flush()
+    tenant_session.add(
+        Guardian(
+            studio_id=studio.id,
+            student_id=trial_student.id,
+            person_id=parent.id,
+            is_primary=True,
+            relation="parent",
+        )
+    )
+    booking = TrialBooking(
+        studio_id=studio.id,
+        student_id=trial_student.id,
+        group_id=a_group,
+        session_id=None,
+        booked_at=T0,
+        attended=True,
+        outcome="pending",
+        is_override=False,
+    )
+    tenant_session.add(booking)
+    tenant_session.commit()
+    return identity_row, trial_student, booking
+
+
+def _convert(tenant_session, studio, a_group, twice_weekly, identity_row, email):
+    """`register()`'s own conversion call, on the exact child `_trial_student_with_booking`
+    just created -- name matched, no student id passed, exactly the shape the real join
+    wizard submits."""
+    OnboardingService.register(
+        tenant_session,
+        studio_id=studio.id,
+        identity_id=identity_row.id,
+        first_name="שירה",
+        last_name="לוי",
+        phone=None,
+        email=email,
+        children=[
+            {
+                "first_name": "נועה",
+                "last_name": "כהן",
+                "birthdate": None,
+                "group_ids": [a_group],
+                "self": False,
+            }
+        ],
+        at=T0,
+        schedule=twice_weekly,
+    )
+    tenant_session.commit()
+
+
+def test_a_converting_trial_bookings_outcome_becomes_converted(
+    tenant_session, app_session, studio, a_group, twice_weekly, a_live_plan
+):
+    """`_sync_enrollments` reuses `StudentService.convert`'s own `_close_open_trials`
+    rather than a second copy of it -- `outcome='converted'` is the exact value
+    `convert` itself sets, matched rather than invented."""
+    email = "trial-outcome@example.invalid"
+    identity_row, trial_student, booking = _trial_student_with_booking(
+        tenant_session, app_session, studio, a_group, email=email
+    )
+    _convert(tenant_session, studio, a_group, twice_weekly, identity_row, email)
+
+    assert tenant_session.get(TrialBooking, booking.id).outcome == "converted"
+
+
+def test_a_converted_trial_gets_no_further_follow_up_from_the_ladder(
+    tenant_session, app_session, studio, a_group, twice_weekly, a_live_plan, monkeypatch
+):
+    """The symptom the coordinator named first: a family who has already joined kept
+    getting 'איך היה?' on days 1/3/7, because the ladder's own query
+    (`TrialBooking.outcome == 'pending'`) never learned the family had converted.
+    Asserted through the WORKER, not by reading the column -- the worker is the thing
+    that was misbehaving, and a column check alone would not prove it stopped."""
+    from app.workers import followups
+
+    email = "trial-ladder@example.invalid"
+    identity_row, trial_student, booking = _trial_student_with_booking(
+        tenant_session, app_session, studio, a_group, email=email
+    )
+    _convert(tenant_session, studio, a_group, twice_weekly, identity_row, email)
+
+    sent: list[str] = []
+    monkeypatch.setattr(
+        followups,
+        "_notify",
+        lambda person_id, kind, title, body, payload: sent.append(kind) or True,
+    )
+    # Day 1 is squarely inside the ladder's own window (`FOLLOW_UP_DAYS = (1, 3, 7)`) --
+    # the day this exact family used to be asked how their (completed) trial went.
+    followups.run_for_studio(tenant_session, at=T0 + timedelta(days=1), tally=followups.Tally())
+    assert sent == []
+
+
+def test_a_converted_trial_is_not_swept_into_lost(
+    tenant_session, app_session, studio, a_group, twice_weekly, a_live_plan, monkeypatch
+):
+    """The worse symptom: `_sweep_the_lost` writes off any booking still `pending`
+    after `LOST_AFTER_DAYS` -- so a family who registered, paid and is training would
+    have been recorded `lost`, with a reason, by a job nobody is watching. §5.4a's own
+    funnel report is computed from this column; this is the assertion that matters
+    most, and it means nothing without moving the clock past the cutoff."""
+    from app.workers import followups
+
+    email = "trial-lost@example.invalid"
+    identity_row, trial_student, booking = _trial_student_with_booking(
+        tenant_session, app_session, studio, a_group, email=email
+    )
+    _convert(tenant_session, studio, a_group, twice_weekly, identity_row, email)
+
+    sent: list[str] = []
+    monkeypatch.setattr(
+        followups,
+        "_notify",
+        lambda person_id, kind, title, body, payload: sent.append(kind) or True,
+    )
+    well_past_the_window = T0 + timedelta(days=followups.LOST_AFTER_DAYS + 5)
+    followups.run_for_studio(tenant_session, at=well_past_the_window, tally=followups.Tally())
+    tenant_session.commit()
+
+    assert tenant_session.get(Student, trial_student.id).status == "active", (
+        "a real conversion must never be swept into lost"
+    )
+    assert tenant_session.get(TrialBooking, booking.id).outcome == "converted"
+    assert sent == []
+
+
+def test_a_converting_lead_with_no_trial_booking_at_all_is_unaffected(
+    tenant_session, app_session, studio, a_group, twice_weekly, a_live_plan
+):
+    """§5.4a's own graph note: 'lead -> active is legal and deliberate -- the
+    manager-added student never books a trial.' `_close_open_trials`'s query matches
+    zero rows for a student who never had a booking, and must do nothing rather than
+    raise -- this is a stranger's own fresh conversion path, not the trial funnel's."""
+    parent = Person(studio_id=studio.id, first_name="שירה", last_name="לוי")
+    tenant_session.add(parent)
+    tenant_session.flush()
+    lead_child = Person(studio_id=studio.id, first_name="איתן", last_name="מזרחי")
+    tenant_session.add(lead_child)
+    tenant_session.flush()
+    lead_student = Student(
+        studio_id=studio.id,
+        person_id=lead_child.id,
+        status="lead",
+        source="manager",
+        health_status="missing",
+    )
+    tenant_session.add(lead_student)
+    tenant_session.flush()
+    tenant_session.add(
+        Guardian(
+            studio_id=studio.id,
+            student_id=lead_student.id,
+            person_id=parent.id,
+            is_primary=True,
+            relation="parent",
+        )
+    )
+    tenant_session.commit()
+
+    OnboardingService.register(
+        tenant_session,
+        studio_id=studio.id,
+        identity_id=None,
+        first_name="שירה",
+        last_name="לוי",
+        phone=None,
+        email=None,
+        children=[
+            {
+                "first_name": "איתן",
+                "last_name": "מזרחי",
+                "birthdate": None,
+                "group_ids": [a_group],
+                "self": False,
+            }
+        ],
+        at=T0,
+        schedule=twice_weekly,
+    )
+    tenant_session.commit()
+
+    assert tenant_session.get(Student, lead_student.id).status == "active"
+
+
 def test_a_frozen_student_is_not_reactivated_by_a_resubmitted_link(
     tenant_session, app_session, studio, a_group, twice_weekly, a_live_plan
 ):
@@ -1670,6 +1892,20 @@ def test_a_frozen_student_is_not_reactivated_by_a_resubmitted_link(
             relation="parent",
         )
     )
+    # A trial booking from before the freeze, still open -- must be left exactly as it
+    # is, the same reason the status itself must not move: `_close_open_trials` is
+    # scoped to a student actually promoted, and this one deliberately is not.
+    booking = TrialBooking(
+        studio_id=studio.id,
+        student_id=frozen_student.id,
+        group_id=a_group,
+        session_id=None,
+        booked_at=T0,
+        attended=True,
+        outcome="pending",
+        is_override=False,
+    )
+    tenant_session.add(booking)
     tenant_session.commit()
 
     OnboardingService.register(
@@ -1695,6 +1931,7 @@ def test_a_frozen_student_is_not_reactivated_by_a_resubmitted_link(
     tenant_session.commit()
 
     assert tenant_session.get(Student, frozen_student.id).status == "frozen"
+    assert tenant_session.get(TrialBooking, booking.id).outcome == "pending"
 
 
 def test_an_already_active_student_is_left_alone_by_the_promotion(
@@ -1740,11 +1977,28 @@ def test_an_already_active_student_is_left_alone_by_the_promotion(
     student_id = first_ids[0]
     assert tenant_session.get(Student, student_id).status == "active"
 
+    # An unrelated, still-open trial booking on this same student (a sibling's trial
+    # session logged against the wrong child, or simply a stale row) -- a plain
+    # resubmission of an already-active student must not touch it either.
+    booking = TrialBooking(
+        studio_id=studio.id,
+        student_id=student_id,
+        group_id=a_group,
+        session_id=None,
+        booked_at=T0,
+        attended=True,
+        outcome="pending",
+        is_override=False,
+    )
+    tenant_session.add(booking)
+    tenant_session.commit()
+
     # The same submission again, verbatim -- an ordinary resubmission, not a conversion.
     OnboardingService.register(tenant_session, children=[child], **common)
     tenant_session.commit()
 
     assert tenant_session.get(Student, student_id).status == "active"
+    assert tenant_session.get(TrialBooking, booking.id).outcome == "pending"
 
 
 def test_a_genuine_resubmission_still_charges_nothing_extra(

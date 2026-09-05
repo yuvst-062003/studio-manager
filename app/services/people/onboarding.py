@@ -434,6 +434,17 @@ class OnboardingService:
         the full form." Promoting it here would switch off the health gate for a
         student who has signed nothing.
 
+        **And closes the student's own open trial bookings, reusing `convert`'s own
+        `_close_open_trials` rather than a second copy of it.** Left `pending`, a
+        booking the family has actually converted from is exactly what makes
+        `app/workers/followups.py`'s `_walk_the_ladder` keep sending "איך היה?" on days
+        1/3/7 to a family that has already joined -- and, worse, what makes its
+        `_sweep_the_lost` write them off as `lost` on day 21, a real conversion counted
+        as a loss in the one column §5.4a's funnel report is computed from. Scoped to
+        exactly the student just promoted, for the same reason the promotion itself is:
+        an already-`active` student, or one deliberately left `frozen`/`left`/`lost`,
+        has their bookings left exactly as they were.
+
         **Calls `charge_first_month`, exactly as `add_child` does.** The comment this
         replaced said the rule was to raise no new charge, and that was right for a
         RESUBMISSION -- a plan that changed mid-onboarding is not corrected here, and
@@ -466,6 +477,17 @@ class OnboardingService:
                 actor_person_id=actor_person_id,
                 reason="converted through the onboarding link",
             )
+            # `StudentService.convert`'s own follow-on step, reused rather than
+            # reimplemented: a trial booking left `pending` after the family has
+            # actually joined is what makes `app/workers/followups.py` keep asking a
+            # member "how was it?" on days 1/3/7, and then write them off as `lost` on
+            # day 21 -- a real conversion counted as a loss, in the one column §5.4a's
+            # funnel report is computed from. Scoped to exactly the student just
+            # promoted, same as the transition above: an already-`active` student, or
+            # one deliberately left `frozen`/`left`/`lost`, has nothing here touched.
+            from app.services.people.students import StudentService
+
+            StudentService._close_open_trials(session, student_id=student.id, outcome="converted")
         existing_group_ids = set(
             session.execute(
                 select(Enrollment.group_id).where(
