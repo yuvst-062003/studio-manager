@@ -88,6 +88,57 @@ def training_start_times(
     )
 
 
+def training_durations_min(
+    group_id: uuid.UUID,
+    *,
+    since: date,
+    schedule: ScheduleReader,
+    weeks: int = OBSERVATION_WEEKS,
+) -> frozenset[int]:
+    """Distinct session lengths in whole minutes, from `ends_at - starts_at`.
+
+    A set for the same reason `training_start_times` is one: a group whose Sunday
+    lesson runs 60 minutes and whose Thursday one runs 90 has two lengths, and picking
+    one would print a wrong one. An empty set means the group has no materialized
+    sessions in the window -- the same "no schedule yet" answer `training_weekdays`
+    gives, not a lesson that is zero minutes long.
+    """
+    sessions = schedule.materialize_sessions(group_id, since, since + timedelta(weeks=weeks))
+    return frozenset(
+        int((session.ends_at - session.starts_at).total_seconds() // 60)
+        for session in sessions
+        if session.status in _TRAINING_STATUSES
+    )
+
+
+def training_locations(
+    group_id: uuid.UUID,
+    *,
+    since: date,
+    schedule: ScheduleReader,
+    weeks: int = OBSERVATION_WEEKS,
+) -> frozenset[uuid.UUID]:
+    """The locations this group actually trains at, observed from the same materialized
+    calendar -- **through the session seam, never from `group_schedule_rule`**. That
+    module's own header explains why at length: the rule table answers "what was
+    configured, as of when" and the session table answers "when and where does this
+    group actually train", and reading the rules here would make this a second
+    implementation of the effective-date logic.
+
+    A `Session.location_id` is nullable (a rule with none set materializes a session with
+    none either), and a null tells nothing about where the group trains, so it is
+    dropped rather than counted as a location. An empty set means either no sessions in
+    the window or none of them carry a location -- the caller cannot tell which, and
+    does not need to: both render as "no location to show".
+    """
+    sessions = schedule.materialize_sessions(group_id, since, since + timedelta(weeks=weeks))
+    return frozenset(
+        session.location_id
+        for session in sessions
+        if session.status in _TRAINING_STATUSES and session.location_id is not None
+    )
+
+
 def training_weekdays(
     group_id: uuid.UUID,
     *,

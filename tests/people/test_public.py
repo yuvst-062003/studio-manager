@@ -1,14 +1,16 @@
 """§7's `/public/*`. Unauthenticated, on the open internet, and shaped for that.
 
-The leak tests carry the weight. A landing page that returned a coach's name, an enrollment
-count or an internal id would be publishing the club's roster to anyone who guessed a slug
--- and the slug is printed on a flyer.
+The leak tests carry the weight. A landing page that returned an enrollment count or an
+internal id would be publishing the club's roster to anyone who guessed a slug -- and the
+slug is printed on a flyer. A coach's DISPLAY NAME left this list on 2026-09-05 (task 2):
+the owner decided a club may advertise who teaches, the same way it advertises the hour --
+what still may never follow it is a phone, an email or a person id.
 """
 
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from app.models.structure import Group
@@ -66,10 +68,14 @@ def test_a_suspended_studio_is_invisible(client, app_session, studio, with_slots
 def test_the_landing_payload_carries_no_staff_no_counts_and_no_internal_ids(
     client, studio, a_group, a_class, with_slots
 ):
+    """`coach` dropped out of this list on 2026-09-05: the owner decided coach display
+    names ARE public now (task 2's `PublicGroupOut.coaches`), so the field's own name
+    contains the substring and would fail this test on an empty list. `GroupStaff`'s
+    internal id, a phone or an email never do -- those are still refused."""
     body = client.get(f"/api/v1/public/studios/{studio.slug}/landing").json()
     serialized = str(body)
     assert str(a_class) not in serialized
-    for forbidden in ("coach", "staff", "enrollment", "student_count", "class_id"):
+    for forbidden in ("staff", "enrollment", "student_count", "class_id"):
         assert forbidden not in serialized
 
 
@@ -154,6 +160,166 @@ def test_a_group_carries_the_times_it_trains(client, studio, a_group, with_slots
     groups = client.get(f"/api/v1/public/studios/{studio.slug}/groups").json()["items"]
     group = next(g for g in groups if uuid.UUID(g["id"]) == a_group)
     assert group["training_times"] == ["17:00"]
+
+
+# -- task 2: the join wizard's group card gets its other three facts -----------
+
+
+def test_a_group_carries_its_class_as_a_display_name_not_an_id(
+    client, studio, a_group, a_class, with_slots
+):
+    """The card's LEVEL line. `Class.name`, not `class_id` -- the narrowness rule still
+    refuses the id (`PublicGroupOut`'s own docstring)."""
+    groups = client.get(f"/api/v1/public/studios/{studio.slug}/groups").json()["items"]
+    group = next(g for g in groups if uuid.UUID(g["id"]) == a_group)
+    assert group["class_name"] == "ג'ודו"
+
+
+def test_a_group_whose_sessions_are_all_one_length_reports_that_one_value(
+    client, studio, a_group, with_slots
+):
+    """Both fixture sessions run the default one hour, so the card gets one number."""
+    groups = client.get(f"/api/v1/public/studios/{studio.slug}/groups").json()["items"]
+    group = next(g for g in groups if uuid.UUID(g["id"]) == a_group)
+    assert group["training_durations_min"] == [60]
+
+
+def test_a_group_with_two_lesson_lengths_reports_both(
+    client, monkeypatch, studio, a_group, a_training_year
+):
+    """The Sunday lesson runs 60 minutes and the Thursday one runs 90 -- the card has to
+    say so rather than print one of the two."""
+    import app.routers.public as public_router
+    from app.models.schedule import Session as SessionRow
+
+    fake = FakeSchedule()
+    fake.sessions[a_group] = [
+        SessionRow(
+            id=uuid.uuid4(),
+            studio_id=studio.id,
+            group_id=a_group,
+            training_year_id=a_training_year,
+            starts_at=SUNDAY,
+            ends_at=SUNDAY + timedelta(minutes=60),
+            status="scheduled",
+            is_manually_edited=False,
+            is_ad_hoc=False,
+        ),
+        SessionRow(
+            id=uuid.uuid4(),
+            studio_id=studio.id,
+            group_id=a_group,
+            training_year_id=a_training_year,
+            starts_at=WEDNESDAY,
+            ends_at=WEDNESDAY + timedelta(minutes=90),
+            status="scheduled",
+            is_manually_edited=False,
+            is_ad_hoc=False,
+        ),
+    ]
+    monkeypatch.setattr(public_router, "schedule_reader", lambda _session: fake)
+
+    groups = client.get(f"/api/v1/public/studios/{studio.slug}/groups").json()["items"]
+    group = next(g for g in groups if uuid.UUID(g["id"]) == a_group)
+    assert group["training_durations_min"] == [60, 90]
+
+
+def test_a_group_with_a_lead_and_an_assistant_coach_lists_both_lead_first(
+    client, app_session, studio, a_group, with_slots
+):
+    from app.models.person import Person
+    from app.models.structure import GroupStaff
+
+    assistant = Person(studio_id=studio.id, first_name="אבי", last_name="כהן")
+    lead = Person(studio_id=studio.id, first_name="דנה", last_name="לוי")
+    app_session.add_all([assistant, lead])
+    app_session.flush()
+    app_session.add_all(
+        [
+            GroupStaff(
+                studio_id=studio.id,
+                group_id=a_group,
+                person_id=assistant.id,
+                role="assistant_coach",
+                from_date=SUNDAY.date(),
+            ),
+            GroupStaff(
+                studio_id=studio.id,
+                group_id=a_group,
+                person_id=lead.id,
+                role="lead_coach",
+                from_date=SUNDAY.date(),
+            ),
+        ]
+    )
+    app_session.commit()
+
+    groups = client.get(f"/api/v1/public/studios/{studio.slug}/groups").json()["items"]
+    group = next(g for g in groups if uuid.UUID(g["id"]) == a_group)
+    assert group["coaches"] == ["דנה לוי", "אבי כהן"]
+
+
+def test_a_coach_whose_assignment_has_ended_is_not_listed(
+    client, app_session, studio, a_group, with_slots
+):
+    """`to_date` in the past means they no longer teach this group -- `uq_group_staff_live`'s
+    own predicate for what a LIVE assignment is."""
+    from app.models.person import Person
+    from app.models.structure import GroupStaff
+
+    former = Person(studio_id=studio.id, first_name="נועה", last_name="פרץ")
+    app_session.add(former)
+    app_session.flush()
+    app_session.add(
+        GroupStaff(
+            studio_id=studio.id,
+            group_id=a_group,
+            person_id=former.id,
+            role="lead_coach",
+            from_date=SUNDAY.date().replace(month=1, day=1),
+            to_date=SUNDAY.date().replace(month=6, day=1),
+        )
+    )
+    app_session.commit()
+
+    groups = client.get(f"/api/v1/public/studios/{studio.slug}/groups").json()["items"]
+    group = next(g for g in groups if uuid.UUID(g["id"]) == a_group)
+    assert group["coaches"] == []
+
+
+def test_a_groups_locations_come_from_its_sessions_deduplicated(
+    client, monkeypatch, studio, a_group, a_training_year, app_session
+):
+    from app.models.structure import Location
+
+    hall = Location(studio_id=studio.id, name="אולם א")
+    app_session.add(hall)
+    app_session.commit()
+
+    import app.routers.public as public_router
+
+    fake = FakeSchedule()
+    fake.sessions[a_group] = [
+        make_session(
+            studio_id=studio.id,
+            group_id=a_group,
+            training_year_id=a_training_year,
+            starts_at=SUNDAY,
+        ),
+        make_session(
+            studio_id=studio.id,
+            group_id=a_group,
+            training_year_id=a_training_year,
+            starts_at=WEDNESDAY,
+        ),
+    ]
+    for session in fake.sessions[a_group]:
+        session.location_id = hall.id
+    monkeypatch.setattr(public_router, "schedule_reader", lambda _session: fake)
+
+    groups = client.get(f"/api/v1/public/studios/{studio.slug}/groups").json()["items"]
+    group = next(g for g in groups if uuid.UUID(g["id"]) == a_group)
+    assert group["locations"] == ["אולם א"]
 
 
 def test_the_landing_carries_the_clubs_phone_from_settings(client, app_session, studio, with_slots):

@@ -9,32 +9,52 @@ import type { PlanOption } from '../familyDraft'
 import { isMinor, needsManagerReview } from './types'
 import type { StudentDraft, WizardGroup, WizardPlan } from './types'
 
-/** `OnboardingGroupOut` -- what `GET /public/onboarding/{token}` actually returns. */
+/** `OnboardingGroupOut` -- what `GET /public/onboarding/{token}` actually returns, and
+ *  (task 2) the same four names `PublicGroupOut` carries too, since both doors read
+ *  through this one function. Every field beyond `id`/`name`/`weekdays` is optional on
+ *  the wire and defaulted below: an older server that has not deployed task 2 yet sends
+ *  a response missing these keys entirely, and that must map to empty labels, never a
+ *  crash on the wizard's first screen. */
 export type ApiGroup = {
   id: string
   name: string
   class_name?: string | null
   weekdays: number[]
+  training_durations_min?: number[]
+  coaches?: string[]
+  locations?: string[]
 }
 
 const WEEKDAY_NAMES = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'] as const
 
 const SESSIONS_LABEL = (count: number) => `${count} אימונים בשבוע`
 
-/** Degrades honestly. §10 asks the API for the schedule text, the coaches, the location
- *  and the session length; `OnboardingGroupOut` carries none of them yet, so the card
- *  shows what IS known -- the group's name, its class and the days it trains -- and the
- *  richer lines simply do not render rather than showing invented values. */
+/** The group card draws six facts; this is where all six get a value.
+ *
+ * `trackLabel` is the LEVEL line -- `class_name`, not the session count that used to sit
+ * there before task 2 gave this function a real class name to put on it. The session
+ * count moved onto `scheduleLabel`, beside the days, so it is not lost.
+ *
+ * `durationMin` is `0` -- the card's existing "do not draw this line" value -- whenever
+ * `training_durations_min` is empty (no materialized schedule yet) OR has more than one
+ * entry (the group's sessions genuinely differ in length, and there is no single number
+ * that is not a lie); it is the one real value only when exactly one length was observed.
+ *
+ * `coachesLabel` and `locationLabel` join their lists with ' · ', or are `''` when the
+ * club has assigned no live coach / the group has no materialized session with a
+ * location yet -- an absence, not an error. */
 export function toWizardGroup(group: ApiGroup): WizardGroup {
   const days = [...group.weekdays].sort((a, b) => a - b)
+  const dayNames = days.map((day) => WEEKDAY_NAMES[day] ?? '').filter(Boolean).join(' · ')
+  const durations = group.training_durations_min ?? []
   return {
     id: group.id,
     name: group.name,
-    trackLabel: days.length > 0 ? SESSIONS_LABEL(days.length) : '',
-    durationMin: 0,
-    scheduleLabel: days.map((day) => WEEKDAY_NAMES[day] ?? '').filter(Boolean).join(' · '),
-    coachesLabel: '',
-    locationLabel: group.class_name ?? '',
+    trackLabel: group.class_name ?? '',
+    durationMin: durations.length === 1 ? (durations[0] ?? 0) : 0,
+    scheduleLabel: days.length > 0 ? [dayNames, SESSIONS_LABEL(days.length)].join(' · ') : '',
+    coachesLabel: (group.coaches ?? []).join(' · '),
+    locationLabel: (group.locations ?? []).join(' · '),
   }
 }
 

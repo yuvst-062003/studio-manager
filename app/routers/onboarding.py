@@ -91,6 +91,12 @@ class OnboardingGroupOut(BaseModel):
     name: str
     class_name: str | None
     weekdays: list[int]
+    #: Distinct lesson lengths in whole minutes, sorted.
+    training_durations_min: list[int]
+    #: Live coach display names, lead coaches first.
+    coaches: list[str]
+    #: Distinct location names this group trains at, sorted.
+    locations: list[str]
 
 
 class OnboardingInfoOut(BaseModel):
@@ -330,8 +336,11 @@ def onboarding_info(token: str, request: Request, session: SessionDep) -> Onboar
             OnboardingGroupOut(
                 id=group.id,
                 name=group.name,
-                class_name=None,
+                class_name=group.class_name,
                 weekdays=list(group.training_weekdays),
+                training_durations_min=group.training_durations_min,
+                coaches=group.coaches,
+                locations=group.locations,
             )
             for group in groups
         ],

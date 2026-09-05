@@ -10,12 +10,15 @@ asking the second question.
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
+from app.models.schedule import Session as SessionRow
 from app.services.people.group_days import (
     OBSERVATION_WEEKS,
     studio_weekday,
+    training_durations_min,
+    training_locations,
     training_weekdays,
 )
 from tests.people.conftest import FakeSchedule, make_session
@@ -138,3 +141,110 @@ def test_a_group_with_no_sessions_trains_on_no_days(fake_schedule):
     and the enrolment form renders 'this group has no schedule' rather than a silent
     empty checkbox list."""
     assert training_weekdays(GROUP, since=SINCE, schedule=fake_schedule) == frozenset()
+
+
+# -- training_durations_min, task 2's lesson-length seam -----------------------
+
+
+def _session_with_duration(
+    *, starts_at: datetime, duration_minutes: int, status: str = "scheduled"
+) -> SessionRow:
+    return SessionRow(
+        id=uuid.uuid4(),
+        studio_id=STUDIO,
+        group_id=GROUP,
+        training_year_id=YEAR,
+        starts_at=starts_at,
+        ends_at=starts_at + timedelta(minutes=duration_minutes),
+        status=status,
+        is_manually_edited=False,
+        is_ad_hoc=False,
+    )
+
+
+def test_a_group_whose_sessions_are_all_one_length_reports_one_value(fake_schedule):
+    fake_schedule.sessions[GROUP] = [
+        _session_with_duration(
+            starts_at=datetime(2026, 9, 6, 14, 0, tzinfo=UTC), duration_minutes=60
+        ),
+        _session_with_duration(
+            starts_at=datetime(2026, 9, 9, 14, 0, tzinfo=UTC), duration_minutes=60
+        ),
+    ]
+    assert training_durations_min(GROUP, since=SINCE, schedule=fake_schedule) == frozenset({60})
+
+
+def test_a_group_with_two_lesson_lengths_reports_both(fake_schedule):
+    """The Sunday lesson runs 60 minutes and the Thursday one runs 90 -- a single number
+    would print a wrong one for whichever day it left out."""
+    fake_schedule.sessions[GROUP] = [
+        _session_with_duration(
+            starts_at=datetime(2026, 9, 6, 14, 0, tzinfo=UTC), duration_minutes=60
+        ),
+        _session_with_duration(
+            starts_at=datetime(2026, 9, 10, 14, 0, tzinfo=UTC), duration_minutes=90
+        ),
+    ]
+    assert training_durations_min(GROUP, since=SINCE, schedule=fake_schedule) == frozenset({60, 90})
+
+
+def test_a_cancelled_sessions_length_does_not_count(fake_schedule):
+    """Same filter as `training_weekdays`: a cancelled session is not a training day, and
+    its length is not a lesson length either."""
+    fake_schedule.sessions[GROUP] = [
+        _session_with_duration(
+            starts_at=datetime(2026, 9, 6, 14, 0, tzinfo=UTC), duration_minutes=60
+        ),
+        _session_with_duration(
+            starts_at=datetime(2026, 9, 9, 14, 0, tzinfo=UTC),
+            duration_minutes=90,
+            status="cancelled",
+        ),
+    ]
+    assert training_durations_min(GROUP, since=SINCE, schedule=fake_schedule) == frozenset({60})
+
+
+def test_a_group_with_no_sessions_has_no_duration(fake_schedule):
+    assert training_durations_min(GROUP, since=SINCE, schedule=fake_schedule) == frozenset()
+
+
+# -- training_locations, task 2's location seam ---------------------------------
+
+
+def _session_at(*, starts_at: datetime, location_id: uuid.UUID | None) -> SessionRow:
+    row = make_session(studio_id=STUDIO, group_id=GROUP, training_year_id=YEAR, starts_at=starts_at)
+    row.location_id = location_id
+    return row
+
+
+def test_a_groups_locations_are_deduplicated(fake_schedule):
+    hall = uuid.uuid4()
+    fake_schedule.sessions[GROUP] = [
+        _session_at(starts_at=datetime(2026, 9, 6, 14, 0, tzinfo=UTC), location_id=hall),
+        _session_at(starts_at=datetime(2026, 9, 9, 14, 0, tzinfo=UTC), location_id=hall),
+    ]
+    assert training_locations(GROUP, since=SINCE, schedule=fake_schedule) == frozenset({hall})
+
+
+def test_two_different_locations_are_both_reported(fake_schedule):
+    hall_a, hall_b = uuid.uuid4(), uuid.uuid4()
+    fake_schedule.sessions[GROUP] = [
+        _session_at(starts_at=datetime(2026, 9, 6, 14, 0, tzinfo=UTC), location_id=hall_a),
+        _session_at(starts_at=datetime(2026, 9, 9, 14, 0, tzinfo=UTC), location_id=hall_b),
+    ]
+    assert training_locations(GROUP, since=SINCE, schedule=fake_schedule) == frozenset(
+        {hall_a, hall_b}
+    )
+
+
+def test_a_session_with_no_location_is_dropped_not_counted_as_none(fake_schedule):
+    """A rule with no location set materializes a session with none either -- a null
+    tells nothing about where the group trains, so it does not become a phantom entry."""
+    fake_schedule.sessions[GROUP] = [
+        _session_at(starts_at=datetime(2026, 9, 6, 14, 0, tzinfo=UTC), location_id=None),
+    ]
+    assert training_locations(GROUP, since=SINCE, schedule=fake_schedule) == frozenset()
+
+
+def test_a_group_with_no_sessions_has_no_locations(fake_schedule):
+    assert training_locations(GROUP, since=SINCE, schedule=fake_schedule) == frozenset()

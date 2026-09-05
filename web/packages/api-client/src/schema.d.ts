@@ -8875,13 +8875,19 @@ export interface components {
         OnboardingGroupOut: {
             /** Class Name */
             class_name: string | null;
+            /** Coaches */
+            coaches: string[];
             /**
              * Id
              * Format: uuid
              */
             id: string;
+            /** Locations */
+            locations: string[];
             /** Name */
             name: string;
+            /** Training Durations Min */
+            training_durations_min: number[];
             /** Weekdays */
             weekdays: number[];
         };
@@ -9834,20 +9840,31 @@ export interface components {
          * @description §7 — `GET /public/studios/{slug}/groups`, unauthenticated.
          *
          *     A deliberately narrow projection, for the same reason `TrialSlotOut` is one: this is a
-         *     shop window on the open internet. No class id, no staff, no enrollment count.
-         *     `training_weekdays` is here because parent `13a` shows "מתאמנים בימים" beside each
-         *     group, and because §5.4a filters groups by the child's age where a range is set.
+         *     shop window on the open internet. No class id, no enrollment count. `training_weekdays`
+         *     is here because parent `13a` shows "מתאמנים בימים" beside each group, and because
+         *     §5.4a filters groups by the child's age where a range is set.
          *
          *     `training_times` was added for landing L1 (2026-08-27): region 4 and `13c`'s schedule
          *     cards draw `days · HH:MM`, and a class's hour is already public information — it is on
-         *     the flyer. It comes through the schedule seam like `training_weekdays`. Nothing else
-         *     has been added, and nothing else should be: the narrowness is the contract.
+         *     the flyer. It comes through the schedule seam like `training_weekdays`.
+         *
+         *     **The narrowness moved, once, on purpose.** The join wizard's group card (owner
+         *     decision, 2026-09-05) publishes `coaches` and `locations` too: a club advertises who
+         *     teaches and where, the way it advertises the hour, and a coach's display name with no
+         *     contact details attached is not sensitive the way a member's data is — this shape still
+         *     carries no phone, no email and no person id for anyone. What is still refused, and
+         *     always will be: a class id, and an enrollment count. Nothing that carries contact
+         *     details or member data follows `coaches` and `locations` onto this shape.
          */
         PublicGroupOut: {
             /** Age Max */
             age_max: number | null;
             /** Age Min */
             age_min: number | null;
+            /** Class Name */
+            class_name?: string | null;
+            /** Coaches */
+            coaches?: string[];
             /** Description */
             description: string | null;
             /**
@@ -9855,8 +9872,12 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /** Locations */
+            locations?: string[];
             /** Name */
             name: string;
+            /** Training Durations Min */
+            training_durations_min?: number[];
             /** Training Times */
             training_times?: string[];
             /** Training Weekdays */

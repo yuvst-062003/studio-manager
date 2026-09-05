@@ -934,6 +934,27 @@ def test_the_public_read_carries_club_terms_version(client, as_manager):
     assert info.json()["club_terms_version"] == CLUB_TERMS_VERSION
 
 
+# -- task 2: the wizard's group card gets the three facts it was missing ------
+def test_the_public_read_carries_the_group_cards_wizard_facts_and_a_real_class_name(
+    client, as_manager, a_group, a_class
+):
+    """Regression test for a hardcoded `class_name=None`: `onboarding_info` has always
+    called `LandingService.public_groups`, which has always had the real class name in
+    hand, and threw it away at the last line building `OnboardingGroupOut`. The other
+    three fields are new -- this group has no coach assigned and no materialized
+    schedule, so the honest answer for all three is empty, not absent."""
+    created = client.post("/api/v1/onboarding-link", headers=as_manager.headers)
+    token = created.json()["url"].rsplit("/join/", 1)[1]
+
+    info = client.get(f"/api/v1/public/onboarding/{token}")
+    assert info.status_code == 200, info.text
+    group = next(g for g in info.json()["groups"] if g["id"] == str(a_group))
+    assert group["class_name"] == "ג'ודו"
+    assert group["training_durations_min"] == []
+    assert group["coaches"] == []
+    assert group["locations"] == []
+
+
 # -- /me/onboarding-status -- §3's one answer to "what is left" (B1 item 5) ----
 def test_onboarding_status_is_incomplete_for_consents_at_the_pre_bump_version(
     client, as_guardian, tenant_session

@@ -155,6 +155,10 @@ def _group_out(group: PublicGroup) -> PublicGroupOut:
         age_max=group.age_max,
         training_weekdays=group.training_weekdays,
         training_times=group.training_times,
+        class_name=group.class_name,
+        training_durations_min=group.training_durations_min,
+        coaches=group.coaches,
+        locations=group.locations,
     )
 
 

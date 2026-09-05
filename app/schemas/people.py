@@ -621,14 +621,21 @@ class PublicGroupOut(BaseModel):
     """§7 — `GET /public/studios/{slug}/groups`, unauthenticated.
 
     A deliberately narrow projection, for the same reason `TrialSlotOut` is one: this is a
-    shop window on the open internet. No class id, no staff, no enrollment count.
-    `training_weekdays` is here because parent `13a` shows "מתאמנים בימים" beside each
-    group, and because §5.4a filters groups by the child's age where a range is set.
+    shop window on the open internet. No class id, no enrollment count. `training_weekdays`
+    is here because parent `13a` shows "מתאמנים בימים" beside each group, and because
+    §5.4a filters groups by the child's age where a range is set.
 
     `training_times` was added for landing L1 (2026-08-27): region 4 and `13c`'s schedule
     cards draw `days · HH:MM`, and a class's hour is already public information — it is on
-    the flyer. It comes through the schedule seam like `training_weekdays`. Nothing else
-    has been added, and nothing else should be: the narrowness is the contract.
+    the flyer. It comes through the schedule seam like `training_weekdays`.
+
+    **The narrowness moved, once, on purpose.** The join wizard's group card (owner
+    decision, 2026-09-05) publishes `coaches` and `locations` too: a club advertises who
+    teaches and where, the way it advertises the hour, and a coach's display name with no
+    contact details attached is not sensitive the way a member's data is — this shape still
+    carries no phone, no email and no person id for anyone. What is still refused, and
+    always will be: a class id, and an enrollment count. Nothing that carries contact
+    details or member data follows `coaches` and `locations` onto this shape.
     """
 
     id: uuid.UUID
@@ -639,6 +646,17 @@ class PublicGroupOut(BaseModel):
     training_weekdays: list[Weekday] = Field(default_factory=list)
     #: Distinct wall-clock start times, `HH:MM`, Asia/Jerusalem, sorted.
     training_times: list[str] = Field(default_factory=list)
+    #: The class this group belongs to -- the wizard card's "level" line. A display
+    #: label, not the class id: the narrowness rule above still refuses the id.
+    class_name: str | None = None
+    #: Distinct lesson lengths in whole minutes, sorted. Two values means the group's
+    #: sessions genuinely differ in length; the card says so rather than picking one.
+    training_durations_min: list[int] = Field(default_factory=list)
+    #: Live coach display names, lead coaches first. Published deliberately -- see the
+    #: class docstring above.
+    coaches: list[str] = Field(default_factory=list)
+    #: Distinct location names this group actually trains at, sorted.
+    locations: list[str] = Field(default_factory=list)
 
 
 class PublicGroupListResponse(BaseModel):

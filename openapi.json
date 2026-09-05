@@ -7502,14 +7502,35 @@
             ],
             "title": "Class Name"
           },
+          "coaches": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Coaches",
+            "type": "array"
+          },
           "id": {
             "format": "uuid",
             "title": "Id",
             "type": "string"
           },
+          "locations": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Locations",
+            "type": "array"
+          },
           "name": {
             "title": "Name",
             "type": "string"
+          },
+          "training_durations_min": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Training Durations Min",
+            "type": "array"
           },
           "weekdays": {
             "items": {
@@ -7523,7 +7544,10 @@
           "id",
           "name",
           "class_name",
-          "weekdays"
+          "weekdays",
+          "training_durations_min",
+          "coaches",
+          "locations"
         ],
         "title": "OnboardingGroupOut",
         "type": "object"
@@ -9646,7 +9670,7 @@
         "type": "object"
       },
       "PublicGroupOut": {
-        "description": "§7 — `GET /public/studios/{slug}/groups`, unauthenticated.\n\nA deliberately narrow projection, for the same reason `TrialSlotOut` is one: this is a\nshop window on the open internet. No class id, no staff, no enrollment count.\n`training_weekdays` is here because parent `13a` shows \"מתאמנים בימים\" beside each\ngroup, and because §5.4a filters groups by the child's age where a range is set.\n\n`training_times` was added for landing L1 (2026-08-27): region 4 and `13c`'s schedule\ncards draw `days · HH:MM`, and a class's hour is already public information — it is on\nthe flyer. It comes through the schedule seam like `training_weekdays`. Nothing else\nhas been added, and nothing else should be: the narrowness is the contract.",
+        "description": "§7 — `GET /public/studios/{slug}/groups`, unauthenticated.\n\nA deliberately narrow projection, for the same reason `TrialSlotOut` is one: this is a\nshop window on the open internet. No class id, no enrollment count. `training_weekdays`\nis here because parent `13a` shows \"מתאמנים בימים\" beside each group, and because\n§5.4a filters groups by the child's age where a range is set.\n\n`training_times` was added for landing L1 (2026-08-27): region 4 and `13c`'s schedule\ncards draw `days · HH:MM`, and a class's hour is already public information — it is on\nthe flyer. It comes through the schedule seam like `training_weekdays`.\n\n**The narrowness moved, once, on purpose.** The join wizard's group card (owner\ndecision, 2026-09-05) publishes `coaches` and `locations` too: a club advertises who\nteaches and where, the way it advertises the hour, and a coach's display name with no\ncontact details attached is not sensitive the way a member's data is — this shape still\ncarries no phone, no email and no person id for anyone. What is still refused, and\nalways will be: a class id, and an enrollment count. Nothing that carries contact\ndetails or member data follows `coaches` and `locations` onto this shape.",
         "properties": {
           "age_max": {
             "anyOf": [
@@ -9670,6 +9694,24 @@
             ],
             "title": "Age Min"
           },
+          "class_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Class Name"
+          },
+          "coaches": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Coaches",
+            "type": "array"
+          },
           "description": {
             "anyOf": [
               {
@@ -9686,9 +9728,23 @@
             "title": "Id",
             "type": "string"
           },
+          "locations": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Locations",
+            "type": "array"
+          },
           "name": {
             "title": "Name",
             "type": "string"
+          },
+          "training_durations_min": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Training Durations Min",
+            "type": "array"
           },
           "training_times": {
             "items": {
