@@ -13,6 +13,12 @@ export type WizardStudio = {
   studioName: string
   logoUrl: string | null
   groups: WizardGroup[]
+  /** `OnboardingInfoOut.club_terms_version` -- live off the server's own
+   *  `CLUB_TERMS_VERSION`, so step 1 can show the family which version they are agreeing
+   *  to (gap 2). `null` when the door has no such number to show: `studioSource` below
+   *  (doors C/D) reads `/me/studio`, which carries no version at all, and inventing one
+   *  would be worse than showing none. */
+  clubTermsVersion: number | null
 }
 
 export type WizardCatalogue = {
@@ -60,6 +66,21 @@ export type JoinWizardSource = {
   register: (payload: RegisterPayload) => Promise<RegisterResult>
 }
 
+/** Carries `detail.code` from a failed `register` -- either door's -- so a caller can
+ *  tell `national_id_invalid` from a generic failure -- the same distinction
+ *  `SelfServeJoinFlow.submitRegistration` already reads off the same endpoint. A plain
+ *  `Error` subclass, in this file, so this module adds no dependency for it. Gap 1: this
+ *  used to be `studioSource`'s alone, leaving door B's `tokenSource.register` throwing a
+ *  bare `Error` that discarded the code entirely -- a family who mistyped a ת.ז. saw only
+ *  "something went wrong". One error type for both doors closes that. */
+export class RegisterCodeError extends Error {
+  readonly code: string | undefined
+  constructor(code: string | undefined) {
+    super(code ?? 'register_failed')
+    this.code = code
+  }
+}
+
 /** Door B (`/join/{token}`): a caller who belongs to no studio yet, so everything is
  *  resolved from the TOKEN. Lifted from `WizardJoinFlow` (task 2) unchanged -- same three
  *  request shapes, same failure handling, no behaviour change. */
@@ -72,11 +93,15 @@ export function tokenSource(token: string, healthClient: HealthClient): JoinWiza
         studio_name: string
         logo_url: string | null
         groups: ApiGroup[]
+        //: Optional for the same reason `logo_url` is: an older cached response (or a
+        //: test fixture) predating this field must read as "no version", not crash.
+        club_terms_version?: number
       }
       return {
         studioName: info.studio_name,
         logoUrl: info.logo_url ?? null,
         groups: (info.groups ?? []).map(toWizardGroup),
+        clubTermsVersion: info.club_terms_version ?? null,
       }
     },
 
@@ -106,21 +131,17 @@ export function tokenSource(token: string, healthClient: HealthClient): JoinWiza
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       })
-      if (!response.ok) throw new Error(String(response.status))
+      if (!response.ok) {
+        let code: string | undefined
+        try {
+          code = ((await response.json()) as { detail?: { code?: string } }).detail?.code
+        } catch {
+          code = undefined
+        }
+        throw new RegisterCodeError(code)
+      }
       return (await response.json()) as RegisterResult
     },
-  }
-}
-
-/** Carries `detail.code` from a failed `studioSource.register`, so a caller can tell
- *  `national_id_invalid` from a generic failure -- the same distinction
- *  `SelfServeJoinFlow.submitRegistration` already reads off the same endpoint. A plain
- *  `Error` subclass, in this file, so this module adds no dependency for it. */
-export class RegisterCodeError extends Error {
-  readonly code: string | undefined
-  constructor(code: string | undefined) {
-    super(code ?? 'register_failed')
-    this.code = code
   }
 }
 
@@ -193,6 +214,12 @@ export function studioSource(healthClient: HealthClient): JoinWizardSource {
         // `app/routers/public.py`/`app/routers/onboarding.py`. Null stays null.
         logoUrl: logoUrl ? `/api/v1/public/studios/${slug}/logo` : null,
         groups: groups.map(toWizardGroup),
+        // Gap 2: `/me/studio` carries no `club_terms_version` at all -- this door has no
+        // number to show, and inventing one (a frontend constant, or the WRITE's default)
+        // would be worse than showing none. `null` is the honest answer; the WRITE itself
+        // is unaffected either way, since the server stamps its own constant regardless
+        // of what this screen displays.
+        clubTermsVersion: null,
       }
     },
 

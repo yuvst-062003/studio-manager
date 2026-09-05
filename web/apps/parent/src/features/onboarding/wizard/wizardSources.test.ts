@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { HealthClient } from '../../health/healthClient'
 import type { RegisterPayload } from './adapters'
 import type { RegisterResult } from './submitJoin'
-import { studioSource, tokenSource } from './wizardSources'
+import { RegisterCodeError, studioSource, tokenSource } from './wizardSources'
 
 vi.mock('@studio/core', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@studio/core')>()
@@ -105,6 +105,37 @@ describe('tokenSource -- door B, lifted unchanged from WizardJoinFlow', () => {
     // Mapped through `toWizardGroup`, not passed through raw -- `scheduleLabel` is a
     // derived field `OnboardingGroupOut` never sends, so seeing it proves the mapping ran.
     expect(studio.groups[0]?.scheduleLabel).toContain('ראשון')
+    // No `club_terms_version` in this fixture's response -- an older cached response, or
+    // a test that predates the field, must read as "no version", not crash.
+    expect(studio.clubTermsVersion).toBeNull()
+  })
+
+  // Gap 2 -- `OnboardingInfoOut.club_terms_version` is live off the server's own
+  // `CLUB_TERMS_VERSION`, so step 1 can show the family which version they are agreeing
+  // to. This is the one place that reads it off the wire.
+  it('loadStudio maps club_terms_version onto clubTermsVersion', async () => {
+    const { apiFetch } = await import('@studio/core')
+    const fetchMock = vi.fn(async (input: string | URL) => {
+      const url = String(input)
+      if (url.includes(`/api/v1/public/onboarding/${TOKEN}`)) {
+        return new Response(
+          JSON.stringify({
+            studio_name: 'מועדון בדיקה',
+            logo_url: null,
+            groups: [],
+            club_terms_version: 3,
+          }),
+          { status: 200 },
+        )
+      }
+      return new Response(JSON.stringify({ items: [] }), { status: 200 })
+    })
+    vi.mocked(apiFetch).mockImplementation(fetchMock)
+
+    const source = tokenSource(TOKEN, healthClientStub())
+    const studio = await source.loadStudio()
+
+    expect(studio.clubTermsVersion).toBe(3)
   })
 
   it('register posts to /api/v1/onboarding/{token}/register and rejects on a non-ok response', async () => {
@@ -124,6 +155,28 @@ describe('tokenSource -- door B, lifted unchanged from WizardJoinFlow', () => {
         body: JSON.stringify(REGISTER_PAYLOAD),
       }),
     )
+  })
+
+  // Gap 1 -- door B used to throw a bare `Error(String(response.status))` here, discarding
+  // `detail.code` entirely: a family who mistyped a ת.ז. saw "something went wrong" with no
+  // way to tell which field was wrong. `tokenSource.register` now throws the same
+  // `RegisterCodeError` `studioSource.register` already does, from the same wire shape.
+  it("register on a 422 carrying detail.code = 'national_id_invalid' rejects with an error exposing that code", async () => {
+    const { apiFetch } = await import('@studio/core')
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ detail: { code: 'national_id_invalid' } }), {
+          status: 422,
+        }),
+    )
+    vi.mocked(apiFetch).mockImplementation(fetchMock)
+
+    const source = tokenSource(TOKEN, healthClientStub())
+
+    await expect(source.register(REGISTER_PAYLOAD)).rejects.toMatchObject({
+      code: 'national_id_invalid',
+    })
+    await expect(source.register(REGISTER_PAYLOAD)).rejects.toBeInstanceOf(RegisterCodeError)
   })
 
   it('loadCatalogue maps the snake_case wire price-plan shape to WizardPlan -- pricePerMonthAgorot is the real number, not NaN', async () => {
@@ -263,6 +316,19 @@ describe('studioSource -- doors C and D, no token anywhere', () => {
     const studio = await source.loadStudio()
 
     expect(studio.logoUrl).toBeNull()
+  })
+
+  // Gap 2 -- `/me/studio` carries no `club_terms_version` at all, and doors C/D have no
+  // other read that would. `null` is the honest answer, not an invented number.
+  it('loadStudio always returns a null clubTermsVersion -- /me/studio carries no such field', async () => {
+    const { apiFetch } = await import('@studio/core')
+    const fetchMock = fetchMockFor()
+    vi.mocked(apiFetch).mockImplementation(fetchMock)
+
+    const source = studioSource(healthClientStub())
+    const studio = await source.loadStudio()
+
+    expect(studio.clubTermsVersion).toBeNull()
   })
 
   it('register posts to /api/v1/me/students/register with a body carrying club_terms_accepted and children and NO signer', async () => {

@@ -487,6 +487,7 @@ export const people: Bundle = {
   'joinWizard.step1.continue': 'Продолжить',
   'joinWizard.step1.closeDocument': 'Подтвердить и закрыть',
   'joinWizard.step1.close': 'Закрыть',
+  'joinWizard.step1.termsVersion': 'Версия',
 
   // STEP2_COPY -> joinWizard.step2.*
   'joinWizard.step2.seasonPill': 'Сезон тренировок 2025–2026',
@@ -656,6 +657,8 @@ export const people: Bundle = {
   'joinWizard.step3.secureNote': 'Защищённая транзакция по стандарту PCI-DSS',
   'joinWizard.step3.submitting': 'Регистрируем семью…',
   'joinWizard.step3.submitFailed': 'Регистрация не отправлена. Проверьте соединение и попробуйте снова.',
+  'joinWizard.step3.submitFailedNationalId':
+    'Один из введённых номеров удостоверения личности не принят. Вернитесь к данным учеников и проверьте его.',
   'joinWizard.step3.standingOrderMultiNote': 'Постоянное поручение оформляется отдельно для каждого ученика. При оплате картой заполняется одна форма на всю семью.',
   'joinWizard.step3.demoNoForm': 'В этой среде страницу оплаты открыть нельзя. Заказ записан и будет оформлен с клубом.',
   'joinWizard.step3.mandatesTitle': 'Постоянное поручение',

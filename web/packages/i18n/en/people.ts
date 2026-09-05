@@ -485,6 +485,7 @@ export const people: Bundle = {
   'joinWizard.step1.continue': 'Continue',
   'joinWizard.step1.closeDocument': 'Acknowledge and close',
   'joinWizard.step1.close': 'Close',
+  'joinWizard.step1.termsVersion': 'Version',
 
   // STEP2_COPY -> joinWizard.step2.*
   'joinWizard.step2.seasonPill': '2025–2026 training season',
@@ -654,6 +655,8 @@ export const people: Bundle = {
   'joinWizard.step3.secureNote': 'Secured to the PCI-DSS standard',
   'joinWizard.step3.submitting': 'Registering the family…',
   'joinWizard.step3.submitFailed': 'Registration wasn\'t sent. Check your connection and try again.',
+  'joinWizard.step3.submitFailedNationalId':
+    'One of the ID numbers you entered wasn\'t accepted. Go back to the students\' details and check it.',
   'joinWizard.step3.standingOrderMultiNote': 'A standing order is signed separately for each student. With card payment, you fill in one form for the whole family.',
   'joinWizard.step3.demoNoForm': 'A payment page can\'t be opened in this environment. The order was recorded and will be arranged with the club.',
   'joinWizard.step3.mandatesTitle': 'Standing order',

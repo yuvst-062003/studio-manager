@@ -36,6 +36,7 @@ import type { PaymentFrameRequest } from './PaymentFrame'
 import type { SubmitJoinResult } from './submitJoin'
 import { formatShekels, needsManagerReview } from './types'
 import type { PaymentMethod, StudentDraft, WizardPlan } from './types'
+import { RegisterCodeError } from './wizardSources'
 
 type SubView = 'decision' | 'methods'
 type Intent = 'now' | 'arranged'
@@ -174,8 +175,17 @@ export function Step3Payment({
         return
       }
       onDone(landed)
-    } catch {
-      setSubmitError(copy.submitFailed)
+    } catch (error) {
+      // Gap 1 -- a malformed ת.ז. is a 422 that NAMES the problem
+      // (`detail.code = 'national_id_invalid'`), and the family deserves to be told which
+      // field it belongs to rather than the one generic message every other failure gets.
+      // Both doors' `register` (`wizardSources.ts`) throw the same `RegisterCodeError`
+      // for this, so this is the one place that reads it.
+      setSubmitError(
+        error instanceof RegisterCodeError && error.code === 'national_id_invalid'
+          ? copy.submitFailedNationalId
+          : copy.submitFailed,
+      )
       setPhase('form')
     }
   }

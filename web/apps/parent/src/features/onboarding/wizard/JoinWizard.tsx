@@ -43,7 +43,13 @@ import type { JoinWizardSource } from './wizardSources'
 type StudioState =
   | { status: 'loading' }
   | { status: 'failed' }
-  | { status: 'ready'; studioName: string; logoUrl: string | null; groups: WizardGroup[] }
+  | {
+      status: 'ready'
+      studioName: string
+      logoUrl: string | null
+      groups: WizardGroup[]
+      clubTermsVersion: number | null
+    }
 
 type CatalogueState =
   | { status: 'loading' }
@@ -232,6 +238,7 @@ export function JoinWizard({
           <Step1Agreements
             locale={locale}
             emblemUrl={studio.logoUrl}
+            clubTermsVersion={studio.clubTermsVersion}
             agreed={agreed}
             onAgreedChange={setAgreed}
             onContinue={() => setStep(2)}

@@ -23,6 +23,7 @@ import { emptyStudent } from './types'
 import type { WizardPlan } from './types'
 import type { WizardStep } from './WizardHeader'
 import { JoinWizard } from './JoinWizard'
+import { RegisterCodeError } from './wizardSources'
 import type { JoinWizardSource, WizardCatalogue, WizardStudio } from './wizardSources'
 
 // The wizard renders in Hebrew by default in these tests -- see `renderWizard`'s
@@ -46,6 +47,7 @@ const STUDIO: WizardStudio = {
   studioName: 'מועדון בדיקה',
   logoUrl: null,
   groups: [toWizardGroup({ id: 'g1', name: 'קבוצת בוקר', weekdays: [0, 2] })],
+  clubTermsVersion: null,
 }
 
 const PLAN: WizardPlan = toWizardPlan({
@@ -330,6 +332,198 @@ describe('JoinWizard -- wiring submitJoin into the screens', () => {
     ).toBeEnabled()
   }, 20000)
 
+  // Gap 1 -- `OnboardingService` refuses a malformed ת.ז. with a 422 carrying
+  // `detail.code = 'national_id_invalid'`. Both sources throw the same `RegisterCodeError`
+  // for it (`wizardSources.ts`); this is the one place that reads the code back and shows
+  // the family which field it belongs to, instead of the one generic message every other
+  // failure gets.
+  it('a registration failing with national_id_invalid shows that specific message, not the generic one', async () => {
+    const user = userEvent.setup()
+    const source = fakeSource({
+      register: vi.fn(async () => {
+        throw new RegisterCodeError('national_id_invalid')
+      }),
+    })
+    const billingClient = billingClientStub()
+    renderWizard({ source, billingClient })
+
+    await addOneChildAndReachStep3(user)
+    await user.click(screen.getByRole('button', { name: STEP3_COPY.continueToPay }))
+    await user.click(screen.getByRole('button', { name: new RegExp(STEP3_COPY.submitWithCredit) }))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(STEP3_COPY.submitFailedNationalId)
+    expect(alert).not.toHaveTextContent(STEP3_COPY.submitFailed)
+  }, 20000)
+
+  // Gap 3 -- the seam the repo's own verification notes ask for: `toRegisterPayload` builds
+  // the whole submission, but nothing before this drove more than one child through the
+  // REAL step-2 form and asserted on the request body it produces. Two groups and two plans
+  // (rather than the shared fixture's one of each) so a field a bug copied from child 1
+  // instead of reading from child 2 -- group_ids, price_plan_id -- has somewhere to show up
+  // wrong, not just somewhere to coincidentally agree.
+  it('two children, driven through the real step-2 form, produce two distinct entries in the register payload', async () => {
+    const user = userEvent.setup()
+    const twoGroupStudio: WizardStudio = {
+      ...STUDIO,
+      groups: [STUDIO.groups[0]!, toWizardGroup({ id: 'g2', name: 'קבוצת ערב', weekdays: [1, 3] })],
+    }
+    const twoPlanCatalogue: WizardCatalogue = {
+      ...CATALOGUE,
+      plans: [
+        PLAN,
+        toWizardPlan({
+          id: 'plan-2',
+          name: 'דו-שבועי',
+          sessionsPerWeek: 3,
+          monthlyAmountAgorot: 45_000,
+        }),
+      ],
+    }
+    const source = fakeSource({
+      loadStudio: vi.fn(async () => twoGroupStudio),
+      loadCatalogue: vi.fn(async () => twoPlanCatalogue),
+    })
+    const billingClient = billingClientStub()
+    renderWizard({ source, billingClient })
+
+    const fieldIn = (root: HTMLElement, text: string) =>
+      within(root).getByLabelText(
+        new RegExp(`^${text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\*?$`),
+      )
+    const drawSignature = (root: HTMLElement) => {
+      const canvas = root.querySelector('canvas')
+      if (!canvas) throw new Error('signature canvas not found')
+      fireEvent.pointerDown(canvas, { clientX: 100, clientY: 100, pointerId: 1 })
+      fireEvent.pointerMove(canvas, { clientX: 200, clientY: 100, pointerId: 1 })
+      fireEvent.pointerUp(canvas, { clientX: 200, clientY: 100, pointerId: 1 })
+    }
+
+    // Step 1.
+    await screen.findByTestId('join-welcome')
+    await user.click(screen.getByLabelText(STEP1_COPY.agree))
+    await user.click(screen.getByRole('button', { name: STEP1_COPY.continue }))
+
+    // Step 2 -- child 1: nothing is prefilled yet, every field is typed.
+    await screen.findByTestId('join-family-step')
+    await user.click(screen.getByRole('button', { name: STEP2_COPY.addStudent }))
+    let dialog = screen.getByRole('dialog')
+
+    await user.type(fieldIn(dialog, STUDENT_FORM_COPY.firstName), 'נועה')
+    await user.type(fieldIn(dialog, STUDENT_FORM_COPY.lastName), 'כהן')
+    await user.type(fieldIn(dialog, STUDENT_FORM_COPY.nationalId), '100000017')
+    await user.type(fieldIn(dialog, STUDENT_FORM_COPY.birthDate), '2016-04-01')
+    await user.type(fieldIn(dialog, STUDENT_FORM_COPY.address), 'הרצל 1')
+    await user.type(fieldIn(dialog, STUDENT_FORM_COPY.city), 'תל אביב')
+    await user.selectOptions(fieldIn(dialog, STUDENT_FORM_COPY.grade), 'grade_3')
+    await user.type(fieldIn(dialog, STUDENT_FORM_COPY.guardianFirstName), 'דנה')
+    await user.type(fieldIn(dialog, STUDENT_FORM_COPY.guardianLastName), 'כהן')
+    await user.type(fieldIn(dialog, STUDENT_FORM_COPY.guardianNationalId), '100000017')
+    await user.type(fieldIn(dialog, STUDENT_FORM_COPY.guardianPhone), '0501234567')
+    await user.type(fieldIn(dialog, STUDENT_FORM_COPY.guardianEmail), 'dana@example.com')
+    await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.next1 }))
+
+    // Part 2 -- the FIRST of the two groups.
+    await user.click(within(dialog).getAllByRole('radio')[0]!)
+    await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.next2 }))
+
+    // Part 3 -- the FIRST of the two plans.
+    await user.click(within(dialog).getAllByRole('radio')[0]!)
+    await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.next3 }))
+
+    // Part 4 -- healthy.
+    await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.healthYes }))
+    await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.next4 }))
+
+    // Part 5.
+    await user.type(fieldIn(dialog, STUDENT_FORM_COPY.emergencyPhone), '0507654321')
+    await user.selectOptions(fieldIn(dialog, STUDENT_FORM_COPY.healthFund), 'clalit')
+    await user.click(
+      within(dialog).getByRole('checkbox', { name: new RegExp(STUDENT_FORM_COPY.attestCheckbox) }),
+    )
+    drawSignature(dialog)
+    await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.save }))
+
+    // Step 2 -- child 2. Guardian, address, city and emergency phone are seeded from
+    // child 1 by `Step2Trainees`'s own family-default behaviour (§5.6), so only what is
+    // genuinely per-child gets typed here -- exactly the fields a copy-instead-of-its-own
+    // bug would otherwise silently share with child 1.
+    await user.click(screen.getByRole('button', { name: STEP2_COPY.addStudent }))
+    dialog = screen.getByRole('dialog')
+
+    await user.type(fieldIn(dialog, STUDENT_FORM_COPY.firstName), 'איתן')
+    await user.type(fieldIn(dialog, STUDENT_FORM_COPY.lastName), 'לוי')
+    await user.type(fieldIn(dialog, STUDENT_FORM_COPY.nationalId), '200000008')
+    await user.type(fieldIn(dialog, STUDENT_FORM_COPY.birthDate), '2014-02-10')
+    await user.selectOptions(fieldIn(dialog, STUDENT_FORM_COPY.grade), 'grade_5')
+    await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.next1 }))
+
+    // Part 2 -- the SECOND group -- proves `group_ids` is this child's own choice, not
+    // child 1's carried over.
+    await user.click(within(dialog).getAllByRole('radio')[1]!)
+    await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.next2 }))
+
+    // Part 3 -- the SECOND plan, same reasoning for `price_plan_id`.
+    await user.click(within(dialog).getAllByRole('radio')[1]!)
+    await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.next3 }))
+
+    // Part 4 -- healthy preset, then ONE answer flipped to "yes": this child is flagged
+    // for manager review and child 1 is not, so the health block reaching the payload is
+    // provably this child's own answers.
+    await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.healthYes }))
+    await user.click(within(dialog).getByRole('radio', { name: STUDENT_FORM_COPY.answerYes }))
+    await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.next4 }))
+
+    // Part 5 -- a different health fund from child 1's, same reasoning again.
+    await user.selectOptions(fieldIn(dialog, STUDENT_FORM_COPY.healthFund), 'maccabi')
+    await user.click(
+      within(dialog).getByRole('checkbox', { name: new RegExp(STUDENT_FORM_COPY.attestCheckbox) }),
+    )
+    drawSignature(dialog)
+    await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.save }))
+
+    await user.click(screen.getByRole('button', { name: STEP2_COPY.continueToStep3 }))
+
+    // Step 3 -- child 2 is awaiting manager review (flagged above), so only child 1 has a
+    // payment-method radio; the default (credit) is fine here since this test is about the
+    // payload `register` receives, not the payment outcome.
+    await user.click(screen.getByRole('button', { name: STEP3_COPY.continueToPay }))
+    await user.click(screen.getByRole('button', { name: new RegExp(STEP3_COPY.submitWithCredit) }))
+
+    await waitFor(() => expect(source.register).toHaveBeenCalledTimes(1))
+    const [payload] = vi.mocked(source.register).mock.calls[0]!
+
+    expect(payload.children).toHaveLength(2)
+    const child1 = payload.children[0]!
+    const child2 = payload.children[1]!
+
+    expect(child1.first_name).toBe('נועה')
+    expect(child1.last_name).toBe('כהן')
+    expect(child1.birthdate).toBe('2016-04-01')
+    expect(child1.group_ids).toEqual(['g1'])
+    expect(child1.price_plan_id).toBe('plan-1')
+    expect(child1.health?.template_id).toBe('tmpl-1')
+    expect(child1.health?.answers.asthma).toBe(false)
+    expect(child1.health?.answers.health_fund).toBe('clalit')
+
+    expect(child2.first_name).toBe('איתן')
+    expect(child2.last_name).toBe('לוי')
+    expect(child2.birthdate).toBe('2014-02-10')
+    expect(child2.group_ids).toEqual(['g2'])
+    expect(child2.price_plan_id).toBe('plan-2')
+    expect(child2.health?.template_id).toBe('tmpl-1')
+    expect(child2.health?.answers.asthma).toBe(true)
+    expect(child2.health?.answers.health_fund).toBe('maccabi')
+
+    // The signer -- present once, carrying the guardian's own details (shared by both
+    // children, per the form's own §5.6 behaviour), never one child's own.
+    expect(payload.first_name).toBe('דנה')
+    expect(payload.last_name).toBe('כהן')
+    expect(payload.signer.national_id).toBe('100000017')
+    expect(payload.signer.address).toBe('הרצל 1')
+    expect(payload.signer.city).toBe('תל אביב')
+  }, 20000)
+
   it('registration succeeds while the promise write fails: still reaches step 4, showing the child as not recorded rather than arranged', async () => {
     const user = userEvent.setup()
     const billingClient = billingClientStub({
@@ -503,5 +697,40 @@ describe('Step1Agreements -- renders in English when given locale="en" (task 6)'
     // ones happen to also be present alongside the Hebrew originals.
     expect(screen.queryByText(he.heading)).toBeNull()
     expect(screen.queryByText(he.lead)).toBeNull()
+  })
+})
+
+// Gap 2 -- `OnboardingInfoOut.club_terms_version` is live off the server's own constant,
+// and step 1 is the screen where the consent ledger records one, so the family should be
+// able to see which version they are agreeing to. `wizardSources.test.ts` covers the read
+// itself (`tokenSource.loadStudio` maps it, `studioSource.loadStudio` always answers
+// `null`); these two cover the render.
+describe('Step1Agreements -- the club terms version (gap 2)', () => {
+  it('renders the version beside the club-terms document when the source has one', () => {
+    render(
+      <Step1Agreements
+        locale="he"
+        clubTermsVersion={7}
+        agreed={false}
+        onAgreedChange={() => {}}
+        onContinue={() => {}}
+      />,
+    )
+
+    expect(screen.getByText(`${STEP1_COPY.termsVersion} 7`)).toBeInTheDocument()
+  })
+
+  it('renders no version text when clubTermsVersion is null (doors C/D)', () => {
+    render(
+      <Step1Agreements
+        locale="he"
+        clubTermsVersion={null}
+        agreed={false}
+        onAgreedChange={() => {}}
+        onContinue={() => {}}
+      />,
+    )
+
+    expect(screen.queryByText(new RegExp(STEP1_COPY.termsVersion))).toBeNull()
   })
 })

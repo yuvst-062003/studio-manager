@@ -562,6 +562,7 @@ export const people: Bundle = {
   'joinWizard.step1.continue': 'המשך',
   'joinWizard.step1.closeDocument': 'אישור וסגירה',
   'joinWizard.step1.close': 'סגור',
+  'joinWizard.step1.termsVersion': 'גרסה',
 
   // STEP2_COPY -> joinWizard.step2.*
   'joinWizard.step2.seasonPill': 'עונת האימונים תשפ״ה • 2025-2026',
@@ -731,6 +732,8 @@ export const people: Bundle = {
   'joinWizard.step3.secureNote': 'עסקה מאובטחת ע״פ תקן PCI-DSS',
   'joinWizard.step3.submitting': 'רושמים את המשפחה…',
   'joinWizard.step3.submitFailed': 'ההרשמה לא נשלחה. בדקו את החיבור ונסו שוב.',
+  'joinWizard.step3.submitFailedNationalId':
+    'אחד ממספרי הזהות שהוזנו אינו תקין. חזרו לשלב פרטי המתאמנים ובדקו אותו.',
   'joinWizard.step3.standingOrderMultiNote': 'הוראת קבע נחתמת בנפרד עבור כל חניך. בתשלום באשראי תמלאו טופס אחד לכל המשפחה.',
   'joinWizard.step3.demoNoForm': 'לא ניתן לפתוח דף תשלום בסביבה זו. ההזמנה נרשמה ותוסדר מול המועדון.',
   'joinWizard.step3.mandatesTitle': 'הוראת קבע',

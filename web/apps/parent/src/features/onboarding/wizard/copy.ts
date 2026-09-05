@@ -154,6 +154,9 @@ export function step1Copy(locale: Locale) {
     continue: t(locale, 'people.joinWizard.step1.continue'),
     closeDocument: t(locale, 'people.joinWizard.step1.closeDocument'),
     close: t(locale, 'people.joinWizard.step1.close'),
+    //: Gap 2 -- rendered as `{label} {n}`, the way the wizard renders its other counts.
+    //: Never interpolated in the locale file itself.
+    termsVersion: t(locale, 'people.joinWizard.step1.termsVersion'),
   } as const
 }
 
@@ -332,6 +335,8 @@ export function step3Copy(locale: Locale) {
     secureNote: t(locale, 'people.joinWizard.step3.secureNote'),
     submitting: t(locale, 'people.joinWizard.step3.submitting'),
     submitFailed: t(locale, 'people.joinWizard.step3.submitFailed'),
+    //: Gap 1 -- the one code `Step3Payment` distinguishes from every other failure.
+    submitFailedNationalId: t(locale, 'people.joinWizard.step3.submitFailedNationalId'),
     standingOrderMultiNote: t(locale, 'people.joinWizard.step3.standingOrderMultiNote'),
     demoNoForm: t(locale, 'people.joinWizard.step3.demoNoForm'),
     mandatesTitle: t(locale, 'people.joinWizard.step3.mandatesTitle'),
