@@ -10,26 +10,29 @@
 // unanswered. The prototype defaults the preset to "healthy" and all thirteen answers to
 // "no", so the whole safety declaration completes itself by pressing Next five times.
 import { AlertCircle, Check, CheckCircle2, Clock, HeartPulse } from 'lucide-react'
+import type { Locale } from '@studio/i18n'
 import { isVisible } from '../../../health/healthClient'
 import type { AnswerValue, TemplateSchema } from '../../../health/healthClient'
-import { STUDENT_FORM_COPY } from '../content'
+import { studentFormCopy } from '../copy'
 import { needsManagerReview } from '../types'
 import type { StudentDraft } from '../types'
 
 export function PartHealth({
+  locale,
   schema,
   student,
   onChange,
   presetError,
   answersError,
 }: {
+  locale: Locale
   schema: TemplateSchema
   student: StudentDraft
   onChange: (patch: Partial<StudentDraft>) => void
   presetError: string | null
   answersError: string | null
 }) {
-  const copy = STUDENT_FORM_COPY
+  const copy = studentFormCopy(locale)
   const flagged = needsManagerReview(student)
 
   const setAnswer = (id: string, value: AnswerValue) => {

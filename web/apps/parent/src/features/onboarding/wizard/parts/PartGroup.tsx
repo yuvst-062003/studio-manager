@@ -7,21 +7,24 @@
 // A real radio group, not the prototype's `<div onClick>`: those are unreachable by
 // keyboard and announce as nothing (§14.3).
 import { Calendar, Check, CheckCircle2, Swords } from 'lucide-react'
-import { STUDENT_FORM_COPY } from '../content'
+import type { Locale } from '@studio/i18n'
+import { studentFormCopy } from '../copy'
 import type { WizardGroup } from '../types'
 
 export function PartGroup({
+  locale,
   groups,
   selectedId,
   onSelect,
   error,
 }: {
+  locale: Locale
   groups: readonly WizardGroup[]
   selectedId: string
   onSelect: (id: string) => void
   error: string | null
 }) {
-  const copy = STUDENT_FORM_COPY
+  const copy = studentFormCopy(locale)
   const selected = groups.find((group) => group.id === selectedId)
 
   return (

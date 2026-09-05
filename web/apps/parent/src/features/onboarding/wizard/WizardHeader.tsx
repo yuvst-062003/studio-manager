@@ -3,7 +3,8 @@
 // The prototype's header carries a fourth row of "מסך 1..4" quick-jump buttons. It is a
 // design-review affordance and is NOT ported (spec §2, §16 item 5).
 import { ArrowRight, Check, User } from 'lucide-react'
-import { STEP1_COPY } from './content'
+import type { Locale } from '@studio/i18n'
+import { step1Copy } from './copy'
 
 export type WizardStep = 1 | 2 | 3 | 4
 
@@ -21,6 +22,7 @@ const STEP_DETAIL: Record<WizardStep, { title: string; stage: string; percent: n
 }
 
 export type WizardHeaderProps = {
+  locale: Locale
   currentStep: WizardStep
   studioName: string
   logoUrl?: string | null
@@ -31,12 +33,14 @@ export type WizardHeaderProps = {
 }
 
 export function WizardHeader({
+  locale,
   currentStep,
   studioName,
   logoUrl,
   onNavigate,
   onBack,
 }: WizardHeaderProps) {
+  const copy = step1Copy(locale)
   const current = STEP_DETAIL[currentStep]
 
   return (
@@ -83,7 +87,7 @@ export function WizardHeader({
         <div className="flex items-center justify-between text-[#444650] text-[13px] font-medium mb-1.5 px-0.5">
           <span className="font-bold text-[#001849]">{current.stage}</span>
           <div className="flex items-center gap-1.5">
-            <span className="text-[11px] text-[#444650] font-medium">{STEP1_COPY.completedLabel}</span>
+            <span className="text-[11px] text-[#444650] font-medium">{copy.completedLabel}</span>
             <span className="text-[12.5px] font-extrabold text-[#0056c5] bg-[#e9edff] px-2 py-0.5 rounded-md">
               {current.percent}%
             </span>

@@ -29,7 +29,8 @@ import {
   ShieldCheck,
   Users,
 } from 'lucide-react'
-import { STEP3_COPY } from './content'
+import type { Locale } from '@studio/i18n'
+import { step3Copy } from './copy'
 import { PaymentFrame } from './PaymentFrame'
 import type { PaymentFrameRequest } from './PaymentFrame'
 import type { SubmitJoinResult } from './submitJoin'
@@ -39,15 +40,16 @@ import type { PaymentMethod, StudentDraft, WizardPlan } from './types'
 type SubView = 'decision' | 'methods'
 type Intent = 'now' | 'arranged'
 type Phase = 'form' | 'working' | 'mandates'
+type Step3CopyKey = keyof ReturnType<typeof step3Copy>
 
-const METHOD_BUTTONS: readonly { key: PaymentMethod; label: keyof typeof STEP3_COPY; Icon: typeof CreditCard }[] = [
+const METHOD_BUTTONS: readonly { key: PaymentMethod; label: Step3CopyKey; Icon: typeof CreditCard }[] = [
   { key: 'credit', label: 'methodCredit', Icon: CreditCard },
   { key: 'cash', label: 'methodCash', Icon: Banknote },
   { key: 'cheque', label: 'methodCheque', Icon: Receipt },
   { key: 'standing_order', label: 'methodStandingOrder', Icon: Repeat },
 ]
 
-const LONG_LABEL: Record<PaymentMethod, keyof typeof STEP3_COPY> = {
+const LONG_LABEL: Record<PaymentMethod, Step3CopyKey> = {
   credit: 'methodCreditLong',
   cash: 'methodCashLong',
   cheque: 'methodChequeLong',
@@ -55,6 +57,7 @@ const LONG_LABEL: Record<PaymentMethod, keyof typeof STEP3_COPY> = {
 }
 
 export type Step3PaymentProps = {
+  locale: Locale
   students: readonly StudentDraft[]
   plans: readonly WizardPlan[]
   methods: Readonly<Record<string, PaymentMethod>>
@@ -72,6 +75,7 @@ export type Step3PaymentProps = {
 }
 
 export function Step3Payment({
+  locale,
   students,
   plans,
   methods,
@@ -81,7 +85,7 @@ export function Step3Payment({
   onSubmit,
   onDone,
 }: Step3PaymentProps) {
-  const copy = STEP3_COPY
+  const copy = step3Copy(locale)
   const [subView, setSubView] = useState<SubView>('decision')
   const [intent, setIntentState] = useState<Intent>('now')
   const [phase, setPhase] = useState<Phase>('form')
@@ -648,7 +652,9 @@ export function Step3Payment({
         </div>
       </footer>
 
-      {frame ? <PaymentFrame request={frame} onComplete={closeFrame} onClose={closeFrame} /> : null}
+      {frame ? (
+        <PaymentFrame locale={locale} request={frame} onComplete={closeFrame} onClose={closeFrame} />
+      ) : null}
     </div>
   )
 }

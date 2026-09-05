@@ -5,11 +5,13 @@
 import { useCallback, useId, useState } from 'react'
 import type { ReactNode } from 'react'
 import { CheckCircle2, ChevronDown, X } from 'lucide-react'
+import type { Locale } from '@studio/i18n'
 import { useDialog } from './useDialog'
-import { FAQ_ITEMS, STEP1_COPY } from './content'
-import type { LegalDocument } from './content'
+import { faqItems, step1Copy } from './copy'
+import type { LegalDocument } from './copy'
 
 type PopupShellProps = {
+  locale: Locale
   title: string
   subtitle?: string
   icon: ReactNode
@@ -18,7 +20,8 @@ type PopupShellProps = {
   footer?: ReactNode
 }
 
-function PopupShell({ title, subtitle, icon, onClose, children, footer }: PopupShellProps) {
+function PopupShell({ locale, title, subtitle, icon, onClose, children, footer }: PopupShellProps) {
+  const copy = step1Copy(locale)
   const titleId = useId()
   const dialogRef = useDialog(true, onClose)
 
@@ -53,7 +56,7 @@ function PopupShell({ title, subtitle, icon, onClose, children, footer }: PopupS
           </div>
           <button
             type="button"
-            aria-label={STEP1_COPY.close}
+            aria-label={copy.close}
             onClick={onClose}
             className="w-9 h-9 rounded-full bg-white hover:bg-[#e3e7fa] text-[#444650] flex items-center justify-center transition-colors cursor-pointer shrink-0"
           >
@@ -74,16 +77,20 @@ function PopupShell({ title, subtitle, icon, onClose, children, footer }: PopupS
 }
 
 export function DocumentPopup({
+  locale,
   document: doc,
   icon,
   onClose,
 }: {
+  locale: Locale
   document: LegalDocument
   icon: ReactNode
   onClose: () => void
 }) {
+  const copy = step1Copy(locale)
   return (
     <PopupShell
+      locale={locale}
       title={doc.title}
       icon={icon}
       onClose={onClose}
@@ -93,7 +100,7 @@ export function DocumentPopup({
           onClick={onClose}
           className="w-full py-3 px-5 rounded-xl bg-[#0056c5] hover:bg-[#001849] text-white font-semibold text-[15px] shadow-sm transition-all duration-200 flex items-center justify-center gap-2 active:scale-[0.99] cursor-pointer"
         >
-          {STEP1_COPY.closeDocument}
+          {copy.closeDocument}
         </button>
       }
     >
@@ -123,7 +130,17 @@ export function DocumentPopup({
   )
 }
 
-export function FaqPopup({ icon, onClose }: { icon: ReactNode; onClose: () => void }) {
+export function FaqPopup({
+  locale,
+  icon,
+  onClose,
+}: {
+  locale: Locale
+  icon: ReactNode
+  onClose: () => void
+}) {
+  const copy = step1Copy(locale)
+  const items = faqItems(locale)
   //: §3.3 -- all five collapsed on open, so the reader meets the LIST and opens the one
   //: they want. The prototype pre-opened the first, which hides the other four below the
   //: fold on a phone.
@@ -134,13 +151,14 @@ export function FaqPopup({ icon, onClose }: { icon: ReactNode; onClose: () => vo
 
   return (
     <PopupShell
-      title={STEP1_COPY.faqTitle}
-      subtitle={STEP1_COPY.faqLead}
+      locale={locale}
+      title={copy.faqTitle}
+      subtitle={copy.faqLead}
       icon={icon}
       onClose={onClose}
     >
       <div className="flex flex-col gap-2">
-        {FAQ_ITEMS.map((item) => {
+        {items.map((item) => {
           const isOpen = openId === item.id
           return (
             <div

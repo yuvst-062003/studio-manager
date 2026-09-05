@@ -9,6 +9,7 @@
 //   * The dialog traps focus, closes on Escape and restores focus -- see useDialog.ts.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, CreditCard, HeartPulse, PenTool, Swords, User, X } from 'lucide-react'
+import type { Locale } from '@studio/i18n'
 import type { TemplateSchema } from '../../health/healthClient'
 import { useDialog } from './useDialog'
 import { PartDetails } from './parts/PartDetails'
@@ -16,24 +17,29 @@ import { PartGroup } from './parts/PartGroup'
 import { PartPlan } from './parts/PartPlan'
 import { PartHealth } from './parts/PartHealth'
 import { PartSignature } from './parts/PartSignature'
-import { STUDENT_FORM_COPY } from './content'
+import { studentFormCopy } from './copy'
 import { clearStudentDraft, saveStudentDraft } from './draft'
 import { emptyStudent } from './types'
 import type { FormPart, StudentDraft, WizardGroup, WizardPlan } from './types'
 import { VALIDATION_COPY, fieldError, partErrors } from './validation'
 import type { FieldKey } from './validation'
 
-const PART_META: Record<FormPart, { title: string; next: string; tab: string; Icon: typeof User }> = {
-  1: { title: STUDENT_FORM_COPY.part1Title, next: STUDENT_FORM_COPY.next1, tab: STUDENT_FORM_COPY.tab1, Icon: User },
-  2: { title: STUDENT_FORM_COPY.part2Title, next: STUDENT_FORM_COPY.next2, tab: STUDENT_FORM_COPY.tab2, Icon: Swords },
-  3: { title: STUDENT_FORM_COPY.part3Title, next: STUDENT_FORM_COPY.next3, tab: STUDENT_FORM_COPY.tab3, Icon: CreditCard },
-  4: { title: STUDENT_FORM_COPY.part4Title, next: STUDENT_FORM_COPY.next4, tab: STUDENT_FORM_COPY.tab4, Icon: HeartPulse },
-  5: { title: STUDENT_FORM_COPY.part5Title, next: STUDENT_FORM_COPY.save, tab: STUDENT_FORM_COPY.tab5, Icon: PenTool },
+function partMeta(
+  copy: ReturnType<typeof studentFormCopy>,
+): Record<FormPart, { title: string; next: string; tab: string; Icon: typeof User }> {
+  return {
+    1: { title: copy.part1Title, next: copy.next1, tab: copy.tab1, Icon: User },
+    2: { title: copy.part2Title, next: copy.next2, tab: copy.tab2, Icon: Swords },
+    3: { title: copy.part3Title, next: copy.next3, tab: copy.tab3, Icon: CreditCard },
+    4: { title: copy.part4Title, next: copy.next4, tab: copy.tab4, Icon: HeartPulse },
+    5: { title: copy.part5Title, next: copy.save, tab: copy.tab5, Icon: PenTool },
+  }
 }
 
 const PARTS: readonly FormPart[] = [1, 2, 3, 4, 5]
 
 export type StudentFormSheetProps = {
+  locale: Locale
   initial: StudentDraft | null
   initialPart?: FormPart
   groups: readonly WizardGroup[]
@@ -46,6 +52,7 @@ export type StudentFormSheetProps = {
 }
 
 export function StudentFormSheet({
+  locale,
   initial,
   initialPart = 1,
   groups,
@@ -55,6 +62,8 @@ export function StudentFormSheet({
   onSave,
   onClose,
 }: StudentFormSheetProps) {
+  const STUDENT_FORM_COPY = studentFormCopy(locale)
+  const PART_META = partMeta(STUDENT_FORM_COPY)
   const isEditing = initial !== null && initial.firstName !== ''
   const [student, setStudent] = useState<StudentDraft>(
     () => initial ?? emptyStudent(`student-${Date.now()}`, familyDefaults),
@@ -77,7 +86,10 @@ export function StudentFormSheet({
     // A dirty EDIT has no draft behind it, so discarding it loses the work outright.
     if (dirty && isEditing && !window.confirm(STUDENT_FORM_COPY.cancel + '?')) return
     onClose()
-  }, [dirty, isEditing, onClose])
+    // `STUDENT_FORM_COPY` is recomputed from `locale` every render (task 6), not a stable
+    // module-level constant any more -- depend on `locale` itself rather than the object.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dirty, isEditing, onClose, locale])
 
   const dialogRef = useDialog(true, requestClose)
   const bodyRef = useRef<HTMLDivElement | null>(null)
@@ -214,10 +226,17 @@ export function StudentFormSheet({
         {/* Not a <form>: Enter must not submit from part 1. */}
         <div ref={bodyRef} className="overflow-y-auto p-4 sm:p-5 flex-1 flex flex-col gap-4">
           {part === 1 ? (
-            <PartDetails student={student} onChange={change} errorFor={errorFor} onBlurField={blurField} />
+            <PartDetails
+              locale={locale}
+              student={student}
+              onChange={change}
+              errorFor={errorFor}
+              onBlurField={blurField}
+            />
           ) : null}
           {part === 2 ? (
             <PartGroup
+              locale={locale}
               groups={groups}
               selectedId={student.groupId}
               onSelect={(groupId) => change({ groupId })}
@@ -226,6 +245,7 @@ export function StudentFormSheet({
           ) : null}
           {part === 3 ? (
             <PartPlan
+              locale={locale}
               plans={plans}
               selectedId={student.planId}
               onSelect={(planId) => change({ planId })}
@@ -234,6 +254,7 @@ export function StudentFormSheet({
           ) : null}
           {part === 4 ? (
             <PartHealth
+              locale={locale}
               schema={healthSchema}
               student={student}
               onChange={change}
@@ -242,7 +263,13 @@ export function StudentFormSheet({
             />
           ) : null}
           {part === 5 ? (
-            <PartSignature student={student} onChange={change} errorFor={errorFor} onBlurField={blurField} />
+            <PartSignature
+              locale={locale}
+              student={student}
+              onChange={change}
+              errorFor={errorFor}
+              onBlurField={blurField}
+            />
           ) : null}
 
           {showWarning ? (

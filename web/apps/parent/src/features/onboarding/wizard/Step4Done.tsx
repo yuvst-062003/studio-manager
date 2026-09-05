@@ -14,13 +14,16 @@
 //     the celebration is CSS -- and it respects `prefers-reduced-motion`.
 import { useEffect, useState } from 'react'
 import { AlertCircle, Check, Clock, Copy, MessageCircle } from 'lucide-react'
+import type { Locale } from '@studio/i18n'
 import { AthleteCardModal } from './AthleteCardModal'
-import { STEP4_COPY } from './content'
+import { step4Copy } from './copy'
 import type { OutcomeReason, PaymentOutcome } from './submitJoin'
 import { needsManagerReview } from './types'
 import type { StudentDraft, WizardGroup } from './types'
 
-const STATE_COPY: Record<PaymentOutcome['state'], keyof typeof STEP4_COPY> = {
+type Step4CopyKey = keyof ReturnType<typeof step4Copy>
+
+const STATE_COPY: Record<PaymentOutcome['state'], Step4CopyKey> = {
   awaiting_review: 'paymentAwaitingReview',
   recorded: 'paymentRecorded',
   mandate_pending: 'paymentMandatePending',
@@ -28,7 +31,7 @@ const STATE_COPY: Record<PaymentOutcome['state'], keyof typeof STEP4_COPY> = {
   not_recorded: 'paymentNotRecorded',
 }
 
-const REASON_COPY: Record<OutcomeReason, keyof typeof STEP4_COPY> = {
+const REASON_COPY: Record<OutcomeReason, Step4CopyKey> = {
   no_charge_for_card: 'paymentReasonNoChargeForCard',
   write_failed: 'paymentReasonWriteFailed',
   no_student: 'paymentReasonNoStudent',
@@ -41,8 +44,14 @@ const REASON_COPY: Record<OutcomeReason, keyof typeof STEP4_COPY> = {
  *  uPay order is not an approved payment). Driven from the outcome instead -- and drawn
  *  as nothing at all when no outcome names this child, because an absent fact is not a
  *  reassuring one. */
-function PaymentChip({ outcome }: { outcome: PaymentOutcome | undefined }) {
-  const copy = STEP4_COPY
+function PaymentChip({
+  locale,
+  outcome,
+}: {
+  locale: Locale
+  outcome: PaymentOutcome | undefined
+}) {
+  const copy = step4Copy(locale)
   if (!outcome) return null
 
   const AMBER =
@@ -129,6 +138,7 @@ function Confetti() {
 }
 
 export type Step4DoneProps = {
+  locale: Locale
   students: readonly StudentDraft[]
   groups: readonly WizardGroup[]
   /** What became of each child's payment choice. Required so a caller cannot quietly
@@ -148,6 +158,7 @@ export type Step4DoneProps = {
 }
 
 export function Step4Done({
+  locale,
   students,
   groups,
   outcomes,
@@ -157,7 +168,7 @@ export function Step4Done({
   whatsappUrl,
   onEnterApp,
 }: Step4DoneProps) {
-  const copy = STEP4_COPY
+  const copy = step4Copy(locale)
   const [copied, setCopied] = useState(false)
   const [card, setCard] = useState<StudentDraft | null>(null)
   const anyAwaiting = students.some(needsManagerReview)
@@ -332,7 +343,7 @@ export function Step4Done({
                         </span>
                       </span>
                     </span>
-                    <PaymentChip outcome={outcome} />
+                    <PaymentChip locale={locale} outcome={outcome} />
                   </button>
                 </li>
               )
@@ -406,6 +417,7 @@ export function Step4Done({
 
       {card ? (
         <AthleteCardModal
+          locale={locale}
           student={card}
           groups={groups}
           registrationRef={registrationRef}

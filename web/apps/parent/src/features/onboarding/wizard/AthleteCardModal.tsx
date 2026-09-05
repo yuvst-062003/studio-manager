@@ -8,25 +8,28 @@
 // answer once. The card number here comes from the REGISTRATION reference, which is a
 // reference and not an identity document.
 import { Award, IdCard, ShieldCheck, X } from 'lucide-react'
+import type { Locale } from '@studio/i18n'
 import { useDialog } from './useDialog'
-import { ATHLETE_CARD_COPY, BELT_OPTIONS } from './content'
+import { athleteCardCopy, beltOptions } from './copy'
 import { needsManagerReview } from './types'
 import type { StudentDraft, WizardGroup } from './types'
 
-const beltLabel = (id: string) => BELT_OPTIONS.find((option) => option.value === id)?.label ?? ''
-
 export function AthleteCardModal({
+  locale,
   student,
   groups,
   registrationRef,
   onClose,
 }: {
+  locale: Locale
   student: StudentDraft
   groups: readonly WizardGroup[]
   registrationRef?: string
   onClose: () => void
 }) {
-  const copy = ATHLETE_CARD_COPY
+  const copy = athleteCardCopy(locale)
+  const beltLabel = (id: string) =>
+    beltOptions(locale).find((option) => option.value === id)?.label ?? ''
   const dialogRef = useDialog(true, onClose)
   const name = `${student.firstName} ${student.lastName}`.trim()
   const initials = [student.firstName, student.lastName]

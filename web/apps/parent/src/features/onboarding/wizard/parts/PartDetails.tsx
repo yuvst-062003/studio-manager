@@ -5,23 +5,27 @@
 // all accepted by its own validation. A distracted family submits a stranger's identity as
 // their own and the club's records are quietly wrong (§14.1).
 import { School, User, Users } from 'lucide-react'
+import type { Locale } from '@studio/i18n'
 import { SectionBand, SelectField, TextField } from './Field'
-import { GRADE_OPTIONS, BELT_OPTIONS, STUDENT_FORM_COPY } from '../content'
+import { gradeOptions, beltOptions, studentFormCopy } from '../copy'
 import { ageFrom, isMinor } from '../types'
 import type { StudentDraft } from '../types'
 import type { FieldKey } from '../validation'
 
 export type PartProps = {
+  locale: Locale
   student: StudentDraft
   onChange: (patch: Partial<StudentDraft>) => void
   errorFor: (field: FieldKey) => string | null
   onBlurField: (field: FieldKey) => void
 }
 
-export function PartDetails({ student, onChange, errorFor, onBlurField }: PartProps) {
+export function PartDetails({ locale, student, onChange, errorFor, onBlurField }: PartProps) {
   const minor = isMinor(student.birthDate)
   const age = ageFrom(student.birthDate)
-  const copy = STUDENT_FORM_COPY
+  const copy = studentFormCopy(locale)
+  const GRADE_OPTIONS = gradeOptions(locale)
+  const BELT_OPTIONS = beltOptions(locale)
 
   return (
     <div className="flex flex-col gap-3.5">

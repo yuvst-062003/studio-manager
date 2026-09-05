@@ -15,7 +15,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { BillingClient, ChargeOut } from '../../billing/billingClient'
 import type { StandingOrderLink } from '../../billing/PaymentSetup'
 import { toWizardGroup, toWizardPlan } from './adapters'
-import { STEP1_COPY, STEP2_COPY, STEP3_COPY, STEP4_COPY, STUDENT_FORM_COPY } from './content'
+import { step1Copy, step2Copy, step3Copy, step4Copy, studentFormCopy } from './copy'
+import { Step1Agreements } from './Step1Agreements'
 import { Step3Payment } from './Step3Payment'
 import type { RegisterResult, SubmitJoinResult } from './submitJoin'
 import { emptyStudent } from './types'
@@ -23,6 +24,15 @@ import type { WizardPlan } from './types'
 import type { WizardStep } from './WizardHeader'
 import { JoinWizard } from './JoinWizard'
 import type { JoinWizardSource, WizardCatalogue, WizardStudio } from './wizardSources'
+
+// The wizard renders in Hebrew by default in these tests -- see `renderWizard`'s
+// `locale="he"` below -- so the assertions below read the same reference values `t('he', …)`
+// resolves to, rather than the deleted `content.ts` constants they used to import.
+const STEP1_COPY = step1Copy('he')
+const STEP2_COPY = step2Copy('he')
+const STEP3_COPY = step3Copy('he')
+const STEP4_COPY = step4Copy('he')
+const STUDENT_FORM_COPY = studentFormCopy('he')
 
 vi.mock('@studio/core', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@studio/core')>()
@@ -128,6 +138,7 @@ function renderWizard(
   const source = options.source ?? fakeSource()
   render(
     <JoinWizard
+      locale="he"
       billingClient={billingClient}
       source={source}
       onEnterApp={vi.fn()}
@@ -444,6 +455,7 @@ describe('Step3Payment -- the mandates checklist (F2 fix round 1)', () => {
 
     render(
       <Step3Payment
+        locale="he"
         students={[student]}
         plans={[PLAN]}
         methods={{ c1: 'standing_order' }}
@@ -464,5 +476,32 @@ describe('Step3Payment -- the mandates checklist (F2 fix round 1)', () => {
     // that nothing on screen told a SIGHTED parent the row was tappable. The visible
     // text has to be there too, and in the link-blue the rest of the screen uses for it.
     expect(within(row).getByText(STEP3_COPY.mandateOpen)).toBeVisible()
+  })
+})
+
+// Task 6 -- the wizard's copy moved out of `content.ts` and into the shared `people`
+// namespace, translated into English and Russian beside the Hebrew. Nothing above this
+// point ever executes the English (or Russian) file: every assertion renders `locale="he"`
+// and reads its own reference strings back from `step*Copy('he')`. Without a test that
+// actually renders a non-Hebrew locale, `en/people.ts` could go half-empty -- every missing
+// key would fall back to Hebrew (`translate`'s own rule) and nothing here would go red.
+describe('Step1Agreements -- renders in English when given locale="en" (task 6)', () => {
+  it('shows the English heading, lead, FAQ title and continue button, and none of the Hebrew', () => {
+    const en = step1Copy('en')
+    const he = step1Copy('he')
+
+    render(
+      <Step1Agreements locale="en" agreed={false} onAgreedChange={() => {}} onContinue={() => {}} />,
+    )
+
+    expect(screen.getByText(en.heading)).toBeInTheDocument()
+    expect(screen.getByText(en.lead)).toBeInTheDocument()
+    expect(screen.getByText(en.faqTitle)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: en.continue })).toBeInTheDocument()
+
+    // Proof the locale actually switched the rendered strings, not merely that the English
+    // ones happen to also be present alongside the Hebrew originals.
+    expect(screen.queryByText(he.heading)).toBeNull()
+    expect(screen.queryByText(he.lead)).toBeNull()
   })
 })

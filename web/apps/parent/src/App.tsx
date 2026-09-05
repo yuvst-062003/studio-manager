@@ -326,6 +326,7 @@ function JoinShell({ token }: { token: string }) {
       <AccessibilityMenu locale={locale} />
       <LanguagePicker locale={locale} onChoose={setLocale} />
       <JoinWizard
+        locale={locale}
         billingClient={billingClient}
         source={source}
         onEnterApp={() => {
@@ -823,6 +824,7 @@ function AuthedApp() {
             // state rather than flashing the old gates first and correcting a moment
             // later -- see `JoinWizard`'s own `studio.status === 'loading'` branch.
             <JoinWizard
+              locale={locale}
               billingClient={billingClient}
               onEnterApp={() => {
                 setWizardFinished(true)
@@ -954,6 +956,7 @@ function AuthedApp() {
             // family's own gate to clear before adding a fourth child, not a wizard
             // Door D exists to route around.
             <JoinWizard
+              locale={locale}
               billingClient={billingClient}
               onEnterApp={() => {
                 setFamilyJoined((n) => n + 1)

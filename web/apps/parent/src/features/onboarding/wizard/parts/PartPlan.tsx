@@ -8,23 +8,26 @@
 // So a plan exceeding the base group's two sessions is the product, not a mismatch. The
 // wizard only sets `price_plan_id`; booking the extra session is a parent-app feature.
 import { Check, CheckCircle2, CreditCard } from 'lucide-react'
-import { STUDENT_FORM_COPY } from '../content'
+import type { Locale } from '@studio/i18n'
+import { studentFormCopy } from '../copy'
 import type { WizardPlan } from '../types'
 
 const shekels = (agorot: number) => Math.round(agorot / 100).toLocaleString('he-IL')
 
 export function PartPlan({
+  locale,
   plans,
   selectedId,
   onSelect,
   error,
 }: {
+  locale: Locale
   plans: readonly WizardPlan[]
   selectedId: string
   onSelect: (id: string) => void
   error: string | null
 }) {
-  const copy = STUDENT_FORM_COPY
+  const copy = studentFormCopy(locale)
 
   return (
     <fieldset className="flex flex-col gap-3.5 border-0 p-0 m-0">

@@ -15,6 +15,7 @@
 // draws, validates, persists and submits stays exactly here, unchanged.
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { refresh } from '@studio/core'
+import type { Locale } from '@studio/i18n'
 import type { BillingClient } from '../../billing/billingClient'
 import type { StandingOrderLink } from '../../billing/PaymentSetup'
 import type { TemplateSchema } from '../../health/healthClient'
@@ -26,7 +27,7 @@ import { WizardHeader } from './WizardHeader'
 import type { WizardStep } from './WizardHeader'
 import { toRegisterPayload } from './adapters'
 import { clearStudentDraft } from './draft'
-import { WIZARD_FLOW_COPY } from './content'
+import { wizardFlowCopy } from './copy'
 import { submitJoin } from './submitJoin'
 import type { SubmitJoinResult } from './submitJoin'
 import type { PaymentMethod, StudentDraft, WizardGroup, WizardPlan } from './types'
@@ -50,6 +51,7 @@ type CatalogueState =
   | { status: 'ready'; plans: WizardPlan[]; schema: TemplateSchema; templateId: string }
 
 export type JoinWizardProps = {
+  locale: Locale
   /** What this door reads and writes. See `wizardSources.ts`. The effects below key on
    *  this object's IDENTITY, not its contents, so a caller MUST hand this a stable
    *  reference -- build it with `useMemo` at the call site, never inline. */
@@ -70,6 +72,7 @@ export type JoinWizardProps = {
 }
 
 export function JoinWizard({
+  locale,
   source,
   billingClient,
   standingOrderLinks,
@@ -77,7 +80,7 @@ export function JoinWizard({
   startAtStep,
   onEnterApp,
 }: JoinWizardProps) {
-  const copy = WIZARD_FLOW_COPY
+  const copy = wizardFlowCopy(locale)
   const [studio, setStudio] = useState<StudioState>({ status: 'loading' })
   const [catalogue, setCatalogue] = useState<CatalogueState>({ status: 'loading' })
   const [step, setStep] = useState<WizardStep>(startAtStep ?? 1)
@@ -204,6 +207,7 @@ export function JoinWizard({
   if (step === 4) {
     return (
       <Step4Done
+        locale={locale}
         students={students}
         groups={studio.groups}
         outcomes={submitResult?.outcomes ?? []}
@@ -216,6 +220,7 @@ export function JoinWizard({
   return (
     <div className="tw-scope min-h-screen bg-[#faf8ff] text-[#161b28] flex flex-col">
       <WizardHeader
+        locale={locale}
         currentStep={step}
         studioName={studio.studioName}
         logoUrl={studio.logoUrl}
@@ -225,6 +230,7 @@ export function JoinWizard({
       <main className="flex-1 flex flex-col w-full mx-auto pt-32 px-4 max-w-[480px]">
         {step === 1 ? (
           <Step1Agreements
+            locale={locale}
             emblemUrl={studio.logoUrl}
             agreed={agreed}
             onAgreedChange={setAgreed}
@@ -242,6 +248,7 @@ export function JoinWizard({
         ) : null}
         {step === 2 && catalogue.status === 'ready' ? (
           <Step2Trainees
+            locale={locale}
             students={students}
             onStudentsChange={setStudents}
             groups={studio.groups}
@@ -255,6 +262,7 @@ export function JoinWizard({
 
         {step === 3 ? (
           <Step3Payment
+            locale={locale}
             students={students}
             plans={catalogue.status === 'ready' ? catalogue.plans : []}
             methods={methods}

@@ -15,6 +15,7 @@
 // preview harness therefore posts to a local stand-in; see `upayStub` in the preview.
 import { useEffect, useState } from 'react'
 import { Loader2, Lock, X } from 'lucide-react'
+import type { Locale } from '@studio/i18n'
 import {
   PAYMENT_OVERLAY_FRAME_NAME,
   PAYMENT_OVERLAY_MESSAGE_TYPE,
@@ -22,7 +23,7 @@ import {
 import { submitUpayForm } from '../../billing/PaymentsSection'
 import type { UpayForm } from '../../billing/billingClient'
 import { useDialog } from './useDialog'
-import { PAYMENT_FRAME_COPY } from './content'
+import { paymentFrameCopy } from './copy'
 
 export type PaymentFrameRequest =
   /** uPay's card page: a POST of hidden fields into the named frame. */
@@ -31,13 +32,14 @@ export type PaymentFrameRequest =
   | { kind: 'link'; url: string }
 
 export type PaymentFrameProps = {
+  locale: Locale
   request: PaymentFrameRequest
   onComplete: (publicRef: string) => void
   onClose: () => void
 }
 
-export function PaymentFrame({ request, onComplete, onClose }: PaymentFrameProps) {
-  const copy = PAYMENT_FRAME_COPY
+export function PaymentFrame({ locale, request, onComplete, onClose }: PaymentFrameProps) {
+  const copy = paymentFrameCopy(locale)
   const dialogRef = useDialog(true, onClose)
   const [loaded, setLoaded] = useState(false)
 

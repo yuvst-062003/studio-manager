@@ -7,6 +7,7 @@ import { createRoot } from 'react-dom/client'
 // Without this the preview renders in the browser's default serif and Tailwind's theme
 // tokens stand unopposed — which is exactly what the first two checkpoints screenshotted.
 import { ThemeProvider } from '@studio/ui'
+import type { Locale } from '@studio/i18n'
 import { Step1Agreements } from './features/onboarding/wizard/Step1Agreements'
 import { Step2Trainees } from './features/onboarding/wizard/Step2Trainees'
 import { Step3Payment } from './features/onboarding/wizard/Step3Payment'
@@ -105,6 +106,10 @@ function previewOutcomes(
   })
 }
 
+//: This harness screenshots against the Hebrew prototype, so it stays fixed on 'he' rather
+//: than growing its own language picker -- see the module header.
+const LOCALE: Locale = 'he'
+
 function Preview() {
   const params = new URLSearchParams(window.location.search)
   const [step, setStep] = useState<WizardStep>(Number(params.get('step') ?? 1) as WizardStep)
@@ -151,6 +156,7 @@ function Preview() {
     <div className="tw-scope min-h-screen bg-[#faf8ff] text-[#161b28] flex flex-col">
       {step === 4 ? (
         <Step4Done
+          locale={LOCALE}
           students={students}
           groups={GROUPS}
           outcomes={previewOutcomes(students, methods)}
@@ -163,6 +169,7 @@ function Preview() {
       ) : (
         <>
       <WizardHeader
+        locale={LOCALE}
         currentStep={step}
         studioName="מועדון גלדיאטור"
         logoUrl={LOGO}
@@ -172,6 +179,7 @@ function Preview() {
       <main className="flex-1 flex flex-col w-full mx-auto pt-32 px-4 max-w-[480px]">
         {step === 1 ? (
           <Step1Agreements
+            locale={LOCALE}
             emblemUrl={EMBLEM}
             agreed={agreed}
             onAgreedChange={setAgreed}
@@ -180,6 +188,7 @@ function Preview() {
         ) : null}
         {step === 3 ? (
           <Step3Payment
+            locale={LOCALE}
             students={students}
             plans={PLANS}
             methods={methods}
@@ -239,6 +248,7 @@ function Preview() {
         ) : null}
         {step === 2 ? (
           <Step2Trainees
+            locale={LOCALE}
             students={students}
             onStudentsChange={setStudents}
             groups={GROUPS}

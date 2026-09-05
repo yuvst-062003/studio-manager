@@ -14,9 +14,10 @@ import {
   Shield,
   Swords,
 } from 'lucide-react'
+import type { Locale } from '@studio/i18n'
 import { DocumentPopup, FaqPopup } from './WizardPopup'
-import { LEGAL_DOCS, STEP1_COPY } from './content'
-import type { DocumentKey } from './content'
+import { legalDocs, step1Copy } from './copy'
+import type { DocumentKey } from './copy'
 
 const DOCUMENT_ROWS: readonly { key: DocumentKey; icon: typeof FileText }[] = [
   { key: 'terms', icon: FileText },
@@ -31,6 +32,7 @@ const ICON_FOR: Record<DocumentKey, typeof FileText> = {
 }
 
 export type Step1AgreementsProps = {
+  locale: Locale
   emblemUrl?: string | null
   /** Lifted, not local: the prototype keeps this in the step's own state, so it is lost on
    *  back-navigation and on refresh while the step number IS persisted (§14.2). */
@@ -40,11 +42,14 @@ export type Step1AgreementsProps = {
 }
 
 export function Step1Agreements({
+  locale,
   emblemUrl,
   agreed,
   onAgreedChange,
   onContinue,
 }: Step1AgreementsProps) {
+  const STEP1_COPY = step1Copy(locale)
+  const LEGAL_DOCS = legalDocs(locale)
   const [openDocument, setOpenDocument] = useState<DocumentKey | null>(null)
   const [faqOpen, setFaqOpen] = useState(false)
 
@@ -176,6 +181,7 @@ export function Step1Agreements({
           const Icon = ICON_FOR[openDocument]
           return (
             <DocumentPopup
+              locale={locale}
               document={LEGAL_DOCS[openDocument]}
               icon={<Icon className="w-5 h-5 text-[#0056c5]" />}
               onClose={() => setOpenDocument(null)}
@@ -186,6 +192,7 @@ export function Step1Agreements({
 
       {faqOpen ? (
         <FaqPopup
+          locale={locale}
           icon={<HelpCircle className="w-5 h-5 text-[#0056c5]" />}
           onClose={() => setFaqOpen(false)}
         />

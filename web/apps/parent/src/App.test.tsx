@@ -8,12 +8,21 @@ import type { OnboardingStatus } from './features/onboarding/doorSteps'
 // (`StudentFormSheet`), the same way `JoinWizard.test.tsx` does, rather than the retired
 // `SelfServeJoinFlow`'s `JoinFamilyStep` panel.
 import {
-  STEP1_COPY,
-  STEP2_COPY,
-  STEP3_COPY,
-  STEP4_COPY,
-  STUDENT_FORM_COPY,
-} from './features/onboarding/wizard/content'
+  step1Copy,
+  step2Copy,
+  step3Copy,
+  step4Copy,
+  studentFormCopy,
+} from './features/onboarding/wizard/copy'
+
+// `AuthedApp`'s wizard doors render with `locale` defaulted to 'he' (its own `useState<
+// Locale>('he')`), so these reference values -- read the same way `JoinWizard.test.tsx`
+// does -- match what actually renders.
+const STEP1_COPY = step1Copy('he')
+const STEP2_COPY = step2Copy('he')
+const STEP3_COPY = step3Copy('he')
+const STEP4_COPY = step4Copy('he')
+const STUDENT_FORM_COPY = studentFormCopy('he')
 
 // M0's version of this file asserted HelloProof's app name and its display-mode chip.
 // M1 replaced that screen with §6.1's real first run, so the assertions moved with it

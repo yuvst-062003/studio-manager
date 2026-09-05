@@ -8,24 +8,28 @@
 //     pad that looks signed is worse than a blank one
 import { useEffect, useRef, useState } from 'react'
 import { AlertCircle, PenTool, RotateCcw, Shield } from 'lucide-react'
+import type { Locale } from '@studio/i18n'
 import { SelectField, TextField } from './Field'
-import { HEALTH_FUND_OPTIONS, STUDENT_FORM_COPY } from '../content'
+import { healthFundOptions, studentFormCopy } from '../copy'
 import { isMinor } from '../types'
 import type { StudentDraft } from '../types'
 import type { FieldKey } from '../validation'
 
 export function PartSignature({
+  locale,
   student,
   onChange,
   errorFor,
   onBlurField,
 }: {
+  locale: Locale
   student: StudentDraft
   onChange: (patch: Partial<StudentDraft>) => void
   errorFor: (field: FieldKey) => string | null
   onBlurField: (field: FieldKey) => void
 }) {
-  const copy = STUDENT_FORM_COPY
+  const copy = studentFormCopy(locale)
+  const HEALTH_FUND_OPTIONS = healthFundOptions(locale)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const drawing = useRef(false)
   const [hasInk, setHasInk] = useState(Boolean(student.signatureDataUrl))

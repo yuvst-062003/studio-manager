@@ -15,9 +15,10 @@ import {
   Trash2,
   Users,
 } from 'lucide-react'
+import type { Locale } from '@studio/i18n'
 import type { TemplateSchema } from '../../health/healthClient'
 import { StudentFormSheet } from './StudentFormSheet'
-import { GRADE_OPTIONS, BELT_OPTIONS, STEP2_COPY } from './content'
+import { gradeOptions, beltOptions, step2Copy } from './copy'
 import { clearStudentDraft, isResumable, loadStudentDraft } from './draft'
 import { ageFrom, isMinor, needsManagerReview } from './types'
 import type { FormPart, StudentDraft, WizardGroup, WizardPlan } from './types'
@@ -31,6 +32,7 @@ const formatBirthDate = (value: string) =>
   value ? value.split('-').reverse().join('/') : ''
 
 export type Step2TraineesProps = {
+  locale: Locale
   students: readonly StudentDraft[]
   onStudentsChange: (students: StudentDraft[]) => void
   groups: readonly WizardGroup[]
@@ -45,6 +47,7 @@ export type Step2TraineesProps = {
 }
 
 export function Step2Trainees({
+  locale,
   students,
   onStudentsChange,
   groups,
@@ -54,7 +57,9 @@ export function Step2Trainees({
   onBack,
   onContinue,
 }: Step2TraineesProps) {
-  const copy = STEP2_COPY
+  const copy = step2Copy(locale)
+  const BELT_OPTIONS = beltOptions(locale)
+  const GRADE_OPTIONS = gradeOptions(locale)
   const [sheet, setSheet] = useState<{ initial: StudentDraft | null; part: FormPart } | null>(null)
   const [draft, setDraft] = useState(() => loadStudentDraft())
   const [removeError, setRemoveError] = useState<string | null>(null)
@@ -323,6 +328,7 @@ export function Step2Trainees({
 
       {sheet ? (
         <StudentFormSheet
+          locale={locale}
           initial={sheet.initial}
           initialPart={sheet.part}
           groups={groups}
