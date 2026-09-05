@@ -8,9 +8,9 @@ import { useMemo, useState } from 'react'
 import type { Locale } from '@studio/i18n'
 import { EmptyState, PageHeader, SectionHeader, SegmentedControl, TextField } from '@studio/ui'
 import { familiesOf, searchTechniques, techniqueBySlug } from './data'
-import { loadShelf } from './shelf'
+import { loadShelf, saveShelf, toggleFavourite } from './shelf'
 import type { Category, Technique } from './types'
-import { fillGroup, s } from './strings'
+import { fill, fillGroup, s } from './strings'
 import './techniques.css'
 
 function GokyoMark({ locale, group }: { locale: Locale; group: number | null }) {
@@ -30,13 +30,20 @@ function GokyoMark({ locale, group }: { locale: Locale; group: number | null }) 
   )
 }
 
-function TechniqueRow({ locale, technique }: { locale: Locale; technique: Technique }) {
+function TechniqueRow({
+  locale,
+  technique,
+  saved,
+  onToggle,
+}: {
+  locale: Locale
+  technique: Technique
+  saved: boolean
+  onToggle: () => void
+}) {
   return (
-    <a
-      className="studio-technique-row"
-      data-testid={`technique-row-${technique.slug}`}
-      href={`#/techniques/${technique.slug}`}
-    >
+    <div className="studio-technique-row" data-testid={`technique-row-${technique.slug}`}>
+      <a className="studio-technique-row__link" href={`#/techniques/${technique.slug}`}>
       <GokyoMark group={technique.gokyoGroup} locale={locale} />
       <span className="studio-technique-row__body">
         {/* The romaji leads: it is the name the coach calls out and the name written on
@@ -55,15 +62,37 @@ function TechniqueRow({ locale, technique }: { locale: Locale; technique: Techni
           <path d="m9 6 6 6-6 6" />
         </svg>
       </span>
-    </a>
+      </a>
+      {/* The name is IN the label. A hundred rows each offering "add" gives a screen
+          reader user a hundred identical controls and no way to tell them apart. */}
+      <button
+        aria-label={fill(s(locale, saved ? 'shelf.remove.named' : 'shelf.add.named'), {
+          name: technique.nameRomaji,
+        })}
+        aria-pressed={saved}
+        className="studio-technique-row__add"
+        data-testid={`add-${technique.slug}`}
+        onClick={onToggle}
+        type="button"
+      >
+        <svg aria-hidden="true" fill="none" height="19" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" width="19">
+          {saved ? <path d="M20 6 9 17l-5-5" /> : <path d="M12 5v14M5 12h14" />}
+        </svg>
+      </button>
+    </div>
   )
 }
 
 export function TechniquesScreen({ locale }: { locale: Locale }) {
   const [category, setCategory] = useState<Category>('nage-waza')
   const [query, setQuery] = useState('')
-  // Read once. The shelf changes on the detail screen, and coming back remounts this one.
-  const [shelf] = useState(loadShelf)
+  const [shelf, setShelf] = useState(loadShelf)
+
+  const toggle = (slug: string) => {
+    const next = toggleFavourite(shelf, slug)
+    setShelf(next)
+    saveShelf(next)
+  }
 
   // A child's own techniques come FIRST and are not filtered by the category switch —
   // the list is theirs, and hiding half of it behind a segment they did not touch would
@@ -107,7 +136,13 @@ export function TechniquesScreen({ locale }: { locale: Locale }) {
           <p className="studio-techniques__shelf-hint">{s(locale, 'shelf.hint')}</p>
           <div className="studio-techniques__rows">
             {mine.map((technique) => (
-              <TechniqueRow key={technique.slug} locale={locale} technique={technique} />
+              <TechniqueRow
+                key={technique.slug}
+                locale={locale}
+                onToggle={() => toggle(technique.slug)}
+                saved
+                technique={technique}
+              />
             ))}
           </div>
         </section>
@@ -133,7 +168,13 @@ export function TechniquesScreen({ locale }: { locale: Locale }) {
               <SectionHeader level={3} title={s(locale, `family.${family.subcategory}`)} />
               <div className="studio-techniques__rows">
                 {family.techniques.map((technique) => (
-                  <TechniqueRow key={technique.slug} locale={locale} technique={technique} />
+                  <TechniqueRow
+                    key={technique.slug}
+                    locale={locale}
+                    onToggle={() => toggle(technique.slug)}
+                    saved={shelf.favourites.includes(technique.slug)}
+                    technique={technique}
+                  />
                 ))}
               </div>
             </section>

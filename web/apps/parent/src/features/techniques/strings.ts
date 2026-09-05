@@ -43,6 +43,8 @@ const he: Bundle = {
   'shelf.title': 'הטכניקות שלי',
   'shelf.hint': 'הטכניקות שסימנתם — טוקוי־וואזה',
   'shelf.add': 'הוספה לטכניקות שלי',
+  'shelf.add.named': 'הוספת {{name}} לטכניקות שלי',
+  'shelf.remove.named': 'הסרת {{name}} מהטכניקות שלי',
   'shelf.remove': 'הסרה מהטכניקות שלי',
   'shelf.saved': 'בטכניקות שלי',
   'video.speed': 'מהירות',
@@ -94,6 +96,8 @@ const en: Bundle = {
   'shelf.title': 'My techniques',
   'shelf.hint': 'The ones you saved — your tokui-waza',
   'shelf.add': 'Add to my techniques',
+  'shelf.add.named': 'Add {{name}} to my techniques',
+  'shelf.remove.named': 'Remove {{name}} from my techniques',
   'shelf.remove': 'Remove from my techniques',
   'shelf.saved': 'In my techniques',
   'video.speed': 'Speed',
@@ -145,6 +149,8 @@ const ru: Bundle = {
   'shelf.title': 'Мои приёмы',
   'shelf.hint': 'Сохранённые вами — ваши токуй-вадза',
   'shelf.add': 'Добавить к моим приёмам',
+  'shelf.add.named': 'Добавить {{name}} к моим приёмам',
+  'shelf.remove.named': 'Убрать {{name}} из моих приёмов',
   'shelf.remove': 'Убрать из моих приёмов',
   'shelf.saved': 'В моих приёмах',
   'video.speed': 'Скорость',
@@ -173,8 +179,15 @@ export function s(locale: Locale, key: string): string {
 }
 
 /** `t()` performs no interpolation either; the caller fills the slot. */
+export function fill(template: string, slots: Record<string, string | number>): string {
+  return Object.entries(slots).reduce(
+    (text, [key, value]) => text.replace(`{{${key}}}`, String(value)),
+    template,
+  )
+}
+
 export function fillGroup(template: string, group: number): string {
-  return template.replace('{{group}}', String(group))
+  return fill(template, { group })
 }
 
 export const bundles = BUNDLES

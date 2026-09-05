@@ -276,9 +276,19 @@ library down over a saved star.
 the category switch**. The list is the child's; hiding the holds in it because they were
 looking at throws would make the shelf appear to have lost something.
 
-**The star lives on the detail screen only.** `DetailRow` establishes that a row which
-goes somewhere carries no separate control, and a button nested inside a link is a defect
-for a keyboard and a screen reader both.
+**Saving takes one tap, from the list.** The first cut put the star on the detail screen
+only, reasoning from `DetailRow`'s rule that a row which goes somewhere carries no separate
+control. That read the rule too widely: it is about rows whose only job IS navigation, and
+a row you can save from is a different thing. Three taps to save something you already
+recognised was the wrong trade.
+
+So each row carries a **+** — a tick once saved — and the row is a **container** whose
+children are the link and the button as *siblings*. Never a `<button>` inside an `<a>`,
+which is what the original worry was actually about and which is unreachable by keyboard
+and ambiguous to a screen reader. A test asserts the nesting never comes back. Each
+button's accessible name carries the technique's name, because a hundred rows offering
+"add" is a hundred identical controls to a screen-reader user. The detail screen keeps its
+own full-width control.
 
 **Slow motion and the start point** go through YouTube's `postMessage` interface with
 `enablejsapi=1`, not through their IFrame API script — loading `youtube.com/iframe_api`

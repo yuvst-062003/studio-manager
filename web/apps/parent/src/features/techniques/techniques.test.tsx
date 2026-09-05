@@ -283,3 +283,59 @@ describe('the video controls', () => {
     expect(shelf.favourites).toEqual(['uchi-mata', 'o-soto-gari'])
   })
 })
+
+describe('adding from the list', () => {
+  beforeEach(() => globalThis.localStorage.clear())
+
+  it('saves in one tap, without opening the technique', async () => {
+    const user = userEvent.setup()
+    render(<TechniquesScreen locale="he" />)
+    await user.click(screen.getByTestId('add-tai-otoshi'))
+    expect(loadShelf().favourites).toEqual(['tai-otoshi'])
+    // And it appears at the top immediately, not on the next visit.
+    expect(within(screen.getByTestId('my-techniques')).getByTestId('technique-row-tai-otoshi')).toBeInTheDocument()
+  })
+
+  it('toggles back off from the same control', async () => {
+    const user = userEvent.setup()
+    render(<TechniquesScreen locale="he" />)
+    const add = screen.getByTestId('add-tai-otoshi')
+    await user.click(add)
+    expect(add).toHaveAttribute('aria-pressed', 'true')
+    await user.click(add)
+    expect(add).toHaveAttribute('aria-pressed', 'false')
+    expect(loadShelf().favourites).toEqual([])
+  })
+
+  it('never nests the button inside the link', () => {
+    // The reason this row is a container and not an <a>. A <button> inside an <a> is
+    // unreachable by keyboard and ambiguous to a screen reader, and it is the exact
+    // shape of bug that would come back the next time someone adds a row control.
+    render(<TechniquesScreen locale="he" />)
+    const row = screen.getByTestId('technique-row-tai-otoshi')
+    expect(row.querySelector('a button')).toBeNull()
+    expect(row.querySelector('button a')).toBeNull()
+    expect(row.querySelector(':scope > a')).not.toBeNull()
+    expect(row.querySelector(':scope > button')).not.toBeNull()
+  })
+
+  it('names the technique in the control, so a hundred rows are not a hundred identical buttons', () => {
+    render(<TechniquesScreen locale="he" />)
+    expect(screen.getByRole('button', { name: 'הוספת Tai-otoshi לטכניקות שלי' })).toBeInTheDocument()
+  })
+
+  it('still lets the row itself go to the technique', () => {
+    render(<TechniquesScreen locale="he" />)
+    const row = screen.getByTestId('technique-row-tai-otoshi')
+    expect(row.querySelector('a')).toHaveAttribute('href', '#/techniques/tai-otoshi')
+  })
+
+  it('agrees with the detail screen about what is saved', async () => {
+    const user = userEvent.setup()
+    const { unmount } = render(<TechniquesScreen locale="he" />)
+    await user.click(screen.getByTestId('add-uchi-mata'))
+    unmount()
+    render(<TechniqueDetail locale="he" slug="uchi-mata" />)
+    expect(screen.getByTestId('save-technique')).toHaveAttribute('aria-pressed', 'true')
+  })
+})
