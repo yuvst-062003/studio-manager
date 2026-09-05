@@ -20,8 +20,21 @@ import type { Locale } from '@studio/i18n'
 import { needsFullDeclaration } from '../../health/HealthGate'
 import { AccountControls } from '../../shell/AccountControls'
 import type { AccountControlsProps } from '../../shell/AccountControls'
-import { ProfileTop } from './ProfileTop'
-import { ProfileBody } from './ProfileBody'
+import {
+  ProfileBillingBlock,
+  ProfileContactCta,
+  ProfileHeader,
+  ProfilePreferences,
+} from './ProfileTop'
+import {
+  ProfileAttendance,
+  ProfileDojo,
+  ProfileLinks,
+  ProfilePurchases,
+  ProfileTrainees,
+} from './ProfileBody'
+import { PersonalDetailsSheet, ProfilePersonalDetails } from './PersonalDetails'
+import type { MyDetails } from './PersonalDetails'
 import { ContactSheet } from './ContactSheet'
 import { familyNameOf, purchasesFrom, summariseAttendance } from './derive'
 import type { AttendanceRow } from './derive'
@@ -60,6 +73,10 @@ export function ProfileScreen({
   const [purchases, setPurchases] = useState<readonly PurchaseRow[] | null>(null)
   const [selectedChildId, setSelectedChildId] = useState<string | null>(null)
   const [contactOpen, setContactOpen] = useState(false)
+  const [details, setDetails] = useState<MyDetails | null>(null)
+  const [editingDetails, setEditingDetails] = useState(false)
+  const [savingDetails, setSavingDetails] = useState(false)
+  const [detailsFailed, setDetailsFailed] = useState(false)
 
   useEffect(() => {
     let live = true
@@ -131,11 +148,34 @@ export function ProfileScreen({
       })
       .catch(() => undefined)
 
+    void apiFetch('/api/v1/me/profile')
+      .then(async (response) => {
+        if (!response.ok || !live) return
+        const body = (await response.json()) as {
+          first_name: string
+          last_name: string
+          email: string | null
+          phone: string | null
+        }
+        setDetails({
+          firstName: body.first_name,
+          lastName: body.last_name,
+          email: body.email,
+          phone: body.phone,
+        })
+      })
+      .catch(() => undefined)
+
     void apiFetch('/api/v1/me/studio')
       .then(async (response) => {
         if (!response.ok || !live) return
         const body = (await response.json()) as ClubDetails
-        setClub({ name: body.name, address: body.address ?? null, phone: body.phone ?? null })
+        setClub({
+          name: body.name,
+          address: body.address ?? null,
+          phone: body.phone ?? null,
+          email: body.email ?? null,
+        })
       })
       .catch(() => undefined)
 
@@ -190,33 +230,82 @@ export function ProfileScreen({
 
   const money = useCallback((agorot: number) => formatAgorot(agorot), [])
 
+  const saveDetails = useCallback((next: MyDetails) => {
+    setSavingDetails(true)
+    setDetailsFailed(false)
+    void apiFetch('/api/v1/me/profile', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        first_name: next.firstName.trim(),
+        last_name: next.lastName.trim(),
+        email: next.email,
+        phone: next.phone,
+      }),
+    })
+      .then((response) => {
+        setSavingDetails(false)
+        if (!response.ok) return setDetailsFailed(true)
+        // The screen shows what the server ACCEPTED, and the sheet closes only then. A
+        // sheet that closed on the tap would leave a parent believing a correction landed
+        // that the server refused.
+        setDetails(next)
+        setEditingDetails(false)
+      })
+      .catch(() => {
+        setSavingDetails(false)
+        setDetailsFailed(true)
+      })
+  }, [])
+
   return (
     <section aria-label={t(locale, 'people.profile.title')} data-testid="parent-profile">
-      <ProfileTop
-        familyName={familyName}
+      {/* THE ORDER IS THE OWNER'S, 2026-09-06, and it is not the prototype's.
+       *
+       *   פרטים אישיים · נוכחות · תשלומים · מתאמנים · רכישות · דוג׳ו · שפה ובהירות · קשר
+       *
+       * Attendance came from the middle of the page to the top ("הסיכום נוכחות צריך להיות
+       * בתחילת העמוד"); language and brightness went the other way, from the top to the
+       * bottom ("את השפה או הבהירות תוריד לסוף העמוד"); and contact is last of all. The
+       * sections are separate components precisely so this list is the only thing that has
+       * to change when the order does. */}
+      <ProfileHeader familyName={familyName} />
+
+      <ProfilePersonalDetails details={details} onEdit={() => setEditingDetails(true)} />
+
+      <ProfileAttendance
+        childList={children ?? []}
+        selectedChildId={selectedChildId}
+        onSelectChild={setSelectedChildId}
+        attendance={attendance}
+      />
+
+      <ProfileBillingBlock billing={billing} money={money} />
+
+      <ProfileTrainees childList={children ?? []} />
+
+      <ProfilePurchases
+        purchases={purchases}
+        money={money}
+        // A `YYYY-MM-DD` due date, read at MIDDAY so no zone can move it to the day
+        // before — the same trap `derive.ts` documents for the week strip.
+        dateLabel={(isoDate) => formatDateInStudioZone(`${isoDate}T12:00:00Z`, locale)}
+      />
+
+      <ProfileDojo club={club} />
+
+      <ProfilePreferences
         locale={locale}
         locales={LOCALES}
         localeLabel={(code) => ENDONYM[code as Locale]}
         onChooseLocale={(code) => onLocaleChange(code as Locale)}
         theme={theme.preference}
         onChooseTheme={theme.setPreference}
-        billing={billing}
-        onOpenContact={() => setContactOpen(true)}
-        money={money}
       />
 
-      <ProfileBody
-        childList={children ?? []}
-        selectedChildId={selectedChildId}
-        onSelectChild={setSelectedChildId}
-        attendance={attendance}
-        purchases={purchases}
-        club={club}
-        money={money}
-        // A `YYYY-MM-DD` due date, read at MIDDAY so no zone can move it to the day
-        // before — the same trap `derive.ts` documents for the week strip.
-        dateLabel={(isoDate) => formatDateInStudioZone(`${isoDate}T12:00:00Z`, locale)}
-      />
+      <ProfileLinks />
+
+      <ProfileContactCta onOpenContact={() => setContactOpen(true)} />
 
       {/* The drawer's two orphans, unchanged since checkpoint 1 — sign-out and the studio
           switcher. They stay a separate component because they are the SHELL's, handed down
@@ -226,6 +315,19 @@ export function ProfileScreen({
       </div>
 
       {contactOpen ? <ContactSheet club={club} onClose={() => setContactOpen(false)} /> : null}
+
+      {editingDetails && details ? (
+        <PersonalDetailsSheet
+          details={details}
+          busy={savingDetails}
+          failed={detailsFailed}
+          onSave={saveDetails}
+          onClose={() => {
+            setEditingDetails(false)
+            setDetailsFailed(false)
+          }}
+        />
+      ) : null}
     </section>
   )
 }

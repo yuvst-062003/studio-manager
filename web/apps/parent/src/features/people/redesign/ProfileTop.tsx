@@ -18,33 +18,59 @@ import { PROFILE, fill } from './content'
 
 const THEME_OPTIONS = ['light', 'dark', 'system'] as const
 
-export function ProfileTop({
-  familyName,
+
+/* ── The page, taken apart ────────────────────────────────────────────────────────────
+ *
+ * This file used to export ONE `ProfileTop` holding the header, the preferences, the
+ * contact button and the billing block in that order. Owner review, 2026-09-06, reordered
+ * the whole screen — attendance to the top, language and brightness to the bottom, contact
+ * last of all — and a single component cannot be reordered from outside.
+ *
+ * So each block is its own export and `ProfileScreen` composes them. The markup inside each
+ * is unchanged; only the seams are new.
+ */
+
+export function ProfileHeader({ familyName }: { familyName: string | null }) {
+  return (
+    <div className="flex flex-col space-y-4 text-start">
+      {/* Header */}
+      <header className="flex items-center justify-between" data-testid="profile-header">
+        <div className="flex items-center gap-3">
+          <div
+            className="w-12 h-12 rounded-2xl bg-[#001849] dark:bg-blue-600 text-white flex items-center justify-center font-bold text-lg shadow-sm"
+            aria-hidden="true"
+          >
+            {familyName ? familyName.charAt(0) : <User className="w-5 h-5" />}
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-slate-900 dark:text-white leading-tight">
+              {familyName !== null
+                ? fill(PROFILE.familyTitle, { name: familyName })
+                : PROFILE.familyTitleUnknown}
+            </h1>
+            <p className="text-xs text-slate-500 dark:text-slate-400">{PROFILE.familySubtitle}</p>
+          </div>
+        </div>
+      </header>
+
+    </div>
+  )
+}
+
+export function ProfilePreferences({
   locale,
   locales,
   localeLabel,
   onChooseLocale,
   theme,
   onChooseTheme,
-  billing,
-  onOpenContact,
-  money,
 }: {
-  /** The household's surname, or null — then the header shows PROFILE.familyTitleUnknown.
-   *  There is NO season line; the API has no training-year label and will not invent one. */
-  familyName: string | null
   locale: string
-  /** Every locale the app offers, in order. */
   locales: readonly string[]
-  /** A locale code -> its own endonym ("עברית", "English", "Русский"). */
   localeLabel: (code: string) => string
   onChooseLocale: (code: string) => void
   theme: 'light' | 'dark' | 'system'
   onChooseTheme: (next: 'light' | 'dark' | 'system') => void
-  billing: ProfileBilling | null
-  onOpenContact: () => void
-  /** Integer agorot -> a formatted string. NEVER divide by 100 in this file. */
-  money: (agorot: number) => string
 }) {
   const themeActiveClass: Record<(typeof THEME_OPTIONS)[number], string> = {
     light: 'bg-white dark:bg-slate-700 text-amber-600 shadow-xs',
@@ -68,31 +94,8 @@ export function ProfileTop({
   }
   const ThemeIcon = themeIcons[theme]
 
-  const openChargeLabel = (count: number) =>
-    count === 1 ? PROFILE.openChargeOne : fill(PROFILE.openCharges, { count })
-
   return (
     <div className="flex flex-col space-y-4 text-start">
-      {/* Header */}
-      <header className="flex items-center justify-between" data-testid="profile-header">
-        <div className="flex items-center gap-3">
-          <div
-            className="w-12 h-12 rounded-2xl bg-[#001849] dark:bg-blue-600 text-white flex items-center justify-center font-bold text-lg shadow-sm"
-            aria-hidden="true"
-          >
-            {familyName ? familyName.charAt(0) : <User className="w-5 h-5" />}
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-slate-900 dark:text-white leading-tight">
-              {familyName !== null
-                ? fill(PROFILE.familyTitle, { name: familyName })
-                : PROFILE.familyTitleUnknown}
-            </h1>
-            <p className="text-xs text-slate-500 dark:text-slate-400">{PROFILE.familySubtitle}</p>
-          </div>
-        </div>
-      </header>
-
       {/* ========================================================================= */}
       {/* APP PREFERENCES: language + theme, both single-choice, both real radios    */}
       {/* ========================================================================= */}
@@ -185,7 +188,13 @@ export function ProfileTop({
           </div>
         </fieldset>
       </section>
+    </div>
+  )
+}
 
+export function ProfileContactCta({ onOpenContact }: { onOpenContact: () => void }) {
+  return (
+    <div className="flex flex-col space-y-4 text-start">
       {/* Quick Contact Button */}
       <button
         type="button"
@@ -208,6 +217,22 @@ export function ProfileTop({
         />
       </button>
 
+    </div>
+  )
+}
+
+export function ProfileBillingBlock({
+  billing,
+  money,
+}: {
+  billing: ProfileBilling | null
+  money: (agorot: number) => string
+}) {
+  const openChargeLabel = (count: number) =>
+    count === 1 ? PROFILE.openChargeOne : fill(PROFILE.openCharges, { count })
+
+  return (
+    <div className="flex flex-col space-y-4 text-start">
       {/* Account & Billing */}
       <section
         aria-labelledby="profile-billing-heading"

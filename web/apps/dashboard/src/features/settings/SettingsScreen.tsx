@@ -46,6 +46,8 @@ type StudioDetails = {
   sport: string | null
   address: string | null
   phone: string | null
+  /** The club's address for enquiries, shown to parents in the contact sheet. */
+  email: string | null
   default_locale: string
   parent_locales: string[]
   logo_url: string | null
@@ -418,6 +420,14 @@ export function SettingsScreen({ locale }: { locale: Locale }) {
                 label={t(locale, 'common.setup.studio.address')}
                 defaultValue={details.address ?? ''}
                 onBlur={(event) => save({ address: event.target.value })}
+              />
+              {/* 2026-09-06 — the parent app's contact sheet offers WhatsApp, a call and
+                  email, and a studio had nowhere to put an address for enquiries. */}
+              <TextField
+                label={t(locale, 'common.setup.studio.email')}
+                type="email"
+                defaultValue={details.email ?? ''}
+                onBlur={(event) => save({ email: event.target.value })}
               />
 
               <h4>{t(locale, 'common.setup.studio.parentLocales')}</h4>

@@ -278,6 +278,7 @@ export const common: Bundle = {
   'setup.studio.name': 'Название клуба',
   'setup.studio.sport': 'Вид спорта',
   'setup.studio.address': 'Адрес',
+  'setup.studio.email': 'Эл. почта клуба',
   'setup.studio.phone': 'Телефон',
   'setup.studio.parentLocales': 'Языки, которые увидят родители',
   'setup.studio.locale.he': 'Иврит',

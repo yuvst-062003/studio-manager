@@ -1,15 +1,20 @@
 // "יצירת קשר" — ported from the prototype's ProfileScreen MODAL 1.
 //
-// TWO ACTIONS, NOT THREE. The prototype offers WhatsApp, a phone call and email. `Studio`
-// has `address` and `phone` and no email column anywhere, so the third button would either
-// be dead or would need an address invented for it — and a mailto: to a guessed address is
-// a message a club never receives. It is dropped rather than disabled: a greyed-out control
-// still promises a feature that does not exist.
+// ALL THREE ACTIONS the prototype offers — WhatsApp, a call and email.
 //
-// Both remaining actions are ordinary links with a scheme the phone already knows —
-// `https://wa.me/…` and `tel:` — so they work with no permission, no SDK and no JS, and a
-// long-press "copy number" behaves the way a parent expects.
-import { MessageCircle, Phone, X } from 'lucide-react'
+// Email was missing on the first pass because a studio had nowhere to keep one. Owner
+// review, 2026-09-06: "צור קשר צריך להכיל גם מייל". The club's address and phone already
+// live in `studio.settings` rather than in columns, so the email joined them there and no
+// migration was needed; the manager sets it in the dashboard's settings panel.
+//
+// Each button is drawn only when the club has the detail behind it. A greyed-out control
+// still promises a feature that does not exist, and a `mailto:` to a guessed address is a
+// message the club never receives.
+//
+// All three are ordinary links with a scheme the phone already knows — `https://wa.me/…`,
+// `tel:` and `mailto:` — so they work with no permission, no SDK and no JS, and a
+// long-press "copy" behaves the way a parent expects.
+import { Mail, MessageCircle, Phone, X } from 'lucide-react'
 import { useDialog } from '../../onboarding/wizard/useDialog'
 import { PROFILE } from './content'
 import type { ClubDetails } from './types'
@@ -37,6 +42,10 @@ export function whatsappNumber(phone: string | null): string | null {
 export function ContactSheet({ club, onClose }: { club: ClubDetails | null; onClose: () => void }) {
   const dialogRef = useDialog(true, onClose)
   const wa = whatsappNumber(club?.phone ?? null)
+  // How many buttons there will be, so the grid fits them rather than stranding the third
+  // on a row of its own. A club with a phone gets WhatsApp AND a call from the one number.
+  const count = (wa ? 1 : 0) + (club?.phone ? 1 : 0) + (club?.email ? 1 : 0)
+  const hasAny = count > 0
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/60 flex items-end sm:items-center justify-center p-0 sm:p-4 modal-backdrop-blur transition-all duration-300">
@@ -73,8 +82,8 @@ export function ContactSheet({ club, onClose }: { club: ClubDetails | null; onCl
           </button>
         </div>
 
-        {club?.phone ? (
-          <div className="grid grid-cols-2 gap-2.5">
+        {hasAny ? (
+          <div className={`grid gap-2.5 ${count >= 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
             {wa ? (
               <a
                 href={`https://wa.me/${wa}`}
@@ -87,20 +96,32 @@ export function ContactSheet({ club, onClose }: { club: ClubDetails | null; onCl
                 <span>{PROFILE.contactWhatsApp}</span>
               </a>
             ) : null}
-            <a
-              href={`tel:${club.phone}`}
-              data-testid="profile-contact-call"
-              className="flex flex-col items-center gap-1.5 p-4 rounded-2xl bg-blue-50 dark:bg-blue-400/15 border border-blue-200 dark:border-blue-500/25 text-[#0056c5] dark:text-blue-300 text-xs font-bold active:scale-95 transition-all cursor-pointer"
-            >
-              <Phone className="w-6 h-6" />
-              <span>{PROFILE.contactCall}</span>
-            </a>
+            {club?.phone ? (
+              <a
+                href={`tel:${club.phone}`}
+                data-testid="profile-contact-call"
+                className="flex flex-col items-center gap-1.5 p-4 rounded-2xl bg-blue-50 dark:bg-blue-400/15 border border-blue-200 dark:border-blue-500/25 text-[#0056c5] dark:text-blue-300 text-xs font-bold active:scale-95 transition-all cursor-pointer"
+              >
+                <Phone className="w-6 h-6" />
+                <span>{PROFILE.contactCall}</span>
+              </a>
+            ) : null}
+            {club?.email ? (
+              <a
+                href={`mailto:${club.email}`}
+                data-testid="profile-contact-email"
+                className="flex flex-col items-center gap-1.5 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold active:scale-95 transition-all cursor-pointer"
+              >
+                <Mail className="w-6 h-6" />
+                <span>{PROFILE.contactEmail}</span>
+              </a>
+            ) : null}
           </div>
         ) : (
           // The honest state, and a real one: a club that has not filled in its phone
           // number. Saying so beats two buttons that dial nothing.
           <p className="text-xs text-slate-500 dark:text-slate-400 text-center py-4">
-            {PROFILE.contactNoPhone}
+            {PROFILE.contactNone}
           </p>
         )}
 

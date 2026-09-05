@@ -6,8 +6,21 @@ import { ThemeProvider, useTheme } from '@studio/ui'
 import { formatAgorot } from '@studio/core'
 import { LOCALES } from '@studio/i18n'
 import { ParentShell } from './features/shell/ParentShell'
-import { ProfileTop } from './features/people/redesign/ProfileTop'
-import { ProfileBody } from './features/people/redesign/ProfileBody'
+import {
+  ProfileBillingBlock,
+  ProfileContactCta,
+  ProfileHeader,
+  ProfilePreferences,
+} from './features/people/redesign/ProfileTop'
+import {
+  ProfileAttendance,
+  ProfileDojo,
+  ProfileLinks,
+  ProfilePurchases,
+  ProfileTrainees,
+} from './features/people/redesign/ProfileBody'
+import { PersonalDetailsSheet, ProfilePersonalDetails } from './features/people/redesign/PersonalDetails'
+import type { MyDetails } from './features/people/redesign/PersonalDetails'
 import { ContactSheet } from './features/people/redesign/ContactSheet'
 import type { ProfileChild } from './features/people/redesign/types'
 import './tailwind.css'
@@ -32,7 +45,12 @@ const PURCHASES = [
   { id: 'c', label: 'מגן שיניים', amountAgorot: 4500, dueDate: '2026-07-30', status: 'settled' },
 ]
 
-const CLUB = { name: 'מועדון ג׳ודו גלדיאטור', address: 'רחוב ויצמן 42, כפר סבא', phone: '050-8492019' }
+const CLUB = {
+  name: 'מועדון ג׳ודו גלדיאטור',
+  address: 'רחוב ויצמן 42, כפר סבא',
+  phone: '050-8492019',
+  email: 'office@gladiator.example',
+}
 
 function Preview() {
   const params = new URLSearchParams(window.location.search)
@@ -40,18 +58,26 @@ function Preview() {
   const [locale, setLocale] = useState('he')
   const [selected, setSelected] = useState<string | null>('dana')
   const [contact, setContact] = useState(params.has('contact'))
+  const [editing, setEditing] = useState(params.has('editing'))
+  const [details, setDetails] = useState<MyDetails>({
+    firstName: 'יוסף',
+    lastName: 'כהן',
+    email: 'yosef@example.com',
+    phone: '052-1234567',
+  })
   const settled = params.has('settled')
 
   return (
     <ParentShell activeTab="profile" updatesBadgeCount={2}>
-      <ProfileTop
-        familyName="כהן"
-        locale={locale}
-        locales={LOCALES}
-        localeLabel={(code) => ENDONYMS[code] ?? code}
-        onChooseLocale={setLocale}
-        theme={theme.preference}
-        onChooseTheme={theme.setPreference}
+      <ProfileHeader familyName="כהן" />
+      <ProfilePersonalDetails details={details} onEdit={() => setEditing(true)} />
+      <ProfileAttendance
+        childList={CHILDREN}
+        selectedChildId={selected}
+        onSelectChild={setSelected}
+        attendance={params.has('loading') ? null : ATTENDANCE}
+      />
+      <ProfileBillingBlock
         billing={
           params.has('loading')
             ? null
@@ -63,20 +89,38 @@ function Preview() {
                 methodLabel: params.has('nomethod') ? null : 'כרטיס אשראי',
               }
         }
-        onOpenContact={() => setContact(true)}
         money={formatAgorot}
       />
-      <ProfileBody
-        childList={CHILDREN}
-        selectedChildId={selected}
-        onSelectChild={setSelected}
-        attendance={params.has('loading') ? null : ATTENDANCE}
+      <ProfileTrainees childList={CHILDREN} />
+      <ProfilePurchases
         purchases={params.has('loading') ? null : params.has('nopurchases') ? [] : PURCHASES}
-        club={CLUB}
         money={formatAgorot}
         dateLabel={(iso) => new Date(`${iso}T12:00:00Z`).toLocaleDateString('he-IL')}
       />
+      <ProfileDojo club={CLUB} />
+      <ProfilePreferences
+        locale={locale}
+        locales={LOCALES}
+        localeLabel={(code) => ENDONYMS[code] ?? code}
+        onChooseLocale={setLocale}
+        theme={theme.preference}
+        onChooseTheme={theme.setPreference}
+      />
+      <ProfileLinks />
+      <ProfileContactCta onOpenContact={() => setContact(true)} />
       {contact ? <ContactSheet club={CLUB} onClose={() => setContact(false)} /> : null}
+      {editing ? (
+        <PersonalDetailsSheet
+          details={details}
+          busy={false}
+          failed={params.has('savefail')}
+          onSave={(next) => {
+            setDetails(next)
+            setEditing(false)
+          }}
+          onClose={() => setEditing(false)}
+        />
+      ) : null}
     </ParentShell>
   )
 }

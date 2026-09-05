@@ -9,6 +9,22 @@ export const PROFILE = {
   familyTitleUnknown: 'הפרופיל שלי',
   familySubtitle: 'הגדרות, תשלומים והמתאמנים שלכם',
 
+  /** Personal details — the guardian's own record. Not in the prototype at all: that
+   *  design shows a family's children and never the parent. Owner review, 2026-09-06. */
+  personalTitle: 'פרטים אישיים',
+  personalEdit: 'עריכה',
+  personalName: 'שם',
+  personalFirstName: 'שם פרטי',
+  personalLastName: 'שם משפחה',
+  personalEmail: 'דוא״ל',
+  personalPhone: 'טלפון',
+  personalNotSet: 'לא הוזן',
+  personalSheetTitle: 'עריכת פרטים אישיים',
+  personalSave: 'שמירה',
+  personalSaving: 'שומר…',
+  personalCancel: 'ביטול',
+  personalSaveFailed: 'השמירה נכשלה. נסו שוב.',
+
   /** App preferences. */
   preferencesTitle: 'שפה ותצוגה',
   languageLabel: 'שפת האפליקציה',
@@ -24,7 +40,8 @@ export const PROFILE = {
   contactWhatsApp: 'ווטסאפ',
   contactCall: 'שיחה',
   contactEmail: 'דוא״ל',
-  contactNoPhone: 'המועדון לא הגדיר מספר טלפון',
+  /** Nothing to contact them WITH — no phone and no email on file. */
+  contactNone: 'המועדון עדיין לא הגדיר פרטי יצירת קשר',
   close: 'סגירה',
 
   /** Billing — §4's "money moves into Profile". */

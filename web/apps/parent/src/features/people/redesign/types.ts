@@ -78,4 +78,8 @@ export type ClubDetails = {
   name: string
   address: string | null
   phone: string | null
+  /** Added 2026-09-06 — the contact sheet offers email as well as WhatsApp and a call.
+   *  It lives in `studio.settings`, so it needed no migration. `null` for a club that has
+   *  not set one, and then no email button is drawn. */
+  email: string | null
 }

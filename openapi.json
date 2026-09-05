@@ -13763,6 +13763,18 @@
             ],
             "title": "Address"
           },
+          "email": {
+            "anyOf": [
+              {
+                "maxLength": 254,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
           "landing": {
             "anyOf": [
               {
@@ -15295,6 +15307,17 @@
           "default_locale": {
             "title": "Default Locale",
             "type": "string"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
           },
           "id": {
             "format": "uuid",

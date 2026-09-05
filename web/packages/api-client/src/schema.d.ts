@@ -11720,6 +11720,8 @@ export interface components {
         StudioUpdate: {
             /** Address */
             address?: string | null;
+            /** Email */
+            email?: string | null;
             landing?: components["schemas"]["StudioLandingContent"] | null;
             /** Name */
             name?: string | null;
@@ -12401,6 +12403,8 @@ export interface components {
             address?: string | null;
             /** Default Locale */
             default_locale: string;
+            /** Email */
+            email?: string | null;
             /**
              * Id
              * Format: uuid

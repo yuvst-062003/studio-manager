@@ -16,29 +16,25 @@ import { AlertCircle, Award, Building2, CalendarDays, ChevronLeft, FileText, Map
 import { PROFILE, fill } from './content'
 import type { AttendanceSummary, ClubDetails, ProfileChild, PurchaseRow } from './types'
 
-export function ProfileBody({
+
+/* ── The page, taken apart ────────────────────────────────────────────────────────────
+ *
+ * One `ProfileBody` used to hold all five sections in a fixed order. Owner review,
+ * 2026-09-06, reordered the whole screen, and a single component cannot be reordered from
+ * outside — so each section is its own export and `ProfileScreen` composes them. The markup
+ * inside each is unchanged; only the seams are new.
+ */
+
+export function ProfileAttendance({
   childList,
   selectedChildId,
   onSelectChild,
   attendance,
-  purchases,
-  club,
-  money,
-  dateLabel,
 }: {
   childList: readonly ProfileChild[]
-  /** Which child the attendance card is showing. `null` before the list has loaded. */
   selectedChildId: string | null
   onSelectChild: (id: string) => void
-  /** One entry per child, already computed. `null` while the read is in flight. */
   attendance: readonly AttendanceSummary[] | null
-  /** Newest first, already filtered to shop orders. `null` while loading. */
-  purchases: readonly PurchaseRow[] | null
-  club: ClubDetails | null
-  /** Integer agorot -> a formatted string. NEVER divide by 100 in this file. */
-  money: (agorot: number) => string
-  /** `YYYY-MM-DD` -> a formatted date. Studio zone, done by the caller. */
-  dateLabel: (isoDate: string) => string
 }) {
   const selectedSummary =
     attendance?.find((entry) => entry.studentId === selectedChildId) ?? null
@@ -144,7 +140,21 @@ export function ProfileBody({
 
         <p className="text-[11px] text-slate-500 dark:text-slate-400">{PROFILE.attendanceHint}</p>
       </section>
+    </div>
+  )
+}
 
+export function ProfilePurchases({
+  purchases,
+  money,
+  dateLabel,
+}: {
+  purchases: readonly PurchaseRow[] | null
+  money: (agorot: number) => string
+  dateLabel: (isoDate: string) => string
+}) {
+  return (
+    <div className="space-y-4">
       {/* ========================================================= */}
       {/* PAST PURCHASES & ORDERS SUMMARY */}
       {/* ========================================================= */}
@@ -201,7 +211,13 @@ export function ProfileBody({
           <ChevronLeft className="w-3.5 h-3.5" aria-hidden="true" />
         </a>
       </section>
+    </div>
+  )
+}
 
+export function ProfileTrainees({ childList }: { childList: readonly ProfileChild[] }) {
+  return (
+    <div className="space-y-4">
       {/* Trainees Cards - each an <a> into the child's own card */}
       <section aria-labelledby="profile-trainees-heading" data-testid="profile-trainees" className="space-y-2.5 text-start">
         <div className="flex items-center justify-between">
@@ -286,7 +302,13 @@ export function ProfileBody({
           </a>
         </div>
       </section>
+    </div>
+  )
+}
 
+export function ProfileDojo({ club }: { club: ClubDetails | null }) {
+  return (
+    <div className="space-y-4">
       {/* Dojo Branch Details */}
       <section
         aria-labelledby="profile-dojo-heading"
@@ -318,7 +340,13 @@ export function ProfileBody({
           <ChevronLeft className="w-3.5 h-3.5" aria-hidden="true" />
         </a>
       </section>
+    </div>
+  )
+}
 
+export function ProfileLinks() {
+  return (
+    <div className="space-y-4">
       {/* Quick Links & Regulations */}
       <section aria-labelledby="profile-links-heading" data-testid="profile-links">
         <h2 id="profile-links-heading" className="sr-only">

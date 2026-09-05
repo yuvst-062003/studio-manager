@@ -299,6 +299,7 @@ export const common: Bundle = {
   'setup.studio.name': 'שם המועדון',
   'setup.studio.sport': 'ענף',
   'setup.studio.address': 'כתובת',
+  'setup.studio.email': 'דוא״ל המועדון',
   'setup.studio.phone': 'טלפון',
   'setup.studio.parentLocales': 'שפות שההורים יראו',
   'setup.studio.locale.he': 'עברית',
