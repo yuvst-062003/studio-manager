@@ -431,6 +431,15 @@ export const people: Bundle = {
   'alerts.upcomingTrials': 'שיעורי ניסיון קרובים',
   'alerts.trialsAwaitingDecision': 'שיעורי ניסיון שממתינים להחלטה',
   'alerts.viewAll': 'הצגת הכול',
+  // -- task 4b's queue: the join wizard's health gate holds an enrolment rather than
+  // refusing it, and this is the manager's view of every hold.
+  'alerts.pendingHealthReview': 'ממתינים למענה מנהל',
+  'alerts.pendingHealthReview.empty': 'אין רישומים הממתינים למענה',
+  'alerts.pendingHealthReview.answersYes': 'תשובות "כן" בהצהרת הבריאות',
+  'alerts.pendingHealthReview.waitingSince': 'ממתין מאז',
+  'alerts.pendingHealthReview.approve': 'אישור והפעלת הרישום',
+  'alerts.pendingHealthReview.approveConfirm': 'אישור — החניך יופעל ויחויב עבור החודש',
+  'alerts.pendingHealthReview.contact': 'יצירת קשר',
 
   // -- C12's day checkboxes ------------------------------------------------------
   'weekdays.title': 'באילו ימים מגיע/ה?',

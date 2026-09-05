@@ -8,6 +8,10 @@ export type EnrollmentOut = components['schemas']['EnrollmentOut']
 export type WeekdayOptions = components['schemas']['EnrollmentWeekdayOptionsOut']
 export type RegistrationRequestOut = components['schemas']['RegistrationRequestOut']
 export type TrialBookingRow = components['schemas']['TrialBookingRow']
+/** Task 4a's manager queue: one row per pending `Enrollment` the join wizard's health
+ *  gate held. Mirrors `PendingReviewOut` exactly — snake case on the wire, kept snake
+ *  case here, same as `TrialBookingRow` above. */
+export type PendingReviewRow = components['schemas']['PendingReviewOut']
 export type StatusHistoryOut = components['schemas']['StudentStatusHistoryOut']
 /** One attendance mark, as `GET /students/{id}/attendance` returns it. */
 export type AttendanceMarkRow = components['schemas']['AttendanceOut']
@@ -151,6 +155,21 @@ export function makeDashboardPeopleClient(fetcher: Fetcher) {
       fetcher(`/api/v1/trial-bookings${outcome ? `?outcome=${outcome}` : ''}`).then(
         json<{ items: TrialBookingRow[] }>,
       ),
+
+    // -- Task 4b's queue -------------------------------------------------------
+    // Task 4a's health gate holds an enrolment rather than refusing it; this is the
+    // manager's view of every hold, and the decision that clears one. The route itself
+    // returns a bare array (`response_model=list[PendingReviewOut]`) -- wrapped in
+    // `items` here, the same shape every other list on this client hands its caller.
+    pendingHealthReviews: () =>
+      fetcher('/api/v1/enrollments/pending-review')
+        .then(json<PendingReviewRow[]>)
+        .then((items) => ({ items })),
+
+    /** Activates the enrolment and raises the month -- the manager's decision on a
+     *  hold task 4a's health gate created. No body: the route reads only the id. */
+    approvePendingReview: (enrollmentId: string) =>
+      fetcher(`/api/v1/enrollments/${enrollmentId}/approve`, { method: 'POST' }),
   }
 }
 

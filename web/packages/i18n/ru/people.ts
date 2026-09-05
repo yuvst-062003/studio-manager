@@ -370,6 +370,16 @@ export const people: Bundle = {
   'alerts.upcomingTrials': 'Ближайшие пробные занятия',
   'alerts.trialsAwaitingDecision': 'Пробные занятия, ожидающие решения',
   'alerts.viewAll': 'Показать все',
+  // -- task 4b's queue: the join wizard's health gate holds an enrolment rather than
+  // refusing it, and this is the manager's view of every hold.
+  'alerts.pendingHealthReview': 'Ожидают ответа менеджера',
+  'alerts.pendingHealthReview.empty': 'Нет записей, ожидающих ответа',
+  'alerts.pendingHealthReview.answersYes': 'Ответов «да» в декларации здоровья',
+  'alerts.pendingHealthReview.waitingSince': 'Ожидает с',
+  'alerts.pendingHealthReview.approve': 'Подтвердить и активировать запись',
+  'alerts.pendingHealthReview.approveConfirm':
+    'Подтвердить — ученик будет активирован, и за месяц будет выставлен счёт',
+  'alerts.pendingHealthReview.contact': 'Связаться',
 
   'weekdays.title': 'В какие дни приходит?',
   'weekdays.hint': 'Отметьте дни тренировок. По умолчанию — все дни',

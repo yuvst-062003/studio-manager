@@ -367,6 +367,16 @@ export const people: Bundle = {
   'alerts.upcomingTrials': 'Trial classes coming up',
   'alerts.trialsAwaitingDecision': 'Trial classes awaiting a decision',
   'alerts.viewAll': 'View all',
+  // -- task 4b's queue: the join wizard's health gate holds an enrolment rather than
+  // refusing it, and this is the manager's view of every hold.
+  'alerts.pendingHealthReview': 'Awaiting manager review',
+  'alerts.pendingHealthReview.empty': 'No enrolments waiting for review',
+  'alerts.pendingHealthReview.answersYes': '"Yes" answers on the health declaration',
+  'alerts.pendingHealthReview.waitingSince': 'Waiting since',
+  'alerts.pendingHealthReview.approve': 'Approve and activate enrolment',
+  'alerts.pendingHealthReview.approveConfirm':
+    'Confirm — the student will be activated and charged for the month',
+  'alerts.pendingHealthReview.contact': 'Contact',
 
   'weekdays.title': 'Which days do they come?',
   'weekdays.hint':

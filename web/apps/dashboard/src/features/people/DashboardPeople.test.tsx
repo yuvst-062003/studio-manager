@@ -14,6 +14,7 @@ import { t } from '@studio/i18n'
 import { StudentsScreen, documentLabelKey } from './StudentsScreen'
 import { AddStudentScreen } from './AddStudentScreen'
 import { StudentDetailScreen } from './StudentDetailScreen'
+import { PendingHealthReviewAlert } from './sections/PendingHealthReviewAlert'
 import { TrialsAwaitingDecisionAlert } from './sections/TrialsAwaitingDecisionAlert'
 import { AlertCentre } from './AlertCentre'
 import type { AlertSectionProps } from './AlertCentre'
@@ -21,6 +22,7 @@ import { registerPeopleAlerts } from './register'
 import type {
   AttendanceMarkRow,
   DashboardPeopleClient,
+  PendingReviewRow,
   StudentSummary,
   TrialBookingRow,
 } from './peopleClient'
@@ -56,6 +58,21 @@ const booking = (over: Partial<TrialBookingRow> = {}): TrialBookingRow =>
     is_override: false,
     ...over,
   }) as TrialBookingRow
+
+const pendingReview = (over: Partial<PendingReviewRow> = {}): PendingReviewRow =>
+  ({
+    enrollment_id: 'e-pending-1',
+    student_id: 'st1',
+    student_name: 'דנה כהן',
+    group_name: 'מתחילים',
+    plan_name: 'מסלול חודשי',
+    monthly_amount_agorot: 32000,
+    answers_yes: 2,
+    guardian_name: 'יעל כהן',
+    guardian_phone: '0521234567',
+    started_on: '2026-09-01',
+    ...over,
+  }) as PendingReviewRow
 
 const mark = (over: Partial<AttendanceMarkRow> = {}): AttendanceMarkRow =>
   ({
@@ -162,6 +179,11 @@ function makeClient(over: Partial<DashboardPeopleClient> = {}): DashboardPeopleC
     markLost: vi.fn(),
     freeze: vi.fn(),
     trialBookings: vi.fn(() => Promise.resolve({ items: [booking()] })),
+    // Task 4b's queue — empty by default so the alert-centre tests that assert what a
+    // manager sees across ALL registered sections (no ₪ anywhere, the deleted queue's
+    // testid absent) are not disturbed by a lane's row this lane doesn't own.
+    pendingHealthReviews: vi.fn(() => Promise.resolve({ items: [] })),
+    approvePendingReview: vi.fn(),
     approve: vi.fn(),
     reject: vi.fn(),
     ...over,
@@ -1035,6 +1057,98 @@ describe('F2 — the four buttons that used to do nothing', () => {
     await userEvent.type(screen.getByTestId('alert-lost-reason-st9'), 'לא התאים')
     await userEvent.click(screen.getByTestId('alert-lost-submit-st9'))
     expect(client.markLost).toHaveBeenCalledWith('st9', 'לא התאים')
+  })
+})
+
+// -- Task 4b: the health-gate hold, in the alert centre --------------------------------
+describe('task 4b — the pending health review queue', () => {
+  it('renders a hold with the child, the amount and the yes-count — never the questions or answers', async () => {
+    const client = makeClient({
+      pendingHealthReviews: vi.fn(() => Promise.resolve({ items: [pendingReview()] })),
+    })
+    render(<PendingHealthReviewAlert locale="he" client={client} />)
+    const row = await screen.findByTestId('alert-pending-health-row')
+    expect(within(row).getByText('דנה כהן')).toBeInTheDocument()
+    expect(within(row).getByText('320₪')).toBeInTheDocument()
+    expect(
+      within(row).getByTestId('alert-pending-health-answers-e-pending-1'),
+    ).toHaveTextContent('2')
+
+    // The privacy rule (task 4b brief), tested rather than trusted: a count is the whole
+    // of it. Nothing here names a question or an answer, in any form.
+    const text = document.body.textContent ?? ''
+    expect(text).not.toMatch(/שאלה|הצהרת בריאות מלאה|אלרגיה|אסטמה|תרופ/)
+  })
+
+  it('takes two presses to approve, and only the second calls the client', async () => {
+    const client = makeClient({
+      pendingHealthReviews: vi.fn(() => Promise.resolve({ items: [pendingReview()] })),
+    })
+    ;(client.approvePendingReview as ReturnType<typeof vi.fn>).mockResolvedValue(
+      new Response('{}'),
+    )
+    render(<PendingHealthReviewAlert locale="he" client={client} />)
+    await userEvent.click(
+      await screen.findByTestId('alert-pending-health-approve-e-pending-1'),
+    )
+    expect(client.approvePendingReview).not.toHaveBeenCalled()
+    await userEvent.click(
+      screen.getByTestId('alert-pending-health-approve-confirm-e-pending-1'),
+    )
+    expect(client.approvePendingReview).toHaveBeenCalledWith('e-pending-1')
+  })
+
+  it('refetches after approving rather than patching the row list locally', async () => {
+    const fetchRows = vi.fn(() => Promise.resolve({ items: [pendingReview()] }))
+    const client = makeClient({ pendingHealthReviews: fetchRows })
+    ;(client.approvePendingReview as ReturnType<typeof vi.fn>).mockResolvedValue(
+      new Response('{}'),
+    )
+    render(<PendingHealthReviewAlert locale="he" client={client} />)
+    await screen.findByTestId('alert-pending-health-row')
+    expect(fetchRows).toHaveBeenCalledTimes(1)
+    await userEvent.click(
+      screen.getByTestId('alert-pending-health-approve-e-pending-1'),
+    )
+    await userEvent.click(
+      screen.getByTestId('alert-pending-health-approve-confirm-e-pending-1'),
+    )
+    await waitFor(() => expect(fetchRows).toHaveBeenCalledTimes(2))
+  })
+
+  it('shows the empty state, not a bare heading, when the queue is empty', async () => {
+    const client = makeClient({
+      pendingHealthReviews: vi.fn(() => Promise.resolve({ items: [] })),
+    })
+    render(<PendingHealthReviewAlert locale="he" client={client} />)
+    expect(await screen.findByText(t('he', 'people.alerts.pendingHealthReview.empty'))).toBeInTheDocument()
+    expect(screen.queryByTestId('alert-pending-health-row')).toBeNull()
+  })
+
+  it('renders no tel: link when the guardian phone is null', async () => {
+    const client = makeClient({
+      pendingHealthReviews: vi.fn(() =>
+        Promise.resolve({ items: [pendingReview({ guardian_phone: null })] }),
+      ),
+    })
+    render(<PendingHealthReviewAlert locale="he" client={client} />)
+    await screen.findByTestId('alert-pending-health-row')
+    expect(screen.queryByTestId('alert-pending-health-contact-e-pending-1')).toBeNull()
+    expect(document.querySelector('a[href^="tel:"]')).toBeNull()
+  })
+
+  it('is registered above the trial queues, at order 20', async () => {
+    registerPeopleAlerts()
+    const client = makeClient({
+      pendingHealthReviews: vi.fn(() => Promise.resolve({ items: [pendingReview()] })),
+    })
+    render(<AlertCentre locale="he" client={client} />)
+    await screen.findByTestId('alert-pending-health-review')
+    const sections = document.querySelectorAll('[data-testid^="alert-"]')
+    const order = Array.from(sections).map((el) => el.getAttribute('data-testid'))
+    expect(order.indexOf('alert-pending-health-review')).toBeLessThan(
+      order.indexOf('alert-trials-awaiting'),
+    )
   })
 })
 
