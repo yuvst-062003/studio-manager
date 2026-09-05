@@ -144,3 +144,54 @@ That is true of `BottomNavigation` (24) and `ProfileScreen` (318) and FALSE of `
 So the ported Home, Updates and Shop have no `dark:` classes, correctly. The sweep at the end
 ports those 18 overrides scoped to `.tw-scope` and matched against `[data-theme="dark"]`,
 which is the mechanism `tailwind.css`'s custom variant already points at.
+
+
+## פרופיל, after two owner reviews on 2026-09-06
+
+The tab shipped as a stacked page of nine sections and ran to four thousand pixels. Two
+reviews took it apart.
+
+**First review — the order.** Attendance to the top, language and brightness to the bottom,
+contact last, and a new פרטים אישיים section for the guardian's own record.
+
+**Second review — the shape.** "A card of buttons, so the screen isn't full and stacked."
+The page is now a menu; each row opens a sheet.
+
+| Row | Sheet holds |
+|---|---|
+| פרטים אישיים | name, email, phone + an edit sheet writing `PATCH /me/profile` |
+| המתאמנים שלי | a row per child **with their attendance %**, → the child's card, + add a child |
+| תשלומים | one sentence of coverage, the method, `כל התנועות` |
+| המועדון | WhatsApp / call / email, the address, directions |
+| הגדרות | language, theme, privacy, calendar feed, studio switcher, sign out |
+
+A row carries its title and nothing else, except a **red dot** when something needs the
+parent — an unpaid balance or a missing declaration. "Without the data itself" was the
+instruction; a silent row would hide a debt behind a popup, and a dot is a mark, not a number.
+
+### Two sections left the tab
+
+- **נוכחות is no longer a section.** It is a per-child number, and putting it on a family
+  screen is what forced a child picker onto a screen about nobody in particular — while the
+  child's own card had shown the full record all along. The percentage now sits on the
+  child's row inside המתאמנים שלי. **Nothing on Home:** those chips are a FILTER, one
+  already carries a count of children, and a second number meaning something else on the
+  same row is the confusion the updates counter had to be fixed for.
+- **היסטוריית רכישות moved to חנות המועדון**, as ההזמנות שלי. They are shop orders, the
+  prototype's own GearScreen puts an order tracker at the top of the shop, and on פרופיל
+  they sat two rows under היסטוריית תשלומים reading the same charges.
+
+### תשלומים answers "am I sorted", not "charged versus paid"
+
+The first build led with `סך החיובים ₪1,280 / שולם ₪960` — a bookkeeper's view, and the
+owner's review said the filling made no sense. It does not, because most families pay in
+bulk: cheques for the season, cash three months ahead. `coverageFrom` takes the furthest
+settled TUITION period and says **משולם עד יוני 2027**. Only a card payer sees a balance to
+act on, and only a card payer sees the note about where card details are handled.
+
+### The fast path, instead of a side menu
+
+The owner asked whether a side drawer should come back for faster access. It should not —
+the drawer's problem was never capacity, it was that a hamburger hides everything equally.
+Instead **a child's name on a Home session card is a link to their card**: the name is
+already on screen at the moment a parent is thinking about that child.

@@ -9,6 +9,7 @@ import { ThemeProvider } from '@studio/ui'
 import { formatAgorot } from '@studio/core'
 import { ParentShell } from './features/shell/ParentShell'
 import { ShopScreen } from './features/billing/redesign/ShopScreen'
+import { OrdersSheet } from './features/billing/redesign/OrdersSheet'
 import type { CartLine, CheckoutState, ShopProduct } from './features/billing/redesign/types'
 import './tailwind.css'
 
@@ -28,6 +29,11 @@ const PRODUCTS: ShopProduct[] = [
   { id: 'p6', name: 'מגן שיניים', description: 'כולל קופסת נשיאה', priceAgorot: 4500, sizes: [], imageUrl: null },
 ]
 
+const ORDERS = [
+  { id: 'o1', label: 'ג׳ודוגי תחרותי · מידה 140', amountAgorot: 42000, dueDate: '2026-08-20' },
+  { id: 'o2', label: 'חגורה רשמית', amountAgorot: 6500, dueDate: '2026-08-12' },
+]
+
 function Preview() {
   const params = new URLSearchParams(window.location.search)
   const state = params.get('state')
@@ -39,6 +45,7 @@ function Preview() {
         ]
       : [],
   )
+  const [orders, setOrders] = useState(params.has('orders'))
   const [checkout, setCheckout] = useState<CheckoutState>(
     params.has('placed') ? { kind: 'placed', lines: 3, totalAgorot: 55000 } : { kind: 'idle' },
   )
@@ -77,7 +84,16 @@ function Preview() {
         }}
         onCheckoutClose={() => setCheckout({ kind: 'idle' })}
         money={formatAgorot}
+        onOpenOrders={() => setOrders(true)}
       />
+      {orders ? (
+        <OrdersSheet
+          orders={ORDERS}
+          money={formatAgorot}
+          dateLabel={(iso) => new Date(`${iso}T12:00:00Z`).toLocaleDateString('he-IL')}
+          onClose={() => setOrders(false)}
+        />
+      ) : null}
     </ParentShell>
   )
 }

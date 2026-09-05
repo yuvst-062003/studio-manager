@@ -5,6 +5,7 @@
 // imported nothing from this folder. A component test renders the component directly,
 // which is exactly the thing a guardian cannot do. This one renders `App` and navigates
 // the way a guardian does — by the hash, and by the nav drawer.
+import userEvent from '@testing-library/user-event'
 import { render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from '../../App'
@@ -77,18 +78,20 @@ describe('the parent app mounts lane SCHEDULE', () => {
 
   it('offers the calendar from a screen, so the hash is not the only way in', async () => {
     // A screen reachable only by typing a URL is not reachable on a phone. This used to
-    // open the nav drawer; the redesign deleted it (§4, four tabs and no side menu). The
-    // link's final home is Profile's quick links, where it is the CALENDAR FEED — §5.12's
-    // subscription, which is what `#/calendar` still exists for now that בית draws the
-    // month itself in a modal.
+    // open the nav drawer; the redesign deleted it (§4), and the owner's review of
+    // 2026-09-06 turned פרופיל into a card of button-rows — so the link now sits inside the
+    // הגדרות sheet, as §5.12's CALENDAR FEED. That is what `#/calendar` still exists for
+    // now that בית draws the month itself in a modal.
     //
-    // The assertion is deliberately on the LINK and not on where it happens to sit: what
-    // this test has always been about is that something in the running app leads here.
+    // The test WALKS that path rather than asserting the link is on the surface: one tap is
+    // reachable, and a test that demanded no taps would be asserting a layout instead of
+    // the property it was written for — that something in the running app leads here.
     globalThis.location.hash = '#/profile'
     vi.stubGlobal('fetch', signedInAs({ parent: true }))
 
     render(<App />)
 
+    await userEvent.click(await screen.findByTestId('profile-row-settings'))
     const link = await screen.findByTestId('link-calendar')
     expect(link).toHaveAttribute('href', '#/calendar')
   })

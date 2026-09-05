@@ -220,7 +220,18 @@ export function HomeSchedule({
                   {/* Middle Info Details */}
                   <div className="flex-1 text-start">
                     <div className="flex items-center justify-start gap-2">
-                      <h3 className="font-bold text-base text-slate-900">{session.studentName}</h3>
+                      {/* THE FAST PATH TO A CHILD'S CARD (owner review, 2026-09-06). The
+                          alternative was a side menu; the answer is that the name is
+                          already on screen at the moment a parent is thinking about that
+                          child, so it is the link. Profile → המתאמנים → the child still
+                          works; this is one tap from the screen they open every day. */}
+                      <a
+                        href={`#/student/${session.studentId}`}
+                        data-testid={`home-child-${session.studentId}`}
+                        className="font-bold text-base text-slate-900 hover:underline underline-offset-2 cursor-pointer"
+                      >
+                        {session.studentName}
+                      </a>
                       <span
                         className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
                           isCancelled

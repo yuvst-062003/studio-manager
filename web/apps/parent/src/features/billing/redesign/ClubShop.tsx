@@ -16,10 +16,12 @@
 // loaded may be minutes old, and a manager who repriced a גי in between would otherwise have
 // the app tell a parent one figure while charging another.
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { apiFetch, formatAgorot } from '@studio/core'
+import { apiFetch, formatAgorot, formatDateInStudioZone } from '@studio/core'
 import type { Locale } from '@studio/i18n'
 import { t } from '@studio/i18n'
 import { ShopScreen } from './ShopScreen'
+import { OrdersSheet } from './OrdersSheet'
+import type { OrderRow } from './OrdersSheet'
 import type { CartLine, CheckoutState, ShopProduct } from './types'
 
 type ProductRow = {
@@ -37,6 +39,9 @@ export function ClubShop({ locale }: { locale: Locale }) {
   const [attempt, setAttempt] = useState(0)
   const [cart, setCart] = useState<readonly CartLine[]>([])
   const [checkout, setCheckout] = useState<CheckoutState>({ kind: 'idle' })
+  // ההזמנות שלי — moved here from פרופיל on the owner's review of 2026-09-06.
+  const [orders, setOrders] = useState<readonly OrderRow[] | null>(null)
+  const [ordersOpen, setOrdersOpen] = useState(false)
 
   useEffect(() => {
     let live = true
@@ -74,6 +79,43 @@ export function ClubShop({ locale }: { locale: Locale }) {
       live = false
     }
   }, [attempt])
+
+  useEffect(() => {
+    let live = true
+    void apiFetch('/api/v1/me/charges')
+      .then(async (response) => {
+        if (!live) return
+        if (!response.ok) return setOrders([])
+        const body = (await response.json()) as {
+          items: {
+            id: string
+            label?: string | null
+            amount_agorot: number
+            due_date: string
+            created_by: string
+          }[]
+        }
+        // `manual` is what the order endpoint writes — "one manual charge per line". Tuition
+        // comes from a billing run and an event charge from an event, and neither is
+        // something a family bought from the shop.
+        setOrders(
+          body.items
+            .filter((charge) => charge.created_by === 'manual')
+            .map((charge) => ({
+              id: charge.id,
+              label: charge.label ?? '',
+              amountAgorot: charge.amount_agorot,
+              dueDate: charge.due_date,
+            }))
+            .sort((a, b) => b.dueDate.localeCompare(a.dueDate)),
+        )
+      })
+      .catch(() => live && setOrders([]))
+    return () => {
+      live = false
+    }
+    // Re-read after a checkout lands, so an order just placed is in the list.
+  }, [checkout.kind])
 
   const addToCart = useCallback((line: CartLine) => {
     setCart((current) => {
@@ -152,7 +194,17 @@ export function ClubShop({ locale }: { locale: Locale }) {
         onCheckout={placeOrder}
         onCheckoutClose={() => setCheckout({ kind: 'idle' })}
         money={money}
+        onOpenOrders={() => setOrdersOpen(true)}
       />
+
+      {ordersOpen ? (
+        <OrdersSheet
+          orders={orders}
+          money={money}
+          dateLabel={(isoDate) => formatDateInStudioZone(`${isoDate}T12:00:00Z`, locale)}
+          onClose={() => setOrdersOpen(false)}
+        />
+      ) : null}
     </section>
   )
 }

@@ -3,31 +3,30 @@
 // the three things the prototype does that this must not (a card-details modal, a printed
 // national id, an invented season label).
 import {
-  ChevronLeft,
-  CreditCard,
   Globe,
   Monitor,
-  MessageCircle,
   Moon,
   Sliders,
   Sun,
   User,
 } from 'lucide-react'
-import type { ProfileBilling } from './types'
 import { PROFILE, fill } from './content'
 
 const THEME_OPTIONS = ['light', 'dark', 'system'] as const
 
 
-/* ── The page, taken apart ────────────────────────────────────────────────────────────
+/* ── What is left of the stacked screen ───────────────────────────────────────────────
  *
- * This file used to export ONE `ProfileTop` holding the header, the preferences, the
- * contact button and the billing block in that order. Owner review, 2026-09-06, reordered
- * the whole screen — attendance to the top, language and brightness to the bottom, contact
- * last of all — and a single component cannot be reordered from outside.
+ * This file exported ONE `ProfileTop` holding the header, the preferences, a contact button
+ * and a billing block. Two owner reviews on 2026-09-06 took it apart: the first reordered
+ * the screen, the second replaced the stack with a card of button-rows.
  *
- * So each block is its own export and `ProfileScreen` composes them. The markup inside each
- * is unchanged; only the seams are new.
+ * TWO of the four survive, and they are the two the menu still renders — the header, which
+ * is the only thing above the card, and the preferences, which the הגדרות sheet opens. The
+ * billing block went with the review that rejected a charged-versus-paid summary in favour
+ * of one sentence about coverage (`PaymentsSheet`), and the contact button became a menu
+ * row. Both are deleted rather than kept for later: an unrendered component is where a
+ * stale link hides, and `routes.reachable.test.ts` cannot tell the difference.
  */
 
 export function ProfileHeader({ familyName }: { familyName: string | null }) {
@@ -192,152 +191,3 @@ export function ProfilePreferences({
   )
 }
 
-export function ProfileContactCta({ onOpenContact }: { onOpenContact: () => void }) {
-  return (
-    <div className="flex flex-col space-y-4 text-start">
-      {/* Quick Contact Button */}
-      <button
-        type="button"
-        data-testid="profile-contact"
-        onClick={onOpenContact}
-        className="w-full flex items-center justify-between p-3.5 bg-gradient-to-r from-blue-900 via-[#001849] to-blue-950 dark:from-blue-950 dark:via-slate-900 dark:to-blue-950 text-white rounded-3xl shadow-md hover:shadow-lg active:scale-98 transition-all cursor-pointer group border border-blue-800/40"
-      >
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-2xl bg-white/15 dark:bg-blue-600/30 flex items-center justify-center text-white shrink-0">
-            <MessageCircle className="w-5 h-5" />
-          </div>
-          <div className="text-start">
-            <div className="text-sm font-bold">{PROFILE.contactCta}</div>
-            <div className="text-[11px] text-blue-200 dark:text-blue-300">{PROFILE.contactSub}</div>
-          </div>
-        </div>
-        <ChevronLeft
-          className="w-5 h-5 text-blue-200 group-hover:scale-110 transition-transform"
-          aria-hidden="true"
-        />
-      </button>
-
-    </div>
-  )
-}
-
-export function ProfileBillingBlock({
-  billing,
-  money,
-}: {
-  billing: ProfileBilling | null
-  money: (agorot: number) => string
-}) {
-  const openChargeLabel = (count: number) =>
-    count === 1 ? PROFILE.openChargeOne : fill(PROFILE.openCharges, { count })
-
-  return (
-    <div className="flex flex-col space-y-4 text-start">
-      {/* Account & Billing */}
-      <section
-        aria-labelledby="profile-billing-heading"
-        data-testid="profile-billing"
-        className="bg-white dark:bg-slate-900 rounded-3xl p-4 border border-slate-100 dark:border-slate-800 shadow-xs space-y-3 text-start transition-colors"
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5 text-xs font-bold text-slate-900 dark:text-white">
-            <CreditCard className="w-4 h-4 text-[#0056c5] dark:text-blue-400" />
-            <span id="profile-billing-heading">{PROFILE.billingTitle}</span>
-          </div>
-          {billing !== null && billing.balanceAgorot <= 0 && (
-            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-2.5 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-              <span>{PROFILE.balanceSettled}</span>
-            </span>
-          )}
-        </div>
-
-        {billing === null ? (
-          <div className="p-3.5 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-100 dark:border-slate-800 flex items-center justify-center text-xs text-slate-500 dark:text-slate-400">
-            {PROFILE.loading}
-          </div>
-        ) : (
-          <>
-            {/* Totals — always shown, regardless of balance state */}
-            <div className="p-3.5 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-100 dark:border-slate-800 flex items-center justify-between">
-              <div className="text-start">
-                <div className="text-lg font-black text-slate-900 dark:text-white leading-tight">
-                  {money(billing.chargedAgorot)}
-                </div>
-                <div className="text-[10px] text-slate-400">{PROFILE.chargedTotal}</div>
-              </div>
-              <div className="text-end">
-                <div className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                  {PROFILE.paidTotal}
-                </div>
-                <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                  {money(billing.paidAgorot)}
-                </div>
-              </div>
-            </div>
-
-            {/* Payment method — a link to the real payment setup, never a card form here */}
-            <a
-              href="#/payments"
-              data-testid="profile-method"
-              className="w-full flex items-center justify-between p-3 bg-blue-50/60 dark:bg-slate-800/80 hover:bg-blue-50 dark:hover:bg-slate-800 border border-blue-100 dark:border-slate-700 rounded-2xl text-start transition-all group active:scale-98 cursor-pointer"
-            >
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-[#0056c5] dark:bg-blue-600 text-white flex items-center justify-center shrink-0">
-                  <CreditCard className="w-4 h-4" />
-                </div>
-                <div className="text-start">
-                  <div className="text-xs font-bold text-slate-900 dark:text-white">
-                    {billing.methodLabel ?? PROFILE.paymentMethodNone}
-                  </div>
-                  <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                    {PROFILE.paymentMethod}
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center gap-1 text-xs font-bold text-[#0056c5] dark:text-blue-400">
-                <span>{PROFILE.paymentMethodUpdate}</span>
-                <ChevronLeft
-                  className="w-4 h-4 group-hover:translate-x-0.5 transition-transform"
-                  aria-hidden="true"
-                />
-              </div>
-            </a>
-            <p className="text-[10px] text-slate-400 dark:text-slate-500 px-1">
-              {PROFILE.paymentMethodHint}
-            </p>
-
-            {/* Owed state — no card form, just the balance and a link to the real payment page */}
-            {billing.balanceAgorot > 0 && (
-              <div className="p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/60 rounded-2xl flex items-center justify-between">
-                <a
-                  href="#/payments"
-                  data-testid="profile-pay"
-                  className="px-3 py-1.5 bg-[#ba1a1a] hover:bg-red-800 text-white rounded-xl text-xs font-bold shadow-xs active:scale-95 transition-all cursor-pointer"
-                >
-                  {PROFILE.payNow}
-                </a>
-                <div className="text-end">
-                  <div className="text-xs font-bold text-red-950 dark:text-red-200">
-                    {PROFILE.balanceOwed} · {money(billing.balanceAgorot)}
-                  </div>
-                  <div className="text-[10px] text-red-700 dark:text-red-300">
-                    {openChargeLabel(billing.openChargeCount)}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <a
-              href="#/payments/history"
-              data-testid="profile-history"
-              className="w-full flex items-center justify-center gap-1 py-2 text-xs font-bold text-[#0056c5] dark:text-blue-400 hover:underline"
-            >
-              {PROFILE.paymentHistory}
-            </a>
-          </>
-        )}
-      </section>
-    </div>
-  )
-}

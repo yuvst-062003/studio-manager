@@ -9,6 +9,32 @@ export const PROFILE = {
   familyTitleUnknown: 'הפרופיל שלי',
   familySubtitle: 'הגדרות, תשלומים והמתאמנים שלכם',
 
+  /** THE MENU. Owner review 2026-09-06: the screen is a card of button-rows and each one
+   *  opens a sheet — "בלי המידע עצמו", so a row carries its title and nothing else. The one
+   *  exception is a red dot on a row that needs attention; a silent row would hide a debt
+   *  behind a popup, and a dot is a mark rather than a number. */
+  menuPersonal: 'פרטים אישיים',
+  menuTrainees: 'המתאמנים שלי',
+  menuPayments: 'תשלומים',
+  menuClub: 'המועדון',
+  menuSettings: 'הגדרות',
+  needsAttention: 'דורש טיפול',
+
+  /** תשלומים — a SENTENCE about whether the family is straight with the club, not a
+   *  charged-versus-paid summary. Which sentence depends on how they pay: a cheque payer
+   *  settled the season in one go and has nothing to do. */
+  coverageOwedTitle: 'יתרה לתשלום',
+  /** `{month}` is already a Hebrew month name, `{year}` the year. */
+  coverageCovered: 'משולם עד {month} {year}',
+  coverageCoveredNote: 'אין מה לעשות — הכול מסודר',
+  coverageSettled: 'אין יתרה פתוחה',
+  coverageSettledNote: 'אין חיובים פתוחים על שמכם',
+  allTransactions: 'כל התנועות',
+
+  /** המועדון — the dojo and the contact actions, merged. Both answer "how do I reach the
+   *  club", and two rows for one question is the kind of thing that fills a screen. */
+  clubTitle: 'המועדון',
+
   /** Personal details — the guardian's own record. Not in the prototype at all: that
    *  design shows a family's children and never the parent. Owner review, 2026-09-06. */
   personalTitle: 'פרטים אישיים',

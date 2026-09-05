@@ -21,6 +21,7 @@ export function ShopScreen({
   onCheckout,
   onCheckoutClose,
   money,
+  onOpenOrders,
 }: {
   /** `null` while loading. */
   products: readonly ShopProduct[] | null
@@ -36,6 +37,8 @@ export function ShopScreen({
   onCheckoutClose: () => void
   /** Integer agorot -> a formatted string. NEVER divide by 100 in this file. */
   money: (agorot: number) => string
+  /** Opens ההזמנות שלי — the shop's own history, which used to sit on פרופיל. */
+  onOpenOrders: () => void
 }) {
   // Product customiser sheet -- belongs entirely to the sheet, nothing outside it reads it.
   const [selectedProduct, setSelectedProduct] = useState<ShopProduct | null>(null)
@@ -90,9 +93,22 @@ export function ShopScreen({
             </h1>
             <p className="text-[13px] font-medium text-slate-600">{SHOP.subtitle}</p>
           </div>
-          <div className="shrink-0 flex items-center gap-1 bg-[#EEF2FF] text-[#2563EB] px-2.5 py-1.5 rounded-full border border-blue-100 shadow-xs">
-            <ShieldCheck className="w-4 h-4 text-[#2563EB]" aria-hidden="true" />
-            <span className="text-xs font-bold whitespace-nowrap">{SHOP.standardBadge}</span>
+          <div className="shrink-0 flex flex-col items-end gap-1.5">
+            <div className="flex items-center gap-1 bg-[#EEF2FF] text-[#2563EB] px-2.5 py-1.5 rounded-full border border-blue-100 shadow-xs">
+              <ShieldCheck className="w-4 h-4 text-[#2563EB]" aria-hidden="true" />
+              <span className="text-xs font-bold whitespace-nowrap">{SHOP.standardBadge}</span>
+            </div>
+            {/* ההזמנות שלי — moved here from פרופיל (owner review, 2026-09-06). It belongs
+                beside the catalogue it is a history of, which is also where the prototype's
+                own order tracker sits. */}
+            <button
+              type="button"
+              onClick={onOpenOrders}
+              data-testid="shop-open-orders"
+              className="text-xs font-bold text-[#2563EB] underline underline-offset-2 whitespace-nowrap cursor-pointer"
+            >
+              {SHOP.ordersCta}
+            </button>
           </div>
         </div>
       </header>

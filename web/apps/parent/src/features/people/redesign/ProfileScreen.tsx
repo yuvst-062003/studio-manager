@@ -12,33 +12,22 @@
 // `ProfileSection`'s own header records why: "a studio read that 403s must not blank a
 // screen whose subject is the parent."
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { apiFetch, formatAgorot, formatDateInStudioZone, studioDayKey } from '@studio/core'
+import { apiFetch, formatAgorot } from '@studio/core'
 import { useTheme } from '@studio/ui'
 import { ENDONYM } from '@studio/ui'
 import { LOCALES, t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { needsFullDeclaration } from '../../health/HealthGate'
-import { AccountControls } from '../../shell/AccountControls'
 import type { AccountControlsProps } from '../../shell/AccountControls'
-import {
-  ProfileBillingBlock,
-  ProfileContactCta,
-  ProfileHeader,
-  ProfilePreferences,
-} from './ProfileTop'
-import {
-  ProfileAttendance,
-  ProfileDojo,
-  ProfileLinks,
-  ProfilePurchases,
-  ProfileTrainees,
-} from './ProfileBody'
-import { PersonalDetailsSheet, ProfilePersonalDetails } from './PersonalDetails'
+import { ProfileHeader } from './ProfileTop'
+import { ProfileMenu } from './ProfileMenu'
+import type { MenuKey } from './ProfileMenu'
+import { ClubSheet, MONTH_NAME, PaymentsSheet, SettingsSheet, TraineesSheet } from './sheets'
+import { PersonalDetailsSheet } from './PersonalDetails'
 import type { MyDetails } from './PersonalDetails'
-import { ContactSheet } from './ContactSheet'
-import { familyNameOf, purchasesFrom, summariseAttendance } from './derive'
-import type { AttendanceRow } from './derive'
-import type { ClubDetails, ProfileBilling, ProfileChild, PurchaseRow } from './types'
+import { coverageFrom, familyNameOf } from './derive'
+import type { Coverage, CoverageCharge } from './derive'
+import type { ClubDetails, ProfileChild } from './types'
 
 type StudentRow = {
   id: string
@@ -53,9 +42,6 @@ type StudentRow = {
   group_names?: string[]
 }
 
-/** How far back the attendance card looks. 30 days, inside the route's own 62-day cap. */
-const WINDOW_DAYS = 30
-
 export function ProfileScreen({
   locale,
   onLocaleChange,
@@ -67,14 +53,16 @@ export function ProfileScreen({
 }) {
   const theme = useTheme()
   const [children, setChildren] = useState<readonly ProfileChild[] | null>(null)
-  const [billing, setBilling] = useState<ProfileBilling | null>(null)
   const [club, setClub] = useState<ClubDetails | null>(null)
-  const [attendanceRows, setAttendanceRows] = useState<readonly AttendanceRow[] | null>(null)
-  const [purchases, setPurchases] = useState<readonly PurchaseRow[] | null>(null)
-  const [selectedChildId, setSelectedChildId] = useState<string | null>(null)
-  const [contactOpen, setContactOpen] = useState(false)
   const [details, setDetails] = useState<MyDetails | null>(null)
-  const [editingDetails, setEditingDetails] = useState(false)
+  const [balance, setBalance] = useState<{ balanceAgorot: number; openChargeCount: number } | null>(
+    null,
+  )
+  const [methodLabel, setMethodLabel] = useState<string | null>(null)
+  const [methodIsCard, setMethodIsCard] = useState(false)
+  const [charges, setCharges] = useState<readonly CoverageCharge[] | null>(null)
+
+  const [open, setOpen] = useState<MenuKey | 'settings' | null>(null)
   const [savingDetails, setSavingDetails] = useState(false)
   const [detailsFailed, setDetailsFailed] = useState(false)
 
@@ -86,67 +74,27 @@ export function ProfileScreen({
         if (!response.ok) throw new Error(String(response.status))
         const body = (await response.json()) as { items: StudentRow[] }
         if (!live) return
-        const mapped = body.items.map((row) => ({
-          id: row.id,
-          firstName: row.first_name,
-          lastName: row.last_name,
-          displayName: `${row.first_name} ${row.last_name}`,
-          beltName: row.current_belt_name ?? null,
-          beltColorHex: row.current_belt_color_hex ?? null,
-          groupNames: row.group_names ?? [],
-          attendancePercent: row.attendance_percent ?? null,
-          // The SAME predicate §6.1's gate uses. Two spellings of "does this child still
-          // owe something" is how a card comes to disagree with the gate that blocks the
-          // app — which `App.tsx` records having already happened once.
-          needsDeclaration: needsFullDeclaration({
-            ...row,
-            display_name: `${row.first_name} ${row.last_name}`,
-          } as Parameters<typeof needsFullDeclaration>[0]),
-        }))
-        setChildren(mapped)
-        setSelectedChildId((current) => current ?? mapped[0]?.id ?? null)
-      })
-      .catch(() => live && setChildren([]))
-
-    void apiFetch('/api/v1/me/balance')
-      .then(async (response) => {
-        if (!response.ok || !live) return
-        const body = (await response.json()) as {
-          balance_agorot: number
-          charged_agorot: number
-          paid_agorot: number
-          open_charge_count: number
-        }
-        setBilling((current) => ({
-          balanceAgorot: body.balance_agorot,
-          chargedAgorot: body.charged_agorot,
-          paidAgorot: body.paid_agorot,
-          openChargeCount: body.open_charge_count,
-          // Kept if the promises read landed first — the two fill different halves of one
-          // object and neither should clear the other's work.
-          methodLabel: current?.methodLabel ?? null,
-        }))
-      })
-      .catch(() => undefined)
-
-    void apiFetch('/api/v1/me/payment-promises')
-      .then(async (response) => {
-        if (!response.ok || !live) return
-        const body = (await response.json()) as { items?: { method?: string | null }[] }
-        const method = body.items?.[0]?.method ?? null
-        setBilling((current) =>
-          current
-            ? { ...current, methodLabel: method }
-            : {
-                balanceAgorot: 0,
-                chargedAgorot: 0,
-                paidAgorot: 0,
-                openChargeCount: 0,
-                methodLabel: method,
-              },
+        setChildren(
+          body.items.map((row) => ({
+            id: row.id,
+            firstName: row.first_name,
+            lastName: row.last_name,
+            displayName: `${row.first_name} ${row.last_name}`,
+            beltName: row.current_belt_name ?? null,
+            beltColorHex: row.current_belt_color_hex ?? null,
+            groupNames: row.group_names ?? [],
+            attendancePercent: row.attendance_percent ?? null,
+            // The SAME predicate §6.1's gate uses. Two spellings of "does this child still
+            // owe something" is how a card comes to disagree with the gate that blocks the
+            // app — which `App.tsx` records having already happened once.
+            needsDeclaration: needsFullDeclaration({
+              ...row,
+              display_name: `${row.first_name} ${row.last_name}`,
+            } as Parameters<typeof needsFullDeclaration>[0]),
+          })),
         )
       })
-      .catch(() => undefined)
+      .catch(() => live && setChildren([]))
 
     void apiFetch('/api/v1/me/profile')
       .then(async (response) => {
@@ -179,53 +127,59 @@ export function ProfileScreen({
       })
       .catch(() => undefined)
 
-    const today = new Date()
-    const from = new Date(today.getTime() - WINDOW_DAYS * 24 * 60 * 60 * 1000)
-    void apiFetch(
-      `/api/v1/me/attendance?from=${studioDayKey(from)}&to=${studioDayKey(today)}`,
-    )
+    void apiFetch('/api/v1/me/balance')
       .then(async (response) => {
-        if (!live) return
-        if (!response.ok) return setAttendanceRows([])
-        const body = (await response.json()) as { items: AttendanceRow[] }
-        setAttendanceRows(body.items)
+        if (!response.ok || !live) return
+        const body = (await response.json()) as {
+          balance_agorot: number
+          open_charge_count: number
+        }
+        setBalance({
+          balanceAgorot: body.balance_agorot,
+          openChargeCount: body.open_charge_count,
+        })
       })
-      .catch(() => live && setAttendanceRows([]))
+      .catch(() => undefined)
 
+    void apiFetch('/api/v1/me/payment-promises')
+      .then(async (response) => {
+        if (!response.ok || !live) return
+        const body = (await response.json()) as { items?: { method?: string | null }[] }
+        const method = body.items?.[0]?.method ?? null
+        setMethodLabel(method ? t(locale, `billing.method.${method}`) : null)
+        // The PCI note is only true for a card payer; see `PaymentsSheet`.
+        setMethodIsCard(method === 'upay_card' || method === 'card')
+      })
+      .catch(() => undefined)
+
+    // The charges are read for ONE question: which month is already paid for. `coverageFrom`
+    // takes the furthest settled tuition period, which is how a family that wrote cheques
+    // for the season learns they are covered until June rather than reading twelve rows.
     void apiFetch('/api/v1/me/charges')
       .then(async (response) => {
         if (!live) return
-        if (!response.ok) return setPurchases([])
-        const body = (await response.json()) as {
-          items: {
-            id: string
-            label?: string | null
-            amount_agorot: number
-            due_date: string
-            status: string
-            created_by: string
-          }[]
-        }
-        setPurchases(purchasesFrom(body.items))
+        if (!response.ok) return setCharges([])
+        const body = (await response.json()) as { items: CoverageCharge[] }
+        setCharges(body.items)
       })
-      .catch(() => live && setPurchases([]))
+      .catch(() => live && setCharges([]))
 
     return () => {
       live = false
     }
-  }, [])
-
-  const attendance = useMemo(
-    () =>
-      attendanceRows === null || children === null
-        ? null
-        : summariseAttendance(attendanceRows, children),
-    [attendanceRows, children],
-  )
+  }, [locale])
 
   const familyName = useMemo(
     () => (children === null ? null : familyNameOf(children.map((child) => child.lastName))),
     [children],
+  )
+
+  const coverage: Coverage | null = useMemo(
+    () =>
+      balance === null || charges === null
+        ? null
+        : coverageFrom(balance.balanceAgorot, balance.openChargeCount, charges),
+    [balance, charges],
   )
 
   const money = useCallback((agorot: number) => formatAgorot(agorot), [])
@@ -246,11 +200,9 @@ export function ProfileScreen({
       .then((response) => {
         setSavingDetails(false)
         if (!response.ok) return setDetailsFailed(true)
-        // The screen shows what the server ACCEPTED, and the sheet closes only then. A
-        // sheet that closed on the tap would leave a parent believing a correction landed
-        // that the server refused.
+        // The screen shows what the server ACCEPTED, and the sheet closes only then.
         setDetails(next)
-        setEditingDetails(false)
+        setOpen(null)
       })
       .catch(() => {
         setSavingDetails(false)
@@ -258,74 +210,63 @@ export function ProfileScreen({
       })
   }, [])
 
+  const close = useCallback(() => {
+    setOpen(null)
+    setDetailsFailed(false)
+  }, [])
+
   return (
     <section aria-label={t(locale, 'people.profile.title')} data-testid="parent-profile">
-      {/* THE ORDER IS THE OWNER'S, 2026-09-06, and it is not the prototype's.
-       *
-       *   פרטים אישיים · נוכחות · תשלומים · מתאמנים · רכישות · דוג׳ו · שפה ובהירות · קשר
-       *
-       * Attendance came from the middle of the page to the top ("הסיכום נוכחות צריך להיות
-       * בתחילת העמוד"); language and brightness went the other way, from the top to the
-       * bottom ("את השפה או הבהירות תוריד לסוף העמוד"); and contact is last of all. The
-       * sections are separate components precisely so this list is the only thing that has
-       * to change when the order does. */}
       <ProfileHeader familyName={familyName} />
 
-      <ProfilePersonalDetails details={details} onEdit={() => setEditingDetails(true)} />
-
-      <ProfileAttendance
-        childList={children ?? []}
-        selectedChildId={selectedChildId}
-        onSelectChild={setSelectedChildId}
-        attendance={attendance}
+      <ProfileMenu
+        onOpen={setOpen}
+        onOpenSettings={() => setOpen('settings')}
+        // A dot, never a number: "בלי המידע עצמו" was the instruction, and a silent row
+        // would hide an unpaid balance behind a popup.
+        attention={{
+          payments: coverage?.kind === 'owed',
+          trainees: (children ?? []).some((child) => child.needsDeclaration),
+        }}
       />
 
-      <ProfileBillingBlock billing={billing} money={money} />
-
-      <ProfileTrainees childList={children ?? []} />
-
-      <ProfilePurchases
-        purchases={purchases}
-        money={money}
-        // A `YYYY-MM-DD` due date, read at MIDDAY so no zone can move it to the day
-        // before — the same trap `derive.ts` documents for the week strip.
-        dateLabel={(isoDate) => formatDateInStudioZone(`${isoDate}T12:00:00Z`, locale)}
-      />
-
-      <ProfileDojo club={club} />
-
-      <ProfilePreferences
-        locale={locale}
-        locales={LOCALES}
-        localeLabel={(code) => ENDONYM[code as Locale]}
-        onChooseLocale={(code) => onLocaleChange(code as Locale)}
-        theme={theme.preference}
-        onChooseTheme={theme.setPreference}
-      />
-
-      <ProfileLinks />
-
-      <ProfileContactCta onOpenContact={() => setContactOpen(true)} />
-
-      {/* The drawer's two orphans, unchanged since checkpoint 1 — sign-out and the studio
-          switcher. They stay a separate component because they are the SHELL's, handed down
-          rather than read again here. */}
-      <div className="tw-scope px-4 pb-4">
-        <AccountControls locale={locale} {...account} />
-      </div>
-
-      {contactOpen ? <ContactSheet club={club} onClose={() => setContactOpen(false)} /> : null}
-
-      {editingDetails && details ? (
+      {open === 'personal' && details ? (
         <PersonalDetailsSheet
           details={details}
           busy={savingDetails}
           failed={detailsFailed}
           onSave={saveDetails}
-          onClose={() => {
-            setEditingDetails(false)
-            setDetailsFailed(false)
-          }}
+          onClose={close}
+        />
+      ) : null}
+
+      {open === 'trainees' ? (
+        <TraineesSheet childList={children ?? []} onClose={close} />
+      ) : null}
+
+      {open === 'payments' ? (
+        <PaymentsSheet
+          coverage={coverage}
+          methodLabel={methodLabel}
+          methodIsCard={methodIsCard}
+          money={money}
+          monthName={(month) => MONTH_NAME[month - 1] ?? String(month)}
+          onClose={close}
+        />
+      ) : null}
+
+      {open === 'club' ? <ClubSheet club={club} onClose={close} /> : null}
+
+      {open === 'settings' ? (
+        <SettingsSheet
+          locale={locale}
+          locales={LOCALES}
+          localeLabel={(code) => ENDONYM[code as Locale]}
+          onChooseLocale={(code) => onLocaleChange(code as Locale)}
+          theme={theme.preference}
+          onChooseTheme={theme.setPreference}
+          account={{ ...account, locale }}
+          onClose={close}
         />
       ) : null}
     </section>

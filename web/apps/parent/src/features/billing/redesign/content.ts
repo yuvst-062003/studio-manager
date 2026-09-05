@@ -42,6 +42,16 @@ export const SHOP = {
   placedClose: 'סגירה',
   checkoutFailed: 'ההזמנה לא נשלחה. נסו שוב.',
 
+  /** ההזמנות שלי — moved here from פרופיל on the owner's review of 2026-09-06. They are
+   *  shop orders, and the prototype's own GearScreen puts an order tracker at the top of
+   *  the shop; פרופיל had them two rows under "היסטוריית תשלומים", reading the same
+   *  charges and answering a different question. */
+  ordersCta: 'ההזמנות שלי',
+  ordersTitle: 'ההזמנות שלי',
+  ordersSub: 'פריטים שהזמנתם מהמועדון',
+  ordersEmpty: 'עדיין לא הזמנתם פריטים',
+  ordersAll: 'לכל התשלומים',
+
   /** The catalogue itself. */
   loading: 'טוען את החנות…',
   loadFailed: 'לא הצלחנו לטעון את החנות',

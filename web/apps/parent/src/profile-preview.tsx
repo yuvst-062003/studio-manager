@@ -1,48 +1,36 @@
-// A render harness for checkpoint 5's design review, NOT a shipped entry. Deleted with the
-// other previews once the redesign is accepted.
+// A render harness for the profile menu, NOT a shipped entry. Deleted with the other
+// previews once the redesign is accepted.
+//
+// `?open=personal|trainees|payments|club|settings` opens a sheet directly, which is how the
+// checkpoint screenshots each one without a click path.
 import { StrictMode, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { ThemeProvider, useTheme } from '@studio/ui'
 import { formatAgorot } from '@studio/core'
 import { LOCALES } from '@studio/i18n'
 import { ParentShell } from './features/shell/ParentShell'
+import { ProfileHeader } from './features/people/redesign/ProfileTop'
+import { ProfileMenu } from './features/people/redesign/ProfileMenu'
+import type { MenuKey } from './features/people/redesign/ProfileMenu'
 import {
-  ProfileBillingBlock,
-  ProfileContactCta,
-  ProfileHeader,
-  ProfilePreferences,
-} from './features/people/redesign/ProfileTop'
-import {
-  ProfileAttendance,
-  ProfileDojo,
-  ProfileLinks,
-  ProfilePurchases,
-  ProfileTrainees,
-} from './features/people/redesign/ProfileBody'
-import { PersonalDetailsSheet, ProfilePersonalDetails } from './features/people/redesign/PersonalDetails'
+  ClubSheet,
+  MONTH_NAME,
+  PaymentsSheet,
+  SettingsSheet,
+  TraineesSheet,
+} from './features/people/redesign/sheets'
+import { PersonalDetailsSheet } from './features/people/redesign/PersonalDetails'
 import type { MyDetails } from './features/people/redesign/PersonalDetails'
-import { ContactSheet } from './features/people/redesign/ContactSheet'
+import type { Coverage } from './features/people/redesign/derive'
 import type { ProfileChild } from './features/people/redesign/types'
 import './tailwind.css'
 
 const ENDONYMS: Record<string, string> = { he: 'עברית', en: 'English', ru: 'Русский' }
 
 const CHILDREN: ProfileChild[] = [
-  { id: 'dana', firstName: 'דנה', lastName: 'כהן', displayName: 'דנה כהן', beltName: 'חגורה ירוקה', beltColorHex: '#10b981', groupNames: ['קדטים'], attendancePercent: 94, needsDeclaration: false },
-  { id: 'yossi', firstName: 'יוסי', lastName: 'כהן', displayName: 'יוסי כהן', beltName: 'חגורה כחולה', beltColorHex: '#2563eb', groupNames: ['בוגרים'], attendancePercent: 88, needsDeclaration: false },
-  { id: 'noa', firstName: 'נועה', lastName: 'כהן', displayName: 'נועה כהן', beltName: null, beltColorHex: null, groupNames: ['צעירים'], attendancePercent: 82, needsDeclaration: true },
-]
-
-const ATTENDANCE = [
-  { studentId: 'dana', attended: 15, marked: 16, percent: 94 },
-  { studentId: 'yossi', attended: 14, marked: 16, percent: 88 },
-  { studentId: 'noa', attended: 0, marked: 0, percent: 0 },
-]
-
-const PURCHASES = [
-  { id: 'a', label: 'ג׳ודוגי תחרותי · מידה 140', amountAgorot: 42000, dueDate: '2026-08-20', status: 'open' },
-  { id: 'b', label: 'חגורה רשמית', amountAgorot: 6500, dueDate: '2026-08-12', status: 'settled' },
-  { id: 'c', label: 'מגן שיניים', amountAgorot: 4500, dueDate: '2026-07-30', status: 'settled' },
+  { id: 'dana', firstName: 'דנה', lastName: 'כהן', displayName: 'דנה כהן', beltName: 'חגורה ירוקה', beltColorHex: '#10b981', groupNames: [], attendancePercent: 94, needsDeclaration: false },
+  { id: 'yossi', firstName: 'יוסי', lastName: 'כהן', displayName: 'יוסי כהן', beltName: 'חגורה כחולה', beltColorHex: '#2563eb', groupNames: [], attendancePercent: 88, needsDeclaration: false },
+  { id: 'noa', firstName: 'נועה', lastName: 'כהן', displayName: 'נועה כהן', beltName: null, beltColorHex: null, groupNames: [], attendancePercent: 82, needsDeclaration: true },
 ]
 
 const CLUB = {
@@ -56,69 +44,76 @@ function Preview() {
   const params = new URLSearchParams(window.location.search)
   const theme = useTheme()
   const [locale, setLocale] = useState('he')
-  const [selected, setSelected] = useState<string | null>('dana')
-  const [contact, setContact] = useState(params.has('contact'))
-  const [editing, setEditing] = useState(params.has('editing'))
+  const [open, setOpen] = useState<MenuKey | 'settings' | null>(
+    (params.get('open') as MenuKey | 'settings' | null) ?? null,
+  )
   const [details, setDetails] = useState<MyDetails>({
     firstName: 'יוסף',
     lastName: 'כהן',
     email: 'yosef@example.com',
     phone: '052-1234567',
   })
-  const settled = params.has('settled')
+
+  //: `?owed` is a family with a balance; the default is the cheque payer the owner
+  //: described — settled for the season, with nothing to do.
+  const coverage: Coverage = params.has('owed')
+    ? { kind: 'owed', balanceAgorot: 32000, openChargeCount: 2 }
+    : { kind: 'covered', year: 2027, month: 6 }
+
+  const close = () => setOpen(null)
 
   return (
     <ParentShell activeTab="profile" updatesBadgeCount={2}>
       <ProfileHeader familyName="כהן" />
-      <ProfilePersonalDetails details={details} onEdit={() => setEditing(true)} />
-      <ProfileAttendance
-        childList={CHILDREN}
-        selectedChildId={selected}
-        onSelectChild={setSelected}
-        attendance={params.has('loading') ? null : ATTENDANCE}
+      <ProfileMenu
+        onOpen={setOpen}
+        onOpenSettings={() => setOpen('settings')}
+        attention={{
+          payments: coverage.kind === 'owed',
+          trainees: CHILDREN.some((child) => child.needsDeclaration),
+        }}
       />
-      <ProfileBillingBlock
-        billing={
-          params.has('loading')
-            ? null
-            : {
-                balanceAgorot: settled ? 0 : 32000,
-                chargedAgorot: 128000,
-                paidAgorot: settled ? 128000 : 96000,
-                openChargeCount: settled ? 0 : 2,
-                methodLabel: params.has('nomethod') ? null : 'כרטיס אשראי',
-              }
-        }
-        money={formatAgorot}
-      />
-      <ProfileTrainees childList={CHILDREN} />
-      <ProfilePurchases
-        purchases={params.has('loading') ? null : params.has('nopurchases') ? [] : PURCHASES}
-        money={formatAgorot}
-        dateLabel={(iso) => new Date(`${iso}T12:00:00Z`).toLocaleDateString('he-IL')}
-      />
-      <ProfileDojo club={CLUB} />
-      <ProfilePreferences
-        locale={locale}
-        locales={LOCALES}
-        localeLabel={(code) => ENDONYMS[code] ?? code}
-        onChooseLocale={setLocale}
-        theme={theme.preference}
-        onChooseTheme={theme.setPreference}
-      />
-      <ProfileLinks />
-      <ProfileContactCta onOpenContact={() => setContact(true)} />
-      {contact ? <ContactSheet club={CLUB} onClose={() => setContact(false)} /> : null}
-      {editing ? (
+
+      {open === 'personal' ? (
         <PersonalDetailsSheet
           details={details}
           busy={false}
-          failed={params.has('savefail')}
+          failed={false}
           onSave={(next) => {
             setDetails(next)
-            setEditing(false)
+            close()
           }}
-          onClose={() => setEditing(false)}
+          onClose={close}
+        />
+      ) : null}
+      {open === 'trainees' ? <TraineesSheet childList={CHILDREN} onClose={close} /> : null}
+      {open === 'payments' ? (
+        <PaymentsSheet
+          coverage={coverage}
+          methodLabel={params.has('owed') ? 'כרטיס אשראי' : 'צ׳קים'}
+          methodIsCard={params.has('owed')}
+          money={formatAgorot}
+          monthName={(month) => MONTH_NAME[month - 1] ?? String(month)}
+          onClose={close}
+        />
+      ) : null}
+      {open === 'club' ? <ClubSheet club={CLUB} onClose={close} /> : null}
+      {open === 'settings' ? (
+        <SettingsSheet
+          locale={locale}
+          locales={LOCALES}
+          localeLabel={(code) => ENDONYMS[code] ?? code}
+          onChooseLocale={setLocale}
+          theme={theme.preference}
+          onChooseTheme={theme.setPreference}
+          account={{
+            locale: 'he',
+            studios: [],
+            activeStudioId: null,
+            onSwitchStudio: () => {},
+            onSignOut: () => {},
+          }}
+          onClose={close}
         />
       ) : null}
     </ParentShell>
