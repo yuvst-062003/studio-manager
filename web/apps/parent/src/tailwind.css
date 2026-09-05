@@ -1,0 +1,173 @@
+/* Tailwind v4 for the onboarding wizard, WITHOUT preflight.
+ *
+ * §9 of docs/superpowers/specs/2026-09-05-join-wizard-redesign-design.md: the wizard is
+ * ported from a Tailwind prototype, so this app carries a second styling system that the
+ * staff and dashboard apps do not. Two facts make that safe, and both were checked rather
+ * than assumed:
+ *
+ *   1. UTILITIES CANNOT COLLIDE. @studio/ui names every class `studio-*` in BEM
+ *      (`studio-card`, `studio-choice__input`), and Tailwind's utilities are `flex`,
+ *      `p-4`, `rounded-xl`. No overlap, so utilities are safe to load app-wide -- they
+ *      only apply where a class is written.
+ *
+ *   2. PREFLIGHT IS THE WHOLE PROBLEM. Its rules are element selectors -- `*`, `h1`-`h6`,
+ *      `a`, `button`, `ol`, `img` -- and loading them globally would restyle every screen
+ *      @studio/ui draws. So `@import "tailwindcss"` is NOT used; its three layers are
+ *      imported individually and preflight is replaced by the scoped block below.
+ *
+ * tokens.css already supplies four of preflight's rules globally and compatibly:
+ * `box-sizing: border-box` on `*`, `body { margin: 0 }`, `font-family: inherit` on form
+ * controls (family only, deliberately -- see its own note), and a `:focus-visible`
+ * outline preflight does not have. Those are not repeated here.
+ */
+
+@layer theme, base, components, utilities;
+
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+
+/* THE TEN VARIABLES BOTH SYSTEMS NAME.
+ *
+ * Tailwind's theme defines 419 custom properties; ten of them are also design-system
+ * tokens: `--font-sans`, `--leading-tight|snug|normal|relaxed` and
+ * `--radius-xs|sm|md|lg|xl`. This was missed when the isolation was first checked --
+ * CLASS names were compared and cannot collide, but variable names were not.
+ *
+ * The cascade already resolves it in the right direction: tokens.css and fonts.css are
+ * UNLAYERED, and unlayered declarations beat every `@layer`, so `:root` keeps the studio's
+ * 14px radius, 1.0 tight leading and Rubik. The rest of the app is safe without doing
+ * anything.
+ *
+ * The cost lands the other way. Inside the wizard, `rounded-xl` compiles to
+ * `var(--radius-xl)` and would resolve to the studio's 14px rather than the 12px the
+ * ported markup was drawn against, and `leading-tight` would be 1.0 rather than 1.25 --
+ * cramped enough to see. So Tailwind's own values are restored HERE, scoped, where its
+ * utilities are the ones being used.
+ *
+ * `--font-sans` is deliberately NOT in this list: the prototype asks for Rubik and the
+ * design system already provides it, so both systems agree and the studio's wins. */
+.tw-scope {
+  --leading-tight: 1.25;
+  --leading-snug: 1.375;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.625;
+  --radius-xs: 0.125rem;
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+}
+
+/* Preflight, scoped to `.tw-scope`.
+ *
+ * Layer order above puts `utilities` last, so a utility beats these regardless of the
+ * added specificity that scoping costs -- `.tw-scope *` is (0,1,0) and would otherwise
+ * tie with a utility and win on source order. */
+@layer base {
+  .tw-scope,
+  .tw-scope *,
+  .tw-scope ::before,
+  .tw-scope ::after,
+  .tw-scope ::backdrop {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    border: 0 solid;
+  }
+
+  /* Not `font-family`: tokens.css already sets Rubik on `html`, which is the same family
+   * the prototype asks for, and D6 makes it the only one covering he+en+ru. */
+  .tw-scope {
+    line-height: 1.5;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .tw-scope h1,
+  .tw-scope h2,
+  .tw-scope h3,
+  .tw-scope h4,
+  .tw-scope h5,
+  .tw-scope h6 {
+    font-size: inherit;
+    font-weight: inherit;
+  }
+
+  .tw-scope a {
+    color: inherit;
+    text-decoration: inherit;
+  }
+
+  .tw-scope b,
+  .tw-scope strong {
+    font-weight: bolder;
+  }
+
+  .tw-scope ol,
+  .tw-scope ul,
+  .tw-scope menu {
+    list-style: none;
+  }
+
+  .tw-scope img,
+  .tw-scope svg,
+  .tw-scope video,
+  .tw-scope canvas {
+    display: block;
+    vertical-align: middle;
+  }
+
+  .tw-scope img,
+  .tw-scope video {
+    max-width: 100%;
+    height: auto;
+  }
+
+  /* `font: inherit` and not just the family: the prototype sizes every control with a
+   * utility, so the UA's own size is never load-bearing inside this scope. That is the
+   * opposite of tokens.css's global rule, and the reason this one is scoped. */
+  .tw-scope button,
+  .tw-scope input,
+  .tw-scope select,
+  .tw-scope optgroup,
+  .tw-scope textarea {
+    font: inherit;
+    color: inherit;
+    border-radius: 0;
+    background-color: transparent;
+    opacity: 1;
+  }
+
+  /* iOS Safari refuses to apply `border-radius` to a control with its native appearance,
+   * and every button in this wizard is `rounded-xl`. Preflight writes the standard
+   * `appearance: button` here; that keyword is deprecated, and stylelint's suggested
+   * `auto` means "keep the native look", which is the bug. The vendor property is the one
+   * `none` instead: it is the standard, non-deprecated way to say "this control has no
+   * native look", which is true here -- every button in the wizard draws its own
+   * background, border and radius from a utility. Safari has supported the unprefixed
+   * property since 15.4 and this app already requires iOS 16.4+ for Web Push (§6.5). */
+  .tw-scope button,
+  .tw-scope input[type="button"],
+  .tw-scope input[type="reset"],
+  .tw-scope input[type="submit"] {
+    appearance: none;
+  }
+
+  .tw-scope ::placeholder {
+    opacity: 1;
+    color: color-mix(in oklab, currentcolor 50%, transparent);
+  }
+
+  .tw-scope textarea {
+    resize: vertical;
+  }
+
+  .tw-scope table {
+    text-indent: 0;
+    border-color: inherit;
+    border-collapse: collapse;
+  }
+
+  .tw-scope :disabled {
+    cursor: default;
+  }
+}

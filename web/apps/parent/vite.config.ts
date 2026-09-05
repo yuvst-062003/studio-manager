@@ -1,5 +1,8 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+// §9 — Tailwind for the onboarding wizard only. src/tailwind.css imports theme and
+// utilities but NOT preflight; see that file for why.
+import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 import { manifest } from './manifest.config'
 import { workspaceAliases } from '../../tools/workspace-aliases'
@@ -11,6 +14,7 @@ export default defineConfig({
   resolve: { alias: workspaceAliases() },
   plugins: [
     react(),
+    tailwindcss(),
     VitePWA({
       registerType: 'prompt',
       manifest,
