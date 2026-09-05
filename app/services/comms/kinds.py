@@ -75,6 +75,15 @@ ANNOUNCEMENT = "announcement.published"
 #: dead `tel:` link.
 AT_RISK = "attendance.at_risk"
 
+#: Task 4a's review hold. A child whose health declaration answered yes is enrolled
+#: `pending`, is not charged, and cannot train until a manager decides. Under the `health`
+#: prefix deliberately: `ALWAYS_ON_GROUPS` makes it unmutable, because the family has been
+#: told the club will contact them and a muted switch would turn that into a promise
+#: nobody kept. It also sets billing fairness -- approving charges the month the family
+#: registered in, so a hold that sits over a weekend charges them for days their child was
+#: not allowed on a mat.
+HEALTH_REVIEW_PENDING = "health.review_pending"
+
 
 def group_for(kind: str) -> str | None:
     """The preference group governing `kind`, or None if nothing governs it.

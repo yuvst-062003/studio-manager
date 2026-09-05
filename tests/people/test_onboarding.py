@@ -1936,3 +1936,282 @@ def test_a_yes_to_a_question_the_schema_does_not_mark_flag_still_triggers_the_ga
         select(Enrollment).where(Enrollment.student_id == student_ids[0])
     ).scalar_one()
     assert enrollment.status == "pending"
+
+
+# -- task 4c: the hold pushes, rather than waiting to be noticed ---------------
+#
+# Task 4a holds a flagged child pending, uncharged, until a manager decides. Task 4b
+# puts the hold in the manager's alert centre. Neither makes anybody look -- these tests
+# are the push that does: fired from inside `add_child`'s own `if needs_review:` block,
+# same transaction as the pending enrollment and its audit row above.
+def _manager(app_session, studio, *, role: str = "manager") -> Person:
+    """An owner or a manager, queried directly rather than signed in -- these tests call
+    `OnboardingService.register` as a service, never through a router, so there is no
+    request for `RoleAssignment` to gate."""
+    from app.models.person import RoleAssignment
+
+    person = Person(studio_id=studio.id, first_name="מנהל", last_name=role)
+    app_session.add(person)
+    app_session.flush()
+    app_session.add(
+        RoleAssignment(
+            studio_id=studio.id,
+            person_id=person.id,
+            role=role,
+            scope_type="studio",
+            granted_at=T0,
+        )
+    )
+    app_session.commit()
+    return person
+
+
+def test_a_flagged_child_pushes_exactly_one_notice_per_manager(
+    tenant_session, app_session, studio, a_group, twice_weekly, a_live_plan
+):
+    """One flagged child, two managers (an owner and a manager) -- one notification each,
+    of the new kind, and none for a coach: this is an enrolment and billing state, not a
+    medical disclosure. The payload is pinned to exactly the enrollment and student ids
+    the alert centre needs to route a tap, for a child with a single group -- so
+    `created_enrollments[0]` and "the" enrollment are the same row."""
+    from app.models.comms import Notification
+    from app.services.comms.kinds import HEALTH_REVIEW_PENDING
+    from app.services.structure.health_templates import ensure_full_template
+
+    template = ensure_full_template(app_session, studio.id, at=T0)
+    app_session.commit()
+    owner = _manager(app_session, studio, role="owner")
+    manager = _manager(app_session, studio, role="manager")
+    coach = _manager(app_session, studio, role="lead_coach")
+
+    flagged_answers = {**_HEALTH_ANSWERS, "asthma": True, "clause_confirmed": "limited"}
+    _parent, _student_ids, charged, child_student_ids = OnboardingService.register(
+        tenant_session,
+        studio_id=studio.id,
+        identity_id=None,
+        first_name="שירה",
+        last_name="לוי",
+        phone=None,
+        email=None,
+        children=[
+            {
+                "first_name": "נועה",
+                "last_name": "לוי",
+                "birthdate": None,
+                "group_ids": [a_group],
+                "self": False,
+                "health": {
+                    "template_id": str(template.id),
+                    "answers": flagged_answers,
+                    "signature_image_base64": _ONE_PIXEL_PNG_B64,
+                },
+            }
+        ],
+        at=T0,
+        schedule=twice_weekly,
+    )
+    tenant_session.commit()
+
+    assert charged == 0
+    flagged_student_id = child_student_ids[0]
+    flagged_enrollment = tenant_session.execute(
+        select(Enrollment).where(Enrollment.student_id == flagged_student_id)
+    ).scalar_one()
+
+    rows = (
+        tenant_session.execute(
+            select(Notification).where(Notification.kind == HEALTH_REVIEW_PENDING)
+        )
+        .scalars()
+        .all()
+    )
+    assert {row.person_id for row in rows} == {owner.id, manager.id}
+    assert coach.id not in {row.person_id for row in rows}
+    assert len(rows) == 2
+
+    for row in rows:
+        assert row.title == "נדרש אישור מנהל"
+        assert row.body == "נועה לוי — הרישום ממתין לאישור מנהל"
+        assert row.payload == {
+            "enrollment_id": str(flagged_enrollment.id),
+            "student_id": str(flagged_student_id),
+        }
+
+
+def test_a_clean_family_pushes_no_review_hold_notice(
+    tenant_session, app_session, studio, a_group, twice_weekly, a_live_plan
+):
+    """No flagged child, no notice: the push is conditioned on `needs_review` exactly
+    like the hold itself is."""
+    from app.models.comms import Notification
+    from app.services.comms.kinds import HEALTH_REVIEW_PENDING
+
+    _manager(app_session, studio, role="manager")
+
+    OnboardingService.register(
+        tenant_session,
+        studio_id=studio.id,
+        identity_id=None,
+        first_name="שירה",
+        last_name="לוי",
+        phone=None,
+        email=None,
+        children=[
+            {
+                "first_name": "איתן",
+                "last_name": "לוי",
+                "birthdate": None,
+                "group_ids": [a_group],
+                "self": False,
+            }
+        ],
+        at=T0,
+        schedule=twice_weekly,
+    )
+    tenant_session.commit()
+
+    rows = (
+        tenant_session.execute(
+            select(Notification).where(Notification.kind == HEALTH_REVIEW_PENDING)
+        )
+        .scalars()
+        .all()
+    )
+    assert rows == []
+
+
+def test_the_review_hold_notice_carries_no_question_answer_or_flag_name(
+    tenant_session, app_session, studio, a_group, twice_weekly, a_live_plan
+):
+    """G7, tested rather than trusted: the actual title, body and payload keys, not just
+    the intent. `answers_yes` -- the one count the audit row above is allowed to carry --
+    does not travel here either; the payload contract is exactly two ids."""
+    from app.models.comms import Notification
+    from app.services.comms.kinds import HEALTH_REVIEW_PENDING
+    from app.services.structure.health_templates import ensure_full_template
+
+    template = ensure_full_template(app_session, studio.id, at=T0)
+    app_session.commit()
+    _manager(app_session, studio, role="manager")
+
+    flagged_answers = {
+        **_HEALTH_ANSWERS,
+        "asthma": True,
+        "chronic_illness": True,
+        "clause_confirmed": "limited",
+    }
+    OnboardingService.register(
+        tenant_session,
+        studio_id=studio.id,
+        identity_id=None,
+        first_name="שירה",
+        last_name="לוי",
+        phone=None,
+        email=None,
+        children=[
+            {
+                "first_name": "נועה",
+                "last_name": "לוי",
+                "birthdate": None,
+                "group_ids": [a_group],
+                "self": False,
+                "health": {
+                    "template_id": str(template.id),
+                    "answers": flagged_answers,
+                    "signature_image_base64": _ONE_PIXEL_PNG_B64,
+                },
+            }
+        ],
+        at=T0,
+        schedule=twice_weekly,
+    )
+    tenant_session.commit()
+
+    row = tenant_session.execute(
+        select(Notification).where(Notification.kind == HEALTH_REVIEW_PENDING)
+    ).scalar_one()
+
+    # Every flag-question id in the bundled schema, every free-text answer, the clause
+    # value, and the count itself -- none of it may appear, dressed up as a "helpful"
+    # sentence or not.
+    banned = {
+        "asthma",
+        "chronic_illness",
+        "allergy",
+        "medication",
+        "epilepsy",
+        "heart",
+        "diabetes",
+        "injury",
+        "clause_confirmed",
+        "limited",
+        "health_fund",
+        "מכבי",
+        "answers_yes",
+        "בריאות",
+    }
+    assert set(row.payload) == {"enrollment_id", "student_id"}
+    haystack = f"{row.title} {row.body}"
+    for term in banned:
+        assert term not in haystack
+
+
+def test_an_enqueue_that_raises_does_not_fail_the_registration(
+    tenant_session, app_session, studio, a_group, twice_weekly, a_live_plan, monkeypatch
+):
+    """A push that cannot be written is a worse-off manager, never a lost registration.
+    The family, the student and the pending enrollment this call created must all survive
+    the commit that follows -- `NotificationService.enqueue` is monkeypatched to raise
+    unconditionally, standing in for a push transport or a database hiccup."""
+    from app.services.comms import NotificationService
+    from app.services.structure.health_templates import ensure_full_template
+
+    template = ensure_full_template(app_session, studio.id, at=T0)
+    app_session.commit()
+    _manager(app_session, studio, role="manager")
+
+    def _boom(self, *args, **kwargs):
+        raise RuntimeError("push transport exploded")
+
+    monkeypatch.setattr(NotificationService, "enqueue", _boom)
+
+    flagged_answers = {**_HEALTH_ANSWERS, "asthma": True, "clause_confirmed": "limited"}
+    parent, _student_ids, charged, child_student_ids = OnboardingService.register(
+        tenant_session,
+        studio_id=studio.id,
+        identity_id=None,
+        first_name="שירה",
+        last_name="לוי",
+        phone=None,
+        email=None,
+        children=[
+            {
+                "first_name": "נועה",
+                "last_name": "לוי",
+                "birthdate": None,
+                "group_ids": [a_group],
+                "self": False,
+                "health": {
+                    "template_id": str(template.id),
+                    "answers": flagged_answers,
+                    "signature_image_base64": _ONE_PIXEL_PNG_B64,
+                },
+            }
+        ],
+        at=T0,
+        schedule=twice_weekly,
+    )
+    tenant_session.commit()
+
+    assert charged == 0
+    flagged_student_id = child_student_ids[0]
+    student = tenant_session.get(Student, flagged_student_id)
+    assert student is not None
+    enrollment = tenant_session.execute(
+        select(Enrollment).where(Enrollment.student_id == flagged_student_id)
+    ).scalar_one()
+    assert enrollment.status == "pending"
+    guardian = tenant_session.execute(
+        select(Guardian).where(Guardian.student_id == flagged_student_id)
+    ).scalar_one()
+    assert guardian.person_id == parent.id

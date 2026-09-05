@@ -22,9 +22,11 @@ from app.services.comms.kinds import (
     ALWAYS_ON_KINDS,
     ANNOUNCEMENT,
     AT_RISK,
+    HEALTH_REVIEW_PENDING,
     group_for,
     is_transactional,
 )
+from app.services.comms.preferences import NotificationPreferenceService
 
 
 @pytest.mark.parametrize(
@@ -42,6 +44,7 @@ from app.services.comms.kinds import (
         ("attendance.at_risk", "attendance"),
         ("health.declaration_missing", "health"),
         ("health.declaration_renewal", "health"),
+        ("health.review_pending", "health"),
     ],
 )
 def test_the_prefix_selects_the_preference_group(kind: str, group: str) -> None:
@@ -90,6 +93,34 @@ def test_the_two_transactional_notices_cannot_be_muted() -> None:
     assert is_transactional("health.declaration_missing")
     assert is_transactional("health.declaration_renewal")
     assert is_transactional("billing.payment_failed")
+
+
+def test_the_review_hold_kind_is_stable_and_transactional() -> None:
+    """Task 4c -- a manager must not be able to mute a notice that a child is blocked
+    from training. `HEALTH_REVIEW_PENDING` inherits `health`'s always-on rule from its
+    PREFIX alone; nothing in `ALWAYS_ON_KINDS` names it individually, which is the whole
+    point of putting it under a prefix `_GROUP_BY_PREFIX` already maps."""
+    assert HEALTH_REVIEW_PENDING == "health.review_pending"
+    assert group_for(HEALTH_REVIEW_PENDING) == "health"
+    assert group_for(HEALTH_REVIEW_PENDING) in ALWAYS_ON_GROUPS
+    assert is_transactional(HEALTH_REVIEW_PENDING)
+    assert HEALTH_REVIEW_PENDING not in ALWAYS_ON_KINDS
+
+
+def test_a_manager_who_muted_everything_mutable_still_gets_the_review_hold_notice(
+    tenant_session, as_manager
+) -> None:
+    """The behaviour `is_transactional` promises, exercised through the real preference
+    check rather than re-derived: mute every group a switch actually governs, and
+    `allows` must still say yes for the review hold -- asserted through kinds.py's own
+    mapping (`ALWAYS_ON_GROUPS`), not by re-implementing which groups are mutable here."""
+    service = NotificationPreferenceService(tenant_session)
+    for group in PREFERENCE_GROUPS:
+        if group in ALWAYS_ON_GROUPS:
+            continue
+        service.set(as_manager.person_id, group, enabled=False)
+
+    assert service.allows(as_manager.person_id, HEALTH_REVIEW_PENDING)
 
 
 def test_the_rest_of_the_payment_group_remains_mutable() -> None:

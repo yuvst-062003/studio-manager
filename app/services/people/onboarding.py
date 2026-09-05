@@ -22,6 +22,7 @@ plans at all, and `GET /billing/unpriced-students` is where a manager now sees i
 from __future__ import annotations
 
 import hashlib
+import logging
 import secrets
 import uuid
 from datetime import datetime
@@ -37,12 +38,15 @@ from app.models.person import Guardian, Person
 from app.services.audit import AuditService
 from app.services.billing.catalogue import plan_for_volume
 from app.services.billing.run import BillingRunService, _Tally
+from app.services.comms.kinds import HEALTH_REVIEW_PENDING
 from app.services.health.flags import answered_yes_count
 from app.services.people.attendance_pattern import weekly_volume
 from app.services.people.enrollments import PENDING_REVIEW_ACTION, EnrollmentService
 from app.services.people.errors import DuplicateStudentError, NotFoundError, RefusedError
 from app.services.people.group_days import ScheduleReader
 from app.services.people.matching import duplicate_student
+
+logger = logging.getLogger(__name__)
 
 
 def _hash(token: str) -> str:
@@ -325,6 +329,22 @@ class OnboardingService:
                     diff={"reason": "health_answered_yes", "answers_yes": answers_yes},
                 )
 
+            # Task 4c -- the hold pushes rather than waiting to be noticed. Same
+            # transaction as the pending enrollment above, one notice per manager for
+            # this CHILD (not per enrollment: two groups is still one kid on hold).
+            OnboardingService._notify_managers_of_review_hold(
+                session,
+                studio_id=studio_id,
+                parent=parent,
+                student_id=student.id,
+                # The first enrollment this child got, in group order. The review queue
+                # (`EnrollmentService.pending_review`) lists every pending row for this
+                # student regardless, so any one of this child's enrollment ids gets a
+                # tap to the same place in the alert centre.
+                enrollment_id=created_enrollments[0].id,
+                child_name=f"{child_person.first_name} {child_person.last_name}",
+            )
+
         volume = weekly_volume(volume_pairs)
         plan: PricePlan | None
         requested_plan_id = child.get("price_plan_id")
@@ -438,6 +458,44 @@ class OnboardingService:
                 session.flush()
 
     @staticmethod
+    def _managers_of_studio(
+        session: Session, *, exclude_person_id: uuid.UUID | None = None
+    ) -> list[uuid.UUID]:
+        """Every owner and manager the active studio currently has, sorted by id.
+
+        **The one query this file's two office-facing notifications both need** --
+        `notify_managers_of_new_child` (a child arrived) and task 4c's
+        `_notify_managers_of_review_hold` (a child is held) both used to run this same
+        `RoleAssignment` lookup independently. Factored out so the second caller reuses
+        it rather than a third one restating `RoleAssignment.role.in_(("owner",
+        "manager"))` -- the same query `app/services/attendance/service.py` and
+        `app/services/billing/payment_promise.py` also carry, each for their own single
+        caller.
+
+        `session` is expected to be a `TenantSession`: there is no explicit `studio_id`
+        filter here because the tenant filter already scopes every query to the active
+        studio, same as the query this replaces.
+
+        Sorted rather than a bare set, so a fan-out's send order is deterministic --
+        useful for a test asserting "exactly one per manager" and for reading the
+        resulting `notification_delivery` rows in a stable order.
+        """
+        from app.models.person import RoleAssignment
+
+        ids = set(
+            session.execute(
+                select(RoleAssignment.person_id).where(
+                    RoleAssignment.role.in_(("owner", "manager")),
+                    RoleAssignment.scope_type == "studio",
+                    RoleAssignment.revoked_at.is_(None),
+                )
+            ).scalars()
+        )
+        if exclude_person_id is not None:
+            ids.discard(exclude_person_id)
+        return sorted(ids, key=str)
+
+    @staticmethod
     def notify_managers_of_new_child(
         session: Session, *, parent: Person, student_id: uuid.UUID
     ) -> None:
@@ -453,24 +511,16 @@ class OnboardingService:
         from typing import cast
 
         from app.core.tenancy import TenantSession
-        from app.models.person import RoleAssignment
         from app.services.comms import NotificationService
 
         student = session.get(Student, student_id)
         child = session.get(Person, student.person_id) if student else None
         child_name = f"{child.first_name} {child.last_name}" if child else ""
         parent_name = f"{parent.first_name} {parent.last_name}"
-        manager_ids = set(
-            session.execute(
-                select(RoleAssignment.person_id).where(
-                    RoleAssignment.role.in_(("owner", "manager")),
-                    RoleAssignment.scope_type == "studio",
-                    RoleAssignment.revoked_at.is_(None),
-                )
-            ).scalars()
-        ) - {parent.id}
         notifier = NotificationService(cast(TenantSession, session))
-        for person_id in sorted(manager_ids, key=str):
+        for person_id in OnboardingService._managers_of_studio(
+            session, exclude_person_id=parent.id
+        ):
             notifier.enqueue(
                 person_id=person_id,
                 kind="people.child_added",
@@ -478,6 +528,74 @@ class OnboardingService:
                 body=f"{child_name} — נרשם על ידי {parent_name}",
                 payload={"student_id": str(student_id), "parent_person_id": str(parent.id)},
             )
+
+    @staticmethod
+    def _notify_managers_of_review_hold(
+        session: Session,
+        *,
+        studio_id: uuid.UUID,
+        parent: Person,
+        student_id: uuid.UUID,
+        enrollment_id: uuid.UUID,
+        child_name: str,
+    ) -> None:
+        """Task 4c -- the hold pushes rather than waiting for a manager to notice it.
+
+        A Friday-evening registration used to sit until Sunday, and approving a hold
+        charges the family from the day they registered, not the day it was noticed --
+        so a hold that sits over a weekend is a billing-fairness bug, not just a slow
+        one. This is what makes it not sit.
+
+        **Title and body carry the child's name and nothing about their health.** G7's
+        rule applies to a notification exactly as it applies to a log line or an audit
+        `diff`: a question id, an answer or a flag name may never reach here, even
+        dressed up as a helpful sentence. The payload is narrower still -- just the
+        enrollment id and the student id, so tapping the push can route straight to the
+        alert centre row.
+
+        **One notice per manager, not per enrollment.** A child in two groups produced
+        two `pending` rows and two audit entries just above, but it is one hold on one
+        kid -- the office does not need to be told twice.
+
+        **A failed enqueue must not fail the registration.** The family, the students and
+        the pending enrollment are already real by the time this runs; losing all of that
+        because a push could not be written would be absurd. Each manager's send runs in
+        its own SAVEPOINT (the same idiom `BillingRunService._raise_charge` uses to keep
+        one bad charge from poisoning a whole run) so a failure here rolls back only its
+        own attempt, never the registration around it. The failure is logged -- structured,
+        `extra=`, no health content -- and then swallowed.
+        """
+        from typing import cast
+
+        from app.core.tenancy import TenantSession
+        from app.services.comms import NotificationService
+
+        notifier = NotificationService(cast(TenantSession, session))
+        payload = {"enrollment_id": str(enrollment_id), "student_id": str(student_id)}
+        body = f"{child_name} — הרישום ממתין לאישור מנהל"
+        for person_id in OnboardingService._managers_of_studio(
+            session, exclude_person_id=parent.id
+        ):
+            try:
+                with session.begin_nested():
+                    notifier.enqueue(
+                        person_id=person_id,
+                        kind=HEALTH_REVIEW_PENDING,
+                        title="נדרש אישור מנהל",
+                        body=body,
+                        payload=payload,
+                    )
+            except Exception:
+                logger.exception(
+                    "failed to enqueue health review hold notification",
+                    extra={
+                        "studio_id": str(studio_id),
+                        "student_id": str(student_id),
+                        "enrollment_id": str(enrollment_id),
+                        "manager_person_id": str(person_id),
+                        "kind": HEALTH_REVIEW_PENDING,
+                    },
+                )
 
     @staticmethod
     def register(
