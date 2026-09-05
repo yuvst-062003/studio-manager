@@ -64,6 +64,12 @@ export type BillingClient = {
     method: PromiseMethod,
     prepayMonths: number,
     alreadyPaid?: boolean,
+    /** The plan-claim flow (owner request, 2026-08-30): the payment program the parent
+     *  says they already paid for. The server prices a plan claim from the PLAN ROW, so
+     *  this names a plan and never an amount -- and it is what lets a promise exist for a
+     *  child who has no open charge to promise over (the join wizard's payment step, for
+     *  a child register skipped because they were already on the roster). */
+    claimedPlanId?: string | null,
   ): Promise<PaymentPromiseOut>
   balance(payerPersonId: string): Promise<PayerBalanceOut>
   payments(payerPersonId: string): Promise<PaymentOut[]>
