@@ -22,6 +22,7 @@ from app.core.clock import now
 from app.core.db import SessionDep, get_engine
 from app.core.tenancy import TenantSession, TenantSessionDep, use_studio
 from app.models.identity import AuthIdentity
+from app.models.structure import Location
 from app.models.studio import Studio
 from app.schemas._pagination import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, IdempotencyKey
 from app.schemas.people import (
@@ -43,6 +44,7 @@ from app.schemas.people import (
 )
 from app.services.people.errors import ConflictError, NotFoundError
 from app.services.people.group_days import ScheduleReader
+from app.services.people.invitations import TrialConfirmationLesson, send_trial_confirmation_email
 from app.services.people.landing import LandingService
 from app.services.people.naming import format_person_name
 from app.services.people.rate_limit import (
@@ -108,6 +110,46 @@ def _self_result(session: TenantSession, booked: BookedTrial) -> TrialBookingSel
             for row, summary in zip(booked.booked, students, strict=True)
         ],
     )
+
+
+def _send_confirmation_email(
+    session: TenantSession, *, booked: BookedTrial, result: TrialBookingSelfResult, to_email: str
+) -> None:
+    """Task 9 §2 -- the day and time, where it is, what to bring. **Never the app** --
+    see `render_trial_confirmation`'s own docstring for why that link belongs on the
+    day-1 follow-up instead of here.
+
+    A send that fails must not fail the booking: `send_trial_confirmation_email` already
+    swallows and logs internally, the same way `app/routers/students.py` does for the
+    invitation email, so this function's return value is never read.
+    """
+    lessons: list[TrialConfirmationLesson] = []
+    for row, confirmation in zip(booked.booked, result.bookings, strict=True):
+        if confirmation.session_starts_at is None:
+            # No specific session was picked for this child -- nothing honest to say
+            # about a day and time, so this child is left out of the email rather than
+            # given a guessed one.
+            continue
+        address: str | None = None
+        location_id = row.session_row.location_id if row.session_row else None
+        if location_id is not None:
+            location = session.get(Location, location_id)
+            if location is not None:
+                # `Location.address` first, falling back to the (NOT NULL) `Location.name`
+                # for a location recorded with no street address. `address` stays `None`
+                # -- never a placeholder -- when the session names no location at all.
+                address = location.address or location.name
+        lessons.append(
+            TrialConfirmationLesson(
+                student_display_name=confirmation.student_display_name,
+                starts_at=confirmation.session_starts_at,
+                address=address,
+            )
+        )
+    if lessons:
+        send_trial_confirmation_email(
+            to_email=to_email, studio_name=result.studio_name, lessons=lessons
+        )
 
 
 @router.post(
@@ -224,7 +266,12 @@ def book_trial_for_self(
         # Read back inside the scope, so §5.4a step 5's "נתראה ביום א' 17:00" needs no
         # second round trip -- which the parent could not make anyway: their token still
         # has no studio in it until they refresh.
-        return _self_result(scoped, booked)
+        result = _self_result(scoped, booked)
+        # Task 9 §2 -- the confirmation email, additive on the on-screen confirmation
+        # above and sent only after the booking has actually committed.
+        if contact_email:
+            _send_confirmation_email(scoped, booked=booked, result=result, to_email=contact_email)
+        return result
 
 
 @router.get("/trial-bookings", response_model=TrialBookingRowPage)

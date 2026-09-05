@@ -11,13 +11,20 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime, timedelta
 
+import app.services.people.invitations as invitations
 import pytest
 import sqlalchemy as sa
+from app.core.config import settings
+from app.models.comms import Notification
 from app.models.people import Enrollment, RegistrationRequest, Student, TrialBooking
 from app.models.person import Guardian, Person
+from app.models.structure import Location
+from app.services.comms.kinds import HEALTH_TRIAL_FLAGGED
+from pydantic import SecretStr
 from sqlalchemy import select
 from tests.conftest import sign_in
 from tests.people.conftest import FakeSchedule, make_session
+from tests.people.test_invitation_email import BoomSMTP, ExplodingSMTP, FakeSMTP
 
 SUNDAY = datetime(2026, 9, 6, 14, 0, tzinfo=UTC)
 
@@ -922,3 +929,179 @@ def test_the_coach_note_never_reaches_the_audit_trail(
     ).scalar_one()
     assert "צעירה מדי" not in str(entry.diff)
     assert entry.diff["note_written"] is True
+
+
+# -- Task 9 §2: the booking-time confirmation email ---------------------------
+
+
+def _configure_smtp(monkeypatch, *, host="smtp.example.invalid", password="app-password"):
+    monkeypatch.setattr(settings, "SMTP_HOST", host)
+    monkeypatch.setattr(settings, "SMTP_PASSWORD", SecretStr(password) if password else None)
+    monkeypatch.setattr(settings, "SMTP_USERNAME", "bot@example.invalid")
+
+
+def test_the_confirmation_email_carries_the_lesson_time_in_jerusalem_and_no_app_link(
+    client, a_stranger, bookable, a_group, monkeypatch
+):
+    """SUNDAY is 2026-09-06 14:00 UTC -- 17:00 in Asia/Jerusalem (DST, +3 in September).
+    A confirmation naming the UTC hour would tell a family to show up two or three hours
+    early or late, which is worse than sending nothing."""
+    _configure_smtp(monkeypatch)
+    fake = FakeSMTP()
+    monkeypatch.setattr(invitations.smtplib, "SMTP", fake)
+
+    session_id = bookable.sessions[a_group][0].id
+    response = _book(client, a_stranger, a_group, session_id)
+    assert response.status_code == 201, response.text
+
+    assert len(fake.sent_messages) == 1
+    body = fake.sent_messages[0].get_content()
+    assert "17:00" in body
+    assert "06.09.2026" in body
+    assert "ראשון" in body
+    # §2 -- 'It must not mention the app.' The install prompt belongs on the day-1
+    # follow-up (`render_trial_followup`), not here.
+    for marker in ("http://", "https://", "invite=", "אפליקצי"):
+        assert marker not in body
+
+
+def test_the_confirmation_omits_the_address_line_when_the_session_has_no_location(
+    client, a_stranger, bookable, a_group, monkeypatch
+):
+    """§2 -- 'omitting the line entirely when the studio has recorded neither.' No
+    placeholder, no empty line -- `bookable`'s session carries no `location_id` at all."""
+    _configure_smtp(monkeypatch)
+    fake = FakeSMTP()
+    monkeypatch.setattr(invitations.smtplib, "SMTP", fake)
+
+    session_id = bookable.sessions[a_group][0].id
+    _book(client, a_stranger, a_group, session_id)
+
+    body = fake.sent_messages[0].get_content()
+    # `·` is the separator this module only ever adds in front of an address.
+    assert "·" not in body
+
+
+def test_the_confirmation_includes_the_session_s_recorded_address(
+    client, a_stranger, bookable, a_group, app_session, studio, monkeypatch
+):
+    """§2 -- 'The address from the session's location_id -> Location.address.' Never
+    invented: this is the positive case, proven against a real `Location` row."""
+    _configure_smtp(monkeypatch)
+    fake = FakeSMTP()
+    monkeypatch.setattr(invitations.smtplib, "SMTP", fake)
+
+    location = Location(studio_id=studio.id, name="אולם ראשי", address="הרצל 1, תל אביב")
+    app_session.add(location)
+    app_session.flush()
+    row = bookable.sessions[a_group][0]
+    row.location_id = location.id
+    app_session.add(row)
+    app_session.commit()
+
+    _book(client, a_stranger, a_group, row.id)
+
+    body = fake.sent_messages[0].get_content()
+    assert "הרצל 1, תל אביב" in body
+
+
+def test_an_smtp_failure_on_the_confirmation_does_not_fail_the_booking(
+    client, a_stranger, bookable, a_group, monkeypatch
+):
+    """§2 -- 'A send that fails must not fail the booking.' The booking is committed
+    before the send is attempted, and `_send` swallows and logs the rest."""
+    _configure_smtp(monkeypatch)
+    monkeypatch.setattr(invitations.smtplib, "SMTP", BoomSMTP())
+
+    session_id = bookable.sessions[a_group][0].id
+    response = _book(client, a_stranger, a_group, session_id)
+    assert response.status_code == 201, response.text
+
+
+def test_with_smtp_unconfigured_the_confirmation_is_not_attempted_and_booking_still_succeeds(
+    client, a_stranger, bookable, a_group, monkeypatch
+):
+    """Production's state today: `SMTP_HOST` set, `SMTP_PASSWORD` absent. This is the one
+    case that absolutely must not throw."""
+    _configure_smtp(monkeypatch, password=None)
+    monkeypatch.setattr(invitations.smtplib, "SMTP", ExplodingSMTP())
+
+    session_id = bookable.sessions[a_group][0].id
+    response = _book(client, a_stranger, a_group, session_id)
+    assert response.status_code == 201, response.text
+
+
+# -- Task 9 §4: a flagged trial declaration reaches a manager ------------------
+
+
+def test_a_flagged_trial_declaration_notifies_managers_with_no_answer_content(
+    client, a_stranger, bookable, a_group, as_manager, app_session
+):
+    """Task 9 §4 -- reusing task 4c's mechanism (commit 68845a6) exactly: a kind under the
+    `health` prefix, fanned out to the studio's managers. The notification names the child
+    and carries a COUNT -- never a question, an answer or a flag name."""
+    session_id = bookable.sessions[a_group][0].id
+    body = _book(
+        client,
+        a_stranger,
+        a_group,
+        session_id,
+        declarations=[
+            {
+                "template_id": str(uuid.uuid4()),
+                "answers": {"asthma": True, "allergy": False},
+                "signature_image_base64": "",
+            }
+        ],
+    ).json()
+    student_id = body["students"][0]["id"]
+
+    note = app_session.execute(
+        select(Notification).where(
+            Notification.person_id == as_manager.person_id,
+            Notification.kind == HEALTH_TRIAL_FLAGGED,
+        )
+    ).scalar_one()
+    assert note.payload["student_id"] == student_id
+    assert note.payload["answers_yes"] == 1
+    assert set(note.payload) == {"student_id", "trial_booking_id", "answers_yes"}
+    for text in (note.title, note.body):
+        assert "asthma" not in text
+        assert "אסטמה" not in text
+        assert "True" not in text
+        assert "False" not in text
+
+
+def test_a_declaration_with_no_yes_answers_notifies_nobody(
+    client, a_stranger, bookable, a_group, as_manager, app_session
+):
+    """The control. Every existing booking test in this file uses a declaration with no
+    `answers` key at all, and none of them should have been quietly notifying a manager
+    all along."""
+    session_id = bookable.sessions[a_group][0].id
+    _book(
+        client,
+        a_stranger,
+        a_group,
+        session_id,
+        declarations=[
+            {
+                "template_id": str(uuid.uuid4()),
+                "answers": {"asthma": False},
+                "signature_image_base64": "",
+            }
+        ],
+    )
+
+    # Scoped to THIS test's manager -- `app_session` has no per-test rollback (see the
+    # comment on `test_the_trial_declaration_is_stored_encrypted_and_never_in_the_clear`
+    # above), so an unscoped query would also match the previous test's real notification.
+    assert (
+        app_session.execute(
+            select(Notification).where(
+                Notification.person_id == as_manager.person_id,
+                Notification.kind == HEALTH_TRIAL_FLAGGED,
+            )
+        ).first()
+        is None
+    )

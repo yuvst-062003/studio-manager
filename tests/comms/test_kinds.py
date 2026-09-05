@@ -23,6 +23,7 @@ from app.services.comms.kinds import (
     ANNOUNCEMENT,
     AT_RISK,
     HEALTH_REVIEW_PENDING,
+    HEALTH_TRIAL_FLAGGED,
     group_for,
     is_transactional,
 )
@@ -105,6 +106,18 @@ def test_the_review_hold_kind_is_stable_and_transactional() -> None:
     assert group_for(HEALTH_REVIEW_PENDING) in ALWAYS_ON_GROUPS
     assert is_transactional(HEALTH_REVIEW_PENDING)
     assert HEALTH_REVIEW_PENDING not in ALWAYS_ON_KINDS
+
+
+def test_the_trial_flagged_kind_is_stable_and_transactional() -> None:
+    """Task 9 §4 -- its own kind rather than a second use of `HEALTH_REVIEW_PENDING`,
+    because a trial never gets the `pending` enrollment that one's payload names. Same
+    always-on guarantee though: a family who answered honestly deserves a manager to
+    actually see it, regardless of that manager's notification settings."""
+    assert HEALTH_TRIAL_FLAGGED == "health.trial_flagged"
+    assert group_for(HEALTH_TRIAL_FLAGGED) == "health"
+    assert group_for(HEALTH_TRIAL_FLAGGED) in ALWAYS_ON_GROUPS
+    assert is_transactional(HEALTH_TRIAL_FLAGGED)
+    assert HEALTH_TRIAL_FLAGGED not in ALWAYS_ON_KINDS
 
 
 def test_a_manager_who_muted_everything_mutable_still_gets_the_review_hold_notice(

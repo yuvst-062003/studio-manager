@@ -195,7 +195,7 @@ class StudentService:
             session.add(parent)
             session.flush()
             guardian_person_id = parent.id
-            token = StudentService._issue_invitation(
+            token = StudentService.issue_invitation(
                 session,
                 student_id=student.id,
                 email=guardian_email,
@@ -258,7 +258,7 @@ class StudentService:
         return CreatedStudent(student=student, invitation_token=token, enrollment=enrollment)
 
     @staticmethod
-    def _issue_invitation(
+    def issue_invitation(
         session: Session,
         *,
         student_id: uuid.UUID,
@@ -274,6 +274,12 @@ class StudentService:
         reaches `invitation.token_hash`, which is what M1's `accept-invitation` compares
         against. `secrets.token_urlsafe(32)` is 256 bits -- an invitation is a bearer
         credential for a child's record, so it is sized like one.
+
+        **Not underscore-prefixed, deliberately.** Task 9's day-1 follow-up
+        (`app/workers/followups.py`) mints the SAME shape of token for a converting trial
+        family, and "do not invent a second token mechanism" means calling this rather
+        than restating the mint-hash-audit sequence a third time in a third module --
+        `add_guardian` below is already the second caller in this file.
         """
         token = secrets.token_urlsafe(32)
         invitation = Invitation(
@@ -613,7 +619,7 @@ class StudentService:
             raise ConflictError("this person is already a guardian of this student")
 
         if matched is None:
-            StudentService._issue_invitation(
+            StudentService.issue_invitation(
                 session,
                 student_id=student.id,
                 email=email,

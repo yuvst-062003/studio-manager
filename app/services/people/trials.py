@@ -30,6 +30,7 @@ reviewed it. `student.health_status` becomes `trial_signed`, which §5.4a says i
 
 from __future__ import annotations
 
+import logging
 import uuid
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -43,9 +44,13 @@ from app.models.person import Guardian, Person
 from app.models.schedule import Session as SessionRow
 from app.models.structure import Group
 from app.services.audit import AuditService
+from app.services.comms.kinds import HEALTH_TRIAL_FLAGGED
+from app.services.health.flags import answered_yes_count
 from app.services.people.errors import ConflictError, NotFoundError
 from app.services.people.matching import match_person
 from app.services.people.status import StudentStatusService
+
+logger = logging.getLogger(__name__)
 
 
 def _normalize_name(value: str) -> str:
@@ -363,6 +368,19 @@ class TrialService:
                 declarations=declarations,
                 at=at,
             )
+            # Task 9 §4 -- a trial declaration that answers anything "yes" must put the
+            # child in front of somebody before they are on a mat. Fired here, at
+            # submission, because a trial never gets the `pending` enrollment that task
+            # 4c's review hold hangs off of (see the module docstring: "No enrollment is
+            # created, ever").
+            TrialService._notify_managers_of_flagged_declarations(
+                session,
+                studio_id=studio_id,
+                parent=parent,
+                booked=booked,
+                children=children,
+                declarations=declarations,
+            )
 
         # §2 decision 5 -- the welcome screen's three ticks, deferred all the way to this
         # one write because an anonymous caller has no authenticated route to record them
@@ -500,6 +518,98 @@ class TrialService:
         session.add(row)
         session.flush()
         return row
+
+    @staticmethod
+    def _managers_of_studio(session: Session, *, exclude_person_id: uuid.UUID) -> list[uuid.UUID]:
+        """Every owner and manager the active studio currently has, sorted by id.
+
+        Deliberately a second copy of the `RoleAssignment` lookup task 4c's
+        `OnboardingService._managers_of_studio` already runs, rather than a cross-module
+        call into another lane's underscore-prefixed method -- `app/services/attendance/
+        service.py` and `app/services/billing/payment_promise.py` each carry their own
+        copy of this exact query for their own single caller too; that commit's factoring
+        was scoped to onboarding.py's own two callers, not to every future one.
+
+        Sorted rather than a bare set, so a fan-out's send order is deterministic.
+        """
+        from app.models.person import RoleAssignment
+
+        ids = set(
+            session.execute(
+                select(RoleAssignment.person_id).where(
+                    RoleAssignment.role.in_(("owner", "manager")),
+                    RoleAssignment.scope_type == "studio",
+                    RoleAssignment.revoked_at.is_(None),
+                )
+            ).scalars()
+        )
+        ids.discard(exclude_person_id)
+        return sorted(ids, key=str)
+
+    @staticmethod
+    def _notify_managers_of_flagged_declarations(
+        session: Session,
+        *,
+        studio_id: uuid.UUID,
+        parent: Person,
+        booked: list[BookedChild],
+        children: list[dict[str, Any]],
+        declarations: list[dict[str, Any]],
+    ) -> None:
+        """Task 9 §4 -- 'A trial declaration that answers anything "yes" must put the
+        child in front of somebody before they are on a mat.'
+
+        Reuses task 4c's mechanism (commit 68845a6) exactly: a kind under the `health`
+        prefix, which `app/services/comms/kinds.py::ALWAYS_ON_GROUPS` makes unmutable, fanned
+        out to the studio's managers and owners through `NotificationService.enqueue`, each
+        send in its own SAVEPOINT so one failed enqueue cannot lose the booking that already
+        committed above it.
+
+        **Title, body and payload carry the child's name and a COUNT -- never a question,
+        an answer or a flag name.** G7's rule applies to a notification exactly as it
+        applies to a log line or an audit `diff`; this is the rule this task is most likely
+        to break, so nothing below reads an individual answer, only `answered_yes_count`'s
+        total.
+        """
+        from typing import cast
+
+        from app.core.tenancy import TenantSession
+        from app.services.comms import NotificationService
+
+        notifier = NotificationService(cast(TenantSession, session))
+        managers = TrialService._managers_of_studio(session, exclude_person_id=parent.id)
+        for row, child, declaration in zip(booked, children, declarations, strict=False):
+            count = answered_yes_count(declaration.get("answers") or {})
+            if count == 0:
+                continue
+            child_name = f"{child['first_name']} {child['last_name']}".strip()
+            payload = {
+                "student_id": str(row.student.id),
+                "trial_booking_id": str(row.booking.id),
+                "answers_yes": count,
+            }
+            body = f"{child_name} — ההצהרה הבריאותית לשיעור הניסיון מסומנת לבדיקה ({count} תשובות)"
+            for person_id in managers:
+                try:
+                    with session.begin_nested():
+                        notifier.enqueue(
+                            person_id=person_id,
+                            kind=HEALTH_TRIAL_FLAGGED,
+                            title="הצהרת בריאות מסומנת",
+                            body=body,
+                            payload=payload,
+                        )
+                except Exception:
+                    logger.exception(
+                        "failed to enqueue flagged trial declaration notification",
+                        extra={
+                            "studio_id": str(studio_id),
+                            "student_id": str(row.student.id),
+                            "trial_booking_id": str(row.booking.id),
+                            "manager_person_id": str(person_id),
+                            "kind": HEALTH_TRIAL_FLAGGED,
+                        },
+                    )
 
     @staticmethod
     def grant_override(

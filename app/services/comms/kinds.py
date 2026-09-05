@@ -84,6 +84,16 @@ AT_RISK = "attendance.at_risk"
 #: not allowed on a mat.
 HEALTH_REVIEW_PENDING = "health.review_pending"
 
+#: Task 9 §4 -- a trial declaration that answers anything "yes", flagged the moment it is
+#: submitted. Deliberately its OWN kind rather than a second use of `HEALTH_REVIEW_PENDING`:
+#: that one's payload is an `enrollment_id`, and `TrialService`'s own module docstring is
+#: emphatic that a trial creates "no enrollment, ever" -- so there is nothing for that
+#: payload shape to point at here. Under the `health` prefix for the same reason as the row
+#: above: `ALWAYS_ON_GROUPS` makes it unmutable, because a family who booked a trial and
+#: answered honestly deserves a manager to actually see it, regardless of that manager's
+#: notification settings.
+HEALTH_TRIAL_FLAGGED = "health.trial_flagged"
+
 
 def group_for(kind: str) -> str | None:
     """The preference group governing `kind`, or None if nothing governs it.

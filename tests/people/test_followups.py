@@ -14,10 +14,16 @@ from pathlib import Path
 
 import pytest
 from app.models.people import StudentFreeze, TrialBooking
+from app.models.person import Invitation
 from app.services.people.status import StudentStatusService
-from app.services.people.students import StudentService
+from app.services.people.students import INVITATION_TTL_DAYS, StudentService
 from app.workers import followups
+from sqlalchemy import delete, select
 from tests.people.conftest import T0, TODAY, make_session
+
+#: Distinguishes "the caller did not pass a guardian email" from "the caller explicitly
+#: wants no email" -- both would otherwise collapse onto the same `None`.
+_UNSET = object()
 
 
 @pytest.fixture
@@ -44,8 +50,33 @@ def sent(monkeypatch):
     return calls
 
 
-def _trial_student(session, *, status: str = "trial"):
+@pytest.fixture
+def sent_emails(monkeypatch):
+    """Task 9 -- what the day-1 join invitation chose to email, without touching SMTP.
+    The transport itself (`_send`, `email_configured`, the SMTP swallow-and-log) is
+    `app/services/people/invitations.py`'s own module, covered in
+    `tests/people/test_trials.py`; this fixture is only about the WORKER's wiring --
+    whether it calls the sender at all, and with what."""
+    calls: list[dict] = []
+
+    def _fake(*, to_email, studio_name, child_first_name, invitation_url):
+        calls.append(
+            {
+                "to_email": to_email,
+                "studio_name": studio_name,
+                "child_first_name": child_first_name,
+                "invitation_url": invitation_url,
+            }
+        )
+        return True
+
+    monkeypatch.setattr(followups, "send_trial_followup_email", _fake)
+    return calls
+
+
+def _trial_student(session, *, status: str = "trial", guardian_email=_UNSET, guardian_phone=None):
     tag = uuid.uuid4().hex[:8]
+    email = f"g-{tag}@example.invalid" if guardian_email is _UNSET else guardian_email
     student = StudentService.create(
         session,
         first_name=f"נועה{tag}",
@@ -53,11 +84,17 @@ def _trial_student(session, *, status: str = "trial"):
         birthdate=None,
         guardian_first_name=f"הורה{tag}",
         guardian_last_name=f"לוי{tag}",
-        guardian_email=f"g-{tag}@example.invalid",
-        guardian_phone=None,
+        guardian_email=email,
+        guardian_phone=guardian_phone,
         at=T0,
         actor_person_id=None,
     ).student
+    # `StudentService.create` mints a manager-facing invitation the moment it creates a
+    # new, unmatched guardian -- a side effect this fixture's callers never asked for,
+    # and one a REAL trial booking (`TrialService.book_for_self`) never produces at all.
+    # Cleared here so Task 9's own tests can assert on the invitation THEY mint, rather
+    # than tripping over this helper's setup noise.
+    session.execute(delete(Invitation).where(Invitation.student_id == student.id))
     if status != "lead":
         StudentStatusService.transition(session, student=student, to_status=status, at=T0)
     return student
@@ -249,6 +286,135 @@ def test_a_no_show_is_offered_no_join_action(tenant_session, a_group, sent):
     assert "route" not in sent[0]["payload"]
 
 
+# -- Task 9: the day-1 join invitation and its once-only email -----------------
+
+
+def test_day_one_attended_mints_one_invitation_and_attempts_one_email(
+    tenant_session, a_group, sent, sent_emails
+):
+    """Task 9 §3 -- attended, day 1: one `Invitation` bound to the student, and one email
+    carrying `/?invite=`."""
+    student = _trial_student(tenant_session)
+    _booking(tenant_session, student, a_group, attended=True, booked_at=T0 - timedelta(days=1))
+    tenant_session.commit()
+
+    followups.run_for_studio(tenant_session, at=T0, tally=followups.Tally())
+    tenant_session.commit()
+
+    invitation = tenant_session.execute(
+        select(Invitation).where(Invitation.student_id == student.id)
+    ).scalar_one()
+    assert invitation.intended_role == "guardian"
+
+    assert len(sent_emails) == 1
+    assert "/?invite=" in sent_emails[0]["invitation_url"]
+    # The in-app ladder is unchanged alongside it.
+    assert [call["kind"] for call in sent] == ["trial.followup"]
+
+
+def test_day_one_no_show_mints_no_invitation_and_sends_no_email(
+    tenant_session, a_group, sent, sent_emails
+):
+    """Task 9 §3 -- 'The gentler message that already exists, with no join link and no
+    token.' The in-app notification still goes -- only the email and the mint are
+    withheld."""
+    student = _trial_student(tenant_session)
+    _booking(tenant_session, student, a_group, attended=False, booked_at=T0 - timedelta(days=1))
+    tenant_session.commit()
+
+    followups.run_for_studio(tenant_session, at=T0, tally=followups.Tally())
+    tenant_session.commit()
+
+    assert (
+        tenant_session.execute(
+            select(Invitation).where(Invitation.student_id == student.id)
+        ).first()
+        is None
+    )
+    assert sent_emails == []
+    assert [call["kind"] for call in sent] == ["trial.no_show"]
+
+
+@pytest.mark.parametrize("day", [3, 7])
+def test_days_three_and_seven_send_no_second_email(tenant_session, a_group, sent, sent_emails, day):
+    """Task 9 §3 -- 'The email goes ONCE, on day 1 only.' Days 3 and 7 keep sending the
+    in-app message the ladder always has; neither attempts a second email."""
+    student = _trial_student(tenant_session)
+    _booking(tenant_session, student, a_group, attended=True, booked_at=T0 - timedelta(days=day))
+    tenant_session.commit()
+
+    followups.run_for_studio(tenant_session, at=T0, tally=followups.Tally())
+
+    assert sent_emails == []
+    assert [call["kind"] for call in sent] == ["trial.followup"]
+
+
+def test_running_the_worker_twice_on_day_one_mints_exactly_one_invitation(
+    tenant_session, a_group, sent, sent_emails
+):
+    """Task 9 §3 -- 'The worker runs daily and must not mint a second token on a re-run,
+    or after an operator replays a day.' A bearer credential for a child's record is not
+    something to hand out twice."""
+    student = _trial_student(tenant_session)
+    _booking(tenant_session, student, a_group, attended=True, booked_at=T0 - timedelta(days=1))
+    tenant_session.commit()
+
+    followups.run_for_studio(tenant_session, at=T0, tally=followups.Tally())
+    tenant_session.commit()
+    followups.run_for_studio(tenant_session, at=T0, tally=followups.Tally())
+    tenant_session.commit()
+
+    invitations = list(
+        tenant_session.execute(
+            select(Invitation).where(Invitation.student_id == student.id)
+        ).scalars()
+    )
+    assert len(invitations) == 1
+    assert len(sent_emails) == 1
+
+
+def test_the_minted_token_outlives_the_write_off_window(tenant_session, a_group, sent, sent_emails):
+    """Task 9 §3 -- 'the token already outlives the write-off... assert that relationship
+    in a test rather than trusting two constants in two files to stay in order.' Computed
+    from the actual constants and the actual rows, not hard-coded 30 and 21."""
+    student = _trial_student(tenant_session)
+    booking = _booking(
+        tenant_session, student, a_group, attended=True, booked_at=T0 - timedelta(days=1)
+    )
+    tenant_session.commit()
+
+    followups.run_for_studio(tenant_session, at=T0, tally=followups.Tally())
+    tenant_session.commit()
+
+    invitation = tenant_session.execute(
+        select(Invitation).where(Invitation.student_id == student.id)
+    ).scalar_one()
+    # A family returning on day LOST_AFTER_DAYS must still land on a live link.
+    assert invitation.expires_at > booking.booked_at + timedelta(days=followups.LOST_AFTER_DAYS)
+    # And the relationship the docstring names, spelled out: minted on day 1, so the
+    # token's own TTL alone already clears the write-off window with room to spare.
+    assert INVITATION_TTL_DAYS > followups.LOST_AFTER_DAYS - 1
+
+
+def test_a_guardian_with_no_email_skips_the_email_but_completes_the_pass(
+    tenant_session, a_group, sent, sent_emails
+):
+    """Task 9 §3 -- 'Skip the email, count it, and carry on... Do not fail the pass.' The
+    in-app notification still goes."""
+    student = _trial_student(tenant_session, guardian_email=None, guardian_phone="0501112222")
+    _booking(tenant_session, student, a_group, attended=True, booked_at=T0 - timedelta(days=1))
+    tenant_session.commit()
+
+    tally = followups.Tally()
+    followups.run_for_studio(tenant_session, at=T0, tally=tally)
+    tenant_session.commit()
+
+    assert sent_emails == []
+    assert tally.followup_emails_skipped == 1
+    assert tally.followup_emails_sent == 0
+    assert [call["kind"] for call in sent] == ["trial.followup"]
+
+
 # -- §5.4a ⑤: the sweep --------------------------------------------------------
 
 
@@ -256,7 +422,6 @@ def test_after_the_window_the_lead_is_marked_lost_with_a_reason(tenant_session, 
     """§5.4a ⑤ -- 'No conversion after N days -> status=lost, with a reason.' `lost` is a
     real outcome, and it is what makes the funnel's denominator honest."""
     from app.models.people import StudentStatusHistory
-    from sqlalchemy import select
 
     student = _trial_student(tenant_session)
     booking = _booking(
