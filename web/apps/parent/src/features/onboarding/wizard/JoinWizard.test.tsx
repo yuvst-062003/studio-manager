@@ -1,8 +1,10 @@
 // The seam the repo's own verification notes ask for: a field collected at the FORM must
 // be asserted all the way through `fetch -> state -> the call it produces`, not through a
-// component's props built by hand. `apiFetch` and `refresh` (`@studio/core`) are mocked;
-// `billingClient` is a fake object, driven the same way `SelfServeJoinFlow.test.tsx` drives
-// its own billing fake.
+// component's props built by hand. `billingClient` is a fake object, driven the same way
+// `SelfServeJoinFlow.test.tsx` drives its own billing fake; `source` is a fake
+// `JoinWizardSource` (task 3a) rather than a mocked `apiFetch` -- what door B's real
+// source actually does with `apiFetch` is `wizardSources.test.ts`'s job, not this file's.
+// `refresh` (`@studio/core`) is still mocked: `JoinWizard` calls it directly.
 //
 // Every test below reaches step 3 by filling the REAL step-2 form (`StudentFormSheet`, all
 // five parts) through `userEvent`, exactly as the task brief asks: "drive it through the
@@ -12,32 +14,36 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { BillingClient, ChargeOut } from '../../billing/billingClient'
 import type { StandingOrderLink } from '../../billing/PaymentSetup'
-import type { HealthClient } from '../../health/healthClient'
+import { toWizardGroup, toWizardPlan } from './adapters'
 import { STEP1_COPY, STEP2_COPY, STEP3_COPY, STEP4_COPY, STUDENT_FORM_COPY } from './content'
 import { Step3Payment } from './Step3Payment'
-import type { SubmitJoinResult } from './submitJoin'
+import type { RegisterResult, SubmitJoinResult } from './submitJoin'
 import { emptyStudent } from './types'
 import type { WizardPlan } from './types'
-import { WizardJoinFlow } from './WizardJoinFlow'
+import type { WizardStep } from './WizardHeader'
+import { JoinWizard } from './JoinWizard'
+import type { JoinWizardSource, WizardCatalogue, WizardStudio } from './wizardSources'
 
 vi.mock('@studio/core', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@studio/core')>()
   return {
     ...actual,
-    apiFetch: vi.fn(),
     refresh: vi.fn(async () => null),
   }
 })
 
-const TOKEN = 'tok-e2e'
-
-const STUDIO_INFO = {
-  studio_name: 'מועדון בדיקה',
-  logo_url: null,
-  groups: [{ id: 'g1', name: 'קבוצת בוקר', weekdays: [0, 2] }],
+const STUDIO: WizardStudio = {
+  studioName: 'מועדון בדיקה',
+  logoUrl: null,
+  groups: [toWizardGroup({ id: 'g1', name: 'קבוצת בוקר', weekdays: [0, 2] })],
 }
 
-const PLAN = { id: 'plan-1', name: 'חודשי', sessionsPerWeek: 2, monthlyAmountAgorot: 30_000 }
+const PLAN: WizardPlan = toWizardPlan({
+  id: 'plan-1',
+  name: 'חודשי',
+  sessionsPerWeek: 2,
+  monthlyAmountAgorot: 30_000,
+})
 
 const HEALTH_SCHEMA = {
   sections: [
@@ -49,10 +55,29 @@ const HEALTH_SCHEMA = {
   ],
 }
 
-function healthClientStub(): HealthClient {
+const CATALOGUE: WizardCatalogue = {
+  plans: [PLAN],
+  schema: HEALTH_SCHEMA,
+  templateId: 'tmpl-1',
+}
+
+const DEFAULT_REGISTER_RESPONSE: RegisterResult = {
+  person_id: 'person-1',
+  student_ids: ['s1'],
+  child_student_ids: ['s1'],
+  charges_created: 1,
+}
+
+/** A fresh fake `JoinWizardSource` per test -- `loadStudio`/`loadCatalogue` answer the
+ *  fixtures above and `register` answers `DEFAULT_REGISTER_RESPONSE` unless a test
+ *  overrides it (to reject, or to answer something else). */
+function fakeSource(overrides: Partial<JoinWizardSource> = {}): JoinWizardSource {
   return {
-    template: vi.fn(async () => ({ id: 'tmpl-1', version: 1, schema: HEALTH_SCHEMA })),
-  } as unknown as HealthClient
+    loadStudio: vi.fn(async () => STUDIO),
+    loadCatalogue: vi.fn(async () => CATALOGUE),
+    register: vi.fn(async () => DEFAULT_REGISTER_RESPONSE),
+    ...overrides,
+  }
 }
 
 function charge(id: string, studentId: string, amount = 30_000): ChargeOut {
@@ -89,61 +114,35 @@ function billingClientStub(overrides: Partial<BillingClient> = {}): BillingClien
   } as unknown as BillingClient
 }
 
-const DEFAULT_REGISTER_RESPONSE = {
-  person_id: 'person-1',
-  student_ids: ['s1'],
-  child_student_ids: ['s1'],
-  charges_created: 1,
-}
-
-/** One handler covers the three GETs every render needs (studio, price-plans) plus the
- *  register POST -- everything else answers an empty list, which nothing in these tests
- *  reads. `registerStatus`/`registerResponse` let a test choose what the write answers
- *  without rewriting the whole handler. */
-function fetchHandler(options: { registerStatus?: number; registerResponse?: unknown } = {}) {
-  const { registerStatus = 201, registerResponse = DEFAULT_REGISTER_RESPONSE } = options
-  return vi.fn(async (input: string | URL, init?: RequestInit) => {
-    const url = String(input)
-    if (url.includes(`/api/v1/public/onboarding/${TOKEN}/price-plans`)) {
-      return new Response(JSON.stringify({ items: [PLAN] }), { status: 200 })
-    }
-    if (url.includes(`/api/v1/public/onboarding/${TOKEN}`)) {
-      return new Response(JSON.stringify(STUDIO_INFO), { status: 200 })
-    }
-    if (url.includes(`/api/v1/onboarding/${TOKEN}/register`) && init?.method === 'POST') {
-      return new Response(JSON.stringify(registerResponse), { status: registerStatus })
-    }
-    return new Response(JSON.stringify({ items: [] }), { status: 200 })
-  })
-}
-
 function renderWizard(
   options: {
     billingClient?: BillingClient
     standingOrderLinks?: () => Promise<readonly StandingOrderLink[]>
+    source?: JoinWizardSource
+    startAtStep?: WizardStep
+    prefillFirstRowName?: string
   } = {},
 ) {
   const billingClient = options.billingClient ?? billingClientStub()
   const standingOrderLinks = options.standingOrderLinks ?? vi.fn(async () => [])
+  const source = options.source ?? fakeSource()
   render(
-    <WizardJoinFlow
+    <JoinWizard
       billingClient={billingClient}
-      healthClient={healthClientStub()}
+      source={source}
       onEnterApp={vi.fn()}
       standingOrderLinks={standingOrderLinks}
-      token={TOKEN}
+      startAtStep={options.startAtStep}
+      prefillFirstRowName={options.prefillFirstRowName}
     />,
   )
-  return { billingClient, standingOrderLinks }
+  return { billingClient, standingOrderLinks, source }
 }
 
-/** Drives the real step-1 and step-2 forms for ONE minor child, leaving the wizard on
- *  step 3's decision sub-view. Every field is the minimum `validation.ts` requires. */
-async function addOneChildAndReachStep3(user: ReturnType<typeof userEvent.setup>) {
-  await screen.findByTestId('join-welcome')
-  await user.click(screen.getByLabelText(STEP1_COPY.agree))
-  await user.click(screen.getByRole('button', { name: STEP1_COPY.continue }))
-
+/** Fills the real step-2 form (`StudentFormSheet`, all five parts) for ONE minor child and
+ *  presses through to step 3's decision sub-view. Assumes step 2's family list is already
+ *  on screen. Every field is the minimum `validation.ts` requires. */
+async function fillOneChildAndContinue(user: ReturnType<typeof userEvent.setup>) {
   await screen.findByTestId('join-family-step')
   await user.click(screen.getByRole('button', { name: STEP2_COPY.addStudent }))
 
@@ -203,6 +202,15 @@ async function addOneChildAndReachStep3(user: ReturnType<typeof userEvent.setup>
   await user.click(screen.getByRole('button', { name: STEP2_COPY.continueToStep3 }))
 }
 
+/** Drives the real step-1 agreement, then `fillOneChildAndContinue`, leaving the wizard on
+ *  step 3's decision sub-view for a run that opened at step 1 (door B's default). */
+async function addOneChildAndReachStep3(user: ReturnType<typeof userEvent.setup>) {
+  await screen.findByTestId('join-welcome')
+  await user.click(screen.getByLabelText(STEP1_COPY.agree))
+  await user.click(screen.getByRole('button', { name: STEP1_COPY.continue }))
+  await fillOneChildAndContinue(user)
+}
+
 /** From step 3's decision sub-view, chooses "now" (the default), switches to the method
  *  sub-view, sets the one child's method, and presses the final button. */
 async function chooseMethodAndSubmit(user: ReturnType<typeof userEvent.setup>, method: string) {
@@ -244,54 +252,35 @@ afterEach(() => {
   localStorage.clear()
 })
 
-describe('WizardJoinFlow -- wiring submitJoin into the screens', () => {
+describe('JoinWizard -- wiring submitJoin into the screens', () => {
   it('writes nothing before the final button: reaching step 3 fires no register, createPromise or createOrder', async () => {
     const user = userEvent.setup()
-    const { apiFetch } = await import('@studio/core')
-    const fetchMock = fetchHandler()
-    vi.mocked(apiFetch).mockImplementation(fetchMock)
-    const { billingClient } = renderWizard()
+    const { billingClient, source } = renderWizard()
 
     await addOneChildAndReachStep3(user)
 
-    expect(
-      fetchMock.mock.calls.some(([url]) => String(url).includes(`/onboarding/${TOKEN}/register`)),
-    ).toBe(false)
+    expect(source.register).not.toHaveBeenCalled()
     expect(billingClient.createPromise).not.toHaveBeenCalled()
     expect(billingClient.createOrder).not.toHaveBeenCalled()
   }, 20000)
 
-  it('the button writes once: posts /onboarding/{token}/register exactly once, carrying the collected child', async () => {
+  it('the button writes once: calls source.register exactly once, carrying the collected child', async () => {
     const user = userEvent.setup()
-    const { apiFetch } = await import('@studio/core')
-    const fetchMock = fetchHandler()
-    vi.mocked(apiFetch).mockImplementation(fetchMock)
     const billingClient = billingClientStub({ openCharges: vi.fn(async () => [charge('ch1', 's1')]) })
-    renderWizard({ billingClient })
+    const { source } = renderWizard({ billingClient })
 
     await addOneChildAndReachStep3(user)
     await chooseMethodAndSubmit(user, STEP3_COPY.methodCash)
 
-    await waitFor(() => {
-      const registerCalls = fetchMock.mock.calls.filter(
-        ([url, init]) =>
-          String(url).includes(`/onboarding/${TOKEN}/register`) && init?.method === 'POST',
-      )
-      expect(registerCalls).toHaveLength(1)
-    })
-    const [, init] = fetchMock.mock.calls.find(
-      ([url, reqInit]) =>
-        String(url).includes(`/onboarding/${TOKEN}/register`) && reqInit?.method === 'POST',
-    )!
-    const body = JSON.parse(String(init?.body)) as { children: { first_name: string }[] }
-    expect(body.children).toHaveLength(1)
-    expect(body.children[0]?.first_name).toBe('נועה')
+    await waitFor(() => expect(source.register).toHaveBeenCalledTimes(1))
+    const registerMock = vi.mocked(source.register)
+    const [payload] = registerMock.mock.calls[0]!
+    expect(payload.children).toHaveLength(1)
+    expect(payload.children[0]?.first_name).toBe('נועה')
   }, 20000)
 
   it('the chosen method reaches the write: cash calls createPromise with that child\'s charge id and "cash", driven from the screen', async () => {
     const user = userEvent.setup()
-    const { apiFetch } = await import('@studio/core')
-    vi.mocked(apiFetch).mockImplementation(fetchHandler())
     const billingClient = billingClientStub({ openCharges: vi.fn(async () => [charge('ch1', 's1')]) })
     renderWizard({ billingClient })
 
@@ -305,10 +294,13 @@ describe('WizardJoinFlow -- wiring submitJoin into the screens', () => {
 
   it('a failed registration keeps the family on step 3 with the error visible, and step 4 never renders', async () => {
     const user = userEvent.setup()
-    const { apiFetch } = await import('@studio/core')
-    vi.mocked(apiFetch).mockImplementation(fetchHandler({ registerStatus: 500 }))
+    const source = fakeSource({
+      register: vi.fn(async () => {
+        throw new Error('500')
+      }),
+    })
     const billingClient = billingClientStub()
-    renderWizard({ billingClient })
+    renderWizard({ source, billingClient })
 
     await addOneChildAndReachStep3(user)
     await user.click(screen.getByRole('button', { name: STEP3_COPY.continueToPay }))
@@ -329,8 +321,6 @@ describe('WizardJoinFlow -- wiring submitJoin into the screens', () => {
 
   it('registration succeeds while the promise write fails: still reaches step 4, showing the child as not recorded rather than arranged', async () => {
     const user = userEvent.setup()
-    const { apiFetch } = await import('@studio/core')
-    vi.mocked(apiFetch).mockImplementation(fetchHandler())
     const billingClient = billingClientStub({
       openCharges: vi.fn(async () => [charge('ch1', 's1')]),
       createPromise: vi.fn(async () => {
@@ -349,8 +339,6 @@ describe('WizardJoinFlow -- wiring submitJoin into the screens', () => {
 
   it('F5: "already arranged" removes the card option entirely, and submitting reaches createPromise, never createOrder', async () => {
     const user = userEvent.setup()
-    const { apiFetch } = await import('@studio/core')
-    vi.mocked(apiFetch).mockImplementation(fetchHandler())
     const billingClient = billingClientStub({ openCharges: vi.fn(async () => [charge('ch1', 's1')]) })
     renderWizard({ billingClient })
 
@@ -372,6 +360,28 @@ describe('WizardJoinFlow -- wiring submitJoin into the screens', () => {
 
     await waitFor(() => expect(billingClient.createPromise).toHaveBeenCalled())
     expect(billingClient.createOrder).not.toHaveBeenCalled()
+  }, 20000)
+
+  // Task 3a: doors C and D open past the agreements screen when the family's consents are
+  // already current (`doorSteps.ts::startingStep`), and the register payload must say so
+  // (`AgreementService.accept_club_terms` treats a redundant `club_terms_accepted: true`
+  // as a duplicate, not a mistake) -- asserted through the seam `register` actually
+  // receives, not by reading `agreed` off component state.
+  it('startAtStep={2} opens on step 2 directly, and the register body it eventually posts carries club_terms_accepted: true', async () => {
+    const user = userEvent.setup()
+    const billingClient = billingClientStub({ openCharges: vi.fn(async () => [charge('ch1', 's1')]) })
+    const { source } = renderWizard({ billingClient, startAtStep: 2 })
+
+    await screen.findByTestId('join-family-step')
+    expect(screen.queryByTestId('join-welcome')).toBeNull()
+
+    await fillOneChildAndContinue(user)
+    await chooseMethodAndSubmit(user, STEP3_COPY.methodCash)
+
+    await waitFor(() => expect(source.register).toHaveBeenCalledTimes(1))
+    const registerMock = vi.mocked(source.register)
+    const [payload] = registerMock.mock.calls[0]!
+    expect(payload.club_terms_accepted).toBe(true)
   }, 20000)
 })
 

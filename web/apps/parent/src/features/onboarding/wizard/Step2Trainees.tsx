@@ -36,6 +36,10 @@ export type Step2TraineesProps = {
   groups: readonly WizardGroup[]
   plans: readonly WizardPlan[]
   healthSchema: TemplateSchema
+  /** Seeds the FIRST child this run adds -- door C's manager-supplied stub name. Applied
+   *  only while the list is empty and no saved draft is being resumed: it is a starting
+   *  point for the first row, never a value that reappears on the second child. */
+  firstStudentDefaults?: Partial<StudentDraft>
   onBack: () => void
   onContinue: () => void
 }
@@ -46,6 +50,7 @@ export function Step2Trainees({
   groups,
   plans,
   healthSchema,
+  firstStudentDefaults,
   onBack,
   onContinue,
 }: Step2TraineesProps) {
@@ -336,7 +341,13 @@ export function Step2Trainees({
                   address: students[0].address,
                   city: students[0].city,
                 }
-              : undefined
+              : // Door C's stub name (task 3a): a starting point for the FIRST row only --
+                // never while resuming a saved draft (`sheet.initial` is that draft's
+                // student, not `null`, when resuming), and it cannot collide with the
+                // branch above, which only applies once a first child already exists.
+                sheet.initial === null
+                ? firstStudentDefaults
+                : undefined
           }
           onSave={save}
           onClose={() => {

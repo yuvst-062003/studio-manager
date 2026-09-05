@@ -8,28 +8,29 @@
 //     plans, the first charge and every health declaration go in one POST.
 //   * **The sign-in wall is above this.** `JoinShell` reads the session once, so by the
 //     time this mounts the family is signed in.
-//   * The same endpoints: `/public/onboarding/{token}` for the studio and its groups,
-//     `/public/onboarding/{token}/price-plans` for the plans, `healthClient.template()`
-//     for the declaration, and `/onboarding/{token}/register` for the write.
-import { useCallback, useEffect, useState } from 'react'
-import { apiFetch, refresh } from '@studio/core'
+//
+// Task 3a moved this door's differences -- the token, the three endpoints, `healthClient`
+// -- out into an injected `JoinWizardSource` (`wizardSources.ts`), so this same shell can
+// serve doors B, C and D. What each door reads and writes now lives there; what the wizard
+// draws, validates, persists and submits stays exactly here, unchanged.
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { refresh } from '@studio/core'
 import type { BillingClient } from '../../billing/billingClient'
 import type { StandingOrderLink } from '../../billing/PaymentSetup'
-import type { HealthClient, TemplateSchema } from '../../health/healthClient'
-import type { PlanOption } from '../familyDraft'
+import type { TemplateSchema } from '../../health/healthClient'
 import { Step1Agreements } from './Step1Agreements'
 import { Step2Trainees } from './Step2Trainees'
 import { Step3Payment } from './Step3Payment'
 import { Step4Done } from './Step4Done'
 import { WizardHeader } from './WizardHeader'
 import type { WizardStep } from './WizardHeader'
-import { toRegisterPayload, toWizardGroup, toWizardPlan } from './adapters'
-import type { ApiGroup } from './adapters'
+import { toRegisterPayload } from './adapters'
 import { clearStudentDraft } from './draft'
 import { WIZARD_FLOW_COPY } from './content'
 import { submitJoin } from './submitJoin'
-import type { RegisterResult, SubmitJoinResult } from './submitJoin'
+import type { SubmitJoinResult } from './submitJoin'
 import type { PaymentMethod, StudentDraft, WizardGroup, WizardPlan } from './types'
+import type { JoinWizardSource } from './wizardSources'
 
 // **The studio gates the wizard; the catalogue gates step 2.**
 //
@@ -48,30 +49,45 @@ type CatalogueState =
   | { status: 'failed' }
   | { status: 'ready'; plans: WizardPlan[]; schema: TemplateSchema; templateId: string }
 
-export type WizardJoinFlowProps = {
-  /** The join token from `/join/{token}`. */
-  token: string
-  healthClient: HealthClient
+export type JoinWizardProps = {
+  /** What this door reads and writes. See `wizardSources.ts`. The effects below key on
+   *  this object's IDENTITY, not its contents, so a caller MUST hand this a stable
+   *  reference -- build it with `useMemo` at the call site, never inline. */
+  source: JoinWizardSource
   billingClient: BillingClient
   /** `GET /me/standing-order-links`. Read after the write -- the children it names do
    *  not exist before it. */
   standingOrderLinks: () => Promise<readonly StandingOrderLink[]>
+  /** Door C's "one row pre-filled": the manager's stub name, seeded into the FIRST child
+   *  the family adds and nowhere else. Undefined on every other door. */
+  prefillFirstRowName?: string
+  /** The step this run opens on. Doors C and D skip the agreements screen when the
+   *  family's consents are already current -- `doorSteps.ts::startingStep` decides it
+   *  from `GET /me/onboarding-status`. Door B always opens at 1. */
+  startAtStep?: WizardStep
   /** Where "enter the app" goes once the family is registered. */
   onEnterApp: () => void
 }
 
-export function WizardJoinFlow({
-  token,
-  healthClient,
+export function JoinWizard({
+  source,
   billingClient,
   standingOrderLinks,
+  prefillFirstRowName,
+  startAtStep,
   onEnterApp,
-}: WizardJoinFlowProps) {
+}: JoinWizardProps) {
   const copy = WIZARD_FLOW_COPY
   const [studio, setStudio] = useState<StudioState>({ status: 'loading' })
   const [catalogue, setCatalogue] = useState<CatalogueState>({ status: 'loading' })
-  const [step, setStep] = useState<WizardStep>(1)
-  const [agreed, setAgreed] = useState(false)
+  const [step, setStep] = useState<WizardStep>(startAtStep ?? 1)
+  // The agreements step was SKIPPED because the family HAS agreed -- that is the whole
+  // meaning of `startAtStep` being past 1 -- so the register payload must say so from the
+  // start, not only once a family that opened on step 1 ticks the box. Re-sending it is
+  // safe and deliberate: `AgreementService.accept_club_terms` returns `None` when the
+  // person already holds the current version, and its own docstring calls a re-signature
+  // reaching it a duplicate rather than a mistake.
+  const [agreed, setAgreed] = useState(() => (startAtStep ?? 1) > 1)
   const [students, setStudents] = useState<StudentDraft[]>([])
   const [methods, setMethods] = useState<Record<string, PaymentMethod>>({})
   //: Step 3's own "כן, התשלום כבר הוסדר מראש" choice, lifted here because `submitJoin`
@@ -79,26 +95,24 @@ export function WizardJoinFlow({
   const [alreadyArranged, setAlreadyArranged] = useState(false)
   const [submitResult, setSubmitResult] = useState<SubmitJoinResult | null>(null)
 
+  //: Door C's "one row pre-filled" (§3): the manager's stub name, split into the two
+  //: fields `StudentDraft` actually stores. `undefined` on every door but C, so
+  //: `Step2Trainees` seeds nothing extra for B/D.
+  const firstStudentDefaults = useMemo<Partial<StudentDraft> | undefined>(() => {
+    if (!prefillFirstRowName) return undefined
+    const [firstName = '', ...rest] = prefillFirstRowName.trim().split(' ')
+    return { firstName, lastName: rest.join(' ') }
+  }, [prefillFirstRowName])
+
   useEffect(() => {
     let live = true
 
     //: The club itself -- everything step 1 needs.
     void (async () => {
       try {
-        const response = await apiFetch(`/api/v1/public/onboarding/${token}`)
-        if (!response.ok) throw new Error(String(response.status))
-        const info = (await response.json()) as {
-          studio_name: string
-          logo_url: string | null
-          groups: ApiGroup[]
-        }
+        const info = await source.loadStudio()
         if (!live) return
-        setStudio({
-          status: 'ready',
-          studioName: info.studio_name,
-          logoUrl: info.logo_url ?? null,
-          groups: (info.groups ?? []).map(toWizardGroup),
-        })
+        setStudio({ status: 'ready', ...info })
       } catch {
         if (live) setStudio({ status: 'failed' })
       }
@@ -108,20 +122,9 @@ export function WizardJoinFlow({
     //: and its own failure, so it cannot take the agreements screen down with it.
     void (async () => {
       try {
-        const [plansResponse, template] = await Promise.all([
-          apiFetch(`/api/v1/public/onboarding/${token}/price-plans`),
-          healthClient.template(),
-        ])
-        if (!plansResponse.ok) throw new Error(String(plansResponse.status))
-        const body = (await plansResponse.json()) as { items?: PlanOption[] } | PlanOption[]
-        const planList = Array.isArray(body) ? body : (body.items ?? [])
+        const info = await source.loadCatalogue()
         if (!live) return
-        setCatalogue({
-          status: 'ready',
-          plans: planList.map(toWizardPlan),
-          schema: template.schema as unknown as TemplateSchema,
-          templateId: template.id,
-        })
+        setCatalogue({ status: 'ready', ...info })
       } catch {
         if (live) setCatalogue({ status: 'failed' })
       }
@@ -130,7 +133,7 @@ export function WizardJoinFlow({
     return () => {
       live = false
     }
-  }, [token, healthClient])
+  }, [source])
 
   //: Forward navigation from the header pills obeys the same gate the buttons do. The
   //: prototype's pills navigate unconditionally, which walks straight past step 1's
@@ -157,25 +160,14 @@ export function WizardJoinFlow({
     const templateId = catalogue.templateId
     const plans = catalogue.plans
 
-    const register = async (): Promise<RegisterResult> => {
-      const response = await apiFetch(`/api/v1/onboarding/${token}/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(
-          toRegisterPayload(students, { templateId, clubTermsAccepted: agreed }),
-        ),
-      })
-      if (!response.ok) throw new Error(String(response.status))
-      return (await response.json()) as RegisterResult
-    }
-
     const result = await submitJoin({
       students,
       plans,
       methods,
       alreadyArranged,
       deps: {
-        register,
+        register: () =>
+          source.register(toRegisterPayload(students, { templateId, clubTermsAccepted: agreed })),
         refreshSession: async () => {
           await refresh()
         },
@@ -255,6 +247,7 @@ export function WizardJoinFlow({
             groups={studio.groups}
             plans={catalogue.plans}
             healthSchema={catalogue.schema}
+            firstStudentDefaults={firstStudentDefaults}
             onBack={() => setStep(1)}
             onContinue={() => setStep(3)}
           />

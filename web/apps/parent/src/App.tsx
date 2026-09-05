@@ -45,7 +45,8 @@ import { matchJoinPath } from './features/onboarding/JoinFlow'
 // keeps its contract: the sign-in wall above it, nothing written until step 3's final
 // button, and the same four endpoints. `JoinFlow` itself is left in place until the
 // doors below (A, C, D) move across too.
-import { WizardJoinFlow } from './features/onboarding/wizard/WizardJoinFlow'
+import { JoinWizard } from './features/onboarding/wizard/JoinWizard'
+import { tokenSource } from './features/onboarding/wizard/wizardSources'
 import { SelfServeJoinFlow } from './features/onboarding/SelfServeJoinFlow'
 // §2 decision 3 -- "cleared ... on sign-out": a stale draft (children's national ids,
 // health answers) must not survive into whoever signs in on this device next.
@@ -235,6 +236,10 @@ function JoinShell({ token }: { token: string }) {
   const [wallInfo, setWallInfo] = useState<JoinWallInfo | null>(null)
   const healthClient = useMemo(() => makeHealthClient(apiFetch), [])
   const billingClient = useMemo(() => makeParentBillingClient(apiFetch), [])
+  // `JoinWizard`'s effects key on `source`'s IDENTITY (task 3a) -- built with `useMemo`
+  // keyed on `[token, healthClient]` so it stays the same object across a re-render, not
+  // a fresh one that would restart both loads.
+  const source = useMemo(() => tokenSource(token, healthClient), [token, healthClient])
   useDocumentLocale(locale)
 
   // §5.10's mandate links, read by `submitJoin` AFTER the write -- the children it names
@@ -315,14 +320,13 @@ function JoinShell({ token }: { token: string }) {
     <ThemeProvider>
       <AccessibilityMenu locale={locale} />
       <LanguagePicker locale={locale} onChoose={setLocale} />
-      <WizardJoinFlow
+      <JoinWizard
         billingClient={billingClient}
-        healthClient={healthClient}
+        source={source}
         onEnterApp={() => {
           globalThis.location.assign('/')
         }}
         standingOrderLinks={standingOrderLinks}
-        token={token}
       />
     </ThemeProvider>
   )

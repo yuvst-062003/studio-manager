@@ -59,7 +59,7 @@ export type Step3PaymentProps = {
   plans: readonly WizardPlan[]
   methods: Readonly<Record<string, PaymentMethod>>
   onMethodChange: (studentId: string, method: PaymentMethod) => void
-  /** Step 3's own "כן, התשלום כבר הוסדר מראש" choice, lifted so `WizardJoinFlow` can pass
+  /** Step 3's own "כן, התשלום כבר הוסדר מראש" choice, lifted so `JoinWizard` can pass
    *  it into `submitJoin` as `alreadyArranged`. Fired only when the family changes it. */
   onIntentChange?: (arranged: boolean) => void
   onBack: () => void
