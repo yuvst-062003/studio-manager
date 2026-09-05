@@ -27,12 +27,23 @@ export type SubjectHealthDraft = {
   signatureBase64: string | null
 }
 
-export function emptyHealthDraft(studentId: string): SubjectHealthDraft {
+/**
+ * `seedAnswers` (task 10 item 1) pre-fills a fresh draft with a value the caller already
+ * collected elsewhere on the SAME screen -- the trial door's own contact phone, standing
+ * in for `emergency_contact`, so the parent is not asked for it a second time. It is
+ * applied only when creating a brand-new draft (never onto one already in progress,
+ * which would overwrite an answer the parent already typed over it), and it is still an
+ * ordinary, editable answer afterwards -- nothing marks it read-only.
+ */
+export function emptyHealthDraft(
+  studentId: string,
+  seedAnswers?: Readonly<Record<string, AnswerValue>>,
+): SubjectHealthDraft {
   return {
     studentId,
     templateId: null,
     openingAnswer: null,
-    answers: {},
+    answers: seedAnswers ? { ...seedAnswers } : {},
     signatureBase64: null,
   }
 }

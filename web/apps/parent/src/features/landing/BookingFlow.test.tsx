@@ -284,6 +284,74 @@ describe('F21 -- the trial declaration carries the real answers, never a hardcod
   }, 20000)
 })
 
+describe('Item 1 -- the one-question health collapse reuses the phone already collected', () => {
+  it('answering "healthy" pre-fills the emergency phone from the contact block and submits every boolean as false against the template id', async () => {
+    stubFetch()
+    const user = userEvent.setup()
+    const client = makeClient()
+    render(
+      <BookingFlow client={client} groups={GROUPS} initialGroupId="g1" locale="he" slug="demo-club" />,
+    )
+    await acceptAgreements(user)
+    await screen.findByTestId('booking-students-step')
+
+    await user.type(screen.getByTestId('booking-contact-first-name'), 'רותי')
+    await user.type(screen.getByTestId('booking-contact-last-name'), 'מזרחי')
+    // The number this test asserts is NEVER typed again below -- it is the whole point.
+    await user.type(screen.getByTestId('booking-contact-phone'), '0501234567')
+    await user.type(screen.getByTestId('booking-contact-email'), 'ruti@example.invalid')
+
+    const panel = await screen.findByTestId(/^booking-row-panel-/)
+    await user.type(within(panel).getByTestId('booking-row-name-0'), 'דנה מזרחי')
+    await user.type(within(panel).getByTestId('booking-row-birthdate-0'), '2019-04-01')
+    await user.click(within(panel).getByTestId('booking-row-group-0-g1'))
+    await waitFor(() => expect(client.trialSlots).toHaveBeenCalled())
+
+    await user.click(screen.getByTestId('booking-to-health'))
+
+    await screen.findByTestId('health-opening-question')
+    await user.click(screen.getByTestId('health-opening-healthy'))
+
+    // Item 1: "use it rather than asking twice" -- already filled, not blank.
+    expect(screen.getByLabelText('טלפון חירום')).toHaveValue('0501234567')
+
+    signByDrawing()
+    await user.click(screen.getByRole('checkbox', { name: /אני מאשר/ }))
+    await user.click(screen.getByTestId('health-sign-continue'))
+
+    await waitFor(() => expect(client.book).toHaveBeenCalledTimes(1))
+    const body = (client.book as ReturnType<typeof vi.fn>).mock.calls[0]![0]
+    const declaration = body.trial_health_declarations[0]
+    expect(declaration.template_id).toBe('tmpl1')
+    // Every boolean question in the real template -- here just `asthma` -- recorded false,
+    // never invented as true and never left unanswered.
+    expect(declaration.answers.asthma).toBe(false)
+    expect(declaration.answers.emergency_contact).toBe('0501234567')
+    expect(declaration.signature_image_base64).toBeTruthy()
+  }, 20000)
+
+  it('answering "yes, something to report" still opens the full form (unchanged)', async () => {
+    stubFetch()
+    const user = userEvent.setup()
+    render(<BookingFlow client={makeClient()} groups={GROUPS} locale="he" slug="demo-club" />)
+    await acceptAgreements(user)
+    await screen.findByTestId('booking-students-step')
+    await user.type(screen.getByTestId('booking-contact-first-name'), 'רותי')
+    await user.type(screen.getByTestId('booking-contact-email'), 'ruti@example.invalid')
+    const panel = await screen.findByTestId(/^booking-row-panel-/)
+    await user.type(within(panel).getByTestId('booking-row-name-0'), 'דנה מזרחי')
+    await user.type(within(panel).getByTestId('booking-row-birthdate-0'), '2019-04-01')
+    await user.click(within(panel).getByTestId('booking-row-group-0-g1'))
+    await user.click(screen.getByTestId('booking-to-health'))
+
+    await screen.findByTestId('health-opening-question')
+    await user.click(screen.getByTestId('health-opening-reporting'))
+
+    // The full form: the boolean question is on screen to be answered, not pre-decided.
+    expect(screen.getByRole('radiogroup', { name: 'אסתמה' })).toBeInTheDocument()
+  })
+})
+
 describe('Door A -- the ordinary healthy-child path reaches confirmation', () => {
   it('books, through the real slot and the real health popup', async () => {
     stubFetch()

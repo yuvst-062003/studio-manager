@@ -139,6 +139,21 @@ describe('healthAnswersComplete', () => {
   })
 })
 
+// Task 10 item 1 -- `seedAnswers` lets a caller (Door A's `BookingFlow`) pre-fill a
+// brand-new draft with a value it already collected elsewhere on the same screen, so the
+// opening question does not ask for it a second time.
+describe('emptyHealthDraft seedAnswers', () => {
+  it('starts a fresh draft with the seeded answer already in place', () => {
+    const draft = emptyHealthDraft('st1', { emergency_contact: '0501234567' })
+    expect(draft.answers).toEqual({ emergency_contact: '0501234567' })
+  })
+
+  it('starts with an empty answers object when nothing is seeded, as before', () => {
+    const draft = emptyHealthDraft('st1')
+    expect(draft.answers).toEqual({})
+  })
+})
+
 describe('markAllHealthyDraft', () => {
   it('fills every blank boolean with false and leaves existing answers alone', () => {
     const draft = {

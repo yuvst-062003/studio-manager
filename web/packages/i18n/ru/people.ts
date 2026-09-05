@@ -125,7 +125,6 @@ export const people: Bundle = {
   'submitted.subtitle': 'Мы пришлём напоминание перед занятием',
   'submitted.whatNext': 'Что дальше?',
   'submitted.bringHint': 'Приходите за десять минут, в удобной одежде',
-  'submitted.installApp': 'Установить приложение',
   'submitted.done': 'Готово',
 
   'trial.one': 'Пробное занятие',
@@ -512,6 +511,7 @@ export const people: Bundle = {
   'joinWizard.step2.draftResume': 'Продолжить заполнение',
   'joinWizard.step2.draftDiscard': 'Удалить черновик',
   'joinWizard.step2.addStudent': '+ Зарегистрировать ещё одного ученика / ребёнка',
+  'joinWizard.step2.tryFirst': 'Хотите, чтобы ребёнок сначала попробовал? Записаться на пробное занятие',
   'joinWizard.step2.continueDraft': 'Продолжить заполнение анкеты ученика',
   'joinWizard.step2.back': 'Назад',
   'joinWizard.step2.continueToStep3': 'Далее к шагу 3: оплата и итоги',
@@ -609,6 +609,11 @@ export const people: Bundle = {
   'joinWizard.form.signAdult': 'Цифровая подпись совершеннолетнего ученика',
   'joinWizard.form.signHere': 'Распишитесь здесь мышью или пальцем',
   'joinWizard.form.clearSignature': 'Очистить подпись',
+  // Task 10 item 4 -- the duplicate-check warning (never a refusal).
+  'joinWizard.form.duplicateWarningTitle': 'Возможно, этот ученик уже зарегистрирован',
+  'joinWizard.form.duplicateWarningBody': 'Мы нашли ученика с похожим именем и датой рождения. Можно продолжить, если это другой ребёнок, или вернуться и проверить данные.',
+  'joinWizard.form.duplicateContinue': 'Всё равно продолжить',
+  'joinWizard.form.duplicateGoBack': 'Вернуться и проверить',
 
   // STEP3_COPY -> joinWizard.step3.*
   'joinWizard.step3.familyCount': 'учеников семьи зарегистрировано',

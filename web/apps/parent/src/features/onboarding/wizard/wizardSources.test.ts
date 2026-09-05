@@ -138,6 +138,57 @@ describe('tokenSource -- door B, lifted unchanged from WizardJoinFlow', () => {
     expect(studio.clubTermsVersion).toBe(3)
   })
 
+  // Task 10 item 3 -- `OnboardingInfoOut.slug` was already on this response; step 2's
+  // "try a trial lesson first" link is the first thing to read it back.
+  it('loadStudio maps slug onto WizardStudio.slug', async () => {
+    const { apiFetch } = await import('@studio/core')
+    const fetchMock = vi.fn(async (input: string | URL) => {
+      const url = String(input)
+      if (url.includes(`/api/v1/public/onboarding/${TOKEN}`)) {
+        return new Response(
+          JSON.stringify({
+            studio_name: 'מועדון בדיקה',
+            logo_url: null,
+            groups: [],
+            slug: 'club-tel-aviv',
+          }),
+          { status: 200 },
+        )
+      }
+      return new Response(JSON.stringify({ items: [] }), { status: 200 })
+    })
+    vi.mocked(apiFetch).mockImplementation(fetchMock)
+
+    const source = tokenSource(TOKEN, healthClientStub())
+    const studio = await source.loadStudio()
+
+    expect(studio.slug).toBe('club-tel-aviv')
+  })
+
+  it('loadStudio maps a missing slug to null rather than crashing (an older cached response or fixture)', async () => {
+    const { apiFetch } = await import('@studio/core')
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({ studio_name: 'מועדון בדיקה', logo_url: null, groups: [] }),
+          { status: 200 },
+        ),
+    )
+    vi.mocked(apiFetch).mockImplementation(fetchMock)
+
+    const source = tokenSource(TOKEN, healthClientStub())
+    const studio = await source.loadStudio()
+
+    expect(studio.slug).toBeNull()
+  })
+
+  // Item 4 -- door B has no session for a `/me/*` read, so `checkDuplicate` is not on
+  // this source at all (`undefined`), never a function that would throw if called.
+  it('has no checkDuplicate -- door B carries no /me/* session', () => {
+    const source = tokenSource(TOKEN, healthClientStub())
+    expect(source.checkDuplicate).toBeUndefined()
+  })
+
   it('register posts to /api/v1/onboarding/{token}/register and rejects on a non-ok response', async () => {
     const { apiFetch } = await import('@studio/core')
     const fetchMock = vi.fn(
@@ -376,5 +427,76 @@ describe('studioSource -- doors C and D, no token anywhere', () => {
     expect(catalogue.plans).toHaveLength(1)
     expect(catalogue.plans[0]?.pricePerMonthAgorot).toBe(40_000)
     expect(catalogue.plans[0]?.subtitle).toBe('3 אימונים בשבוע')
+  })
+
+  // Task 10 item 3 -- the same `slug` already read for the groups call, threaded through
+  // onto `WizardStudio.slug` instead of discarded once the groups URL is built.
+  it('loadStudio threads the slug it already reads for /me/studio onto WizardStudio.slug', async () => {
+    const { apiFetch } = await import('@studio/core')
+    const fetchMock = fetchMockFor()
+    vi.mocked(apiFetch).mockImplementation(fetchMock)
+
+    const source = studioSource(healthClientStub())
+    const studio = await source.loadStudio()
+
+    expect(studio.slug).toBe('demo-club')
+  })
+})
+
+// Task 10 item 4 -- the retired flow's duplicate warning, wired back in against the
+// endpoint that never left (`GET /me/students/duplicate-check`,
+// `app/routers/students.py`). Doors C/D only; `tokenSource`'s own "has no checkDuplicate"
+// coverage lives in that describe block above.
+describe('studioSource.checkDuplicate -- GET /me/students/duplicate-check (task 10 item 4)', () => {
+  function fetchMockFor(body: unknown, status = 200) {
+    return vi.fn(async (input: string | URL) => {
+      if (String(input).includes('/api/v1/me/students/duplicate-check')) {
+        return new Response(JSON.stringify(body), { status })
+      }
+      return new Response('{}', { status: 200 })
+    })
+  }
+
+  it('calls the endpoint with first_name, last_name and birthdate, and resolves true on a hit', async () => {
+    const { apiFetch } = await import('@studio/core')
+    const fetchMock = fetchMockFor({ duplicate: true })
+    vi.mocked(apiFetch).mockImplementation(fetchMock)
+
+    const source = studioSource(healthClientStub())
+    const result = await source.checkDuplicate!('נועה', 'כהן', '2016-04-01')
+
+    expect(result).toBe(true)
+    const [url] = fetchMock.mock.calls[0]!
+    expect(String(url)).toContain('/api/v1/me/students/duplicate-check?')
+    const params = new URL(String(url), 'http://x').searchParams
+    expect(params.get('first_name')).toBe('נועה')
+    expect(params.get('last_name')).toBe('כהן')
+    expect(params.get('birthdate')).toBe('2016-04-01')
+  })
+
+  it('resolves false on a miss -- silent, nothing to warn about', async () => {
+    const { apiFetch } = await import('@studio/core')
+    vi.mocked(apiFetch).mockImplementation(fetchMockFor({ duplicate: false }))
+
+    const source = studioSource(healthClientStub())
+    await expect(source.checkDuplicate!('נועה', 'כהן', '2016-04-01')).resolves.toBe(false)
+  })
+
+  it('resolves false (never rejects) on a non-OK response -- the endpoint being down must not block a registration', async () => {
+    const { apiFetch } = await import('@studio/core')
+    vi.mocked(apiFetch).mockImplementation(fetchMockFor({ detail: 'boom' }, 500))
+
+    const source = studioSource(healthClientStub())
+    await expect(source.checkDuplicate!('נועה', 'כהן', '2016-04-01')).resolves.toBe(false)
+  })
+
+  it('resolves false (never rejects) when the fetch itself throws', async () => {
+    const { apiFetch } = await import('@studio/core')
+    vi.mocked(apiFetch).mockImplementation(async () => {
+      throw new Error('network down')
+    })
+
+    const source = studioSource(healthClientStub())
+    await expect(source.checkDuplicate!('נועה', 'כהן', '2016-04-01')).resolves.toBe(false)
   })
 })

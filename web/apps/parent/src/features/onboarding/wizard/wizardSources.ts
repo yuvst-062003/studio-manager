@@ -19,6 +19,12 @@ export type WizardStudio = {
    *  (doors C/D) reads `/me/studio`, which carries no version at all, and inventing one
    *  would be worse than showing none. */
   clubTermsVersion: number | null
+  /** Task 10 item 3 -- the club's own slug, for step 2's "try a trial lesson first"
+   *  link (`/t/{slug}`). `tokenSource` (door B) already has it on the join-link read
+   *  (`OnboardingInfoOut.slug`); `studioSource` (doors C/D) already reads it off
+   *  `/me/studio` for its own groups call and now threads the same value through here
+   *  instead of discarding it. `null` only if a source genuinely has none to offer. */
+  slug: string | null
 }
 
 export type WizardCatalogue = {
@@ -64,6 +70,13 @@ export type JoinWizardSource = {
   loadCatalogue: () => Promise<WizardCatalogue>
   /** The one write. Rejects on failure. */
   register: (payload: RegisterPayload) => Promise<RegisterResult>
+  /** Task 10 item 4 -- `GET /me/students/duplicate-check`, re-wired into the new
+   *  wizard's student form save. `undefined` on door B (`tokenSource`): that caller has
+   *  no session for a `/me/*` read, since a token-only visitor belongs to no studio yet.
+   *  Doors C and D (`studioSource`) already have the session this needs. Never throws --
+   *  a failed check must not block a registration, so the caller reads a plain `boolean`
+   *  and a failure resolves `false` (silent) rather than rejecting. */
+  checkDuplicate?: (firstName: string, lastName: string, birthDate: string) => Promise<boolean>
 }
 
 /** Carries `detail.code` from a failed `register` -- either door's -- so a caller can
@@ -96,12 +109,17 @@ export function tokenSource(token: string, healthClient: HealthClient): JoinWiza
         //: Optional for the same reason `logo_url` is: an older cached response (or a
         //: test fixture) predating this field must read as "no version", not crash.
         club_terms_version?: number
+        //: `OnboardingInfoOut.slug` -- always present on the real endpoint; optional
+        //: here so an older cached response or a test fixture predating this field
+        //: reads as "no slug", not a crash.
+        slug?: string
       }
       return {
         studioName: info.studio_name,
         logoUrl: info.logo_url ?? null,
         groups: (info.groups ?? []).map(toWizardGroup),
         clubTermsVersion: info.club_terms_version ?? null,
+        slug: info.slug ?? null,
       }
     },
 
@@ -220,6 +238,10 @@ export function studioSource(healthClient: HealthClient): JoinWizardSource {
         // is unaffected either way, since the server stamps its own constant regardless
         // of what this screen displays.
         clubTermsVersion: null,
+        // Item 3 -- the same `slug` this call already read to build the groups URL,
+        // threaded through instead of discarded. Step 2 uses it for the "try a trial
+        // lesson first" link.
+        slug,
       }
     },
 
@@ -263,6 +285,27 @@ export function studioSource(healthClient: HealthClient): JoinWizardSource {
         throw new RegisterCodeError(code)
       }
       return (await response.json()) as RegisterResult
+    },
+
+    // Item 4 -- `GET /api/v1/me/students/duplicate-check` (`app/routers/students.py`).
+    // Doors C/D only: this caller already holds the `/me/*` session the read needs,
+    // unlike door B's `tokenSource`, which has none and never gets this method at all.
+    // **Never refuses, never throws.** A parent may genuinely have two children with
+    // similar names, and the club's own record may be the wrong one -- so this warns and
+    // nothing more. A non-OK response or a network failure answers `false` (silent)
+    // rather than rejecting: the endpoint being down must not stop a registration over a
+    // check that only ever warns.
+    async checkDuplicate(firstName, lastName, birthDate) {
+      try {
+        const params = new URLSearchParams({ first_name: firstName, last_name: lastName })
+        if (birthDate) params.set('birthdate', birthDate)
+        const response = await apiFetch(`/api/v1/me/students/duplicate-check?${params.toString()}`)
+        if (!response.ok) return false
+        const body = (await response.json()) as { duplicate: boolean }
+        return body.duplicate
+      } catch {
+        return false
+      }
     },
   }
 }

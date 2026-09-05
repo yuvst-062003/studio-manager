@@ -125,11 +125,12 @@ describe('BookingConfirmed — 13b', () => {
     )
   })
 
-  it('offers the install here, where the parent is most willing', () => {
-    // §6.5 — the install is part of onboarding. It belongs after the thing they wanted,
-    // not in front of the shop window.
+  it('offers no install prompt -- that moved into the day-after follow-up email (task 10 item 2)', () => {
+    // §6.5's prompt used to sit here; a stranger who has not yet had the lesson has no
+    // reason to install anything. An assertion inverted, not removed: the guarantee this
+    // screen makes now is the opposite one.
     render(<BookingConfirmed result={RESULT} locale="he" />)
-    expect(screen.getByTestId('booked-install')).toBeInTheDocument()
+    expect(screen.queryByTestId('booked-install')).toBeNull()
   })
 
   it('promises no place in the club and no payment', () => {

@@ -184,6 +184,7 @@ export function step2Copy(locale: Locale) {
     draftResume: t(locale, 'people.joinWizard.step2.draftResume'),
     draftDiscard: t(locale, 'people.joinWizard.step2.draftDiscard'),
     addStudent: t(locale, 'people.joinWizard.step2.addStudent'),
+    tryFirst: t(locale, 'people.joinWizard.step2.tryFirst'),
     continueDraft: t(locale, 'people.joinWizard.step2.continueDraft'),
     back: t(locale, 'people.joinWizard.step2.back'),
     continueToStep3: t(locale, 'people.joinWizard.step2.continueToStep3'),
@@ -284,6 +285,12 @@ export function studentFormCopy(locale: Locale) {
     signAdult: t(locale, 'people.joinWizard.form.signAdult'),
     signHere: t(locale, 'people.joinWizard.form.signHere'),
     clearSignature: t(locale, 'people.joinWizard.form.clearSignature'),
+    //: Task 10 item 4 -- the duplicate-check warning. Never a refusal: a parent may
+    //: genuinely have two children with similar names.
+    duplicateWarningTitle: t(locale, 'people.joinWizard.form.duplicateWarningTitle'),
+    duplicateWarningBody: t(locale, 'people.joinWizard.form.duplicateWarningBody'),
+    duplicateContinue: t(locale, 'people.joinWizard.form.duplicateContinue'),
+    duplicateGoBack: t(locale, 'people.joinWizard.form.duplicateGoBack'),
   } as const
 }
 

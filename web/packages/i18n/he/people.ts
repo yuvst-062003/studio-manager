@@ -160,7 +160,6 @@ export const people: Bundle = {
   'submitted.subtitle': 'נשלח אליכם תזכורת לפני השיעור',
   'submitted.whatNext': 'מה עכשיו?',
   'submitted.bringHint': 'הגיעו עשר דקות לפני, בבגדים נוחים',
-  'submitted.installApp': 'התקנת האפליקציה',
   'submitted.done': 'סיום',
 
   // -- trials (staff 11b) --------------------------------------------------------
@@ -587,6 +586,7 @@ export const people: Bundle = {
   'joinWizard.step2.draftResume': 'המשך מילוי',
   'joinWizard.step2.draftDiscard': 'מחק טיוטה',
   'joinWizard.step2.addStudent': '+ רישום תלמיד / ילד נוסף במשפחה',
+  'joinWizard.step2.tryFirst': 'רוצים שהילד/ה ינסה קודם? קביעת שיעור ניסיון',
   'joinWizard.step2.continueDraft': 'המשך עריכת טופס החניך',
   'joinWizard.step2.back': 'חזרה',
   'joinWizard.step2.continueToStep3': 'המשך לשלב 3: תשלום וסיכום',
@@ -684,6 +684,11 @@ export const people: Bundle = {
   'joinWizard.form.signAdult': 'חתימה דיגיטלית של המתאמן הבגיר',
   'joinWizard.form.signHere': 'חתמו כאן בעזרת העכבר או מגע באצבע',
   'joinWizard.form.clearSignature': 'נקה חתימה',
+  // Task 10 item 4 -- the duplicate-check warning (never a refusal).
+  'joinWizard.form.duplicateWarningTitle': 'ייתכן שהחניך/ה כבר רשומ/ה במועדון',
+  'joinWizard.form.duplicateWarningBody': 'מצאנו מתאמן/ת בשם ובתאריך לידה דומים. ניתן להמשיך אם מדובר בילד/ה אחר/ת, או לחזור ולבדוק את הפרטים.',
+  'joinWizard.form.duplicateContinue': 'להמשיך בכל זאת',
+  'joinWizard.form.duplicateGoBack': 'לחזור ולבדוק',
 
   // STEP3_COPY -> joinWizard.step3.*
   'joinWizard.step3.familyCount': 'מתאמנים רשומים למשפחה',

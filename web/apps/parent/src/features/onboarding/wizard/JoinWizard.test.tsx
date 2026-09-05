@@ -48,6 +48,7 @@ const STUDIO: WizardStudio = {
   logoUrl: null,
   groups: [toWizardGroup({ id: 'g1', name: 'קבוצת בוקר', weekdays: [0, 2] })],
   clubTermsVersion: null,
+  slug: 'demo-club',
 }
 
 const PLAN: WizardPlan = toWizardPlan({
@@ -609,6 +610,154 @@ describe('JoinWizard -- wiring submitJoin into the screens', () => {
     const registerMock = vi.mocked(source.register)
     const [payload] = registerMock.mock.calls[0]!
     expect(payload.club_terms_accepted).toBe(true)
+  }, 20000)
+})
+
+// Task 10 item 3 -- "add a child" offers a trial. The old add-a-child screen let a parent
+// book a trial instead of a membership; the redesigned wizard registers members only, so
+// this is the alternative for a family not ready to commit -- a quiet text link to the
+// club's own public booking page, never a second primary button.
+describe('Step2Trainees -- the "try a trial lesson first" link (task 10 item 3)', () => {
+  it('renders the link to /t/{slug} once the studio (and its slug) has loaded', async () => {
+    const user = userEvent.setup()
+    renderWizard()
+
+    await screen.findByTestId('join-welcome')
+    await user.click(screen.getByLabelText(STEP1_COPY.agree))
+    await user.click(screen.getByRole('button', { name: STEP1_COPY.continue }))
+
+    await screen.findByTestId('join-family-step')
+    const link = screen.getByTestId('step2-try-first-link')
+    expect(link).toHaveTextContent(STEP2_COPY.tryFirst)
+    expect(link).toHaveAttribute('href', '/t/demo-club')
+  })
+
+  it('renders no trial link when the source has no slug to offer', async () => {
+    const user = userEvent.setup()
+    const source = fakeSource({ loadStudio: vi.fn(async () => ({ ...STUDIO, slug: null })) })
+    renderWizard({ source })
+
+    await screen.findByTestId('join-welcome')
+    await user.click(screen.getByLabelText(STEP1_COPY.agree))
+    await user.click(screen.getByRole('button', { name: STEP1_COPY.continue }))
+
+    await screen.findByTestId('join-family-step')
+    expect(screen.queryByTestId('step2-try-first-link')).toBeNull()
+  })
+})
+
+// Task 10 item 4 -- the duplicate-name warning comes back. `checkDuplicate` is
+// `JoinWizardSource`'s own optional field (`undefined` on door B); wired into the student
+// form's save. It only ever WARNS -- a parent may genuinely have two children with
+// similar names, and a failed check must not block a registration.
+describe('StudentFormSheet -- the duplicate-check warning (task 10 item 4)', () => {
+  it('a duplicate-check hit warns on save and still lets the family continue', async () => {
+    const user = userEvent.setup()
+    const checkDuplicate = vi.fn(async () => true)
+    const source = fakeSource({ checkDuplicate })
+    const billingClient = billingClientStub({ openCharges: vi.fn(async () => [charge('ch1', 's1')]) })
+    renderWizard({ source, billingClient })
+
+    await screen.findByTestId('join-welcome')
+    await user.click(screen.getByLabelText(STEP1_COPY.agree))
+    await user.click(screen.getByRole('button', { name: STEP1_COPY.continue }))
+
+    // Drive the real step-2 form through to the final save button, one step short of the
+    // shared helper (which would click save itself) so this test controls that click.
+    await screen.findByTestId('join-family-step')
+    await user.click(screen.getByRole('button', { name: STEP2_COPY.addStudent }))
+    const dialog = screen.getByRole('dialog')
+    const field = (text: string) =>
+      within(dialog).getByLabelText(
+        new RegExp(`^${text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\*?$`),
+      )
+    const fill = (text: string, value: string) => user.type(field(text), value)
+
+    await fill(STUDENT_FORM_COPY.firstName, 'נועה')
+    await fill(STUDENT_FORM_COPY.lastName, 'כהן')
+    await fill(STUDENT_FORM_COPY.nationalId, '100000017')
+    await fill(STUDENT_FORM_COPY.birthDate, '2016-04-01')
+    await fill(STUDENT_FORM_COPY.address, 'הרצל 1')
+    await fill(STUDENT_FORM_COPY.city, 'תל אביב')
+    await user.selectOptions(field(STUDENT_FORM_COPY.grade), 'grade_3')
+    await fill(STUDENT_FORM_COPY.guardianFirstName, 'דנה')
+    await fill(STUDENT_FORM_COPY.guardianLastName, 'כהן')
+    await fill(STUDENT_FORM_COPY.guardianNationalId, '100000017')
+    await fill(STUDENT_FORM_COPY.guardianPhone, '0501234567')
+    await fill(STUDENT_FORM_COPY.guardianEmail, 'dana@example.com')
+    await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.next1 }))
+    await user.click(within(dialog).getByRole('radio'))
+    await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.next2 }))
+    await user.click(within(dialog).getByRole('radio'))
+    await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.next3 }))
+    await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.healthYes }))
+    await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.next4 }))
+    await fill(STUDENT_FORM_COPY.emergencyPhone, '0507654321')
+    await user.selectOptions(field(STUDENT_FORM_COPY.healthFund), 'clalit')
+    await user.click(
+      within(dialog).getByRole('checkbox', { name: new RegExp(STUDENT_FORM_COPY.attestCheckbox) }),
+    )
+    const canvas = dialog.querySelector('canvas')
+    if (!canvas) throw new Error('signature canvas not found')
+    fireEvent.pointerDown(canvas, { clientX: 100, clientY: 100, pointerId: 1 })
+    fireEvent.pointerMove(canvas, { clientX: 200, clientY: 100, pointerId: 1 })
+    fireEvent.pointerUp(canvas, { clientX: 200, clientY: 100, pointerId: 1 })
+
+    await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.save }))
+
+    // The check ran with what was just typed, and the sheet is still open, warning.
+    await waitFor(() => expect(checkDuplicate).toHaveBeenCalledWith('נועה', 'כהן', '2016-04-01'))
+    const warning = await within(dialog).findByTestId('duplicate-warning')
+    expect(warning).toHaveTextContent(STUDENT_FORM_COPY.duplicateWarningTitle)
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+
+    // "Continue anyway" saves without asking again.
+    await user.click(within(dialog).getByTestId('duplicate-continue'))
+    await screen.findByTestId('join-family-step')
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(checkDuplicate).toHaveBeenCalledTimes(1)
+
+    // The rest of the wizard is unaffected -- the family still reaches step 3 and submits.
+    await user.click(screen.getByRole('button', { name: STEP2_COPY.continueToStep3 }))
+    await chooseMethodAndSubmit(user, STEP3_COPY.methodCash)
+    await waitFor(() => expect(source.register).toHaveBeenCalledTimes(1))
+  }, 20000)
+
+  it('a miss is silent -- no warning, the sheet just closes', async () => {
+    const user = userEvent.setup()
+    const checkDuplicate = vi.fn(async () => false)
+    const source = fakeSource({ checkDuplicate })
+    renderWizard({ source })
+
+    await addOneChildAndReachStep3(user)
+
+    expect(checkDuplicate).toHaveBeenCalledTimes(1)
+    expect(screen.queryByTestId('duplicate-warning')).toBeNull()
+  }, 20000)
+
+  it('a failed check is silent rather than blocking -- the endpoint being down does not stop the registration', async () => {
+    const user = userEvent.setup()
+    const checkDuplicate = vi.fn(async () => {
+      throw new Error('502')
+    })
+    const source = fakeSource({ checkDuplicate })
+    renderWizard({ source })
+
+    // Reaching step 3 at all proves the rejected check never blocked the save.
+    await addOneChildAndReachStep3(user)
+
+    expect(checkDuplicate).toHaveBeenCalledTimes(1)
+    expect(screen.queryByTestId('duplicate-warning')).toBeNull()
+  }, 20000)
+
+  it("door B's fake source has no checkDuplicate -- the save skips the check entirely, never crashing on a missing function", async () => {
+    const user = userEvent.setup()
+    // `fakeSource()` with no override -- exactly door B's `tokenSource`, which carries no
+    // `checkDuplicate` at all (`wizardSources.ts`).
+    renderWizard()
+
+    await addOneChildAndReachStep3(user)
+    expect(screen.queryByTestId('duplicate-warning')).toBeNull()
   }, 20000)
 })
 

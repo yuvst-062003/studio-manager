@@ -42,6 +42,13 @@ export type Step2TraineesProps = {
    *  only while the list is empty and no saved draft is being resumed: it is a starting
    *  point for the first row, never a value that reappears on the second child. */
   firstStudentDefaults?: Partial<StudentDraft>
+  /** Task 10 item 3 -- the club's own slug, for the "try a trial lesson first" line
+   *  under the add-student button. `null` when the door has none to offer (rendered:
+   *  nothing) -- see `WizardStudio.slug`'s own doc for which doors have it. */
+  slug: string | null
+  /** Task 10 item 4 -- threaded straight through to the student form's save.
+   *  `undefined` on door B, which has no session for the `/me/*` read it needs. */
+  checkDuplicate?: (firstName: string, lastName: string, birthDate: string) => Promise<boolean>
   onBack: () => void
   onContinue: () => void
 }
@@ -54,6 +61,8 @@ export function Step2Trainees({
   plans,
   healthSchema,
   firstStudentDefaults,
+  slug,
+  checkDuplicate,
   onBack,
   onContinue,
 }: Step2TraineesProps) {
@@ -300,6 +309,19 @@ export function Step2Trainees({
           </span>
           <span className="text-[15px] font-bold">{copy.addStudent}</span>
         </button>
+
+        {/* Task 10 item 3 -- the alternative for a family that is not ready to commit to
+            a membership: a quiet text link, never a second primary button, to the same
+            public booking page a new family uses. Rendered only when a slug is known. */}
+        {slug ? (
+          <a
+            className="self-center text-[13px] font-medium text-[#0056c5] hover:underline -mt-1"
+            data-testid="step2-try-first-link"
+            href={`/t/${slug}`}
+          >
+            {copy.tryFirst}
+          </a>
+        ) : null}
       </div>
 
       <div className="fixed bottom-0 inset-x-0 z-30 bg-[#faf8ff]/95 backdrop-blur-md border-t border-[#dee2f4] shadow-[0_-4px_16px_rgba(15,23,42,0.06)] py-3 px-4">
@@ -334,6 +356,7 @@ export function Step2Trainees({
           groups={groups}
           plans={plans}
           healthSchema={healthSchema}
+          checkDuplicate={checkDuplicate}
           familyDefaults={
             students[0]
               ? {

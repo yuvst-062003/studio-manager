@@ -121,7 +121,6 @@ export const people: Bundle = {
   'submitted.subtitle': 'We’ll send you a reminder before the class',
   'submitted.whatNext': 'What now?',
   'submitted.bringHint': 'Arrive ten minutes early, in comfortable clothes',
-  'submitted.installApp': 'Install the app',
   'submitted.done': 'Done',
 
   'trial.one': 'Trial class',
@@ -510,6 +509,7 @@ export const people: Bundle = {
   'joinWizard.step2.draftResume': 'Resume',
   'joinWizard.step2.draftDiscard': 'Delete draft',
   'joinWizard.step2.addStudent': '+ Register another student / child',
+  'joinWizard.step2.tryFirst': 'Want your child to try it first? Book a trial lesson',
   'joinWizard.step2.continueDraft': 'Continue editing the student\'s form',
   'joinWizard.step2.back': 'Back',
   'joinWizard.step2.continueToStep3': 'Continue to step 3: payment and summary',
@@ -607,6 +607,11 @@ export const people: Bundle = {
   'joinWizard.form.signAdult': 'Digital signature of the adult student',
   'joinWizard.form.signHere': 'Sign here with your mouse or finger',
   'joinWizard.form.clearSignature': 'Clear signature',
+  // Task 10 item 4 -- the duplicate-check warning (never a refusal).
+  'joinWizard.form.duplicateWarningTitle': 'This student may already be registered',
+  'joinWizard.form.duplicateWarningBody': 'We found a student with a similar name and birth date. You can continue if this is a different child, or go back and check the details.',
+  'joinWizard.form.duplicateContinue': 'Continue anyway',
+  'joinWizard.form.duplicateGoBack': 'Go back and check',
 
   // STEP3_COPY -> joinWizard.step3.*
   'joinWizard.step3.familyCount': 'students registered for the family',

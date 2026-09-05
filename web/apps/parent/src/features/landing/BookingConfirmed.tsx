@@ -6,8 +6,10 @@
 // lesson, and a "complete your registration" button on this screen would offer something
 // nobody has granted. The next decision is the manager's (§5.4).
 //
-// §6.5 puts the install prompt here rather than in front of the landing page: this is the
-// moment a parent is most willing, having just booked something they care about.
+// **Task 10 item 2 -- no install prompt here any more.** A stranger who has not yet had
+// the lesson has no reason to install anything; §6.5's prompt moves into the follow-up
+// email that goes out the day after the lesson (built separately), the moment a family
+// that actually showed up is the one being asked.
 import type { CSSProperties } from 'react'
 import { Card, Icon } from '@studio/ui'
 import { formatDateInStudioZone, formatTimeInStudioZone } from '@studio/core'
@@ -160,11 +162,6 @@ export function BookingConfirmed({
         <p style={nextRowStyle} data-testid="booked-bring">
           <Icon name="attendance" size={18} />
           {t(locale, 'people.submitted.bringHint')}
-        </p>
-        {/* §6.5 — the install is part of onboarding, and this is the willing moment. */}
-        <p style={nextRowStyle} data-testid="booked-install">
-          <Icon name="home" size={18} />
-          {t(locale, 'people.submitted.installApp')}
         </p>
       </section>
 

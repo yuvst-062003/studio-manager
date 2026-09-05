@@ -47,6 +47,12 @@ export type StudentFormSheetProps = {
   healthSchema: TemplateSchema
   /** Applied to a NEW child only, so the family types it once (§5.6). */
   familyDefaults?: Partial<StudentDraft>
+  /** Task 10 item 4 -- `GET /me/students/duplicate-check`, called right before the
+   *  final save. `undefined` on door B (no `/me/*` session); doors C/D get the real
+   *  thing from `studioSource`. **Warns, never refuses** -- a parent may genuinely have
+   *  two children with similar names, and a failed check must not block a registration,
+   *  so a rejection here is treated exactly like `false`. */
+  checkDuplicate?: (firstName: string, lastName: string, birthDate: string) => Promise<boolean>
   onSave: (student: StudentDraft) => void
   onClose: () => void
 }
@@ -59,6 +65,7 @@ export function StudentFormSheet({
   plans,
   healthSchema,
   familyDefaults,
+  checkDuplicate,
   onSave,
   onClose,
 }: StudentFormSheetProps) {
@@ -73,6 +80,11 @@ export function StudentFormSheet({
   const [attempted, setAttempted] = useState<Partial<Record<FormPart, boolean>>>({})
   const [showWarning, setShowWarning] = useState(false)
   const [dirty, setDirty] = useState(false)
+  // Task 10 item 4 -- the duplicate-check warning, and whether the check is in flight.
+  // `duplicateWarning` gates re-checking: once shown, the "continue anyway" button saves
+  // directly rather than re-asking a question the parent already answered.
+  const [duplicateWarning, setDuplicateWarning] = useState(false)
+  const [checkingDuplicate, setCheckingDuplicate] = useState(false)
 
   const questionIds = useMemo(
     () =>
@@ -140,16 +152,39 @@ export function StudentFormSheet({
     setPart(target)
   }
 
-  const submit = () => {
+  const finalizeSave = () => {
+    if (!isEditing) clearStudentDraft()
+    onSave(student)
+    onClose()
+  }
+
+  const submit = async () => {
     for (const target of PARTS) {
       if (!validate(target)) {
         setPart(target)
         return
       }
     }
-    if (!isEditing) clearStudentDraft()
-    onSave(student)
-    onClose()
+    // Item 4 -- warn, never refuse. Skipped once the warning has already been shown and
+    // dismissed with "continue anyway" for THIS save, so pressing save again does not
+    // re-ask the same question a second time.
+    if (checkDuplicate && !duplicateWarning) {
+      setCheckingDuplicate(true)
+      let isDuplicate: boolean
+      try {
+        isDuplicate = await checkDuplicate(student.firstName, student.lastName, student.birthDate)
+      } catch {
+        // A failed check is silent rather than blocking -- the endpoint being down must
+        // not stop a registration.
+        isDuplicate = false
+      }
+      setCheckingDuplicate(false)
+      if (isDuplicate) {
+        setDuplicateWarning(true)
+        return
+      }
+    }
+    finalizeSave()
   }
 
   const meta = PART_META[part]
@@ -281,6 +316,40 @@ export function StudentFormSheet({
               </div>
             </div>
           ) : null}
+
+          {duplicateWarning ? (
+            <div
+              className="p-3 rounded-xl bg-amber-50 border-2 border-amber-400 flex flex-col gap-2.5 text-amber-900"
+              data-testid="duplicate-warning"
+              role="alert"
+            >
+              <div className="flex items-start gap-2.5">
+                <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
+                <div className="flex flex-col text-[12.5px]">
+                  <span className="font-bold">{STUDENT_FORM_COPY.duplicateWarningTitle}</span>
+                  <span className="text-amber-800">{STUDENT_FORM_COPY.duplicateWarningBody}</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 justify-end">
+                <button
+                  className="h-9 px-3 rounded-lg bg-white border border-amber-300 text-amber-900 text-[13px] font-semibold hover:bg-amber-100 transition-colors cursor-pointer"
+                  data-testid="duplicate-go-back"
+                  onClick={() => setDuplicateWarning(false)}
+                  type="button"
+                >
+                  {STUDENT_FORM_COPY.duplicateGoBack}
+                </button>
+                <button
+                  className="h-9 px-3 rounded-lg bg-amber-600 text-white text-[13px] font-semibold hover:bg-amber-700 transition-colors cursor-pointer"
+                  data-testid="duplicate-continue"
+                  onClick={finalizeSave}
+                  type="button"
+                >
+                  {STUDENT_FORM_COPY.duplicateContinue}
+                </button>
+              </div>
+            </div>
+          ) : null}
         </div>
 
         <div className="flex items-center gap-2 px-4 sm:px-5 py-3 bg-white border-t border-[#e9edff]">
@@ -307,8 +376,9 @@ export function StudentFormSheet({
           ) : (
             <button
               type="button"
-              onClick={submit}
-              className="flex-1 h-12 rounded-xl bg-[#0056c5] hover:bg-[#001849] text-white text-[15px] font-bold flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.99] cursor-pointer"
+              disabled={checkingDuplicate}
+              onClick={() => void submit()}
+              className="flex-1 h-12 rounded-xl bg-[#0056c5] hover:bg-[#001849] disabled:opacity-60 disabled:cursor-not-allowed text-white text-[15px] font-bold flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.99] cursor-pointer"
             >
               <CheckCircle2 className="w-5 h-5 shrink-0" />
               <span className="truncate">{STUDENT_FORM_COPY.save}</span>

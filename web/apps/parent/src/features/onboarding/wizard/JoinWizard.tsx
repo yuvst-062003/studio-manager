@@ -49,6 +49,8 @@ type StudioState =
       logoUrl: string | null
       groups: WizardGroup[]
       clubTermsVersion: number | null
+      /** Task 10 item 3 -- threaded down to step 2's "try a trial lesson first" link. */
+      slug: string | null
     }
 
 type CatalogueState =
@@ -262,6 +264,8 @@ export function JoinWizard({
             plans={catalogue.plans}
             healthSchema={catalogue.schema}
             firstStudentDefaults={firstStudentDefaults}
+            slug={studio.slug}
+            checkDuplicate={source.checkDuplicate}
             onBack={() => setStep(1)}
             onContinue={() => setStep(3)}
           />

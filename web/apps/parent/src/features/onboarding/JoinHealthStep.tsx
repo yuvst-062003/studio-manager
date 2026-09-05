@@ -260,6 +260,11 @@ export type JoinHealthStepProps = {
    *  existing call site's unchanged rail; Door A (`/t/<slug>`) passes its own 3-step
    *  list (no payment step). */
   steps?: readonly WizardStepKey[]
+  /** Task 10 item 1 -- seeds a brand-new student's draft (never one already in
+   *  `drafts`) with an answer the caller already collected on the same screen, so the
+   *  opening question does not ask for it twice. `undefined` on every call site but
+   *  Door A's `BookingFlow`, which passes its own contact phone as `emergency_contact`. */
+  seedAnswers?: Readonly<Record<string, AnswerValue>>
 }
 
 export function JoinHealthStep({
@@ -271,6 +276,7 @@ export function JoinHealthStep({
   signerName,
   students,
   steps,
+  seedAnswers,
 }: JoinHealthStepProps) {
   // Server truth (`needsFullDeclaration`) alone would loop forever under the deferred
   // model: a signed kid's `health_status` stays 'missing' until the final flush, which
@@ -329,7 +335,7 @@ export function JoinHealthStep({
 
         <SubjectHealthFlow
           client={client}
-          initialDraft={drafts[current.id] ?? emptyHealthDraft(current.id)}
+          initialDraft={drafts[current.id] ?? emptyHealthDraft(current.id, seedAnswers)}
           key={current.id}
           locale={locale}
           onSigned={onSigned}

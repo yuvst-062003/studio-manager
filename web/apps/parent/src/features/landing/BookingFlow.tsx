@@ -503,6 +503,11 @@ export function BookingFlow({
         locale={locale}
         onBack={() => setStep('family')}
         onSigned={handleHealthSigned}
+        // Item 1's "use it rather than asking twice": the parent's own phone, already
+        // typed into the contact block above, stands in for `emergency_contact` so the
+        // "no" path never asks for it a second time. Still an ordinary, editable field --
+        // a family that wants a DIFFERENT emergency number can still change it.
+        seedAnswers={{ emergency_contact: contact.phone.trim() }}
         signerName={`${contact.firstName} ${contact.lastName}`.trim() || undefined}
         steps={TRIAL_STEPS}
         students={students}
